@@ -107,7 +107,7 @@ impl HttpSink for HttpEventSink {
     fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let metric = event.into_metric();
 
-        match &metric.data.value {
+        match metric.value() {
             &MetricValue::Counter { .. } => Some(metric),
             &MetricValue::Gauge { .. } => Some(metric),
             not_supported => {
@@ -132,22 +132,16 @@ impl HttpSink for HttpEventSink {
             metric.name()
         );
 
-        let metric_labels = metric
-            .series
-            .tags
-            .unwrap_or_default()
-            .into_iter()
-            .collect::<std::collections::HashMap<_, _>>();
-        let end_time = metric.data.timestamp.unwrap_or_else(chrono::Utc::now);
+        let end_time = metric.timestamp().unwrap_or_else(chrono::Utc::now);
 
-        let (point_value, interval, metric_kind) = match metric.data.value {
+        let (point_value, interval, metric_kind) = match metric.value() {
             MetricValue::Counter { value } => {
                 let interval = gcp::GcpInterval {
                     start_time: Some(self.started),
                     end_time,
                 };
 
-                (value, interval, gcp::GcpMetricKind::Cumulative)
+                (*value, interval, gcp::GcpMetricKind::Cumulative)
             }
             MetricValue::Gauge { value } => {
                 let interval = gcp::GcpInterval {
@@ -155,10 +149,17 @@ impl HttpSink for HttpEventSink {
                     end_time,
                 };
 
-                (value, interval, gcp::GcpMetricKind::Gauge)
+                (*value, interval, gcp::GcpMetricKind::Gauge)
             }
             _ => unreachable!(),
         };
+
+        let metric_labels = metric
+            .series
+            .tags
+            .unwrap_or_default()
+            .into_iter()
+            .collect::<std::collections::HashMap<_, _>>();
 
         let series = gcp::GcpSeries {
             time_series: &[gcp::GcpSerie {

@@ -171,13 +171,13 @@ impl CloudWatchMetricsSvc {
             .into_iter()
             .filter_map(|event| {
                 let metric_name = event.name().to_string();
-                let timestamp = event.data.timestamp.map(timestamp_to_string);
+                let timestamp = event.timestamp().map(timestamp_to_string);
                 let dimensions = event.series.tags.clone().map(tags_to_dimensions);
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
-                match event.data.value {
+                match event.value() {
                     MetricValue::Counter { value } => Some(MetricDatum {
                         metric_name,
-                        value: Some(value),
+                        value: Some(*value),
                         timestamp,
                         dimensions,
                         ..Default::default()
@@ -202,7 +202,7 @@ impl CloudWatchMetricsSvc {
                     }),
                     MetricValue::Gauge { value } => Some(MetricDatum {
                         metric_name,
-                        value: Some(value),
+                        value: Some(*value),
                         timestamp,
                         dimensions,
                         ..Default::default()
@@ -218,7 +218,7 @@ struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
+        match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
         }

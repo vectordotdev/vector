@@ -8,6 +8,7 @@ use shared::EventDataEq;
 use std::convert::TryFrom;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    convert::AsRef,
     fmt::{self, Display, Formatter},
     sync::Arc,
 };
@@ -16,11 +17,26 @@ use std::{
 pub struct Metric {
     #[serde(flatten)]
     pub series: MetricSeries,
+
+    #[getset(get = "pub")]
     #[serde(flatten)]
-    pub data: MetricData,
+    pub(super) data: MetricData,
+
     #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip_serializing, default = "EventMetadata::default")]
     metadata: EventMetadata,
+}
+
+impl AsRef<MetricData> for Metric {
+    fn as_ref(&self) -> &MetricData {
+        &self.data
+    }
+}
+
+impl AsRef<MetricValue> for Metric {
+    fn as_ref(&self) -> &MetricValue {
+        &self.data.value
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
@@ -44,7 +60,9 @@ pub struct MetricName {
 pub struct MetricData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
+
     pub kind: MetricKind,
+
     #[serde(flatten)]
     pub value: MetricValue,
 }
@@ -260,16 +278,19 @@ impl Metric {
         }
     }
 
+    #[inline]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.series.name.name = name.into();
         self
     }
 
+    #[inline]
     pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
         self.series.name.namespace = namespace.map(Into::into);
         self
     }
 
+    #[inline]
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
         self.data.timestamp = timestamp;
         self
@@ -284,20 +305,24 @@ impl Metric {
         self
     }
 
+    #[inline]
     pub fn with_tags(mut self, tags: Option<MetricTags>) -> Self {
         self.series.tags = tags;
         self
     }
 
+    #[inline]
     pub fn with_value(mut self, value: MetricValue) -> Self {
         self.data.value = value;
         self
     }
 
+    #[inline]
     pub fn into_parts(self) -> (MetricSeries, MetricData, EventMetadata) {
         (self.series, self.data, self.metadata)
     }
 
+    #[inline]
     pub fn from_parts(series: MetricSeries, data: MetricData, metadata: EventMetadata) -> Self {
         Self {
             series,
@@ -366,20 +391,39 @@ impl Metric {
             })
     }
 
+    #[inline]
     pub fn name(&self) -> &str {
         &self.series.name.name
     }
 
+    #[inline]
     pub fn namespace(&self) -> Option<&str> {
         self.series.name.namespace.as_deref()
     }
 
+    #[inline]
     pub fn tags(&self) -> Option<&MetricTags> {
         self.series.tags.as_ref()
     }
 
+    #[inline]
     pub fn tags_mut(&mut self) -> &mut Option<MetricTags> {
         &mut self.series.tags
+    }
+
+    #[inline]
+    pub fn timestamp(&self) -> Option<DateTime<Utc>> {
+        self.data.timestamp
+    }
+
+    #[inline]
+    pub fn value(&self) -> &MetricValue {
+        &self.data.value
+    }
+
+    #[inline]
+    pub fn kind(&self) -> MetricKind {
+        self.data.kind
     }
 
     /// Returns `true` if `name` tag is present, and matches the provided `value`
@@ -406,13 +450,29 @@ impl Metric {
         self.series.tags.as_mut().and_then(|tags| tags.remove(name))
     }
 
-    /// Create a new metric from this with the data zeroed.
-    pub fn zero(&self) -> Self {
-        Self {
-            series: self.series.clone(),
-            data: self.data.zero(),
-            metadata: self.metadata.clone(),
-        }
+    /// Zero out the data in this metric
+    pub fn zero(&mut self) {
+        self.data.zero()
+    }
+
+    /// Add the data from the other metric to this one. The `other` must
+    /// be incremental and contain the same value type as this one.
+    #[must_use]
+    pub fn add(&mut self, other: impl AsRef<MetricData>) -> bool {
+        self.data.add(other.as_ref())
+    }
+
+    /// Update this `MetricData` by adding the value from another.
+    #[must_use]
+    pub fn update(&mut self, other: impl AsRef<MetricData>) -> bool {
+        self.data.update(other.as_ref())
+    }
+
+    /// Subtract the data from the other metric from this one. The
+    /// `other` must contain the same value type as this one.
+    #[must_use]
+    pub fn subtract(&mut self, other: impl AsRef<MetricData>) -> bool {
+        self.data.subtract(other.as_ref())
     }
 }
 
@@ -464,54 +524,57 @@ impl MetricData {
         other.kind == MetricKind::Incremental && self.update(other)
     }
 
-    /// Create a new metric data from this with a zero value.
-    pub fn zero(&self) -> Self {
-        Self {
-            timestamp: self.timestamp,
-            kind: self.kind,
-            value: self.value.zero(),
-        }
+    /// Subtract the data from the other metric from this one. The
+    /// `other` must contain the same value type as this one.
+    #[must_use]
+    pub fn subtract(&mut self, other: &Self) -> bool {
+        self.value.subtract(&other.value)
+    }
+
+    /// Zero out the data in this metric.
+    pub fn zero(&mut self) {
+        self.value.zero();
+    }
+}
+
+impl AsRef<MetricData> for MetricData {
+    fn as_ref(&self) -> &Self {
+        self
     }
 }
 
 impl MetricValue {
-    /// Create a new metric value with all the contained values set to
-    /// zero. This keeps all the bucket/value vectors for the histogram
-    /// and summary metric types intact while zeroing the
-    /// counts. Distribution metrics are emptied of all their values.
-    pub fn zero(&self) -> Self {
+    /// Zero out all the values contained in this. This keeps all the
+    /// bucket/value vectors for the histogram and summary metric types
+    /// intact while zeroing the counts. Distribution metrics are
+    /// emptied of all their values.
+    pub fn zero(&mut self) {
         match self {
-            Self::Counter { .. } => Self::Counter { value: 0.0 },
-            Self::Gauge { .. } => Self::Gauge { value: 0.0 },
-            Self::Set { .. } => Self::Set {
-                values: BTreeSet::default(),
-            },
-            Self::Distribution { samples, statistic } => Self::Distribution {
-                samples: Vec::with_capacity(samples.len()),
-                statistic: *statistic,
-            },
-            Self::AggregatedHistogram { buckets, .. } => Self::AggregatedHistogram {
-                buckets: buckets
-                    .iter()
-                    .map(|&Bucket { upper_limit, .. }| Bucket {
-                        upper_limit,
-                        count: 0,
-                    })
-                    .collect(),
-                count: 0,
-                sum: 0.0,
-            },
-            Self::AggregatedSummary { quantiles, .. } => Self::AggregatedSummary {
-                quantiles: quantiles
-                    .iter()
-                    .map(|&Quantile { upper_limit, .. }| Quantile {
-                        upper_limit,
-                        value: 0.0,
-                    })
-                    .collect(),
-                count: 0,
-                sum: 0.0,
-            },
+            Self::Counter { value } | Self::Gauge { value } => *value = 0.0,
+            Self::Set { values } => *values = BTreeSet::default(),
+            Self::Distribution { samples, .. } => samples.clear(),
+            Self::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                for bucket in buckets {
+                    bucket.count = 0;
+                }
+                *count = 0;
+                *sum = 0.0;
+            }
+            Self::AggregatedSummary {
+                quantiles,
+                sum,
+                count,
+            } => {
+                for quantile in quantiles {
+                    quantile.value = 0.0;
+                }
+                *count = 0;
+                *sum = 0.0;
+            }
         }
     }
 

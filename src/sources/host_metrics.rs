@@ -1145,13 +1145,13 @@ mod tests {
     fn all_counters(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.data.value, MetricValue::Counter { .. }))
+            .any(|metric| !matches!(metric.value(), &MetricValue::Counter { .. }))
     }
 
     fn all_gauges(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.data.value, MetricValue::Gauge { .. }))
+            .any(|metric| !matches!(metric.value(), &MetricValue::Gauge { .. }))
     }
 
     fn all_tags_match(metrics: &[Metric], tag: &str, matches: impl Fn(&str) -> bool) -> bool {

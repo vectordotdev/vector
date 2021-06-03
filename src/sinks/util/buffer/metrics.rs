@@ -147,7 +147,7 @@ impl MetricSet {
     /// Either pass the metric through as-is if absolute, or convert it
     /// to absolute if incremental.
     pub fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
-        match metric.data.kind {
+        match metric.kind() {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => Some(self.incremental_to_absolute(metric)),
         }
@@ -156,7 +156,7 @@ impl MetricSet {
     /// Either convert the metric to incremental if absolute, or
     /// aggregate it with any previous value if already incremental.
     pub fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
-        match metric.data.kind {
+        match metric.kind() {
             MetricKind::Absolute => self.absolute_to_incremental(metric),
             MetricKind::Incremental => Some(metric),
         }
@@ -168,20 +168,20 @@ impl MetricSet {
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
         match self.0.get_mut(&metric.series) {
             Some(existing) => {
-                if existing.0.value.add(&metric.data.value) {
-                    metric.data.value = existing.0.value.clone();
+                if existing.0.value.add(metric.value()) {
+                    metric = metric.with_value(existing.0.value.clone());
                 } else {
                     // Metric changed type, store this as the new reference value
                     self.0.insert(
                         metric.series.clone(),
-                        (metric.data.clone(), EventMetadata::default()),
+                        (metric.data().clone(), EventMetadata::default()),
                     );
                 }
             }
             None => {
                 self.0.insert(
                     metric.series.clone(),
-                    (metric.data.clone(), EventMetadata::default()),
+                    (metric.data().clone(), EventMetadata::default()),
                 );
             }
         }
@@ -193,9 +193,9 @@ impl MetricSet {
     fn absolute_to_incremental(&mut self, mut metric: Metric) -> Option<Metric> {
         match self.0.get_mut(&metric.series) {
             Some(reference) => {
-                let new_value = metric.data.value.clone();
+                let new_value = metric.value().clone();
                 // From the stored reference value, emit an increment
-                if metric.data.value.subtract(&reference.0.value) {
+                if metric.subtract(&reference.0) {
                     reference.0.value = new_value;
                     Some(metric.into_incremental())
                 } else {
@@ -218,7 +218,7 @@ impl MetricSet {
     }
 
     fn insert_update(&mut self, metric: Metric) {
-        let update = match metric.data.kind {
+        let update = match metric.kind() {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => {
                 // Incremental metrics update existing entries, if present

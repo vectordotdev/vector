@@ -203,7 +203,7 @@ impl FunctionTransform for MockTransform {
                 v.push_str(&self.suffix);
                 log.insert(vector::config::log_schema().message_key(), Value::from(v));
             }
-            Event::Metric(metric) => match metric.data.value {
+            Event::Metric(metric) => match metric.value() {
                 MetricValue::Counter { ref mut value } => {
                     *value += self.increase;
                 }

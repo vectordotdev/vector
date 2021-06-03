@@ -190,8 +190,9 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
     let timestamp = match event {
         EventRef::Log(log) => log
             .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp),
-        EventRef::Metric(metric) => metric.data.timestamp.as_ref(),
+            .and_then(Value::as_timestamp)
+            .copied(),
+        EventRef::Metric(metric) => metric.timestamp(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()
