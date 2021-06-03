@@ -327,8 +327,6 @@ struct EventIterator<R: Read> {
     events: usize,
     /// Optional channel from headers
     channel: Option<Value>,
-    /// Optional remote address, extracted from X-Forwarded-For headers
-    remote_addr: Option<Value>,
     /// Default time
     time: Time,
     /// Remaining extracted default values
@@ -346,13 +344,16 @@ impl<R: Read> EventIterator<R> {
             data,
             events: 0,
             channel: channel.map(Value::from),
-            remote_addr: remote_addr.or(remote.map(|addr| addr.to_string())).map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
+                // Extract the host field with the given priority:
+                // 1. The host field is present in the event payload
+                // 2. The x-forwarded-for header is present in the incoming request
+                // 3. Use the `remote`: SocketAddr value provided by warp
                 DefaultExtractor::new_with(
                     "host",
                     log_schema().host_key(),
-                    remote.map(|addr| addr.to_string()).map(Value::from),
+                    remote_addr.or(remote.map(|addr| addr.to_string())).map(Value::from),
                 ),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
@@ -424,12 +425,6 @@ impl<R: Read> EventIterator<R> {
             log.insert(CHANNEL, guid);
         } else if let Some(guid) = self.channel.as_ref() {
             log.insert(CHANNEL, guid.clone());
-        }
-
-        // Add host field from X-Forwarded-For header, if present.
-        // If not, `splunk_remote_addr` will be the remote: SocketAddr received from warp instead.
-        if let Some(splunk_remote_addr) = self.remote_addr.as_ref() {
-            log.insert(log_schema().host_key(), splunk_remote_addr.clone());
         }
 
         // Process fields field
