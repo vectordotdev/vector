@@ -11,7 +11,7 @@ tags: ["type: announcement", "domain: performance"]
 ---
 
 Since version 0.2.0, Vector has used [jemalloc](\(urls.jemalloc)) as its memory allocator on *nix-based OSes. As part of
-some on-going performance work, we've made the decision to switch to the system allocator provided by the platform
+some ongoing performance work, we've made the decision to switch to the system allocator provided by the platform
 Vector is deployed on. This will be either the [GNU Allocator](\(urls.gnu_allocator)) for `glibc`-based builds (like
 Debian) or the [`musl` allocator](\(urls.musl_allocator)) for `musl`-based builds (like Alpine Linux).
 
