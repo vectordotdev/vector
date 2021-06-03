@@ -6,6 +6,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
+async-trait = { version = "0.1", default-features = false }
 async-graphql = { version = "=2.6.4", default-features = false, optional = true }
 atomig = { version = "0.2.0", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
