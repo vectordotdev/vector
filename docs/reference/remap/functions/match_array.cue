@@ -41,21 +41,21 @@ remap: functions: match_array: {
 		{
 			title: "Match all elements"
 			source: #"""
-					match(["foo", "foobar", "barfoo"], r'foo', all: true)
+					match_array(["foo", "foobar", "barfoo"], r'foo', all: true)
 				"""#
 			return: true
 		},
 		{
 			title: "No matches"
 			source: #"""
-					match(["bazqux", "xyz"], r'foo')
+					match_array(["bazqux", "xyz"], r'foo')
 				"""#
 			return: false
 		},
 		{
 			title: "Not all elements match"
 			source: #"""
-					match(["foo", "foobar", "baz"], r'foo', all: true)
+					match_array(["foo", "foobar", "baz"], r'foo', all: true)
 				"""#
 			return: false
 		},
