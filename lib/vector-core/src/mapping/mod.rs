@@ -150,20 +150,6 @@ impl Mapping {
     pub(self) fn new(assignments: Vec<Box<dyn Function>>) -> Self {
         Mapping { assignments }
     }
-
-    /// Execute the mapping with a given `Event`
-    ///
-    /// # Errors
-    ///
-    /// This function will fail if the underlying mapping could not be applied.
-    pub fn execute(&self, event: &mut Event) -> Result<()> {
-        for (i, assignment) in self.assignments.iter().enumerate() {
-            if let Err(err) = assignment.apply(event) {
-                return Err(format!("failed to apply mapping {}: {}", i, err));
-            }
-        }
-        Ok(())
-    }
 }
 
 //------------------------------------------------------------------------------

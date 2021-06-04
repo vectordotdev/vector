@@ -344,9 +344,9 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.9.17"
+version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40573171e8ee967a21def8b765ead77fd452bf51fbd32f92bebae1b65a97e9df"
+checksum = "baee5c52a335d4ced7f7f8913516a17f663ab7d707cda0b399e1920ef9459171"
 dependencies = [
  "blocking",
  "nats",
@@ -1318,6 +1318,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10c2722795460108a7872e1cd933a85d6ec38abc4baecad51028f702da28889f"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccaeedb56da03b09f598226e25e80088cb4cd25f316e6e4df7d695f0feeb1403"
+
+[[package]]
 name = "crc32fast"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2103,7 +2118,7 @@ dependencies = [
  "bstr",
  "bytes 1.0.1",
  "chrono",
- "crc",
+ "crc 2.0.0",
  "criterion",
  "dashmap",
  "flate2",
@@ -3016,6 +3031,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "infer"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea70330449622910e0edebab230734569516269fb32342fb0a8956340fa48c6c"
+
+[[package]]
 name = "inherent"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3204,14 +3225,17 @@ dependencies = [
 name = "k8s-e2e-tests"
 version = "0.1.0"
 dependencies = [
+ "env_logger 0.8.3",
  "futures 0.3.15",
  "indoc",
  "k8s-openapi",
  "k8s-test-framework",
+ "rand 0.8.3",
  "regex",
  "reqwest",
  "serde_json",
  "tokio",
+ "tracing 0.1.26",
 ]
 
 [[package]]
@@ -3236,6 +3260,7 @@ name = "k8s-test-framework"
 version = "0.1.0"
 dependencies = [
  "k8s-openapi",
+ "log",
  "once_cell",
  "serde_json",
  "tempfile",
@@ -3742,11 +3767,12 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
 name = "maxminddb"
-version = "0.17.2"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bf48ee3b3978a8c5e8cbdcf5a0a7de020b263144f55f1ed5779759d2dc02e62"
+checksum = "dee0495e82f8667d42e039ea47c3efe46e3326b33e98042d00d35424f048e4c8"
 dependencies = [
  "log",
+ "memchr",
  "serde",
 ]
 
@@ -4060,9 +4086,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.9.17"
+version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dddfc75930159fd0a7cc9910b88a6ef3396c910a40bab7a62c21e1329420ba88"
+checksum = "ffcf29146fe0d7954a0f35f299ea01a44589a984c94255441f10de9e3becd630"
 dependencies = [
  "base64 0.13.0",
  "base64-url",
@@ -4463,12 +4489,11 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "2.5.0"
+version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "809348965973b261c3e504c8d0434e465274f78c880e10039914f2c5dcf49461"
+checksum = "f100fcfb41e5385e0991f74981732049f9b896821542a219420491046baafdc2"
 dependencies = [
  "num-traits",
- "rand 0.8.3",
 ]
 
 [[package]]
@@ -5063,7 +5088,7 @@ dependencies = [
  "bit-vec 0.6.3",
  "bytes 1.0.1",
  "chrono",
- "crc",
+ "crc 1.8.1",
  "futures 0.3.15",
  "futures-io",
  "futures-timer",
@@ -6090,9 +6115,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.0"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76b5842e81eb9bbea19276a9dbbda22ac042532f390a67ab08b895617978abf3"
+checksum = "965645ad4a66d27024921aa1e2e47a76524a4cfd55e038b62104eca65c363230"
 dependencies = [
  "serde",
 ]
@@ -7772,7 +7797,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "vector"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "approx",
@@ -7822,6 +7847,7 @@ dependencies = [
  "hyper-openssl",
  "indexmap",
  "indoc",
+ "infer",
  "inventory",
  "itertools 0.10.0",
  "k8s-openapi",
@@ -7883,7 +7909,7 @@ dependencies = [
  "schannel",
  "seahash",
  "security-framework",
- "semver 1.0.0",
+ "semver 1.0.2",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -7978,6 +8004,7 @@ dependencies = [
  "criterion",
  "db-key",
  "derivative 2.2.0",
+ "dyn-clone",
  "futures 0.3.15",
  "getset",
  "indexmap",
@@ -8002,6 +8029,7 @@ dependencies = [
  "shared",
  "snafu",
  "tokio",
+ "tokio-stream",
  "tokio-test",
  "toml",
  "tracing 0.1.26",

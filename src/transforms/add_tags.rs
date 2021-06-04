@@ -100,7 +100,10 @@ impl FunctionTransform for AddTags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue},
+        transforms::test::transform_one,
+    };
     use shared::btreemap;
 
     #[test]
@@ -128,8 +131,7 @@ mod tests {
         .collect();
 
         let mut transform = AddTags::new(map, true);
-        let event = transform.transform_one(metric.into()).unwrap();
-
+        let event = transform_one(&mut transform, metric.into()).unwrap();
         assert_eq!(event, expected.into());
     }
 
@@ -148,9 +150,7 @@ mod tests {
             .collect();
 
         let mut transform = AddTags::new(map, false);
-
-        let event = transform.transform_one(metric.into()).unwrap();
-
+        let event = transform_one(&mut transform, metric.into()).unwrap();
         assert_eq!(event, expected.into());
     }
 }

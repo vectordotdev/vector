@@ -76,6 +76,7 @@ mod test {
     use crate::{
         conditions::{is_log::IsLogConfig, ConditionConfig},
         event::Event,
+        transforms::test::transform_one,
     };
 
     #[test]
@@ -90,7 +91,7 @@ mod test {
         };
         let event = Event::from("message");
         let metadata = event.metadata().clone();
-        let result = filter.transform_one(event).unwrap();
+        let result = transform_one(&mut filter, event).unwrap();
         assert_eq!(result.metadata(), &metadata);
     }
 }

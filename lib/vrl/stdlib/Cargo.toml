@@ -105,6 +105,7 @@ default = [
     "parse_query_string",
     "parse_regex",
     "parse_regex_all",
+    "parse_ruby_hash",
     "parse_syslog",
     "parse_timestamp",
     "parse_tokens",
@@ -204,6 +205,7 @@ parse_nginx_log = ["chrono", "regex"]
 parse_query_string = []
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]
+parse_ruby_hash = ["nom"]
 parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_tokens = ["shared/tokenize"]

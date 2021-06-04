@@ -1,11 +1,11 @@
 use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricValue},
     event::Event,
     internal_events::PrometheusServerRequestComplete,
     sinks::{
-        util::{statistic::validate_quantiles, MetricEntry, StreamSink},
+        util::{statistic::validate_quantiles, StreamSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -23,7 +23,10 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     convert::Infallible,
+    hash::{Hash, Hasher},
+    mem::discriminant,
     net::SocketAddr,
+    ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
 };
 use stream_cancel::{Trigger, Tripwire};
@@ -314,8 +317,11 @@ impl StreamSink for PrometheusExporter {
                 MetricKind::Incremental => {
                     let mut entry = MetricEntry(item.into_absolute());
                     if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&entry) {
-                        existing.data.update(&entry.data);
-                        entry = MetricEntry(existing);
+                        if existing.data.update(&entry.data) {
+                            entry = MetricEntry(existing);
+                        } else {
+                            warn!(message = "Metric changed type, dropping old value.", series = %entry.series);
+                        }
                     }
                     let is_set = matches!(entry.data.value, MetricValue::Set { .. });
                     metrics.map.insert(entry, is_set);
@@ -330,6 +336,90 @@ impl StreamSink for PrometheusExporter {
             self.acker.ack(1);
         }
         Ok(())
+    }
+}
+
+struct MetricEntry(Metric);
+
+impl Deref for MetricEntry {
+    type Target = Metric;
+    fn deref(&self) -> &Metric {
+        &self.0
+    }
+}
+
+impl DerefMut for MetricEntry {
+    fn deref_mut(&mut self) -> &mut Metric {
+        &mut self.0
+    }
+}
+
+impl Eq for MetricEntry {}
+
+impl Hash for MetricEntry {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let metric = &self.0;
+        metric.series.hash(state);
+        metric.data.kind.hash(state);
+        discriminant(&metric.data.value).hash(state);
+
+        match &metric.data.value {
+            MetricValue::AggregatedHistogram { buckets, .. } => {
+                for bucket in buckets {
+                    bucket.upper_limit.to_bits().hash(state);
+                }
+            }
+            MetricValue::AggregatedSummary { quantiles, .. } => {
+                for quantile in quantiles {
+                    quantile.upper_limit.to_bits().hash(state);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl PartialEq for MetricEntry {
+    fn eq(&self, other: &Self) -> bool {
+        // This differs from a straightforward implementation of `eq` by
+        // comparing only the "shape" bits (name, tags, and type) while
+        // allowing the contained values to be different.
+        self.series == other.series
+            && self.data.kind == other.data.kind
+            && discriminant(&self.data.value) == discriminant(&other.data.value)
+            && match (&self.data.value, &other.data.value) {
+                (
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets1, ..
+                    },
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets2, ..
+                    },
+                ) => {
+                    buckets1.len() == buckets2.len()
+                        && buckets1
+                            .iter()
+                            .zip(buckets2.iter())
+                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                }
+                (
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles1,
+                        ..
+                    },
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles2,
+                        ..
+                    },
+                ) => {
+                    quantiles1.len() == quantiles2.len()
+                        && quantiles1
+                            .iter()
+                            .zip(quantiles2.iter())
+                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                }
+                _ => true,
+            }
     }
 }
 

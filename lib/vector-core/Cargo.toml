@@ -6,13 +6,14 @@ edition = "2018"
 publish = false
 
 [dependencies]
-buffers = { path = "buffers", default-features = false }
 async-graphql = { version = "=2.6.4", default-features = false, optional = true }
 atomig = { version = "0.2.0", features = ["derive", "serde"] }
+buffers = { path = "buffers", default-features = false }
 bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
+dyn-clone = { version = "1.0.4", default-features = false }
 futures = { version = "0.3.15", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
 indexmap = { version = "1.6.2", default-features = false, features = ["serde"] }
@@ -34,6 +35,7 @@ serde_json = { version = "1.0.64", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
 tokio = { version = "1.5.0", default-features = false }
+tokio-stream = { version = "0.1", default-features = false, optional = true }
 toml = { version = "0.5.8", default-features = false }
 tracing = { version = "0.1.26", default-features = false }
 tracing-core = { version = "0.1.17", default-features = false }
@@ -54,7 +56,7 @@ tokio-test = "0.4.2"
 [features]
 default = []
 api = ["async-graphql"]
-lua = ["rlua"]
+lua = ["rlua", "tokio-stream"]
 vrl = ["vrl-core"]
 disk-buffer = ["buffers/disk-buffer"]
 

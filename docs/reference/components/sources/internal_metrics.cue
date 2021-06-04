@@ -412,8 +412,7 @@ components: sources: internal_metrics: {
 			description: """
 				The total number of events processed by this component.
 				This metric is deprecated in place of using
-				[`events_in_total`][docs.sources.internal_metrics.events_in_total] and
-				[`events_out_total`][docs.sources.internal_metrics.events_out_total] metrics.
+				`events_in_total` and `events_out_total` metrics.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
@@ -678,6 +677,12 @@ components: sources: internal_metrics: {
 		}
 		request_read_errors_total: {
 			description:       "The total number of request read errors for this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		request_automatic_decode_errors_total: {
+			description:       "The total number of request errors for this component when it attempted to automatically discover and handle the content-encoding of incoming request data."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags

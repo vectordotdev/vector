@@ -79,6 +79,7 @@ impl FunctionTransform for AnsiStripper {
 mod tests {
     use super::*;
     use crate::event::LogEvent;
+    use crate::transforms::test::transform_one;
 
     #[test]
     fn generate_config() {
@@ -95,8 +96,8 @@ mod tests {
                 let log = LogEvent::from($in);
                 let mut expected = log.clone();
                 expected.insert("message", "foo bar");
-                let event = transform.transform_one(log.into()).unwrap();
 
+                let event = transform_one(&mut transform, log.into()).unwrap();
                 assert_eq!(event.into_log(), expected);
             )+
         };
