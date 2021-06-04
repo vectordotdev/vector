@@ -622,7 +622,7 @@ bench_function! {
     some_match {
         args: func_args![
             value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
-            patterns: Regex::new(r"foo \d bar").unwrap(),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
         ],
         want: Ok(true),
     }
@@ -630,7 +630,7 @@ bench_function! {
     all_match {
         args: func_args![
             value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
-            patterns: Regex::new(r"foo \d bar").unwrap(),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
             all: value!(true)
         ],
         want: Ok(true),
@@ -639,7 +639,7 @@ bench_function! {
     not_all_match {
         args: func_args![
             value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo x bar"]),
-            patterns: Regex::new(r"foo \d bar").unwrap(),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
             all: value!(true)
         ],
         want: Ok(false),
