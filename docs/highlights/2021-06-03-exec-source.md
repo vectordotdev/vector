@@ -16,6 +16,6 @@ does not yet natively support such as querying data from a Postgres database via
 
 It is capable of either running a command on an interval or starting up a long-running command.
 
-See [the `exec` source documentation](\(urls.vector_exec_source)) for more details and examples.
+See [the `exec` source documentation][docs.sources.exec] for more details and examples.
 
 Thanks to [@moogstuart](https://github.com/moogstuart) for this contribution.
