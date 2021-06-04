@@ -267,6 +267,8 @@ prometheusSink:
     # Whether to add the `PodMonitor` resource or not.
     # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
     enabled: false
+    # Additional labels for PodMonitor
+    additionalLabels: {}
     # Additional relabelings to include in the `PodMonitor`.
     extraRelabelings: []
 

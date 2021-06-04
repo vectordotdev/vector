@@ -496,11 +496,6 @@ async fn healthcheck(
     config: CloudwatchLogsSinkConfig,
     client: CloudWatchLogsClient,
 ) -> crate::Result<()> {
-    if config.group_name.is_dynamic() {
-        info!("Cloudwatch group_name is dynamic; skipping healthcheck.");
-        return Ok(());
-    }
-
     let group_name = config.group_name.get_ref().to_owned();
     let expected_group_name = group_name.clone();
 
@@ -529,7 +524,17 @@ async fn healthcheck(
                     Err(HealthcheckError::GroupNameError.into())
                 }
             }
-            None => Err(HealthcheckError::NoLogGroup.into()),
+            None => {
+                if config.group_name.is_dynamic() {
+                    info!("Skipping healthcheck log group check: `group_name` is dynamic.");
+                    return Ok(());
+                } else if config.create_missing_group.unwrap_or(true) {
+                    info!("Skipping healthcheck log group check: `group_name` will be created if missing.");
+                    return Ok(());
+                } else {
+                    Err(HealthcheckError::NoLogGroup.into())
+                }
+            }
         },
         Err(source) => Err(HealthcheckError::DescribeLogGroupsFailed { source }.into()),
     }

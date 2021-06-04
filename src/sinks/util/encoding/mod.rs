@@ -219,7 +219,7 @@ mod tests {
 
     const TOML_EXCEPT_FIELD: &str = indoc! {r#"
         encoding.codec = "Snoot"
-        encoding.except_fields = ["a.b.c", "b", "c[0].y"]
+        encoding.except_fields = ["a.b.c", "b", "c[0].y", "d\\.z", "e"]
     "#};
     #[test]
     fn test_except() {
@@ -236,12 +236,17 @@ mod tests {
             log.insert("b[1].x", 1);
             log.insert("c[0].x", 1);
             log.insert("c[0].y", 1);
+            log.insert("d\\.z", 1);
+            log.insert("e.a", 1);
+            log.insert("e.b", 1);
         }
         config.encoding.apply_rules(&mut event);
         assert!(!event.as_mut_log().contains("a.b.c"));
         assert!(!event.as_mut_log().contains("b"));
         assert!(!event.as_mut_log().contains("b[1].x"));
         assert!(!event.as_mut_log().contains("c[0].y"));
+        assert!(!event.as_mut_log().contains("d\\.z"));
+        assert!(!event.as_mut_log().contains("e.a"));
 
         assert!(event.as_mut_log().contains("a.b.d"));
         assert!(event.as_mut_log().contains("c[0].x"));
@@ -249,7 +254,7 @@ mod tests {
 
     const TOML_ONLY_FIELD: &str = indoc! {r#"
         encoding.codec = "Snoot"
-        encoding.only_fields = ["a.b.c", "b", "c[0].y"]
+        encoding.only_fields = ["a.b.c", "b", "c[0].y", "g\\.z"]
     "#};
     #[test]
     fn test_only() {
@@ -270,17 +275,21 @@ mod tests {
             log.insert("d.z", 1);
             log.insert("e[0]", 1);
             log.insert("e[1]", 1);
+            log.insert("f\\.z", 1);
+            log.insert("g\\.z", 1);
         }
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
         assert!(event.as_mut_log().contains("b"));
         assert!(event.as_mut_log().contains("b[1].x"));
         assert!(event.as_mut_log().contains("c[0].y"));
+        assert!(event.as_mut_log().contains("g\\.z"));
 
         assert!(!event.as_mut_log().contains("a.b.d"));
         assert!(!event.as_mut_log().contains("c[0].x"));
         assert!(!event.as_mut_log().contains("d"));
         assert!(!event.as_mut_log().contains("e"));
+        assert!(!event.as_mut_log().contains("f\\.z"));
     }
 
     const TOML_TIMESTAMP_FORMAT: &str = indoc! {r#"

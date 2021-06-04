@@ -161,7 +161,7 @@ impl DatadogEndpoint {
     }
 
     fn from_metric(metric: &Metric) -> Self {
-        match metric.data.value {
+        match metric.value() {
             MetricValue::Distribution {
                 statistic: StatisticKind::Summary,
                 ..
@@ -212,12 +212,7 @@ impl SinkConfig for DatadogConfig {
         let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal datadog metric sink error.", %error))
             .with_flat_map(move |event: Event| {
-                stream::iter(normalizer.apply(event).map(|event| {
-                    let endpoint = DatadogEndpoint::from_metric(&event);
-                    Ok(EncodedEvent::new(PartitionInnerBuffer::new(
-                        event, endpoint,
-                    )))
-                }))
+                stream::iter(normalizer.apply(event).map(encode_metric))
             });
 
         Ok((VectorSink::Sink(Box::new(svc_sink)), healthcheck))
@@ -230,6 +225,20 @@ impl SinkConfig for DatadogConfig {
     fn sink_type(&self) -> &'static str {
         "datadog_metrics"
     }
+}
+
+fn encode_metric(
+    metric: Metric,
+) -> Result<EncodedEvent<PartitionInnerBuffer<Metric, DatadogEndpoint>>, ()> {
+    let endpoint = DatadogEndpoint::from_metric(&metric);
+    // TODO: Avoiding this clone requires rewriting MetricsBuffer to
+    // accept separated MetricSeries and MetricData values, which in
+    // turn requires rewriting all metrics sinks. See Issue #6045
+    let metadata = metric.metadata().clone();
+    Ok(EncodedEvent {
+        item: PartitionInnerBuffer::new(metric, endpoint),
+        metadata: Some(metadata),
+    })
 }
 
 impl DatadogSink {
@@ -366,7 +375,7 @@ struct DatadogMetricNormalize;
 
 impl MetricNormalize for DatadogMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
+        match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
         }
@@ -384,15 +393,15 @@ fn encode_events(
         .filter_map(|event| {
             let fullname =
                 encode_namespace(event.namespace().or(default_namespace), '.', event.name());
-            let ts = encode_timestamp(event.data.timestamp);
+            let ts = encode_timestamp(event.timestamp());
             let tags = event.tags().map(encode_tags);
             // DatadogMetricNormalize converts these to the right MetricKind
-            match event.data.value {
+            match event.value() {
                 MetricValue::Counter { value } => Some(vec![DatadogMetric {
                     metric: fullname,
                     r#type: DatadogMetricType::Count,
                     interval: Some(interval),
-                    points: vec![DatadogPoint(ts, value)],
+                    points: vec![DatadogPoint(ts, *value)],
                     tags,
                 }]),
                 MetricValue::Distribution {
@@ -463,7 +472,7 @@ fn encode_events(
                     metric: fullname,
                     r#type: DatadogMetricType::Gauge,
                     interval: None,
-                    points: vec![DatadogPoint(ts, value)],
+                    points: vec![DatadogPoint(ts, *value)],
                     tags,
                 }]),
                 _ => None,
@@ -486,10 +495,10 @@ fn encode_distribution_events(
         .filter_map(|event| {
             let fullname =
                 encode_namespace(event.namespace().or(default_namespace), '.', event.name());
-            let ts = encode_timestamp(event.data.timestamp);
+            let ts = encode_timestamp(event.timestamp());
             let tags = event.tags().map(encode_tags);
-            match event.data.kind {
-                MetricKind::Incremental => match event.data.value {
+            match event.kind() {
+                MetricKind::Incremental => match event.value() {
                     MetricValue::Distribution {
                         samples,
                         statistic: StatisticKind::Summary,

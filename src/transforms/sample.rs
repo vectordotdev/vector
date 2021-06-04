@@ -143,7 +143,7 @@ mod tests {
     use super::*;
     use crate::{
         conditions::check_fields::CheckFieldsPredicateArg, config::log_schema, event::Event,
-        test_util::random_lines,
+        test_util::random_lines, transforms::test::transform_one,
     };
     use approx::assert_relative_eq;
     use indexmap::IndexMap;
@@ -179,7 +179,11 @@ mod tests {
         );
         let total_passed = events
             .into_iter()
-            .filter_map(|event| sampler.transform_one(event))
+            .filter_map(|event| {
+                let mut buf = Vec::with_capacity(1);
+                sampler.transform(&mut buf, event);
+                buf.pop()
+            })
             .count();
         let ideal = 1.0f64 / 2.0f64;
         let actual = total_passed as f64 / num_events as f64;
@@ -193,7 +197,11 @@ mod tests {
         );
         let total_passed = events
             .into_iter()
-            .filter_map(|event| sampler.transform_one(event))
+            .filter_map(|event| {
+                let mut buf = Vec::with_capacity(1);
+                sampler.transform(&mut buf, event);
+                buf.pop()
+            })
             .count();
         let ideal = 1.0f64 / 25.0f64;
         let actual = total_passed as f64 / num_events as f64;
@@ -212,11 +220,19 @@ mod tests {
         let first_run = events
             .clone()
             .into_iter()
-            .filter_map(|event| sampler.transform_one(event))
+            .filter_map(|event| {
+                let mut buf = Vec::with_capacity(1);
+                sampler.transform(&mut buf, event);
+                buf.pop()
+            })
             .collect::<Vec<_>>();
         let second_run = events
             .into_iter()
-            .filter_map(|event| sampler.transform_one(event))
+            .filter_map(|event| {
+                let mut buf = Vec::with_capacity(1);
+                sampler.transform(&mut buf, event);
+                buf.pop()
+            })
             .collect::<Vec<_>>();
 
         assert_eq!(first_run, second_run);
@@ -231,8 +247,7 @@ mod tests {
             let iterations = 0..1000;
             let total_passed = iterations
                 .filter_map(|_| {
-                    sampler
-                        .transform_one(event.clone())
+                    transform_one(&mut sampler, event.clone())
                         .map(|result| assert_eq!(result, event))
                 })
                 .count();
@@ -252,8 +267,7 @@ mod tests {
             let iterations = 0..1000;
             let total_passed = iterations
                 .filter_map(|_| {
-                    sampler
-                        .transform_one(event.clone())
+                    transform_one(&mut sampler, event.clone())
                         .map(|result| assert_eq!(result, event))
                 })
                 .count();
@@ -273,7 +287,7 @@ mod tests {
                         .to_string_lossy()
                         .contains("na")
                 })
-                .find_map(|event| sampler.transform_one(event))
+                .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
             assert_eq!(passing.as_log()["sample_rate"], "10".into());
 
@@ -286,14 +300,14 @@ mod tests {
                         .to_string_lossy()
                         .contains("na")
                 })
-                .find_map(|event| sampler.transform_one(event))
+                .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
             assert_eq!(passing.as_log()["sample_rate"], "25".into());
 
             // If the event passed the regex check, don't include the sampling rate
             let mut sampler = Sample::new(25, key_field.clone(), Some(condition_contains("na")));
             let event = Event::from("nananana");
-            let passing = sampler.transform_one(event).unwrap();
+            let passing = transform_one(&mut sampler, event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
         }
     }

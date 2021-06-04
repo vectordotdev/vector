@@ -11,7 +11,7 @@ components: sources: vector: {
 
 	classes: {
 		commonly_used: false
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
@@ -63,6 +63,7 @@ components: sources: vector: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		address: {
 			description: "The TCP address to listen for connections on, or `systemd#N to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			required:    true

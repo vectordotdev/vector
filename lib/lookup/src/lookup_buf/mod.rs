@@ -157,11 +157,6 @@ impl LookupBuf {
         &self.segments
     }
 
-    /// Return the SegmentBuf set.
-    pub fn into_segments(self) -> VecDeque<SegmentBuf> {
-        self.segments
-    }
-
     /// Create the possible fields that can be followed by this lookup.
     /// Because of coalesced paths there can be a number of different combinations.
     /// There is the potential for this function to create a vast number of different

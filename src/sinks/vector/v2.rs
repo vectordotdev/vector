@@ -1,6 +1,5 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
-    event::Event,
     proto::vector as proto,
     sinks::util::{
         retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
@@ -24,6 +23,7 @@ use tonic::{
     IntoRequest,
 };
 use tower::ServiceBuilder;
+use vector_core::event::{self, Event, WithMetadata};
 
 type Client = proto::Client<Channel>;
 type Response = Result<tonic::Response<proto::EventResponse>, tonic::Status>;
@@ -220,11 +220,14 @@ impl tower::Service<Vec<proto::EventRequest>> for Client {
 }
 
 fn encode_event(event: Event) -> EncodedEvent<proto::EventRequest> {
-    let request = proto::EventRequest {
-        message: Some(event.into()),
-    };
+    let event: WithMetadata<event::proto::EventWrapper> = event.into();
 
-    EncodedEvent::new(request)
+    EncodedEvent {
+        item: proto::EventRequest {
+            message: Some(event.data),
+        },
+        metadata: Some(event.metadata),
+    }
 }
 
 impl EncodedLength for proto::EventRequest {
@@ -271,13 +274,14 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkContext,
-        sinks::util::test::build_test_server,
+        sinks::util::test::build_test_server_status,
         test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::Bytes;
     use futures::{channel::mpsc, StreamExt};
-    use http::request::Parts;
+    use http::{request::Parts, StatusCode};
     use hyper::Method;
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[test]
     fn generate_config() {
@@ -296,15 +300,53 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
-
-        let (input_lines, events) = random_lines_with_stream(8, num_lines, None);
-        let pump = sink.run(events);
-
+        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::OK);
         tokio::spawn(server);
 
-        pump.await.unwrap();
+        let (batch, _receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        sink.run(events).await.unwrap();
         drop(trigger);
+        // This check fails, ref https://github.com/timberio/vector/issues/7624
+        // assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
+            assert_eq!(
+                "application/grpc",
+                parts.headers.get("content-type").unwrap().to_str().unwrap()
+            );
+        })
+        .await;
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    #[ignore] // This test hangs, possibly an infinite retry loop
+    async fn acknowledges_error() {
+        let num_lines = 10;
+
+        let in_addr = next_addr();
+
+        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let cx = SinkContext::new_test();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+        tokio::spawn(server);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        sink.run(events).await.unwrap();
+        drop(trigger);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
 
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);

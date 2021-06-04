@@ -68,7 +68,7 @@ impl vrl_core::Target for VrlTarget {
                         ["tags"] => {
                             let value = value.try_object().map_err(|e| e.to_string())?;
                             for (field, value) in &value {
-                                metric.set_tag_value(
+                                metric.insert_tag(
                                     field.as_str().to_owned(),
                                     value
                                         .try_bytes_utf8_lossy()
@@ -80,7 +80,7 @@ impl vrl_core::Target for VrlTarget {
                         }
                         ["tags", field] => {
                             let value = value.try_bytes().map_err(|e| e.to_string())?;
-                            metric.set_tag_value(
+                            metric.insert_tag(
                                 (*field).to_owned(),
                                 String::from_utf8_lossy(&value).into_owned(),
                             );
@@ -231,7 +231,7 @@ impl vrl_core::Target for VrlTarget {
                                 vrl_core::Value::from_iter(iter)
                             }))
                         }
-                        ["tags", field] => return Ok(metric.delete_tag(field).map(Into::into)),
+                        ["tags", field] => return Ok(metric.remove_tag(field).map(Into::into)),
                         _ => {
                             return Err(MetricPathError::InvalidPath {
                                 path: &path.to_string(),
