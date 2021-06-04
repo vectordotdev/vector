@@ -1,0 +1,72 @@
+{{ if .Values.haproxy.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-haproxy
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+    app.kubernetes.io/component: load-balancer
+data:
+  haproxy.cfg: |
+    global
+      log stdout local0
+      maxconn 4096
+      stats socket /tmp/haproxy
+
+    defaults
+      log     global
+      option  dontlognull
+      retries 3
+      option  redispatch
+      timeout client 5s
+      timeout server 5s
+      timeout connect 5s
+
+    resolvers coredns
+      nameserver dns1 kube-dns.kube-system.svc.{{ .Values.global.clusterDomain }}:53
+      resolve_retries 3
+      timeout resolve 2s
+      timeout retry 1s
+      accepted_payload_size 8192
+      hold valid 10s
+      hold obsolete 60s
+
+    frontend datadog-logs
+      bind *:3837
+      mode http
+      option httplog
+      default_backend datadog-logs
+
+    backend datadog-logs
+      mode http
+      balance roundrobin
+      option tcp-check
+      server-template srv 5 _datadog-logs._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns check
+
+    frontend syslog
+      bind *:5140
+      default_backend syslog
+
+    backend syslog
+      balance roundrobin
+      option tcp-check
+      server-template srv 5 _syslog._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns check
+
+    frontend vector
+      bind *:9000 proto h2
+      mode http
+      option httplog
+      default_backend vector
+
+    backend vector
+      mode http
+      balance roundrobin
+      option tcp-check
+      server-template srv 5 _vector._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns proto h2 check
+
+    frontend stats
+      mode http
+      bind *:1024
+      http-request use-service prometheus-exporter if { path /metrics }
+{{- end }}

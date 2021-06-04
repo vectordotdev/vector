@@ -2,6 +2,8 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+global:
+  clusterDomain: "cluster.local"
 # Additional labels to add to all resources
 # commonLabels:
 #   app.kubernetes.io/component: aggregator
@@ -311,6 +313,5 @@ sinks:
   #   rawConfig: |
   #     option = "value"
 
-loadBalancer:
+haproxy:
   enabled: true
-  clusterDomain: "cluster.local"

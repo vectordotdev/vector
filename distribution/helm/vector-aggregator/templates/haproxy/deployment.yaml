@@ -1,0 +1,34 @@
+{{ if .Values.haproxy.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vector-haproxy
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+    app.kubernetes.io/component: load-balancer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "libvector.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: load-balancer
+  template:
+    metadata:
+      labels:
+        {{- include "libvector.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: load-balancer
+    spec:
+      serviceAccountName: vector-haproxy
+      containers:
+      - name: haproxy
+        image: haproxy:2.4.0-alpine
+        volumeMounts:
+        - name: config
+          mountPath: /usr/local/etc/haproxy/
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: vector-haproxy
+{{- end }}
