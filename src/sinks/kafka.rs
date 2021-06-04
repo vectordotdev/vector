@@ -292,8 +292,9 @@ impl Sink<Event> for KafkaSink {
         let timestamp_ms = match &item {
             Event::Log(log) => log
                 .get(log_schema().timestamp_key())
-                .and_then(|v| v.as_timestamp()),
-            Event::Metric(metric) => metric.data.timestamp.as_ref(),
+                .and_then(|v| v.as_timestamp())
+                .copied(),
+            Event::Metric(metric) => metric.timestamp(),
         }
         .map(|ts| ts.timestamp_millis());
         let (key, body) = encode_event(item, &self.key_field, &self.encoding);

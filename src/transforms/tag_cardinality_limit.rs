@@ -217,40 +217,38 @@ impl TagCardinalityLimit {
     }
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
-        match event.as_mut_metric().tags_mut() {
-            Some(tags_map) => {
-                match self.config.limit_exceeded_action {
-                    LimitExceededAction::DropEvent => {
-                        for (key, value) in tags_map {
-                            if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                                emit!(TagCardinalityLimitRejectingEvent {
-                                    tag_key: &key,
-                                    tag_value: &value,
-                                });
-                                return None;
-                            }
-                        }
-                    }
-                    LimitExceededAction::DropTag => {
-                        let mut to_delete = Vec::new();
-                        for (key, value) in tags_map.iter() {
-                            if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                                emit!(TagCardinalityLimitRejectingTag {
-                                    tag_key: &key,
-                                    tag_value: &value,
-                                });
-                                to_delete.push(key.clone());
-                            }
-                        }
-                        for key in to_delete {
-                            tags_map.remove(&key);
+        let metric = event.as_mut_metric();
+        if let Some(tags_map) = metric.tags() {
+            match self.config.limit_exceeded_action {
+                LimitExceededAction::DropEvent => {
+                    for (key, value) in tags_map {
+                        if !self.try_accept_tag(key, Cow::Borrowed(value)) {
+                            emit!(TagCardinalityLimitRejectingEvent {
+                                tag_key: &key,
+                                tag_value: &value,
+                            });
+                            return None;
                         }
                     }
                 }
-                Some(event)
+                LimitExceededAction::DropTag => {
+                    let mut to_delete = Vec::new();
+                    for (key, value) in tags_map {
+                        if !self.try_accept_tag(key, Cow::Borrowed(value)) {
+                            emit!(TagCardinalityLimitRejectingTag {
+                                tag_key: &key,
+                                tag_value: &value,
+                            });
+                            to_delete.push(key.clone());
+                        }
+                    }
+                    for key in to_delete {
+                        metric.remove_tag(&key);
+                    }
+                }
             }
-            None => Some(event),
         }
+        Some(event)
     }
 }
 

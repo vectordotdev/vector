@@ -10,12 +10,12 @@ impl EventsOutTotal {
     }
 
     pub fn get_timestamp(&self) -> Option<DateTime<Utc>> {
-        self.0.data.timestamp
+        self.0.timestamp()
     }
 
     pub fn get_events_out_total(&self) -> f64 {
-        match self.0.data.value {
-            MetricValue::Counter { value } => value,
+        match self.0.value() {
+            MetricValue::Counter { value } => *value,
             _ => 0.00,
         }
     }

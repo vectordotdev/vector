@@ -359,7 +359,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         match metrics.iter().find(|m| m.name() == "up") {
             Some(m) => {
-                assert_eq!(m.data.value, MetricValue::Gauge { value: 1.0 });
+                assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 });
 
                 match m.tags() {
                     Some(tags) => {
@@ -422,7 +422,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         //
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
         match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => assert_eq!(m.data.value, MetricValue::Gauge { value: 1.0 }),
+            Some(m) => assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 }),
             None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
@@ -453,7 +453,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .collect::<Vec<_>>();
 
         match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => assert_eq!(m.data.value, MetricValue::Gauge { value: 0.0 }),
+            Some(m) => assert_eq!(m.value(), &MetricValue::Gauge { value: 0.0 }),
             None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }

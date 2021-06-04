@@ -152,9 +152,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter(normalizer.apply(event).map(|mut metric| {
                     let namespace = metric
-                        .series
-                        .name
-                        .namespace
+                        .take_namespace()
                         .take()
                         .unwrap_or_else(|| default_namespace.clone());
                     Ok(EncodedEvent::new(PartitionInnerBuffer::new(
@@ -171,13 +169,13 @@ impl CloudWatchMetricsSvc {
             .into_iter()
             .filter_map(|event| {
                 let metric_name = event.name().to_string();
-                let timestamp = event.data.timestamp.map(timestamp_to_string);
-                let dimensions = event.series.tags.clone().map(tags_to_dimensions);
+                let timestamp = event.timestamp().map(timestamp_to_string);
+                let dimensions = event.tags().map(tags_to_dimensions);
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
-                match event.data.value {
+                match event.value() {
                     MetricValue::Counter { value } => Some(MetricDatum {
                         metric_name,
-                        value: Some(value),
+                        value: Some(*value),
                         timestamp,
                         dimensions,
                         ..Default::default()
@@ -202,7 +200,7 @@ impl CloudWatchMetricsSvc {
                     }),
                     MetricValue::Gauge { value } => Some(MetricDatum {
                         metric_name,
-                        value: Some(value),
+                        value: Some(*value),
                         timestamp,
                         dimensions,
                         ..Default::default()
@@ -218,7 +216,7 @@ struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
+        match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
         }
@@ -271,7 +269,7 @@ fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
+fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
     tags.iter()
         .take(10)

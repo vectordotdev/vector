@@ -37,13 +37,13 @@ pub(super) trait MetricCollector {
     ) {
         let name = encode_namespace(metric.namespace().or(default_namespace), '_', metric.name());
         let name = &name;
-        let timestamp = metric.data.timestamp.map(|t| t.timestamp_millis());
+        let timestamp = metric.timestamp().map(|t| t.timestamp_millis());
 
-        if metric.data.kind == MetricKind::Absolute {
+        if metric.kind() == MetricKind::Absolute {
             let tags = metric.tags();
-            self.emit_metadata(metric.name(), &name, &metric.data.value);
+            self.emit_metadata(metric.name(), &name, metric.value());
 
-            match &metric.data.value {
+            match metric.value() {
                 MetricValue::Counter { value } => {
                     self.emit_value(timestamp, &name, "", *value, tags, None);
                 }
