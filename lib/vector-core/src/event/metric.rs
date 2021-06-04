@@ -413,11 +413,6 @@ impl Metric {
     }
 
     #[inline]
-    pub fn tags_mut(&mut self) -> &mut Option<MetricTags> {
-        &mut self.series.tags
-    }
-
-    #[inline]
     pub fn timestamp(&self) -> Option<DateTime<Utc>> {
         self.data.timestamp
     }
