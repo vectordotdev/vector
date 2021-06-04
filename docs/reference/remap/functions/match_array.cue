@@ -3,7 +3,7 @@ package metadata
 remap: functions: match_array: {
 	category: "Enumerate"
 	description: """
-		Determines whether the `value` array matches the `pattern`.
+		Determines whether at least one element in the `value` array matches the `pattern`.
 		"""
 
 	arguments: [
@@ -20,12 +20,12 @@ remap: functions: match_array: {
 			type: ["regex"]
 		},
 		{
-			name: "all",
-			description: "Whether to match on all elements of `value`",
-			required: false,
-			default: false,
-			type: ["boolean"],
-		}
+			name:        "all"
+			description: "Whether to match on all elements of `value`"
+			required:    false
+			default:     false
+			type: ["boolean"]
+		},
 	]
 	internal_failure_reasons: []
 	return: types: ["boolean"]
@@ -34,29 +34,29 @@ remap: functions: match_array: {
 		{
 			title: "Match at least one element"
 			source: #"""
-				match_array(["foobar", "bazqux"], r'foo')
-			"""#
+					match_array(["foobar", "bazqux"], r'foo')
+				"""#
 			return: true
 		},
 		{
 			title: "Match all elements"
 			source: #"""
-				match(["foo", "foobar", "barfoo"], r'foo', all:true)
-			"""#
+					match(["foo", "foobar", "barfoo"], r'foo', all:true)
+				"""#
 			return: true
 		},
 		{
 			title: "No matches"
 			source: #"""
-				match(["bazqux", "xyz"], r'foo')
-			"""#
+					match(["bazqux", "xyz"], r'foo')
+				"""#
 			return: false
 		},
 		{
 			title: "Not all elements match"
 			source: #"""
-				match(["foo", "foobar", "baz"], r'foo', all:true)
-			"""#
+					match(["foo", "foobar", "baz"], r'foo', all:true)
+				"""#
 			return: false
 		},
 	]
