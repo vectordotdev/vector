@@ -21,7 +21,7 @@ remap: functions: match_array: {
 		},
 		{
 			name:        "all"
-			description: "Whether to match on all elements of `value`"
+			description: "Whether to match on all elements of `value`."
 			required:    false
 			default:     false
 			type: ["boolean"]
@@ -41,7 +41,7 @@ remap: functions: match_array: {
 		{
 			title: "Match all elements"
 			source: #"""
-					match(["foo", "foobar", "barfoo"], r'foo', all:true)
+					match(["foo", "foobar", "barfoo"], r'foo', all: true)
 				"""#
 			return: true
 		},
@@ -55,7 +55,7 @@ remap: functions: match_array: {
 		{
 			title: "Not all elements match"
 			source: #"""
-					match(["foo", "foobar", "baz"], r'foo', all:true)
+					match(["foo", "foobar", "baz"], r'foo', all: true)
 				"""#
 			return: false
 		},
