@@ -69,6 +69,7 @@ criterion_group!(
               parse_query_string,
               parse_regex,
               parse_regex_all,
+              parse_ruby_hash,
               parse_syslog,
               parse_timestamp,
               parse_tokens,
@@ -1074,6 +1075,23 @@ bench_function! {
                     "1": "peaches",
                     "2": "peas"
                 }]))
+    }
+}
+
+bench_function! {
+    parse_ruby_hash => vrl_stdlib::ParseRubyHash;
+
+    matches {
+        args: func_args![
+            value: r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
+        ],
+        want: Ok(value!({
+            test: "value",
+            testNum: 0.2,
+            testObj: {
+                testBool: true,
+            }
+        }))
     }
 }
 
