@@ -11,9 +11,6 @@ use tracing::{debug, info};
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
 const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
-    kubernetesLogsSource:
-      rawConfig: |
-        glob_minimum_cooldown_ms = 5000
     sinks:
       stdout:
         type: "console"
