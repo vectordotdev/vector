@@ -32,7 +32,8 @@ lazy_static! {
         semver::VersionReq::parse("~2").unwrap();
 }
 
-#[derive(Derivative, Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Derivative, Clone, Debug, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
     pub(super) queue_url: String,
