@@ -72,7 +72,7 @@ team: [#Member, ...#Member] & [
 		_github:  "fanatid"
 		_keybase: "fanatid"
 		bio: """
-			Kirill was is an engineer at Timber.io.
+			Kirill was an engineer at Timber.io.
 			"""
 		active: false
 	},
@@ -84,10 +84,8 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Lee Benson"
-		_github:  "leebenson"
-		_keybase: "leebenson"
-		_twitter: "leebenson"
+		name:    "Lee Benson"
+		_github: "leebenson"
 		bio: """
 			Lee is a senior engineer at Datadog (formerly part of Timber.io).
 			"""
