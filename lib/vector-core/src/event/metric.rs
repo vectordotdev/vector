@@ -7,7 +7,7 @@ use shared::EventDataEq;
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{btree_map, BTreeMap, BTreeSet},
     convert::AsRef,
     fmt::{self, Display, Formatter},
     sync::Arc,
@@ -457,6 +457,13 @@ impl Metric {
         self.series.insert_tag(name, value)
     }
 
+    /// Get the tag entry for the named key. *Note:* This will create
+    /// the tags map if it is not present, even if nothing is later
+    /// inserted.
+    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
+        self.series.tag_entry(key)
+    }
+
     /// Zero out the data in this metric
     pub fn zero(&mut self) {
         self.data.zero()
@@ -512,6 +519,13 @@ impl MetricSeries {
                 result
             }
         }
+    }
+
+    /// Get the tag entry for the named key. *Note:* This will create
+    /// the tags map if it is not present, even if nothing is later
+    /// inserted.
+    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
+        self.tags.get_or_insert_with(Default::default).entry(key)
     }
 }
 
