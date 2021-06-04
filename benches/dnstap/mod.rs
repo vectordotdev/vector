@@ -18,9 +18,7 @@ fn benchmark_query_parsing(c: &mut Criterion) {
     group.bench_function("dns_query_parsing", |b| {
         b.iter_batched(
             || dnstap_data.clone(),
-            |dnstap_data| {
-                parser.parse_dnstap_data(Bytes::from(dnstap_data)).unwrap();
-            },
+            |dnstap_data| parser.parse_dnstap_data(Bytes::from(dnstap_data)).unwrap(),
             BatchSize::SmallInput,
         )
     });
@@ -43,9 +41,7 @@ fn benchmark_update_parsing(c: &mut Criterion) {
     group.bench_function("dns_update_parsing", |b| {
         b.iter_batched(
             || dnstap_data.clone(),
-            |dnstap_data| {
-                parser.parse_dnstap_data(Bytes::from(dnstap_data)).unwrap();
-            },
+            |dnstap_data| parser.parse_dnstap_data(Bytes::from(dnstap_data)).unwrap(),
             BatchSize::SmallInput,
         )
     });

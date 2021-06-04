@@ -15,9 +15,7 @@ fn benchmark_parse_as_query_message(c: &mut Criterion) {
     group.bench_function("parse_as_query_message", |b| {
         b.iter_batched(
             || DnsMessageParser::new(raw_query_message.clone()),
-            |mut parser| {
-                parser.parse_as_query_message().unwrap();
-            },
+            |mut parser| parser.parse_as_query_message().unwrap(),
             BatchSize::SmallInput,
         )
     });
@@ -34,9 +32,7 @@ fn benchmark_parse_as_update_message(c: &mut Criterion) {
     group.bench_function("parse_as_update_message", |b| {
         b.iter_batched(
             || DnsMessageParser::new(raw_update_message.clone()),
-            |mut parser| {
-                parser.parse_as_update_message().unwrap();
-            },
+            |mut parser| parser.parse_as_update_message().unwrap(),
             BatchSize::SmallInput,
         )
     });
@@ -81,9 +77,7 @@ fn benchmark_parse_rdata(c: &mut Criterion, data: &str, code: u16, id: &str) {
                     DnsMessageParser::new(Vec::<u8>::new()),
                 )
             },
-            |(record_rdata, mut parser)| {
-                parser.format_unknown_rdata(code, &record_rdata).unwrap();
-            },
+            |(record_rdata, mut parser)| parser.format_unknown_rdata(code, &record_rdata).unwrap(),
             BatchSize::SmallInput,
         )
     });
