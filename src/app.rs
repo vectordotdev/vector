@@ -7,7 +7,7 @@ use crate::{
 };
 use cfg_if::cfg_if;
 use futures::StreamExt;
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 use tokio::{
     runtime::{self, Runtime},
     sync::mpsc,
@@ -32,7 +32,7 @@ use crate::internal_events::{
 };
 
 pub struct ApplicationConfig {
-    pub config_paths: Vec<(PathBuf, config::FormatHint)>,
+    pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -142,7 +142,7 @@ impl Application {
 
                 if watch_config {
                     // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(config_paths.iter().map(|(path, _)| path), None)
+                    config::watcher::spawn_thread(config_paths.iter().map(Into::into), None)
                         .map_err(|error| {
                             error!(message = "Unable to start config watcher.", %error);
                             exitcode::CONFIG
