@@ -440,6 +440,9 @@ impl Metric {
         self.series.insert_tag(key, value)
     }
 
+    /// Remove the tag entry for the named key, if it exists, and return
+    /// the old value. *Note:* This will drop the tags map if the tag
+    /// was the last entry in it.
     pub fn remove_tag(&mut self, key: &str) -> Option<String> {
         self.series.remove_tag(key)
     }
@@ -461,11 +464,6 @@ impl Metric {
         self.tags_mut()
             .get_or_insert_with(MetricTags::new)
             .insert(name, value);
-    }
-
-    /// Deletes the tag, if it exists, returns the old tag value.
-    pub fn delete_tag(&mut self, name: &str) -> Option<String> {
-        self.series.tags.as_mut().and_then(|tags| tags.remove(name))
     }
 
     /// Zero out the data in this metric
@@ -511,6 +509,9 @@ impl MetricSeries {
         (self.tags.get_or_insert_with(Default::default)).insert(key.into(), value.into())
     }
 
+    /// Remove the tag entry for the named key, if it exists, and return
+    /// the old value. *Note:* This will drop the tags map if the tag
+    /// was the last entry in it.
     pub fn remove_tag(&mut self, key: &str) -> Option<String> {
         match &mut self.tags {
             None => None,

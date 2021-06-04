@@ -231,7 +231,7 @@ impl vrl_core::Target for VrlTarget {
                                 vrl_core::Value::from_iter(iter)
                             }))
                         }
-                        ["tags", field] => return Ok(metric.delete_tag(field).map(Into::into)),
+                        ["tags", field] => return Ok(metric.remove_tag(field).map(Into::into)),
                         _ => {
                             return Err(MetricPathError::InvalidPath {
                                 path: &path.to_string(),
