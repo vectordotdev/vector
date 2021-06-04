@@ -1,9 +1,11 @@
+{{ if .Values.loadBalancer.enabled }}
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: vector-haproxy
   labels:
+    {{- include "libvector.labels" . | nindent 4 }}
     app.kubernetes.io/component: load-balancer
 ---
 apiVersion: v1
@@ -11,44 +13,67 @@ kind: ConfigMap
 metadata:
   name: vector-haproxy
   labels:
+    {{- include "libvector.labels" . | nindent 4 }}
     app.kubernetes.io/component: load-balancer
 data:
   haproxy.cfg: |
+    global
+      log stdout local0
+      maxconn 4096
+      stats socket /tmp/haproxy
+
+    defaults
+      log     global
+      option  dontlognull
+      retries 3
+      option  redispatch
+      timeout client 5s
+      timeout server 5s
+      timeout connect 5s
+
     resolvers coredns
-      nameserver dns1 kube-dns.kube-system.svc.cluster.local:53
-      hold timeout         600s
-      hold refused         600s
+      nameserver dns1 kube-dns.kube-system.svc.{{ .Values.loadBalancer.clusterDomain }}:53
+      resolve_retries 3
+      timeout resolve 2s
+      timeout retry 1s
+      accepted_payload_size 8192
+      hold valid 10s
+      hold obsolete 60s
 
-    frontend datadog
-      bind *:8000
-      default_backend datadog_template
+    frontend datadog-logs
+      bind *:3837
+      mode http
+      option httplog
+      default_backend datadog-logs
 
-    backend datadog_template
+    backend datadog-logs
+      mode http
       balance roundrobin
       option tcp-check
-      server-template srv 5 _datadog._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
+      server-template srv 5 _datadog-logs._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.loadBalancer.clusterDomain }} resolvers coredns check
 
     frontend syslog
       bind *:5140
-      default_backend syslog_template
+      default_backend syslog
 
-    backend syslog_template
+    backend syslog
       balance roundrobin
       option tcp-check
-      server-template srv 5 _syslog._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
+      server-template srv 5 _syslog._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.loadBalancer.clusterDomain }} resolvers coredns check
 
     frontend vector
-      mode http
       bind *:9000 proto h2
-      default_backend vector_template
+      mode http
+      option httplog
+      default_backend vector
 
-    backend vector_template
+    backend vector
       mode http
       balance roundrobin
       option tcp-check
-      server-template srv 5 _vector._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns proto h2 check
+      server-template srv 5 _vector._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.loadBalancer.clusterDomain }} resolvers coredns proto h2 check
 
-    frontend metrics
+    frontend stats
       mode http
       bind *:1024
       http-request use-service prometheus-exporter if { path /metrics }
@@ -61,15 +86,18 @@ kind: Deployment
 metadata:
   name: vector-haproxy
   labels:
+    {{- include "libvector.labels" . | nindent 4 }}
     app.kubernetes.io/component: load-balancer
 spec:
   replicas: 1
   selector:
     matchLabels:
+      {{- include "libvector.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: load-balancer
   template:
     metadata:
       labels:
+        {{- include "libvector.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: load-balancer
     spec:
       serviceAccountName: vector-haproxy
@@ -90,15 +118,17 @@ kind: Service
 metadata:
   name: vector
   labels:
+    {{- include "libvector.labels" . | nindent 4 }}
     app.kubernetes.io/component: load-balancer
 spec:
   selector:
+    {{- include "libvector.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: load-balancer
   ports:
   - name: datadog
-    port: 8000
+    port: 3837
     protocol: TCP
-    targetPort: 8000
+    targetPort: 3837
   - name: metrics
     port: 1024
     protocol: TCP
@@ -111,3 +141,4 @@ spec:
     port: 9000
     protocol: TCP
     targetPort: 9000
+{{- end }}

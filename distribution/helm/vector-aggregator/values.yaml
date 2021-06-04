@@ -166,10 +166,10 @@ service:
   type: "ClusterIP"
   # Additional ports to expose.
   ports:
-    - name: datadog
-      port: 80
+    - name: datadog-logs
+      port: 8080
       protocol: TCP
-      targetPort: 80
+      targetPort: 8080
     #   nodePort: 1243  # (optional but useful with `service.type` is set to `NodePort`)
     - name: syslog
       port: 514
@@ -215,8 +215,8 @@ vectorSource:
   # The port to listen at.
   listenPort: "9000"
   # Additional config to embed at the vector source.
-  config: {}
-    # option: "value"
+  config:
+    version: "2"
   # Specific node port to bind (useful if `service.type` is set to `NodePort`).
   nodePort: null  # 9090 (must be a number)
   # Raw TOML config to embed at the vector source (deprecated).
@@ -283,9 +283,9 @@ prometheusSink:
 
 # Sources to add to the generated `vector` config
 sources:
-  datadog:
+  datadog_logs:
     type: "datadog_logs"
-    address: "0.0.0.0:80"
+    address: "0.0.0.0:8080"
   syslog:
     type: "syslog"
     address: "0.0.0.0:514"
@@ -305,8 +305,12 @@ transforms: {}
 sinks:
   sink_name:
     type: "console"
-    inputs: ["datadog", "syslog", "vector"]
+    inputs: ["datadog_logs", "syslog", "vector"]
     encoding:
       codec: "json"
   #   rawConfig: |
   #     option = "value"
+
+loadBalancer:
+  enabled: true
+  clusterDomain: "cluster.local"
