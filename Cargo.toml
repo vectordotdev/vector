@@ -276,7 +276,7 @@ tonic-build = { version = "0.4", default-features = false, features = ["transpor
 
 [dev-dependencies]
 approx = "0.5.0"
-assert_cmd = "1.0.4"
+assert_cmd = "1.0.5"
 base64 = "0.13.0"
 criterion = { version = "0.3.4", features = ["html_reports"] }
 httpmock = { version = "0.5.8", default-features = false }
