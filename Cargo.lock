@@ -3763,11 +3763,12 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
 name = "maxminddb"
-version = "0.17.2"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bf48ee3b3978a8c5e8cbdcf5a0a7de020b263144f55f1ed5779759d2dc02e62"
+checksum = "dee0495e82f8667d42e039ea47c3efe46e3326b33e98042d00d35424f048e4c8"
 dependencies = [
  "log",
+ "memchr",
  "serde",
 ]
 
