@@ -32,11 +32,11 @@ const HELM_VALUES_DDOG_AGG_TOPOLOGY: &str = indoc! {r#"
 async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
-    let override_name = get_override_name("vector-aggregator");
+    let override_name = get_override_name(&namespace, "vector-aggregator");
     let vector_endpoint = &format!("{}.{}.svc.cluster.local", override_name, namespace);
-    let datadog_namespace = get_namespace_appended("datadog-agent");
-    let datadog_override_name = get_override_name("datadog-agent");
-    let pod_namespace = get_namespace_appended("test-pod");
+    let datadog_namespace = get_namespace_appended(&namespace, "datadog-agent");
+    let datadog_override_name = get_override_name(&namespace, "datadog-agent");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
 
     // Value.yaml for datadog offical chart

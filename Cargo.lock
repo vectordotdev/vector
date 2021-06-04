@@ -3225,14 +3225,17 @@ dependencies = [
 name = "k8s-e2e-tests"
 version = "0.1.0"
 dependencies = [
+ "env_logger 0.8.3",
  "futures 0.3.15",
  "indoc",
  "k8s-openapi",
  "k8s-test-framework",
+ "rand 0.8.3",
  "regex",
  "reqwest",
  "serde_json",
  "tokio",
+ "tracing 0.1.26",
 ]
 
 [[package]]
@@ -3257,6 +3260,7 @@ name = "k8s-test-framework"
 version = "0.1.0"
 dependencies = [
  "k8s-openapi",
+ "log",
  "once_cell",
  "serde_json",
  "tempfile",
