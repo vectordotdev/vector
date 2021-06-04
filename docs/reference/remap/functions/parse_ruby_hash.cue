@@ -24,7 +24,7 @@ remap: functions: parse_ruby_hash: {
 		"`value` isn't a valid ruby hash formatted payload",
 	]
 
-	return: types: ["boolean", "float", "string", "object", "array", "null"]
+	return: types: ["object"]
 
 	examples: [
 		{

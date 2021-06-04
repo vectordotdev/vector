@@ -9,7 +9,6 @@ use nom::{
     sequence::{preceded, separated_pair, terminated},
     IResult,
 };
-use std::collections::BTreeMap;
 use std::num::ParseIntError;
 use vrl::prelude::*;
 use vrl::Value;
@@ -77,11 +76,6 @@ fn kinds() -> Kind {
 fn type_def() -> TypeDef {
     TypeDef::new()
         .fallible()
-        .bytes()
-        .add_boolean()
-        .add_float()
-        .add_null()
-        .add_array_mapped::<(), Kind>(map! { (): kinds() })
         .add_object::<(), Kind>(map! { (): kinds() })
 }
 
@@ -159,20 +153,21 @@ fn parse_key_value<'a, E: HashParseError<&'a str>>(
     )(input)
 }
 
-fn parse_hash<'a, E: HashParseError<&'a str>>(
-    input: &'a str,
-) -> IResult<&'a str, BTreeMap<String, Value>, E> {
+fn parse_hash<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
     context(
         "map",
-        preceded(
-            char('{'),
-            cut(terminated(
-                map(
-                    separated_list0(preceded(sp, char(',')), parse_key_value),
-                    |tuple_vec| tuple_vec.into_iter().collect(),
-                ),
-                preceded(sp, char('}')),
-            )),
+        map(
+            preceded(
+                char('{'),
+                cut(terminated(
+                    map(
+                        separated_list0(preceded(sp, char(',')), parse_key_value),
+                        |tuple_vec| tuple_vec.into_iter().collect(),
+                    ),
+                    preceded(sp, char('}')),
+                )),
+            ),
+            Value::Object,
         ),
     )(input)
 }
@@ -182,7 +177,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
         sp,
         alt((
             parse_nil,
-            map(parse_hash, Value::Object),
+            parse_hash,
             map(parse_array, Value::Array),
             map(parse_bytes, Value::Bytes),
             map(double, |value| Value::Float(NotNan::new(value).unwrap())),
@@ -192,7 +187,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
 }
 
 fn parse(input: &str) -> Result<Value> {
-    let result = parse_value(input)
+    let result = parse_hash(input)
         .map_err(|err| match err {
             nom::Err::Error(err) | nom::Err::Failure(err) => {
                 // Create a descriptive error message if possible.
@@ -244,6 +239,11 @@ mod tests {
         let result = result.as_object().unwrap();
         assert!(result.get("hello").unwrap().is_bytes());
         assert!(result.get("number").unwrap().is_float());
+    }
+
+    #[test]
+    fn test_non_hash() {
+        assert!(parse(r#""hello world""#).is_err());
     }
 
     test_function![
