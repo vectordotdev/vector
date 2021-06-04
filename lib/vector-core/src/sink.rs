@@ -10,6 +10,11 @@ pub enum VectorSink {
 }
 
 impl VectorSink {
+    /// Run the `VectorSink`
+    ///
+    /// # Errors
+    ///
+    /// It is unclear under what conditions this function will error.
     pub async fn run<S>(mut self, input: S) -> Result<(), ()>
     where
         S: Stream<Item = Event> + Send,
@@ -20,6 +25,11 @@ impl VectorSink {
         }
     }
 
+    /// Converts `VectorSink` into a `futures::Sink`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the self instance is not `VectorSink::Sink`.
     pub fn into_sink(self) -> Box<dyn Sink<Event, Error = ()> + Send + Unpin> {
         match self {
             Self::Sink(sink) => sink,
