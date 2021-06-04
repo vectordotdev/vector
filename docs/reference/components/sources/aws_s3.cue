@@ -84,7 +84,7 @@ components: sources: aws_s3: components._aws & {
 				options: {
 					poll_secs: {
 						common:      true
-						description: "How often to poll the queue for new messages in seconds."
+						description: "How long to wait when polling SQS for new messages."
 						required:    false
 						warnings: []
 						type: uint: {
