@@ -86,7 +86,8 @@ sources:
 
 ## Alternatives
 
-Do nothing - as noted it's not a _huge_ amount of burden but it does make our planned transition to configuring Vector with a YAML file more tricky.
+- Do nothing - as noted it's not a _huge_ amount of burden but it does make our planned transition to configuring Vector with a YAML file more tricky.
+- Change the component keys to arrays, which are not merged when providing overrides - but forces the user to replace all entries if they set custom values.
 
 ## Plan Of Attack
 
