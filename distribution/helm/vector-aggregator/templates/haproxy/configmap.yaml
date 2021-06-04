@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vector-haproxy
+  name: {{ include "libvector.fullname" . }}-haproxy
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
     app.kubernetes.io/component: load-balancer

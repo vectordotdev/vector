@@ -315,3 +315,40 @@ sinks:
 
 haproxy:
   enabled: true
+  image:
+    pullPolicy: IfNotPresent
+    repository: haproxy
+    tag: 2.4.0-alpine
+  
+  replicas: 1
+
+  # Annotations to add to the `Pod`s managed by the HAProxy `Deployment`.
+  podAnnotations: {}
+
+  # Labels to add to the `Pod`s managed by the HAProxy `Deployment`.
+  podLabels: {}
+
+  # Priority class name to add to the `Pod`s managed by the HAProxy `Deployment`.
+  podPriorityClassName: ""
+
+  # PodSecurityContext to set at the `Pod`s managed by the HAProxy `Deployment`.
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  # Security context to set at the `haproxy` container at the `Pod`s managed by
+  # `Deployment`.
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  # Tolerations to set for the `Pod`s managed by the HAProxy `Deployment`.
+  tolerations: {}
+
+  # Various tweakables for the `Pod`s managed by the HAProxy `Deployment`.
+  resources: {}
+  nodeSelector: {}
+  affinity: {}
