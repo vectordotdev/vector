@@ -183,7 +183,7 @@ impl HostMetricsConfig {
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
-                metric.insert_tag("host", hostname);
+                metric.insert_tag("host".into(), hostname.into());
             }
         }
         emit!(HostMetricsEventReceived {
@@ -709,7 +709,7 @@ async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Op
 
 fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     for metric in &mut metrics {
-        metric.insert_tag("collector", collector);
+        metric.insert_tag("collector".into(), collector.into());
     }
     metrics
 }

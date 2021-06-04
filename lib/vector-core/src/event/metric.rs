@@ -432,14 +432,6 @@ impl Metric {
         self.data.kind
     }
 
-    pub fn insert_tag(
-        &mut self,
-        key: impl Into<String>,
-        value: impl Into<String>,
-    ) -> Option<String> {
-        self.series.insert_tag(key, value)
-    }
-
     /// Remove the tag entry for the named key, if it exists, and return
     /// the old value. *Note:* This will drop the tags map if the tag
     /// was the last entry in it.
@@ -459,11 +451,10 @@ impl Metric {
         self.tags().and_then(|t| t.get(name).cloned())
     }
 
-    /// Sets or updates the string value of a tag
-    pub fn set_tag_value(&mut self, name: String, value: String) {
-        self.tags_mut()
-            .get_or_insert_with(MetricTags::new)
-            .insert(name, value);
+    /// Set or updates the string value of a tag. *Note:* This will
+    /// create the tags map if it is not present.
+    pub fn insert_tag(&mut self, name: String, value: String) -> Option<String> {
+        self.series.insert_tag(name, value)
     }
 
     /// Zero out the data in this metric
@@ -501,12 +492,10 @@ impl EventDataEq for Metric {
 }
 
 impl MetricSeries {
-    pub fn insert_tag(
-        &mut self,
-        key: impl Into<String>,
-        value: impl Into<String>,
-    ) -> Option<String> {
-        (self.tags.get_or_insert_with(Default::default)).insert(key.into(), value.into())
+    /// Set or updates the string value of a tag. *Note:* This will
+    /// create the tags map if it is not present.
+    pub fn insert_tag(&mut self, key: String, value: String) -> Option<String> {
+        (self.tags.get_or_insert_with(Default::default)).insert(key, value)
     }
 
     /// Remove the tag entry for the named key, if it exists, and return
