@@ -92,6 +92,8 @@ mod log_util;
 mod r#match;
 #[cfg(feature = "match_any")]
 mod match_any;
+#[cfg(feature = "match_array")]
+mod match_array;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -295,6 +297,8 @@ pub use length::Length;
 pub use log::Log;
 #[cfg(feature = "match_any")]
 pub use match_any::MatchAny;
+#[cfg(feature = "match_array")]
+pub use match_array::MatchArray;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -492,8 +496,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Log),
         #[cfg(feature = "match")]
         Box::new(Match),
-        #[cfg(feature = "match")]
+        #[cfg(feature = "match_any")]
         Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -556,8 +562,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Push),
         #[cfg(feature = "match")]
         Box::new(Match),
-        #[cfg(feature = "match")]
+        #[cfg(feature = "match_any")]
         Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "replace")]
