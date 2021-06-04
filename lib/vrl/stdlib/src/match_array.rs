@@ -17,7 +17,7 @@ impl Function for MatchArray {
             },
             Example {
                 title: "mismatch",
-                source: r#"match(["bazqux", "xyz"], r'foo')"#,
+                source: r#"match_array(["bazqux", "xyz"], r'foo')"#,
                 result: Ok("false"),
             },
         ]
