@@ -354,7 +354,7 @@ impl<R: Read> EventIterator<R> {
                     "host",
                     log_schema().host_key(),
                     remote_addr
-                        .or(remote.map(|addr| addr.to_string()))
+                        .or_else(|| remote.map(|addr| addr.to_string()))
                         .map(Value::from),
                 ),
                 DefaultExtractor::new("index", &INDEX),
