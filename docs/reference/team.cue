@@ -121,6 +121,13 @@ team: [#Member, ...#Member] & [
 		active: false
 	},
 	{
+		name:     "Spencer Gilbert"
+		_github:  "spencergilbert"
+		bio: """
+			Spencer is an engineer at Datadog.
+			"""
+	},
+	{
 		name:     "Steve Hall"
 		_github:  "sghall"
 		_keybase: "sghall"
