@@ -49,6 +49,7 @@ criterion_group!(
               log,
               r#match,
               match_any,
+              match_array,
               md5,
               merge,
               // TODO: value is dynamic so we cannot assert equality
@@ -597,6 +598,52 @@ bench_function! {
     simple {
         args: func_args![value: "foo 2 bar", patterns: vec![Regex::new(r"foo \d bar").unwrap()]],
         want: Ok(true),
+    }
+}
+
+bench_function! {
+    match_array => vrl_stdlib::MatchArray;
+
+    single_match {
+        args: func_args![
+            value: value!(["foo 1 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(true),
+    }
+
+    no_match {
+        args: func_args![
+            value: value!(["foo x bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(false),
+    }
+
+    some_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(true),
+    }
+
+    all_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+            all: value!(true)
+        ],
+        want: Ok(true),
+    }
+
+    not_all_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo x bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+            all: value!(true)
+        ],
+        want: Ok(false),
     }
 }
 
