@@ -354,7 +354,7 @@ fn nest_exprs<Expr: ExactSizeIterator<Item = impl Into<ast::Expr>>, O: Into<ast:
             op,
             make_node(exprs.next().expect("must contain expression").into()),
         )),
-        // For 2+ expressions, recurse over the RHS.
+        // For 2+ expressions, recurse over the RHS, and wrap in a container group for atomicity.
         _ => make_container_group(make_op(
             make_node(expr),
             op,
