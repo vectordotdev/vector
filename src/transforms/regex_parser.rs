@@ -331,7 +331,9 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        let result = parser.transform_one(event).map(|event| event.into_log());
+        let mut buf = Vec::with_capacity(1);
+        parser.transform(&mut buf, event);
+        let result = buf.pop().map(|event| event.into_log());
         if let Some(event) = &result {
             assert_eq!(event.metadata(), &metadata);
         }

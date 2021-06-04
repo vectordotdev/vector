@@ -92,16 +92,12 @@ pub fn vector_version() -> impl std::fmt::Display {
 
 pub fn get_version() -> String {
     let pkg_version = vector_version();
-    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
-    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
-        .unwrap()
-        .format("%Y-%m-%d");
-    let built_string = if let Some(commit_hash) = commit_hash {
-        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
-    } else {
-        built_info::TARGET.into()
+    let build_desc = built_info::VECTOR_BUILD_DESC;
+    let build_string = match build_desc {
+        Some(desc) => format!("{} {}", built_info::TARGET, desc),
+        None => built_info::TARGET.into(),
     };
-    format!("{} ({})", pkg_version, built_string)
+    format!("{} ({})", pkg_version, build_string)
 }
 
 #[allow(unused)]

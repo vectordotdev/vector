@@ -1,7 +1,7 @@
 use crate::expression::{Expr, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::collections::BTreeMap;
-use std::fmt;
+use std::{fmt, ops::Deref};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
@@ -14,12 +14,28 @@ impl Object {
     }
 }
 
+impl Deref for Object {
+    type Target = BTreeMap<String, Expr>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
 impl Expression for Object {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.inner
             .iter()
             .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v)))
             .collect::<Result<BTreeMap<_, _>, _>>()
+            .map(Value::Object)
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        self.inner
+            .iter()
+            .map(|(key, expr)| expr.as_value().map(|v| (key.to_owned(), v)))
+            .collect::<Option<BTreeMap<_, _>>>()
             .map(Value::Object)
     }
 

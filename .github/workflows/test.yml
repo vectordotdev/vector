@@ -90,7 +90,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.3.4
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -105,6 +105,8 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+        env:
+          CARGO_BUILD_JOBS: 6
 
   test-misc:
     name: Miscellaneous - Linux
@@ -114,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -152,7 +154,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -182,7 +184,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.3.4
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -222,10 +224,10 @@ jobs:
       - run: |
           TEMP=$(mktemp -d)
           curl \
-              -L https://github.com/cuelang/cue/releases/download/v0.3.2/cue_v0.3.2_linux_amd64.tar.gz \
-              -o "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz"
+              -L https://github.com/cuelang/cue/releases/download/v0.4.0/cue_v0.4.0_linux_amd64.tar.gz \
+              -o "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz"
           tar \
-              -xvf "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz" \
+              -xvf "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz" \
               -C "${TEMP}"
           sudo cp "${TEMP}/cue" /usr/bin/cue
       - run: make test-vrl
@@ -256,7 +258,7 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |

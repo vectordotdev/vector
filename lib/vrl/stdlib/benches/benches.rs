@@ -48,6 +48,7 @@ criterion_group!(
               length,
               log,
               r#match,
+              match_any,
               md5,
               merge,
               // TODO: value is dynamic so we cannot assert equality
@@ -68,13 +69,13 @@ criterion_group!(
               parse_query_string,
               parse_regex,
               parse_regex_all,
+              parse_ruby_hash,
               parse_syslog,
               parse_timestamp,
               parse_tokens,
               parse_url,
               push,
-              // TODO: Has not been ported to vrl/stdlib yet
-              //redact,
+              redact,
               replace,
               round,
               sha1,
@@ -591,6 +592,15 @@ bench_function! {
 }
 
 bench_function! {
+    match_any => vrl_stdlib::MatchAny;
+
+    simple {
+        args: func_args![value: "foo 2 bar", patterns: vec![Regex::new(r"foo \d bar").unwrap()]],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
     md5  => vrl_stdlib::Md5;
 
     literal {
@@ -1069,6 +1079,23 @@ bench_function! {
 }
 
 bench_function! {
+    parse_ruby_hash => vrl_stdlib::ParseRubyHash;
+
+    matches {
+        args: func_args![
+            value: r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
+        ],
+        want: Ok(value!({
+            test: "value",
+            testNum: 0.2,
+            testObj: {
+                testBool: true,
+            }
+        }))
+    }
+}
+
+bench_function! {
     parse_syslog => vrl_stdlib::ParseSyslog;
 
     rfc3164 {
@@ -1162,19 +1189,25 @@ bench_function! {
     }
 }
 
-//bench_function! {
-//redact => vrl_stdlib::Redact;
+bench_function! {
+    redact => vrl_stdlib::Redact;
 
-//literal {
-//args: func_args![
-//value: "hello 1111222233334444",
-//filters: value!(["pattern"]),
-//patterns: value!(vec!(Regex::new(r"/[0-9]{16}/").unwrap())),
-//redactor: "full",
-//],
-//want: Ok("hello ****"),
-//}
-//}
+    regex {
+        args: func_args![
+            value: "hello 123456 world",
+            filters: vec![Regex::new(r"\d+").unwrap()],
+        ],
+        want: Ok("hello [REDACTED] world"),
+    }
+
+    us_social_security_number {
+        args: func_args![
+            value: "hello 123-12-1234 world",
+            filters: vec!["us_social_security_number"],
+        ],
+        want: Ok("hello [REDACTED] world"),
+    }
+}
 
 bench_function! {
     replace => vrl_stdlib::Replace;

@@ -1,8 +1,10 @@
-use crate::expression::{Expr, Expression, FunctionArgument, Literal, Query};
+use crate::expression::{
+    container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+};
 use crate::parser::Node;
 use crate::value::Kind;
 use crate::{Span, Value};
-use diagnostic::{DiagnosticError, Label};
+use diagnostic::{DiagnosticError, Label, Note};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -190,6 +192,25 @@ impl ArgumentList {
         Ok(required(self.optional_regex(keyword)?))
     }
 
+    pub fn optional_array(&mut self, keyword: &'static str) -> Result<Option<Vec<Expr>>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| match expr {
+                Expr::Container(Container {
+                    variant: Variant::Array(array),
+                }) => Ok((*array).clone()),
+                expr => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "array",
+                    expr,
+                }),
+            })
+            .transpose()
+    }
+
+    pub fn required_array(&mut self, keyword: &'static str) -> Result<Vec<Expr>, Error> {
+        Ok(required(self.optional_array(keyword)?))
+    }
+
     pub(crate) fn keywords(&self) -> Vec<&'static str> {
         self.0.keys().copied().collect::<Vec<_>>()
     }
@@ -256,6 +277,16 @@ pub enum Error {
         value: Value,
         variants: Vec<Value>,
     },
+
+    #[error("this argument must be a static expression")]
+    ExpectedStaticExpression { keyword: &'static str, expr: Expr },
+
+    #[error(r#"invalid argument"#)]
+    InvalidArgument {
+        keyword: &'static str,
+        value: Value,
+        error: &'static str,
+    },
 }
 
 impl diagnostic::DiagnosticError for Error {
@@ -265,6 +296,8 @@ impl diagnostic::DiagnosticError for Error {
         match self {
             UnexpectedExpression { .. } => 400,
             InvalidEnumVariant { .. } => 401,
+            ExpectedStaticExpression { .. } => 402,
+            InvalidArgument { .. } => 403,
         }
     }
 
@@ -307,7 +340,32 @@ impl diagnostic::DiagnosticError for Error {
                     Span::default(),
                 ),
             ],
+
+            ExpectedStaticExpression { keyword, expr } => vec![
+                Label::primary(
+                    format!(r#"expected static expression for argument "{}""#, keyword),
+                    Span::default(),
+                ),
+                Label::context(format!("received: {}", expr.as_str()), Span::default()),
+            ],
+
+            InvalidArgument {
+                keyword,
+                value,
+                error,
+            } => vec![
+                Label::primary(
+                    format!(r#"invalid argument "{}""#, keyword),
+                    Span::default(),
+                ),
+                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("error: {}", error), Span::default()),
+            ],
         }
+    }
+
+    fn notes(&self) -> Vec<Note> {
+        vec![Note::SeeCodeDocs(self.code())]
     }
 }
 

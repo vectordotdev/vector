@@ -55,11 +55,11 @@ impl GenerateConfig for SimpleHttpConfig {
     }
 }
 
-pub fn default_path() -> String {
+fn default_path() -> String {
     "/".to_string()
 }
 
-pub fn default_path_key() -> String {
+fn default_path_key() -> String {
     "path".to_string()
 }
 
@@ -110,8 +110,7 @@ impl SourceConfig for SimpleHttpConfig {
             self.strict_path,
             &self.tls,
             &self.auth,
-            cx.out,
-            cx.shutdown,
+            cx,
         )
     }
 
@@ -190,11 +189,14 @@ mod tests {
         path: &str,
         strict_path: bool,
         status: EventStatus,
+        acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
         let path_key = path_key.to_owned();
+        let mut context = SourceContext::new_test(sender);
+        context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,
@@ -207,7 +209,7 @@ mod tests {
                 path_key,
                 path,
             }
-            .build(SourceContext::new_test(sender))
+            .build(context)
             .await
             .unwrap()
             .await
@@ -296,6 +298,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -334,6 +337,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -369,6 +373,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -409,6 +414,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -452,6 +458,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -494,6 +501,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -549,6 +557,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -587,6 +596,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -635,6 +645,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -661,6 +672,7 @@ mod tests {
             "/event/path",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -692,6 +704,7 @@ mod tests {
             "/event",
             false,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -740,6 +753,7 @@ mod tests {
             "/",
             true,
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -761,6 +775,7 @@ mod tests {
             "/",
             true,
             EventStatus::Failed,
+            true,
         )
         .await;
 
@@ -772,5 +787,33 @@ mod tests {
             1,
         )
         .await;
+    }
+
+    #[tokio::test]
+    async fn ignores_disabled_acknowledgements() {
+        trace_init();
+
+        let (rx, addr) = source(
+            Encoding::default(),
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Failed,
+            false,
+        )
+        .await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(200, send(addr, "test body\n").await);
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        assert_eq!(events.len(), 1);
     }
 }

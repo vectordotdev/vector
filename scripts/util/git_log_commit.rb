@@ -3,7 +3,7 @@ module Vector
     class << self
       def fetch_since!(last_version)
         range = "v#{last_version}..."
-        commit_log = `git log #{range} --no-merges --pretty=format:'%H\t%s\t%aN\t%ad'`.chomp
+        commit_log = `git log #{range} --cherry-pick --right-only --no-merges --pretty=format:'%H\t%s\t%aN\t%ad'`.chomp
         commit_lines = commit_log.split("\n").reverse
 
         commit_lines.collect do |commit_line|

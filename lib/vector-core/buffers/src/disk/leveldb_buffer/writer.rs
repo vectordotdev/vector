@@ -15,20 +15,35 @@ use std::sync::{
 };
 use std::task::{Context, Poll, Waker};
 
+/// The writer side of N to 1 channel through leveldb.
 pub struct Writer<T>
 where
     T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug,
 {
+    /// Leveldb database.
+    /// Shared with Reader.
     pub(crate) db: Option<Arc<Database<Key>>>,
+    /// First unused key/index.
+    /// Shared with other Writers.
     pub(crate) offset: Arc<AtomicUsize>,
+    /// Writers notify Reader through this Waker.
+    /// Shared with Reader.
     pub(crate) write_notifier: Arc<AtomicWaker>,
+    /// Waiting queue for when the disk is full.
+    /// Shared with Reader.
     pub(crate) blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
+    /// Batched writes.
     pub(crate) writebatch: Writebatch<Key>,
+    /// Events in batch.
     pub(crate) batch_size: usize,
+    /// Max size of unread events in bytes.
     pub(crate) max_size: usize,
+    /// Size of unread events in bytes.
+    /// Shared with Reader.
     pub(crate) current_size: Arc<AtomicUsize>,
+    /// Buffer for internal use.
     pub(crate) slot: Option<T>,
 }
 
