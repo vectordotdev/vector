@@ -47,9 +47,16 @@ pub fn init(color: bool, json: bool, levels: &str) {
     // bit of duplication as we started to create a generic struct to wrap the formatters that also
     // implemented `Layer`
     let dispatch = if json {
+        #[cfg(not(test))]
         let formatter = tracing_subscriber::fmt::Layer::default()
             .json()
             .flatten_event(true);
+
+        #[cfg(test)]
+        let formatter = tracing_subscriber::fmt::Layer::default()
+            .json()
+            .flatten_event(true)
+            .with_test_writer(); // ensures output is captured
 
         let subscriber = subscriber.with(RateLimitedLayer::new(formatter));
 
@@ -60,7 +67,13 @@ pub fn init(color: bool, json: bool, levels: &str) {
             Dispatch::new(BroadcastSubscriber { subscriber })
         }
     } else {
+        #[cfg(not(test))]
         let formatter = tracing_subscriber::fmt::Layer::default().with_ansi(color);
+
+        #[cfg(test)]
+        let formatter = tracing_subscriber::fmt::Layer::default()
+            .with_ansi(color)
+            .with_test_writer(); // ensures output is captured
 
         let subscriber = subscriber.with(RateLimitedLayer::new(formatter));
 
