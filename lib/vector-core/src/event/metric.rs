@@ -592,7 +592,7 @@ impl MetricValue {
     pub fn zero(&mut self) {
         match self {
             Self::Counter { value } | Self::Gauge { value } => *value = 0.0,
-            Self::Set { values } => *values = BTreeSet::default(),
+            Self::Set { values } => values.clear(),
             Self::Distribution { samples, .. } => samples.clear(),
             Self::AggregatedHistogram {
                 buckets,
