@@ -3,8 +3,8 @@
 # Declare variables to be passed into your templates.
 
 # Additional labels to add to all resources
-commonLabels:
-  app.kubernetes.io/component: agent
+# commonLabels:
+#   app.kubernetes.io/component: agent
 
 image:
   repository: timberio/vector
