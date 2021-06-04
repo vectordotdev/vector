@@ -75,8 +75,14 @@ templating in the future, reducing some long term burden (slight, and I can't im
 
 ## Drawbacks
 
-This change does make opting in or out to our default configurations slightly more difficult, since there would no longer be an "enabled" toggle. To opt out users
-would need to comment out or delete the default values, and to opt in (unless we move to have all the configurations active by default) uncomment our provided configuration.
+This change does make opting in or out to our default configurations slightly more difficult, since there would no longer be an "enabled" toggle. To opt in
+(unless we move to have all the configurations active by default) uncomment our provided configuration. To opt out the user would need to pass the following (based on example above):
+
+```yaml
+sources:
+  internal_metrics: null
+  host_metrics: null
+```
 
 ## Alternatives
 
