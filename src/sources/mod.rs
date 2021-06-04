@@ -1,4 +1,3 @@
-use futures::future::BoxFuture;
 use snafu::Snafu;
 
 #[cfg(feature = "sources-apache_metrics")]
@@ -58,7 +57,7 @@ pub mod vector;
 
 mod util;
 
-pub type Source = BoxFuture<'static, Result<(), ()>>;
+pub use vector_core::source::Source;
 
 /// Common build errors
 #[derive(Debug, Snafu)]
