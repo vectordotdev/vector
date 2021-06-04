@@ -23,7 +23,7 @@ use rusoto_sqs::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
-use std::{cmp, future::ready, sync::Arc};
+use std::{cmp, future::ready, panic, sync::Arc};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 
@@ -185,10 +185,13 @@ impl Ingestor {
             handles.push(handle);
         }
 
+        // Wait for all of the processes to finish.  If any one of them panics, we resume
+        // that panic here to properly shutdown Vector.
         for handle in handles.drain(..) {
-            if handle.await.is_err() {
-                // TODO: probably emit the error as an internal event but then just return Err(())?
-                return Err(());
+            if let Err(e) = handle.await {
+                if e.is_panic() {
+                    panic::resume_unwind(e.into_panic());
+                }
             }
         }
 
