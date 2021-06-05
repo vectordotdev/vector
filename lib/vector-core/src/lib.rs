@@ -27,11 +27,11 @@ pub mod config;
 pub mod event;
 pub mod mapping;
 pub mod metrics;
+pub mod sink;
 pub mod source;
 #[cfg(test)]
 mod test_util;
 pub mod transform;
-
 pub use buffers;
 
 #[macro_use]
