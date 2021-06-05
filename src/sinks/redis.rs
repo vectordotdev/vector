@@ -237,14 +237,7 @@ type RedisPipeResult = RedisResult<Vec<bool>>;
 
 impl Response for Vec<bool> {
     fn is_successful(&self) -> bool {
-        let mut flag = true;
-        for r in self {
-            if !r {
-                flag = false;
-                break;
-            }
-        }
-        flag
+       self.iter().all(|x| x)
     }
 }
 
