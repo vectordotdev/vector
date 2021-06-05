@@ -10,6 +10,8 @@ pub mod events;
 pub mod logs;
 pub mod metrics;
 
+type ApiKey = Arc<str>;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {

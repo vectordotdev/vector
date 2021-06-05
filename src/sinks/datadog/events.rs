@@ -1,4 +1,4 @@
-use super::healthcheck;
+use super::{healthcheck, ApiKey};
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, PathComponent},
@@ -37,8 +37,6 @@ pub struct DatadogEventsConfig {
     #[serde(default)]
     request: TowerRequestConfig<Concurrency>,
 }
-
-type ApiKey = Arc<str>;
 
 fn default_site() -> String {
     "datadoghq.com".to_owned()
@@ -111,7 +109,7 @@ impl DatadogEventsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal datadog_metrics sink error.", %error));
+        .sink_map_err(|error| error!(message = "Fatal datadog_events sink error.", %error));
 
         Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
