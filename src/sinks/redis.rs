@@ -140,10 +140,7 @@ impl RedisSinkConfig {
         let key = Template::try_from(self.key.clone()).context(KeyTemplate)?;
         let encoding = self.encoding.clone();
 
-        let mut method: Option<Method> = None;
-        if self.list_option.is_some() {
-            method = Option::from(self.list_option.unwrap().method)
-        }
+        let method = self.list_option.map(|option| option.method);
 
         let data_type = self.data_type;
 
