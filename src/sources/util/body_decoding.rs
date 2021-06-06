@@ -19,6 +19,7 @@ pub enum Encoding {
     Text,
     Ndjson,
     Json,
+    Binary,
 }
 
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
@@ -61,7 +62,10 @@ pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessag
             let parsed_json = serde_json::from_slice(&body)
                 .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
             json_parse_array_of_object(parsed_json)
-        }
+        },
+        Encoding::Binary => std::iter::once(Ok(body))
+            .map(|r| Ok(LogEvent::from(r?).into()))
+            .collect::<Result<_, _>>()
     }
 }
 

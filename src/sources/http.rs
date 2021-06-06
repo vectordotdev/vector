@@ -362,6 +362,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_multiline_text3() {
+        trace_init();
+
+        //same as above test but with a binary encoding
+        let body = "test body\n\ntest body 2\n";
+
+        let (rx, addr) = source(
+            Encoding::Binary,
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
+
+        let mut events = spawn_ok_collect_n(send(addr, body), rx, 1).await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log[log_schema().message_key()], "test body\n\ntest body 2\n".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
+        }
+    }
+
+    #[tokio::test]
     async fn http_json_parsing() {
         trace_init();
 
