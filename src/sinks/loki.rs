@@ -404,7 +404,7 @@ mod tests {
         tokio::spawn(server);
 
         let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
-        let client = HttpClient::new(tls).expect("could not cerate HTTP client");
+        let client = HttpClient::new(tls).expect("could not create HTTP client");
 
         healthcheck(config.clone(), client)
             .await
