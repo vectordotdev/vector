@@ -5,6 +5,7 @@ use crate::{
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use std::sync::Arc;
 
 pub mod events;
 pub mod logs;
