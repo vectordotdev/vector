@@ -141,8 +141,7 @@ impl QueryVisitor {
         let mut terms: Vec<String> = Vec::new();
         for node in contents {
             match node.as_rule() {
-                // Can probably get a bit more suave with string allocation here
-                // but meh
+                // Can probably get a bit more suave with string allocation here but meh.
                 Rule::TERM => terms.push(Self::visit_term(node)),
                 _ => unreachable!(),
             }
@@ -160,7 +159,7 @@ impl QueryVisitor {
         let mut field: Option<&str> = None;
         for item in clause.into_inner() {
             // As per the parser, a clause will only ever contain:
-            // matchall, field, value, query
+            // matchall, field, value, query.
             match item.as_rule() {
                 Rule::matchall => return QueryNode::MatchAllDocs,
                 Rule::field => {
@@ -168,7 +167,7 @@ impl QueryVisitor {
                 }
                 Rule::value => {
                     // As per the parser, value can only ever be one of:
-                    // STAR, PHRASE, TERM, TERM_PREFIX, TERM_GLOB, range, comparison
+                    // STAR, PHRASE, TERM, TERM_PREFIX, TERM_GLOB, range, comparison.
                     let value_contents = item.into_inner().next().unwrap();
                     match (
                         (field.clone().unwrap_or(default_field)),

@@ -2,7 +2,9 @@ use super::{
     grammar,
     node::{BooleanType, Comparison, ComparisonValue, QueryNode},
 };
+use lazy_static::lazy_static;
 use ordered_float::NotNan;
+use regex::Regex;
 use vrl_parser::{
     ast::{self, Opcode},
     Span,
@@ -29,6 +31,17 @@ static RESERVED_ATTRIBUTES: &[&str] = &[
     "tags",
 ];
 
+lazy_static! {
+    static ref TAGS_QUERY: ast::Expr = ast::Expr::Query(make_node(ast::Query {
+        target: make_node(ast::QueryTarget::External),
+        path: make_node(
+            lookup::parser::parse_lookup("tags")
+                .expect("should parse lookup")
+                .into()
+        )
+    }));
+}
+
 /// Describes a field to search on.
 enum Field {
     /// Default field (when tag/facet isn't provided)
@@ -37,8 +50,11 @@ enum Field {
     /// Reserved field that receives special treatment in Datadog.
     Reserved(String),
 
-    /// Custom field type not described elsewhere.
-    Custom(String),
+    /// A facet -- i.e. started with `@`, transformed to `custom.*`
+    Facet(String),
+
+    /// Tag type - i.e. search in the `tags` field.
+    Tag(String),
 }
 
 impl Field {
@@ -46,7 +62,8 @@ impl Field {
         match self {
             Self::Default(ref s) => s,
             Self::Reserved(ref s) => s,
-            Self::Custom(ref s) => s,
+            Self::Facet(ref s) => s,
+            Self::Tag(ref s) => s,
         }
     }
 }
@@ -77,7 +94,7 @@ impl From<ComparisonValue> for ast::Literal {
             ComparisonValue::String(value) => value
                 .parse::<i64>()
                 .map(ast::Literal::Integer)
-                .unwrap_or_else(|_| ast::Literal::String(value)),
+                .unwrap_or_else(|_| ast::Literal::String(escape_quotes(value))),
 
             ComparisonValue::Numeric(value) => {
                 ast::Literal::Float(NotNan::new(value).expect("should be a float"))
@@ -128,7 +145,13 @@ impl From<QueryNode> for ast::Expr {
                     Field::Default(_) => {
                         make_function_call("match", vec![query, make_regex(&value)])
                     }
-                    _ => make_string_comparison(query, Opcode::Eq, &value),
+                    Field::Reserved(_) | Field::Facet(_) => {
+                        make_string_comparison(query, Opcode::Eq, &value)
+                    }
+                    _ => make_function_call(
+                        "match_array",
+                        vec![TAGS_QUERY.clone(), make_kv_regex(&attr, &value)],
+                    ),
                 })
                 .collect(),
             // Comparison.
@@ -252,7 +275,8 @@ fn normalize_fields<T: AsRef<str>>(value: T) -> Vec<Field> {
     let field = match value.replace("@", "custom.") {
         v if DEFAULT_FIELDS.contains(&v.as_ref()) => Field::Default(v),
         v if RESERVED_ATTRIBUTES.contains(&v.as_ref()) => Field::Reserved(v),
-        v => Field::Custom(v),
+        v if value.starts_with("@") => Field::Facet(v),
+        v => Field::Tag(v),
     };
 
     vec![field]
@@ -290,6 +314,15 @@ fn make_queries<T: AsRef<str>>(field: T) -> Vec<(Field, ast::Expr)> {
 fn make_regex<T: AsRef<str>>(value: T) -> ast::Expr {
     ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
         "\\b{}\\b",
+        regex::escape(value.as_ref()).replace("\\*", ".*")
+    ))))
+}
+
+/// Makes a key/value Regex string, for finding field values inside tags.
+fn make_kv_regex<T: AsRef<str>>(key: T, value: T) -> ast::Expr {
+    ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
+        "^{}:{}$",
+        key.as_ref(),
         regex::escape(value.as_ref()).replace("\\*", ".*")
     ))))
 }
@@ -363,6 +396,15 @@ fn nest_exprs<Expr: ExactSizeIterator<Item = impl Into<ast::Expr>>, O: Into<ast:
     }
 }
 
+/// Escapes surrounding `"` quotes when distinguishing between quoted terms isn't needed.
+fn escape_quotes<T: AsRef<str>>(value: T) -> String {
+    lazy_static! {
+        static ref RE: Regex = Regex::new("^\"(.+)\"$").unwrap();
+    }
+
+    RE.replace_all(value.as_ref(), "$1").to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::make_node;
@@ -416,17 +458,17 @@ mod tests {
         // Quoted keyword (negate w/-).
         (r#"-"bla""#, r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Tag match.
-        ("a:bla", r#".a == "bla""#),
+        ("a:bla", r#"match_array(.tags, r'^a:bla$')"#),
         // Tag match (negate).
-        ("NOT a:bla", r#"!(.a == "bla")"#),
+        ("NOT a:bla", r#"!match_array(.tags, r'^a:bla$')"#),
         // Tag match (negate w/-).
-        ("-a:bla", r#"!(.a == "bla")"#),
+        ("-a:bla", r#"!match_array(.tags, r'^a:bla$')"#),
         // Quoted tag match.
-        (r#"a:"bla""#, r#".a == "bla""#),
+        (r#"a:"bla""#, r#"match_array(.tags, r'^a:bla$')"#),
         // Quoted tag match (negate).
-        (r#"NOT a:"bla""#, r#"!(.a == "bla")"#),
+        (r#"NOT a:"bla""#, r#"!match_array(.tags, r'^a:bla$')"#),
         // Quoted tag match (negate).
-        (r#"-a:"bla""#, r#"!(.a == "bla")"#),
+        (r#"-a:"bla""#, r#"!match_array(.tags, r'^a:bla$')"#),
         // Facet match.
         ("@a:bla", r#".custom.a == "bla""#),
         // Facet match (negate).
@@ -598,12 +640,18 @@ mod tests {
         // A bit of everything.
         (
             "@a:this OR ((@b:test* c:that) AND d:the_other e:[1 TO 5])",
-            r#"(.custom.a == "this" || ((match(.custom.b, r'\btest.*\b') && .c == "that") && (.d == "the_other" && (.e >= 1 && .e <= 5))))"#,
+            r#"(.custom.a == "this" || ((match(.custom.b, r'\btest.*\b') && match_array(.tags, r'^c:that$')) && (match_array(.tags, r'^d:the_other$') && (.e >= 1 && .e <= 5))))"#,
         ),
         // Range - numeric, exclusive
         ("f:{1 TO 10}", "(.f > 1 && .f < 10)"),
         // Range - alpha, inclusive
+        (r#"g:[a TO z]"#, r#"(.g >= "a" && .g <= "z")"#),
+        // Range - alpha, exclusive
+        (r#"g:{a TO z}"#, r#"(.g > "a" && .g < "z")"#),
+        // Range - alpha, inclusive (quoted)
         (r#"g:["a" TO "z"]"#, r#"(.g >= "a" && .g <= "z")"#),
+        // Range - alpha, exclusive (quoted)
+        (r#"g:{"a" TO "z"}"#, r#"(.g > "a" && .g < "z")"#),
     ];
 
     #[test]
