@@ -144,8 +144,14 @@ tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
 serde = { version = "1.0.126", default-features = false, features = ["derive"] }
+serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.64", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.17", default-features = false }
+rmp-serde = { version = "0.15.4", default-features = false, optional = true }
+
+# Messagepack
+
+rmpv = { version = "0.4.7", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
 prost = { version = "0.7.0", default-features = false, features = ["std"]  }
@@ -350,6 +356,8 @@ wasm = ["lucet-runtime", "lucet-wasi", "lucetc", "vector-wasm"]
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
 
+docker = ["bollard", "dirs-next"]
+
 # API
 api = [
   "async-graphql",
@@ -380,6 +388,7 @@ sources-logs = [
   "sources-docker_logs",
   "sources-exec",
   "sources-file",
+  "sources-fluent",
   "sources-generator",
   "sources-heroku_logs",
   "sources-http",
@@ -412,9 +421,10 @@ sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
 sources-dnstap = ["bytesize", "base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
-sources-docker_logs = ["bollard", "dirs-next"]
+sources-docker_logs = ["docker"]
 sources-exec = []
 sources-file = ["bytesize", "file-source"]
+sources-fluent = ["base64", "bytesize", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes"]
 sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http"]
 sources-host_metrics = ["heim"]
@@ -603,6 +613,7 @@ all-integration-tests = [
   "clickhouse-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
+  "fluent-integration-tests",
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
@@ -642,6 +653,7 @@ aws-sqs-integration-tests = ["sinks-aws_sqs"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
+fluent-integration-tests = ["docker", "sources-fluent", "uuid"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]

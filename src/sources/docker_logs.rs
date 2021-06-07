@@ -1,6 +1,7 @@
 use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    docker::{docker, DockerTlsConfig},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, PathComponent, PathIter, Value},
     internal_events::{
@@ -18,28 +19,22 @@ use bollard::{
     errors::Error as DockerError,
     service::{ContainerInspectResponse, SystemEventsResponse},
     system::EventsOptions,
-    Docker, API_DEFAULT_VERSION,
+    Docker,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use http::uri::Uri;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use std::{
     future::ready,
-    path::PathBuf,
     pin::Pin,
     sync::Arc,
     time::Duration,
-    {collections::HashMap, convert::TryFrom, env},
+    {collections::HashMap, convert::TryFrom},
 };
 
 use tokio::sync::mpsc;
-
-// From bollard source.
-const DEFAULT_TIMEOUT: u64 = 120;
 
 const IMAGE: &str = "image";
 const CREATED_AT: &str = "container_created_at";
@@ -53,12 +48,6 @@ lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
     static ref CONSOLE: Bytes = "console".into();
-}
-
-#[derive(Debug, Snafu)]
-enum Error {
-    #[snafu(display("URL has no host."))]
-    NoHost,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -76,14 +65,6 @@ pub struct DockerLogsConfig {
     auto_partial_merge: bool,
     multiline: Option<MultilineConfig>,
     retry_backoff_secs: u64,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct DockerTlsConfig {
-    ca_file: PathBuf,
-    crt_file: PathBuf,
-    key_file: PathBuf,
 }
 
 impl Default for DockerLogsConfig {
@@ -992,89 +973,6 @@ impl ContainerMetadata {
             image: config.image.unwrap().into(),
             created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })
-    }
-}
-
-// From bollard source, unfortunately they don't export this function.
-fn default_certs() -> Option<DockerTlsConfig> {
-    let from_env = env::var("DOCKER_CERT_PATH").or_else(|_| env::var("DOCKER_CONFIG"));
-    let base = match from_env {
-        Ok(path) => PathBuf::from(path),
-        Err(_) => dirs_next::home_dir()?.join(".docker"),
-    };
-    Some(DockerTlsConfig {
-        ca_file: base.join("ca.pem"),
-        key_file: base.join("key.pem"),
-        crt_file: base.join("cert.pem"),
-    })
-}
-
-fn get_authority(url: &str) -> Result<String, Error> {
-    url.parse::<Uri>()
-        .ok()
-        .and_then(|uri| uri.authority().map(<_>::to_string))
-        .ok_or(Error::NoHost)
-}
-
-fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
-    let host = host.or_else(|| env::var("DOCKER_HOST").ok());
-
-    match host {
-        None => {
-            // TODO: Use `connect_with_local_defaults` on all platforms.
-            //
-            // Using `connect_with_local_defaults` defers to `connect_with_named_pipe_defaults` on Windows. However,
-            // named pipes are currently disabled in Tokio. Tracking issue:
-            // https://github.com/fussybeaver/bollard/pull/138
-            if cfg!(windows) {
-                Docker::connect_with_http_defaults().map_err(Into::into)
-            } else {
-                Docker::connect_with_local_defaults().map_err(Into::into)
-            }
-        }
-        Some(host) => {
-            let scheme = host
-                .parse::<Uri>()
-                .ok()
-                .and_then(|uri| uri.into_parts().scheme);
-
-            match scheme.as_ref().map(|scheme| scheme.as_str()) {
-                Some("http") => {
-                    let host = get_authority(&host)?;
-                    Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
-                        .map_err(Into::into)
-                }
-                Some("https") => {
-                    let host = get_authority(&host)?;
-                    let tls = tls
-                        .or_else(default_certs)
-                        .ok_or(DockerError::NoCertPathError)?;
-                    Docker::connect_with_ssl(
-                        &host,
-                        &tls.key_file,
-                        &tls.crt_file,
-                        &tls.ca_file,
-                        DEFAULT_TIMEOUT,
-                        API_DEFAULT_VERSION,
-                    )
-                    .map_err(Into::into)
-                }
-                Some("unix") | Some("npipe") | None => {
-                    // TODO: Use `connect_with_local` on all platforms.
-                    //
-                    // Named pipes are currently disabled in Tokio. Tracking issue:
-                    // https://github.com/fussybeaver/bollard/pull/138
-                    if cfg!(windows) {
-                        warn!("Named pipes are currently not available on Windows, trying to connecting to Docker with default HTTP settings instead.");
-                        Docker::connect_with_http_defaults().map_err(Into::into)
-                    } else {
-                        Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
-                            .map_err(Into::into)
-                    }
-                }
-                Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
-            }
-        }
     }
 }
 

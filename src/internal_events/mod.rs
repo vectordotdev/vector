@@ -43,6 +43,8 @@ mod encoding_transcode;
 mod exec;
 #[cfg(feature = "transforms-filter")]
 mod filter;
+#[cfg(feature = "sources-fluent")]
+mod fluent;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-geoip")]
@@ -172,6 +174,8 @@ pub use self::exec::*;
 pub use self::file::*;
 #[cfg(feature = "transforms-filter")]
 pub use self::filter::*;
+#[cfg(feature = "sources-fluent")]
+pub use self::fluent::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
 #[cfg(feature = "transforms-geoip")]

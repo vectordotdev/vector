@@ -18,6 +18,8 @@ pub mod docker_logs;
 pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
+#[cfg(feature = "sources-fluent")]
+pub mod fluent;
 #[cfg(feature = "sources-generator")]
 pub mod generator;
 #[cfg(feature = "sources-heroku_logs")]

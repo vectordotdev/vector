@@ -89,14 +89,17 @@ pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> 
     Ok(value)
 }
 
+pub fn next_addr_for_ip(ip: IpAddr) -> SocketAddr {
+    let port = pick_unused_port(ip);
+    SocketAddr::new(ip, port)
+}
+
 pub fn next_addr() -> SocketAddr {
-    let port = pick_unused_port();
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+    next_addr_for_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    let port = pick_unused_port();
-    SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
+    next_addr_for_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)))
 }
 
 pub fn trace_init() {

@@ -300,7 +300,7 @@ test-behavior: ## Runs behaviorial test
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
+test-integration: test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
 test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-splunk test-integration-dnstap
@@ -345,6 +345,10 @@ endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh elasticsearch stop
 endif
+
+.PHONY: test-integration-fluent
+test-integration-fluent: ## Runs Fluent integration tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features fluent-integration-tests --lib ::fluent:: -- --nocapture
 
 .PHONY: test-integration-gcp
 test-integration-gcp: ## Runs GCP integration tests
