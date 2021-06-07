@@ -6092,9 +6092,9 @@ checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
 name = "security-framework"
-version = "2.2.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3670b1d2fdf6084d192bc71ead7aabe6c06aa2ea3fbd9cc3ac111fa5c2b1bd84"
+checksum = "b239a3d5db51252f6f48f42172c65317f37202f4a21021bf5f9d40a408f4592c"
 dependencies = [
  "bitflags",
  "core-foundation",
@@ -6105,9 +6105,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework-sys"
-version = "2.2.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3676258fd3cfe2c9a0ec99ce3038798d847ce3e4bb17746373eb9f0f1ac16339"
+checksum = "7e4effb91b4b8b6fb7732e670b6cee160278ff8e6bf485c7805d9e319d76e284"
 dependencies = [
  "core-foundation-sys",
  "libc",
