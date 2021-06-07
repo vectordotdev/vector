@@ -11,6 +11,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryInto,
@@ -20,7 +21,10 @@ use tokio_util::codec::Decoder;
 
 // TODO
 // * Handle window size and acking
+// * Handle protocol version differences
+// * Handle Data frames
 // * usize casts bounds
+// * Integration tests
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogstashConfig {
@@ -31,7 +35,7 @@ pub struct LogstashConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new::<LogstashConfig>("syslog")
+    SourceDescription::new::<LogstashConfig>("logstash")
 }
 
 impl GenerateConfig for LogstashConfig {
@@ -127,29 +131,33 @@ impl LogstashDecoder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Snafu)]
 pub enum DecodeError {
-    IO(io::Error),
+    #[snafu(display("i/o error: {}", source))]
+    IO { source: io::Error },
+    #[snafu(display("Unknown logstash protocol version: {}", version))]
+    UnknownProtocolVersion { version: char },
+    #[snafu(display("Unknown logstash protocol message type: {}", message_type))]
+    UnknownMessageType { message_type: char },
+    #[snafu(display("Failed to decode JSON frame: {}", source))]
+    JsonFrameFailedDecode { source: serde_json::Error },
+    #[snafu(display("Failed to decompress compressed frame: {}", source))]
+    DecompressionFailed { source: io::Error },
 }
 
 impl TcpIsErrorFatal for DecodeError {
     fn is_error_fatal() -> bool {
         // TODO
+        // Protocol and message type errors should be unrecoverable since we don't know how much to advance
+        // DecompressionFailed, JsonFrameFailedDecode should be false as we can advance past that frame
+        // Other i/o errors should be true
         true
     }
 }
 
-impl std::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DecodeError::IO(err) => write!(f, "{}", err),
-        }
-    }
-}
-
 impl From<io::Error> for DecodeError {
-    fn from(e: io::Error) -> Self {
-        DecodeError::IO(e)
+    fn from(source: io::Error) -> Self {
+        DecodeError::IO { source }
     }
 }
 
@@ -167,8 +175,8 @@ enum LogstashFrameType {
     Compressed, // C
 }
 
-// Based on implementation from logstash: https://github.com/logstash-plugins/logstash-input-beats/blob/27bad62a26a81fc000a9d21495b8dc7174ab63e9/src/main/java/org/logstash/beats/BeatsParser.java
-// There is a protocol spec too but it appears to be out-of-date: https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md
+// Based on spec at: https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md
+// And implementation from logstash: https://github.com/logstash-plugins/logstash-input-beats/blob/27bad62a26a81fc000a9d21495b8dc7174ab63e9/src/main/java/org/logstash/beats/BeatsParser.java
 impl Decoder for LogstashDecoder {
     type Item = BTreeMap<String, serde_json::Value>;
     type Error = DecodeError;
@@ -197,8 +205,11 @@ impl Decoder for LogstashDecoder {
                             self.state =
                                 LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V2);
                         }
-                        // TODO decode error
-                        version => panic!("ohno {:?}", version),
+                        version => {
+                            return Err(DecodeError::UnknownProtocolVersion {
+                                version: version as char,
+                            });
+                        }
                     }
                 }
                 LogstashDecoderReadState::ReadType(version) => {
@@ -231,8 +242,11 @@ impl Decoder for LogstashDecoder {
                                 LogstashFrameType::Compressed,
                             )
                         }
-                        // TODO decode error
-                        code => panic!("ohno: {:?}", code),
+                        message_type => {
+                            return Err(DecodeError::UnknownMessageType {
+                                message_type: message_type as char,
+                            });
+                        }
                     }
                 }
                 LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::WindowSize) => {
@@ -260,14 +274,17 @@ impl Decoder for LogstashDecoder {
                                 }
 
                                 Some(slice) => {
-                                    let fields: BTreeMap<String, serde_json::Value> =
-                                        serde_json::from_slice(&slice[..]).expect("TODO");
+                                    let fields_result: Result<
+                                        BTreeMap<String, serde_json::Value>,
+                                        _,
+                                    > = serde_json::from_slice(&slice[..])
+                                        .context(JsonFrameFailedDecode {});
 
                                     src.advance(8 + payload_size as usize);
 
                                     self.state = LogstashDecoderReadState::ReadProtocol;
 
-                                    return Ok(Some(fields));
+                                    return fields_result.map(Option::Some);
                                 }
                             }
                         }
@@ -289,15 +306,15 @@ impl Decoder for LogstashDecoder {
                                     let mut buf = {
                                         let mut buf = Vec::new();
 
-                                        if let Err(err) =
-                                            ZlibDecoder::new(io::Cursor::new(&slice[..]))
-                                                .read_to_end(&mut buf)
-                                        {
-                                            return Err(err.into());
-                                        }
+                                        let res = ZlibDecoder::new(io::Cursor::new(&slice[..]))
+                                            .read_to_end(&mut buf)
+                                            .context(DecompressionFailed)
+                                            .map(|_| BytesMut::from(&buf[..]));
 
-                                        BytesMut::from(&buf[..])
-                                    };
+                                        src.advance(4 + payload_size as usize);
+
+                                        res
+                                    }?;
 
                                     let mut decoder = LogstashDecoder::new();
 
@@ -307,7 +324,6 @@ impl Decoder for LogstashDecoder {
                                         frames.push_back(s);
                                     }
 
-                                    src.advance(4 + payload_size as usize);
                                     self.state = LogstashDecoderReadState::PendingFrames(frames);
                                 }
                             }
