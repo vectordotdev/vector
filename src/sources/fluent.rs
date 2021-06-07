@@ -780,7 +780,7 @@ mod integration_tests {
     use crate::{
         config::SourceContext,
         docker::docker,
-        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
+        test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp},
         Pipeline,
     };
     use bollard::{
@@ -945,6 +945,7 @@ mod integration_tests {
             image: Some(format!("{}:{}", image, tag)),
             host_config: Some(HostConfig {
                 network_mode: Some(String::from("host")),
+                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
                 binds: Some(vec![format!("{}:{}", dir.path().display(), "/fluentd/etc")]),
                 ..Default::default()
             }),
@@ -1006,7 +1007,7 @@ mod integration_tests {
 
     async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
-        let address = next_addr();
+        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             FluentConfig {
                 address: address.into(),
