@@ -23,8 +23,10 @@ pub mod api;
 mod builder;
 mod compiler;
 pub mod component;
+pub mod decoding;
 mod diff;
 pub mod format;
+mod framing;
 mod loading;
 pub mod provider;
 mod unit_test;
@@ -209,6 +211,8 @@ macro_rules! impl_generate_config_from_default {
 pub struct SourceOuter {
     #[serde(default = "default_acknowledgements")]
     pub acknowledgements: bool,
+    pub framing: framing::SourceFramers,
+    pub decoding: decoding::DecodingsConfig,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,
 }
@@ -218,8 +222,14 @@ fn default_acknowledgements() -> bool {
 }
 
 impl SourceOuter {
-    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
+    pub(crate) fn new(
+        framing: framing::SourceFramers,
+        decoding: decoding::DecodingsConfig,
+        source: impl SourceConfig + 'static,
+    ) -> Self {
         Self {
+            framing,
+            decoding,
             acknowledgements: default_acknowledgements(),
             inner: Box::new(source),
         }
@@ -243,6 +253,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 
 pub struct SourceContext {
     pub name: String,
+    pub framing: framing::SourceFramers,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -260,6 +271,7 @@ impl SourceContext {
         (
             Self {
                 name: name.into(),
+                framing: Default::default(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -273,6 +285,7 @@ impl SourceContext {
     pub fn new_test(out: Pipeline) -> Self {
         Self {
             name: "default".into(),
+            framing: Default::default(),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
