@@ -67,6 +67,18 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      # Install and configure sccache, including telling Cargo to use it.
+      - uses: actions-rs/install@v0.1
+        with:
+          crate: sccache
+          version: latest
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make slim-builds
 
       # First, we run the benchmarks against master to establish our baseline numbers. Our benchmark
@@ -106,6 +118,8 @@ jobs:
         run: |
           echo "Comparing $(git rev-parse HEAD) with $(git rev-parse origin/master)"
           cat target/criterion/out | scripts/check-criterion-output.sh
+      - name: Stop sccache
+        run: sccache --stop-server
 
   master-failure:
     name: master-failure
