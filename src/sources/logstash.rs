@@ -20,7 +20,7 @@ use std::{
 use tokio_util::codec::Decoder;
 
 // TODO
-// * Handle window size and acking
+// * Handle acking
 // * Handle protocol version differences
 // * Handle Data frames
 // * usize casts bounds
@@ -249,6 +249,9 @@ impl Decoder for LogstashDecoder {
                         }
                     }
                 }
+                // The window size indicates how many events the writer will send before waiting
+                // for acks. As we forward events as we get them, and ack as they are receieved, we
+                // do not need to keep track of this.
                 LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::WindowSize) => {
                     if src.remaining() < 4 {
                         return Ok(None);
