@@ -7,7 +7,7 @@ use crate::{
 };
 use cfg_if::cfg_if;
 use futures::StreamExt;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 use tokio::{
     runtime::{self, Runtime},
     sync::mpsc,
@@ -151,7 +151,7 @@ impl Application {
 
                 info!(
                     message = "Loading configs.",
-                    path = ?config_paths
+                    paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
