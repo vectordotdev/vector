@@ -18,8 +18,6 @@ const MAX_METRIC_PATH_DEPTH: usize = 3;
 /// An adapter to turn `Event`s into `vrl_core::Target`s.
 #[derive(Debug, Clone)]
 pub enum VrlTarget {
-    Chunk(Value, EventMetadata),
-    Frame(Value, EventMetadata),
     // `LogEvent` is essentially just a destructured `event::LogEvent`, but without the semantics
     // that `fields` must always be a `Map` variant.
     LogEvent(Value, EventMetadata),
@@ -29,8 +27,6 @@ pub enum VrlTarget {
 impl VrlTarget {
     pub fn new(event: Event) -> Self {
         match event {
-            Event::Chunk(chunk, metadata) => VrlTarget::Chunk(Value::Bytes(chunk.into()), metadata),
-            Event::Frame(frame, metadata) => VrlTarget::Frame(Value::Bytes(frame.into()), metadata),
             Event::Log(event) => {
                 let (fields, metadata) = event.into_parts();
                 VrlTarget::LogEvent(Value::Map(fields), metadata)
@@ -45,14 +41,6 @@ impl VrlTarget {
     /// array to `.` in VRL.
     pub fn into_events(self) -> impl Iterator<Item = Event> {
         match self {
-            VrlTarget::Chunk(chunk, metadata) => Box::new(std::iter::once(Event::Chunk(
-                (*chunk.into_bytes()).to_owned(),
-                metadata,
-            ))) as Box<dyn Iterator<Item = Event>>,
-            VrlTarget::Frame(frame, metadata) => Box::new(std::iter::once(Event::Frame(
-                (*frame.into_bytes()).to_owned(),
-                metadata,
-            ))) as Box<dyn Iterator<Item = Event>>,
             VrlTarget::LogEvent(value, metadata) => {
                 Box::new(value_into_log_events(value, metadata)) as Box<dyn Iterator<Item = Event>>
             }
@@ -66,8 +54,6 @@ impl VrlTarget {
 impl vrl_core::Target for VrlTarget {
     fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
         match self {
-            VrlTarget::Chunk(_, _) => Err("cannot set value on byte chunk".to_owned()),
-            VrlTarget::Frame(_, _) => Err("cannot set value on byte frame".to_owned()),
             VrlTarget::LogEvent(ref mut log, _) => log
                 .insert(path.clone(), value)
                 .map(|_| ())
@@ -82,7 +68,7 @@ impl vrl_core::Target for VrlTarget {
                         ["tags"] => {
                             let value = value.try_object().map_err(|e| e.to_string())?;
                             for (field, value) in &value {
-                                metric.set_tag_value(
+                                metric.insert_tag(
                                     field.as_str().to_owned(),
                                     value
                                         .try_bytes_utf8_lossy()
@@ -94,7 +80,7 @@ impl vrl_core::Target for VrlTarget {
                         }
                         ["tags", field] => {
                             let value = value.try_bytes().map_err(|e| e.to_string())?;
-                            metric.set_tag_value(
+                            metric.insert_tag(
                                 (*field).to_owned(),
                                 String::from_utf8_lossy(&value).into_owned(),
                             );
@@ -141,8 +127,6 @@ impl vrl_core::Target for VrlTarget {
 
     fn get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_core::Value>, String> {
         match self {
-            VrlTarget::Chunk(_, _) => Err("cannot get value on byte chunk".to_owned()),
-            VrlTarget::Frame(_, _) => Err("cannot get value on byte frame".to_owned()),
             VrlTarget::LogEvent(log, _) => log
                 .get(path)
                 .map(|val| val.map(|val| val.clone().into()))
@@ -217,8 +201,6 @@ impl vrl_core::Target for VrlTarget {
         compact: bool,
     ) -> Result<Option<vrl_core::Value>, String> {
         match self {
-            VrlTarget::Chunk(_, _) => Err("cannot remove value from byte chunk".to_owned()),
-            VrlTarget::Frame(_, _) => Err("cannot remove value from byte frame".to_owned()),
             VrlTarget::LogEvent(ref mut log, _) => {
                 if path.is_root() {
                     Ok(Some({
@@ -249,7 +231,7 @@ impl vrl_core::Target for VrlTarget {
                                 vrl_core::Value::from_iter(iter)
                             }))
                         }
-                        ["tags", field] => return Ok(metric.delete_tag(field).map(Into::into)),
+                        ["tags", field] => return Ok(metric.remove_tag(field).map(Into::into)),
                         _ => {
                             return Err(MetricPathError::InvalidPath {
                                 path: &path.to_string(),

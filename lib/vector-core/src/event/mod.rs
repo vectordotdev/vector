@@ -6,7 +6,7 @@ pub use finalization::{
 };
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
-pub use metadata::EventMetadata;
+pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
@@ -43,8 +43,6 @@ pub const PARTIAL: &str = "_partial";
 
 #[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Event {
-    Chunk(Vec<u8>, EventMetadata),
-    Frame(Vec<u8>, EventMetadata),
     Log(LogEvent),
     Metric(Metric),
 }
@@ -129,7 +127,6 @@ impl Event {
 
     pub fn metadata(&self) -> &EventMetadata {
         match self {
-            Self::Chunk(_, metadata) | Self::Frame(_, metadata) => metadata,
             Self::Log(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
         }
@@ -137,7 +134,6 @@ impl Event {
 
     pub fn metadata_mut(&mut self) -> &mut EventMetadata {
         match self {
-            Self::Chunk(_, ref mut metadata) | Self::Frame(_, ref mut metadata) => metadata,
             Self::Log(log) => log.metadata_mut(),
             Self::Metric(metric) => metric.metadata_mut(),
         }
@@ -146,11 +142,15 @@ impl Event {
     pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
         let finalizer = EventFinalizer::new(batch);
         match self {
-            Self::Chunk(_, ref mut metadata) | Self::Frame(_, ref mut metadata) => {
-                metadata.add_finalizer(finalizer)
-            }
             Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
+        }
+    }
+
+    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+        match self {
+            Self::Log(log) => log.with_batch_notifier(batch).into(),
+            Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
         }
     }
 }
@@ -158,10 +158,6 @@ impl Event {
 impl EventDataEq for Event {
     fn event_data_eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Chunk(a, metadata_a), Self::Chunk(b, metadata_b))
-            | (Self::Frame(a, metadata_a), Self::Frame(b, metadata_b)) => {
-                a == b && metadata_a.event_data_eq(metadata_b)
-            }
             (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
             (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
             _ => false,
@@ -270,8 +266,6 @@ impl TryInto<serde_json::Value> for Event {
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
         match self {
-            Event::Chunk(chunk, _) => serde_json::to_value(chunk),
-            Event::Frame(frame, _) => serde_json::to_value(frame),
             Event::Log(fields) => serde_json::to_value(fields),
             Event::Metric(metric) => serde_json::to_value(metric),
         }
@@ -375,8 +369,6 @@ impl From<Metric> for Event {
 /// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
 #[derive(Clone, Copy, Debug)]
 pub enum EventRef<'a> {
-    Chunk(&'a [u8], &'a EventMetadata),
-    Frame(&'a [u8], &'a EventMetadata),
     Log(&'a LogEvent),
     Metric(&'a Metric),
 }
@@ -384,8 +376,6 @@ pub enum EventRef<'a> {
 impl<'a> From<&'a Event> for EventRef<'a> {
     fn from(event: &'a Event) -> Self {
         match event {
-            Event::Chunk(chunk, metadata) => EventRef::Chunk(chunk, metadata),
-            Event::Frame(frame, metadata) => EventRef::Chunk(frame, metadata),
             Event::Log(log) => log.into(),
             Event::Metric(metric) => metric.into(),
         }

@@ -5,19 +5,9 @@ import "google/protobuf/timestamp.proto";
 
 message EventWrapper {
   oneof event {
-    Chunk chunk = 3;
-    Frame frame = 4;
     Log log = 1;
     Metric metric = 2;
   }
-}
-
-message Chunk {
-  bytes bytes = 1;
-}
-
-message Frame {
-  bytes bytes = 1;
 }
 
 message Log {

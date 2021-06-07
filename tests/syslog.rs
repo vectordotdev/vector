@@ -35,7 +35,6 @@ async fn test_tcp_syslog() {
             tls: None,
             receive_buffer_bytes: None,
         }),
-        vec![].into(),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
@@ -89,7 +88,6 @@ async fn test_unix_stream_syslog() {
         SyslogConfig::from_mode(Mode::Unix {
             path: in_path.clone(),
         }),
-        vec![].into(),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
@@ -155,7 +153,6 @@ async fn test_octet_counting_syslog() {
             tls: None,
             receive_buffer_bytes: None,
         }),
-        vec![].into(),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 

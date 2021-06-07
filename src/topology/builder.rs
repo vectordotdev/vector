@@ -1,5 +1,4 @@
 use super::{
-    codecs::Codecs,
     fanout::{self, Fanout},
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
@@ -78,8 +77,7 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = Codecs::new(&source.codecs, rx);
-        let pump = pump.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
+        let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source

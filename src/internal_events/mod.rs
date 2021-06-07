@@ -33,6 +33,8 @@ mod console;
 mod datadog_logs;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
+#[cfg(feature = "sources-dnstap")]
+mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
@@ -41,6 +43,8 @@ mod encoding_transcode;
 mod exec;
 #[cfg(feature = "transforms-filter")]
 mod filter;
+#[cfg(feature = "sources-fluent")]
+mod fluent;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-geoip")]
@@ -154,6 +158,8 @@ pub use self::console::*;
 pub use self::datadog_logs::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
+#[cfg(feature = "sources-dnstap")]
+pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
@@ -168,6 +174,8 @@ pub use self::exec::*;
 pub use self::file::*;
 #[cfg(feature = "transforms-filter")]
 pub use self::filter::*;
+#[cfg(feature = "sources-fluent")]
+pub use self::fluent::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
 #[cfg(feature = "transforms-geoip")]

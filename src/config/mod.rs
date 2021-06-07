@@ -21,7 +21,6 @@ use std::path::PathBuf;
 
 pub mod api;
 mod builder;
-pub mod codec;
 mod compiler;
 pub mod component;
 mod diff;
@@ -208,8 +207,6 @@ macro_rules! impl_generate_config_from_default {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SourceOuter {
-    #[serde(flatten)]
-    pub codecs: codec::CodecsConfig,
     #[serde(default = "default_acknowledgements")]
     pub acknowledgements: bool,
     #[serde(flatten)]
@@ -217,13 +214,12 @@ pub struct SourceOuter {
 }
 
 fn default_acknowledgements() -> bool {
-    true
+    false
 }
 
 impl SourceOuter {
-    pub(crate) fn new(codecs: codec::CodecsConfig, source: impl SourceConfig + 'static) -> Self {
+    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
         Self {
-            codecs,
             acknowledgements: default_acknowledgements(),
             inner: Box::new(source),
         }

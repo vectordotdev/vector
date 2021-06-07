@@ -25,7 +25,6 @@ async fn pipe() {
     config.add_source(
         "in",
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-        vec![].into(),
     );
     config.add_sink(
         "out",
@@ -64,7 +63,6 @@ async fn sample() {
     config.add_source(
         "in",
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-        vec![].into(),
     );
     config.add_transform(
         "sample",
@@ -122,7 +120,6 @@ async fn fork() {
     config.add_source(
         "in",
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-        vec![].into(),
     );
     config.add_sink(
         "out1",
@@ -181,12 +178,10 @@ async fn merge_and_fork() {
     config.add_source(
         "in1",
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr1),
-        vec![].into(),
     );
     config.add_source(
         "in2",
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr2),
-        vec![].into(),
     );
     config.add_sink(
         "out1",
@@ -256,7 +251,6 @@ async fn reconnect() {
     config.add_source(
         "in",
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-        vec![].into(),
     );
     config.add_sink(
         "out",

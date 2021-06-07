@@ -23,6 +23,12 @@ is_kubectl_context_minikube() {
   [[ "$(kubectl config current-context || true)" == "minikube" ]]
 }
 
+# Detect if current kubectl context is `kind`.
+is_kubectl_context_kind() {
+  [[ "$(kubectl config current-context || true)" == "kind-kind" ]]
+}
+
+
 # Whether to use `minikube cache` to pass image to the k8s cluster.
 # After we build vector docker image, instead of pushing to the remote repo,
 # we'll be using `minikube cache` to make image available to the cluster.
@@ -125,9 +131,11 @@ fi
 # Export the container image to be accessible from the deployment command.
 export CONTAINER_IMAGE
 
-# Set the deployment command for integration tests.
+# Set the deployment commands for integration tests.
 KUBE_TEST_DEPLOY_COMMAND="$(pwd)/scripts/deploy-kubernetes-test.sh"
 export KUBE_TEST_DEPLOY_COMMAND
+KUBE_TEST_DEPLOY_GENERIC_COMMAND="$(pwd)/scripts/deploy-public-chart-test.sh"
+export KUBE_TEST_DEPLOY_GENERIC_COMMAND
 
 # Prepare args.
 CARGO_TEST_ARGS_CARGO=()
@@ -143,6 +151,7 @@ fi
 
 # Run the tests.
 cd lib/k8s-e2e-tests
+export RUST_LOG=debug
 cargo test \
   --no-fail-fast \
   --no-default-features \

@@ -136,6 +136,7 @@ impl Value {
             Value::Float(lhv) => {
                 (lhv.into_inner() > f64::try_from(&rhs).map_err(|_| err())?).into()
             }
+            Value::Bytes(lhv) => (lhv > rhs.try_bytes()?).into(),
             _ => return Err(err()),
         };
 
@@ -152,6 +153,7 @@ impl Value {
             Value::Float(lhv) => {
                 (lhv.into_inner() >= f64::try_from(&rhs).map_err(|_| err())?).into()
             }
+            Value::Bytes(lhv) => (lhv >= rhs.try_bytes()?).into(),
             _ => return Err(err()),
         };
 
@@ -168,6 +170,7 @@ impl Value {
             Value::Float(lhv) => {
                 (lhv.into_inner() < f64::try_from(&rhs).map_err(|_| err())?).into()
             }
+            Value::Bytes(lhv) => (lhv < rhs.try_bytes()?).into(),
             _ => return Err(err()),
         };
 
@@ -184,6 +187,7 @@ impl Value {
             Value::Float(lhv) => {
                 (lhv.into_inner() <= f64::try_from(&rhs).map_err(|_| err())?).into()
             }
+            Value::Bytes(lhv) => (lhv <= rhs.try_bytes()?).into(),
             _ => return Err(err()),
         };
 

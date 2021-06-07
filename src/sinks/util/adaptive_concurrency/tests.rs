@@ -374,7 +374,7 @@ async fn run_test(params: TestParams) -> TestResults {
     let mut config = config::Config::builder();
     let generator =
         GeneratorConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
-    config.add_source("in", generator, vec![].into());
+    config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
@@ -411,35 +411,28 @@ async fn run_test(params: TestParams) -> TestResults {
         metrics
             .get("adaptive_concurrency_observed_rtt")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
     assert!(matches!(
         metrics
             .get("adaptive_concurrency_averaged_rtt")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
     if params.concurrency == Concurrency::Adaptive {
         assert!(matches!(
-            metrics
-                .get("adaptive_concurrency_limit")
-                .unwrap()
-                .data
-                .value,
-            MetricValue::AggregatedHistogram { .. }
+            metrics.get("adaptive_concurrency_limit").unwrap().value(),
+            &MetricValue::AggregatedHistogram { .. }
         ));
     }
     assert!(matches!(
         metrics
             .get("adaptive_concurrency_in_flight")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
 
     TestResults { stats, cstats }

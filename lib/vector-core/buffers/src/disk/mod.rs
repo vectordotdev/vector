@@ -19,12 +19,12 @@ pub enum DataDirError {
     NotFound { data_dir: PathBuf },
     #[snafu(display("The configured data_dir {:?} is not writable by the vector process, please ensure vector can write to that directory", data_dir))]
     NotWritable { data_dir: PathBuf },
-    #[snafu(display("Unable to look up data_dir {:?}", data_dir))]
+    #[snafu(display("Unable to look up data_dir {:?}: {:?}", data_dir, source))]
     Metadata {
         data_dir: PathBuf,
         source: std::io::Error,
     },
-    #[snafu(display("Unable to open data_dir {:?}", data_dir))]
+    #[snafu(display("Unable to open data_dir {:?}: {:?}", data_dir, source))]
     Open {
         data_dir: PathBuf,
         source: leveldb::database::error::Error,

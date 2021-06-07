@@ -34,7 +34,6 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-                        vec![].into(),
                     );
                     config.add_sink(
                         "out",
@@ -102,12 +101,10 @@ fn benchmark_interconnected(c: &mut Criterion) {
                 config.add_source(
                     "in1",
                     sources::socket::SocketConfig::make_basic_tcp_config(in_addr1),
-                    vec![].into(),
                 );
                 config.add_source(
                     "in2",
                     sources::socket::SocketConfig::make_basic_tcp_config(in_addr2),
-                    vec![].into(),
                 );
                 config.add_sink(
                     "out1",
@@ -176,7 +173,6 @@ fn benchmark_transforms(c: &mut Criterion) {
                 config.add_source(
                     "in",
                     sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-                    vec![].into(),
                 );
                 config.add_transform(
                     "parser",
@@ -255,12 +251,10 @@ fn benchmark_complex(c: &mut Criterion) {
                 config.add_source(
                     "in1",
                     sources::socket::SocketConfig::make_basic_tcp_config(in_addr1),
-                    vec![].into(),
                 );
                 config.add_source(
                     "in2",
                     sources::socket::SocketConfig::make_basic_tcp_config(in_addr2),
-                    vec![].into(),
                 );
                 config.add_transform(
                     "parser",
@@ -474,7 +468,6 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                         tls: None,
                         receive_buffer_bytes: None,
                     }),
-                    vec![].into()
                 );
 
                 let toml_cfg = indoc! {r#"

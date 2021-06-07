@@ -29,6 +29,7 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::Container;
+pub use container::Variant;
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;
@@ -53,6 +54,13 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     ///
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
+
+    /// Resolve an expression to a value without any context, if possible.
+    ///
+    /// This returns `Some` for static expressions, or `None` for dynamic expressions.
+    fn as_value(&self) -> Option<Value> {
+        None
+    }
 
     /// Resolve an expression to its [`TypeDef`] type definition.
     ///
@@ -128,6 +136,24 @@ impl Expression for Expr {
             Noop(v) => v.resolve(ctx),
             Unary(v) => v.resolve(ctx),
             Abort(v) => v.resolve(ctx),
+        }
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        use Expr::*;
+
+        match self {
+            Literal(v) => Expression::as_value(v),
+            Container(v) => Expression::as_value(v),
+            IfStatement(v) => Expression::as_value(v),
+            Op(v) => Expression::as_value(v),
+            Assignment(v) => Expression::as_value(v),
+            Query(v) => Expression::as_value(v),
+            FunctionCall(v) => Expression::as_value(v),
+            Variable(v) => Expression::as_value(v),
+            Noop(v) => Expression::as_value(v),
+            Unary(v) => Expression::as_value(v),
+            Abort(v) => Expression::as_value(v),
         }
     }
 
