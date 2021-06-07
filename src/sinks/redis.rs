@@ -37,9 +37,24 @@ enum RedisSinkError {
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub enum DataType {
+pub enum DataTypeConfig {
     #[derivative(Default)]
     List,
+    Channel,
+}
+
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub struct ListOption {
+    method: Method,
+}
+
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DataType {
+    #[derivative(Default)]
+    List(Method),
     Channel,
 }
 
@@ -50,12 +65,6 @@ pub enum Method {
     #[derivative(Default)]
     LPush,
     RPush,
-}
-
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub struct ListOption {
-    method: Method,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
@@ -77,7 +86,7 @@ lazy_static! {
 pub struct RedisSinkConfig {
     encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    data_type: DataType,
+    data_type: DataTypeConfig,
     #[serde(alias = "list")]
     list_option: Option<ListOption>,
     url: String,
@@ -142,7 +151,10 @@ impl RedisSinkConfig {
 
         let method = self.list_option.map(|option| option.method);
 
-        let data_type = self.data_type;
+        let data_type = match self.data_type {
+            DataTypeConfig::Channel => DataType::Channel,
+            DataTypeConfig::List => DataType::List(method.unwrap()),
+        };
 
         let batch = BatchSettings::default()
             .events(1)
@@ -151,11 +163,7 @@ impl RedisSinkConfig {
 
         let buffer = VecBuffer::new(batch.size);
 
-        let redis = RedisSink {
-            conn,
-            data_type,
-            method,
-        };
+        let redis = RedisSink { conn, data_type };
 
         let svc = ServiceBuilder::new()
             .settings(request, RedisRetryLogic)
@@ -234,7 +242,7 @@ type RedisPipeResult = RedisResult<Vec<bool>>;
 
 impl Response for Vec<bool> {
     fn is_successful(&self) -> bool {
-       self.iter().all(|x| x)
+        self.iter().all(|x| *x)
     }
 }
 
@@ -261,7 +269,6 @@ impl RetryLogic for RedisRetryLogic {
 pub struct RedisSink {
     conn: ConnectionManager,
     data_type: DataType,
-    method: Option<Method>,
 }
 
 impl Service<Vec<RedisKvEntry>> for RedisSink {
@@ -275,36 +282,35 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
 
     fn call(&mut self, kvs: Vec<RedisKvEntry>) -> Self::Future {
         let mut byte_size = 0;
-
-        let data_type = self.data_type;
-        let method = self.method;
+        let mut count = 0;
 
         let mut conn = self.conn.clone();
         let mut pipe = redis::pipe();
 
         for kv in kvs {
+            count += 1;
             byte_size += kv.encoded_length();
-            match (data_type, method) {
-                (DataType::List, Some(Method::LPush)) => {
-                    pipe.atomic().lpush(kv.key, kv.value);
-                }
-                (DataType::List, Some(Method::RPush)) => {
-                    pipe.atomic().rpush(kv.key, kv.value);
-                }
-                (DataType::Channel, None) => {
+            match self.data_type {
+                DataType::List(method) => match method {
+                    Method::LPush => {
+                        pipe.atomic().lpush(kv.key, kv.value);
+                    }
+                    Method::RPush => {
+                        pipe.atomic().rpush(kv.key, kv.value);
+                    }
+                },
+                DataType::Channel => {
                     pipe.atomic().publish(kv.key, kv.value);
-                }
-                _ => {
-                    panic!("The `data_type` can't be empty, when `data_type` is `list`, `method` cannot be empty.")
                 }
             }
         }
+
         Box::pin(async move {
             let result: RedisPipeResult = pipe.query_async(&mut conn).await;
             match result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(RedisEventSent { byte_size });
+                        emit!(RedisEventSent { count, byte_size });
                     }
                     Ok(res)
                 }
@@ -412,7 +418,7 @@ mod integration_tests {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
-            data_type: DataType::List,
+            data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::LPush,
             }),
@@ -471,7 +477,7 @@ mod integration_tests {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
-            data_type: DataType::List,
+            data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::RPush,
             }),
@@ -545,7 +551,7 @@ mod integration_tests {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
-            data_type: DataType::Channel,
+            data_type: DataTypeConfig::Channel,
             list_option: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig {

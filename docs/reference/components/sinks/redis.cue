@@ -30,7 +30,16 @@ components: sinks: redis: {
 					enum: ["json", "text"]
 				}
 			}
-			request: enabled: false
+			request: {
+				enabled:                    true
+				concurrency:                5
+				rate_limit_duration_secs:   1
+				rate_limit_num:             65535
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               1
+				headers:                    false
+			}
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -141,5 +150,13 @@ components: sinks: redis: {
 				API.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		events_in_total:        components.sources.internal_metrics.output.metrics.events_in_total
+		events_out_total:       components.sources.internal_metrics.output.metrics.events_out_total
+		send_errors_total:      components.sources.internal_metrics.output.metrics.send_errors_total
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }
