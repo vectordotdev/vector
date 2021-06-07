@@ -17,8 +17,11 @@ env:
 
 jobs:
   hack:
-    runs-on: [self-hosted, linux, x64, general]
     name: Cargo Flake
+    runs-on: [self-hosted, linux, x64, general]
+    strategy:
+      matrix:
+        target: [default, benches, metrics-benches, remap-benches]
     steps:
       - uses: actions/checkout@v2.3.4
       - uses: actions/cache@v2.1.6
@@ -33,4 +36,4 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install cargo-flake
       - run: make slim-builds
-      - run: cargo flake --features 'default benches metrics-benches remap-benches'
+      - run: cargo flake --features $${ matrix.target }}
