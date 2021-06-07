@@ -32,29 +32,13 @@ data:
       hold valid 10s
       hold obsolete 60s
 
-    frontend datadog-logs
-      bind *:3837
+    frontend stats
       mode http
-      option httplog
-      default_backend datadog-logs
-
-    backend datadog-logs
-      mode http
-      balance roundrobin
-      option tcp-check
-      server-template srv 5 _datadog-logs._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns check
-
-    frontend syslog
-      bind *:5140
-      default_backend syslog
-
-    backend syslog
-      balance roundrobin
-      option tcp-check
-      server-template srv 5 _syslog._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns check
-
+      bind *:1024
+      http-request use-service prometheus-exporter if { path /metrics }
+    {{ if .Values.vectorSource.enabled }}
     frontend vector
-      bind *:9000 proto h2
+      bind *:{{ .Values.vectorSource.listenPort }} proto h2
       mode http
       option httplog
       default_backend vector
@@ -63,10 +47,19 @@ data:
       mode http
       balance roundrobin
       option tcp-check
-      server-template srv 5 _vector._tcp.vector-aggregator-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns proto h2 check
-
-    frontend stats
+      server-template srv 5 _vector._tcp.{{ include "libvector.fullname" . }}-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns proto h2 check
+    {{- end }}
+    {{ range $item := .Values.service.ports }}
+    frontend {{ $item.name }}
+      bind *:{{ $item.port }}
       mode http
-      bind *:1024
-      http-request use-service prometheus-exporter if { path /metrics }
+      option httplog
+      default_backend {{ $item.name }}
+
+    backend {{ $item.name }}
+      mode http
+      balance roundrobin
+      option tcp-check
+      server-template srv 5 _{{ $item.name }}._tcp.{{ include "libvector.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.global.clusterDomain }} resolvers coredns check
+    {{ end }}
 {{- end }}
