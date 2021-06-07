@@ -30,7 +30,8 @@ start_podman () {
 	 -e KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf" \
 	 -e KAFKA_INTER_BROKER_LISTENER_NAME=SASL_PLAINTEXT -e KAFKA_SASL_ENABLED_MECHANISMS=PLAIN \
 	 -e KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN -v "$(pwd)"/tests/data/localhost.p12:/certs/localhost.p12:ro \
-	 -v "$(pwd)"/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name vector_kafka wurstmeister/kafka
+   # pinned to 2.6.0 due to https://github.com/wurstmeister/kafka-docker/issues/669
+	 -v "$(pwd)"/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name vector_kafka wurstmeister/kafka:2.13-2.6.0
 }
 
 start_docker () {
@@ -45,7 +46,8 @@ start_docker () {
 	 -e KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf" \
 	 -e KAFKA_INTER_BROKER_LISTENER_NAME=SASL_PLAINTEXT -e KAFKA_SASL_ENABLED_MECHANISMS=PLAIN \
 	 -e KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN -v "$(pwd)"/tests/data/localhost.p12:/certs/localhost.p12:ro \
-	 -v "$(pwd)"/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name vector_kafka wurstmeister/kafka
+   # pinned to 2.6.0 due to https://github.com/wurstmeister/kafka-docker/issues/669
+	 -v "$(pwd)"/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name vector_kafka wurstmeister/kafka:2.13-2.6.0
 }
 
 stop_podman () {
