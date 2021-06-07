@@ -183,7 +183,7 @@ impl HostMetricsConfig {
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
-                (metric.series.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
+                metric.insert_tag("host".into(), hostname.into());
             }
         }
         emit!(HostMetricsEventReceived {
@@ -709,7 +709,7 @@ async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Op
 
 fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     for metric in &mut metrics {
-        (metric.series.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
+        metric.insert_tag("collector".into(), collector.into());
     }
     metrics
 }
@@ -1145,13 +1145,13 @@ mod tests {
     fn all_counters(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.data.value, MetricValue::Counter { .. }))
+            .any(|metric| !matches!(metric.value(), &MetricValue::Counter { .. }))
     }
 
     fn all_gauges(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.data.value, MetricValue::Gauge { .. }))
+            .any(|metric| !matches!(metric.value(), &MetricValue::Gauge { .. }))
     }
 
     fn all_tags_match(metrics: &[Metric], tag: &str, matches: impl Fn(&str) -> bool) -> bool {

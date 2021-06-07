@@ -161,7 +161,7 @@ mod test {
             "##;
         let result = parse_text(exp).unwrap();
         assert_eq!(result.len(), 1);
-        assert!(result[0].data.timestamp.unwrap() >= now);
+        assert!(result[0].timestamp().unwrap() >= now);
     }
 
     #[test]
@@ -200,7 +200,7 @@ mod test {
             name{labelname="val1",basename="basevalue"} NaN
             "##;
 
-        match parse_text(exp).unwrap()[0].data.value {
+        match parse_text(exp).unwrap()[0].value() {
             MetricValue::Counter { value } => {
                 assert!(value.is_nan());
             }
@@ -897,11 +897,15 @@ mod test {
             "##;
 
         let now = Utc::now();
-        let mut result = parse_text(exp).expect("Parsing failed");
-        for metric in &mut result {
-            assert!(metric.data.timestamp.expect("Missing timestamp") >= now);
-            metric.data.timestamp = Some(*TIMESTAMP);
-        }
+        let result = parse_text(exp).expect("Parsing failed");
+        // Reset all the timestamps for comparison
+        let result: Vec<_> = result
+            .into_iter()
+            .map(|metric| {
+                assert!(metric.timestamp().expect("Missing timestamp") >= now);
+                metric.with_timestamp(Some(*TIMESTAMP))
+            })
+            .collect();
 
         assert_event_data_eq!(
             result,
