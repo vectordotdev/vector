@@ -1,14 +1,9 @@
-use serde::{
-    de::{self, IntoDeserializer, MapAccess, Visitor},
-    Deserialize, Deserializer, Serialize,
-};
-use std::fmt::{self, Debug};
-use vector_core::{
-    event::Event,
-    transform::{FunctionTransform, Transform},
-};
+#[cfg(test)]
+use crate::codecs::NoopCodec;
+use serde::{Deserialize, Deserializer, Serialize};
+use vector_core::transform::Transform;
 
-#[derive(Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Serialize)]
 pub struct CodecsConfig {
     pub codec: Vec<CodecConfig>,
 }
@@ -47,71 +42,37 @@ impl From<Vec<CodecConfig>> for CodecsConfig {
     }
 }
 
-impl IntoIterator for CodecsConfig {
-    type Item = CodecConfig;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.codec.into_iter()
-    }
-}
-
-#[derive(Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CodecConfig(pub(crate) Codec);
 
 impl CodecConfig {
-    pub fn build(&self) -> Transform {
-        #[derive(Copy, Clone)]
-        struct NoopTransform;
-
-        impl FunctionTransform for NoopTransform {
-            fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-                output.push(event)
-            }
+    pub fn name(&self) -> String {
+        match &self.0 {
+            Codec::String(string) => string.into(),
+            Codec::Object(codec) => codec.name().to_owned(),
         }
+    }
 
-        Transform::function(NoopTransform)
+    pub fn build(&self) -> crate::Result<Transform> {
+        match &self.0 {
+            Codec::String(string) => {
+                use crate::codecs::Codec;
+                match string.as_str() {
+                    #[cfg(test)]
+                    "noop" => NoopCodec.build(),
+                    _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
+                }
+            }
+            Codec::Object(codec) => codec.build(),
+        }
     }
 }
 
-impl<'de> Deserialize<'de> for CodecConfig {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct StringOrStruct;
-
-        impl<'de> Visitor<'de> for StringOrStruct {
-            type Value = CodecConfig;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("string or map")
-            }
-
-            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                Ok(CodecConfig(Codec::deserialize(value.into_deserializer())?))
-            }
-
-            fn visit_map<M>(self, map: M) -> std::result::Result<Self::Value, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
-            }
-        }
-
-        deserializer.deserialize_any(StringOrStruct)
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Codec {
-    Utf8,
-    Json,
+    String(String),
+    Object(Box<dyn crate::codecs::Codec>),
 }
 
 #[cfg(test)]
@@ -122,23 +83,55 @@ mod tests {
     #[test]
     fn config_codecs_single() {
         let config: CodecsConfig = toml::from_str(indoc! {r#"
-            codec = "json"
+            codec = "noop"
         "#})
         .unwrap();
+        let codecs = config.codec;
 
-        assert_eq!(config, vec![CodecConfig(Codec::Json)].into());
+        assert_eq!(codecs.len(), 1);
+        assert_eq!(codecs[0].name(), "noop");
     }
 
     #[test]
     fn config_codecs_multiple() {
         let config: CodecsConfig = toml::from_str(indoc! {r#"
-            codec = ["utf8", "json"]
+            codec = ["noop", "noop"]
         "#})
         .unwrap();
+        let codecs = config.codec;
 
-        assert_eq!(
-            config,
-            vec![CodecConfig(Codec::Utf8), CodecConfig(Codec::Json)].into()
-        );
+        assert_eq!(codecs.len(), 2);
+        assert_eq!(codecs[0].name(), "noop");
+        assert_eq!(codecs[1].name(), "noop");
+    }
+
+    #[test]
+    fn config_codecs_with_options() {
+        let config: CodecsConfig = toml::from_str(indoc! {r#"
+            [codec]
+            type = "noop"
+        "#})
+        .unwrap();
+        let codecs = config.codec;
+
+        assert_eq!(codecs.len(), 1);
+        assert_eq!(codecs[0].name(), "noop");
+    }
+
+    #[test]
+    fn config_codecs_with_options_multiple() {
+        let config: CodecsConfig = toml::from_str(indoc! {r#"
+            [[codec]]
+            type = "noop"
+
+            [[codec]]
+            type = "noop"
+        "#})
+        .unwrap();
+        let codecs = config.codec;
+
+        assert_eq!(codecs.len(), 2);
+        assert_eq!(codecs[0].name(), "noop");
+        assert_eq!(codecs[1].name(), "noop");
     }
 }

@@ -59,8 +59,16 @@ pub async fn build_pieces(
         let typetag = source.inner.source_type();
 
         let mut rx = rx.boxed();
-        for codec in source.codec.clone() {
-            rx = codec.build().transform(rx).boxed();
+        for codec in &source.codec.codec {
+            let codec = match codec.build() {
+                Ok(codec) => codec,
+                Err(error) => {
+                    errors.push(format!("Codec \"{}\": {}", name, error));
+                    continue;
+                }
+            };
+
+            rx = codec.transform(rx).boxed();
         }
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
