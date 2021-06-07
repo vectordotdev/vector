@@ -93,7 +93,13 @@ components: sinks: [Name=string]: {
 								default: "memory"
 								enum: {
 									memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
-									disk:   "Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."
+									disk: """
+									Stores the sink's buffer on disk. This is less performant, but durable.
+									Data will not be lost between restarts.
+									Will also hold data in memory to enhance performance.
+									WARNING: This may stall the sink if disk performance isn't on par with the throughput.
+									For comparison, AWS gp2 volumes are usually too slow for common cases.
+									"""
 								}
 								syntax: "literal"
 							}
@@ -176,7 +182,7 @@ components: sinks: [Name=string]: {
 
 						only_fields: {
 							common:      false
-							description: "Prevent the sink from encoding the specified fields."
+							description: "Makes the sink encode only the specified fields."
 							required:    false
 							type: array: {
 								default: null

@@ -1,17 +1,14 @@
-pub use vector_core::event::lua;
-
 use crate::{
     config::{DataType, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
-    transforms::{
-        util::runtime_transform::{RuntimeTransform, Timer},
-        Transform,
-    },
+    transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
+pub use vector_core::event::lua;
+use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {

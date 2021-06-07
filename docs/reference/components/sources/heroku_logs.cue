@@ -68,6 +68,7 @@ components: sources: heroku_logs: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		address:          sources.http.configuration.address
 		auth:             sources.http.configuration.auth
 		query_parameters: sources.http.configuration.query_parameters

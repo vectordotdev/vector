@@ -357,44 +357,6 @@ impl Value {
         }
     }
 
-    /// Lookup API methods
-    /// Return if the node is a leaf (meaning it has no children) or not.
-    ///
-    /// This is notably useful for things like influxdb logs where we list only leaves.
-    ///
-    /// ```rust
-    /// use vector_core::event::Value;
-    /// use std::collections::BTreeMap;
-    ///
-    /// let val = Value::from(1);
-    /// assert_eq!(val.is_leaf(), true);
-    ///
-    /// let mut val = Value::from(Vec::<Value>::default());
-    /// assert_eq!(val.is_leaf(), true);
-    /// val.insert(0, 1);
-    /// assert_eq!(val.is_leaf(), false);
-    /// val.insert(3, 1);
-    /// assert_eq!(val.is_leaf(), false);
-    ///
-    /// let mut val = Value::from(BTreeMap::default());
-    /// assert_eq!(val.is_leaf(), true);
-    /// val.insert("foo", 1);
-    /// assert_eq!(val.is_leaf(), false);
-    /// val.insert("bar", 2);
-    /// assert_eq!(val.is_leaf(), false);
-    /// ```
-    pub fn is_leaf(&self) -> bool {
-        match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_)
-            | Value::Null => true,
-            Value::Map(_) | Value::Array(_) => self.is_empty(),
-        }
-    }
-
     /// Return if the node is empty, that is, it is an array or map with no items.
     ///
     /// ```rust
@@ -428,42 +390,6 @@ impl Value {
             Value::Null => true,
             Value::Map(v) => v.is_empty(),
             Value::Array(v) => v.is_empty(),
-        }
-    }
-
-    /// Return the number of subvalues the value has.
-    ///
-    /// ```rust
-    /// use vector_core::event::Value;
-    /// use std::collections::BTreeMap;
-    ///
-    /// let val = Value::from(1);
-    /// assert_eq!(val.len(), None);
-    ///
-    /// let mut val = Value::from(Vec::<Value>::default());
-    /// assert_eq!(val.len(), Some(0));
-    /// val.insert(0, 1);
-    /// assert_eq!(val.len(), Some(1));
-    /// val.insert(3, 1);
-    /// assert_eq!(val.len(), Some(4));
-    ///
-    /// let mut val = Value::from(BTreeMap::default());
-    /// assert_eq!(val.len(), Some(0));
-    /// val.insert("foo", 1);
-    /// assert_eq!(val.len(), Some(1));
-    /// val.insert("bar", 2);
-    /// assert_eq!(val.len(), Some(2));
-    /// ```
-    pub fn len(&self) -> Option<usize> {
-        match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_)
-            | Value::Null => None,
-            Value::Map(v) => Some(v.len()),
-            Value::Array(v) => Some(v.len()),
         }
     }
 

@@ -503,19 +503,17 @@ mod integration_tests {
             assert_eq!(metrics.len(), 1);
             let output = &metrics[0];
 
-            match metric.data.value {
+            match metric.value() {
                 MetricValue::Gauge { value } => {
-                    assert_eq!(output["value"], Value::Number((value as u32).into()))
+                    assert_eq!(output["value"], Value::Number((*value as u32).into()))
                 }
                 _ => panic!("Unhandled metric value, fix the test"),
             }
             for (tag, value) in metric.tags().unwrap() {
                 assert_eq!(output[&tag[..]], Value::String(value.to_string()));
             }
-            let timestamp = format_timestamp(
-                metric.data.timestamp.unwrap(),
-                chrono::SecondsFormat::Millis,
-            );
+            let timestamp =
+                format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
             assert_eq!(output["time"], Value::String(timestamp));
         }
 

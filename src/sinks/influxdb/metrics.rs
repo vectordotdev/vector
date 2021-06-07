@@ -205,13 +205,12 @@ fn merge_tags(
     event: &Metric,
     tags: Option<&HashMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
-    match (&event.series.tags, tags) {
-        (Some(ref event_tags), Some(ref config_tags)) => {
-            let mut event_tags = event_tags.clone();
+    match (event.tags().cloned(), tags) {
+        (Some(mut event_tags), Some(ref config_tags)) => {
             event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(event_tags)
         }
-        (Some(ref event_tags), None) => Some(event_tags.clone()),
+        (Some(event_tags), None) => Some(event_tags),
         (None, Some(config_tags)) => Some(
             config_tags
                 .iter()
@@ -226,7 +225,7 @@ pub struct InfluxMetricNormalize;
 
 impl MetricNormalize for InfluxMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match (metric.data.kind, &metric.data.value) {
+        match (metric.kind(), &metric.value()) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
             (_, MetricValue::Counter { .. }) => state.make_incremental(metric),
@@ -248,9 +247,9 @@ fn encode_events(
     let mut output = String::new();
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
-        let ts = encode_timestamp(event.data.timestamp);
+        let ts = encode_timestamp(event.timestamp());
         let tags = merge_tags(&event, tags);
-        let (metric_type, fields) = get_type_and_fields(event.data.value, &quantiles);
+        let (metric_type, fields) = get_type_and_fields(event.value(), &quantiles);
 
         if let Err(error) = influx_line_protocol(
             protocol_version,
@@ -271,12 +270,12 @@ fn encode_events(
 }
 
 fn get_type_and_fields(
-    value: MetricValue,
+    value: &MetricValue,
     quantiles: &[f64],
 ) -> (&'static str, Option<HashMap<String, Field>>) {
     match value {
-        MetricValue::Counter { value } => ("counter", Some(to_fields(value))),
-        MetricValue::Gauge { value } => ("gauge", Some(to_fields(value))),
+        MetricValue::Counter { value } => ("counter", Some(to_fields(*value))),
+        MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
         MetricValue::Set { values } => ("set", Some(to_fields(values.len() as f64))),
         MetricValue::AggregatedHistogram {
             buckets,
@@ -292,8 +291,8 @@ fn get_type_and_fields(
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(count));
-            fields.insert("sum".to_owned(), Field::Float(sum));
+            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
+            fields.insert("sum".to_owned(), Field::Float(*sum));
 
             ("histogram", Some(fields))
         }
@@ -311,8 +310,8 @@ fn get_type_and_fields(
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(count));
-            fields.insert("sum".to_owned(), Field::Float(sum));
+            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
+            fields.insert("sum".to_owned(), Field::Float(*sum));
 
             ("summary", Some(fields))
         }
@@ -927,11 +926,11 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
             let name = format!("{}.{}", metric.namespace().unwrap(), metric.name());
-            let value = match metric.data.value {
-                MetricValue::Counter { value } => value,
+            let value = match metric.value() {
+                MetricValue::Counter { value } => *value,
                 _ => unreachable!(),
             };
-            let timestamp = format_timestamp(metric.data.timestamp.unwrap(), SecondsFormat::Nanos);
+            let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
             let res =
                 query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
 

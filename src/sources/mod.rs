@@ -1,4 +1,3 @@
-use futures::future::BoxFuture;
 use snafu::Snafu;
 
 #[cfg(feature = "sources-apache_metrics")]
@@ -11,6 +10,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_s3;
 #[cfg(feature = "sources-datadog")]
 pub mod datadog;
+#[cfg(all(unix, feature = "sources-dnstap"))]
+pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
 #[cfg(feature = "sources-exec")]
@@ -60,7 +61,7 @@ pub mod vector;
 
 mod util;
 
-pub type Source = BoxFuture<'static, Result<(), ()>>;
+pub use vector_core::source::Source;
 
 /// Common build errors
 #[derive(Debug, Snafu)]

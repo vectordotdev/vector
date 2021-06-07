@@ -81,7 +81,7 @@ impl FunctionTransform for FieldFilter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::Event;
+    use crate::{event::Event, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -95,7 +95,7 @@ mod test {
         };
         let event = Event::from(msg);
         let metadata = event.metadata().clone();
-        let result = transform.transform_one(event);
+        let result = transform_one(&mut transform, event);
         if let Some(event) = &result {
             assert_eq!(event.metadata(), &metadata);
         }

@@ -1,6 +1,8 @@
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 mod body_decoding;
 mod encoding_config;
+#[cfg(all(unix, feature = "sources-dnstap"))]
+pub mod framestream;
 #[cfg(feature = "sources-utils-http")]
 mod http;
 pub mod multiline_config;
