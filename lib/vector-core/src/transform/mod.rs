@@ -1,5 +1,5 @@
 use crate::event::Event;
-use futures::Stream;
+use futures::{stream, Stream, StreamExt};
 use std::pin::Pin;
 
 #[cfg(any(feature = "lua"))]
@@ -90,6 +90,23 @@ impl Transform {
                 panic!("Called `Transform::into_task` on something that was not a task variant.")
             }
             Transform::Task(t) => t,
+        }
+    }
+
+    /// Apply the transform to an input stream.
+    pub fn transform(
+        self,
+        input: impl Stream<Item = Event> + Send + 'static,
+    ) -> impl Stream<Item = Event> + Send {
+        match self {
+            Transform::Function(mut function) => input
+                .flat_map(move |event| {
+                    let mut buf = Vec::with_capacity(1);
+                    function.transform(&mut buf, event);
+                    stream::iter(buf.into_iter())
+                })
+                .boxed(),
+            Transform::Task(task) => task.transform(input.boxed()),
         }
     }
 }

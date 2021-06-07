@@ -1,8 +1,8 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, decoding::DecodingsConfig, default_data_dir, framing::SourceFramers, provider,
-    Config, GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    codec::CodecsConfig, compiler, default_data_dir, framing::SourceFramers, provider, Config,
+    GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
     TestDefinition, TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
@@ -77,9 +77,9 @@ impl ConfigBuilder {
         name: T,
         source: S,
         framing: SourceFramers,
-        decoding: DecodingsConfig,
+        codec: CodecsConfig,
     ) {
-        let source = SourceOuter::new(framing, decoding, source);
+        let source = SourceOuter::new(framing, codec, source);
         self.sources.insert(name.into(), source);
     }
 

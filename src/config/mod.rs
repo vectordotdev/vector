@@ -21,9 +21,9 @@ use std::path::PathBuf;
 
 pub mod api;
 mod builder;
+pub mod codec;
 mod compiler;
 pub mod component;
-pub mod decoding;
 mod diff;
 pub mod format;
 mod framing;
@@ -212,7 +212,7 @@ pub struct SourceOuter {
     #[serde(default = "default_acknowledgements")]
     pub acknowledgements: bool,
     pub framing: framing::SourceFramers,
-    pub decoding: decoding::DecodingsConfig,
+    pub codec: codec::CodecsConfig,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,
 }
@@ -224,12 +224,12 @@ fn default_acknowledgements() -> bool {
 impl SourceOuter {
     pub(crate) fn new(
         framing: framing::SourceFramers,
-        decoding: decoding::DecodingsConfig,
+        codec: codec::CodecsConfig,
         source: impl SourceConfig + 'static,
     ) -> Self {
         Self {
             framing,
-            decoding,
+            codec,
             acknowledgements: default_acknowledgements(),
             inner: Box::new(source),
         }

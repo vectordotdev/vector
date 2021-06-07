@@ -36,7 +36,6 @@ pub mod api;
 pub mod app;
 pub mod async_read;
 pub mod buffers;
-pub mod codec;
 pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;

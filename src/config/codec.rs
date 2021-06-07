@@ -1,71 +1,80 @@
-use crate::codec::decoders::Decoder;
 use serde::{
     de::{self, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 use std::fmt::{self, Debug};
-use vector_core::event::Event;
+use vector_core::{
+    event::Event,
+    transform::{FunctionTransform, Transform},
+};
 
 #[derive(Serialize, Debug, Eq, PartialEq, Clone)]
-pub struct DecodingsConfig {
-    pub decoding: Vec<DecodingConfig>,
+pub struct CodecsConfig {
+    pub codec: Vec<CodecConfig>,
 }
 
-impl<'de> Deserialize<'de> for DecodingsConfig {
+impl<'de> Deserialize<'de> for CodecsConfig {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        struct DecodingsConfig {
-            decoding: DecodingsConfigValue,
+        struct CodecsConfig {
+            codec: CodecsConfigValue,
         }
 
         #[derive(Deserialize)]
         #[serde(untagged)]
-        enum DecodingsConfigValue {
-            Single(DecodingConfig),
-            Multiple(Vec<DecodingConfig>),
+        enum CodecsConfigValue {
+            Single(CodecConfig),
+            Multiple(Vec<CodecConfig>),
         }
 
-        let config = DecodingsConfig::deserialize(deserializer)?;
+        let config = CodecsConfig::deserialize(deserializer)?;
 
         Ok(Self {
-            decoding: match config.decoding {
-                DecodingsConfigValue::Single(config) => vec![config],
-                DecodingsConfigValue::Multiple(configs) => configs,
+            codec: match config.codec {
+                CodecsConfigValue::Single(config) => vec![config],
+                CodecsConfigValue::Multiple(configs) => configs,
             },
         })
     }
 }
 
-impl From<Vec<DecodingConfig>> for DecodingsConfig {
-    fn from(configs: Vec<DecodingConfig>) -> Self {
-        Self { decoding: configs }
+impl From<Vec<CodecConfig>> for CodecsConfig {
+    fn from(configs: Vec<CodecConfig>) -> Self {
+        Self { codec: configs }
     }
 }
 
-impl IntoIterator for DecodingsConfig {
-    type Item = DecodingConfig;
+impl IntoIterator for CodecsConfig {
+    type Item = CodecConfig;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.decoding.into_iter()
+        self.codec.into_iter()
     }
 }
 
 #[derive(Serialize, Debug, Eq, PartialEq, Clone)]
-pub struct DecodingConfig(pub(crate) Decoding);
+pub struct CodecConfig(pub(crate) Codec);
 
-impl DecodingConfig {
-    pub fn decode(self, event: Event) -> Event {
-        let decoder = Into::<Decoder>::into(self);
+impl CodecConfig {
+    pub fn build(&self) -> Transform {
+        #[derive(Copy, Clone)]
+        struct NoopTransform;
 
-        decoder.decode(event)
+        impl FunctionTransform for NoopTransform {
+            fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+                output.push(event)
+            }
+        }
+
+        Transform::function(NoopTransform)
     }
 }
 
-impl<'de> Deserialize<'de> for DecodingConfig {
+impl<'de> Deserialize<'de> for CodecConfig {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -73,7 +82,7 @@ impl<'de> Deserialize<'de> for DecodingConfig {
         struct StringOrStruct;
 
         impl<'de> Visitor<'de> for StringOrStruct {
-            type Value = DecodingConfig;
+            type Value = CodecConfig;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("string or map")
@@ -83,9 +92,7 @@ impl<'de> Deserialize<'de> for DecodingConfig {
             where
                 E: de::Error,
             {
-                Ok(DecodingConfig(Decoding::deserialize(
-                    value.into_deserializer(),
-                )?))
+                Ok(CodecConfig(Codec::deserialize(value.into_deserializer())?))
             }
 
             fn visit_map<M>(self, map: M) -> std::result::Result<Self::Value, M::Error>
@@ -102,7 +109,7 @@ impl<'de> Deserialize<'de> for DecodingConfig {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Decoding {
+pub enum Codec {
     Utf8,
     Json,
 }
@@ -113,29 +120,25 @@ mod tests {
     use indoc::indoc;
 
     #[test]
-    fn config_decodings_single() {
-        let config: DecodingsConfig = toml::from_str(indoc! {r#"
-            decoding = "json"
+    fn config_codecs_single() {
+        let config: CodecsConfig = toml::from_str(indoc! {r#"
+            codec = "json"
         "#})
         .unwrap();
 
-        assert_eq!(config, vec![DecodingConfig(Decoding::Json)].into());
+        assert_eq!(config, vec![CodecConfig(Codec::Json)].into());
     }
 
     #[test]
-    fn config_decodings_multiple() {
-        let config: DecodingsConfig = toml::from_str(indoc! {r#"
-            decoding = ["utf8", "json"]
+    fn config_codecs_multiple() {
+        let config: CodecsConfig = toml::from_str(indoc! {r#"
+            codec = ["utf8", "json"]
         "#})
         .unwrap();
 
         assert_eq!(
             config,
-            vec![
-                DecodingConfig(Decoding::Utf8),
-                DecodingConfig(Decoding::Json)
-            ]
-            .into()
+            vec![CodecConfig(Codec::Utf8), CodecConfig(Codec::Json)].into()
         );
     }
 }

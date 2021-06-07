@@ -9,10 +9,9 @@ use crate::{
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
-    transforms::Transform,
     Pipeline,
 };
-use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{future, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::pin::Pin;
 use std::{
     collections::HashMap,
@@ -58,7 +57,11 @@ pub async fn build_pieces(
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.inner.source_type();
-        let decoding = source.decoding.clone();
+
+        let mut rx = rx.boxed();
+        for codec in source.codec.clone() {
+            rx = codec.build().transform(rx).boxed();
+        }
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
@@ -79,16 +82,7 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx
-            .map(move |event| {
-                decoding
-                    .clone()
-                    .into_iter()
-                    .fold(event, |event, decoder| decoder.decode(event))
-            })
-            .map(Ok)
-            .forward(output)
-            .map_ok(|_| TaskOutput::Source);
+        let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
@@ -142,35 +136,24 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
 
-        let transform = match transform {
-            Transform::Function(mut t) => input_rx
+        let transform = {
+            let filtered = input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
-                .inspect(|_| emit!(EventIn))
-                .flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
-                    t.transform(&mut buf, v);
-                    emit!(EventOut { count: buf.len() });
-                    stream::iter(buf.into_iter()).map(Ok)
+                .inspect(|_| emit!(EventIn));
+
+            transform
+                .transform(filtered)
+                .map(Ok)
+                .forward(output.with(|event| async {
+                    emit!(EventOut { count: 1 });
+                    Ok(event)
+                }))
+                .boxed()
+                .map_ok(|_| {
+                    debug!("Finished.");
+                    TaskOutput::Transform
                 })
-                .forward(output)
-                .boxed(),
-            Transform::Task(t) => {
-                let filtered = input_rx
-                    .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventIn));
-                t.transform(Box::pin(filtered))
-                    .map(Ok)
-                    .forward(output.with(|event| async {
-                        emit!(EventOut { count: 1 });
-                        Ok(event)
-                    }))
-                    .boxed()
-            }
-        }
-        .map_ok(|_| {
-            debug!("Finished.");
-            TaskOutput::Transform
-        });
+        };
         let task = Task::new(name, typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
