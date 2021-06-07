@@ -11,3 +11,5 @@ pub trait Codec: std::fmt::Debug + Send + Sync {
 
     fn build(&self) -> crate::Result<Transform>;
 }
+
+inventory::collect!(&'static dyn Codec);

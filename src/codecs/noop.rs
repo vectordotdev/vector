@@ -27,3 +27,7 @@ impl Codec for NoopCodec {
         Ok(Transform::function(NoopTransform))
     }
 }
+
+inventory::submit! {
+    &NoopCodec as &dyn Codec
+}

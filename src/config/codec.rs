@@ -1,6 +1,6 @@
-#[cfg(test)]
-use crate::codecs::NoopCodec;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashMap;
 use vector_core::transform::Transform;
 
 #[derive(Debug, Serialize, Default)]
@@ -54,15 +54,19 @@ impl CodecConfig {
     }
 
     pub fn build(&self) -> crate::Result<Transform> {
+        lazy_static! {
+            static ref CODECS: HashMap<&'static str, &'static dyn crate::codecs::Codec> =
+                inventory::iter::<&dyn crate::codecs::Codec>
+                    .into_iter()
+                    .map(|codec| (codec.name(), *codec))
+                    .collect();
+        }
+
         match &self.0 {
-            Codec::String(string) => {
-                use crate::codecs::Codec;
-                match string.as_str() {
-                    #[cfg(test)]
-                    "noop" => NoopCodec.build(),
-                    _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
-                }
-            }
+            Codec::String(string) => match CODECS.get(string.as_str()) {
+                Some(codec) => codec.build(),
+                _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
+            },
             Codec::Object(codec) => codec.build(),
         }
     }
