@@ -68,6 +68,7 @@ members = [
   "lib/codec",
   "lib/vector-core",
   "lib/vector-core/buffers",
+  "lib/dnsmsg-parser",
   "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
@@ -92,6 +93,7 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
+dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
@@ -146,7 +148,7 @@ serde_json = { version = "1.0.64", default-features = false, features = ["raw_va
 serde_yaml = { version = "0.8.17", default-features = false }
 
 # Prost
-prost = { version = "0.7.0", default-features = false }
+prost = { version = "0.7.0", default-features = false, features = ["std"]  }
 prost-types = { version = "0.7.0", default-features = false }
 
 # GCP
@@ -251,6 +253,8 @@ warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
+data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
+trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
 
 # For WASM
 async-stream = "0.3.2"
@@ -300,29 +304,29 @@ leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "l
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "disk-buffer", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
+default = ["api", "api-client", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
+default-cmake = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
 default-msvc = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
-default-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
-default-no-api-client = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
-default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all"]
+default-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default-no-api-client = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all"]
 disk-buffer = ["vector_core/disk-buffer"]
 
-all-logs = ["sinks-logs", "sources-logs", "transforms-logs"]
+all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
 all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
@@ -407,6 +411,7 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
+sources-dnstap = ["bytesize", "base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-exec = []
 sources-file = ["bytesize", "file-source"]
@@ -612,6 +617,7 @@ all-integration-tests = [
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
+  "dnstap-integration-tests",
 ]
 
 aws-integration-tests = [
@@ -650,6 +656,7 @@ postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["bytesize", "sinks-prometheus", "sources-prometheus"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
+dnstap-integration-tests = ["sources-dnstap"]
 
 disable-resolv-conf = []
 shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
@@ -675,6 +682,7 @@ benches = [
   "transforms-sample",
   "transforms-split",
 ]
+dnstap-benches = ["sources-dnstap"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap", "transforms-wasm"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []
@@ -687,6 +695,13 @@ name = "default"
 harness = false
 test = true
 required-features = ["benches"]
+
+[[bench]]
+name = "dnstap"
+path = "benches/dnstap/mod.rs"
+harness = false
+test = true
+required-features = ["dnstap-benches"]
 
 [[bench]]
 name = "wasm"

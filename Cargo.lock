@@ -1830,6 +1830,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 
 [[package]]
+name = "dnsmsg-parser"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "data-encoding",
+ "thiserror",
+ "trust-dns-proto",
+]
+
+[[package]]
 name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7454,9 +7464,9 @@ checksum = "a7f741b240f1a48843f9b8e0444fb55fb2a4ff67293b50a9179dfd5ea67f8d41"
 
 [[package]]
 name = "trust-dns-proto"
-version = "0.20.1"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d57e219ba600dd96c2f6d82eb79645068e14edbc5c7e27514af40436b88150c"
+checksum = "98a0381b2864c2978db7f8e17c7b23cca5a3a5f99241076e13002261a8ecbabd"
 dependencies = [
  "async-trait",
  "cfg-if 1.0.0",
@@ -7472,16 +7482,15 @@ dependencies = [
  "rand 0.8.3",
  "smallvec",
  "thiserror",
- "tinyvec",
  "tokio",
  "url",
 ]
 
 [[package]]
 name = "trust-dns-resolver"
-version = "0.20.1"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0437eea3a6da51acc1e946545ff53d5b8fb2611ff1c3bed58522dde100536ae"
+checksum = "3072d18c10bd621cb00507d59cfab5517862285c353160366e37fbf4c74856e4"
 dependencies = [
  "cfg-if 1.0.0",
  "futures-util",
@@ -7832,8 +7841,10 @@ dependencies = [
  "criterion",
  "crossterm",
  "dashmap",
+ "data-encoding",
  "derivative 2.2.0",
  "dirs-next",
+ "dnsmsg-parser",
  "dyn-clone",
  "encoding_rs",
  "evmap",
@@ -7952,6 +7963,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "tracing-tower",
+ "trust-dns-proto",
  "tui",
  "twox-hash",
  "typetag",

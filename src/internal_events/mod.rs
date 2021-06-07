@@ -33,6 +33,8 @@ mod console;
 mod datadog_logs;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
+#[cfg(feature = "sources-dnstap")]
+mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
@@ -154,6 +156,8 @@ pub use self::console::*;
 pub use self::datadog_logs::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
+#[cfg(feature = "sources-dnstap")]
+pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
