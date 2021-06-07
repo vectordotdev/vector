@@ -602,10 +602,8 @@ mod tests {
         ),
         // Range - numeric, exclusive
         ("f:{1 TO 10}", "(.f > 1 && .f < 10)"),
-        // TODO: CURRENTLY FAILING TESTS -- needs work in the main grammar and/or VRL to support!
         // Range - alpha, inclusive
-        // TODO: https://github.com/timberio/vector/issues/7539
-        //(r#"["a" TO "z"]"#, r#".message >= "a" && .message <= "z""#),
+        (r#"g:["a" TO "z"]"#, r#"(.g >= "a" && .g <= "z")"#),
     ];
 
     #[test]
