@@ -1862,6 +1862,14 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .restart_rollout("test-vector", "daemonset/vector-agent", vec![])
         .await?;
+    // We need to wait for the new pod to start
+    //    framework
+    //        .wait_for_rollout(
+    //            "test-vector",
+    //            "daemonset/vector-agent",
+    //            vec!["--timeout=60s"],
+    //        )
+    //        .await?;
     got_marker = false;
     look_for_log_line(&mut log_reader, |val| {
         if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
@@ -1876,6 +1884,71 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
         FlowControlCommand::Terminate
     })
     .await?;
+    // We need to re-create the log_reader to connect to the new pod
+    //    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    //    let mut lines_till_we_give_up: usize = 10000;
+    //    let (stop_tx, mut stop_rx) = futures::channel::mpsc::channel(0);
+    //    loop {
+    //        let line = tokio::select! {
+    //            result = stop_rx.next() => {
+    //                result.unwrap();
+    //                log_reader.kill().await?;
+    //                continue;
+    //            }
+    //            line = log_reader.read_line() => line,
+    //        };
+    //        let line = match line {
+    //            Some(line) => line,
+    //            None => break,
+    //        };
+    //        println!("Got line: {:?}", line);
+
+    //        lines_till_we_give_up -= 1;
+    //        if lines_till_we_give_up == 0 {
+    //            println!("Giving up");
+    //            log_reader.kill().await?;
+    //            break;
+    //        }
+
+    //        if !line.starts_with('{') {
+    // This isn't a json, must be an entry from Vector's own log stream.
+    //            continue;
+    //        }
+
+    //        let val = parse_json(&line)?;
+
+    //if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+    // A log from something other than our test pod, pretend we don't
+    // see it.
+    //            continue;
+    //}
+
+    //if val["message"].eq("MARKER") {
+    //    panic!("Checkpointed, marker should not be found");
+    //};
+
+    // Request termination in a while.
+    //        let mut stop_tx = stop_tx.clone();
+    //        tokio::spawn(async move {
+    // Wait for two minutes - a reasonable time for vector internals to
+    // pick up new `Pod` and collect events from them in idle load.
+    // Here, we're assuming that if the `Pod` that was supposed to be
+    // ignored was in fact collected (meaning something's wrong with
+    // the exclusion logic), we'd see it's data within this time frame.
+    // It's not enough to just wait for `Pod` complete, we should still
+    // apply a reasonably big timeout before we stop waiting for the
+    // logs to appear to have high confidence that Vector has enough
+    // time to pick them up and spit them out.
+    //            let duration = std::time::Duration::from_secs(120);
+    //            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+    //            tokio::time::sleep(duration).await;
+    //            println!("Stop timer complete");
+    //            stop_tx.send(()).await.unwrap();
+    //        });
+    //    }
+
+    // Ensure log reader exited.
+    //    log_reader.wait().await.expect("log reader wait failed");
 
     assert!(!got_marker);
 
