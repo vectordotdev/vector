@@ -44,6 +44,8 @@ pub struct ElasticSearchConfig {
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub pipeline: Option<String>,
+    #[serde(default)]
+    pub mode: ElasticSearchMode,
 
     #[serde(default)]
     pub compression: Compression,
@@ -69,7 +71,10 @@ pub struct ElasticSearchConfig {
 
 impl ElasticSearchConfig {
     fn bulk_action(&self) -> crate::Result<Template> {
-        let value = self.bulk_action.as_deref().unwrap_or("index");
+        let value = match self.mode {
+            ElasticSearchMode::Regular => self.bulk_action.as_deref().unwrap_or("index"),
+            ElasticSearchMode::DataStream => "create",
+        };
         Ok(Template::try_from(value).context(BatchActionTemplate)?)
     }
 }
@@ -95,11 +100,22 @@ pub enum ElasticSearchAuth {
     Aws(AwsAuthentication),
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum ElasticSearchMode {
+    Regular,
+    DataStream,
+}
+
+impl Default for ElasticSearchMode {
+    fn default() -> Self {
+        Self::Regular
+    }
+}
+
 #[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum BulkAction {
-    #[derivative(Default)]
     Index,
     Create,
 }
@@ -226,8 +242,7 @@ impl ElasticSearchCommon {
     }
 
     fn bulk_action(&self, event: &Event) -> Option<BulkAction> {
-        let value = self
-            .bulk_action
+        self.bulk_action
             .render_string(event)
             .map_err(|error| {
                 emit!(TemplateRenderingFailed {
@@ -236,8 +251,28 @@ impl ElasticSearchCommon {
                     drop_event: true,
                 });
             })
-            .ok()?;
-        BulkAction::try_from(value.as_str()).ok()
+            .ok()
+            .and_then(|value| BulkAction::try_from(value.as_str()).ok())
+    }
+
+    fn build_action(
+        &self,
+        index: &str,
+        bulk_action: &BulkAction,
+        event: &mut Event,
+    ) -> serde_json::Value {
+        let mut action = json!({
+            bulk_action.as_str(): {
+                "_index": index,
+                "_type": self.doc_type,
+            }
+        });
+        maybe_set_id(
+            self.config.id_key.as_ref(),
+            action.pointer_mut(bulk_action.as_json_pointer()).unwrap(),
+            event,
+        );
+        action
     }
 }
 
@@ -249,18 +284,7 @@ impl HttpSink for ElasticSearchCommon {
     fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let index = self.index(&event)?;
         let bulk_action = self.bulk_action(&event)?;
-
-        let mut action = json!({
-            bulk_action.as_str(): {
-                "_index": index,
-                "_type": self.doc_type,
-            }
-        });
-        maybe_set_id(
-            self.config.id_key.as_ref(),
-            action.pointer_mut(bulk_action.as_json_pointer()).unwrap(),
-            &mut event,
-        );
+        let action = self.build_action(&index, &bulk_action, &mut event);
 
         let mut body = serde_json::to_vec(&action).unwrap();
         body.push(b'\n');
@@ -454,7 +478,6 @@ impl ElasticSearchCommon {
         let index = Template::try_from(index).context(IndexTemplate)?;
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
-        let bulk_action = config.bulk_action()?;
 
         let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -471,6 +494,7 @@ impl ElasticSearchCommon {
         }
         let bulk_url = format!("{}/_bulk?{}", base_url, query.finish());
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
+        let bulk_action = config.bulk_action()?;
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let mut config = config.clone();
@@ -598,6 +622,18 @@ mod tests {
     }
 
     #[test]
+    fn parse_mode() {
+        let config = toml::from_str::<ElasticSearchConfig>(
+            r#"
+            endpoint = ""
+            mode = "data_stream"
+        "#,
+        )
+        .unwrap();
+        assert!(matches!(config.mode, ElasticSearchMode::DataStream));
+    }
+
+    #[test]
     fn removes_and_sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
@@ -640,9 +676,35 @@ mod tests {
         use chrono::{TimeZone, Utc};
 
         let config = ElasticSearchConfig {
-            bulk_action: Some(String::from("create")),
+            bulk_action: Some(String::from("{{ action }}te")),
             index: Some(String::from("vector")),
             endpoint: String::from("https://example.com"),
+            ..Default::default()
+        };
+        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+        let mut event = Event::from("hello there");
+        event.as_mut_log().insert(
+            log_schema().timestamp_key(),
+            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        );
+        event.as_mut_log().insert("action", "crea");
+        let encoded = es.encode_event(event).unwrap().item;
+        let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
+{"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+"#;
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    }
+
+    #[test]
+    fn sets_create_action_when_datastream_mode() {
+        use crate::config::log_schema;
+        use chrono::{TimeZone, Utc};
+
+        let config = ElasticSearchConfig {
+            index: Some(String::from("vector")),
+            endpoint: String::from("https://example.com"),
+            mode: ElasticSearchMode::DataStream,
             ..Default::default()
         };
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
