@@ -211,7 +211,9 @@ macro_rules! impl_generate_config_from_default {
 pub struct SourceOuter {
     #[serde(default = "default_acknowledgements")]
     pub acknowledgements: bool,
+    #[serde(default)]
     pub framing: framing::SourceFramers,
+    #[serde(default)]
     pub codec: codec::CodecsConfig,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,

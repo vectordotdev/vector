@@ -3,7 +3,7 @@ use crate::codecs::NoopCodec;
 use serde::{Deserialize, Deserializer, Serialize};
 use vector_core::transform::Transform;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 pub struct CodecsConfig {
     pub codec: Vec<CodecConfig>,
 }
