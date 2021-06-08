@@ -13,7 +13,7 @@ lazy_static! {
 
 #[derive(Debug, Serialize, Default)]
 pub struct CodecsConfig {
-    pub codec: Vec<CodecConfig>,
+    pub configs: Vec<CodecConfig>,
 }
 
 impl<'de> Deserialize<'de> for CodecsConfig {
@@ -36,7 +36,7 @@ impl<'de> Deserialize<'de> for CodecsConfig {
         let config = CodecsConfig::deserialize(deserializer)?;
 
         Ok(Self {
-            codec: match config.codec {
+            configs: match config.codec {
                 CodecsConfigValue::Single(config) => vec![config],
                 CodecsConfigValue::Multiple(configs) => configs,
             },
@@ -46,47 +46,44 @@ impl<'de> Deserialize<'de> for CodecsConfig {
 
 impl From<Vec<CodecConfig>> for CodecsConfig {
     fn from(configs: Vec<CodecConfig>) -> Self {
-        Self { codec: configs }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CodecConfig(pub(crate) Codec);
-
-impl CodecConfig {
-    pub fn name(&self) -> String {
-        match &self.0 {
-            Codec::String(string) => string.into(),
-            Codec::Object(codec) => codec.name().to_owned(),
-        }
-    }
-
-    pub fn build_decoder(&self) -> crate::Result<Transform<Event>> {
-        match &self.0 {
-            Codec::String(string) => match CODECS.get(string.as_str()) {
-                Some(codec) => codec.build_decoder(),
-                _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
-            },
-            Codec::Object(codec) => codec.build_decoder(),
-        }
-    }
-
-    pub fn build_encoder(&self) -> crate::Result<Transform<Event>> {
-        match &self.0 {
-            Codec::String(string) => match CODECS.get(string.as_str()) {
-                Some(codec) => codec.build_encoder(),
-                _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
-            },
-            Codec::Object(codec) => codec.build_encoder(),
-        }
+        Self { configs }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum Codec {
+pub enum CodecConfig {
     String(String),
     Object(Box<dyn crate::codecs::Codec>),
+}
+
+impl CodecConfig {
+    pub fn name(&self) -> String {
+        match &self {
+            Self::String(string) => string.into(),
+            Self::Object(codec) => codec.name().to_owned(),
+        }
+    }
+
+    pub fn build_decoder(&self) -> crate::Result<Transform<Event>> {
+        match &self {
+            Self::String(string) => match CODECS.get(string.as_str()) {
+                Some(codec) => codec.build_decoder(),
+                _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
+            },
+            Self::Object(codec) => codec.build_decoder(),
+        }
+    }
+
+    pub fn build_encoder(&self) -> crate::Result<Transform<Event>> {
+        match &self {
+            Self::String(string) => match CODECS.get(string.as_str()) {
+                Some(codec) => codec.build_encoder(),
+                _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
+            },
+            Self::Object(codec) => codec.build_encoder(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -100,7 +97,7 @@ mod tests {
             codec = "noop"
         "#})
         .unwrap();
-        let codecs = config.codec;
+        let codecs = config.configs;
 
         assert_eq!(codecs.len(), 1);
         assert_eq!(codecs[0].name(), "noop");
@@ -112,7 +109,7 @@ mod tests {
             codec = ["noop", "noop"]
         "#})
         .unwrap();
-        let codecs = config.codec;
+        let codecs = config.configs;
 
         assert_eq!(codecs.len(), 2);
         assert_eq!(codecs[0].name(), "noop");
@@ -126,7 +123,7 @@ mod tests {
             type = "noop"
         "#})
         .unwrap();
-        let codecs = config.codec;
+        let codecs = config.configs;
 
         assert_eq!(codecs.len(), 1);
         assert_eq!(codecs[0].name(), "noop");
@@ -142,7 +139,7 @@ mod tests {
             type = "noop"
         "#})
         .unwrap();
-        let codecs = config.codec;
+        let codecs = config.configs;
 
         assert_eq!(codecs.len(), 2);
         assert_eq!(codecs[0].name(), "noop");
@@ -155,7 +152,7 @@ mod tests {
             codec = "noop"
         "#})
         .unwrap();
-        let codecs = config.codec;
+        let codecs = config.configs;
         let decoder = codecs[0].build_decoder();
         let encoder = codecs[0].build_encoder();
 
@@ -169,7 +166,7 @@ mod tests {
             codec = "unknown"
         "#})
         .unwrap();
-        let codecs = config.codec;
+        let codecs = config.configs;
         let decoder = codecs[0].build_decoder();
         let encoder = codecs[0].build_encoder();
 
