@@ -75,6 +75,7 @@ where
         self,
         mut chans: C,
         shutdown: S,
+        mut checkpointer: Checkpointer,
     ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
     where
         C: Sink<Vec<Line>> + Unpin,
@@ -89,7 +90,6 @@ where
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
 
-        let mut checkpointer = Checkpointer::new(&self.data_dir);
         checkpointer.read_checkpoints(self.ignore_before);
 
         let mut known_small_files = HashSet::new();
@@ -357,11 +357,11 @@ where
             // limited by the hard-coded cap. Else, we set the backup_cap to its
             // minimum on the assumption that next time through there will be
             // more lines to read promptly.
-            if global_bytes_read == 0 {
-                backoff_cap = cmp::min(2_048, backoff_cap.saturating_mul(2));
+            backoff_cap = if global_bytes_read == 0 {
+                cmp::min(2_048, backoff_cap.saturating_mul(2))
             } else {
-                backoff_cap = 1;
-            }
+                1
+            };
             let backoff = backoff_cap.saturating_sub(global_bytes_read);
 
             // This works only if run inside tokio context since we are using

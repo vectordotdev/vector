@@ -12,6 +12,7 @@ mod internal_events;
 mod metadata_ext;
 pub mod paths_provider;
 
+pub use self::checkpointer::Checkpointer;
 pub use self::file_server::{FileServer, Line, Shutdown as FileServerShutdown};
 pub use self::fingerprinter::{FingerprintStrategy, Fingerprinter};
 pub use self::internal_events::FileSourceInternalEvents;

@@ -21,7 +21,8 @@ use crate::{
 };
 use bytes::Bytes;
 use file_source::{
-    FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
+    Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
+    ReadFrom,
 };
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
@@ -259,6 +260,7 @@ impl Source {
 
         // TODO: maybe more of the parameters have to be configurable.
 
+        let checkpointer = Checkpointer::new(&data_dir);
         let file_server = FileServer {
             // Use our special paths provider.
             paths_provider,
@@ -367,12 +369,11 @@ impl Source {
         }
         {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
-                match result {
+            let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
+                .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
                     Err(error) => error!(message = "File server exited with an error.", %error),
-                }
-            });
+                });
             slot.bind(Box::pin(fut));
         }
         {

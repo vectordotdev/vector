@@ -13,7 +13,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
+    Checkpointer, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
 use futures::{
     future::TryFutureExt,
@@ -254,6 +254,7 @@ pub fn file_source(
         None => Bytes::from(config.line_delimiter.clone()),
     };
 
+    let checkpointer = Checkpointer::new(&data_dir);
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
@@ -340,7 +341,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(tx, shutdown);
+            let result = file_server.run(tx, shutdown, checkpointer);
             emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
