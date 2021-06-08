@@ -2,7 +2,7 @@ use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
-    event::Event,
+    event::{Event, LogEvent},
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -397,22 +397,20 @@ fn create_event(
         byte_size: line.len(),
     });
 
-    let mut event = Event::from(line);
+    let mut event = LogEvent::from(line);
 
     // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("file"));
+    event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
-        event.as_mut_log().insert(file_key.clone(), file);
+        event.insert(file_key.clone(), file);
     }
 
     if let Some(hostname) = &hostname {
-        event.as_mut_log().insert(host_key, hostname.clone());
+        event.insert(host_key, hostname.clone());
     }
 
-    event
+    event.into()
 }
 
 #[cfg(test)]
