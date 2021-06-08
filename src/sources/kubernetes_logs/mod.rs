@@ -5,7 +5,7 @@
 
 #![deny(missing_docs)]
 
-use crate::event::Event;
+use crate::event::{Event, LogEvent};
 use crate::internal_events::{
     FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
     KubernetesLogsEventReceived,
@@ -401,25 +401,23 @@ impl Source {
 }
 
 fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
-    let mut event = Event::from(line);
+    let mut event = LogEvent::from(line);
 
     // Add source type.
-    event.as_mut_log().insert(
+    event.insert(
         crate::config::log_schema().source_type_key(),
         COMPONENT_NAME.to_owned(),
     );
 
     // Add file.
-    event.as_mut_log().insert(FILE_KEY, file.to_owned());
+    event.insert(FILE_KEY, file.to_owned());
 
     // Add ingestion timestamp if requested.
     if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event
-            .as_mut_log()
-            .insert(ingestion_timestamp_field, chrono::Utc::now());
+        event.insert(ingestion_timestamp_field, chrono::Utc::now());
     }
 
-    event
+    event.into()
 }
 
 /// This function returns the default value for `self_node_name` variable
