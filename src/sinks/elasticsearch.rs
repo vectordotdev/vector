@@ -1022,10 +1022,38 @@ mod integration_tests {
         .await;
     }
 
+    #[tokio::test]
+    async fn insert_events_in_data_stream() {
+        trace_init();
+        let template_index = format!("my-template-{}", gen_index());
+        let stream_index = format!("my-stream-{}", gen_index());
+
+        let cfg = ElasticSearchConfig {
+            endpoint: "http://localhost:9200".into(),
+            mode: ElasticSearchMode::DataStream,
+            index: Some(stream_index.clone()),
+            ..config()
+        };
+        let common = ElasticSearchCommon::parse_config(&cfg).expect("Config error");
+
+        create_template_index(&common, &template_index)
+            .await
+            .expect("Template index creation error");
+        create_data_stream(&common, &stream_index)
+            .await
+            .expect("Data stream creation error");
+
+        run_insert_tests_with_config(&cfg, true).await;
+    }
+
     async fn run_insert_tests(mut config: ElasticSearchConfig, break_events: bool) {
-        let index = gen_index();
-        config.index = Some(index.clone());
+        config.index = Some(gen_index());
+        run_insert_tests_with_config(&config, break_events).await;
+    }
+
+    async fn run_insert_tests_with_config(config: &ElasticSearchConfig, break_events: bool) {
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let index = config.index.clone().unwrap();
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
@@ -1120,6 +1148,32 @@ mod integration_tests {
             StatusCode::OK => Ok(()),
             status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
         }
+    }
+
+    async fn create_template_index(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {
+        let uri = format!("{}/_index_template/{}", common.base_url, name);
+        let response = reqwest::Client::new()
+            .put(uri)
+            .json(&json!({
+                "index_patterns": ["my-*-*"],
+                "data_stream": {},
+                "composed_of": ["logs-mapping", "logs-settings"],
+            }))
+            .send()
+            .await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        Ok(())
+    }
+
+    async fn create_data_stream(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {
+        let uri = format!("{}/_data_stream/{}", common.base_url, name);
+        let response = reqwest::Client::new()
+            .put(uri)
+            .header("Content-Type", "application/json")
+            .send()
+            .await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        Ok(())
     }
 
     fn config() -> ElasticSearchConfig {
