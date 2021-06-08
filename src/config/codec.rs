@@ -1,3 +1,4 @@
+use super::DataType;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
@@ -56,7 +57,7 @@ impl CodecConfig {
         }
     }
 
-    pub fn build_decoder(&self) -> crate::Result<Transform<Event>> {
+    pub fn build_decoder(&self) -> crate::Result<(Transform<Event>, DataType, DataType)> {
         match &self {
             Self::String(string) => match CODECS.get(string.as_str()) {
                 Some(codec) => codec.build_decoder(),
@@ -66,7 +67,7 @@ impl CodecConfig {
         }
     }
 
-    pub fn build_encoder(&self) -> crate::Result<Transform<Event>> {
+    pub fn build_encoder(&self) -> crate::Result<(Transform<Event>, DataType, DataType)> {
         match &self {
             Self::String(string) => match CODECS.get(string.as_str()) {
                 Some(codec) => codec.build_encoder(),

@@ -1,4 +1,5 @@
 use super::Codec;
+use crate::config::DataType;
 use serde::{Deserialize, Serialize};
 use vector_core::{
     event::Event,
@@ -14,12 +15,20 @@ impl Codec for NoopCodec {
         "noop"
     }
 
-    fn build_decoder(&self) -> crate::Result<Transform<Event>> {
-        Ok(Transform::function(NoopTransform))
+    fn build_decoder(&self) -> crate::Result<(Transform<Event>, DataType, DataType)> {
+        Ok((
+            Transform::function(NoopTransform),
+            DataType::Any,
+            DataType::Any,
+        ))
     }
 
-    fn build_encoder(&self) -> crate::Result<Transform<Event>> {
-        Ok(Transform::function(NoopTransform))
+    fn build_encoder(&self) -> crate::Result<(Transform<Event>, DataType, DataType)> {
+        Ok((
+            Transform::function(NoopTransform),
+            DataType::Any,
+            DataType::Any,
+        ))
     }
 }
 
