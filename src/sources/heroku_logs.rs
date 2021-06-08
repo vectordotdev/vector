@@ -74,15 +74,7 @@ impl SourceConfig for LogplexConfig {
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
         };
-        source.run(
-            self.address,
-            "events",
-            true,
-            &self.tls,
-            &self.auth,
-            cx.out,
-            cx.shutdown,
-        )
+        source.run(self.address, "events", true, &self.tls, &self.auth, cx)
     }
 
     fn output_type(&self) -> DataType {
@@ -248,9 +240,12 @@ mod tests {
         auth: Option<HttpSourceAuthConfig>,
         query_parameters: Vec<String>,
         status: EventStatus,
+        acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
+        let mut context = SourceContext::new_test(sender);
+        context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
             LogplexConfig {
                 address,
@@ -258,7 +253,7 @@ mod tests {
                 tls: None,
                 auth,
             }
-            .build(SourceContext::new_test(sender))
+            .build(context)
             .await
             .unwrap()
             .await
@@ -309,6 +304,7 @@ mod tests {
             Some(auth.clone()),
             vec!["appname".to_string(), "absent".to_string()],
             EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -350,7 +346,7 @@ mod tests {
 
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed).await;
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, true).await;
 
         let events = spawn_collect_n(
             async move {
@@ -368,10 +364,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn logplex_ignores_disabled_acknowledgements() {
+        trace_init();
+
+        let auth = make_auth();
+
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, false).await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                )
+            },
+            rx,
+            SAMPLE_BODY.lines().count(),
+        )
+        .await;
+
+        assert_eq!(events.len(), SAMPLE_BODY.lines().count());
+    }
+
+    #[tokio::test]
     async fn logplex_auth_failure() {
         trace_init();
 
-        let (_rx, addr) = source(Some(make_auth()), vec![], EventStatus::Delivered).await;
+        let (_rx, addr) = source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
 
         assert_eq!(
             401,

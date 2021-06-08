@@ -91,6 +91,38 @@ components: sources: aws_kinesis_firehose: {
 				syntax: "literal"
 			}
 		}
+		record_compression: {
+			common:      true
+			description: """
+				The compression of records within the Firehose message.
+
+				Some services, like AWS CloudWatch Logs, will [compress the events with
+				gzip](\(urls.aws_cloudwatch_logs_firehose), before sending them AWS Kinesis Firehose. This option
+				can be used to automatically decompress them before forwarding them to the next component.
+
+				Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol))
+				of the Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP
+				request.
+				"""
+			required:    false
+			type: string: {
+				default: "text"
+				enum: {
+					auto: """
+					Vector will try to determine the compression format of the object by looking at its file signature,
+					also known as [magic bytes](\(urls.magic_bytes)).
+
+					Given that determining the encoding using magic bytes is not a perfect check, if the record fails to
+					decompress with the discovered format, the record will be forwarded as-is. Thus, if you know the
+					records will always be gzip encoded (for example if they are coming from AWS CloudWatch Logs) then
+					you should prefer to set `gzip` here to have Vector reject any records that are not-gziped.
+					"""
+					gzip: "GZIP format."
+					none: "Uncompressed."
+				}
+				syntax: "literal"
+			}
+		}
 	}
 
 	output: logs: {
@@ -204,9 +236,10 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
-		request_read_errors_total: components.sources.internal_metrics.output.metrics.request_read_errors_total
-		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
+		events_in_total:                       components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:                 components.sources.internal_metrics.output.metrics.processed_bytes_total
+		request_read_errors_total:             components.sources.internal_metrics.output.metrics.request_read_errors_total
+		requests_received_total:               components.sources.internal_metrics.output.metrics.requests_received_total
+		request_automatic_decode_errors_total: components.sources.internal_metrics.output.metrics.request_automatic_decode_errors_total
 	}
 }

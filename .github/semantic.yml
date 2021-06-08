@@ -15,6 +15,7 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
+  - docs                # A documentation change
 
 scopes:
   - new source

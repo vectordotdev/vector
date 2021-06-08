@@ -6,7 +6,7 @@ remap: {
 		description: string
 		required:    bool
 		multiple:    bool | *false
-		default?:    bool | string | int
+		default?:    bool | string | int | [string, ...string]
 		type: [remap.#Type, ...remap.#Type]
 		enum?: #Enum
 	}

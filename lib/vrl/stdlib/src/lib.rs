@@ -90,6 +90,10 @@ mod log;
 mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
+#[cfg(feature = "match_any")]
+mod match_any;
+#[cfg(feature = "match_array")]
+mod match_array;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -130,10 +134,14 @@ mod parse_linux_authorization;
 mod parse_logfmt;
 #[cfg(feature = "parse_nginx_log")]
 mod parse_nginx_log;
+#[cfg(feature = "parse_query_string")]
+mod parse_query_string;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
 mod parse_regex_all;
+#[cfg(feature = "parse_ruby_hash")]
+mod parse_ruby_hash;
 #[cfg(feature = "parse_syslog")]
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
@@ -144,10 +152,8 @@ mod parse_tokens;
 mod parse_url;
 #[cfg(feature = "push")]
 mod push;
-//#[cfg(feature = "redact")]
-//mod redact;
-#[cfg(feature = "parse_query_string")]
-mod parse_query_string;
+#[cfg(feature = "redact")]
+mod redact;
 #[cfg(feature = "replace")]
 mod replace;
 #[cfg(feature = "round")]
@@ -289,6 +295,10 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
+#[cfg(feature = "match_any")]
+pub use match_any::MatchAny;
+#[cfg(feature = "match_array")]
+pub use match_array::MatchArray;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -333,6 +343,8 @@ pub use parse_query_string::ParseQueryString;
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
 pub use parse_regex_all::ParseRegexAll;
+#[cfg(feature = "parse_ruby_hash")]
+pub use parse_ruby_hash::ParseRubyHash;
 #[cfg(feature = "parse_syslog")]
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
@@ -345,8 +357,8 @@ pub use parse_url::ParseUrl;
 pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
-//#[cfg(feature = "redact")]
-//pub use redact::Redact;
+#[cfg(feature = "redact")]
+pub use redact::Redact;
 #[cfg(feature = "replace")]
 pub use replace::Replace;
 #[cfg(feature = "round")]
@@ -484,6 +496,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Log),
         #[cfg(feature = "match")]
         Box::new(Match),
+        #[cfg(feature = "match_any")]
+        Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -532,6 +548,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseRegex),
         #[cfg(feature = "parse_regex_all")]
         Box::new(ParseRegexAll),
+        #[cfg(feature = "parse_ruby_hash")]
+        Box::new(ParseRubyHash),
         #[cfg(feature = "parse_syslog")]
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
@@ -544,8 +562,12 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Push),
         #[cfg(feature = "match")]
         Box::new(Match),
-        //#[cfg(feature = "redact")]
-        //Box::new(Redact),
+        #[cfg(feature = "match_any")]
+        Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
+        #[cfg(feature = "redact")]
+        Box::new(Redact),
         #[cfg(feature = "replace")]
         Box::new(Replace),
         #[cfg(feature = "round")]

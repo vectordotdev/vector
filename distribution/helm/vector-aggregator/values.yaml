@@ -2,6 +2,10 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Additional labels to add to all resources
+# commonLabels:
+#   app.kubernetes.io/component: aggregator
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -13,6 +17,7 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `StatefulSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
 
 # Override the chart name used in templates.
 nameOverride: ""
@@ -266,6 +271,8 @@ prometheusSink:
     # Whether to add the `PodMonitor` resource or not.
     # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
     enabled: false
+    # Additional labels for PodMonitor
+    additionalLabels: {}
     # Additional relabelings to include in the `PodMonitor`.
     extraRelabelings: []
 

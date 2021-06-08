@@ -23,7 +23,6 @@ administration: interfaces: apt: {
 
 	role_implementations: [string]: {
 		commands: role_implementations._systemd_commands & {
-			_config_path: paths.config
 			add_repo:
 				#"""
 					curl -1sLf \

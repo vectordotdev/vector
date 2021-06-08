@@ -109,13 +109,10 @@ mod tests {
             })
             .collect::<BTreeMap<String, Metric>>();
 
-        assert_eq!(MetricValue::Gauge { value: 2.0 }, output["foo"].data.value);
-        assert_eq!(
-            MetricValue::Counter { value: 7.0 },
-            output["bar"].data.value
-        );
+        assert_eq!(&MetricValue::Gauge { value: 2.0 }, output["foo"].value());
+        assert_eq!(&MetricValue::Counter { value: 7.0 }, output["bar"].value());
 
-        match &output["baz"].data.value {
+        match &output["baz"].value() {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count,
@@ -132,7 +129,7 @@ mod tests {
             _ => panic!("wrong type"),
         }
 
-        match &output["quux"].data.value {
+        match &output["quux"].value() {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count,

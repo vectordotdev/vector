@@ -17,6 +17,7 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   cancel-previous:
@@ -87,7 +88,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.3.4
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -102,6 +103,8 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+        env:
+          CARGO_BUILD_JOBS: 6
 
   test-misc:
     name: Miscellaneous - Linux
@@ -111,7 +114,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -149,7 +152,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -179,7 +182,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.3.4
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -254,7 +257,7 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |

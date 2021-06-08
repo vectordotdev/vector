@@ -760,11 +760,7 @@ async fn parses_sink_full_es_basic_auth() {
     .unwrap();
 }
 
-#[cfg(all(
-    feature = "docker",
-    feature = "sources-stdin",
-    feature = "sinks-elasticsearch"
-))]
+#[cfg(all(feature = "sources-stdin", feature = "sinks-elasticsearch"))]
 #[tokio::test]
 async fn parses_sink_full_es_aws() {
     load(
@@ -780,7 +776,7 @@ async fn parses_sink_full_es_aws() {
         [sinks.out.auth]
         strategy = "aws"
         "#,
-        Some(Format::TOML),
+        Some(Format::Toml),
     )
     .await
     .unwrap();

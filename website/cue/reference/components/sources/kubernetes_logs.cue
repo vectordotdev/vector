@@ -220,6 +220,15 @@ components: sources: kubernetes_logs: {
 				unit:    "bytes"
 			}
 		}
+		glob_minimum_cooldown_ms: {
+			common:      false
+			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files within a single pod."
+			required:    false
+			type: uint: {
+				default: 1_000
+				unit:    "milliseconds"
+			}
+		}
 		timezone: configuration._timezone
 	}
 
@@ -569,6 +578,15 @@ components: sources: kubernetes_logs: {
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
+		k8s_reflector_desyncs_total:            components.sources.internal_metrics.output.metrics.k8s_reflector_desyncs_total
+		k8s_state_ops_total:                    components.sources.internal_metrics.output.metrics.k8s_state_ops_total
+		k8s_stream_chunks_processed_total:      components.sources.internal_metrics.output.metrics.k8s_stream_chunks_processed_total
+		k8s_stream_processed_bytes_total:       components.sources.internal_metrics.output.metrics.k8s_stream_processed_bytes_total
+		k8s_watch_requests_invoked_total:       components.sources.internal_metrics.output.metrics.k8s_watch_requests_invoked_total
+		k8s_watch_requests_failed_total:        components.sources.internal_metrics.output.metrics.k8s_watch_requests_failed_total
+		k8s_watch_stream_failed_total:          components.sources.internal_metrics.output.metrics.k8s_watch_stream_failed_total
+		k8s_watch_stream_items_obtained_total:  components.sources.internal_metrics.output.metrics.k8s_watch_stream_items_obtained_total
+		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
 		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
 	}

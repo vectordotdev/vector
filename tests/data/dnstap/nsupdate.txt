@@ -1,0 +1,3 @@
+server localhost 8003
+update add dh1.example.com 3600 A 10.0.0.21
+send

@@ -15,6 +15,7 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
+    collections::BTreeSet,
     fs::{create_dir, OpenOptions},
     io::Write,
     path::PathBuf,
@@ -33,7 +34,7 @@ use vector::{
         TransformConfig,
     },
     event::{
-        metric::{self, MetricValue},
+        metric::{self, MetricData, MetricValue},
         Event, Value,
     },
     sinks::{util::StreamSink, Healthcheck, VectorSink},
@@ -203,42 +204,39 @@ impl FunctionTransform for MockTransform {
                 v.push_str(&self.suffix);
                 log.insert(vector::config::log_schema().message_key(), Value::from(v));
             }
-            Event::Metric(metric) => match metric.data.value {
-                MetricValue::Counter { ref mut value } => {
-                    *value += self.increase;
-                }
-                MetricValue::Distribution {
-                    ref mut samples,
-                    statistic: _,
-                } => {
-                    samples.push(metric::Sample {
+            Event::Metric(metric) => {
+                let increment = match metric.value() {
+                    MetricValue::Counter { .. } => Some(MetricValue::Counter {
                         value: self.increase,
-                        rate: 1,
-                    });
+                    }),
+                    MetricValue::Gauge { .. } => Some(MetricValue::Gauge {
+                        value: self.increase,
+                    }),
+                    MetricValue::Distribution { statistic, .. } => {
+                        Some(MetricValue::Distribution {
+                            samples: vec![metric::Sample {
+                                value: self.increase,
+                                rate: 1,
+                            }],
+                            statistic: *statistic,
+                        })
+                    }
+                    MetricValue::AggregatedHistogram { .. } => None,
+                    MetricValue::AggregatedSummary { .. } => None,
+                    MetricValue::Set { .. } => {
+                        let mut values = BTreeSet::new();
+                        values.insert(self.suffix.clone());
+                        Some(MetricValue::Set { values })
+                    }
+                };
+                if let Some(increment) = increment {
+                    assert!(metric.add(&MetricData {
+                        kind: metric.kind(),
+                        timestamp: metric.timestamp(),
+                        value: increment,
+                    }));
                 }
-                MetricValue::AggregatedHistogram {
-                    ref mut count,
-                    ref mut sum,
-                    ..
-                } => {
-                    *count += 1;
-                    *sum += self.increase;
-                }
-                MetricValue::AggregatedSummary {
-                    ref mut count,
-                    ref mut sum,
-                    ..
-                } => {
-                    *count += 1;
-                    *sum += self.increase;
-                }
-                MetricValue::Gauge { ref mut value, .. } => {
-                    *value += self.increase;
-                }
-                MetricValue::Set { ref mut values, .. } => {
-                    values.insert(self.suffix.clone());
-                }
-            },
+            }
         };
         output.push(event);
     }

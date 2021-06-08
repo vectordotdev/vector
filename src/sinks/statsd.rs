@@ -173,12 +173,12 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Encoded
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
-    match &metric.data.value {
+    match metric.value() {
         MetricValue::Counter { value } => {
             push_event(&mut buf, &metric, value, "c", None);
         }
         MetricValue::Gauge { value } => {
-            match metric.data.kind {
+            match metric.kind() {
                 MetricKind::Incremental => {
                     push_event(&mut buf, &metric, format!("{:+}", value), "g", None)
                 }
@@ -207,8 +207,8 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Encoded
         }
         _ => {
             emit!(StatsdInvalidMetricReceived {
-                value: &metric.data.value,
-                kind: &metric.data.kind,
+                value: metric.value(),
+                kind: &metric.kind(),
             });
 
             return None;

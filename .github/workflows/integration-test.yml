@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -69,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -80,13 +80,31 @@ jobs:
       - run: make slim-builds
       - run: make test-integration-clickhouse
 
+  test-integration-dnstap:
+    name: Integration - Linux, Dnstap
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-integration-dnstap
+
   test-integration-docker-logs:
     name: Integration - Linux, Docker
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -104,7 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -116,13 +134,32 @@ jobs:
       - run: make slim-builds
       - run: make test-integration-elasticsearch
 
+  test-integration-fluent:
+    name: Integration - Linux, Fluent
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: make ci-sweep
+      - uses: actions/cache@v2.1.5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-integration-fluent
+
+
   test-integration-gcp:
     name: Integration - Linux, GCP
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -140,7 +177,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -158,7 +195,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -176,7 +213,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -194,7 +231,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -212,7 +249,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -230,7 +267,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -248,7 +285,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -266,7 +303,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -284,7 +321,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -302,7 +339,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -320,7 +357,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
@@ -339,6 +376,7 @@ jobs:
       - cancel-previous
       - test-integration-aws
       - test-integration-clickhouse
+      - test-integration-dnstap
       - test-integration-docker-logs
       - test-integration-elasticsearch
       - test-integration-gcp

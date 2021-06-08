@@ -1,11 +1,11 @@
 use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
-    event::metric::MetricKind,
+    event::metric::{Metric, MetricData, MetricKind, MetricValue},
     event::Event,
     internal_events::PrometheusServerRequestComplete,
     sinks::{
-        util::{statistic::validate_quantiles, MetricEntry, StreamSink},
+        util::{statistic::validate_quantiles, StreamSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -23,7 +23,10 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     convert::Infallible,
+    hash::{Hash, Hasher},
+    mem::discriminant,
     net::SocketAddr,
+    ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
 };
 use stream_cancel::{Trigger, Tripwire};
@@ -303,21 +306,24 @@ impl StreamSink for PrometheusExporter {
                     .drain(..)
                     .map(|(MetricEntry(mut metric), is_incremental_set)| {
                         if is_incremental_set {
-                            metric.data.value = metric.data.value.zero();
+                            metric.zero();
                         }
                         (MetricEntry(metric), is_incremental_set)
                     })
                     .collect();
             }
 
-            match item.data.kind {
+            match item.kind() {
                 MetricKind::Incremental => {
                     let mut entry = MetricEntry(item.into_absolute());
                     if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&entry) {
-                        existing.data.update(&entry.data);
-                        entry = MetricEntry(existing);
+                        if existing.update(&entry) {
+                            entry = MetricEntry(existing);
+                        } else {
+                            warn!(message = "Metric changed type, dropping old value.", series = %entry.series());
+                        }
                     }
-                    let is_set = entry.data.value.is_set();
+                    let is_set = matches!(entry.value(), MetricValue::Set { .. });
                     metrics.map.insert(entry, is_set);
                 }
                 MetricKind::Absolute => {
@@ -330,6 +336,96 @@ impl StreamSink for PrometheusExporter {
             self.acker.ack(1);
         }
         Ok(())
+    }
+}
+
+struct MetricEntry(Metric);
+
+impl Deref for MetricEntry {
+    type Target = Metric;
+    fn deref(&self) -> &Metric {
+        &self.0
+    }
+}
+
+impl DerefMut for MetricEntry {
+    fn deref_mut(&mut self) -> &mut Metric {
+        &mut self.0
+    }
+}
+
+impl AsRef<MetricData> for MetricEntry {
+    fn as_ref(&self) -> &MetricData {
+        self.0.as_ref()
+    }
+}
+
+impl Eq for MetricEntry {}
+
+impl Hash for MetricEntry {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let metric = &self.0;
+        metric.series().hash(state);
+        metric.kind().hash(state);
+        discriminant(metric.value()).hash(state);
+
+        match metric.value() {
+            MetricValue::AggregatedHistogram { buckets, .. } => {
+                for bucket in buckets {
+                    bucket.upper_limit.to_bits().hash(state);
+                }
+            }
+            MetricValue::AggregatedSummary { quantiles, .. } => {
+                for quantile in quantiles {
+                    quantile.upper_limit.to_bits().hash(state);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl PartialEq for MetricEntry {
+    fn eq(&self, other: &Self) -> bool {
+        // This differs from a straightforward implementation of `eq` by
+        // comparing only the "shape" bits (name, tags, and type) while
+        // allowing the contained values to be different.
+        self.series() == other.series()
+            && self.kind() == other.kind()
+            && discriminant(self.value()) == discriminant(other.value())
+            && match (self.value(), other.value()) {
+                (
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets1, ..
+                    },
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets2, ..
+                    },
+                ) => {
+                    buckets1.len() == buckets2.len()
+                        && buckets1
+                            .iter()
+                            .zip(buckets2.iter())
+                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                }
+                (
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles1,
+                        ..
+                    },
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles2,
+                        ..
+                    },
+                ) => {
+                    quantiles1.len() == quantiles2.len()
+                        && quantiles1
+                            .iter()
+                            .zip(quantiles2.iter())
+                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                }
+                _ => true,
+            }
     }
 }
 
@@ -525,13 +621,13 @@ mod tests {
         let map = &sink.metrics.read().unwrap().map;
 
         assert_eq!(
-            map.get_full(&MetricEntry(m1)).unwrap().1.data.value,
-            MetricValue::Counter { value: 40. }
+            map.get_full(&MetricEntry(m1)).unwrap().1.value(),
+            &MetricValue::Counter { value: 40. }
         );
 
         assert_eq!(
-            map.get_full(&MetricEntry(m2)).unwrap().1.data.value,
-            MetricValue::Counter { value: 33. }
+            map.get_full(&MetricEntry(m2)).unwrap().1.value(),
+            &MetricValue::Counter { value: 33. }
         );
     }
 }

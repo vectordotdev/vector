@@ -2,6 +2,7 @@ package metadata
 
 administration: interfaces: msi: {
 	title:       "MSI (Windows Installer)"
+	_shell: "powershell"
 	description: """
 		MSI refers to the file format and command line utility for
 		the [Windows Installer](\(urls.windows_installer)). Windows Installer

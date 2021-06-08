@@ -16,7 +16,6 @@ use crate::{
 };
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
-use derive_is_enum_variant::is_enum_variant;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -42,7 +41,7 @@ pub struct SyslogConfig {
     host_key: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
     Tcp {
@@ -568,7 +567,7 @@ mod test {
           "#,
         )
         .unwrap();
-        assert!(config.mode.is_tcp());
+        assert!(matches!(config.mode, Mode::Tcp { .. }));
     }
 
     #[test]
@@ -642,7 +641,7 @@ mod test {
           "#,
         )
         .unwrap();
-        assert!(config.mode.is_udp());
+        assert!(matches!(config.mode, Mode::Udp { .. }));
     }
 
     #[test]
@@ -678,7 +677,7 @@ mod test {
           "#,
         )
         .unwrap();
-        assert!(config.mode.is_unix());
+        assert!(matches!(config.mode, Mode::Unix { .. }));
     }
 
     #[test]

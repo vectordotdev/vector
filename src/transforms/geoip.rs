@@ -210,7 +210,10 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        transforms::json_parser::{JsonParser, JsonParserConfig},
+        transforms::{
+            json_parser::{JsonParser, JsonParserConfig},
+            test::transform_one,
+        },
     };
     use std::collections::HashMap;
 
@@ -355,7 +358,7 @@ mod tests {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(text);
         let metadata = event.metadata().clone();
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
         assert_eq!(event.metadata(), &metadata);
 
         let mut augment = Geoip::new(
@@ -364,8 +367,8 @@ mod tests {
             "geo".to_string(),
         )
         .unwrap();
-        let new_event = augment.transform_one(event).unwrap();
-        assert_eq!(new_event.metadata(), &metadata);
-        new_event
+        let result = transform_one(&mut augment, event).unwrap();
+        assert_eq!(result.metadata(), &metadata);
+        result
     }
 }
