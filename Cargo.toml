@@ -262,7 +262,6 @@ cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
-redis = { version = "0.20.0", features = ["connection-manager","async-std-comp"], optional = true }
 
 # For WASM
 async-stream = "0.3.2"
