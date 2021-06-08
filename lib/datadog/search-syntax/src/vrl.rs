@@ -31,16 +31,7 @@ static RESERVED_ATTRIBUTES: &[&str] = &[
     "tags",
 ];
 
-lazy_static! {
-    static ref TAGS_QUERY: ast::Expr = ast::Expr::Query(make_node(ast::Query {
-        target: make_node(ast::QueryTarget::External),
-        path: make_node(
-            lookup::parser::parse_lookup("tags")
-                .expect("should parse lookup")
-                .into()
-        )
-    }));
-}
+const DATADOG_TAGS_ROOT: &str = ".__datadog_tags";
 
 /// Describes a field to search on.
 enum Field {
@@ -145,13 +136,7 @@ impl From<QueryNode> for ast::Expr {
                     Field::Default(_) => {
                         make_function_call("match", vec![query, make_regex(&value)])
                     }
-                    Field::Reserved(_) | Field::Facet(_) => {
-                        make_string_comparison(query, Opcode::Eq, &value)
-                    }
-                    _ => make_function_call(
-                        "match_array",
-                        vec![TAGS_QUERY.clone(), make_kv_regex(&attr, &value)],
-                    ),
+                    _ => make_string_comparison(query, Opcode::Eq, &value),
                 })
                 .collect(),
             // Comparison.
@@ -257,7 +242,7 @@ impl From<QueryNode> for ast::Expr {
 }
 
 /// Creates a VRL node with a default span.
-fn make_node<T>(node: T) -> ast::Node<T> {
+pub fn make_node<T>(node: T) -> ast::Node<T> {
     ast::Node::new(Span::default(), node)
 }
 
@@ -276,7 +261,7 @@ fn normalize_fields<T: AsRef<str>>(value: T) -> Vec<Field> {
         v if DEFAULT_FIELDS.contains(&v.as_ref()) => Field::Default(v),
         v if RESERVED_ATTRIBUTES.contains(&v.as_ref()) => Field::Reserved(v),
         v if value.starts_with("@") => Field::Facet(v),
-        v => Field::Tag(v),
+        v => Field::Tag(format!("{}.{}", DATADOG_TAGS_ROOT, v)),
     };
 
     vec![field]
@@ -314,15 +299,6 @@ fn make_queries<T: AsRef<str>>(field: T) -> Vec<(Field, ast::Expr)> {
 fn make_regex<T: AsRef<str>>(value: T) -> ast::Expr {
     ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
         "\\b{}\\b",
-        regex::escape(value.as_ref()).replace("\\*", ".*")
-    ))))
-}
-
-/// Makes a key/value Regex string, for finding field values inside tags.
-fn make_kv_regex<T: AsRef<str>>(key: T, value: T) -> ast::Expr {
-    ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
-        "^{}:{}$",
-        key.as_ref(),
         regex::escape(value.as_ref()).replace("\\*", ".*")
     ))))
 }
@@ -422,11 +398,11 @@ mod tests {
         // Match nothing.
         ("-*:*", "(!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_)))))"),
         // Tag exists.
-        ("_exists_:a", "exists(.a)"),
+        ("_exists_:a", "exists(.__datadog_tags.a)"),
         // Tag exists (negate).
-        ("NOT _exists_:a", "!exists(.a)"),
+        ("NOT _exists_:a", "!exists(.__datadog_tags.a)"),
         // Tag exists (negate w/-).
-        ("-_exists_:a", "!exists(.a)"),
+        ("-_exists_:a", "!exists(.__datadog_tags.a)"),
         // Facet exists.
         ("_exists_:@b", "exists(.custom.b)"),
         // Facet exists (negate).
@@ -434,11 +410,11 @@ mod tests {
         // Facet exists (negate w/-).
         ("-_exists_:@b", "!exists(.custom.b)"),
         // Tag doesn't exist.
-        ("_missing_:a", "!exists(.a)"),
+        ("_missing_:a", "!exists(.__datadog_tags.a)"),
         // Tag doesn't exist (negate).
-        ("NOT _missing_:a", "!!exists(.a)"),
+        ("NOT _missing_:a", "!!exists(.__datadog_tags.a)"),
         // Tag doesn't exist (negate w/-).
-        ("-_missing_:a", "!!exists(.a)"),
+        ("-_missing_:a", "!!exists(.__datadog_tags.a)"),
         // Facet doesn't exist.
         ("_missing_:@b", "!exists(.custom.b)"),
         // Facet doesn't exist (negate).
@@ -458,17 +434,23 @@ mod tests {
         // Quoted keyword (negate w/-).
         (r#"-"bla""#, r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Tag match.
-        ("a:bla", r#"match_array(.tags, r'^a:bla$')"#),
+        ("a:bla", r#".__datadog_tags.a == "bla""#),
+        // Reserved tag match
+        ("host:foo", r#".host == "foo""#),
         // Tag match (negate).
-        ("NOT a:bla", r#"!match_array(.tags, r'^a:bla$')"#),
+        ("NOT a:bla", r#"!(.__datadog_tags.a == "bla")"#),
+        // Reserved tag match (negate)
+        ("NOT host:foo", r#"!(.host == "foo")"#),
         // Tag match (negate w/-).
-        ("-a:bla", r#"!match_array(.tags, r'^a:bla$')"#),
+        ("-a:bla", r#"!(.__datadog_tags.a == "bla")"#),
+        // Reserved tag match (negate w/-)
+        ("-trace_id:foo", r#"!(.trace_id == "foo")"#),
         // Quoted tag match.
-        (r#"a:"bla""#, r#"match_array(.tags, r'^a:bla$')"#),
+        (r#"a:"bla""#, r#".__datadog_tags.a == "bla""#),
         // Quoted tag match (negate).
-        (r#"NOT a:"bla""#, r#"!match_array(.tags, r'^a:bla$')"#),
+        (r#"NOT a:"bla""#, r#"!(.__datadog_tags.a == "bla")"#),
         // Quoted tag match (negate).
-        (r#"-a:"bla""#, r#"!match_array(.tags, r'^a:bla$')"#),
+        (r#"-a:"bla""#, r#"!(.__datadog_tags.a == "bla")"#),
         // Facet match.
         ("@a:bla", r#".custom.a == "bla""#),
         // Facet match (negate).
@@ -500,23 +482,23 @@ mod tests {
         // Multiple wildcards (negate w/-).
         ("-*b*la*", r#"!(match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b')))))"#),
         // Wildcard prefix - tag.
-        ("a:*bla", r#"match(.a, r'\b.*bla\b')"#),
+        ("a:*bla", r#"match(.__datadog_tags.a, r'\b.*bla\b')"#),
         // Wildcard prefix - tag (negate).
-        ("NOT a:*bla", r#"!match(.a, r'\b.*bla\b')"#),
+        ("NOT a:*bla", r#"!match(.__datadog_tags.a, r'\b.*bla\b')"#),
         // Wildcard prefix - tag (negate w/-).
-        ("-a:*bla", r#"!match(.a, r'\b.*bla\b')"#),
+        ("-a:*bla", r#"!match(.__datadog_tags.a, r'\b.*bla\b')"#),
         // Wildcard suffix - tag.
-        ("b:bla*", r#"match(.b, r'\bbla.*\b')"#),
+        ("b:bla*", r#"match(.__datadog_tags.b, r'\bbla.*\b')"#),
         // Wildcard suffix - tag (negate).
-        ("NOT b:bla*", r#"!match(.b, r'\bbla.*\b')"#),
+        ("NOT b:bla*", r#"!match(.__datadog_tags.b, r'\bbla.*\b')"#),
         // Wildcard suffix - tag (negate w/-).
-        ("-b:bla*", r#"!match(.b, r'\bbla.*\b')"#),
+        ("-b:bla*", r#"!match(.__datadog_tags.b, r'\bbla.*\b')"#),
         // Multiple wildcards - tag.
-        ("c:*b*la*", r#"match(.c, r'\b.*b.*la.*\b')"#),
+        ("c:*b*la*", r#"match(.__datadog_tags.c, r'\b.*b.*la.*\b')"#),
         // Multiple wildcards - tag (negate).
-        ("NOT c:*b*la*", r#"!match(.c, r'\b.*b.*la.*\b')"#),
+        ("NOT c:*b*la*", r#"!match(.__datadog_tags.c, r'\b.*b.*la.*\b')"#),
         // Multiple wildcards - tag (negate w/-).
-        ("-c:*b*la*", r#"!match(.c, r'\b.*b.*la.*\b')"#),
+        ("-c:*b*la*", r#"!match(.__datadog_tags.c, r'\b.*b.*la.*\b')"#),
         // Wildcard prefix - facet.
         ("@a:*bla", r#"match(.custom.a, r'\b.*bla\b')"#),
         // Wildcard prefix - facet (negate).
@@ -560,29 +542,29 @@ mod tests {
         // Range - numeric, inclusive, unbounded (both) (negate w/-).
         ("-[* TO *]", "!(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
         // Range - numeric, inclusive, tag.
-        ("a:[1 TO 10]", "(.a >= 1 && .a <= 10)"),
+        ("a:[1 TO 10]", "(.__datadog_tags.a >= 1 && .__datadog_tags.a <= 10)"),
         // Range - numeric, inclusive, tag (negate).
-        ("NOT a:[1 TO 10]", "!(.a >= 1 && .a <= 10)"),
+        ("NOT a:[1 TO 10]", "!(.__datadog_tags.a >= 1 && .__datadog_tags.a <= 10)"),
         // Range - numeric, inclusive, tag (negate w/-).
-        ("-a:[1 TO 10]", "!(.a >= 1 && .a <= 10)"),
+        ("-a:[1 TO 10]", "!(.__datadog_tags.a >= 1 && .__datadog_tags.a <= 10)"),
         // Range - numeric, inclusive, unbounded (upper), tag.
-        ("a:[50 TO *]", "(.a >= 50)"),
+        ("a:[50 TO *]", "(.__datadog_tags.a >= 50)"),
         // Range - numeric, inclusive, unbounded (upper), tag (negate).
-        ("NOT a:[50 TO *]", "!(.a >= 50)"),
+        ("NOT a:[50 TO *]", "!(.__datadog_tags.a >= 50)"),
         // Range - numeric, inclusive, unbounded (upper), tag (negate w/-).
-        ("-a:[50 TO *]", "!(.a >= 50)"),
+        ("-a:[50 TO *]", "!(.__datadog_tags.a >= 50)"),
         // Range - numeric, inclusive, unbounded (lower), tag.
-        ("a:[* TO 50]", "(.a <= 50)"),
+        ("a:[* TO 50]", "(.__datadog_tags.a <= 50)"),
         // Range - numeric, inclusive, unbounded (lower), tag (negate).
-        ("NOT a:[* TO 50]", "!(.a <= 50)"),
+        ("NOT a:[* TO 50]", "!(.__datadog_tags.a <= 50)"),
         // Range - numeric, inclusive, unbounded (lower), tag (negate w/-).
-        ("-a:[* TO 50]", "!(.a <= 50)"),
+        ("-a:[* TO 50]", "!(.__datadog_tags.a <= 50)"),
         // Range - numeric, inclusive, unbounded (both), tag.
-        ("a:[* TO *]", "exists(.a)"),
+        ("a:[* TO *]", "exists(.__datadog_tags.a)"),
         // Range - numeric, inclusive, unbounded (both), tag (negate).
-        ("NOT a:[* TO *]", "!exists(.a)"),
+        ("NOT a:[* TO *]", "!exists(.__datadog_tags.a)"),
         // Range - numeric, inclusive, unbounded (both), tag (negate).
-        ("-a:[* TO *]", "!exists(.a)"),
+        ("-a:[* TO *]", "!exists(.__datadog_tags.a)"),
         // Range - numeric, inclusive, facet.
         ("@b:[1 TO 10]", "(.custom.b >= 1 && .custom.b <= 10)"),
         // Range - numeric, inclusive, facet (negate).
@@ -640,18 +622,18 @@ mod tests {
         // A bit of everything.
         (
             "@a:this OR ((@b:test* c:that) AND d:the_other e:[1 TO 5])",
-            r#"(.custom.a == "this" || ((match(.custom.b, r'\btest.*\b') && match_array(.tags, r'^c:that$')) && (match_array(.tags, r'^d:the_other$') && (.e >= 1 && .e <= 5))))"#,
+            r#"(.custom.a == "this" || ((match(.custom.b, r'\btest.*\b') && .__datadog_tags.c == "that") && (.__datadog_tags.d == "the_other" && (.__datadog_tags.e >= 1 && .__datadog_tags.e <= 5))))"#,
         ),
         // Range - numeric, exclusive
-        ("f:{1 TO 10}", "(.f > 1 && .f < 10)"),
+        ("f:{1 TO 10}", "(.__datadog_tags.f > 1 && .__datadog_tags.f < 10)"),
         // Range - alpha, inclusive
-        (r#"g:[a TO z]"#, r#"(.g >= "a" && .g <= "z")"#),
+        (r#"g:[a TO z]"#, r#"(.__datadog_tags.g >= "a" && .__datadog_tags.g <= "z")"#),
         // Range - alpha, exclusive
-        (r#"g:{a TO z}"#, r#"(.g > "a" && .g < "z")"#),
+        (r#"g:{a TO z}"#, r#"(.__datadog_tags.g > "a" && .__datadog_tags.g < "z")"#),
         // Range - alpha, inclusive (quoted)
-        (r#"g:["a" TO "z"]"#, r#"(.g >= "a" && .g <= "z")"#),
+        (r#"g:["a" TO "z"]"#, r#"(.__datadog_tags.g >= "a" && .__datadog_tags.g <= "z")"#),
         // Range - alpha, exclusive (quoted)
-        (r#"g:{"a" TO "z"}"#, r#"(.g > "a" && .g < "z")"#),
+        (r#"g:{"a" TO "z"}"#, r#"(.__datadog_tags.g > "a" && .__datadog_tags.g < "z")"#),
     ];
 
     #[test]
