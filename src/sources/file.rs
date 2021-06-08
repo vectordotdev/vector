@@ -13,7 +13,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    FileServer, FingerprintStrategy, Fingerprinter, ReadFrom,
+    FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
 use futures::{
     future::TryFutureExt,
@@ -294,19 +294,20 @@ pub fn file_source(
         let mut encoding_decoder = encoding_charset.map(|e| Decoder::new(e));
 
         // sizing here is just a guess
-        let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
         let rx = rx
             .map(futures::stream::iter)
             .flatten()
-            .map(move |(line, src)| {
+            .map(move |Line { text, filename }| {
                 // transcode each line from the file's encoding charset to utf8
-                match encoding_decoder.as_mut() {
-                    Some(d) => (d.decode_to_utf8(line), src),
-                    None => (line, src),
-                }
+                let text = match encoding_decoder.as_mut() {
+                    Some(d) => d.decode_to_utf8(text),
+                    None => text,
+                };
+                Line { text, filename }
             });
 
-        let messages: Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin> =
+        let messages: Box<dyn Stream<Item = Line> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
                 wrap_with_line_agg(
                     rx,
@@ -329,9 +330,9 @@ pub fn file_source(
         let span = current_span();
         let span2 = span.clone();
         let mut messages = messages
-            .map(move |(msg, file): (Bytes, String)| {
+            .map(move |Line { text, filename }| {
                 let _enter = span2.enter();
-                create_event(msg, file, &host_key, &hostname, &file_key)
+                create_event(text, filename, &host_key, &hostname, &file_key)
             })
             .map(Ok);
         tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
@@ -375,13 +376,16 @@ fn reconcile_position_options(
 }
 
 fn wrap_with_line_agg(
-    rx: impl Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static,
+    rx: impl Stream<Item = Line> + Send + std::marker::Unpin + 'static,
     config: line_agg::Config,
-) -> Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static> {
+) -> Box<dyn Stream<Item = Line> + Send + std::marker::Unpin + 'static> {
     let logic = line_agg::Logic::new(config);
     Box::new(
-        LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
-            .map(|(src, line, _context)| (line, src)),
+        LineAgg::new(
+            rx.map(|Line { text, filename }| (filename, text, ())),
+            logic,
+        )
+        .map(|(filename, text, _context)| Line { text, filename }),
     )
 }
 

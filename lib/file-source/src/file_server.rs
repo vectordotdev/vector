@@ -75,10 +75,10 @@ where
         self,
         mut chans: C,
         shutdown: S,
-    ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
+    ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
     where
-        C: Sink<Vec<(Bytes, String)>> + Unpin,
-        <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
+        C: Sink<Vec<Line>> + Unpin,
+        <C as Sink<Vec<Line>>>::Error: std::error::Error,
         S: Future + Unpin + Send + 'static,
         <S as Future>::Output: Clone + Send + Sync,
     {
@@ -284,10 +284,10 @@ where
 
                     bytes_read += sz;
 
-                    lines.push((
-                        line,
-                        watcher.path.to_str().expect("not a valid path").to_owned(),
-                    ));
+                    lines.push(Line {
+                        text: line,
+                        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                    });
 
                     if bytes_read > self.max_read_bytes {
                         maxed_out_reading_single_file = true;
@@ -504,4 +504,10 @@ impl Default for TimingStats {
             bytes: Default::default(),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct Line {
+    pub text: Bytes,
+    pub filename: String,
 }

@@ -1,6 +1,5 @@
-use bytes::Bytes;
 use file_source::{
-    paths_provider::PathsProvider, FileServer, FileServerShutdown, FileSourceInternalEvents,
+    paths_provider::PathsProvider, FileServer, FileServerShutdown, FileSourceInternalEvents, Line,
 };
 use futures::future::{select, Either};
 use futures::{pin_mut, Sink};
@@ -19,8 +18,8 @@ pub async fn run_file_server<PP, E, C, S>(
 where
     PP: PathsProvider + Send + 'static,
     E: FileSourceInternalEvents,
-    C: Sink<Vec<(Bytes, String)>> + Unpin + Send + 'static,
-    <C as Sink<Vec<(Bytes, String)>>>::Error: Error + Send,
+    C: Sink<Vec<Line>> + Unpin + Send + 'static,
+    <C as Sink<Vec<Line>>>::Error: Error + Send,
     S: Future + Unpin + Send + 'static,
     <S as Future>::Output: Clone + Send + Sync,
 {

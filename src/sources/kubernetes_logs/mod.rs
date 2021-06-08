@@ -20,7 +20,9 @@ use crate::{
     transforms::{FunctionTransform, TaskTransform},
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
+use file_source::{
+    FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
+};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
@@ -313,21 +315,20 @@ impl Source {
             handle: tokio::runtime::Handle::current(),
         };
 
-        let (file_source_tx, file_source_rx) =
-            futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
         let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
-        let events = events.map(move |(bytes, file)| {
-            let byte_size = bytes.len();
-            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
-            let file_info = annotator.annotate(&mut event, &file);
+        let events = events.map(move |Line { text, filename }| {
+            let byte_size = text.len();
+            let mut event = create_event(text, &filename, ingestion_timestamp_field.as_deref());
+            let file_info = annotator.annotate(&mut event, &filename);
 
             emit!(KubernetesLogsEventReceived {
-                file: &file,
+                file: &filename,
                 byte_size,
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
