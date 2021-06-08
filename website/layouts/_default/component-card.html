@@ -1,27 +1,26 @@
 {{ $title := .Params.short | default .Title }}
 {{ $componentTag := .File.BaseFileName }}
 {{ $kind := .Params.kind }}
-{{ $kindLink := printf "/docs/reference/configuration/%ss" $kind | relURL }}
-<div class="no-prose border rounded dark:border-gray-700 p-4 hover:bg-gray-50 dark:over:bg-black">
-  <span class="flex justify-between text-sm">
-    <span>
-      <a href="{{ .RelPermalink }}" class="text-gray-600 dark:text-gray-300 hover:text-secondary dark:hover:text-primary">
+<a href="{{ .RelPermalink }}">
+  <div class="no-prose border rounded dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-black">
+    <span class="flex justify-between items-center text-sm">
+      <span class="text-gray-600 dark:text-gray-300 hover:text-secondary dark:hover:text-primary">
         {{ $title }}
-      </a>
+      </span>
+
+      {{ partial "badge.html" (dict "word" $kind "color" "indigo") }}
     </span>
 
-    {{ partial "badge.html" (dict "word" $kind "color" "indigo") }}
-  </span>
+    <div class="mt-3.5 overflow-x-auto">
+      <span class="text-xs font-mono bg-gray-100 text-dark dark:bg-gray-600 dark:text-gray-200 py-1 px-2 rounded font-bold">
+        {{ $componentTag }}
+      </span>
+    </div>
 
-  <div class="mt-3.5 overflow-x-auto">
-    <span class="text-xs font-mono bg-gray-100 text-dark dark:bg-gray-600 dark:text-gray-200 py-1 px-2 rounded font-bold">
-      {{ $componentTag }}
-    </span>
+    {{ with .Description }}
+    <div class="mt-3.5 prose-sm dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
+      {{ . | markdownify | plainify }}
+    </div>
+    {{ end }}
   </div>
-
-  {{ with .Description }}
-  <div class="mt-3.5 prose-sm dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
-    {{ . | markdownify }}
-  </div>
-  {{ end }}
-</div>
+</a>
