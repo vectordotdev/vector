@@ -112,8 +112,10 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     };
 
     // Load
+    let paths_list: Vec<_> = paths.iter().map(<&PathBuf>::from).collect();
+
     let mut report_error = |errors| {
-        fmt.title(format!("Failed to load {:?}", &paths));
+        fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
     config::init_log_schema(&paths, true)
@@ -140,10 +142,10 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
             return None;
         }
 
-        fmt.title(format!("Loaded with warnings {:?}", &paths));
+        fmt.title(format!("Loaded with warnings {:?}", &paths_list));
         fmt.sub_warning(warnings);
     } else {
-        fmt.success(format!("Loaded {:?}", &paths));
+        fmt.success(format!("Loaded {:?}", &paths_list));
     }
 
     Some(config)
