@@ -60,15 +60,15 @@ pub async fn build_pieces(
 
         let mut rx = rx.boxed();
         for codec in &source.codec.codec {
-            let codec = match codec.build() {
-                Ok(codec) => codec,
+            let decoder = match codec.build_decoder() {
+                Ok(decoder) => decoder,
                 Err(error) => {
-                    errors.push(format!("Codec \"{}\": {}", name, error));
+                    errors.push(format!("Decoder \"{}\": {}", name, error));
                     continue;
                 }
             };
 
-            rx = codec.transform(rx).boxed();
+            rx = decoder.transform(rx).boxed();
         }
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);

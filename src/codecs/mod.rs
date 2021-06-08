@@ -9,7 +9,9 @@ use vector_core::transform::Transform;
 pub trait Codec: std::fmt::Debug + Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn build(&self) -> crate::Result<Transform>;
+    fn build_decoder(&self) -> crate::Result<Transform>;
+
+    fn build_encoder(&self) -> crate::Result<Transform>;
 }
 
 inventory::collect!(&'static dyn Codec);
