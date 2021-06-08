@@ -288,6 +288,7 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
+    let checkpoints = checkpointer.view();
 
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
@@ -332,6 +333,7 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages
             .map(move |line| {
+                checkpoints.update(line.file_id, line.offset);
                 let _enter = span2.enter();
                 create_event(line.text, line.filename, &host_key, &hostname, &file_key)
             })

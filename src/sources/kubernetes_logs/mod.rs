@@ -322,6 +322,7 @@ impl Source {
         let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
+        let checkpoints = checkpointer.view();
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
         let events = events.map(move |line| {
@@ -342,6 +343,7 @@ impl Source {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
 
+            checkpoints.update(line.file_id, line.offset);
             event
         });
         let events = events.flat_map(move |event| {
