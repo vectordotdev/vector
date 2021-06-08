@@ -113,7 +113,7 @@ impl Default for ElasticSearchMode {
     }
 }
 
-#[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
+#[derive(Derivative, Deserialize, Serialize, Clone, Copy, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
     Index,
@@ -121,15 +121,15 @@ pub enum BulkAction {
 }
 
 impl BulkAction {
-    pub fn as_str(&self) -> &'static str {
-        match *self {
+    pub fn as_str(self) -> &'static str {
+        match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
         }
     }
 
-    pub fn as_json_pointer(&self) -> &'static str {
-        match *self {
+    pub fn as_json_pointer(self) -> &'static str {
+        match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
         }
