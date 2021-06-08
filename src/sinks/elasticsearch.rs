@@ -164,7 +164,7 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let client = HttpClient::new(common.tls_settings.clone())?;
 
-        let healthcheck = healthcheck(client.clone(), common).boxed();
+        let healthcheck = common.healthcheck(client.clone()).boxed();
 
         let common = ElasticSearchCommon::parse_config(&self)?;
         let compression = common.compression;
@@ -534,28 +534,28 @@ impl ElasticSearchCommon {
         }
         request
     }
-}
 
-async fn healthcheck(client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
-    let mut builder = Request::get(format!("{}/_cluster/health", common.base_url));
+    async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
+        let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
 
-    match &common.credentials {
-        None => {
-            if let Some(authorization) = &common.authorization {
-                builder = authorization.apply_builder(builder);
+        match &self.credentials {
+            None => {
+                if let Some(authorization) = &self.authorization {
+                    builder = authorization.apply_builder(builder);
+                }
+            }
+            Some(credentials_provider) => {
+                let mut signer = self.signed_request("GET", builder.uri_ref().unwrap(), false);
+                builder = finish_signer(&mut signer, &credentials_provider, builder).await?;
             }
         }
-        Some(credentials_provider) => {
-            let mut signer = common.signed_request("GET", builder.uri_ref().unwrap(), false);
-            builder = finish_signer(&mut signer, &credentials_provider, builder).await?;
-        }
-    }
-    let request = builder.body(Body::empty())?;
-    let response = client.send(request).await?;
+        let request = builder.body(Body::empty())?;
+        let response = client.send(request).await?;
 
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+        }
     }
 }
 
