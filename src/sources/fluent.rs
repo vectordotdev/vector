@@ -162,7 +162,7 @@ impl FluentDecoder {
             FluentMessage::Message(tag, timestamp, record)
             | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => {
                 self.unread_frames.push_back(FluentFrame {
-                    tag: tag.clone(),
+                    tag,
                     timestamp,
                     record,
                 });
