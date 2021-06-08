@@ -95,15 +95,16 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.15.1",
+              "v1.20.0",
             ]
             const kubernetes_version = [
-              { version: "v1.19.2", is_essential: true },
-              { version: "v1.18.9" },
-              { version: "v1.17.12" },
-              { version: "v1.16.15" }, // v1.16.13 is broken, see https://github.com/kubernetes/kubernetes/issues/93194
+              { version: "v1.21.2", is_essential: true },
+              { version: "v1.20.8" },
+              { version: "v1.19.12" },
+              { version: "v1.18.19" },
+              { version: "v1.17.17" },
+              { version: "v1.16.15" },
               { version: "v1.15.12" },
-              { version: "v1.14.10" },
             ]
             const container_runtime = [
               "docker",
