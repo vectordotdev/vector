@@ -22,12 +22,12 @@ extern crate vrl_cli;
 pub mod config;
 pub mod cli;
 pub mod codecs;
-pub mod framers;
 pub mod conditions;
 pub mod dns;
 #[cfg(feature = "docker")]
 pub mod docker;
 pub mod expiring_hash_map;
+pub mod framers;
 pub mod generate;
 #[cfg(feature = "wasm")]
 pub mod wasm;
