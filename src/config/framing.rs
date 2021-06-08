@@ -12,9 +12,7 @@ lazy_static! {
 }
 
 #[derive(Debug, Serialize, Default)]
-pub struct FramingsConfig {
-    pub configs: Vec<FramingConfig>,
-}
+pub struct FramingsConfig(pub Vec<FramingConfig>);
 
 impl<'de> Deserialize<'de> for FramingsConfig {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
@@ -22,31 +20,24 @@ impl<'de> Deserialize<'de> for FramingsConfig {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        struct FramingsConfig {
-            framer: FramingsConfigValue,
-        }
-
-        #[derive(Deserialize)]
         #[serde(untagged)]
-        enum FramingsConfigValue {
+        enum FramingsConfig {
             Single(FramingConfig),
             Multiple(Vec<FramingConfig>),
         }
 
         let config = FramingsConfig::deserialize(deserializer)?;
 
-        Ok(Self {
-            configs: match config.framer {
-                FramingsConfigValue::Single(config) => vec![config],
-                FramingsConfigValue::Multiple(configs) => configs,
-            },
-        })
+        Ok(Self(match config {
+            FramingsConfig::Single(config) => vec![config],
+            FramingsConfig::Multiple(configs) => configs,
+        }))
     }
 }
 
 impl From<Vec<FramingConfig>> for FramingsConfig {
     fn from(configs: Vec<FramingConfig>) -> Self {
-        Self { configs }
+        Self(configs)
     }
 }
 
@@ -81,13 +72,18 @@ mod tests {
     use super::*;
     use indoc::indoc;
 
+    #[derive(Debug, Deserialize)]
+    struct Config {
+        pub framing: FramingsConfig,
+    }
+
     #[test]
     fn config_framers_single() {
-        let config: FramingsConfig = toml::from_str(indoc! {r#"
-            framer = "noop"
+        let config: Config = toml::from_str(indoc! {r#"
+            framing = "noop"
         "#})
         .unwrap();
-        let framers = config.configs;
+        let framers = config.framing.0;
 
         assert_eq!(framers.len(), 1);
         assert_eq!(framers[0].name(), "noop");
@@ -95,11 +91,11 @@ mod tests {
 
     #[test]
     fn config_framers_multiple() {
-        let config: FramingsConfig = toml::from_str(indoc! {r#"
-            framer = ["noop", "noop"]
+        let config: Config = toml::from_str(indoc! {r#"
+            framing = ["noop", "noop"]
         "#})
         .unwrap();
-        let framers = config.configs;
+        let framers = config.framing.0;
 
         assert_eq!(framers.len(), 2);
         assert_eq!(framers[0].name(), "noop");
@@ -108,12 +104,12 @@ mod tests {
 
     #[test]
     fn config_framers_with_options() {
-        let config: FramingsConfig = toml::from_str(indoc! {r#"
-            [framer]
+        let config: Config = toml::from_str(indoc! {r#"
+            [framing]
             type = "noop"
         "#})
         .unwrap();
-        let framers = config.configs;
+        let framers = config.framing.0;
 
         assert_eq!(framers.len(), 1);
         assert_eq!(framers[0].name(), "noop");
@@ -121,15 +117,15 @@ mod tests {
 
     #[test]
     fn config_framers_with_options_multiple() {
-        let config: FramingsConfig = toml::from_str(indoc! {r#"
-            [[framer]]
+        let config: Config = toml::from_str(indoc! {r#"
+            [[framing]]
             type = "noop"
 
-            [[framer]]
+            [[framing]]
             type = "noop"
         "#})
         .unwrap();
-        let framers = config.configs;
+        let framers = config.framing.0;
 
         assert_eq!(framers.len(), 2);
         assert_eq!(framers[0].name(), "noop");
@@ -138,11 +134,11 @@ mod tests {
 
     #[test]
     fn build_framer() {
-        let config: FramingsConfig = toml::from_str(indoc! {r#"
-            framer = "noop"
+        let config: Config = toml::from_str(indoc! {r#"
+            framing = "noop"
         "#})
         .unwrap();
-        let framers = config.configs;
+        let framers = config.framing.0;
         let framer = framers[0].build();
 
         assert!(framer.is_ok());
@@ -150,11 +146,11 @@ mod tests {
 
     #[test]
     fn build_framer_unknown() {
-        let config: FramingsConfig = toml::from_str(indoc! {r#"
-            framer = "unknown"
+        let config: Config = toml::from_str(indoc! {r#"
+            framing = "unknown"
         "#})
         .unwrap();
-        let framers = config.configs;
+        let framers = config.framing.0;
         let framer = framers[0].build();
 
         assert_eq!(

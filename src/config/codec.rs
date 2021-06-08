@@ -12,9 +12,7 @@ lazy_static! {
 }
 
 #[derive(Debug, Serialize, Default)]
-pub struct CodecsConfig {
-    pub configs: Vec<CodecConfig>,
-}
+pub struct CodecsConfig(pub Vec<CodecConfig>);
 
 impl<'de> Deserialize<'de> for CodecsConfig {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
@@ -22,31 +20,24 @@ impl<'de> Deserialize<'de> for CodecsConfig {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        struct CodecsConfig {
-            codec: CodecsConfigValue,
-        }
-
-        #[derive(Deserialize)]
         #[serde(untagged)]
-        enum CodecsConfigValue {
+        enum CodecsConfig {
             Single(CodecConfig),
             Multiple(Vec<CodecConfig>),
         }
 
         let config = CodecsConfig::deserialize(deserializer)?;
 
-        Ok(Self {
-            configs: match config.codec {
-                CodecsConfigValue::Single(config) => vec![config],
-                CodecsConfigValue::Multiple(configs) => configs,
-            },
-        })
+        Ok(Self(match config {
+            CodecsConfig::Single(config) => vec![config],
+            CodecsConfig::Multiple(configs) => configs,
+        }))
     }
 }
 
 impl From<Vec<CodecConfig>> for CodecsConfig {
     fn from(configs: Vec<CodecConfig>) -> Self {
-        Self { configs }
+        Self(configs)
     }
 }
 
@@ -91,13 +82,18 @@ mod tests {
     use super::*;
     use indoc::indoc;
 
+    #[derive(Debug, Deserialize)]
+    struct Config {
+        pub codec: CodecsConfig,
+    }
+
     #[test]
     fn config_codecs_single() {
-        let config: CodecsConfig = toml::from_str(indoc! {r#"
+        let config: Config = toml::from_str(indoc! {r#"
             codec = "noop"
         "#})
         .unwrap();
-        let codecs = config.configs;
+        let codecs = config.codec.0;
 
         assert_eq!(codecs.len(), 1);
         assert_eq!(codecs[0].name(), "noop");
@@ -105,11 +101,11 @@ mod tests {
 
     #[test]
     fn config_codecs_multiple() {
-        let config: CodecsConfig = toml::from_str(indoc! {r#"
+        let config: Config = toml::from_str(indoc! {r#"
             codec = ["noop", "noop"]
         "#})
         .unwrap();
-        let codecs = config.configs;
+        let codecs = config.codec.0;
 
         assert_eq!(codecs.len(), 2);
         assert_eq!(codecs[0].name(), "noop");
@@ -118,12 +114,12 @@ mod tests {
 
     #[test]
     fn config_codecs_with_options() {
-        let config: CodecsConfig = toml::from_str(indoc! {r#"
+        let config: Config = toml::from_str(indoc! {r#"
             [codec]
             type = "noop"
         "#})
         .unwrap();
-        let codecs = config.configs;
+        let codecs = config.codec.0;
 
         assert_eq!(codecs.len(), 1);
         assert_eq!(codecs[0].name(), "noop");
@@ -131,7 +127,7 @@ mod tests {
 
     #[test]
     fn config_codecs_with_options_multiple() {
-        let config: CodecsConfig = toml::from_str(indoc! {r#"
+        let config: Config = toml::from_str(indoc! {r#"
             [[codec]]
             type = "noop"
 
@@ -139,7 +135,7 @@ mod tests {
             type = "noop"
         "#})
         .unwrap();
-        let codecs = config.configs;
+        let codecs = config.codec.0;
 
         assert_eq!(codecs.len(), 2);
         assert_eq!(codecs[0].name(), "noop");
@@ -148,11 +144,11 @@ mod tests {
 
     #[test]
     fn build_codec() {
-        let config: CodecsConfig = toml::from_str(indoc! {r#"
+        let config: Config = toml::from_str(indoc! {r#"
             codec = "noop"
         "#})
         .unwrap();
-        let codecs = config.configs;
+        let codecs = config.codec.0;
         let decoder = codecs[0].build_decoder();
         let encoder = codecs[0].build_encoder();
 
@@ -162,11 +158,11 @@ mod tests {
 
     #[test]
     fn build_codec_unknown() {
-        let config: CodecsConfig = toml::from_str(indoc! {r#"
+        let config: Config = toml::from_str(indoc! {r#"
             codec = "unknown"
         "#})
         .unwrap();
-        let codecs = config.configs;
+        let codecs = config.codec.0;
         let decoder = codecs[0].build_decoder();
         let encoder = codecs[0].build_encoder();
 
