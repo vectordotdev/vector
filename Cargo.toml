@@ -525,8 +525,6 @@ sinks-logs = [
   "sinks-logdna",
   "sinks-loki",
   "sinks-moogsoft",
-  "sinks-moogsoft_controller",
-  "sinks-moogsoft_internal_logs",
   "sinks-nats",
   "sinks-new_relic_logs",
   "sinks-papertrail",
@@ -573,8 +571,6 @@ sinks-kafka = ["rdkafka"]
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize", "uuid"]
 sinks-moogsoft = []
-sinks-moogsoft_controller = []
-sinks-moogsoft_internal_logs = []
 sinks-nats = ["async-nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]

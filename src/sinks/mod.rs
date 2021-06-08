@@ -1,7 +1,9 @@
-use crate::event::Event;
+use std::fmt;
+
 use futures::{future::BoxFuture, Sink, Stream, StreamExt};
 use snafu::Snafu;
-use std::fmt;
+
+use crate::event::Event;
 
 pub mod util;
 
@@ -49,10 +51,6 @@ pub mod logdna;
 pub mod loki;
 #[cfg(feature = "sinks-moogsoft")]
 pub mod moogsoft;
-#[cfg(feature = "sinks-moogsoft_controller")]
-pub mod moogsoft_controller;
-#[cfg(feature = "sinks-moogsoft_internal_logs")]
-pub mod moogsoft_internal_logs;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
 #[cfg(feature = "sinks-new_relic_logs")]
