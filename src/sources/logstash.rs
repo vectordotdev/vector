@@ -41,7 +41,7 @@ inventory::submit! {
 impl GenerateConfig for LogstashConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
+            address: SocketListenAddr::SocketAddr("0.0.0.0:5000".parse().unwrap()),
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
@@ -106,6 +106,12 @@ impl TcpSource for LogstashSource {
         if log.get(log_schema().host_key()).is_none() {
             log.insert(log_schema().host_key(), host);
         }
+        if log.get(log_schema().timestamp_key()).is_none() {
+            if let Some(timestamp) = log.get("@timestamp") {
+                let timestamp = timestamp.clone();
+                log.insert(log_schema().timestamp_key(), timestamp);
+            }
+        }
         Some(Event::from(log))
     }
 }
@@ -146,12 +152,16 @@ pub enum DecodeError {
 }
 
 impl TcpIsErrorFatal for DecodeError {
-    fn is_error_fatal() -> bool {
-        // TODO
-        // Protocol and message type errors should be unrecoverable since we don't know how much to advance
-        // DecompressionFailed, JsonFrameFailedDecode should be false as we can advance past that frame
-        // Other i/o errors should be true
-        true
+    fn is_error_fatal(&self) -> bool {
+        use DecodeError::*;
+
+        match self {
+            IO { .. } => true,
+            UnknownProtocolVersion { .. } => true,
+            UnknownMessageType { .. } => true,
+            JsonFrameFailedDecode { .. } => false,
+            DecompressionFailed { .. } => false,
+        }
     }
 }
 
@@ -345,5 +355,170 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<LogstashConfig>();
+    }
+}
+
+#[cfg(all(test, feature = "logstash-integration-tests"))]
+mod integration_tests {
+    use super::*;
+    use crate::{
+        config::SourceContext,
+        docker::docker,
+        test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp},
+        Pipeline,
+    };
+    use bollard::{
+        container::{Config as ContainerConfig, CreateContainerOptions},
+        image::{CreateImageOptions, ListImagesOptions},
+        models::HostConfig,
+        Docker,
+    };
+    use futures::{channel::mpsc, StreamExt};
+    use std::{collections::HashMap, fs::File, io::Write, net::SocketAddr, time::Duration};
+    use tokio::time::sleep;
+    use uuid::Uuid;
+
+    #[tokio::test]
+    async fn heartbeat() {
+        trace_init();
+
+        let image = "docker.elastic.co/beats/heartbeat";
+        let tag = "7.12.1";
+
+        let docker = docker(None, None).unwrap();
+
+        let (out, address) = source().await;
+
+        pull_image(&docker, image, tag).await;
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut file = File::create(dir.path().join("heartbeat.yml")).unwrap();
+        write!(
+            &mut file,
+            r#"
+heartbeat.monitors:
+- type: http
+  schedule: '@every 1s'
+  urls:
+    - https://google.com
+
+output.logstash:
+  hosts: ['host.docker.internal:{}']
+"#,
+            address.port()
+        )
+        .unwrap();
+
+        let options = Some(CreateContainerOptions {
+            name: format!("vector_test_logstash_{}", Uuid::new_v4()),
+        });
+        let config = ContainerConfig {
+            image: Some(format!("{}:{}", image, tag)),
+            host_config: Some(HostConfig {
+                network_mode: Some(String::from("host")),
+                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
+                binds: Some(vec![format!(
+                    "{}/heartbeat.yml:{}",
+                    dir.path().display(),
+                    "/usr/share/heartbeat/heartbeat.yml"
+                )]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let container = docker.create_container(options, config).await.unwrap();
+
+        docker
+            .start_container::<String>(&container.id, None)
+            .await
+            .unwrap();
+
+        sleep(Duration::from_secs(5)).await;
+
+        let events = collect_ready(out).await;
+
+        remove_container(&docker, &container.id).await;
+
+        assert!(!events.is_empty());
+
+        let log = events[0].as_log();
+        assert_eq!(
+            log.get("@metadata.beat"),
+            Some(String::from("heartbeat").into()).as_ref()
+        );
+        assert_eq!(log.get("summary.up"), Some(1.into()).as_ref());
+        assert!(log.get("timestamp").is_some());
+        assert!(log.get("host").is_some());
+    }
+
+    async fn pull_image(docker: &Docker, image: &str, tag: &str) {
+        let mut filters = HashMap::new();
+        filters.insert(
+            String::from("reference"),
+            vec![format!("{}:{}", image, tag)],
+        );
+
+        let options = Some(ListImagesOptions {
+            filters,
+            ..Default::default()
+        });
+
+        let images = docker.list_images(options).await.unwrap();
+        if images.is_empty() {
+            // If not found, pull it
+            let options = Some(CreateImageOptions {
+                from_image: image,
+                tag,
+                ..Default::default()
+            });
+
+            docker
+                .create_image(options, None, None)
+                .for_each(|item| async move {
+                    let info = item.unwrap();
+                    if let Some(error) = info.error {
+                        panic!("{:?}", error);
+                    }
+                })
+                .await
+        }
+    }
+
+    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test();
+        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        tokio::spawn(async move {
+            LogstashConfig {
+                address: address.into(),
+                tls: None,
+                keepalive: None,
+                receive_buffer_bytes: None,
+            }
+            .build(SourceContext::new_test(sender))
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+        });
+        wait_for_tcp(address).await;
+        (recv, address)
+    }
+
+    async fn remove_container(docker: &Docker, id: &str) {
+        trace!("Stopping container.");
+
+        let _ = docker
+            .stop_container(id, None)
+            .await
+            .map_err(|e| error!(%e));
+
+        trace!("Removing container.");
+
+        // Don't panic, as this is unrelated to the test
+        let _ = docker
+            .remove_container(id, None)
+            .await
+            .map_err(|e| error!(%e));
     }
 }
