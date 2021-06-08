@@ -220,7 +220,7 @@
   {{ end }}
 
   {{/* Source/transform/sink examples */}}
-  {{ with .commponent_examples }}
+  {{ with .component_examples }}
   {{ $multiple := gt (len . ) 1 }}
   <div class="no-prose py-3.5 px-5">
     {{ if $multiple }}
@@ -234,11 +234,13 @@
         {{ end }}
       </nav>
 
-      {{ range . }}
-      <div x-show="selected === '{{ .title }}'" class="mt-2">
-        {{ template "example" . }}
+      <div class="mt-2">
+        {{ range . }}
+        <div x-show="selected === '{{ .title }}'">
+          {{ template "example" . }}
+        </div>
+        {{ end }}
       </div>
-      {{ end }}
     </div>
     {{ else }}
     {{ $example := index . 0 }}
