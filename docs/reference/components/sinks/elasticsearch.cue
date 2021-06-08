@@ -153,7 +153,7 @@ components: sinks: elasticsearch: {
 		}
 		bulk_action: {
 			common:      false
-			description: "Action to use when making requests to the [Elasticsearch Bulk API](elasticsearch_bulk). Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported."
+			description: "Action to use when making requests to the [Elasticsearch Bulk API](elasticsearch_bulk). Currently, Vector only supports `index` and `create` in the `regular` mode and `create` in `data_stream` mode. `update` and `delete` actions are not supported."
 			required:    false
 			warnings: []
 			type: string: {
@@ -201,6 +201,17 @@ components: sinks: elasticsearch: {
 				default: "vector-%F"
 				examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
 				syntax: "template"
+			}
+		}
+		mode: {
+			common:      true
+			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk_action` is set to `create`."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "regular"
+				examples: ["regular", "data_stream"]
+				syntax: "literal"
 			}
 		}
 		pipeline: {
