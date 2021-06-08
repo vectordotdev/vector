@@ -1,4 +1,6 @@
-use super::{builder::ConfigBuilder, format, validation, vars, Config, Format, FormatHint};
+use super::{
+    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
+};
 use crate::signal;
 use glob::glob;
 use lazy_static::lazy_static;
@@ -10,29 +12,35 @@ use std::{
 };
 
 lazy_static! {
-    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<(PathBuf, FormatHint)> =
-        vec![("/etc/vector/vector.toml".into(), Some(Format::Toml))];
-    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<(PathBuf, FormatHint)> = {
+    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<ConfigPath> = vec![ConfigPath::File(
+        "/etc/vector/vector.toml".into(),
+        Some(Format::Toml)
+    )];
+    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<ConfigPath> = {
         let program_files = std::env::var("ProgramFiles")
             .expect("%ProgramFiles% environment variable must be defined");
         let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-        vec![(PathBuf::from(config_path), Some(Format::Toml))]
+        vec![ConfigPath::File(
+            PathBuf::from(config_path),
+            Some(Format::Toml),
+        )]
     };
-    pub static ref CONFIG_PATHS: Mutex<Vec<(PathBuf, FormatHint)>> = Mutex::default();
+    pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
 }
 
 /// Merge the paths coming from different cli flags with different formats into
 /// a unified list of paths with formats.
-pub fn merge_path_lists(path_lists: Vec<(&[PathBuf], FormatHint)>) -> Vec<(PathBuf, FormatHint)> {
+pub fn merge_path_lists(
+    path_lists: Vec<(&[PathBuf], FormatHint)>,
+) -> impl Iterator<Item = (PathBuf, FormatHint)> + '_ {
     path_lists
         .into_iter()
         .flat_map(|(paths, format)| paths.iter().cloned().map(move |path| (path, format)))
-        .collect()
 }
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
-pub fn process_paths(config_paths: &[(PathBuf, FormatHint)]) -> Option<Vec<(PathBuf, FormatHint)>> {
+pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     let default_paths = if cfg!(unix) {
         DEFAULT_UNIX_CONFIG_PATHS.clone()
     } else if cfg!(windows) {
@@ -49,7 +57,9 @@ pub fn process_paths(config_paths: &[(PathBuf, FormatHint)]) -> Option<Vec<(Path
 
     let mut paths = Vec::new();
 
-    for (config_pattern, format) in starting_paths {
+    for config_path in starting_paths {
+        let config_pattern: &PathBuf = config_path.into();
+
         let matches: Vec<PathBuf> = match glob(config_pattern.to_str().expect("No ability to glob"))
         {
             Ok(glob_paths) => glob_paths.filter_map(Result::ok).collect(),
@@ -64,12 +74,21 @@ pub fn process_paths(config_paths: &[(PathBuf, FormatHint)]) -> Option<Vec<(Path
             std::process::exit(exitcode::CONFIG);
         }
 
-        for path in matches {
-            paths.push((path, *format));
+        match config_path {
+            ConfigPath::File(_, format) => {
+                for path in matches {
+                    paths.push(ConfigPath::File(path, *format));
+                }
+            }
+            ConfigPath::Dir(_) => {
+                for path in matches {
+                    paths.push(ConfigPath::Dir(path))
+                }
+            }
         }
     }
 
-    paths.sort_by(|(a, _), (b, _)| a.cmp(b));
+    paths.sort();
     paths.dedup();
     // Ignore poison error and let the current main thread continue running to do the cleanup.
     std::mem::drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
@@ -77,7 +96,7 @@ pub fn process_paths(config_paths: &[(PathBuf, FormatHint)]) -> Option<Vec<(Path
     Some(paths)
 }
 
-pub fn load_from_paths(config_paths: &[(PathBuf, FormatHint)]) -> Result<Config, Vec<String>> {
+pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
     let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
@@ -91,7 +110,7 @@ pub fn load_from_paths(config_paths: &[(PathBuf, FormatHint)]) -> Result<Config,
 /// Loads a configuration from paths. If a provider is present in the builder, the config is
 /// used as bootstrapping for a remote source. Otherwise, provider instantiation is skipped.
 pub async fn load_from_paths_with_provider(
-    config_paths: &[(PathBuf, FormatHint)],
+    config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
     let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
@@ -114,17 +133,46 @@ pub async fn load_from_paths_with_provider(
 }
 
 pub fn load_builder_from_paths(
-    config_paths: &[(PathBuf, FormatHint)],
+    config_paths: &[ConfigPath],
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = Vec::new();
 
-    for (path, format) in config_paths {
-        if let Some(file) = open_config(&path) {
-            inputs.push((file, format.or_else(move || Format::from_path(&path).ok())));
-        } else {
-            errors.push(format!("Config file not found in path: {:?}.", path));
-        };
+    for config_path in config_paths {
+        match config_path {
+            ConfigPath::File(path, format) => {
+                if let Some(file) = open_config(&path) {
+                    inputs.push((file, format.or_else(move || Format::from_path(&path).ok())));
+                } else {
+                    errors.push(format!("Config file not found in path: {:?}.", path));
+                };
+            }
+            ConfigPath::Dir(path) => match path.read_dir() {
+                Ok(readdir) => {
+                    for res in readdir {
+                        match res {
+                            Ok(direntry) => {
+                                if let Some(file) = open_config(&direntry.path()) {
+                                    // skip any unknown file formats
+                                    if let Ok(format) = Format::from_path(direntry.path()) {
+                                        inputs.push((file, Some(format)));
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                errors.push(format!(
+                                    "Could not read file in config dir: {:?}, {}.",
+                                    path, err
+                                ));
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    errors.push(format!("Could not read config dir: {:?}, {}.", path, err));
+                }
+            },
+        }
     }
 
     if errors.is_empty() {
