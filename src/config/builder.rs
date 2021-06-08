@@ -1,7 +1,7 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    codec::CodecsConfig, compiler, default_data_dir, framing::SourceFramers, provider, Config,
+    codec::CodecsConfig, compiler, default_data_dir, framing::FramingsConfig, provider, Config,
     GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
     TestDefinition, TransformConfig, TransformOuter,
 };
@@ -76,7 +76,7 @@ impl ConfigBuilder {
         &mut self,
         name: T,
         source: S,
-        framing: SourceFramers,
+        framing: FramingsConfig,
         codec: CodecsConfig,
     ) {
         let source = SourceOuter::new(framing, codec, source);

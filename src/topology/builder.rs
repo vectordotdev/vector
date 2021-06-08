@@ -73,9 +73,22 @@ pub async fn build_pieces(
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
+        let framing = source
+            .framing
+            .configs
+            .iter()
+            .filter_map(|config| match config.build() {
+                Ok(framer) => Some(framer),
+                Err(error) => {
+                    errors.push(format!("Framer \"{}\": {}", name, error));
+                    None
+                }
+            })
+            .collect();
+
         let context = SourceContext {
             name: name.into(),
-            framing: source.framing.clone(),
+            framing,
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,

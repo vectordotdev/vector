@@ -22,6 +22,7 @@ extern crate vrl_cli;
 pub mod config;
 pub mod cli;
 pub mod codecs;
+pub mod framers;
 pub mod conditions;
 pub mod dns;
 #[cfg(feature = "docker")]

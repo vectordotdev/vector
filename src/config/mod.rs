@@ -18,6 +18,7 @@ use std::fs::DirBuilder;
 use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use vector_core::transform::Transform;
 
 pub mod api;
 mod builder;
@@ -212,7 +213,7 @@ pub struct SourceOuter {
     #[serde(default = "default_acknowledgements")]
     pub acknowledgements: bool,
     #[serde(default)]
-    pub framing: framing::SourceFramers,
+    pub framing: framing::FramingsConfig,
     #[serde(default)]
     pub codec: codec::CodecsConfig,
     #[serde(flatten)]
@@ -225,7 +226,7 @@ fn default_acknowledgements() -> bool {
 
 impl SourceOuter {
     pub(crate) fn new(
-        framing: framing::SourceFramers,
+        framing: framing::FramingsConfig,
         codec: codec::CodecsConfig,
         source: impl SourceConfig + 'static,
     ) -> Self {
@@ -255,7 +256,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 
 pub struct SourceContext {
     pub name: String,
-    pub framing: framing::SourceFramers,
+    pub framing: Vec<Transform<Vec<u8>>>,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
