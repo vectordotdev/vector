@@ -14,11 +14,11 @@ impl Codec for NoopCodec {
         "noop"
     }
 
-    fn build_decoder(&self) -> crate::Result<Transform> {
+    fn build_decoder(&self) -> crate::Result<Transform<Event>> {
         Ok(Transform::function(NoopTransform))
     }
 
-    fn build_encoder(&self) -> crate::Result<Transform> {
+    fn build_encoder(&self) -> crate::Result<Transform<Event>> {
         Ok(Transform::function(NoopTransform))
     }
 }
@@ -26,7 +26,7 @@ impl Codec for NoopCodec {
 #[derive(Copy, Clone)]
 struct NoopTransform;
 
-impl FunctionTransform for NoopTransform {
+impl FunctionTransform<Event> for NoopTransform {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         output.push(event)
     }

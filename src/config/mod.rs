@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     conditions,
-    event::Metric,
+    event::{Event, Metric},
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
     sources, transforms, Pipeline,
@@ -442,7 +442,7 @@ pub struct TransformOuter {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<transforms::Transform>;
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<transforms::Transform<Event>>;
 
     fn input_type(&self) -> DataType;
 

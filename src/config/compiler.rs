@@ -133,6 +133,7 @@ mod test {
     };
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
+    use vector_core::event::Event;
 
     #[derive(Debug, Serialize, Deserialize)]
     struct MockSourceConfig;
@@ -162,7 +163,7 @@ mod test {
     #[async_trait]
     #[typetag::serde(name = "mock")]
     impl TransformConfig for MockTransformConfig {
-        async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+        async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform<Event>> {
             unimplemented!()
         }
 

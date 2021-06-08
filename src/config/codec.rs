@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
-use vector_core::transform::Transform;
+use vector_core::{event::Event, transform::Transform};
 
 lazy_static! {
     static ref CODECS: HashMap<&'static str, &'static dyn crate::codecs::Codec> =
@@ -61,7 +61,7 @@ impl CodecConfig {
         }
     }
 
-    pub fn build_decoder(&self) -> crate::Result<Transform> {
+    pub fn build_decoder(&self) -> crate::Result<Transform<Event>> {
         match &self.0 {
             Codec::String(string) => match CODECS.get(string.as_str()) {
                 Some(codec) => codec.build_decoder(),
@@ -71,7 +71,7 @@ impl CodecConfig {
         }
     }
 
-    pub fn build_encoder(&self) -> crate::Result<Transform> {
+    pub fn build_encoder(&self) -> crate::Result<Transform<Event>> {
         match &self.0 {
             Codec::String(string) => match CODECS.get(string.as_str()) {
                 Some(codec) => codec.build_encoder(),
