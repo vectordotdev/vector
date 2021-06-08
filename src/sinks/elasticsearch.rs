@@ -200,15 +200,17 @@ impl SinkConfig for ElasticSearchConfig {
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
+    id_key: Option<String>,
     bulk_uri: Uri,
     authorization: Option<Auth>,
     credentials: Option<rusoto::AwsCredentialsProvider>,
+    encoding: EncodingConfigWithDefault<Encoding>,
     index: Template,
     doc_type: String,
     tls_settings: TlsSettings,
-    config: ElasticSearchConfig,
     compression: Compression,
     region: Region,
+    request: RequestConfig,
     query_params: HashMap<String, String>,
     bulk_action: Template,
 }
@@ -268,7 +270,7 @@ impl ElasticSearchCommon {
             }
         });
         maybe_set_id(
-            self.config.id_key.as_ref(),
+            self.id_key.as_ref(),
             action.pointer_mut(bulk_action.as_json_pointer()).unwrap(),
             event,
         );
@@ -289,7 +291,7 @@ impl HttpSink for ElasticSearchCommon {
         let mut body = serde_json::to_vec(&action).unwrap();
         body.push(b'\n');
 
-        self.config.encoding.apply_rules(&mut event);
+        self.encoding.apply_rules(&mut event);
 
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
@@ -314,7 +316,7 @@ impl HttpSink for ElasticSearchCommon {
                 request.add_header("Content-Encoding", ce);
             }
 
-            for (header, value) in &self.config.request.headers {
+            for (header, value) in &self.request.headers {
                 request.add_header(header, value);
             }
 
@@ -339,7 +341,7 @@ impl HttpSink for ElasticSearchCommon {
                 builder = builder.header("Content-Encoding", ce);
             }
 
-            for (header, value) in &self.config.request.headers {
+            for (header, value) in &self.request.headers {
                 builder = builder.header(&header[..], &value[..]);
             }
 
@@ -479,10 +481,13 @@ impl ElasticSearchCommon {
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
 
-        let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
+        let tower_request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
         let mut query_params = config.query.clone().unwrap_or_default();
-        query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
+        query_params.insert(
+            "timeout".into(),
+            format!("{}s", tower_request.timeout.as_secs()),
+        );
 
         if let Some(pipeline) = &config.pipeline {
             query_params.insert("pipeline".into(), pipeline.into());
@@ -498,22 +503,24 @@ impl ElasticSearchCommon {
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let mut config = config.clone();
-
-        config.request.add_old_option(config.headers.take());
+        let mut request = config.request;
+        request.add_old_option(config.headers.take());
 
         Ok(Self {
-            base_url,
-            bulk_uri,
             authorization,
-            credentials,
-            index,
-            doc_type,
-            tls_settings,
-            config,
-            compression,
-            region,
-            query_params,
+            base_url,
             bulk_action,
+            bulk_uri,
+            compression,
+            credentials,
+            doc_type,
+            encoding: config.encoding,
+            id_key: config.id_key,
+            index,
+            query_params,
+            request,
+            region,
+            tls_settings,
         })
     }
 
