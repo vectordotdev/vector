@@ -37,7 +37,6 @@ env:
   AWS_SECRET_ACCESS_KEY: "dummy"
   CI: true
   AWS_REGION: us-east-1
-  RUSTFLAGS: "-D warnings"
 
 jobs:
   cancel-previous:
