@@ -281,26 +281,37 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
     }
 
     fn call(&mut self, kvs: Vec<RedisKvEntry>) -> Self::Future {
+        let count = kvs.len();
         let mut byte_size = 0;
-        let mut count = 0;
 
         let mut conn = self.conn.clone();
         let mut pipe = redis::pipe();
 
         for kv in kvs {
-            count += 1;
             byte_size += kv.encoded_length();
             match self.data_type {
                 DataType::List(method) => match method {
                     Method::LPush => {
-                        pipe.atomic().lpush(kv.key, kv.value);
+                        if count > 1 {
+                            pipe.atomic().lpush(kv.key, kv.value);
+                        } else {
+                            pipe.lpush(kv.key, kv.value);
+                        }
                     }
                     Method::RPush => {
-                        pipe.atomic().rpush(kv.key, kv.value);
+                        if count > 1 {
+                            pipe.atomic().rpush(kv.key, kv.value);
+                        } else {
+                            pipe.rpush(kv.key, kv.value);
+                        }
                     }
                 },
                 DataType::Channel => {
-                    pipe.atomic().publish(kv.key, kv.value);
+                    if count > 1 {
+                        pipe.atomic().publish(kv.key, kv.value);
+                    } else {
+                        pipe.publish(kv.key, kv.value);
+                    }
                 }
             }
         }
