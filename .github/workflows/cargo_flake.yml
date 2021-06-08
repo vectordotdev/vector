@@ -14,6 +14,7 @@ env:
   VERBOSE: true
   CI: true
   DEBIAN_FRONTEND: noninteractive
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   hack:
