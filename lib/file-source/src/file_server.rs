@@ -287,6 +287,8 @@ where
                     lines.push(Line {
                         text: line,
                         filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                        file_id,
+                        offset: watcher.get_file_position(),
                     });
 
                     if bytes_read > self.max_read_bytes {
@@ -510,4 +512,6 @@ impl Default for TimingStats {
 pub struct Line {
     pub text: Bytes,
     pub filename: String,
+    pub file_id: FileFingerprint,
+    pub offset: u64,
 }

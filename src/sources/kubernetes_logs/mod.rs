@@ -322,13 +322,17 @@ impl Source {
 
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
-        let events = events.map(move |Line { text, filename }| {
-            let byte_size = text.len();
-            let mut event = create_event(text, &filename, ingestion_timestamp_field.as_deref());
-            let file_info = annotator.annotate(&mut event, &filename);
+        let events = events.map(move |line| {
+            let byte_size = line.text.len();
+            let mut event = create_event(
+                line.text,
+                &line.filename,
+                ingestion_timestamp_field.as_deref(),
+            );
+            let file_info = annotator.annotate(&mut event, &line.filename);
 
             emit!(KubernetesLogsEventReceived {
-                file: &filename,
+                file: &line.filename,
                 byte_size,
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });

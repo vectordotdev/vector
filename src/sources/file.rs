@@ -298,13 +298,13 @@ pub fn file_source(
         let rx = rx
             .map(futures::stream::iter)
             .flatten()
-            .map(move |Line { text, filename }| {
+            .map(move |mut line| {
                 // transcode each line from the file's encoding charset to utf8
-                let text = match encoding_decoder.as_mut() {
-                    Some(d) => d.decode_to_utf8(text),
-                    None => text,
+                line.text = match encoding_decoder.as_mut() {
+                    Some(d) => d.decode_to_utf8(line.text),
+                    None => line.text,
                 };
-                Line { text, filename }
+                line
             });
 
         let messages: Box<dyn Stream<Item = Line> + Send + std::marker::Unpin> =
@@ -330,9 +330,9 @@ pub fn file_source(
         let span = current_span();
         let span2 = span.clone();
         let mut messages = messages
-            .map(move |Line { text, filename }| {
+            .map(move |line| {
                 let _enter = span2.enter();
-                create_event(text, filename, &host_key, &hostname, &file_key)
+                create_event(line.text, line.filename, &host_key, &hostname, &file_key)
             })
             .map(Ok);
         tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
@@ -382,10 +382,15 @@ fn wrap_with_line_agg(
     let logic = line_agg::Logic::new(config);
     Box::new(
         LineAgg::new(
-            rx.map(|Line { text, filename }| (filename, text, ())),
+            rx.map(|line| (line.filename, line.text, (line.file_id, line.offset))),
             logic,
         )
-        .map(|(filename, text, _context)| Line { text, filename }),
+        .map(|(filename, text, (file_id, offset))| Line {
+            text,
+            filename,
+            file_id,
+            offset,
+        }),
     )
 }
 
