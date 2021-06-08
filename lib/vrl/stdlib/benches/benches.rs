@@ -112,13 +112,13 @@ bench_function! {
     add_datadog_tags => vrl_stdlib::AddDatadogTags;
 
     add_two_tags {
-        args: func_args![value: "tag1:val1", tags: value!(["tag2:val2", "tag4:val3"])],
-        want: Ok("tag1:val1,tag2:val2"),
+        args: func_args![value: "tag1:val1", tags: value!(["tag2:val2", "tag3:val3"])],
+        want: Ok("tag1:val1,tag2:val2,tag3:val3"),
     }
 
     add_duplicate {
-        args: func_args![value: "foo:bar", tags: value!(["foo:bar"])],
-        want: Ok("foo:bar"),
+        args: func_args![value: "foo:bar,foo:baz", tags: value!(["foo:bar"])],
+        want: Ok("foo:bar,foo:baz"),
     }
 }
 
@@ -1342,11 +1342,11 @@ bench_function! {
 
     no_match {
         args: func_args![
-            tags: "foo:barbaz,foo:baz,foobar:baz",
+            tags: "foo:barbaz,foo:bar,foobar:baz",
             key: "foo",
             value: "baz",
         ],
-        want: Ok("foo:barbaz,foo:baz,foobar:baz")
+        want: Ok("foo:barbaz,foo:bar,foobar:baz")
     }
 }
 
