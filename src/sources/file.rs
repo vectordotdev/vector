@@ -702,7 +702,7 @@ mod tests {
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
 
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
 
@@ -752,7 +752,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at its original length before writing to it
@@ -813,7 +813,7 @@ mod tests {
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at its original length before writing to it
@@ -877,7 +877,7 @@ mod tests {
         let path2 = dir.path().join("b.txt");
         let path3 = dir.path().join("a.log");
         let path4 = dir.path().join("a.ignore.txt");
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
             let mut file3 = File::create(&path3).unwrap();
@@ -923,7 +923,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, true, async {
+            let received = run_file_source(&config, true, Acks, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -951,7 +951,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, true, async {
+            let received = run_file_source(&config, true, Acks, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -979,7 +979,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, true, async {
+            let received = run_file_source(&config, true, Acks, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -1007,15 +1007,15 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_acknowledged() {
-        file_start_position_server_restart(true).await
+        file_start_position_server_restart(Acks).await
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_nonacknowledged() {
-        file_start_position_server_restart(false).await
+        file_start_position_server_restart(NoAcks).await
     }
 
-    async fn file_start_position_server_restart(acks: bool) {
+    async fn file_start_position_server_restart(acking: AckingMode) {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1029,7 +1029,7 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let received = run_file_source(&config, false, acks, async {
+            let received = run_file_source(&config, false, acking, async {
                 sleep_500_millis().await;
                 writeln!(&mut file, "first line").unwrap();
                 sleep_500_millis().await;
@@ -1041,7 +1041,7 @@ mod tests {
         }
         // Restart server, read file from checkpoint.
         {
-            let received = run_file_source(&config, false, acks, async {
+            let received = run_file_source(&config, false, acking, async {
                 sleep_500_millis().await;
                 writeln!(&mut file, "second line").unwrap();
                 sleep_500_millis().await;
@@ -1059,7 +1059,7 @@ mod tests {
                 read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
-            let received = run_file_source(&config, false, acks, async {
+            let received = run_file_source(&config, false, acking, async {
                 sleep_500_millis().await;
                 writeln!(&mut file, "third line").unwrap();
                 sleep_500_millis().await;
@@ -1075,16 +1075,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn file_start_position_server_restart_unfinalized() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+        writeln!(&mut file, "the line").unwrap();
+        sleep_500_millis().await;
+
+        // First time server runs it picks up existing lines.
+        let received = run_file_source(&config, false, Unfinalized, sleep_500_millis()).await;
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["the line"]);
+
+        // Restart server, it re-reads file since the events were not acknowledged before shutdown
+        let received = run_file_source(&config, false, Unfinalized, sleep_500_millis()).await;
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["the line"]);
+    }
+
+    #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
-        file_start_position_server_restart_with_file_rotation(true).await
+        file_start_position_server_restart_with_file_rotation(Acks).await
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_nonacknowledged() {
-        file_start_position_server_restart_with_file_rotation(false).await
+        file_start_position_server_restart_with_file_rotation(NoAcks).await
     }
 
-    async fn file_start_position_server_restart_with_file_rotation(acks: bool) {
+    async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1095,7 +1119,7 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let received = run_file_source(&config, false, acks, async {
+            let received = run_file_source(&config, false, acking, async {
                 let mut file = File::create(&path).unwrap();
                 sleep_500_millis().await;
                 writeln!(&mut file, "first line").unwrap();
@@ -1111,7 +1135,7 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let received = run_file_source(&config, false, acks, async {
+            let received = run_file_source(&config, false, acking, async {
                 let mut file = File::create(&path).unwrap();
                 sleep_500_millis().await;
                 writeln!(&mut file, "second line").unwrap();
@@ -1137,7 +1161,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let before_path = dir.path().join("before");
             let mut before_file = File::create(&before_path).unwrap();
             let after_path = dir.path().join("after");
@@ -1207,7 +1231,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received=run_file_source(&config, false, false, async {
+        let received=run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1249,7 +1273,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1308,7 +1332,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1380,7 +1404,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let received = run_file_source(&config, false, false, sleep_500_millis()).await;
+        let received = run_file_source(&config, false, NoAcks, sleep_500_millis()).await;
 
         let received = extract_messages_value(received);
 
@@ -1425,7 +1449,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let received = run_file_source(&config, false, false, sleep_500_millis()).await;
+        let received = run_file_source(&config, false, NoAcks, sleep_500_millis()).await;
 
         let received = extract_messages_value(received);
 
@@ -1458,7 +1482,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             sleep_500_millis().await;
 
             write!(&mut file, "i am not a full line").unwrap();
@@ -1498,7 +1522,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let received = run_file_source(&config, false, false, sleep_500_millis()).await;
+        let received = run_file_source(&config, false, NoAcks, sleep_500_millis()).await;
 
         let received = extract_messages_value(received);
 
@@ -1523,7 +1547,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let received = run_file_source(&config, false, false, sleep_500_millis()).await;
+        let received = run_file_source(&config, false, NoAcks, sleep_500_millis()).await;
 
         let received = extract_messages_value(received);
 
@@ -1549,7 +1573,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, false, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1590,7 +1614,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, true, async {
+        let received = run_file_source(&config, false, Acks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1619,31 +1643,48 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    enum AckingMode {
+        NoAcks,      // No acknowledgement handling and no finalization
+        Unfinalized, // Acknowledgement handling but no finalization
+        Acks,        // Full acknowledgements and proper finalization
+    }
+    use AckingMode::*;
+
     async fn run_file_source(
         config: &FileConfig,
         wait_shutdown: bool,
-        acknowledgements: bool,
+        acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-        tokio::spawn(file::file_source(
-            &config,
-            config.data_dir.clone().unwrap(),
-            shutdown,
-            tx,
-            acknowledgements,
-        ));
+        let wrapper = |tx: Pipeline| async move {
+            tokio::spawn(file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                shutdown,
+                tx,
+                !matches!(acking_mode, NoAcks),
+            ));
 
-        inner.await;
+            inner.await;
 
-        drop(trigger_shutdown);
-        if wait_shutdown {
-            shutdown_done.await;
+            drop(trigger_shutdown);
+            if wait_shutdown {
+                shutdown_done.await;
+            }
+        };
+
+        if acking_mode == Acks {
+            let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+            wrapper(tx).await;
+            wait_with_timeout(rx.collect::<Vec<_>>()).await
+        } else {
+            let (tx, rx) = Pipeline::new_test();
+            wrapper(tx).await;
+            wait_with_timeout(rx.collect::<Vec<_>>()).await
         }
-
-        wait_with_timeout(rx.collect::<Vec<_>>()).await
     }
 
     fn extract_messages_string(received: Vec<Event>) -> Vec<String> {
