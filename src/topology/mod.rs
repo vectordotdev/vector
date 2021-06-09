@@ -815,8 +815,8 @@ mod tests {
         old_config.add_source(
             "in",
             SocketConfig::make_basic_tcp_config(next_addr()),
-            vec![].into(),
-            vec![].into(),
+            None,
+            None,
         );
         old_config.add_sink(
             "out",
@@ -1167,7 +1167,7 @@ mod source_finished_tests {
     async fn sources_finished() {
         let mut old_config = Config::builder();
         let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, None);
-        old_config.add_source("in", generator, vec![].into(), vec![].into());
+        old_config.add_source("in", generator, None, None);
         old_config.add_sink(
             "out",
             &[&"in"],
@@ -1259,7 +1259,7 @@ mod transient_state_tests {
     async fn closed_source() {
         let mut old_config = Config::builder();
         let (trigger_old, source) = MockSourceConfig::new();
-        old_config.add_source("in", source, vec![].into(), vec![].into());
+        old_config.add_source("in", source, None, None);
         old_config.add_transform(
             "trans",
             &["in"],
@@ -1287,7 +1287,7 @@ mod transient_state_tests {
 
         let mut new_config = Config::builder();
         let (_trigger_new, source) = MockSourceConfig::new();
-        new_config.add_source("in", source, vec![].into(), vec![].into());
+        new_config.add_source("in", source, None, None);
         new_config.add_transform(
             "trans",
             &["in"],
@@ -1322,7 +1322,7 @@ mod transient_state_tests {
         trace_init();
 
         let mut old_config = Config::builder();
-        old_config.add_source("in", StdinConfig::default(), vec![].into(), vec![].into());
+        old_config.add_source("in", StdinConfig::default(), None, None);
         old_config.add_transform(
             "trans",
             &["in"],
@@ -1349,7 +1349,7 @@ mod transient_state_tests {
         );
 
         let mut new_config = Config::builder();
-        new_config.add_source("in", StdinConfig::default(), vec![].into(), vec![].into());
+        new_config.add_source("in", StdinConfig::default(), None, None);
         new_config.add_transform(
             "trans",
             &["in"],
@@ -1379,7 +1379,7 @@ mod transient_state_tests {
         trace_init();
 
         let mut old_config = Config::builder();
-        old_config.add_source("in", StdinConfig::default(), vec![].into(), vec![].into());
+        old_config.add_source("in", StdinConfig::default(), None, None);
         old_config.add_transform(
             "trans1",
             &["in"],
@@ -1414,7 +1414,7 @@ mod transient_state_tests {
         );
 
         let mut new_config = Config::builder();
-        new_config.add_source("in", StdinConfig::default(), vec![].into(), vec![].into());
+        new_config.add_source("in", StdinConfig::default(), None, None);
         new_config.add_transform(
             "trans1",
             &["in"],

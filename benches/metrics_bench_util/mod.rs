@@ -133,8 +133,8 @@ fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
                         config.add_source(
                             "in",
                             sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-                            vec![].into(),
-                            vec![].into(),
+                            None,
+                            None,
                         );
                         config.add_sink(
                             "out",

@@ -76,10 +76,14 @@ impl ConfigBuilder {
         &mut self,
         name: T,
         source: S,
-        framing: FramingsConfig,
-        codec: CodecsConfig,
+        framing: Option<FramingsConfig>,
+        codec: Option<CodecsConfig>,
     ) {
-        let source = SourceOuter::new(framing, codec, source);
+        let source = SourceOuter::new(
+            framing.unwrap_or_default(),
+            codec.unwrap_or_default(),
+            source,
+        );
         self.sources.insert(name.into(), source);
     }
 

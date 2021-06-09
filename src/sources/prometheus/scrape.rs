@@ -311,8 +311,8 @@ mod test {
                 tls: None,
                 auth: None,
             },
-            vec![].into(),
-            vec![].into(),
+            None,
+            None,
         );
         config.add_sink(
             "out",
