@@ -5,9 +5,38 @@ use criterion::{
     Throughput,
 };
 use std::time::Duration;
+use vector::conditions::Condition;
 use vector::transforms::filter::Filter;
 use vector::transforms::FunctionTransform;
 use vector_core::event::{Event, LogEvent};
+
+#[derive(Debug)]
+struct Payload {
+    filter: Filter,
+    output: Vec<Event>,
+    events: Vec<Event>,
+}
+
+fn setup(total_events: usize, condition: Box<dyn Condition>) -> Payload {
+    let filter = Filter::new(condition);
+    let output = Vec::with_capacity(total_events);
+    let events = vec![Event::Log(LogEvent::default()); total_events];
+    Payload {
+        filter,
+        output,
+        events,
+    }
+}
+
+fn measurement(payload: Payload) {
+    let mut filter = payload.filter;
+    let mut output = payload.output;
+    let events = payload.events;
+
+    for event in events {
+        filter.transform(&mut output, event)
+    }
+}
 
 ///
 /// `Filter::transform` benchmarks
@@ -22,30 +51,19 @@ fn filter(c: &mut Criterion) {
         c.benchmark_group("vector::transforms::filter::Filter");
     group.sampling_mode(SamplingMode::Auto);
 
-    group.throughput(Throughput::Elements(1));
+    let total_events = 1024; // arbitrary constant, the smaller the noisier
+    group.throughput(Throughput::Elements(total_events as u64));
     group.bench_function("transform/always_fail", |b| {
         b.iter_batched(
-            || {
-                let filter = Filter::new(Box::new(AlwaysFail));
-                let output = Vec::with_capacity(4); // arbitrary constant larger
-                                                    // than output
-                let event = Event::Log(LogEvent::default());
-                (filter, output, event)
-            },
-            |(mut filter, mut output, event)| filter.transform(&mut output, event),
+            || setup(total_events, Box::new(AlwaysFail)),
+            measurement,
             BatchSize::SmallInput,
         )
     });
     group.bench_function("transform/always_pass", |b| {
         b.iter_batched(
-            || {
-                let filter = Filter::new(Box::new(AlwaysPass));
-                let output = Vec::with_capacity(4); // arbitrary constant larger
-                                                    // than output
-                let event = Event::Log(LogEvent::default());
-                (filter, output, event)
-            },
-            |(mut filter, mut output, event)| filter.transform(&mut output, event),
+            || setup(total_events, Box::new(AlwaysPass)),
+            measurement,
             BatchSize::SmallInput,
         )
     });
@@ -54,9 +72,17 @@ fn filter(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(60))
-        .confidence_level(0.99)
-        .nresamples(250_000)
-        .sample_size(250);
+        .warm_up_time(Duration::from_secs(10))
+        .measurement_time(Duration::from_secs(180))
+        // degree of noise to ignore in measurements, here 1%
+        .noise_threshold(0.01)
+        // likelihood of noise registering as difference, here 5%
+        .significance_level(0.05)
+        // likelihood of capturing the true runtime, here 95%
+        .confidence_level(0.95)
+        // total number of bootstrap resamples, higher is less noisy but slower
+        .nresamples(100_000)
+        // total samples to collect within the set measurement time
+        .sample_size(500);
     targets = filter
 );
