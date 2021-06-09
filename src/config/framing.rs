@@ -11,8 +11,8 @@ lazy_static! {
             .collect();
 }
 
-#[derive(Debug, Serialize, Default)]
-pub struct FramingsConfig(pub Vec<FramingConfig>);
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct FramingsConfig(pub Box<[FramingConfig]>);
 
 impl<'de> Deserialize<'de> for FramingsConfig {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
@@ -28,20 +28,32 @@ impl<'de> Deserialize<'de> for FramingsConfig {
 
         let config = FramingsConfig::deserialize(deserializer)?;
 
-        Ok(Self(match config {
-            FramingsConfig::Single(config) => vec![config],
-            FramingsConfig::Multiple(configs) => configs,
-        }))
+        Ok(Self(
+            match config {
+                FramingsConfig::Single(config) => vec![config],
+                FramingsConfig::Multiple(configs) => configs,
+            }
+            .into(),
+        ))
+    }
+}
+
+impl IntoIterator for FramingsConfig {
+    type Item = FramingConfig;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Into::<Vec<_>>::into(self.0).into_iter()
     }
 }
 
 impl From<Vec<FramingConfig>> for FramingsConfig {
     fn from(configs: Vec<FramingConfig>) -> Self {
-        Self(configs)
+        Self(configs.into())
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum FramingConfig {
     String(String),

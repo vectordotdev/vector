@@ -11,8 +11,8 @@ lazy_static! {
             .collect();
 }
 
-#[derive(Debug, Serialize, Default)]
-pub struct CodecsConfig(pub Vec<CodecConfig>);
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct CodecsConfig(pub Box<[CodecConfig]>);
 
 impl<'de> Deserialize<'de> for CodecsConfig {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
@@ -28,20 +28,32 @@ impl<'de> Deserialize<'de> for CodecsConfig {
 
         let config = CodecsConfig::deserialize(deserializer)?;
 
-        Ok(Self(match config {
-            CodecsConfig::Single(config) => vec![config],
-            CodecsConfig::Multiple(configs) => configs,
-        }))
+        Ok(Self(
+            match config {
+                CodecsConfig::Single(config) => vec![config],
+                CodecsConfig::Multiple(configs) => configs,
+            }
+            .into(),
+        ))
+    }
+}
+
+impl IntoIterator for CodecsConfig {
+    type Item = CodecConfig;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Into::<Vec<_>>::into(self.0).into_iter()
     }
 }
 
 impl From<Vec<CodecConfig>> for CodecsConfig {
     fn from(configs: Vec<CodecConfig>) -> Self {
-        Self(configs)
+        Self(configs.into())
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CodecConfig {
     String(String),

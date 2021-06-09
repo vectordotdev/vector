@@ -60,7 +60,7 @@ pub async fn build_pieces(
         let typetag = source.inner.source_type();
 
         let mut rx = rx.boxed();
-        for codec in &source.codec.0 {
+        for codec in source.codec.clone() {
             let CodecTransform {
                 transform,
                 input_type,
@@ -80,8 +80,8 @@ pub async fn build_pieces(
 
         let framing = source
             .framing
-            .0
-            .iter()
+            .clone()
+            .into_iter()
             .filter_map(|config| match config.build() {
                 Ok(framer) => Some(framer),
                 Err(error) => {

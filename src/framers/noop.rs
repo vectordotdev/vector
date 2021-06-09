@@ -2,7 +2,7 @@ use super::Framer;
 use serde::{Deserialize, Serialize};
 use vector_core::transform::{FunctionTransform, Transform};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoopFramer;
 
 #[typetag::serde(name = "noop")]
@@ -16,7 +16,7 @@ impl Framer for NoopFramer {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct NoopTransform;
 
 impl FunctionTransform<Vec<u8>> for NoopTransform {

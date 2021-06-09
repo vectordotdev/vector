@@ -6,7 +6,7 @@ use vector_core::{
     transform::{FunctionTransform, Transform},
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoopCodec;
 
 #[typetag::serde(name = "noop")]
@@ -23,7 +23,7 @@ impl Codec for NoopCodec {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct NoopTransform;
 
 impl FunctionTransform<Event> for NoopTransform {
