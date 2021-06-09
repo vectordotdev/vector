@@ -40,16 +40,36 @@ pub struct Opts {
     /// will be targeted.
     #[structopt(use_delimiter(true))]
     paths: Vec<PathBuf>,
+
+    /// Read configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "config-dir",
+        short = "C",
+        long,
+        env = "VECTOR_CONFIG_DIR",
+        use_delimiter(true)
+    )]
+    pub config_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
-    fn paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
+    fn paths_with_formats(&self) -> Vec<config::ConfigPath> {
         config::merge_path_lists(vec![
             (&self.paths, None),
             (&self.paths_toml, Some(config::Format::Toml)),
             (&self.paths_json, Some(config::Format::Json)),
             (&self.paths_yaml, Some(config::Format::Yaml)),
         ])
+        .map(|(path, hint)| config::ConfigPath::File(path, hint))
+        .chain(
+            self.config_dirs
+                .iter()
+                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+        )
+        .collect()
     }
 }
 
@@ -92,7 +112,8 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     };
 
     // Load
-    let paths_list: Vec<_> = paths.iter().map(|(path, _)| path).collect();
+    let paths_list: Vec<_> = paths.iter().map(<&PathBuf>::from).collect();
+
     let mut report_error = |errors| {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);

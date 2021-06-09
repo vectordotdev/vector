@@ -135,6 +135,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn file_directory_update() {
+        trace_init();
+
+        let delay = Duration::from_secs(3);
+        let file_path = temp_file();
+        let mut file = File::create(&file_path).unwrap();
+
+        let _ = spawn_thread(&[file_path.parent().unwrap().to_path_buf()], delay).unwrap();
+
+        if !test(&mut file, delay * 5).await {
+            panic!("Test timed out");
+        }
+    }
+
+    #[tokio::test]
     async fn file_update() {
         trace_init();
 
