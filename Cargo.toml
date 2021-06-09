@@ -700,6 +700,7 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "
 statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
+transform-benches = []
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-lua", "transforms-remap", "transforms-wasm"]
 
 [[bench]]
@@ -757,3 +758,9 @@ name = "distribution_statistic"
 harness = false
 test = true
 required-features = ["statistic-benches"]
+
+[[bench]]
+name = "transform"
+harness = false
+test = false
+required-features = ["transform-benches"]
