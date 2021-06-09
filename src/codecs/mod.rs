@@ -1,3 +1,4 @@
+mod json;
 #[cfg(test)]
 mod noop;
 
