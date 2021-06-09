@@ -5,9 +5,9 @@ use vector_core::transform::Transform;
 
 lazy_static! {
     static ref FRAMERS: HashMap<&'static str, &'static dyn crate::framers::Framer> =
-        inventory::iter::<&dyn crate::framers::Framer>
+        inventory::iter::<Box<dyn crate::framers::Framer>>
             .into_iter()
-            .map(|framer| (framer.name(), *framer))
+            .map(|framer| (framer.name(), &**framer))
             .collect();
 }
 

@@ -5,9 +5,9 @@ use std::collections::HashMap;
 
 lazy_static! {
     static ref CODECS: HashMap<&'static str, &'static dyn crate::codecs::Codec> =
-        inventory::iter::<&dyn crate::codecs::Codec>
+        inventory::iter::<Box<dyn crate::codecs::Codec>>
             .into_iter()
-            .map(|codec| (codec.name(), *codec))
+            .map(|codec| (codec.name(), &**codec))
             .collect();
 }
 

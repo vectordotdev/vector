@@ -26,5 +26,5 @@ impl FunctionTransform<Vec<u8>> for NoopTransform {
 }
 
 inventory::submit! {
-    &NoopFramer as &dyn Framer
+    Box::new(NoopFramer) as Box<dyn Framer>
 }

@@ -25,4 +25,4 @@ pub struct CodecTransform {
     pub transform: Transform<Event>,
 }
 
-inventory::collect!(&'static dyn Codec);
+inventory::collect!(Box<dyn Codec>);

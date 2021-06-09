@@ -33,5 +33,5 @@ impl FunctionTransform<Event> for NoopTransform {
 }
 
 inventory::submit! {
-    &NoopCodec as &dyn Codec
+    Box::new(NoopCodec) as Box<dyn Codec>
 }

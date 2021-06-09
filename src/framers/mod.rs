@@ -14,4 +14,4 @@ pub trait Framer: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
 
 dyn_clone::clone_trait_object!(Framer);
 
-inventory::collect!(&'static dyn Framer);
+inventory::collect!(Box<dyn Framer>);
