@@ -134,8 +134,8 @@ rusoto_sqs = { version = "0.46.0", optional = true }
 rusoto_sts = { version = "0.46.0", optional = true }
 
 # Azure
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "457bd53107d31f7ccd6cae7128dfaa25f5268679", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "457bd53107d31f7ccd6cae7128dfaa25f5268679", default-features = false, features = ["blob"], optional = true }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["blob"], optional = true }
 reqwest = { version = "0.11", optional = true }
 
 # Tower
@@ -291,8 +291,8 @@ tower-test = "0.4.0"
 walkdir = "2.3.2"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "457bd53107d31f7ccd6cae7128dfaa25f5268679", features = ["azurite_workaround"] }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "457bd53107d31f7ccd6cae7128dfaa25f5268679", features = ["azurite_workaround"] }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin

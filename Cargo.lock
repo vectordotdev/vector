@@ -574,7 +574,7 @@ dependencies = [
 [[package]]
 name = "azure_core"
 version = "0.1.0"
-source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=457bd53107d31f7ccd6cae7128dfaa25f5268679#457bd53107d31f7ccd6cae7128dfaa25f5268679"
+source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=16bcf0ab1bb6e380d966a69d314de1e99ede553a#16bcf0ab1bb6e380d966a69d314de1e99ede553a"
 dependencies = [
  "async-trait",
  "bytes 1.0.1",
@@ -586,6 +586,7 @@ dependencies = [
  "oauth2",
  "rand 0.7.3",
  "reqwest",
+ "rustc_version 0.3.3",
  "serde",
  "serde_derive",
  "serde_json",
@@ -597,7 +598,7 @@ dependencies = [
 [[package]]
 name = "azure_storage"
 version = "0.1.0"
-source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=457bd53107d31f7ccd6cae7128dfaa25f5268679#457bd53107d31f7ccd6cae7128dfaa25f5268679"
+source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=16bcf0ab1bb6e380d966a69d314de1e99ede553a#16bcf0ab1bb6e380d966a69d314de1e99ede553a"
 dependencies = [
  "RustyXML",
  "azure_core",
@@ -1014,7 +1015,7 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc38c385bfd7e444464011bb24820f40dd1c76bcdfa1b78611cb7c2e5cafab75"
 dependencies = [
- "rustc_version",
+ "rustc_version 0.2.3",
 ]
 
 [[package]]
@@ -5419,7 +5420,7 @@ checksum = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
 dependencies = [
  "bitflags",
  "cc",
- "rustc_version",
+ "rustc_version 0.2.3",
 ]
 
 [[package]]
@@ -5430,7 +5431,7 @@ checksum = "beb71f708fe39b2c5e98076204c3cc094ee5a4c12c4cdb119a2b72dc34164f41"
 dependencies = [
  "bitflags",
  "cc",
- "rustc_version",
+ "rustc_version 0.2.3",
 ]
 
 [[package]]
@@ -5717,7 +5718,7 @@ dependencies = [
  "log",
  "rusoto_credential",
  "rusoto_signature",
- "rustc_version",
+ "rustc_version 0.2.3",
  "serde",
  "serde_json",
  "tokio",
@@ -5830,7 +5831,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "rusoto_credential",
- "rustc_version",
+ "rustc_version 0.2.3",
  "serde",
  "sha2",
  "time 0.2.26",
@@ -5908,6 +5909,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
  "semver 0.9.0",
+]
+
+[[package]]
+name = "rustc_version"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0dfe2087c51c460008730de8b57e6a320782fbfb312e1f4d520e6c6fae155ee"
+dependencies = [
+ "semver 0.11.0",
 ]
 
 [[package]]
@@ -6615,7 +6625,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d022496b16281348b52d0e30ae99e01a73d737b2f45d38fed4edf79f9325a1d5"
 dependencies = [
  "discard",
- "rustc_version",
+ "rustc_version 0.2.3",
  "stdweb-derive",
  "stdweb-internal-macros",
  "stdweb-internal-runtime",
@@ -6861,7 +6871,7 @@ dependencies = [
  "cfg-if 0.1.10",
  "lazy_static",
  "num-traits",
- "rustc_version",
+ "rustc_version 0.2.3",
 ]
 
 [[package]]

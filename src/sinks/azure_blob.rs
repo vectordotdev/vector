@@ -19,8 +19,8 @@ use crate::{
     template::Template,
     Result,
 };
-use azure_core::errors::HttpError;
 use azure_core::prelude::*;
+use azure_core::HttpError;
 use azure_storage::blob::blob::responses::PutBlockBlobResponse;
 use azure_storage::blob::prelude::*;
 use azure_storage::core::prelude::*;
@@ -201,9 +201,8 @@ impl AzureBlobSinkConfig {
     pub fn create_client(&self) -> Result<Arc<ContainerClient>> {
         let connection_string = self.connection_string.as_str();
         let container_name = self.container_name.as_str();
-        let http_client: Arc<Box<dyn HttpClient>> = Arc::new(Box::new(reqwest::Client::new()));
         let client =
-            StorageAccountClient::new_connection_string(http_client.clone(), connection_string)?
+            StorageAccountClient::new_connection_string(new_http_client(), connection_string)?
                 .as_storage_client()
                 .as_container_client(container_name);
 
