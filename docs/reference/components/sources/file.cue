@@ -57,6 +57,7 @@ components: sources: file: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		exclude: {
 			common:      false
 			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"

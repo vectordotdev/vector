@@ -2,7 +2,7 @@ use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
-    event::{Event, LogEvent},
+    event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent},
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -13,7 +13,8 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    Checkpointer, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
+    Checkpointer, CheckpointsView, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter,
+    Line, ReadFrom,
 };
 use futures::{
     future::TryFutureExt,
@@ -23,8 +24,10 @@ use futures::{
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::task::spawn_blocking;
 
@@ -209,7 +212,13 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        Ok(file_source(self, data_dir, cx.shutdown, cx.out))
+        Ok(file_source(
+            self,
+            data_dir,
+            cx.shutdown,
+            cx.out,
+            cx.acknowledgements,
+        ))
     }
 
     fn output_type(&self) -> DataType {
@@ -226,6 +235,7 @@ pub fn file_source(
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
+    acknowledgements: bool,
 ) -> super::Source {
     let ignore_before = config
         .ignore_older_secs
@@ -289,6 +299,7 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     let checkpoints = checkpointer.view();
+    let committer = Committer::new(&checkpointer);
 
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
@@ -333,9 +344,18 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages
             .map(move |line| {
-                checkpoints.update(line.file_id, line.offset);
                 let _enter = span2.enter();
-                create_event(line.text, line.filename, &host_key, &hostname, &file_key)
+                let entry = CommitterEntry::from(&line);
+                let mut event =
+                    create_event(line.text, line.filename, &host_key, &hostname, &file_key);
+                if acknowledgements {
+                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                    event = event.with_batch_notifier(&batch);
+                    committer.push(entry, receiver);
+                } else {
+                    checkpoints.update(entry.file_id, entry.offset);
+                }
+                event
             })
             .map(Ok);
         tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
@@ -425,10 +445,101 @@ fn create_event(
     event.into()
 }
 
+struct Committer {
+    checkpoints: Arc<CheckpointsView>,
+    store: Arc<Mutex<CommitterStore>>,
+}
+
+impl Committer {
+    fn new(checkpointer: &Checkpointer) -> Self {
+        Self {
+            checkpoints: checkpointer.view(),
+            store: Default::default(),
+        }
+    }
+
+    fn push(&self, msg: impl Into<CommitterEntry>, receiver: BatchStatusReceiver) {
+        const LOCK_ERROR: &str = "Poisoned file source commit store lock";
+
+        let mut store = self.store.lock().expect(LOCK_ERROR);
+        let index = store.add_msg(msg);
+        drop(store); // Unlock the store ASAP
+
+        let store = Arc::clone(&self.store);
+        let checkpoints = Arc::clone(&self.checkpoints);
+        tokio::spawn(async move {
+            let _status = receiver.await;
+            let mut store = store.lock().expect(LOCK_ERROR);
+            store.mark_done(index);
+            store.extract_done(checkpoints);
+        });
+    }
+}
+
+#[derive(Default)]
+struct CommitterStore {
+    first: u64,
+    entries: VecDeque<CommitterEntry>,
+}
+
+impl CommitterStore {
+    /// Add the needed data from the given message into the store and
+    /// return the index.
+    fn add_msg(&mut self, msg: impl Into<CommitterEntry>) -> u64 {
+        let index = self.first + self.entries.len() as u64;
+        self.entries.push_back(msg.into());
+        index
+    }
+
+    fn mark_done(&mut self, index: u64) {
+        // Under normal usage, both of these conditions should be true,
+        // but they are guarded to avoid panics.
+        if index >= self.first {
+            let offset = (index - self.first) as usize;
+            if let Some(entry) = self.entries.get_mut(offset) {
+                entry.done = true;
+            }
+        }
+    }
+
+    fn extract_done(&mut self, checkpoints: Arc<CheckpointsView>) {
+        while let Some(entry) = self.entries.front() {
+            if !entry.done {
+                break;
+            }
+            let entry = self.entries.pop_front().unwrap();
+            self.first += 1;
+            checkpoints.update(entry.file_id, entry.offset);
+        }
+    }
+}
+
+#[derive(Debug)]
+struct CommitterEntry {
+    done: bool,
+    file_id: FileFingerprint,
+    offset: u64,
+}
+
+impl From<&Line> for CommitterEntry {
+    fn from(line: &Line) -> Self {
+        Self {
+            done: false,
+            file_id: line.file_id,
+            offset: line.offset,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::Config, event::Value, shutdown::ShutdownSignal, sources::file};
+    use crate::{
+        config::Config,
+        event::{EventStatus, Value},
+        shutdown::ShutdownSignal,
+        sources::file,
+    };
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
     use std::{
@@ -591,7 +702,7 @@ mod tests {
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
 
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
 
@@ -641,7 +752,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at its original length before writing to it
@@ -702,7 +813,7 @@ mod tests {
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at its original length before writing to it
@@ -766,7 +877,7 @@ mod tests {
         let path2 = dir.path().join("b.txt");
         let path3 = dir.path().join("a.log");
         let path4 = dir.path().join("a.ignore.txt");
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
             let mut file3 = File::create(&path3).unwrap();
@@ -812,7 +923,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, async {
+            let received = run_file_source(&config, true, true, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -840,7 +951,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, async {
+            let received = run_file_source(&config, true, true, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -868,7 +979,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, async {
+            let received = run_file_source(&config, true, true, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -895,7 +1006,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_start_position_server_restart() {
+    async fn file_start_position_server_restart_acknowledged() {
+        file_start_position_server_restart(true).await
+    }
+
+    #[tokio::test]
+    async fn file_start_position_server_restart_nonacknowledged() {
+        file_start_position_server_restart(false).await
+    }
+
+    async fn file_start_position_server_restart(acks: bool) {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -909,7 +1029,7 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let received = run_file_source(&config, false, async {
+            let received = run_file_source(&config, false, acks, async {
                 sleep_500_millis().await;
                 writeln!(&mut file, "first line").unwrap();
                 sleep_500_millis().await;
@@ -921,7 +1041,7 @@ mod tests {
         }
         // Restart server, read file from checkpoint.
         {
-            let received = run_file_source(&config, false, async {
+            let received = run_file_source(&config, false, acks, async {
                 sleep_500_millis().await;
                 writeln!(&mut file, "second line").unwrap();
                 sleep_500_millis().await;
@@ -939,7 +1059,7 @@ mod tests {
                 read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
-            let received = run_file_source(&config, false, async {
+            let received = run_file_source(&config, false, acks, async {
                 sleep_500_millis().await;
                 writeln!(&mut file, "third line").unwrap();
                 sleep_500_millis().await;
@@ -955,7 +1075,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_start_position_server_restart_with_file_rotation() {
+    async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
+        file_start_position_server_restart_with_file_rotation(true).await
+    }
+
+    #[tokio::test]
+    async fn file_start_position_server_restart_with_file_rotation_nonacknowledged() {
+        file_start_position_server_restart_with_file_rotation(false).await
+    }
+
+    async fn file_start_position_server_restart_with_file_rotation(acks: bool) {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -966,7 +1095,7 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let received = run_file_source(&config, false, async {
+            let received = run_file_source(&config, false, acks, async {
                 let mut file = File::create(&path).unwrap();
                 sleep_500_millis().await;
                 writeln!(&mut file, "first line").unwrap();
@@ -982,7 +1111,7 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let received = run_file_source(&config, false, async {
+            let received = run_file_source(&config, false, acks, async {
                 let mut file = File::create(&path).unwrap();
                 sleep_500_millis().await;
                 writeln!(&mut file, "second line").unwrap();
@@ -1008,7 +1137,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             let before_path = dir.path().join("before");
             let mut before_file = File::create(&before_path).unwrap();
             let after_path = dir.path().join("after");
@@ -1078,7 +1207,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received=run_file_source(&config, false, async {
+        let received=run_file_source(&config, false, false, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1120,7 +1249,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1179,7 +1308,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1251,7 +1380,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let received = run_file_source(&config, false, sleep_500_millis()).await;
+        let received = run_file_source(&config, false, false, sleep_500_millis()).await;
 
         let received = extract_messages_value(received);
 
@@ -1296,7 +1425,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let received = run_file_source(&config, false, sleep_500_millis()).await;
+        let received = run_file_source(&config, false, false, sleep_500_millis()).await;
 
         let received = extract_messages_value(received);
 
@@ -1329,7 +1458,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             sleep_500_millis().await;
 
             write!(&mut file, "i am not a full line").unwrap();
@@ -1369,7 +1498,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let received = run_file_source(&config, false, sleep_500_millis()).await;
+        let received = run_file_source(&config, false, false, sleep_500_millis()).await;
 
         let received = extract_messages_value(received);
 
@@ -1394,7 +1523,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let received = run_file_source(&config, false, sleep_500_millis()).await;
+        let received = run_file_source(&config, false, false, sleep_500_millis()).await;
 
         let received = extract_messages_value(received);
 
@@ -1420,7 +1549,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, false, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1461,7 +1590,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, async {
+        let received = run_file_source(&config, false, true, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1493,9 +1622,10 @@ mod tests {
     async fn run_file_source(
         config: &FileConfig,
         wait_shutdown: bool,
-        doit: impl Future<Output = ()>,
+        acknowledgements: bool,
+        inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
         tokio::spawn(file::file_source(
@@ -1503,9 +1633,10 @@ mod tests {
             config.data_dir.clone().unwrap(),
             shutdown,
             tx,
+            acknowledgements,
         ));
 
-        doit.await;
+        inner.await;
 
         drop(trigger_shutdown);
         if wait_shutdown {
