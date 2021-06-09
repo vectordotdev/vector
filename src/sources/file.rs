@@ -428,9 +428,8 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
+    use crate::{config::Config, event::Value, shutdown::ShutdownSignal, sources::file};
     use encoding_rs::UTF_16LE;
-    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use std::{
         collections::HashSet,
@@ -438,7 +437,6 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
-    use stream_cancel::{Trigger, Tripwire};
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
 
@@ -590,25 +588,23 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
-
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
-        let mut file1 = File::create(&path1).unwrap();
-        let mut file2 = File::create(&path2).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+        let received = run_file_source(&config, false, async {
+            let mut file1 = File::create(&path1).unwrap();
+            let mut file2 = File::create(&path2).unwrap();
 
-        for i in 0..n {
-            writeln!(&mut file1, "hello {}", i).unwrap();
-            writeln!(&mut file2, "goodbye {}", i).unwrap();
-        }
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        sleep_500_millis().await;
+            for i in 0..n {
+                writeln!(&mut file1, "hello {}", i).unwrap();
+                writeln!(&mut file2, "goodbye {}", i).unwrap();
+            }
 
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            sleep_500_millis().await;
+        })
+        .await;
 
         let mut hello_i = 0;
         let mut goodbye_i = 0;
@@ -644,33 +640,30 @@ mod tests {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at its original length before writing to it
+            sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
-        for i in 0..n {
-            writeln!(&mut file, "pretrunc {}", i).unwrap();
-        }
+            for i in 0..n {
+                writeln!(&mut file, "pretrunc {}", i).unwrap();
+            }
 
-        sleep_500_millis().await; // The writes must be observed before truncating
+            sleep_500_millis().await; // The writes must be observed before truncating
 
-        file.set_len(0).unwrap();
-        file.seek(std::io::SeekFrom::Start(0)).unwrap();
+            file.set_len(0).unwrap();
+            file.seek(std::io::SeekFrom::Start(0)).unwrap();
 
-        sleep_500_millis().await; // The truncate must be observed before writing again
+            sleep_500_millis().await; // The truncate must be observed before writing again
 
-        for i in 0..n {
-            writeln!(&mut file, "posttrunc {}", i).unwrap();
-        }
+            for i in 0..n {
+                writeln!(&mut file, "posttrunc {}", i).unwrap();
+            }
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            sleep_500_millis().await;
+        })
+        .await;
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -706,34 +699,32 @@ mod tests {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at its original length before writing to it
+            sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
-        for i in 0..n {
-            writeln!(&mut file, "prerot {}", i).unwrap();
-        }
+            for i in 0..n {
+                writeln!(&mut file, "prerot {}", i).unwrap();
+            }
 
-        sleep_500_millis().await; // The writes must be observed before rotating
+            sleep_500_millis().await; // The writes must be observed before rotating
 
-        fs::rename(&path, archive_path).expect("could not rename");
-        let mut file = File::create(&path).unwrap();
+            fs::rename(&path, archive_path).expect("could not rename");
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The rotation must be observed before writing again
+            sleep_500_millis().await; // The rotation must be observed before writing again
 
-        for i in 0..n {
-            writeln!(&mut file, "postrot {}", i).unwrap();
-        }
+            for i in 0..n {
+                writeln!(&mut file, "postrot {}", i).unwrap();
+            }
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            sleep_500_millis().await;
+        })
+        .await;
 
         let mut i = 0;
         let mut pre_rot = true;
@@ -771,31 +762,28 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
-
         let path1 = dir.path().join("a.txt");
         let path2 = dir.path().join("b.txt");
         let path3 = dir.path().join("a.log");
         let path4 = dir.path().join("a.ignore.txt");
-        let mut file1 = File::create(&path1).unwrap();
-        let mut file2 = File::create(&path2).unwrap();
-        let mut file3 = File::create(&path3).unwrap();
-        let mut file4 = File::create(&path4).unwrap();
+        let received = run_file_source(&config, false, async {
+            let mut file1 = File::create(&path1).unwrap();
+            let mut file2 = File::create(&path2).unwrap();
+            let mut file3 = File::create(&path3).unwrap();
+            let mut file4 = File::create(&path4).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        for i in 0..n {
-            writeln!(&mut file1, "1 {}", i).unwrap();
-            writeln!(&mut file2, "2 {}", i).unwrap();
-            writeln!(&mut file3, "3 {}", i).unwrap();
-            writeln!(&mut file4, "4 {}", i).unwrap();
-        }
+            for i in 0..n {
+                writeln!(&mut file1, "1 {}", i).unwrap();
+                writeln!(&mut file2, "2 {}", i).unwrap();
+                writeln!(&mut file3, "3 {}", i).unwrap();
+                writeln!(&mut file4, "4 {}", i).unwrap();
+            }
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            sleep_500_millis().await;
+        })
+        .await;
 
         let mut is = [0; 3];
 
@@ -823,23 +811,21 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let (mut rx, trigger_shutdown, shutdown_done) = spawn_file_source(&config);
-
             let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, true, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "hello there").unwrap();
+                writeln!(&mut file, "hello there").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
+            })
+            .await;
 
-            drop(trigger_shutdown);
-            shutdown_done.await;
-
-            let received = wait_with_timeout(rx.next()).await.unwrap();
+            assert_eq!(received.len(), 1);
             assert_eq!(
-                received.as_log()["file"].to_string_lossy(),
+                received[0].as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
@@ -853,23 +839,21 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let (mut rx, trigger_shutdown, shutdown_done) = spawn_file_source(&config);
-
             let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, true, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "hello there").unwrap();
+                writeln!(&mut file, "hello there").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
+            })
+            .await;
 
-            drop(trigger_shutdown);
-            shutdown_done.await;
-
-            let received = wait_with_timeout(rx.next()).await.unwrap();
+            assert_eq!(received.len(), 1);
             assert_eq!(
-                received.as_log()["source"].to_string_lossy(),
+                received[0].as_log()["source"].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
@@ -883,23 +867,21 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let (mut rx, trigger_shutdown, shutdown_done) = spawn_file_source(&config);
-
             let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, true, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "hello there").unwrap();
+                writeln!(&mut file, "hello there").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
+            })
+            .await;
 
-            drop(trigger_shutdown);
-            shutdown_done.await;
-
-            let received = wait_with_timeout(rx.next()).await.unwrap();
+            assert_eq!(received.len(), 1);
             assert_eq!(
-                received.as_log().keys().collect::<HashSet<_>>(),
+                received[0].as_log().keys().collect::<HashSet<_>>(),
                 vec![
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
@@ -927,36 +909,26 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+            let received = run_file_source(&config, false, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "first line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            sleep_500_millis().await;
-            writeln!(&mut file, "first line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
         // Restart server, read file from checkpoint.
         {
-            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+            let received = run_file_source(&config, false, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "second line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            sleep_500_millis().await;
-            writeln!(&mut file, "second line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
         }
         // Restart server, read files from beginning.
@@ -967,19 +939,14 @@ mod tests {
                 read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
-            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+            let received = run_file_source(&config, false, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "third line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            sleep_500_millis().await;
-            writeln!(&mut file, "third line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(
                 lines,
                 vec!["zeroth line", "first line", "second line", "third line"]
@@ -999,20 +966,15 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+            let received = run_file_source(&config, false, async {
+                let mut file = File::create(&path).unwrap();
+                sleep_500_millis().await;
+                writeln!(&mut file, "first line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            let mut file = File::create(&path).unwrap();
-            sleep_500_millis().await;
-            writeln!(&mut file, "first line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["first line"]);
         }
         // Perform 'file rotation' to archive old lines.
@@ -1020,20 +982,15 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+            let received = run_file_source(&config, false, async {
+                let mut file = File::create(&path).unwrap();
+                sleep_500_millis().await;
+                writeln!(&mut file, "second line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            let mut file = File::create(&path).unwrap();
-            sleep_500_millis().await;
-            writeln!(&mut file, "second line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
         }
     }
@@ -1051,54 +1008,52 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+        let received = run_file_source(&config, false, async {
+            let before_path = dir.path().join("before");
+            let mut before_file = File::create(&before_path).unwrap();
+            let after_path = dir.path().join("after");
+            let mut after_file = File::create(&after_path).unwrap();
 
-        let before_path = dir.path().join("before");
-        let mut before_file = File::create(&before_path).unwrap();
-        let after_path = dir.path().join("after");
-        let mut after_file = File::create(&after_path).unwrap();
+            writeln!(&mut before_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
+            writeln!(&mut after_file, "_first line").unwrap(); //   and therefore need to be non-identical
 
-        writeln!(&mut before_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
-        writeln!(&mut after_file, "_first line").unwrap(); //   and therefore need to be non-identical
+            {
+                // Set the modified times
+                let before = SystemTime::now() - Duration::from_secs(8);
+                let after = SystemTime::now() - Duration::from_secs(2);
 
-        {
-            // Set the modified times
-            let before = SystemTime::now() - Duration::from_secs(8);
-            let after = SystemTime::now() - Duration::from_secs(2);
+                let before_time = libc::timeval {
+                    tv_sec: before
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as _,
+                    tv_usec: 0,
+                };
+                let before_times = [before_time, before_time];
 
-            let before_time = libc::timeval {
-                tv_sec: before
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as _,
-                tv_usec: 0,
-            };
-            let before_times = [before_time, before_time];
+                let after_time = libc::timeval {
+                    tv_sec: after
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as _,
+                    tv_usec: 0,
+                };
+                let after_times = [after_time, after_time];
 
-            let after_time = libc::timeval {
-                tv_sec: after
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as _,
-                tv_usec: 0,
-            };
-            let after_times = [after_time, after_time];
-
-            unsafe {
-                libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
-                libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
+                unsafe {
+                    libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
+                    libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
+                }
             }
-        }
 
-        sleep_500_millis().await;
-        writeln!(&mut before_file, "second line").unwrap();
-        writeln!(&mut after_file, "_second line").unwrap();
+            sleep_500_millis().await;
+            writeln!(&mut before_file, "second line").unwrap();
+            writeln!(&mut after_file, "_second line").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
+        })
+        .await;
 
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
         let before_lines = received
             .iter()
             .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
@@ -1122,43 +1077,31 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received=run_file_source(&config, false, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        writeln!(&mut file, "short").unwrap();
-        writeln!(&mut file, "this is too long").unwrap();
-        writeln!(&mut file, "11 eleven11").unwrap();
-        let super_long = std::iter::repeat("This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
-        writeln!(&mut file, "{}", super_long).unwrap();
-        writeln!(&mut file, "exactly 10").unwrap();
-        writeln!(&mut file, "it can end on a line that's too long").unwrap();
+            writeln!(&mut file, "short").unwrap();
+            writeln!(&mut file, "this is too long").unwrap();
+            writeln!(&mut file, "11 eleven11").unwrap();
+            let super_long = std::iter::repeat("This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
+            writeln!(&mut file, "{}", super_long).unwrap();
+            writeln!(&mut file, "exactly 10").unwrap();
+            writeln!(&mut file, "it can end on a line that's too long").unwrap();
 
-        sleep_500_millis().await;
-        sleep_500_millis().await;
+            sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "and then continue").unwrap();
-        writeln!(&mut file, "last short").unwrap();
+            writeln!(&mut file, "and then continue").unwrap();
+            writeln!(&mut file, "last short").unwrap();
 
-        sleep_500_millis().await;
-        sleep_500_millis().await;
+            sleep_500_millis().await;
+            sleep_500_millis().await;
+        }).await;
 
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1176,46 +1119,35 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        writeln!(&mut file, "leftover foo").unwrap();
-        writeln!(&mut file, "INFO hello").unwrap();
-        writeln!(&mut file, "INFO goodbye").unwrap();
-        writeln!(&mut file, "part of goodbye").unwrap();
+            writeln!(&mut file, "leftover foo").unwrap();
+            writeln!(&mut file, "INFO hello").unwrap();
+            writeln!(&mut file, "INFO goodbye").unwrap();
+            writeln!(&mut file, "part of goodbye").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "INFO hi again").unwrap();
-        writeln!(&mut file, "and some more").unwrap();
-        writeln!(&mut file, "INFO hello").unwrap();
+            writeln!(&mut file, "INFO hi again").unwrap();
+            writeln!(&mut file, "and some more").unwrap();
+            writeln!(&mut file, "INFO hello").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "too slow").unwrap();
-        writeln!(&mut file, "INFO doesn't have").unwrap();
-        writeln!(&mut file, "to be INFO in").unwrap();
-        writeln!(&mut file, "the middle").unwrap();
+            writeln!(&mut file, "too slow").unwrap();
+            writeln!(&mut file, "INFO doesn't have").unwrap();
+            writeln!(&mut file, "to be INFO in").unwrap();
+            writeln!(&mut file, "the middle").unwrap();
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
+            sleep_500_millis().await;
+        })
         .await;
+
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1246,46 +1178,35 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        writeln!(&mut file, "leftover foo").unwrap();
-        writeln!(&mut file, "INFO hello").unwrap();
-        writeln!(&mut file, "INFO goodbye").unwrap();
-        writeln!(&mut file, "part of goodbye").unwrap();
+            writeln!(&mut file, "leftover foo").unwrap();
+            writeln!(&mut file, "INFO hello").unwrap();
+            writeln!(&mut file, "INFO goodbye").unwrap();
+            writeln!(&mut file, "part of goodbye").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "INFO hi again").unwrap();
-        writeln!(&mut file, "and some more").unwrap();
-        writeln!(&mut file, "INFO hello").unwrap();
+            writeln!(&mut file, "INFO hi again").unwrap();
+            writeln!(&mut file, "and some more").unwrap();
+            writeln!(&mut file, "INFO hello").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "too slow").unwrap();
-        writeln!(&mut file, "INFO doesn't have").unwrap();
-        writeln!(&mut file, "to be INFO in").unwrap();
-        writeln!(&mut file, "the middle").unwrap();
+            writeln!(&mut file, "too slow").unwrap();
+            writeln!(&mut file, "INFO doesn't have").unwrap();
+            writeln!(&mut file, "to be INFO in").unwrap();
+            writeln!(&mut file, "the middle").unwrap();
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
+            sleep_500_millis().await;
+        })
         .await;
+
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1330,23 +1251,9 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+        let received = run_file_source(&config, false, sleep_500_millis()).await;
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1389,23 +1296,9 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+        let received = run_file_source(&config, false, sleep_500_millis()).await;
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1436,32 +1329,21 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+        let received = run_file_source(&config, false, async {
+            sleep_500_millis().await;
 
-        sleep_500_millis().await;
+            write!(&mut file, "i am not a full line").unwrap();
 
-        write!(&mut file, "i am not a full line").unwrap();
+            // Longer than the EOF timeout
+            sleep_500_millis().await;
 
-        // Longer than the EOF timeout
-        sleep_500_millis().await;
+            writeln!(&mut file, " until now").unwrap();
 
-        writeln!(&mut file, " until now").unwrap();
-
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
+            sleep_500_millis().await;
+        })
         .await;
+
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1487,23 +1369,9 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+        let received = run_file_source(&config, false, sleep_500_millis()).await;
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1526,23 +1394,9 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
+        let received = run_file_source(&config, false, sleep_500_millis()).await;
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1565,33 +1419,22 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        write!(&mut file, "hello i am a line\r\n").unwrap();
-        write!(&mut file, "and i am too\r\n").unwrap();
-        write!(&mut file, "CRLF is how we end\r\n").unwrap();
-        write!(&mut file, "please treat us well\r\n").unwrap();
+            write!(&mut file, "hello i am a line\r\n").unwrap();
+            write!(&mut file, "and i am too\r\n").unwrap();
+            write!(&mut file, "CRLF is how we end\r\n").unwrap();
+            write!(&mut file, "please treat us well\r\n").unwrap();
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
+            sleep_500_millis().await;
+        })
         .await;
+
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1617,30 +1460,28 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        for i in 0..n {
-            writeln!(&mut file, "{}", i).unwrap();
-        }
-        std::mem::drop(file);
-
-        for _ in 0..10 {
-            // Wait for remove grace period to end.
-            sleep(Duration::from_secs(remove_after_secs + 1)).await;
-
-            if File::open(&path).is_err() {
-                break;
+            for i in 0..n {
+                writeln!(&mut file, "{}", i).unwrap();
             }
-        }
+            std::mem::drop(file);
 
-        drop(trigger_shutdown);
+            for _ in 0..10 {
+                // Wait for remove grace period to end.
+                sleep(Duration::from_secs(remove_after_secs + 1)).await;
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+                if File::open(&path).is_err() {
+                    break;
+                }
+            }
+        })
+        .await;
+
         assert_eq!(received.len(), n);
 
         match File::open(&path) {
@@ -1649,7 +1490,11 @@ mod tests {
         }
     }
 
-    fn spawn_file_source(config: &FileConfig) -> (mpsc::Receiver<Event>, Trigger, Tripwire) {
+    async fn run_file_source(
+        config: &FileConfig,
+        wait_shutdown: bool,
+        doit: impl Future<Output = ()>,
+    ) -> Vec<Event> {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
@@ -1660,6 +1505,29 @@ mod tests {
             tx,
         ));
 
-        (rx, trigger_shutdown, shutdown_done)
+        doit.await;
+
+        drop(trigger_shutdown);
+        if wait_shutdown {
+            shutdown_done.await;
+        }
+
+        wait_with_timeout(rx.collect::<Vec<_>>()).await
+    }
+
+    fn extract_messages_string(received: Vec<Event>) -> Vec<String> {
+        received
+            .into_iter()
+            .map(Event::into_log)
+            .map(|log| log[log_schema().message_key()].to_string_lossy())
+            .collect()
+    }
+
+    fn extract_messages_value(received: Vec<Event>) -> Vec<Value> {
+        received
+            .into_iter()
+            .map(Event::into_log)
+            .map(|log| log[log_schema().message_key()].clone())
+            .collect()
     }
 }
