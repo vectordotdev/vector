@@ -7,25 +7,19 @@ use criterion::{
 };
 use std::num::NonZeroUsize;
 use std::time::Duration;
-use vector::transforms::dedupe::{CacheConfig, FieldMatchConfig};
-use vector::transforms::dedupe::{Dedupe, DedupeConfig};
+use vector::transforms::dedupe::{CacheConfig, Dedupe, DedupeConfig, FieldMatchConfig};
 use vector_core::transform::Transform;
 
 #[derive(Debug)]
 struct Param {
     slug: &'static str,
-    input_size: NonZeroUsize,
-    cycle_size: NonZeroUsize,
+    input: FixedLogStream,
     dedupe_config: DedupeConfig,
 }
 
 impl fmt::Display for Param {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}:({}, {})",
-            self.slug, self.input_size, self.cycle_size
-        )
+        write!(f, "{}", self.slug)
     }
 }
 
@@ -34,13 +28,16 @@ fn dedupe(c: &mut Criterion) {
         c.benchmark_group("vector::transforms::dedupe::Dedupe");
     group.sampling_mode(SamplingMode::Auto);
 
+    let fixed_stream = FixedLogStream::new(
+        NonZeroUsize::new(128).unwrap(),
+        NonZeroUsize::new(2).unwrap(),
+    );
     for param in &[
         // Measurement where field "message" is ignored. This field is
         // automatically added by the LogEvent construction mechanism.
         Param {
             slug: "field_ignore_message",
-            input_size: NonZeroUsize::new(128).unwrap(),
-            cycle_size: NonZeroUsize::new(2).unwrap(),
+            input: fixed_stream.clone(),
             dedupe_config: DedupeConfig {
                 fields: Some(FieldMatchConfig::IgnoreFields(vec![String::from(
                     "message",
@@ -51,8 +48,7 @@ fn dedupe(c: &mut Criterion) {
         // Modification of previous where field "message" is matched.
         Param {
             slug: "field_match_message",
-            input_size: NonZeroUsize::new(128).unwrap(),
-            cycle_size: NonZeroUsize::new(2).unwrap(),
+            input: fixed_stream.clone(),
             dedupe_config: DedupeConfig {
                 fields: Some(FieldMatchConfig::MatchFields(vec![String::from("message")])),
                 cache: CacheConfig { num_events: 4 },
@@ -61,8 +57,7 @@ fn dedupe(c: &mut Criterion) {
         // Measurement where ignore fields do not exist in the event.
         Param {
             slug: "field_ignore_dne",
-            input_size: NonZeroUsize::new(128).unwrap(),
-            cycle_size: NonZeroUsize::new(2).unwrap(),
+            input: fixed_stream.clone(),
             dedupe_config: DedupeConfig {
                 cache: CacheConfig { num_events: 4 },
                 fields: Some(FieldMatchConfig::IgnoreFields(vec![
@@ -78,8 +73,7 @@ fn dedupe(c: &mut Criterion) {
         // event.
         Param {
             slug: "field_match_dne",
-            input_size: NonZeroUsize::new(128).unwrap(),
-            cycle_size: NonZeroUsize::new(2).unwrap(),
+            input: fixed_stream.clone(),
             dedupe_config: DedupeConfig {
                 cache: CacheConfig { num_events: 4 },
                 fields: Some(FieldMatchConfig::MatchFields(vec![
@@ -92,14 +86,13 @@ fn dedupe(c: &mut Criterion) {
             },
         },
     ] {
-        group.throughput(Throughput::Elements(param.input_size.get() as u64));
+        group.throughput(Throughput::Elements(param.input.len() as u64));
         group.bench_with_input(BenchmarkId::new("transform", param), &param, |b, param| {
             b.iter_batched(
                 || {
                     let dedupe =
                         Transform::task(Dedupe::new(param.dedupe_config.clone())).into_task();
-                    let input = FixedLogStream::new(param.input_size, param.cycle_size);
-                    (Box::new(dedupe), Box::pin(input))
+                    (Box::new(dedupe), Box::pin(param.input.clone()))
                 },
                 |(dedupe, input)| {
                     let output = dedupe.transform(input);

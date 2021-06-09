@@ -50,7 +50,7 @@ pub fn consume<T>(mut stream: Pin<Box<dyn Stream<Item = T>>>) {
 // ==== FixedLogStream ====
 
 /// A fixed size [`futures::stream::Stream`] of `Event::Log` instances.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FixedLogStream {
     events: Vec<Event>,
 }
@@ -78,6 +78,14 @@ impl FixedLogStream {
     /// measure you're trying to establish.
     pub fn new_from_vec(events: Vec<Event>) -> Self {
         FixedLogStream { events }
+    }
+
+    /// Return the length of the fixed stream
+    ///
+    /// This function will return the length of the items remaining in the
+    /// stream.
+    pub fn len(&self) -> usize {
+        self.events.len()
     }
 }
 
