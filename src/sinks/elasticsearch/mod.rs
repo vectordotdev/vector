@@ -15,6 +15,7 @@ use crate::{
     },
     template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
+    transforms::metric_to_log::{MetricToLog, MetricToLogConfig},
 };
 use futures::{FutureExt, SinkExt};
 use http::{
@@ -72,6 +73,7 @@ pub struct ElasticSearchConfig {
     pub bulk_action: Option<String>,
     pub normal: Option<NormalConfig>,
     pub data_stream: Option<DataStreamConfig>,
+    pub metrics: Option<MetricToLogConfig>,
 }
 
 impl ElasticSearchConfig {
@@ -399,7 +401,7 @@ impl SinkConfig for ElasticSearchConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn sink_type(&self) -> &'static str {
@@ -477,6 +479,7 @@ pub struct ElasticSearchCommon {
     region: Region,
     request: RequestConfig,
     query_params: HashMap<String, String>,
+    metric_to_log: MetricToLog,
 }
 
 #[derive(Debug, Snafu)]
@@ -494,33 +497,7 @@ enum ParseError {
 }
 
 impl ElasticSearchCommon {
-    fn build_action(
-        &self,
-        index: &str,
-        bulk_action: BulkAction,
-        event: &mut Event,
-    ) -> serde_json::Value {
-        let mut action = json!({
-            bulk_action.as_str(): {
-                "_index": index,
-                "_type": self.doc_type,
-            }
-        });
-        maybe_set_id(
-            self.id_key.as_ref(),
-            action.pointer_mut(bulk_action.as_json_pointer()).unwrap(),
-            event,
-        );
-        action
-    }
-}
-
-#[async_trait::async_trait]
-impl HttpSink for ElasticSearchCommon {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
-
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_log(&self, event: Event) -> Option<EncodedEvent<Vec<u8>>> {
         let index = self.mode.index(&event)?;
 
         let mut event = if let Some(cfg) = self.mode.as_data_stream_config() {
@@ -530,22 +507,50 @@ impl HttpSink for ElasticSearchCommon {
         };
 
         let bulk_action = self.mode.bulk_action(&event)?;
-        let action = self.build_action(&index, bulk_action, &mut event);
+
+        let mut action = json!({
+            bulk_action.as_str(): {
+                "_index": index,
+                "_type": self.doc_type,
+            }
+        });
+
+        maybe_set_id(
+            self.id_key.as_ref(),
+            action.pointer_mut(bulk_action.as_json_pointer()).unwrap(),
+            &mut event,
+        );
 
         let mut body = serde_json::to_vec(&action).unwrap();
         body.push(b'\n');
 
         self.encoding.apply_rules(&mut event);
 
-        serde_json::to_writer(&mut body, &event.into_log()).unwrap();
+        serde_json::to_writer(&mut body, event.as_log()).unwrap();
         body.push(b'\n');
 
         emit!(ElasticSearchEventEncoded {
             byte_size: body.len(),
-            index
+            index: index.into(),
         });
 
         Some(EncodedEvent::new(body))
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for ElasticSearchCommon {
+    type Input = Vec<u8>;
+    type Output = Vec<u8>;
+
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+        match event {
+            Event::Log(_) => self.encode_log(event),
+            Event::Metric(metric) => self
+                .metric_to_log
+                .transform_one(metric)
+                .and_then(|log| self.encode_log(log.into())),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -662,6 +667,12 @@ impl ElasticSearchCommon {
         let mut request = config.request;
         request.add_old_option(config.headers.take());
 
+        let metric_config = config.metrics.clone().unwrap_or_default();
+        let metric_to_log = MetricToLog::new(
+            metric_config.host_tag,
+            metric_config.timezone.unwrap_or_default(),
+        );
+
         Ok(Self {
             authorization,
             base_url,
@@ -676,6 +687,7 @@ impl ElasticSearchCommon {
             request,
             region,
             tls_settings,
+            metric_to_log,
         })
     }
 
@@ -741,12 +753,14 @@ async fn finish_signer(
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &mut Event) {
-    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(k)) {
-        let val = val.to_string_lossy();
+    if let Event::Log(_) = event {
+        if let Some(val) = key.and_then(|k| event.as_mut_log().remove(k)) {
+            let val = val.to_string_lossy();
 
-        doc.as_object_mut()
-            .unwrap()
-            .insert("_id".into(), json!(val));
+            doc.as_object_mut()
+                .unwrap()
+                .insert("_id".into(), json!(val));
+        }
     }
 }
 
@@ -754,7 +768,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, Value},
+        event::{Event, Metric, MetricKind, MetricValue, Value},
         sinks::util::retries::{RetryAction, RetryLogic},
     };
     use bytes::Bytes;
@@ -928,6 +942,38 @@ mod tests {
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    }
+
+    #[test]
+    fn handle_metrics() {
+        let config = ElasticSearchConfig {
+            bulk_action: Some(String::from("create")),
+            index: Some(String::from("vector")),
+            endpoint: String::from("https://example.com"),
+            ..Default::default()
+        };
+        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+        let metric = Metric::new(
+            "cpu",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+        );
+        let event = Event::from(metric);
+
+        let encoded = es.encode_event(event).unwrap().item;
+        let encoded = std::str::from_utf8(&encoded).unwrap();
+        let encoded_lines = encoded.split('\n').map(String::from).collect::<Vec<_>>();
+        assert_eq!(encoded_lines.len(), 3); // there's an empty line at the end
+        assert_eq!(
+            encoded_lines.get(0).unwrap(),
+            r#"{"create":{"_index":"vector","_type":"_doc"}}"#
+        );
+        println!("line: {}", encoded_lines.get(1).unwrap());
+        assert!(encoded_lines
+            .get(1)
+            .unwrap()
+            .starts_with(r#"{"gauge":{"value":42.0},"kind":"absolute","name":"cpu","timestamp""#));
     }
 
     #[test]
