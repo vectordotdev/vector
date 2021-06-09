@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
     collections::{BTreeMap, VecDeque},
-    convert::TryInto,
     io::{self, Read},
 };
 use tokio_util::codec::Decoder;
@@ -271,77 +270,119 @@ impl Decoder for LogstashDecoder {
                     self.state = LogstashDecoderReadState::ReadProtocol;
                 }
                 LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::Data) => {
-                    unimplemented!("TODO")
+                    let mut rest = src.as_ref();
+
+                    if rest.remaining() < 8 {
+                        return Ok(None);
+                    }
+                    let _sequence_number = rest.get_u32();
+                    let pair_count = rest.get_u32();
+
+                    let mut fields: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+                    for _ in 0..pair_count {
+                        if src.remaining() < 4 {
+                            return Ok(None);
+                        }
+                        let key_length = rest.get_u32() as usize;
+
+                        if rest.remaining() < key_length {
+                            return Ok(None);
+                        }
+                        let (key, right) = rest.split_at(key_length);
+                        rest = right;
+
+                        if src.remaining() < 4 {
+                            return Ok(None);
+                        }
+                        let value_length = rest.get_u32() as usize;
+                        if rest.remaining() < value_length {
+                            return Ok(None);
+                        }
+                        let (value, right) = rest.split_at(value_length);
+                        rest = right;
+
+                        fields.insert(
+                            String::from_utf8_lossy(key).to_string(),
+                            String::from_utf8_lossy(value).into(),
+                        );
+                    }
+
+                    let remaining = rest.remaining();
+
+                    src.advance(src.remaining() - remaining);
+
+                    self.state = LogstashDecoderReadState::ReadProtocol;
+
+                    return Ok(Some(fields));
                 }
                 LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::Json) => {
-                    match (src.get(0..4), src.get(4..8)) {
-                        (None, _) | (_, None) => return Ok(None),
-                        (Some(_sequence_number), Some(payload_size)) => {
-                            let payload_size = u32::from_be_bytes(
-                                payload_size.try_into().expect("exactly 4 bytes"),
-                            );
-                            match &src.get(8..8 + payload_size as usize) {
-                                None => {
-                                    src.reserve(8 + payload_size as usize);
-                                    return Ok(None);
-                                }
+                    let mut rest = src.as_ref();
 
-                                Some(slice) => {
-                                    let fields_result: Result<
-                                        BTreeMap<String, serde_json::Value>,
-                                        _,
-                                    > = serde_json::from_slice(&slice[..])
-                                        .context(JsonFrameFailedDecode {});
-
-                                    src.advance(8 + payload_size as usize);
-
-                                    self.state = LogstashDecoderReadState::ReadProtocol;
-
-                                    return fields_result.map(Option::Some);
-                                }
-                            }
-                        }
+                    if rest.remaining() < 8 {
+                        return Ok(None);
                     }
+                    let _sequence_number = rest.get_u32();
+                    let payload_size = rest.get_u32() as usize;
+
+                    if rest.remaining() < payload_size {
+                        src.reserve(payload_size as usize);
+                        return Ok(None);
+                    }
+
+                    let (slice, right) = rest.split_at(payload_size);
+                    rest = right;
+
+                    let fields_result: Result<BTreeMap<String, serde_json::Value>, _> =
+                        serde_json::from_slice(slice).context(JsonFrameFailedDecode {});
+
+                    let remaining = rest.remaining();
+
+                    src.advance(src.remaining() - remaining);
+
+                    self.state = LogstashDecoderReadState::ReadProtocol;
+
+                    return fields_result.map(Option::Some);
                 }
                 LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::Compressed) => {
-                    match src.get(0..4) {
-                        None => return Ok(None),
-                        Some(bytes) => {
-                            let payload_size =
-                                u32::from_be_bytes(bytes.try_into().expect("exactly 4 bytes"));
+                    let mut rest = src.as_ref();
 
-                            match &src.get(4..4 + payload_size as usize) {
-                                None => {
-                                    src.reserve(4 + payload_size as usize);
-                                    return Ok(None);
-                                }
-                                Some(slice) => {
-                                    let mut buf = {
-                                        let mut buf = Vec::new();
-
-                                        let res = ZlibDecoder::new(io::Cursor::new(&slice[..]))
-                                            .read_to_end(&mut buf)
-                                            .context(DecompressionFailed)
-                                            .map(|_| BytesMut::from(&buf[..]));
-
-                                        src.advance(4 + payload_size as usize);
-
-                                        res
-                                    }?;
-
-                                    let mut decoder = LogstashDecoder::new();
-
-                                    let mut frames = VecDeque::new();
-
-                                    while let Some(s) = decoder.decode(&mut buf)? {
-                                        frames.push_back(s);
-                                    }
-
-                                    self.state = LogstashDecoderReadState::PendingFrames(frames);
-                                }
-                            }
-                        }
+                    if rest.remaining() < 4 {
+                        return Ok(None);
                     }
+                    let payload_size = rest.get_u32() as usize;
+
+                    if rest.remaining() < payload_size {
+                        src.reserve(payload_size as usize);
+                        return Ok(None);
+                    }
+
+                    let (slice, right) = rest.split_at(payload_size);
+                    rest = right;
+
+                    let mut buf = {
+                        let mut buf = Vec::new();
+
+                        let res = ZlibDecoder::new(io::Cursor::new(slice))
+                            .read_to_end(&mut buf)
+                            .context(DecompressionFailed)
+                            .map(|_| BytesMut::from(&buf[..]));
+
+                        let remaining = rest.remaining();
+
+                        src.advance(src.remaining() - remaining);
+
+                        res
+                    }?;
+
+                    let mut decoder = LogstashDecoder::new();
+
+                    let mut frames = VecDeque::new();
+
+                    while let Some(s) = decoder.decode(&mut buf)? {
+                        frames.push_back(s);
+                    }
+
+                    self.state = LogstashDecoderReadState::PendingFrames(frames);
                 }
             };
         }
