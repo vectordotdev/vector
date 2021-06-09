@@ -10,9 +10,17 @@ use vector_core::{event::Event, transform::Transform};
 pub trait Codec: std::fmt::Debug + Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn build_decoder(&self) -> crate::Result<(Transform<Event>, DataType, DataType)>;
+    fn build(&self, hint: CodecHint) -> crate::Result<CodecTransform>;
+}
 
-    fn build_encoder(&self) -> crate::Result<(Transform<Event>, DataType, DataType)>;
+pub enum CodecHint {
+    Decoder,
+    Encoder,
+}
+
+pub struct CodecTransform {
+    pub input_type: DataType,
+    pub transform: Transform<Event>,
 }
 
 inventory::collect!(&'static dyn Codec);

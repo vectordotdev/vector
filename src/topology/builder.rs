@@ -5,6 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
+    codecs::{CodecHint, CodecTransform},
     config::{DataType, SinkContext, SourceContext},
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
@@ -60,16 +61,19 @@ pub async fn build_pieces(
 
         let mut rx = rx.boxed();
         for codec in &source.codec.0 {
-            let (decoder, input_type, _) = match codec.build_decoder() {
-                Ok(decoder) => decoder,
+            let CodecTransform {
+                transform,
+                input_type,
+            } = match codec.build(CodecHint::Decoder) {
+                Ok(transform) => transform,
                 Err(error) => {
-                    errors.push(format!("Decoder \"{}\": {}", name, error));
+                    errors.push(format!("Codec \"{}\": {}", name, error));
                     continue;
                 }
             };
 
             let filtered = rx.filter(move |event| ready(filter_event_type(event, input_type)));
-            rx = decoder.transform(filtered).boxed();
+            rx = transform.transform(filtered).boxed();
         }
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);

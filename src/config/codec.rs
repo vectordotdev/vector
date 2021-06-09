@@ -1,8 +1,7 @@
-use super::DataType;
+use crate::codecs::{CodecHint, CodecTransform};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
-use vector_core::{event::Event, transform::Transform};
 
 lazy_static! {
     static ref CODECS: HashMap<&'static str, &'static dyn crate::codecs::Codec> =
@@ -57,23 +56,13 @@ impl CodecConfig {
         }
     }
 
-    pub fn build_decoder(&self) -> crate::Result<(Transform<Event>, DataType, DataType)> {
+    pub fn build(&self, hint: CodecHint) -> crate::Result<CodecTransform> {
         match &self {
             Self::String(string) => match CODECS.get(string.as_str()) {
-                Some(codec) => codec.build_decoder(),
+                Some(codec) => codec.build(hint),
                 _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
             },
-            Self::Object(codec) => codec.build_decoder(),
-        }
-    }
-
-    pub fn build_encoder(&self) -> crate::Result<(Transform<Event>, DataType, DataType)> {
-        match &self {
-            Self::String(string) => match CODECS.get(string.as_str()) {
-                Some(codec) => codec.build_encoder(),
-                _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
-            },
-            Self::Object(codec) => codec.build_encoder(),
+            Self::Object(codec) => codec.build(hint),
         }
     }
 }
@@ -150,8 +139,8 @@ mod tests {
         "#})
         .unwrap();
         let codecs = config.codec.0;
-        let decoder = codecs[0].build_decoder();
-        let encoder = codecs[0].build_encoder();
+        let decoder = codecs[0].build(CodecHint::Decoder);
+        let encoder = codecs[0].build(CodecHint::Encoder);
 
         assert!(decoder.is_ok());
         assert!(encoder.is_ok());
@@ -164,8 +153,8 @@ mod tests {
         "#})
         .unwrap();
         let codecs = config.codec.0;
-        let decoder = codecs[0].build_decoder();
-        let encoder = codecs[0].build_encoder();
+        let decoder = codecs[0].build(CodecHint::Decoder);
+        let encoder = codecs[0].build(CodecHint::Encoder);
 
         assert_eq!(
             decoder.err().map(|error| error.to_string()),
