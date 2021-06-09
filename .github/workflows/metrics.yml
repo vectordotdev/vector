@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   report:
-    name: Report 
+    name: Report
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Action
