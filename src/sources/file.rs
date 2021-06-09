@@ -430,6 +430,7 @@ mod tests {
     use super::*;
     use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
     use encoding_rs::UTF_16LE;
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use std::{
         collections::HashSet,
@@ -437,6 +438,7 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
+    use stream_cancel::{Trigger, Tripwire};
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
 
@@ -581,8 +583,6 @@ mod tests {
     #[tokio::test]
     async fn file_happy_path() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -590,8 +590,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
@@ -639,16 +638,13 @@ mod tests {
     #[tokio::test]
     async fn file_truncate() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -704,16 +700,13 @@ mod tests {
     #[tokio::test]
     async fn file_rotate() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
@@ -770,8 +763,6 @@ mod tests {
     #[tokio::test]
     async fn file_multiple_paths() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -780,8 +771,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path1 = dir.path().join("a.txt");
         let path2 = dir.path().join("b.txt");
@@ -827,17 +817,13 @@ mod tests {
     async fn file_file_key() {
         // Default
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-
-            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let (mut rx, trigger_shutdown, shutdown_done) = spawn_file_source(&config);
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
@@ -860,9 +846,6 @@ mod tests {
 
         // Custom
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-
-            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -870,8 +853,7 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let (mut rx, trigger_shutdown, shutdown_done) = spawn_file_source(&config);
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
@@ -894,9 +876,6 @@ mod tests {
 
         // Hidden
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-
-            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -904,8 +883,7 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let (mut rx, trigger_shutdown, shutdown_done) = spawn_file_source(&config);
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
@@ -949,11 +927,7 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
             sleep_500_millis().await;
             writeln!(&mut file, "first line").unwrap();
@@ -970,11 +944,7 @@ mod tests {
         }
         // Restart server, read file from checkpoint.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
             sleep_500_millis().await;
             writeln!(&mut file, "second line").unwrap();
@@ -991,17 +961,13 @@ mod tests {
         }
         // Restart server, read files from beginning.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 ignore_checkpoints: Some(true),
                 read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
             sleep_500_millis().await;
             writeln!(&mut file, "third line").unwrap();
@@ -1033,11 +999,7 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
             let mut file = File::create(&path).unwrap();
             sleep_500_millis().await;
@@ -1058,11 +1020,7 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
             let mut file = File::create(&path).unwrap();
             sleep_500_millis().await;
@@ -1086,8 +1044,6 @@ mod tests {
         use std::os::unix::io::AsRawFd;
         use std::time::{Duration, SystemTime};
 
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1095,8 +1051,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let before_path = dir.path().join("before");
         let mut before_file = File::create(&before_path).unwrap();
@@ -1160,9 +1115,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_max_line_bytes() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1170,8 +1122,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -1217,9 +1168,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_line_aggregation_legacy() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1228,8 +1176,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -1287,9 +1234,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_line_aggregation() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1302,8 +1246,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -1361,9 +1304,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_fair_reads() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1390,8 +1330,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         sleep_500_millis().await;
 
@@ -1424,9 +1363,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_oldest_first() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1453,8 +1389,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         sleep_500_millis().await;
 
@@ -1487,9 +1422,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_split_reads() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1504,8 +1436,7 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         sleep_500_millis().await;
 
@@ -1543,9 +1474,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_gzipped_file() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![PathBuf::from("tests/data/gzipped.log")],
@@ -1559,8 +1487,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         sleep_500_millis().await;
 
@@ -1592,9 +1519,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_non_utf8_encoded_file() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![PathBuf::from("tests/data/utf-16le.log")],
@@ -1602,8 +1526,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         sleep_500_millis().await;
 
@@ -1635,9 +1558,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_non_default_line_delimiter() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1645,8 +1565,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -1690,9 +1609,6 @@ mod tests {
         let n = 5;
         let remove_after_secs = 1;
 
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1701,8 +1617,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let (rx, trigger_shutdown, _) = spawn_file_source(&config);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -1732,5 +1647,19 @@ mod tests {
             Ok(_) => panic!("File wasn't removed"),
             Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
         }
+    }
+
+    fn spawn_file_source(config: &FileConfig) -> (mpsc::Receiver<Event>, Trigger, Tripwire) {
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+
+        tokio::spawn(file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            shutdown,
+            tx,
+        ));
+
+        (rx, trigger_shutdown, shutdown_done)
     }
 }
