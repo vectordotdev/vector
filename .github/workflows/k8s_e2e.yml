@@ -98,9 +98,9 @@ jobs:
               "v1.20.0",
             ]
             const kubernetes_version = [
-              { version: "v1.21.2", is_essential: true },
-              { version: "v1.20.8" },
-              { version: "v1.19.12" },
+              { version: "v1.21.1", is_essential: true }, // Has a known performance issue on cluster startup. It might take 2 to 3 minutes for a cluster to start.
+              { version: "v1.20.7" }, // Has a known performance issue on cluster startup. It might take 2 to 3 minutes for a cluster to start.
+              { version: "v1.19.11" },
               { version: "v1.18.19" },
               { version: "v1.17.17" },
               { version: "v1.16.15" },
