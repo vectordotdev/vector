@@ -4,7 +4,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8
+    LC_ALL=en_US.UTF-8 \
+    CROSS_DOCKER_IN_DOCKER=true
 
 # Container junk
 RUN echo $TZ > /etc/timezone

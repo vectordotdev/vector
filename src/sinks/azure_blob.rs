@@ -604,7 +604,7 @@ mod integration_tests {
             ..config
         };
         let sink = config.to_sink();
-        let (events, input) = random_events_with_stream(100, 10);
+        let (events, input) = random_events_with_stream(100, 10, None);
 
         sink.run(input).await.expect("Failed to run sink");
 
@@ -656,7 +656,7 @@ mod integration_tests {
             ..config
         };
         let sink = config.to_sink();
-        let (events, input) = random_events_with_stream(100, 10);
+        let (events, input) = random_events_with_stream(100, 10, None);
 
         sink.run(input).await.expect("Failed to run sink");
 

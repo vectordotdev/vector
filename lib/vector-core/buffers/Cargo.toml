@@ -1,0 +1,37 @@
+[package]
+name = "buffers"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+bytes = { version = "1.0.1", default-features = false }
+db-key = { version = "0.0.5", default-features = false, optional = true }
+futures = { version = "0.3.15", default-features = false, features = ["std"] }
+leveldb = { version = "0.8.6", default-features = false, optional = true }
+metrics = { version = "0.16.0", default-features = false, features = ["std"] }
+pin-project = { version = "1.0.7", default-features = false }
+serde = { version = "1.0.126", default-features = false, features = ["derive"] }
+snafu = { version = "0.6.10", default-features = false, features = ["std"], optional = true }
+tokio = { version = "1.5.0", default-features = false, features = ["rt", "macros", "rt-multi-thread"] }
+tracing = { version = "0.1.26", default-features = false }
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"] }
+pretty_assertions = "0.7.2"
+quickcheck = "1.0"
+tempdir = "0.3"
+tokio-test = "0.4.2"
+
+[features]
+disk-buffer = ["db-key", "snafu", "leveldb"]
+
+[[bench]]
+name = "on_disk"
+harness = false
+required-features = ["disk-buffer"]
+
+[[bench]]
+name = "in_memory"
+harness = false

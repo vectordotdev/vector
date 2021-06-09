@@ -9,6 +9,10 @@
 #
 # global:
 #   vector:
+#     # Additional labels to add to all resources
+#     commonLabels:
+#       app: vector
+#
 #     image:
 #       repository: <docker repo>
 #       # Overrides the image tag, the default is `{image.version}-{image.base}`.
@@ -17,6 +21,9 @@
 #       version: <version>
 #       # Overrides the image flavor, the default is `debian`.
 #       base: <base>
+#     # Overrides the imagePullSecrets
+#     imagePullSecrets:
+#       - myRegistryCredentialSecretName
 #     # Sets common environment variables for use in all `Pod`s.
 #     commonEnvKV:
 #       LOG: info

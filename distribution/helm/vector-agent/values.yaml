@@ -2,6 +2,10 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Additional labels to add to all resources
+# commonLabels:
+#   app.kubernetes.io/component: agent
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -13,6 +17,10 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
+
+# Command to use at the pods managed by DaemonSet
+command: []
 
 # Override the chart name used in templates.
 nameOverride: ""
@@ -195,8 +203,12 @@ hostMetricsSource:
   # Additional config to embed at the host metrics source.
   config:
     filesystem:
+      devices:
+        excludes: [binfmt_misc]
       filesystems:
         excludes: [binfmt_misc]
+      mountpoints:
+        excludes: ["*/proc/sys/fs/binfmt_misc"]
     # option: "value"
   # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null
@@ -242,6 +254,8 @@ prometheusSink:
     # Whether to add the `PodMonitor` resource or not.
     # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
     enabled: false
+    # Additional labels for PodMonitor
+    additionalLabels: {}
     # Additional relabelings to include in the `PodMonitor`.
     extraRelabelings: []
 

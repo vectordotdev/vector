@@ -70,6 +70,9 @@ pub struct Config {
     #[serde(default = "crate::serde::default_true")]
     auto_partial_merge: bool,
 
+    /// Override global data_dir
+    data_dir: Option<PathBuf>,
+
     /// Specifies the field names for metadata annotation.
     annotation_fields: pod_metadata_annotator::FieldsSpec,
 
@@ -176,7 +179,7 @@ impl Source {
         };
         let client = k8s::client::Client::new(k8s_config)?;
 
-        let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), name)?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = config
@@ -442,7 +445,7 @@ fn default_max_line_bytes() -> usize {
 }
 
 fn default_glob_minimum_cooldown_ms() -> usize {
-    60000
+    5000
 }
 
 /// This function construct the effective field selector to use, based on

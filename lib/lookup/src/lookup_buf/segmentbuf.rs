@@ -92,18 +92,6 @@ pub enum SegmentBuf {
     Coalesce(Vec<FieldBuf>),
 }
 
-impl SegmentBuf {
-    pub fn as_segment(&self) -> Segment {
-        match self {
-            SegmentBuf::Field(field) => Segment::field(field.into()),
-            SegmentBuf::Index(i) => Segment::index(*i),
-            SegmentBuf::Coalesce(v) => {
-                Segment::coalesce(v.iter().map(|field| field.into()).collect())
-            }
-        }
-    }
-}
-
 #[cfg(any(test, feature = "arbitrary"))]
 impl Arbitrary for SegmentBuf {
     fn arbitrary(g: &mut Gen) -> Self {

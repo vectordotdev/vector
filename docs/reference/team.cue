@@ -33,6 +33,13 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
+		name:    "Brian L. Troutwine"
+		_github: "blt"
+		bio: """
+			Brian is a staff engineer at Datadog and a member of the Vector team.
+			"""
+	},
+	{
 		name:    "Bruce"
 		_github: "bruceg"
 		bio: """

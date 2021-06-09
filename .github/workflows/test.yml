@@ -17,6 +17,7 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   cancel-previous:
@@ -41,7 +42,7 @@ jobs:
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -89,8 +90,8 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.5
+      - uses: actions/checkout@v2.3.4
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -105,6 +106,8 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+        env:
+          CARGO_BUILD_JOBS: 6
 
   test-misc:
     name: Miscellaneous - Linux
@@ -112,9 +115,9 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -150,9 +153,9 @@ jobs:
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -181,8 +184,8 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.5
+      - uses: actions/checkout@v2.3.4
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -207,7 +210,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: choco install llvm
       - run: make test
 
@@ -218,14 +221,14 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: |
           TEMP=$(mktemp -d)
           curl \
-              -L https://github.com/cuelang/cue/releases/download/v0.3.2/cue_v0.3.2_linux_amd64.tar.gz \
-              -o "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz"
+              -L https://github.com/cuelang/cue/releases/download/v0.4.0/cue_v0.4.0_linux_amd64.tar.gz \
+              -o "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz"
           tar \
-              -xvf "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz" \
+              -xvf "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz" \
               -C "${TEMP}"
           sudo cp "${TEMP}/cue" /usr/bin/cue
       - run: make test-vrl
@@ -236,7 +239,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
@@ -252,11 +255,11 @@ jobs:
     container: timberio/ci_image
     needs: changes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
           path: |
@@ -302,12 +305,12 @@ jobs:
         run: make check-events
       - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check advisories
       - name: Check cargo deny licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check licenses
 

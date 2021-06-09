@@ -193,7 +193,7 @@ struct SematextMetricNormalize;
 
 impl MetricNormalize for SematextMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
+        match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
@@ -220,23 +220,23 @@ fn create_build_request(
 fn encode_events(
     token: &str,
     default_namespace: &str,
-    events: Vec<Metric>,
+    metrics: Vec<Metric>,
 ) -> EncodedEvent<String> {
     let mut output = String::new();
-    for event in events.into_iter() {
-        let namespace = event
-            .series
+    for metric in metrics.into_iter() {
+        let (series, data, _metadata) = metric.into_parts();
+        let namespace = series
             .name
             .namespace
             .unwrap_or_else(|| default_namespace.into());
-        let label = event.series.name.name;
-        let ts = encode_timestamp(event.data.timestamp);
+        let label = series.name.name;
+        let ts = encode_timestamp(data.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
-        let mut tags = event.series.tags.clone().unwrap_or_default();
+        let mut tags = series.tags.unwrap_or_default();
         tags.insert("token".into(), token.into());
 
-        let (metric_type, fields) = match event.data.value {
+        let (metric_type, fields) = match data.value {
             MetricValue::Counter { value } => ("counter", to_fields(label, value)),
             MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
             _ => unreachable!(), // handled by SematextMetricNormalize

@@ -15,6 +15,7 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
+  - docs                # A documentation change
 
 scopes:
   - new source
@@ -76,6 +77,7 @@ scopes:
   - debian platform # Anything `debian` platform related
   - docker platform # Anything `docker` platform related
   - dpkg platform # Anything `dpkg` platform related
+  - helm platform # Anything `helm` platform related
   - heroku platform # Anything `heroku` platform related
   - homebrew platform # Anything `homebrew` platform related
   - kubernetes platform # Anything `kubernetes` platform related
@@ -161,9 +163,9 @@ scopes:
   - remove_fields transform # Anything `remove_fields` transform related
   - remove_tags transform # Anything `remove_tags` transform related
   - rename_fields transform # Anything `rename_fields` transform related
+  - route transform # Anything `route` transform related
   - sample transform # Anything `sample` transform related
   - split transform # Anything `split` transform related
-  - route transform # Anything `route` transform related
   - tag_cardinality_limit transform # Anything `tag_cardinality_limit` transform related
   - tokenizer transform # Anything `tokenizer` transform related
   - wasm transform # Anything `wasm` transform related
@@ -179,6 +181,7 @@ scopes:
   - blackhole sink # Anything `blackhole` sink related
   - clickhouse sink # Anything `clickhouse` sink related
   - console sink # Anything `console` sink related
+  - datadog_events sink # Anything `datadog_events` sink related
   - datadog_logs sink # Anything `datadog_logs` sink related
   - datadog_metrics sink # Anything `datadog_metrics` sink related
   - elasticsearch sink # Anything `elasticsearch` sink related

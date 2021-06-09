@@ -47,10 +47,7 @@ pub use vector_core::config::{log_schema, LogSchema};
 /// Once this is done, configurations can be correctly loaded using
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema(
-    config_paths: &[(PathBuf, FormatHint)],
-    deny_if_set: bool,
-) -> Result<(), Vec<String>> {
+pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
     vector_core::config::init_log_schema(
         || {
             let (builder, _) = load_builder_from_paths(config_paths)?;
@@ -60,13 +57,28 @@ pub fn init_log_schema(
     )
 }
 
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum ConfigPath {
+    File(PathBuf, FormatHint),
+    Dir(PathBuf),
+}
+
+impl<'a> From<&'a ConfigPath> for &'a PathBuf {
+    fn from(config_path: &'a ConfigPath) -> &'a PathBuf {
+        match config_path {
+            ConfigPath::File(path, _) => path,
+            ConfigPath::Dir(path) => path,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    pub sources: IndexMap<String, SourceOuter>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
     tests: Vec<TestDefinition>,
@@ -205,6 +217,27 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SourceOuter {
+    #[serde(default = "default_acknowledgements")]
+    pub acknowledgements: bool,
+    #[serde(flatten)]
+    pub(super) inner: Box<dyn SourceConfig>,
+}
+
+fn default_acknowledgements() -> bool {
+    false
+}
+
+impl SourceOuter {
+    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
+        Self {
+            acknowledgements: default_acknowledgements(),
+            inner: Box::new(source),
+        }
+    }
+}
+
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
@@ -225,6 +258,7 @@ pub struct SourceContext {
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
+    pub acknowledgements: bool,
 }
 
 impl SourceContext {
@@ -241,6 +275,7 @@ impl SourceContext {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
+                acknowledgements: default_acknowledgements(),
             },
             shutdown,
         )
@@ -253,6 +288,7 @@ impl SourceContext {
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
+            acknowledgements: default_acknowledgements(),
         }
     }
 }

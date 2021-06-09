@@ -500,6 +500,14 @@ components: {
 		classes: #Classes & {_args: kind: Kind}
 
 		configuration: {
+			_acknowledgements: {
+				common:      true
+				description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
+				warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+				required: false
+				type: bool: default: false
+			}
+
 			_tls_accept: {
 				_args: {
 					can_enable:             bool

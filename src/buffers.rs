@@ -1,6 +1,5 @@
 use crate::config::Resource;
 use crate::event::Event;
-use futures::channel::mpsc;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -33,6 +32,8 @@ impl Default for BufferConfig {
     }
 }
 
+pub(crate) type EventStream = Box<dyn Stream<Item = Event> + Unpin + Send>;
+
 impl BufferConfig {
     #[inline]
     const fn memory_max_events() -> usize {
@@ -44,41 +45,30 @@ impl BufferConfig {
         &self,
         data_dir: &Option<PathBuf>,
         sink_name: &str,
-    ) -> Result<
-        (
-            BufferInputCloner,
-            Box<dyn Stream<Item = Event> + Send>,
-            Acker,
-        ),
-        String,
-    > {
-        match &self {
+    ) -> Result<(BufferInputCloner<Event>, EventStream, Acker), String> {
+        let variant = match &self {
             BufferConfig::Memory {
                 max_events,
                 when_full,
-            } => {
-                let (tx, rx) = mpsc::channel(*max_events);
-                let tx = BufferInputCloner::Memory(tx, *when_full);
-                let rx = Box::new(rx);
-                Ok((tx, rx, Acker::Null))
-            }
-
+            } => Variant::Memory {
+                max_events: *max_events,
+                when_full: *when_full,
+            },
             #[cfg(feature = "disk-buffer")]
             BufferConfig::Disk {
                 max_size,
                 when_full,
-            } => {
-                let data_dir = data_dir
+            } => Variant::Disk {
+                max_size: *max_size,
+                when_full: *when_full,
+                data_dir: data_dir
                     .as_ref()
-                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?;
-                let buffer_dir = format!("{}_buffer", sink_name);
-
-                let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
-                    .map_err(|error| error.to_string())?;
-                let tx = BufferInputCloner::Disk(tx, *when_full);
-                Ok((tx, rx, acker))
-            }
-        }
+                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
+                    .to_path_buf(),
+                name: sink_name.to_string(),
+            },
+        };
+        build(variant)
     }
 
     /// Resources that the sink is using.

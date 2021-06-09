@@ -19,6 +19,7 @@ criterion_group!(
               downcase,
               encode_base64,
               encode_json,
+              encode_logfmt,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -47,6 +48,8 @@ criterion_group!(
               length,
               log,
               r#match,
+              match_any,
+              match_array,
               md5,
               merge,
               // TODO: value is dynamic so we cannot assert equality
@@ -67,13 +70,13 @@ criterion_group!(
               parse_query_string,
               parse_regex,
               parse_regex_all,
+              parse_ruby_hash,
               parse_syslog,
               parse_timestamp,
               parse_tokens,
               parse_url,
               push,
-              // TODO: Has not been ported to vrl/stdlib yet
-              //redact,
+              redact,
               replace,
               round,
               sha1,
@@ -193,6 +196,31 @@ bench_function! {
     map {
         args: func_args![value: value![{"field": "value"}]],
         want: Ok(r#"{"field":"value"}"#),
+    }
+}
+
+bench_function! {
+    encode_logfmt => vrl_stdlib::EncodeLogfmt;
+
+    string_with_characters_to_escape {
+        args: func_args![value:
+            btreemap! {
+                "lvl" => "info",
+                "msg" => r#"payload: {"code": 200}\n"#
+            }],
+        want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
+    }
+
+    fields_ordering {
+        args: func_args![value:
+            btreemap! {
+                "lvl" => "info",
+                "msg" => "This is a log message",
+                "log_id" => 12345,
+            },
+            fields_ordering: value!(["lvl", "msg"])
+        ],
+        want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
     }
 }
 
@@ -561,6 +589,61 @@ bench_function! {
     simple {
         args: func_args![value: "foo 2 bar", pattern: Regex::new("foo \\d bar").unwrap()],
         want: Ok(true),
+    }
+}
+
+bench_function! {
+    match_any => vrl_stdlib::MatchAny;
+
+    simple {
+        args: func_args![value: "foo 2 bar", patterns: vec![Regex::new(r"foo \d bar").unwrap()]],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    match_array => vrl_stdlib::MatchArray;
+
+    single_match {
+        args: func_args![
+            value: value!(["foo 1 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(true),
+    }
+
+    no_match {
+        args: func_args![
+            value: value!(["foo x bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(false),
+    }
+
+    some_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(true),
+    }
+
+    all_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+            all: value!(true)
+        ],
+        want: Ok(true),
+    }
+
+    not_all_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo x bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+            all: value!(true)
+        ],
+        want: Ok(false),
     }
 }
 
@@ -1043,6 +1126,23 @@ bench_function! {
 }
 
 bench_function! {
+    parse_ruby_hash => vrl_stdlib::ParseRubyHash;
+
+    matches {
+        args: func_args![
+            value: r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
+        ],
+        want: Ok(value!({
+            test: "value",
+            testNum: 0.2,
+            testObj: {
+                testBool: true,
+            }
+        }))
+    }
+}
+
+bench_function! {
     parse_syslog => vrl_stdlib::ParseSyslog;
 
     rfc3164 {
@@ -1136,19 +1236,25 @@ bench_function! {
     }
 }
 
-//bench_function! {
-//redact => vrl_stdlib::Redact;
+bench_function! {
+    redact => vrl_stdlib::Redact;
 
-//literal {
-//args: func_args![
-//value: "hello 1111222233334444",
-//filters: value!(["pattern"]),
-//patterns: value!(vec!(Regex::new(r"/[0-9]{16}/").unwrap())),
-//redactor: "full",
-//],
-//want: Ok("hello ****"),
-//}
-//}
+    regex {
+        args: func_args![
+            value: "hello 123456 world",
+            filters: vec![Regex::new(r"\d+").unwrap()],
+        ],
+        want: Ok("hello [REDACTED] world"),
+    }
+
+    us_social_security_number {
+        args: func_args![
+            value: "hello 123-12-1234 world",
+            filters: vec!["us_social_security_number"],
+        ],
+        want: Ok("hello [REDACTED] world"),
+    }
+}
 
 bench_function! {
     replace => vrl_stdlib::Replace;

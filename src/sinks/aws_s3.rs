@@ -427,10 +427,11 @@ fn encode_event(
         }
     };
 
-    Some(EncodedEvent::new(PartitionInnerBuffer::new(
-        bytes,
-        key.into(),
-    )))
+    let (_fields, metadata) = log.into_parts();
+    Some(EncodedEvent {
+        item: PartitionInnerBuffer::new(bytes, key.into()),
+        metadata: Some(metadata),
+    })
 }
 
 #[cfg(test)]
@@ -579,9 +580,11 @@ mod integration_tests {
     };
     use bytes::{Buf, BytesMut};
     use flate2::read::MultiGzDecoder;
+    use futures::Stream;
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use std::io::{BufRead, BufReader};
+    use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent};
 
     const BUCKET: &str = "router-tests";
 
@@ -594,8 +597,9 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 10, None);
+        let (lines, events, mut receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 1);
@@ -627,7 +631,7 @@ mod integration_tests {
         let (lines, _events) = random_lines_with_stream(100, 30, None);
 
         let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
-            let mut e = Event::from(line);
+            let mut e = LogEvent::from(line);
             let i = if i < 10 {
                 1
             } else if i < 20 {
@@ -635,9 +639,10 @@ mod integration_tests {
             } else {
                 3
             };
-            e.as_mut_log().insert("i", format!("{}", i));
-            e
+            e.insert("i", format!("{}", i));
+            Event::from(e)
         });
+
         sink.run(stream::iter(events)).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
@@ -669,8 +674,9 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 500, None);
+        let (lines, events, mut receiver) = make_events_batch(100, 500);
         sink.run(events).await.unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 6);
@@ -686,6 +692,25 @@ mod integration_tests {
         });
 
         assert_eq!(lines, response_lines.await);
+    }
+
+    #[tokio::test]
+    async fn acknowledges_failures() {
+        let cx = SinkContext::new_test();
+
+        let mut config = config(1).await;
+        // Break the bucket name
+        config.bucket = format!("BREAK{}IT", config.bucket);
+        let prefix = config.key_prefix.clone();
+        let client = config.create_client().unwrap();
+        let sink = config.new(client, cx).unwrap();
+
+        let (_lines, events, mut receiver) = make_events_batch(1, 1);
+        sink.run(events).await.unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+
+        let objects = list_objects(prefix.unwrap()).await;
+        assert_eq!(objects, None);
     }
 
     #[tokio::test]
@@ -748,6 +773,18 @@ mod integration_tests {
         }
     }
 
+    fn make_events_batch(
+        len: usize,
+        count: usize,
+    ) -> (Vec<String>, impl Stream<Item = Event>, BatchStatusReceiver) {
+        let (lines, events) = random_lines_with_stream(len, count, None);
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let events = events.map(move |event| event.into_log().with_batch_notifier(&batch).into());
+
+        (lines, events, receiver)
+    }
+
     async fn ensure_bucket(client: &S3Client) {
         use rusoto_s3::{CreateBucketError, CreateBucketRequest};
 
@@ -768,20 +805,23 @@ mod integration_tests {
         }
     }
 
-    async fn get_keys(prefix: String) -> Vec<String> {
+    async fn list_objects(prefix: String) -> Option<Vec<rusoto_s3::Object>> {
         let prefix = prefix.split('/').next().unwrap().to_string();
 
-        let list_res = client()
+        client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {
                 bucket: BUCKET.to_string(),
                 prefix: Some(prefix),
                 ..Default::default()
             })
             .await
-            .unwrap();
-
-        list_res
+            .unwrap()
             .contents
+    }
+
+    async fn get_keys(prefix: String) -> Vec<String> {
+        list_objects(prefix)
+            .await
             .unwrap()
             .into_iter()
             .map(|obj| obj.key.unwrap())

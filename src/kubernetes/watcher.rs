@@ -47,9 +47,9 @@ pub mod stream {
             /// The underlying error.
             source: T,
         },
-        /// Any other error that may have meaning for downstream but doesn't have
-        /// a semantics attached to it at the [`Watcher`] trait level.
-        Other {
+        /// Errors that signal a possibility they can be recovered and as such should be
+        /// logged and bubbled up but shouldn't stop processing.
+        Recoverable {
             /// The underlying error.
             source: T,
         },
@@ -65,10 +65,10 @@ pub mod stream {
             Self::Desync { source }
         }
 
-        /// Create an `Error::Other`.
+        /// Create an `Error::Recoverable`.
         #[inline]
-        pub fn other(source: T) -> Self {
-            Self::Other { source }
+        pub fn recoverable(source: T) -> Self {
+            Self::Recoverable { source }
         }
     }
 
@@ -79,7 +79,7 @@ pub mod stream {
         fn eq(&self, other: &Self) -> bool {
             match (self, other) {
                 (Error::Desync { source: a }, Error::Desync { source: b })
-                | (Error::Other { source: a }, Error::Other { source: b }) => a.eq(b),
+                | (Error::Recoverable { source: a }, Error::Recoverable { source: b }) => a.eq(b),
                 _ => false,
             }
         }

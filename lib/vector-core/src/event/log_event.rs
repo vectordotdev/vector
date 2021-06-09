@@ -19,7 +19,7 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(Clone, Debug, Getters, MutGetters, PartialEq, Derivative, Deserialize)]
+#[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
@@ -69,10 +69,9 @@ impl LogEvent {
         )
     }
 
-    pub fn with_batch_notifier(self, batch: Arc<BatchNotifier>) -> Self {
-        // Don't make new metadata, just modify it
-        let (fields, metadata) = self.into_parts();
-        Self::from_parts(fields, metadata.with_finalizer(EventFinalizer::new(batch)))
+    pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
+        self.metadata = self.metadata.with_batch_notifier(batch);
+        self
     }
 
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
