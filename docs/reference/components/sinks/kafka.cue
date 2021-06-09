@@ -54,11 +54,11 @@ components: sinks: kafka: {
 	configuration: {
 		bootstrap_servers: components._kafka.configuration.bootstrap_servers
 		key_field: {
-			description: "The log field name or tags key to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log or in tags, a blank value will be used."
+			description: "The log field name or tags key to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log or in tags, a blank value will be used. Setting to 'none' will results to not sending key, which disables sending blank or other value"
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["user_id"]
+				examples: ["user_id", "none"]
 				syntax: "literal"
 			}
 		}
