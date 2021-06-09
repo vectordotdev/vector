@@ -1,0 +1,37 @@
+{{ $why := .Params.why }}
+<div class="relative pt-6 pb-16 sm:pb-24">
+  <div class="my-16 sm:mt-24 px-4 sm:px-6 mx-auto max-w-7xl">
+    <div class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary text-center">
+      <h1 class="text-3xl md:text-4xl lg:text-5xl font-extrabold">
+        Why Vector?
+      </h1>
+    </div>
+
+    <div class="mt-10 md:mt-12 lg:mt-16">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 lg:gap-12">
+        {{ range $why }}
+        <div class="flex space-x-4 md:space-x-6 lg:space-x-8">
+          {{ with .icon }}
+          <div class="flex-0 pt-2">
+            {{ $icon := printf "/img/icons/%s" . }}
+            <div class="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10">
+              {{ partial "svg.html" (dict "src" $icon) }}
+            </div>
+          </div>
+          {{ end }}
+
+          <div class="flex flex-col space-y-2">
+            <span class="text-lg md:text-xl lg:text-2xl font-medium tracking-loose dark:text-gray-100">
+              {{ .title }}
+            </span>
+
+            <div class="prose dark:prose-dark font-light text-sm md:text-base lg:text-lg">
+              {{ .description | markdownify }}
+            </div>
+          </div>
+        </div>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+</div>
