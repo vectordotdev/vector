@@ -5,4 +5,4 @@ mod dedupe;
 mod filter;
 mod reduce;
 
-criterion_main!(reduce::benches, dedupe::benches, filter::benches,);
+criterion_main!(dedupe::benches, filter::benches, reduce::benches,);
