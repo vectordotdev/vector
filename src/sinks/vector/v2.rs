@@ -360,15 +360,26 @@ mod tests {
             assert_parts(parts);
 
             // Remove the grpc header, which is:
-            // 1 bytes for compressed/not compressed, plus a new line
-            // 4 bytes for the message len, plus a new line
+            // 1 bytes for compressed/not compressed
+            // 4 bytes for the message len
             // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
-            let proto_body = body.slice(7..);
-            let req = crate::event::proto::EventWrapper::decode(proto_body).unwrap();
-            let event: Event = req.into();
-            event.as_log().get("message").unwrap().to_string_lossy()
+            let proto_body = body.slice(5..);
+
+            let req = proto::PushEventsRequest::decode(proto_body).unwrap();
+
+            let mut events = Vec::with_capacity(req.events.len());
+            for event in req.events {
+                let event: Event = event.into();
+                let string = event.as_log().get("message").unwrap().to_string_lossy();
+                events.push(string)
+            }
+
+            events
         })
         .collect::<Vec<_>>()
         .await
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
