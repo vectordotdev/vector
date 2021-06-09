@@ -1,5 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
+    event::proto::EventWrapper,
     proto::vector as proto,
     sinks::util::{
         retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
@@ -7,10 +8,7 @@ use crate::{
     },
     sinks::{Healthcheck, VectorSink},
 };
-use futures::{
-    future::{self, BoxFuture},
-    stream, SinkExt, StreamExt,
-};
+use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
 use lazy_static::lazy_static;
 use prost::Message;
@@ -23,10 +21,10 @@ use tonic::{
     IntoRequest,
 };
 use tower::ServiceBuilder;
-use vector_core::event::{self, Event, WithMetadata};
+use vector_core::event::{Event, WithMetadata};
 
 type Client = proto::Client<Channel>;
-type Response = Result<tonic::Response<proto::EventResponse>, tonic::Status>;
+type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
 
 // TODO: rename
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -183,7 +181,7 @@ fn get_authority(url: &str) -> Result<String, Error> {
         .ok_or(Error::NoHost)
 }
 
-impl tower::Service<Vec<proto::EventRequest>> for Client {
+impl tower::Service<Vec<EventWrapper>> for Client {
     type Response = ();
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -197,40 +195,32 @@ impl tower::Service<Vec<proto::EventRequest>> for Client {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, requests: Vec<proto::EventRequest>) -> Self::Future {
-        let mut futures = Vec::with_capacity(requests.len());
+    fn call(&mut self, events: Vec<EventWrapper>) -> Self::Future {
+        let mut client = self.clone();
 
-        // TODO: Instead of firing off multiple requests, have the server accept
-        // more than one event per request (i.e. bulk endpoint).
-        for request in requests {
-            let mut client = self.clone();
-            futures.push(async move { client.push_events(request.into_request()).await })
-        }
-
-        Box::pin(async move {
-            future::join_all(futures)
+        let request = proto::PushEventsRequest { events };
+        let future = async move {
+            client
+                .push_events(request.into_request())
+                .map_ok(|_| ())
+                .map_err(|source| Error::Request { source })
                 .await
-                .into_iter()
-                .try_for_each(|v| match v {
-                    Ok(..) => Ok(()),
-                    Err(err) => Err(Error::Request { source: err }),
-                })
-        })
+        };
+
+        Box::pin(future)
     }
 }
 
-fn encode_event(event: Event) -> EncodedEvent<proto::EventRequest> {
-    let event: WithMetadata<event::proto::EventWrapper> = event.into();
+fn encode_event(event: Event) -> EncodedEvent<EventWrapper> {
+    let event: WithMetadata<EventWrapper> = event.into();
 
     EncodedEvent {
-        item: proto::EventRequest {
-            message: Some(event.data),
-        },
+        item: event.data,
         metadata: Some(event.metadata),
     }
 }
 
-impl EncodedLength for proto::EventRequest {
+impl EncodedLength for EventWrapper {
     fn encoded_length(&self) -> usize {
         self.encoded_len()
     }
@@ -370,15 +360,26 @@ mod tests {
             assert_parts(parts);
 
             // Remove the grpc header, which is:
-            // 1 bytes for compressed/not compressed, plus a new line
-            // 4 bytes for the message len, plus a new line
+            // 1 bytes for compressed/not compressed
+            // 4 bytes for the message len
             // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
-            let proto_body = body.slice(7..);
-            let req = crate::event::proto::EventWrapper::decode(proto_body).unwrap();
-            let event: Event = req.into();
-            event.as_log().get("message").unwrap().to_string_lossy()
+            let proto_body = body.slice(5..);
+
+            let req = proto::PushEventsRequest::decode(proto_body).unwrap();
+
+            let mut events = Vec::with_capacity(req.events.len());
+            for event in req.events {
+                let event: Event = event.into();
+                let string = event.as_log().get("message").unwrap().to_string_lossy();
+                events.push(string)
+            }
+
+            events
         })
         .collect::<Vec<_>>()
         .await
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
