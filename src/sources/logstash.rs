@@ -406,6 +406,7 @@ mod integration_tests {
         config::SourceContext,
         docker::docker,
         test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp},
+        tls::TlsOptions,
         Pipeline,
     };
     use bollard::{
@@ -420,7 +421,7 @@ mod integration_tests {
     use uuid::Uuid;
 
     #[tokio::test]
-    async fn heartbeat() {
+    async fn beats_heartbeat() {
         trace_init();
 
         let image = "docker.elastic.co/beats/heartbeat";
@@ -428,7 +429,7 @@ mod integration_tests {
 
         let docker = docker(None, None).unwrap();
 
-        let (out, address) = source().await;
+        let (out, address) = source(None).await;
 
         pull_image(&docker, image, tag).await;
 
@@ -493,6 +494,96 @@ output.logstash:
         assert!(log.get("host").is_some());
     }
 
+    #[tokio::test]
+    async fn logstash() {
+        trace_init();
+
+        let image = "docker.elastic.co/logstash/logstash";
+        let tag = "7.13.1";
+
+        let docker = docker(None, None).unwrap();
+
+        let (out, address) = source(Some(TlsConfig {
+            enabled: Some(true),
+            options: TlsOptions {
+                crt_file: Some("tests/data/host.docker.internal.crt".into()),
+                key_file: Some("tests/data/host.docker.internal.key".into()),
+                ..Default::default()
+            },
+        }))
+        .await;
+
+        pull_image(&docker, image, tag).await;
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut file = File::create(dir.path().join("logstash.conf")).unwrap();
+        write!(
+            &mut file,
+            "{}",
+            r#"
+input {
+  generator {
+    count => 5
+    message => "Hello World"
+  }
+}
+output {
+  lumberjack {
+    hosts => "host.docker.internal"
+    ssl_certificate => "/tmp/logstash.crt"
+    port => PORT
+  }
+}
+"#
+            .replace("PORT", &address.port().to_string())
+        )
+        .unwrap();
+
+        let options = Some(CreateContainerOptions {
+            name: format!("vector_test_logstash_{}", Uuid::new_v4()),
+        });
+        let config = ContainerConfig {
+            image: Some(format!("{}:{}", image, tag)),
+            host_config: Some(HostConfig {
+                network_mode: Some(String::from("host")),
+                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
+                binds: Some(vec![
+                    "/dev/null:/usr/share/logstash/config/logstash.yml".to_string(), // tries to contact elasticsearch by default
+                    format!(
+                        "{}/logstash.conf:{}",
+                        dir.path().display(),
+                        "/usr/share/logstash/pipeline/logstash.conf"
+                    ),
+                    format!(
+                        "{}/tests/data/host.docker.internal.crt:/tmp/logstash.crt",
+                        std::env::current_dir().unwrap().display()
+                    ),
+                ]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let container = docker.create_container(options, config).await.unwrap();
+
+        docker
+            .start_container::<String>(&container.id, None)
+            .await
+            .unwrap();
+
+        sleep(Duration::from_secs(30)).await; // logstash is sloooow to startup
+
+        let events = collect_ready(out).await;
+
+        remove_container(&docker, &container.id).await;
+
+        assert!(!events.is_empty());
+
+        let log = events[0].as_log();
+        assert!(log.get("message").unwrap().contains("Hello World"));
+        assert!(log.get("timestamp").is_some());
+    }
+
     async fn pull_image(docker: &Docker, image: &str, tag: &str) {
         let mut filters = HashMap::new();
         filters.insert(
@@ -526,13 +617,13 @@ output.logstash:
         }
     }
 
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source(tls: Option<TlsConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
-                tls: None,
+                tls,
                 keepalive: None,
                 receive_buffer_bytes: None,
             }
