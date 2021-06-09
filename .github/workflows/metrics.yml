@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: timberio/gh-actions-workflow-metrics
-          ref: master
+          ref: main
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           path: .github/actions/gh-actions-workflow-metrics
       - name: Run Action
