@@ -1,6 +1,10 @@
 use indoc::formatdoc;
 use k8s_openapi::{
-    api::core::v1::{Affinity, Container, Pod, PodAffinity, PodAffinityTerm, PodSpec},
+    api::apps::v1::{DaemonSet, DaemonSetSpec},
+    api::core::v1::{
+        Affinity, Container, HostPathVolumeSource, Pod, PodAffinity, PodAffinityTerm, PodSpec,
+        PodTemplateSpec, Volume, VolumeMount,
+    },
     apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta},
 };
 use k8s_test_framework::{
@@ -102,12 +106,123 @@ pub fn make_test_container<'a>(name: &'a str, command: &'a str) -> Container {
     }
 }
 
+/// Creates a Daemonset that will delete the Vector data directory with the given override name.
+pub fn make_delete_daemonset(namespace: &str, override_name: &str) -> DaemonSet {
+    let volume = Volume {
+        host_path: Some(HostPathVolumeSource {
+            path: "/var/lib".to_string(),
+            ..Default::default()
+        }),
+        name: "var-lib".to_string(),
+        ..Default::default()
+    };
+
+    make_daemonset_with_containers(
+        namespace,
+        "delete-pod",
+        vec![("name", "data-dir-cleaner")],
+        Some(vec![volume]),
+        vec![make_delete_container(override_name)],
+    )
+}
+
+/// Creates a container that will delete the Vector data directory.
+pub fn make_delete_container(override_name: &str) -> Container {
+    let folder = if is_multinode() {
+        format!("{}-vector", override_name)
+    } else {
+        "vector".to_string()
+    };
+
+    let mount = VolumeMount {
+        mount_path: "/var/lib/host/".to_owned(),
+        mount_propagation: None,
+        name: "var-lib".to_owned(),
+        read_only: None,
+        sub_path: None,
+        sub_path_expr: None,
+    };
+
+    // Note, the `tail -f` in the command. Since the deletion is installed as a DaemonSet we need
+    // the container to stay running so K8s doesn't attempt to restart it and we can wait for the
+    // rollout to ensure the command completes.
+    Container {
+        name: "delete".to_string(),
+        image: Some(BUSYBOX_IMAGE.to_owned()),
+        command: Some(vec!["sh".to_owned()]),
+        args: Some(vec![
+            "-c".to_owned(),
+            format!("rm -rf /var/lib/host/{}; tail -f /dev/null;", folder),
+        ]),
+        volume_devices: None,
+        volume_mounts: Some(vec![mount]),
+        ..Container::default()
+    }
+}
+
+/// Creates a Daemonset that deletes the Vector data directory identified by the given override
+/// name.
+pub async fn delete_vector_folder(
+    framework: &Framework,
+    namespace: &str,
+    folder: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let _delete_pod = framework
+        .test_pod(test_pod::Config::from_daemonset(&make_delete_daemonset(
+            namespace, folder,
+        ))?)
+        .await?;
+
+    framework
+        .wait_for_rollout(namespace, "daemonset/delete-pod", vec!["--timeout=60s"])
+        .await?;
+
+    Ok(())
+}
+
+pub fn make_daemonset_with_containers<'a>(
+    namespace: &'a str,
+    name: &'a str,
+    labels: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+    volumes: Option<Vec<Volume>>,
+    containers: Vec<Container>,
+) -> DaemonSet {
+    let labels = collect_btree(labels);
+    DaemonSet {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            ..ObjectMeta::default()
+        },
+        spec: Some(DaemonSetSpec {
+            template: PodTemplateSpec {
+                metadata: Some(ObjectMeta {
+                    labels: labels.clone(),
+                    ..ObjectMeta::default()
+                }),
+                spec: Some(PodSpec {
+                    containers,
+                    volumes,
+                    ..PodSpec::default()
+                }),
+            },
+            selector: LabelSelector {
+                match_expressions: None,
+                match_labels: labels,
+            },
+            ..DaemonSetSpec::default()
+        }),
+        ..DaemonSet::default()
+    }
+}
+
 pub fn make_test_pod_with_containers<'a>(
     namespace: &'a str,
     name: &'a str,
     labels: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
     annotations: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
     affinity: Option<Affinity>,
+    volumes: Option<Vec<Volume>>,
     containers: Vec<Container>,
 ) -> Pod {
     Pod {
@@ -122,6 +237,7 @@ pub fn make_test_pod_with_containers<'a>(
             containers,
             restart_policy: Some("Never".to_owned()),
             affinity,
+            volumes,
             ..PodSpec::default()
         }),
         ..Pod::default()
@@ -169,6 +285,7 @@ pub fn make_test_pod_with_affinity<'a>(
         labels,
         annotations,
         affinity,
+        None,
         vec![make_test_container(name, command)],
     )
 }

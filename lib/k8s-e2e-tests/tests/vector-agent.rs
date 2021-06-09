@@ -140,6 +140,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -237,6 +238,7 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -330,7 +332,9 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
+
     Ok(())
 }
 
@@ -425,6 +429,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -520,6 +525,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -652,6 +658,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -833,6 +840,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     drop(control_test_pod);
     drop(affinity_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -1031,6 +1039,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     drop(excluded_test_pods);
     drop(control_test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -1074,6 +1083,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             vec![],
             vec![("vector.dev/exclude-containers", "excluded")],
+            None,
             None,
             vec![
                 make_test_container("excluded", "echo EXCLUDED_MARKER"),
@@ -1186,6 +1196,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -1241,6 +1252,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             vec![],
             vec![],
+            None,
             None,
             vec![
                 make_test_container("excluded", "echo EXCLUDED_MARKER"),
@@ -1352,6 +1364,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -1469,6 +1482,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     drop(affinity_ns);
     drop(test_pods);
     drop(test_namespaces);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -1565,6 +1579,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -1709,6 +1724,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     drop(test_pod);
     drop(test_namespace);
     drop(vector_metrics_port_forward);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }
@@ -1773,6 +1789,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     metrics::assert_host_metrics_present(&vector_metrics_url).await?;
 
     drop(vector_metrics_port_forward);
+    delete_vector_folder(&framework, &namespace, &override_name).await?;
     drop(vector);
     Ok(())
 }

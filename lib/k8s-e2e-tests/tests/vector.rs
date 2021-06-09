@@ -162,6 +162,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pod);
     drop(test_namespace);
+    delete_vector_folder(&framework, &namespace, &agent_override_name).await?;
     drop(vector);
     Ok(())
 }

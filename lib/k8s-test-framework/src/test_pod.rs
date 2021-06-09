@@ -2,7 +2,7 @@
 
 use super::{resource_file::ResourceFile, Result};
 use crate::up_down;
-use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::api::{apps::v1::DaemonSet, core::v1::Pod};
 use std::process::{Command, Stdio};
 
 /// A config that holds a test `Pod` resource file.
@@ -15,6 +15,11 @@ impl Config {
     /// Create a [`Config`] using a structured [`Pod`] object.
     pub fn from_pod(pod: &Pod) -> Result<Self> {
         Self::from_resource_string(serde_json::to_string(pod)?.as_str())
+    }
+
+    /// Create a [`Config`] using a structured [`DaemonSet`] object.
+    pub fn from_daemonset(daemonset: &DaemonSet) -> Result<Self> {
+        Self::from_resource_string(serde_json::to_string(daemonset)?.as_str())
     }
 
     /// Create a [`Config`] using an unstructured resource string.
