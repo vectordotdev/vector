@@ -1,0 +1,30 @@
+{{ $tabs := .Params.platform_tabs }}
+{{ $defaultTab := index $tabs 0 }}
+<div class="relative px-6 md:px-4 mx-auto max-w-7xl text-center">
+  <div class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary py-2">
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-looser">
+      A complete, end-to-end platform
+    </h1>
+  </div>
+
+  <div x-data="{ selected: '{{ $defaultTab }}' }" class="mt-4 text-center">
+    {{/* Selector */}}
+    <div class="inline-flex space-x-5 bg-dark dark:bg-white py-1 px-1.5 rounded-full">
+      {{ range $tabs }}
+      <button @click="selected = '{{ . }}'" :class="{ 'rounded-full py-0.5 px-2.5 text-dark bg-primary dark:bg-dark dark:text-primary': selected === '{{ . }}' }" class="uppercase font-semibold tracking-tight text-white dark:text-dark">
+        {{ . }}
+      </button>
+      {{ end }}
+    </div>
+
+    {{/* Selectable images */}}
+    <div class="mt-12 text-center">
+      {{ range $tabs }}
+      {{ $svg := printf "/img/pipelines-%s.svg" (. | urlize) }}
+      <div x-show="selected === '{{ . }}'" class="inline-flex max-w-full md:max-w-5xl">
+        {{ partial "svg.html" (dict "src" $svg) }}
+      </div>
+      {{ end }}
+    </div>
+  </div>
+</div>
