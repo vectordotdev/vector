@@ -203,6 +203,29 @@ components: sinks: elasticsearch: {
 				syntax: "template"
 			}
 		}
+		metrics: {
+			common:      false
+			description: "Options for metrics."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					host_tag: {
+						common:      false
+						description: "Tag key that identifies the source host."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "hostname"
+							examples: ["host", "hostname"]
+							syntax: "literal"
+						}
+					}
+					timezone: configuration._timezone
+				}
+			}
+		}
 		pipeline: {
 			common:      true
 			description: "Name of the pipeline to apply."
