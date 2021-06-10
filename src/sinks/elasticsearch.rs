@@ -79,14 +79,14 @@ impl ElasticSearchConfig {
         Ok(Template::try_from(value).context(BatchActionTemplate)?)
     }
 
-    fn common_mode(&self) -> crate::Result<CommonMode> {
+    fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
         match self.mode {
             ElasticSearchMode::Regular => {
                 let index = self.index.as_deref().unwrap_or("vector-%Y.%m.%d");
                 let index = Template::try_from(index).context(IndexTemplate)?;
-                Ok(CommonMode::Regular { index })
+                Ok(ElasticSearchCommonMode::Regular { index })
             }
-            ElasticSearchMode::DataStream => Ok(CommonMode::DataStream(
+            ElasticSearchMode::DataStream => Ok(ElasticSearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
             )),
         }
@@ -96,6 +96,8 @@ impl ElasticSearchConfig {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
+    #[serde(default = "DataStreamConfig::default_timestamp")]
+    timestamp: String,
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     dtype: String,
     #[serde(default = "DataStreamConfig::default_dataset")]
@@ -111,6 +113,7 @@ pub struct DataStreamConfig {
 impl Default for DataStreamConfig {
     fn default() -> Self {
         Self {
+            timestamp: Self::default_type(),
             dtype: Self::default_type(),
             dataset: Self::default_dataset(),
             namespace: Self::default_namespace(),
@@ -121,6 +124,10 @@ impl Default for DataStreamConfig {
 }
 
 impl DataStreamConfig {
+    fn default_timestamp() -> String {
+        "@timestamp".into()
+    }
+
     fn default_type() -> String {
         "logs".into()
     }
@@ -147,6 +154,17 @@ impl DataStreamConfig {
             ("dataset".into(), Value::from(self.dataset.clone())),
             ("namespace".into(), Value::from(self.namespace.clone())),
         ]
+    }
+
+    fn update_timestamp(&self, event: &mut Event) {
+        // we keep it if the timestamp field is @timestamp
+        if self.timestamp == Self::default_timestamp() {
+            return;
+        }
+        let log = event.as_mut_log().as_map_mut();
+        if let Some(value) = log.remove(&self.timestamp) {
+            log.insert(Self::default_timestamp(), value);
+        }
     }
 
     fn sync_fields(&self, event: &mut Event) {
@@ -305,12 +323,12 @@ impl SinkConfig for ElasticSearchConfig {
 }
 
 #[derive(Debug)]
-enum CommonMode {
+enum ElasticSearchCommonMode {
     Regular { index: Template },
     DataStream(DataStreamConfig),
 }
 
-impl CommonMode {
+impl ElasticSearchCommonMode {
     fn index(&self, event: &Event) -> Option<String> {
         match self {
             Self::Regular { index } => index
@@ -343,7 +361,7 @@ pub struct ElasticSearchCommon {
     authorization: Option<Auth>,
     credentials: Option<rusoto::AwsCredentialsProvider>,
     encoding: EncodingConfigWithDefault<Encoding>,
-    mode: CommonMode,
+    mode: ElasticSearchCommonMode,
     doc_type: String,
     tls_settings: TlsSettings,
     compression: Compression,
@@ -413,6 +431,7 @@ impl HttpSink for ElasticSearchCommon {
 
         if let Some(cfg) = self.mode.as_data_stream_config() {
             cfg.sync_fields(&mut event);
+            cfg.update_timestamp(&mut event);
         }
 
         let bulk_action = self.bulk_action(&event)?;
@@ -880,6 +899,7 @@ mod tests {
             data_stream: Some(DataStreamConfig {
                 auto_routing: false,
                 namespace: "something".into(),
+                timestamp: log_schema().timestamp_key().into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -894,7 +914,7 @@ mod tests {
         );
         let encoded = es.encode_event(event).unwrap().item;
         let expected = r#"{"create":{"_index":"logs-generic-something","_type":"_doc"}}
-{"data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+{"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
