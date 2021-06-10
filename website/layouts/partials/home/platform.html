@@ -7,11 +7,15 @@
     </h1>
   </div>
 
-  <div x-data="{ selected: '{{ $defaultTab }}' }" class="mt-4 text-center">
+  <p class="mt-2 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
+    Deploy Vector in a variety of roles to suit your use case
+  </p>
+
+  <div x-data="{ selected: '{{ $defaultTab }}' }" class="mt-6 text-center">
     {{/* Selector */}}
-    <div class="inline-flex space-x-5 bg-dark dark:bg-white py-1 px-1.5 rounded-full">
+    <div class="inline-flex space-x-5 bg-dark dark:bg-white py-1 px-1.5 rounded-full shadow-sm">
       {{ range $tabs }}
-      <button @click="selected = '{{ . }}'" :class="{ 'rounded-full py-0.5 px-2.5 text-dark bg-primary dark:bg-dark dark:text-primary': selected === '{{ . }}' }" class="uppercase font-semibold tracking-tight text-white dark:text-dark">
+      <button @click="selected = '{{ . }}'" :class="{ 'rounded-full py-0.5 px-2.5 text-dark bg-primary dark:bg-dark dark:text-primary': selected === '{{ . }}' }" class="uppercase font-semibold text-smtracking-tight text-white dark:text-dark">
         {{ . }}
       </button>
       {{ end }}

@@ -10,8 +10,8 @@
     <div class="relative flex items-center justify-between h-16">
       <div class="flex items-center px-2 lg:px-0">
         <div class="flex-shrink-0">
-          <a href="{{ site.BaseURL }}" class="dark:text-gray-100{{ if .IsHome }} font-bold{{ end }}">
-            {{ site.Title }}
+          <a href="{{ site.BaseURL }}">
+            {{ partial "svg.html" (dict "src" "/img/logos/vector-logo-light.svg" "h" "auto" "w" 32) }}
           </a>
         </div>
         <div class="hidden lg:block lg:ml-6">

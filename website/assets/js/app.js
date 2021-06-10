@@ -38,6 +38,14 @@ const manageState = () => {
     // Release version
     release: 'stable',
 
+    isDark() {
+      return this.dark;
+    },
+
+    isLight() {
+      return !this.dark;
+    },
+
     // Set release directly
     setRelease(release) {
       this.release = release;
