@@ -2,8 +2,10 @@ use crate::grammar::{EventPlatformQuery, QueryVisitor, DEFAULT_FIELD};
 use crate::node::QueryNode;
 use pest::Parser;
 
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 /// Quick wrapper parse function to convert query strings into our AST
-pub fn parse(query: &str) -> Result<QueryNode, Box<dyn std::error::Error>> {
+pub fn parse(query: &str) -> Result<QueryNode, Error> {
     // Clean up our query string
     let clean_query = query.trim();
     // If we have an empty query, we presume we're matching everything
