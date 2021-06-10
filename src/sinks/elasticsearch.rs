@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::Event,
+    event::{Event, Value},
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
     rusoto::{self, region_from_endpoint, AwsAuthentication, RegionOrEndpoint},
@@ -31,7 +31,7 @@ use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -104,6 +104,8 @@ pub struct DataStreamConfig {
     namespace: String,
     #[serde(default = "DataStreamConfig::default_auto_routing")]
     auto_routing: bool,
+    #[serde(default = "DataStreamConfig::default_sync_fields")]
+    sync_fields: bool,
 }
 
 impl Default for DataStreamConfig {
@@ -113,6 +115,7 @@ impl Default for DataStreamConfig {
             dataset: Self::default_dataset(),
             namespace: Self::default_namespace(),
             auto_routing: Self::default_auto_routing(),
+            sync_fields: Self::default_sync_fields(),
         }
     }
 }
@@ -132,6 +135,33 @@ impl DataStreamConfig {
 
     fn default_auto_routing() -> bool {
         true
+    }
+
+    fn default_sync_fields() -> bool {
+        true
+    }
+
+    fn entries(&self) -> Vec<(String, Value)> {
+        vec![
+            ("type".into(), Value::from(self.dtype.clone())),
+            ("dataset".into(), Value::from(self.dataset.clone())),
+            ("namespace".into(), Value::from(self.namespace.clone())),
+        ]
+    }
+
+    fn sync_fields(&self, event: &mut Event) {
+        if !self.sync_fields {
+            return;
+        }
+        let existing = event
+            .as_mut_log()
+            .as_map_mut()
+            .entry("data_stream".into())
+            .or_insert_with(|| Value::Map(BTreeMap::new()))
+            .as_map_mut();
+        for (key, value) in self.entries() {
+            existing.entry(key).or_insert(value);
+        }
     }
 
     fn index(&self, event: &Event) -> String {
@@ -296,6 +326,13 @@ impl CommonMode {
             Self::DataStream(ds) => Some(ds.index(event)),
         }
     }
+
+    fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
+        match self {
+            Self::DataStream(value) => Some(value),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -373,6 +410,11 @@ impl HttpSink for ElasticSearchCommon {
 
     fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let index = self.mode.index(&event)?;
+
+        if let Some(cfg) = self.mode.as_data_stream_config() {
+            cfg.sync_fields(&mut event);
+        }
+
         let bulk_action = self.bulk_action(&event)?;
         let action = self.build_action(&index, &bulk_action, &mut event);
 
@@ -797,7 +839,6 @@ mod tests {
         let mut ds = BTreeMap::<String, Value>::new();
         ds.insert("type".into(), Value::from("synthetics"));
         ds.insert("dataset".into(), Value::from("testing"));
-        ds.insert("namespace".into(), Value::from("something"));
         ds
     }
 
@@ -821,8 +862,8 @@ mod tests {
         );
         event.as_mut_log().insert("data_stream", data_stream_body());
         let encoded = es.encode_event(event).unwrap().item;
-        let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
-{"data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+        let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
+{"data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
@@ -838,6 +879,7 @@ mod tests {
             mode: ElasticSearchMode::DataStream,
             data_stream: Some(DataStreamConfig {
                 auto_routing: false,
+                namespace: "something".into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -851,7 +893,7 @@ mod tests {
             Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
         );
         let encoded = es.encode_event(event).unwrap().item;
-        let expected = r#"{"create":{"_index":"logs-generic-default","_type":"_doc"}}
+        let expected = r#"{"create":{"_index":"logs-generic-something","_type":"_doc"}}
 {"data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
@@ -887,6 +929,38 @@ mod tests {
         let event = Event::from("hello there");
         let action = es.bulk_action(&event).unwrap();
         assert!(matches!(action, BulkAction::Create));
+    }
+
+    #[test]
+    fn encode_datastream_mode_no_sync() {
+        use crate::config::log_schema;
+        use chrono::{TimeZone, Utc};
+
+        let config = ElasticSearchConfig {
+            index: Some(String::from("vector")),
+            endpoint: String::from("https://example.com"),
+            mode: ElasticSearchMode::DataStream,
+            data_stream: Some(DataStreamConfig {
+                namespace: "something".into(),
+                sync_fields: false,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+        let mut event = Event::from("hello there");
+        event.as_mut_log().insert("data_stream", data_stream_body());
+        event.as_mut_log().insert(
+            log_schema().timestamp_key(),
+            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        );
+        let encoded = es.encode_event(event).unwrap().item;
+        let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
+{"data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+"#;
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
 
     #[test]

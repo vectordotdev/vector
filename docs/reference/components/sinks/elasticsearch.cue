@@ -171,6 +171,7 @@ components: sinks: elasticsearch: {
 				examples: []
 				options: {
 					auto_routing: {
+						common: false
 						description: """
 							Automatically routes events by deriving the data stream name using specific event fields with the `data_stream.type-data_stream.dataset-data_stream.namespace` format.
 
@@ -178,13 +179,10 @@ components: sinks: elasticsearch: {
 						"""
 						required: false
 						warnings: []
-						type: string: {
-							default: "generic"
-							examples: ["generic", "nginx"]
-							syntax: "literal"
-						}
+						type: bool: default: true
 					}
 					dataset: {
+						common:      false
 						description: "The data stream dataset used to construct the data stream at index time."
 						required:    false
 						warnings: []
@@ -195,6 +193,7 @@ components: sinks: elasticsearch: {
 						}
 					}
 					namespace: {
+						common:      false
 						description: "The data stream namespace used to construct the data stream at index time."
 						required:    false
 						warnings: []
@@ -204,7 +203,15 @@ components: sinks: elasticsearch: {
 							syntax: "literal"
 						}
 					}
+					sync_fields: {
+						common:      false
+						description: "Automatically adds and syncs the data_stream.* event fields if they are missing from the event. This ensures that fields match the name of the data stream that is receiving events."
+						required:    false
+						warnings: []
+						type: bool: default: true
+					}
 					type: {
+						common:      false
 						description: "The data stream type used to construct the data stream at index time."
 						required:    false
 						warnings: []
