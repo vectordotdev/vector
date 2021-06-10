@@ -97,16 +97,26 @@ fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
 
-    #[cfg(any(feature = "sources-vector", feature = "sinks-vector"))]
+    #[cfg(any(
+        feature = "sources-vector",
+        feature = "sources-dnstap",
+        feature = "sinks-vector"
+    ))]
     {
         println!("cargo:rerun-if-changed=proto/vector.proto");
+        println!("cargo:rerun-if-changed=proto/dnstap.proto");
+
         let mut prost_build = prost_build::Config::new();
         prost_build.btree_map(&["."]);
 
         tonic_build::configure()
             .compile_with_config(
                 prost_build,
-                &["lib/vector-core/proto/event.proto", "proto/vector.proto"],
+                &[
+                    "lib/vector-core/proto/event.proto",
+                    "proto/vector.proto",
+                    "proto/dnstap.proto",
+                ],
                 &["proto/", "lib/vector-core/proto/"],
             )
             .unwrap();

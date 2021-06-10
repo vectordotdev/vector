@@ -27,9 +27,7 @@
 // For more information, please refer to <http://unlicense.org>
 
 use rand::{thread_rng, Rng};
-use std::net::{
-    Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6, TcpListener, ToSocketAddrs, UdpSocket,
-};
+use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs, UdpSocket};
 
 pub type Port = u16;
 
@@ -44,56 +42,48 @@ fn test_bind_tcp<A: ToSocketAddrs>(addr: A) -> Option<Port> {
 }
 
 /// Check if a port is free on UDP
-pub fn is_free_udp(port: Port) -> bool {
-    let ipv4 = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
-    let ipv6 = SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0);
-
-    test_bind_udp(ipv6).is_some() && test_bind_udp(ipv4).is_some()
+pub fn is_free_udp(ip: IpAddr, port: Port) -> bool {
+    test_bind_udp(SocketAddr::new(ip, port)).is_some()
 }
 
 /// Check if a port is free on TCP
-pub fn is_free_tcp(port: Port) -> bool {
-    let ipv4 = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
-    let ipv6 = SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0);
-
-    test_bind_tcp(ipv6).is_some() && test_bind_tcp(ipv4).is_some()
+pub fn is_free_tcp(ip: IpAddr, port: Port) -> bool {
+    test_bind_tcp(SocketAddr::new(ip, port)).is_some()
 }
 
 /// Check if a port is free on both TCP and UDP
-pub fn is_free(port: Port) -> bool {
-    is_free_tcp(port) && is_free_udp(port)
+pub fn is_free(ip: IpAddr, port: Port) -> bool {
+    is_free_tcp(ip, port) && is_free_udp(ip, port)
 }
 
 /// Asks the OS for a free port
-fn ask_free_tcp_port() -> Option<Port> {
-    let ipv4 = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0);
-    let ipv6 = SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0);
-
-    test_bind_tcp(ipv6).or_else(|| test_bind_tcp(ipv4))
+fn ask_free_tcp_port(ip: IpAddr) -> Option<Port> {
+    test_bind_tcp(SocketAddr::new(ip, 0))
 }
 
 /// Picks an available port that is available on both TCP and UDP
 /// ```rust
 /// use portpicker::pick_unused_port;
-/// let port: u16 = pick_unused_port();
+/// use std::net::{IpAddr, Ipv4Addr};
+/// let port: u16 = pick_unused_port(IpAddr::V4(Ipv4Addr::LOCALHOST));
 /// ```
-pub fn pick_unused_port() -> Port {
+pub fn pick_unused_port(ip: IpAddr) -> Port {
     let mut rng = thread_rng();
 
     loop {
         // Try random port first
         for _ in 0..10 {
             let port = rng.gen_range(15000..25000);
-            if is_free(port) {
+            if is_free(ip, port) {
                 return port;
             }
         }
 
         // Ask the OS for a port
         for _ in 0..10 {
-            if let Some(port) = ask_free_tcp_port() {
+            if let Some(port) = ask_free_tcp_port(ip) {
                 // Test that the udp port is free as well
-                if is_free_udp(port) {
+                if is_free_udp(ip, port) {
                     return port;
                 }
             }
@@ -104,9 +94,15 @@ pub fn pick_unused_port() -> Port {
 #[cfg(test)]
 mod tests {
     use super::pick_unused_port;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     #[test]
-    fn it_works() {
-        pick_unused_port();
+    fn ipv4_localhost() {
+        pick_unused_port(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    }
+
+    #[test]
+    fn ipv6_localhost() {
+        pick_unused_port(IpAddr::V6(Ipv6Addr::LOCALHOST));
     }
 }

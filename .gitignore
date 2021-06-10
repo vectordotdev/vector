@@ -1,3 +1,4 @@
+cargo-timing*.html
 *.iml
 *.tmp
 **/*.rs.bk

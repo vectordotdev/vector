@@ -5,8 +5,6 @@ use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};
 use std::fs;
 use std::io::Write;
-#[cfg(windows)]
-use std::os::windows::fs::MetadataExt;
 
 // Interpret all FWActions, excluding truncation
 //

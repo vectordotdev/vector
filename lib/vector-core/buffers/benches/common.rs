@@ -72,8 +72,8 @@ pub fn setup<const N: usize>(
     max_events: usize,
     variant: Variant,
 ) -> (
-    Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
-    Box<dyn Stream<Item = Message<N>> + Unpin + Send>,
+    Pin<Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>>,
+    Pin<Box<dyn Stream<Item = Message<N>> + Unpin + Send>>,
     Vec<Message<N>>,
 ) {
     let mut messages: Vec<Message<N>> = Vec::with_capacity(max_events);
@@ -82,17 +82,17 @@ pub fn setup<const N: usize>(
     }
 
     let (tx, rx, _) = buffers::build::<Message<N>>(variant).unwrap();
-    (tx.get(), rx, messages)
+    (Pin::new(tx.get()), Box::pin(rx), messages)
 }
 
 fn send_msg<const N: usize>(
     msg: Message<N>,
-    sink: &mut (dyn Sink<Message<N>, Error = ()> + Unpin + Send),
+    mut sink: Pin<&mut (dyn Sink<Message<N>, Error = ()> + Unpin + Send)>,
     context: &mut Context,
 ) {
-    match Sink::poll_ready(Pin::new(sink), context) {
-        Poll::Ready(Ok(())) => match Sink::start_send(Pin::new(sink), msg) {
-            Ok(()) => match Sink::poll_flush(Pin::new(sink), context) {
+    match sink.as_mut().poll_ready(context) {
+        Poll::Ready(Ok(())) => match sink.as_mut().start_send(msg) {
+            Ok(()) => match sink.as_mut().poll_flush(context) {
                 Poll::Ready(Ok(())) => {}
                 _ => unreachable!(),
             },
@@ -102,11 +102,9 @@ fn send_msg<const N: usize>(
     }
 }
 
-fn read_all_msg<const N: usize>(
-    stream: &mut (dyn Stream<Item = Message<N>> + Unpin + Send),
-    context: &mut Context,
-) {
-    while let Poll::Ready(Some(_)) = Stream::poll_next(Pin::new(stream), context) {}
+#[inline]
+fn consume<T>(mut stream: Pin<&mut (dyn Stream<Item = T> + Unpin + Send)>, context: &mut Context) {
+    while let Poll::Ready(Some(_)) = stream.as_mut().poll_next(context) {}
 }
 
 //
@@ -123,9 +121,9 @@ fn read_all_msg<const N: usize>(
 
 #[allow(clippy::type_complexity)]
 pub fn wtr_measurement<const N: usize>(
-    mut input: (
-        Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
-        Box<dyn Stream<Item = Message<N>> + Unpin + Send>,
+    input: (
+        Pin<Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>>,
+        Pin<Box<dyn Stream<Item = Message<N>> + Unpin + Send>>,
         Vec<Message<N>>,
     ),
 ) {
@@ -133,9 +131,9 @@ pub fn wtr_measurement<const N: usize>(
         let waker = noop_waker();
         let mut context = Context::from_waker(&waker);
 
-        let sink = input.0.as_mut();
+        let mut sink = input.0;
         for msg in input.2.into_iter() {
-            send_msg(msg, sink, &mut context)
+            send_msg(msg, sink.as_mut(), &mut context)
         }
     }
 
@@ -143,16 +141,16 @@ pub fn wtr_measurement<const N: usize>(
         let waker = noop_waker();
         let mut context = Context::from_waker(&waker);
 
-        let stream = input.1.as_mut();
-        read_all_msg(stream, &mut context)
+        let mut stream = input.1;
+        consume(stream.as_mut(), &mut context)
     }
 }
 
 #[allow(clippy::type_complexity)]
 pub fn war_measurement<const N: usize>(
-    mut input: (
-        Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
-        Box<dyn Stream<Item = Message<N>> + Unpin + Send>,
+    input: (
+        Pin<Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>>,
+        Pin<Box<dyn Stream<Item = Message<N>> + Unpin + Send>>,
         Vec<Message<N>>,
     ),
 ) {
@@ -162,10 +160,10 @@ pub fn war_measurement<const N: usize>(
     let rcv_waker = noop_waker();
     let mut rcv_context = Context::from_waker(&rcv_waker);
 
-    let stream = input.1.as_mut();
-    let sink = input.0.as_mut();
+    let mut stream = input.1;
+    let mut sink = input.0;
     for msg in input.2.into_iter() {
-        send_msg(msg, sink, &mut snd_context);
-        read_all_msg(stream, &mut rcv_context)
+        send_msg(msg, sink.as_mut(), &mut snd_context);
+        consume(stream.as_mut(), &mut rcv_context)
     }
 }

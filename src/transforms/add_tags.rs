@@ -6,7 +6,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::btree_map::Entry;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -68,16 +68,10 @@ impl AddTags {
 impl FunctionTransform for AddTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         if !self.tags.is_empty() {
-            let tags = &mut event.as_mut_metric().series.tags;
-
-            if tags.is_none() {
-                *tags = Some(BTreeMap::new());
-            }
+            let metric = event.as_mut_metric();
 
             for (name, value) in &self.tags {
-                let map = tags.as_mut().unwrap(); // initialized earlier
-
-                let entry = map.entry(name.to_string());
+                let entry = metric.tag_entry(name.to_string());
                 match (entry, self.overwrite) {
                     (Entry::Vacant(entry), _) => {
                         entry.insert(value.clone());

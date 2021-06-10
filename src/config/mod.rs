@@ -47,10 +47,7 @@ pub use vector_core::config::{log_schema, LogSchema};
 /// Once this is done, configurations can be correctly loaded using
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema(
-    config_paths: &[(PathBuf, FormatHint)],
-    deny_if_set: bool,
-) -> Result<(), Vec<String>> {
+pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
     vector_core::config::init_log_schema(
         || {
             let (builder, _) = load_builder_from_paths(config_paths)?;
@@ -58,6 +55,21 @@ pub fn init_log_schema(
         },
         deny_if_set,
     )
+}
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum ConfigPath {
+    File(PathBuf, FormatHint),
+    Dir(PathBuf),
+}
+
+impl<'a> From<&'a ConfigPath> for &'a PathBuf {
+    fn from(config_path: &'a ConfigPath) -> &'a PathBuf {
+        match config_path {
+            ConfigPath::File(path, _) => path,
+            ConfigPath::Dir(path) => path,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
