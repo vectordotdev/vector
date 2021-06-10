@@ -119,7 +119,7 @@ jobs:
 
   test-misc:
     name: Miscellaneous - Linux
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, general]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -229,6 +229,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: choco install llvm
+      - run: Get-Command cargo
+      - run: Get-Command sccache
       - name: Start sccache
         env:
           SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
@@ -243,7 +245,7 @@ jobs:
   test-vrl:
     name: VRL - Linux
     continue-on-error: true
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, general]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -314,13 +316,6 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
-      - name: Start sccache
-        env:
-          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
-          SCCACHE_IDLE_TIMEOUT: 0
-        run: |
-          sccache --start-server
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - name: Make slim-builds
         run: make slim-builds
       - name: Check markdown
@@ -364,8 +359,6 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check licenses
-      - name: Stop sccache
-        run: sccache --stop-server
 
   master-failure:
     name: master-failure
