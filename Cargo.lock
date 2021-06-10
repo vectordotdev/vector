@@ -3414,9 +3414,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.95"
+version = "0.2.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
+checksum = "5600b4e6efc5421841a2138a6b082e07fe12f9aaa12783d50e5d13325b26b4fc"
 
 [[package]]
 name = "libflate"
