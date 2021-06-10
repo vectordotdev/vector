@@ -302,9 +302,14 @@ bench_function! {
     }
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(target_os = "windows")]
 bench_function! {
     get_host_ip => vrl_stdlib::GetHostIp;
+
+    loopback {
+        args: func_args![interface: "lo0", family: "IPv4"],
+        want: Ok("127.0.0.1"),
+    }
 }
 
 bench_function! {
