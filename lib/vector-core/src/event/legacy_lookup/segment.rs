@@ -23,10 +23,6 @@ impl Segment {
         Segment::Index(v)
     }
 
-    pub fn is_value(&self) -> bool {
-        matches!(self, Segment::Index(_))
-    }
-
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_lookup(segment: Pair<'_, Rule>) -> crate::Result<Vec<Segment>> {
         let rule = segment.as_rule();

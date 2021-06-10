@@ -153,7 +153,7 @@ components: sinks: elasticsearch: {
 		}
 		bulk_action: {
 			common:      false
-			description: "Action to use when making requests to the [Elasticsearch Bulk API](elasticsearch_bulk). Supports `index` and `create`."
+			description: "Action to use when making requests to the [Elasticsearch Bulk API](elasticsearch_bulk). Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported."
 			required:    false
 			warnings: []
 			type: string: {
@@ -237,7 +237,7 @@ components: sinks: elasticsearch: {
 			body: """
 				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's
 				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are
-				inserted via the `index` action which will update documents if an existing
+				inserted via the `index` action which will replace documents if an existing
 				one has the same `id`. If `bulk_action` is configured with `create`, Elasticsearch
 				will _not_ replace an existing document and instead return a conflict error.
 				"""

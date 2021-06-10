@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
-    event::Event,
+    event::proto::EventWrapper,
     proto::vector as proto,
     sinks::util::{
         retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
@@ -8,10 +8,7 @@ use crate::{
     },
     sinks::{Healthcheck, VectorSink},
 };
-use futures::{
-    future::{self, BoxFuture},
-    stream, SinkExt, StreamExt,
-};
+use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
 use lazy_static::lazy_static;
 use prost::Message;
@@ -24,9 +21,10 @@ use tonic::{
     IntoRequest,
 };
 use tower::ServiceBuilder;
+use vector_core::event::{Event, WithMetadata};
 
 type Client = proto::Client<Channel>;
-type Response = Result<tonic::Response<proto::EventResponse>, tonic::Status>;
+type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
 
 // TODO: rename
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -183,7 +181,7 @@ fn get_authority(url: &str) -> Result<String, Error> {
         .ok_or(Error::NoHost)
 }
 
-impl tower::Service<Vec<proto::EventRequest>> for Client {
+impl tower::Service<Vec<EventWrapper>> for Client {
     type Response = ();
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -197,37 +195,32 @@ impl tower::Service<Vec<proto::EventRequest>> for Client {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, requests: Vec<proto::EventRequest>) -> Self::Future {
-        let mut futures = Vec::with_capacity(requests.len());
+    fn call(&mut self, events: Vec<EventWrapper>) -> Self::Future {
+        let mut client = self.clone();
 
-        // TODO: Instead of firing off multiple requests, have the server accept
-        // more than one event per request (i.e. bulk endpoint).
-        for request in requests {
-            let mut client = self.clone();
-            futures.push(async move { client.push_events(request.into_request()).await })
-        }
-
-        Box::pin(async move {
-            future::join_all(futures)
+        let request = proto::PushEventsRequest { events };
+        let future = async move {
+            client
+                .push_events(request.into_request())
+                .map_ok(|_| ())
+                .map_err(|source| Error::Request { source })
                 .await
-                .into_iter()
-                .try_for_each(|v| match v {
-                    Ok(..) => Ok(()),
-                    Err(err) => Err(Error::Request { source: err }),
-                })
-        })
+        };
+
+        Box::pin(future)
     }
 }
 
-fn encode_event(event: Event) -> EncodedEvent<proto::EventRequest> {
-    let request = proto::EventRequest {
-        message: Some(event.into()),
-    };
+fn encode_event(event: Event) -> EncodedEvent<EventWrapper> {
+    let event: WithMetadata<EventWrapper> = event.into();
 
-    EncodedEvent::new(request)
+    EncodedEvent {
+        item: event.data,
+        metadata: Some(event.metadata),
+    }
 }
 
-impl EncodedLength for proto::EventRequest {
+impl EncodedLength for EventWrapper {
     fn encoded_length(&self) -> usize {
         self.encoded_len()
     }
@@ -271,13 +264,14 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkContext,
-        sinks::util::test::build_test_server,
+        sinks::util::test::build_test_server_status,
         test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::Bytes;
     use futures::{channel::mpsc, StreamExt};
-    use http::request::Parts;
+    use http::{request::Parts, StatusCode};
     use hyper::Method;
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[test]
     fn generate_config() {
@@ -296,15 +290,53 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
-
-        let (input_lines, events) = random_lines_with_stream(8, num_lines, None);
-        let pump = sink.run(events);
-
+        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::OK);
         tokio::spawn(server);
 
-        pump.await.unwrap();
+        let (batch, _receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        sink.run(events).await.unwrap();
         drop(trigger);
+        // This check fails, ref https://github.com/timberio/vector/issues/7624
+        // assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
+            assert_eq!(
+                "application/grpc",
+                parts.headers.get("content-type").unwrap().to_str().unwrap()
+            );
+        })
+        .await;
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    #[ignore] // This test hangs, possibly an infinite retry loop
+    async fn acknowledges_error() {
+        let num_lines = 10;
+
+        let in_addr = next_addr();
+
+        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config: VectorConfig = toml::from_str(&config).unwrap();
+
+        let cx = SinkContext::new_test();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+        tokio::spawn(server);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+
+        sink.run(events).await.unwrap();
+        drop(trigger);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
 
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
@@ -328,15 +360,26 @@ mod tests {
             assert_parts(parts);
 
             // Remove the grpc header, which is:
-            // 1 bytes for compressed/not compressed, plus a new line
-            // 4 bytes for the message len, plus a new line
+            // 1 bytes for compressed/not compressed
+            // 4 bytes for the message len
             // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
-            let proto_body = body.slice(7..);
-            let req = crate::event::proto::EventWrapper::decode(proto_body).unwrap();
-            let event: Event = req.into();
-            event.as_log().get("message").unwrap().to_string_lossy()
+            let proto_body = body.slice(5..);
+
+            let req = proto::PushEventsRequest::decode(proto_body).unwrap();
+
+            let mut events = Vec::with_capacity(req.events.len());
+            for event in req.events {
+                let event: Event = event.into();
+                let string = event.as_log().get("message").unwrap().to_string_lossy();
+                events.push(string)
+            }
+
+            events
         })
         .collect::<Vec<_>>()
         .await
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }

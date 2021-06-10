@@ -41,7 +41,6 @@ configuration: {
 							Sets the event key to use for the event message field.
 							"""
 						required: false
-						warnings: ["This option is deprecated in-lieu of using [`remap` transform][docs.transforms.remap] to rename fields"]
 						type: string: {
 							default: "message"
 							examples: ["message", "@message"]
@@ -55,7 +54,6 @@ configuration: {
 							Sets the event key to use for the event timestamp field.
 							"""
 						required: false
-						warnings: ["This option is deprecated in-lieu of using [`remap` transform][docs.transforms.remap] to rename fields"]
 						type: string: {
 							default: "timestamp"
 							examples: ["timestamp", "@timestamp"]
@@ -69,7 +67,6 @@ configuration: {
 							Sets the event key to use for the event host field.
 							"""
 						required: false
-						warnings: ["This option is deprecated in-lieu of using [`remap` transform][docs.transforms.remap] to rename fields"]
 						type: string: {
 							default: "host"
 							examples: ["host", "@host"]
@@ -84,7 +81,6 @@ configuration: {
 							field that is set by some sources.
 							"""
 						required: false
-						warnings: ["This option is deprecated in-lieu of using [`remap` transform][docs.transforms.remap] to rename fields"]
 						type: string: {
 							default: "source_type"
 							examples: ["source_type", "@source_type"]

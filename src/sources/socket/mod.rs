@@ -515,6 +515,7 @@ mod test {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,
+                acknowledgements: false,
             })
             .await
             .unwrap();

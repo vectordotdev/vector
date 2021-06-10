@@ -1,6 +1,5 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext},
-    event::{proto, Event},
     sinks::util::{tcp::TcpSinkConfig, EncodedEvent},
     sinks::{Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
@@ -11,6 +10,7 @@ use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_core::event::{proto, Event, WithMetadata};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
@@ -88,15 +88,19 @@ enum HealthcheckError {
 }
 
 fn encode_event(event: Event) -> EncodedEvent<Bytes> {
-    let event = proto::EventWrapper::from(event);
-    let event_len = event.encoded_len();
+    let event: WithMetadata<proto::EventWrapper> = event.into();
+    let WithMetadata { data, metadata } = event;
+    let event_len = data.encoded_len();
     let full_len = event_len + 4;
 
     let mut out = BytesMut::with_capacity(full_len);
     out.put_u32(event_len as u32);
-    event.encode(&mut out).unwrap();
+    data.encode(&mut out).unwrap();
 
-    EncodedEvent::new(out.into())
+    EncodedEvent {
+        item: out.into(),
+        metadata: Some(metadata),
+    }
 }
 
 #[cfg(test)]

@@ -80,7 +80,7 @@ impl FunctionTransform for RemoveFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -97,7 +97,9 @@ mod tests {
         let mut transform =
             RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
 
-        let result = transform.transform_one(log.into()).unwrap().into_log();
+        let result = transform_one(&mut transform, log.into())
+            .unwrap()
+            .into_log();
 
         assert_eq!(result, expected);
     }

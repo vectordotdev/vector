@@ -25,7 +25,6 @@ use std::borrow::Cow;
 
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
-pub use buffer::metrics::MetricEntry;
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};

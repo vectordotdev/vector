@@ -24,6 +24,14 @@ pub trait EncodeBytes<T> {
     where
         B: BufMut,
         Self: Sized;
+
+    /// Return the encoded byte size of `T`
+    ///
+    /// For some `T` it is not clear ahead of time how large the encoded size
+    /// will be. For such types the return will be `None`, otherwise `Some`.
+    fn encoded_size(&self) -> Option<usize> {
+        None
+    }
 }
 
 /// Decode a `T` from a `bytes` buffer, possibly unsuccessfully

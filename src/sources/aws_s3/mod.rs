@@ -265,7 +265,9 @@ mod integration_tests {
         line_agg,
         rusoto::RegionOrEndpoint,
         sources::util::MultilineConfig,
-        test_util::{collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines},
+        test_util::{
+            collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
+        },
         Pipeline,
     };
     use pretty_assertions::assert_eq;
@@ -275,6 +277,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_process_message() {
+        trace_init();
+
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
@@ -283,6 +287,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_process_message_special_characters() {
+        trace_init();
+
         let key = format!("special:{}", uuid::Uuid::new_v4().to_string());
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
@@ -292,6 +298,8 @@ mod integration_tests {
     #[tokio::test]
     async fn s3_process_message_gzip() {
         use std::io::Read;
+
+        trace_init();
 
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
@@ -309,6 +317,8 @@ mod integration_tests {
     #[tokio::test]
     async fn s3_process_message_multipart_gzip() {
         use std::io::Read;
+
+        trace_init();
 
         let key = uuid::Uuid::new_v4().to_string();
         let logs = lines_from_gzip_file("tests/data/multipart-gzip.log.gz");
@@ -328,6 +338,8 @@ mod integration_tests {
     async fn s3_process_message_multipart_zstd() {
         use std::io::Read;
 
+        trace_init();
+
         let key = uuid::Uuid::new_v4().to_string();
         let logs = lines_from_zst_file("tests/data/multipart-zst.log.zst");
 
@@ -344,6 +356,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_process_message_multiline() {
+        trace_init();
+
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = vec!["abc", "def", "geh"]
             .into_iter()

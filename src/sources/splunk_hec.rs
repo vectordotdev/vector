@@ -163,6 +163,7 @@ impl SplunkSource {
             .and(self.authorization())
             .and(splunk_channel)
             .and(warp::addr::remote())
+            .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
             .and(warp::body::bytes())
             .and_then(
@@ -170,6 +171,7 @@ impl SplunkSource {
                       _,
                       channel: Option<String>,
                       remote: Option<SocketAddr>,
+                      xff: Option<String>,
                       gzip: bool,
                       body: Bytes| {
                     let mut out = out
@@ -182,7 +184,7 @@ impl SplunkSource {
                             Box::new(body.reader())
                         };
 
-                        let events = stream::iter(EventIterator::new(reader, channel, remote));
+                        let events = stream::iter(EventIterator::new(reader, channel, remote, xff));
 
                         // `fn send_all` can be used once https://github.com/rust-lang/futures-rs/issues/2402
                         // is resolved.
@@ -216,6 +218,7 @@ impl SplunkSource {
             .and(self.authorization())
             .and(splunk_channel)
             .and(warp::addr::remote())
+            .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
             .and(warp::body::bytes())
             .and_then(
@@ -223,12 +226,12 @@ impl SplunkSource {
                       _,
                       channel: String,
                       remote: Option<SocketAddr>,
+                      xff: Option<String>,
                       gzip: bool,
                       body: Bytes| {
                     let out = out.clone();
                     async move {
-                        // Construct event parser
-                        let event = future::ready(raw_event(body, gzip, channel, remote));
+                        let event = future::ready(raw_event(body, gzip, channel, remote, xff));
                         futures::stream::once(event)
                             .forward(
                                 out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown)),
@@ -315,7 +318,6 @@ impl SplunkSource {
             .boxed()
     }
 }
-
 /// Constructs one or more events from json-s coming from reader.
 /// If errors, it's done with input.
 struct EventIterator<R: Read> {
@@ -332,17 +334,28 @@ struct EventIterator<R: Read> {
 }
 
 impl<R: Read> EventIterator<R> {
-    fn new(data: R, channel: Option<String>, remote: Option<SocketAddr>) -> Self {
+    fn new(
+        data: R,
+        channel: Option<String>,
+        remote: Option<SocketAddr>,
+        remote_addr: Option<String>,
+    ) -> Self {
         EventIterator {
             data,
             events: 0,
             channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
+                // Extract the host field with the given priority:
+                // 1. The host field is present in the event payload
+                // 2. The x-forwarded-for header is present in the incoming request
+                // 3. Use the `remote`: SocketAddr value provided by warp
                 DefaultExtractor::new_with(
                     "host",
                     log_schema().host_key(),
-                    remote.map(|addr| addr.to_string()).map(Value::from),
+                    remote_addr
+                        .or_else(|| remote.map(|addr| addr.to_string()))
+                        .map(Value::from),
                 ),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
@@ -580,6 +593,7 @@ fn raw_event(
     gzip: bool,
     channel: String,
     remote: Option<SocketAddr>,
+    xff: Option<String>,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -606,8 +620,12 @@ fn raw_event(
     // Add channel
     log.insert(CHANNEL, channel);
 
-    // Add host
-    if let Some(remote) = remote {
+    // host-field priority for raw endpoint:
+    // - x-forwarded-for is set to `host` field first, if present. If not present:
+    // - set remote addr to host field
+    if let Some(remote_address) = xff {
+        log.insert(log_schema().host_key(), remote_address);
+    } else if let Some(remote) = remote {
         log.insert(log_schema().host_key(), remote.to_string());
     }
 
@@ -854,29 +872,45 @@ mod tests {
         QueryParam(&'a str),
     }
 
-    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
-        send_with(address, api, message, TOKEN, Channel::Header("channel")).await
+    #[derive(Default)]
+    struct SendWithOpts<'a> {
+        channel: Option<Channel<'a>>,
+        forwarded_for: Option<String>,
     }
 
-    async fn send_with(
+    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
+        let channel = Channel::Header("channel");
+        let options = SendWithOpts {
+            channel: Some(channel),
+            forwarded_for: None,
+        };
+        send_with(address, api, message, TOKEN, &options).await
+    }
+
+    async fn send_with<'a>(
         address: SocketAddr,
         api: &str,
         message: &str,
         token: &str,
-        channel: Channel<'_>,
+        opts: &SendWithOpts<'_>,
     ) -> u16 {
-        let wrap_with_channel =
-            |b: reqwest::RequestBuilder, c: Channel| -> reqwest::RequestBuilder {
-                match c {
-                    Channel::Header(v) => b.header("x-splunk-request-channel", v),
-                    Channel::QueryParam(v) => b.query(&[("channel", v)]),
-                }
-            };
-
         let mut b = reqwest::Client::new()
             .post(&format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token));
-        b = wrap_with_channel(b, channel);
+
+        b = match opts.channel {
+            Some(c) => match c {
+                Channel::Header(v) => b.header("x-splunk-request-channel", v),
+                Channel::QueryParam(v) => b.query(&[("channel", v)]),
+            },
+            None => b,
+        };
+
+        b = match &opts.forwarded_for {
+            Some(f) => b.header("X-Forwarded-For", f),
+            None => b,
+        };
+
         b.body(message.to_owned())
             .send()
             .await
@@ -1041,20 +1075,83 @@ mod tests {
         let message = "raw";
         let (source, address) = source().await;
 
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+
         assert_eq!(
             200,
-            send_with(
-                address,
-                "services/collector/raw",
-                message,
-                TOKEN,
-                Channel::Header("guid")
-            )
-            .await
+            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
         );
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+    }
+
+    #[tokio::test]
+    async fn xff_header_raw() {
+        trace_init();
+
+        let message = "raw";
+        let (source, address) = source().await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: Some(String::from("10.0.0.1")),
+        };
+
+        assert_eq!(
+            200,
+            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
+    }
+
+    // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
+    #[tokio::test]
+    async fn xff_header_event_with_host_field() {
+        trace_init();
+
+        let message = r#"{"event":"first", "host": "10.1.0.2"}"#;
+        let (source, address) = source().await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: Some(String::from("10.0.0.1")),
+        };
+
+        assert_eq!(
+            200,
+            send_with(address, "services/collector/event", message, TOKEN, &opts).await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[log_schema().host_key()], "10.1.0.2".into());
+    }
+
+    // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
+    #[tokio::test]
+    async fn xff_header_event_without_host_field() {
+        trace_init();
+
+        let message = r#"{"event":"first", "color": "blue"}"#;
+        let (source, address) = source().await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: Some(String::from("10.0.0.1")),
+        };
+
+        assert_eq!(
+            200,
+            send_with(address, "services/collector/event", message, TOKEN, &opts).await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
     }
 
     #[tokio::test]
@@ -1064,16 +1161,14 @@ mod tests {
         let message = "raw";
         let (source, address) = source().await;
 
+        let opts = SendWithOpts {
+            channel: Some(Channel::QueryParam("guid")),
+            forwarded_for: None,
+        };
+
         assert_eq!(
             200,
-            send_with(
-                address,
-                "services/collector/raw",
-                message,
-                TOKEN,
-                Channel::QueryParam("guid")
-            )
-            .await
+            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
         );
 
         let event = collect_n(source, 1).await.remove(0);
@@ -1094,17 +1189,14 @@ mod tests {
         trace_init();
 
         let (_source, address) = source().await;
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("channel")),
+            forwarded_for: None,
+        };
 
         assert_eq!(
             401,
-            send_with(
-                address,
-                "services/collector/event",
-                "",
-                "nope",
-                Channel::Header("channel")
-            )
-            .await
+            send_with(address, "services/collector/event", "", "nope", &opts).await
         );
     }
 

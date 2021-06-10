@@ -1,8 +1,12 @@
 #![deny(missing_docs)]
 
 use atomig::{Atom, AtomInteger, Atomic, Ordering};
+use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 use std::iter::{self, ExactSizeIterator};
+use std::pin::Pin;
+use std::task::Poll;
 use std::{cmp, mem, sync::Arc};
 use tokio::sync::oneshot;
 
@@ -145,9 +149,36 @@ impl Drop for EventFinalizer {
     }
 }
 
-/// A convenience type alias for the one-shot receiver for an individual
-/// batch status.
-pub type BatchStatusReceiver = oneshot::Receiver<BatchStatus>;
+/// A convenience newtype wrapper for the one-shot receiver for an
+/// individual batch status.
+#[pin_project::pin_project]
+pub struct BatchStatusReceiver(oneshot::Receiver<BatchStatus>);
+
+impl Future for BatchStatusReceiver {
+    type Output = BatchStatus;
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        match self.0.poll_unpin(ctx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Ok(status)) => Poll::Ready(status),
+            Poll::Ready(Err(error)) => {
+                error!(message = "Batch status receiver dropped before sending.", %error);
+                Poll::Ready(BatchStatus::Errored)
+            }
+        }
+    }
+}
+
+impl BatchStatusReceiver {
+    /// Wrapper for the underlying `try_recv` function.
+    ///
+    /// # Errors
+    ///
+    /// - `TryRecvError::Empty` if no value has been sent yet.
+    /// - `TryRecvError::Closed` if the sender has dropped without sending a value.
+    pub fn try_recv(&mut self) -> Result<BatchStatus, oneshot::error::TryRecvError> {
+        self.0.try_recv()
+    }
+}
 
 /// A batch notifier contains the status of the current batch along with
 /// a one-shot notifier to send that status back to the source. It is
@@ -167,7 +198,7 @@ impl BatchNotifier {
             status: Atomic::new(BatchStatus::Delivered),
             notifier: Some(sender),
         };
-        (Arc::new(notifier), receiver)
+        (Arc::new(notifier), BatchStatusReceiver(receiver))
     }
 
     /// Update this notifier's status from the status of a finalized event.
@@ -290,7 +321,7 @@ impl EventStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::oneshot::{error::TryRecvError::Empty, Receiver};
+    use tokio::sync::oneshot::error::TryRecvError::Empty;
 
     #[test]
     fn defaults() {
@@ -394,7 +425,7 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
-    fn make_finalizer() -> (EventFinalizers, Receiver<BatchStatus>) {
+    fn make_finalizer() -> (EventFinalizers, BatchStatusReceiver) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
         let finalizer = EventFinalizers::new(EventFinalizer::new(batch));
         assert_eq!(finalizer.count_finalizers(), 1);

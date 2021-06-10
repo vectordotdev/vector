@@ -1,17 +1,14 @@
-pub use vector_core::event::lua;
-
 use crate::{
-    config::{DataType, CONFIG_PATHS},
+    config::{self, DataType, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
-    transforms::{
-        util::runtime_transform::{RuntimeTransform, Timer},
-        Transform,
-    },
+    transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
+pub use vector_core::event::lua;
+use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -58,9 +55,12 @@ fn default_config_paths() -> Vec<PathBuf> {
         Some(config_paths) => config_paths
             .clone()
             .into_iter()
-            .map(|(mut path_buf, _format)| {
-                path_buf.pop();
-                path_buf
+            .map(|config_path| match config_path {
+                config::ConfigPath::File(mut path, _format) => {
+                    path.pop();
+                    path
+                }
+                config::ConfigPath::Dir(path) => path,
             })
             .collect(),
         None => vec![],
