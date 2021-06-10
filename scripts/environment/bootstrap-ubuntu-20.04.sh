@@ -76,7 +76,7 @@ dpkg-reconfigure locales
 # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 20.04 images _and_
 # by our own Ubuntu 20.04 images, so this is really just make sure the path is configured.
 if [ -n "${CI-}" ] ; then
-  echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
+    echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 else
     echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
 fi
