@@ -320,6 +320,7 @@ haproxy:
 
   containerPorts:
     http: null
+    https: null
     vector: 9000
     datadog-logs: 8080
     syslog: 514
