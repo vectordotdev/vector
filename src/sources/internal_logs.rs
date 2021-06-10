@@ -72,31 +72,43 @@ mod tests {
         crate::test_util::test_generate_config::<InternalLogsConfig>();
     }
 
-    const ERROR_TEXT: &str = "This is not an error.";
-
     #[tokio::test]
     async fn receives_logs() {
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
-
-        let rx = start_source().await;
-        error!(message = ERROR_TEXT);
-        let logs = collect_output(rx).await;
-
-        check_events(logs, start);
-    }
-
-    #[tokio::test]
-    async fn receives_early_logs() {
-        let start = chrono::Utc::now();
-        trace::init(false, false, "debug");
         trace::reset_early_buffer();
-        error!(message = ERROR_TEXT);
+        error!(message = "Before source started.");
 
         let rx = start_source().await;
-        let logs = collect_output(rx).await;
 
-        check_events(logs, start);
+        error!(message = "After source started.");
+
+        sleep(Duration::from_millis(1)).await;
+        let events = collect_ready(rx).await;
+
+        let end = chrono::Utc::now();
+
+        assert_eq!(events.len(), 2);
+
+        assert_eq!(
+            events[0].as_log()["message"],
+            "Before source started.".into()
+        );
+        assert_eq!(
+            events[1].as_log()["message"],
+            "After source started.".into()
+        );
+
+        for event in events {
+            let log = event.as_log();
+            let timestamp = *log["timestamp"]
+                .as_timestamp()
+                .expect("timestamp isn't a timestamp");
+            assert!(timestamp >= start);
+            assert!(timestamp <= end);
+            assert_eq!(log["metadata.kind"], "event".into());
+            assert_eq!(log["metadata.level"], "ERROR".into());
+        }
     }
 
     async fn start_source() -> mpsc::Receiver<Event> {
@@ -110,26 +122,5 @@ mod tests {
         sleep(Duration::from_millis(1)).await;
         trace::stop_buffering();
         rx
-    }
-
-    async fn collect_output(rx: mpsc::Receiver<Event>) -> Vec<Event> {
-        sleep(Duration::from_millis(1)).await;
-        collect_ready(rx).await
-    }
-
-    fn check_events(events: Vec<Event>, start: chrono::DateTime<chrono::Utc>) {
-        let end = chrono::Utc::now();
-
-        assert_eq!(events.len(), 1);
-
-        let log = events[0].as_log();
-        assert_eq!(log["message"], ERROR_TEXT.into());
-        let timestamp = *log["timestamp"]
-            .as_timestamp()
-            .expect("timestamp isn't a timestamp");
-        assert!(timestamp >= start);
-        assert!(timestamp <= end);
-        assert_eq!(log["metadata.kind"], "event".into());
-        assert_eq!(log["metadata.level"], "ERROR".into());
     }
 }
