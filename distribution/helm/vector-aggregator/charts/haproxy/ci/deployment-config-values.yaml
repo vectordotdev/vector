@@ -1,0 +1,18 @@
+config: |
+  global
+    log stdout format raw local0
+    daemon
+    maxconn 1024
+
+  defaults
+    log global
+    timeout client 60s
+    timeout connect 60s
+    timeout server 60s
+
+  frontend fe_main
+    bind :80
+    default_backend be_main
+
+  backend be_main
+    server web1 10.0.0.1:8080 check

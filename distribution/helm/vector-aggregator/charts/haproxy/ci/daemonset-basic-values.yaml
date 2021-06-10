@@ -1,0 +1,2 @@
+kind: DaemonSet
+replicaCount: 2

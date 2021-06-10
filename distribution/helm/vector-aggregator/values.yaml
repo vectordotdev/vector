@@ -315,57 +315,52 @@ sinks:
 
 haproxy:
   enabled: true
-  image:
-    pullPolicy: IfNotPresent
-    repository: haproxy
-    tag: 2.4.0-alpine
   
-  replicas: 1
+  replicaCount: 1
 
-  serviceAccount:
-    # Specifies whether a service account should be created.
-    create: true
-    # Annotations to add to the service account.
-    annotations: {}
-    # The name of the service account to use.
-    # If not set and `create` is true, a name is generated using the `fullname`
-    # template.
-    name: ""
-    # Automount API credentials for a service account.
-    automountServiceAccountToken: true
+  containerPorts:
+    http: null
+    vector: 9000
+    datadog-logs: 8080
+    syslog: 514
 
-  # Annotations to add to the `Pod`s managed by the HAProxy `Deployment`.
-  podAnnotations: {}
+  config: |
+    global
+      log stdout local0
+      maxconn 4096
+      stats socket /tmp/haproxy
 
-  # Labels to add to the `Pod`s managed by the HAProxy `Deployment`.
-  podLabels: {}
+    defaults
+      log     global
+      option  dontlognull
+      retries 3
+      option  redispatch
+      timeout client 5s
+      timeout server 5s
+      timeout connect 5s
 
-  # Priority class name to add to the `Pod`s managed by the HAProxy `Deployment`.
-  podPriorityClassName: ""
+    resolvers coredns
+      nameserver dns1 kube-dns.kube-system.svc.{{ .Values.global.clusterDomain }}:53
+      resolve_retries 3
+      timeout resolve 2s
+      timeout retry 1s
+      accepted_payload_size 8192
+      hold valid 10s
+      hold obsolete 60s
 
-  # PodSecurityContext to set at the `Pod`s managed by the HAProxy `Deployment`.
-  podSecurityContext: {}
-    # fsGroup: 2000
+    frontend stats
+      mode http
+      bind *:1024
+      http-request use-service prometheus-exporter if { path /metrics }
 
-  # Security context to set at the `haproxy` container at the `Pod`s managed by
-  # `Deployment`.
-  securityContext: {}
-    # capabilities:
-    #   drop:
-    #   - ALL
-    # readOnlyRootFilesystem: true
-    # runAsNonRoot: true
-    # runAsUser: 1000
+    frontend vector
+      bind *:9000 proto h2
+      mode http
+      option httplog
+      default_backend vector
 
-  # Tolerations to set for the `Pod`s managed by the HAProxy `Deployment`.
-  tolerations: {}
-
-  # Various tweakables for the `Pod`s managed by the HAProxy `Deployment`.
-  resources: {}
-  nodeSelector: {}
-  affinity: {}
-
-  # Configuration for the HAProxy `Service`.
-  service:
-    # Service type - defaults to `ClusterIP`.
-    type: "ClusterIP"
+    backend vector
+      mode http
+      balance roundrobin
+      option tcp-check
+      server-template srv 5 _vector._tcp.{{ include "libvector.fullname" . }}-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns proto h2 check

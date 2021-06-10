@@ -1,0 +1,50 @@
+HAProxy has been has been successfully installed. This Chart is used to run HAProxy as a regular application,
+as opposed to HAProxy Ingress Controller Chart.
+
+Controller image deployed is: "{{ .Values.image.repository }}:{{ tpl .Values.image.tag . }}".
+Your HAProxy app is of a "{{ .Values.kind }}" kind.
+
+Service ports mapped are:
+{{- if eq .Values.kind "Deployment" }}
+{{- range $key, $value := .Values.containerPorts }}
+  - name: {{ $key }}
+    containerPort: {{ $value }}
+    protocol: TCP
+{{- end }}
+{{- end }}
+{{- if eq .Values.kind "DaemonSet" }}
+{{- $hostPorts := .Values.daemonset.hostPorts -}}
+{{- $useHostPort := .Values.daemonset.useHostPort -}}
+{{- range $key, $value := .Values.containerPorts }}
+  - name: {{ $key }}
+    containerPort: {{ $value }}
+    protocol: TCP
+    {{- if $useHostPort }}
+    hostPort: {{ index $hostPorts $key | default $value }}
+    {{- end }}
+{{- end }}
+{{- end }}
+
+To be able to bind to privileged ports as non-root, the following is required:
+
+securityContext:
+  enabled: true
+  runAsUser: 1000
+  runAsGroup: 1000
+initContainers:
+  - name: sysctl
+    image: "busybox:musl"
+    command:
+      - /bin/sh
+      - -c
+      - sysctl -w net.ipv4.ip_unprivileged_port_start=0
+    securityContext:
+      privileged: true
+
+Node IP can be found with:
+  $ kubectl --namespace {{ .Release.Namespace }} get nodes -o jsonpath="{.items[0].status.addresses[1].address}"
+
+For more examples and up to date documentation, please visit:
+  * Helm chart documentation: https://github.com/haproxytech/helm-charts/tree/main/haproxy
+  * HAProxy Alpine Docker container documentation: https://github.com/haproxytech/haproxy-docker-alpine
+  * HAProxy documentation: https://www.haproxy.org/download/2.2/doc/configuration.txt

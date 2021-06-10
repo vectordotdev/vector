@@ -1,0 +1,13 @@
+kind: DaemonSet
+containerPorts:
+  http: 8080
+  https: 8443
+  stat: 8024
+daemonset:
+  useHostNetwork: true
+  useHostPort: true
+  hostPorts:
+    http: 8080
+    https: 8443
+    stat: 8024
+dnsPolicy: ClusterFirstWithHostNet
