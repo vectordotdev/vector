@@ -24,7 +24,7 @@ contentDir = "content/en"
 weight = 1
 
 [params]
-description = "A lightweight and ultra-fast tool for building observability pipelines"
+description = "A lightweight, ultra-fast tool for building observability pipelines"
 tagline = "Take control of your observability stack"
 undertagline = "Collect, transform, and route all your observability data with one simple tool"
 subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 companies and startups"

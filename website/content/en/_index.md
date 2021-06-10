@@ -42,4 +42,28 @@ why: [
     icon: "laptop.svg"
   }
 ]
+
+# Installation icons
+installation: [
+  {
+    logo: "kubernetes.svg",
+    url: "/docs/setup/installation/platforms/kubernetes"
+  },
+  {
+    logo: "docker.svg",
+    url: "/docs/setup/installation/platforms/docker"
+  },
+]
+
+# Install commands
+commands: [
+  {
+    title: "For humans",
+    cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
+  },
+  {
+    title: "For machines",
+    cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh -s -- -y"
+  }
+]
 ---

@@ -3,8 +3,8 @@
 {{ $subtagline := site.Params.subtagline }}
 {{ $latest := index site.Data.docs.versions 0 }}
 {{ $link := printf "releases/%s" $latest | relURL }}
-<div class="relative pt-6 pb-16 sm:pb-24">
-  <div class="my-16 sm:mt-24 px-4 sm:px-6 text-center lg:text-left mx-auto max-w-7xl">
+<div class="py-16 md:py-20 lg:py-24 relative bg-gradient-to-r from-white to-gray-100 dark:from-dark dark:to-black">
+  <div class="px-4 sm:px-6 text-center lg:text-left mx-auto max-w-7xl">
     <a href="{{ $link }}" class="dark:bg-gray-800 bg-gradient-to-r uppercase from-primary to-purple-v inline-flex items-center text-white rounded-full py-1 px-1.5 sm:text-base lg:text-sm xl:text-base hover:text-gray-100">
       <span class="bg-black text-white font-semibold px-2.5 py-0 lg:py-0.5 text-xs leading-5 tracking-tight rounded-full">
         New
