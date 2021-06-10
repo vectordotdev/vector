@@ -70,8 +70,7 @@ pub struct ElasticSearchConfig {
 impl ElasticSearchConfig {
     fn bulk_action(&self) -> crate::Result<Template> {
         let value = self.bulk_action.as_deref().unwrap_or("index");
-        let value = Template::try_from(value).context(BatchActionTemplate)?;
-        Ok(value)
+        Ok(Template::try_from(value).context(BatchActionTemplate)?)
     }
 }
 
