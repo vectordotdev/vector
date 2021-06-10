@@ -20,7 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -37,7 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -62,7 +60,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -80,7 +77,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -106,7 +102,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -131,7 +126,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
