@@ -2,8 +2,10 @@
 use crate::node::{
     BooleanBuilder, Comparison, ComparisonValue, LuceneClause, LuceneOccur, QueryNode, Range,
 };
+
 use itertools::Itertools;
 use pest::iterators::Pair;
+
 #[derive(Debug, Parser)]
 #[grammar = "grammar.pest"]
 pub struct EventPlatformQuery;

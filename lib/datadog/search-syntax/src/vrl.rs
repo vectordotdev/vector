@@ -86,7 +86,7 @@ pub fn make_queries<T: AsRef<str>>(field: T) -> Vec<(Field, ast::Expr)> {
         .collect()
 }
 
-/// Makes a Regex string to be used with the `match`.
+/// Makes a Regex string to be used with the `match` function for word boundary matching.
 pub fn make_regex<T: AsRef<str>>(value: T) -> ast::Expr {
     ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
         "\\b{}\\b",
@@ -168,7 +168,7 @@ pub fn recurse<I: ExactSizeIterator<Item = impl Into<ast::Expr>>>(exprs: I) -> a
     recurse_op(exprs, ast::Opcode::Or)
 }
 
-/// Wraps expressions in an infallibility check by transforming to <query> ?? false.
+/// Coalesces an expression to <query> ?? false to avoid fallible states.
 pub fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
     make_op(
         make_node(expr.into()),

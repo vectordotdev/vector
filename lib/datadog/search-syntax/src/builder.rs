@@ -7,8 +7,12 @@ use super::{
         make_queries, make_regex, make_string_comparison, recurse, recurse_op,
     },
 };
+
 use vrl_parser::ast;
 
+/// Builds a VRL expression. Building an expression means converting each leaf of a
+/// `QueryNode` into an equilvalent VRL `Expr`, and tracking whether any of its sub-expressions
+/// require final coalescence to a `false` value to avoid error states.
 pub struct Builder {
     coalesce: bool,
 }
@@ -20,10 +24,13 @@ impl Default for Builder {
 }
 
 impl Builder {
+    /// Default to not requiring coalescence, since it is an error to use it when not needed.
     pub fn new() -> Self {
         Self { coalesce: false }
     }
 
+    /// Build a VRL expression from a `&QueryNode`. Will recurse through each leaf element
+    /// as required, and coalesce the final expression to false if a fallible expression is found.
     pub fn build(mut self, node: &QueryNode) -> ast::Expr {
         let expr = recurse(self.parse_node(&node).into_iter());
 
@@ -34,10 +41,13 @@ impl Builder {
         }
     }
 
+    /// Indicate that coalescence is required in the final expression
     fn coalesce(&mut self) {
         self.coalesce = true;
     }
 
+    /// Parse the provided Datadog `QueryNode`. This will return a vector of VRL expressions,
+    /// in order to accommodate expansion to multiple fields where relevant.
     fn parse_node(&mut self, node: &QueryNode) -> Vec<ast::Expr> {
         match node {
             // Match everything.
@@ -199,7 +209,7 @@ mod tests {
     use crate::{compile, parse};
     use vrl_parser::ast;
 
-    // Datadog search syntax -> VRL
+    // Lhs = Datadog syntax. Rhs = VRL equivalent.
     static TESTS: &[(&str, &str)] = &[
         // Match everything (empty).
         ("", "(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
@@ -466,7 +476,8 @@ mod tests {
 
     #[test]
     /// Compile each Datadog search query -> VRL, and do the same with the equivalent direct
-    /// VRL syntax, and then compare the results.
+    /// VRL syntax, and then compare the results. Each expression should match identically to
+    /// the debugging output.
     fn to_vrl() {
         for (dd, vrl) in TESTS.iter() {
             let node =
@@ -488,7 +499,8 @@ mod tests {
     }
 
     #[test]
-    /// Test that the program compiles, and has the right number of expressions.
+    /// Test that the program compiles, and has the right number of expressions (which should
+    /// be initial Datadog tags parsing, and a subsequent query against tags and other fields.)
     fn compiles() {
         for (dd, _) in TESTS.iter() {
             let node = parse(dd).unwrap();
