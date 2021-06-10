@@ -307,18 +307,20 @@ fn create_consumer(
 mod test {
     use super::*;
 
+    pub(super) const BOOTSTRAP_SERVER: &str = "localhost:9091";
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<KafkaSourceConfig>();
     }
 
-    fn make_config() -> KafkaSourceConfig {
+    pub(super) fn make_config(topic: &str, group: &str) -> KafkaSourceConfig {
         KafkaSourceConfig {
-            bootstrap_servers: "localhost:9092".to_string(),
-            topics: vec!["my-topic".to_string()],
-            group_id: "group-id".to_string(),
-            auto_offset_reset: "earliest".to_string(),
-            session_timeout_ms: 10000,
+            bootstrap_servers: BOOTSTRAP_SERVER.into(),
+            topics: vec![topic.into()],
+            group_id: group.into(),
+            auto_offset_reset: "beginning".into(),
+            session_timeout_ms: 6000,
             commit_interval_ms: 5000,
             key_field: "message_key".to_string(),
             topic_key: "topic".to_string(),
@@ -333,7 +335,7 @@ mod test {
 
     #[tokio::test]
     async fn consumer_create_ok() {
-        let config = make_config();
+        let config = make_config("topic", "group");
         assert!(create_consumer(&config).is_ok());
     }
 
@@ -341,7 +343,7 @@ mod test {
     async fn consumer_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
-            ..make_config()
+            ..make_config("topic", "group")
         };
         assert!(create_consumer(&config).is_err());
     }
@@ -350,6 +352,7 @@ mod test {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
+    use super::test::*;
     use super::*;
     use crate::{
         shutdown::ShutdownSignal,
@@ -418,22 +421,7 @@ mod integration_test {
         let group_id = format!("test-group-{}", random_string(10));
         let now = Utc::now();
 
-        let config = KafkaSourceConfig {
-            bootstrap_servers: BOOTSTRAP_SERVER.into(),
-            topics: vec![topic.clone()],
-            group_id: group_id.clone(),
-            auto_offset_reset: "beginning".into(),
-            session_timeout_ms: 6000,
-            commit_interval_ms: 5000,
-            key_field: "message_key".to_string(),
-            topic_key: "topic".to_string(),
-            partition_key: "partition".to_string(),
-            offset_key: "offset".to_string(),
-            headers_key: "headers".to_string(),
-            socket_timeout_ms: 60000,
-            fetch_wait_max_ms: 100,
-            ..Default::default()
-        };
+        let config = make_config(&topic, &group_id);
 
         send_events(
             topic.clone(),
@@ -447,9 +435,8 @@ mod integration_test {
         .await;
 
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
-        let consumer = create_consumer(&config).unwrap();
         tokio::spawn(kafka_source(
-            consumer,
+            create_consumer(&config).unwrap(),
             config.key_field,
             config.topic_key,
             config.partition_key,
