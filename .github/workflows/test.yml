@@ -228,6 +228,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: choco install llvm
+      - run: .\scripts\environment\bootstrap-windows-2019.ps1
       - run: Get-Command cargo
       - run: Get-Command sccache
       - name: Start sccache
