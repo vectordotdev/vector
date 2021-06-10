@@ -103,10 +103,19 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make slim-builds
       - run: make test
         env:
           CARGO_BUILD_JOBS: 6
+      - name: Stop sccache
+        run: sccache --stop-server
 
   test-misc:
     name: Miscellaneous - Linux
@@ -128,11 +137,20 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make slim-builds
       - run: make test-shutdown
       - run: make test-cli
       - run: make test-behavior
       - run: make check-examples
+      - name: Stop sccache
+        run: sccache --stop-server
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
@@ -211,7 +229,16 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: choco install llvm
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make test
+      - name: Stop sccache
+        run: sccache --stop-server
 
   test-vrl:
     name: VRL - Linux
@@ -230,7 +257,16 @@ jobs:
               -xvf "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz" \
               -C "${TEMP}"
           sudo cp "${TEMP}/cue" /usr/bin/cue
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make test-vrl
+      - name: Stop sccache
+        run: sccache --stop-server
 
   check-component-features:
     name: Component Features - Linux
@@ -243,10 +279,19 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: cargo install cargo-hack
       - run: make check-component-features
         env:
           RUSTFLAGS: "-D warnings"
+      - name: Stop sccache
+        run: sccache --stop-server
 
   checks:
     name: Checks
@@ -269,6 +314,13 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - name: Make slim-builds
         run: make slim-builds
       - name: Check markdown
@@ -312,6 +364,8 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check licenses
+      - name: Stop sccache
+        run: sccache --stop-server
 
   master-failure:
     name: master-failure
