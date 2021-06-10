@@ -19,7 +19,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -35,7 +35,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -59,7 +59,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -76,7 +76,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -101,7 +101,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -125,7 +125,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -526,7 +526,7 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
           path: target/artifacts
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: |
           export SHA1="${{ github.sha }}"
@@ -540,7 +540,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: |
           export GITHUB_TOKEN="${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}"
