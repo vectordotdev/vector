@@ -162,6 +162,61 @@ components: sinks: elasticsearch: {
 				syntax: "template"
 			}
 		}
+		data_stream: {
+			common:      false
+			description: "Options for the data stream mode."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					auto_routing: {
+						description: """
+							Automatically routes events by deriving the data stream name using specific event fields with the `data_stream.type-data_stream.dataset-data_stream.namespace` format.
+
+							If enabled, the data_stream.* event fields will take precedence over the data_stream.type, data_stream.dataset, and data_stream.namespace settings, but will fall back to them if any of the fields are missing from the event.
+						"""
+						required: false
+						warnings: []
+						type: string: {
+							default: "generic"
+							examples: ["generic", "nginx"]
+							syntax: "literal"
+						}
+					}
+					dataset: {
+						description: "The data stream dataset used to construct the data stream at index time."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "generic"
+							examples: ["generic", "nginx"]
+							syntax: "literal"
+						}
+					}
+					namespace: {
+						description: "The data stream namespace used to construct the data stream at index time."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "default"
+							examples: ["default"]
+							syntax: "literal"
+						}
+					}
+					type: {
+						description: "The data stream type used to construct the data stream at index time."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "logs"
+							examples: ["logs", "metrics", "synthetics"]
+							syntax: "literal"
+						}
+					}
+				}
+			}
+		}
 		doc_type: {
 			common:      false
 			description: "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
@@ -257,9 +312,8 @@ components: sinks: elasticsearch: {
 		data_streams: {
 			title: "Data streams"
 			body: """
-				By default, Vector will use the `index` action with Elasticsearch's Bulk API.
-				To use [Data streams][urls.elasticsearch_data_streams], `bulk_action` must be configured
-				with the `create` option.
+				To use [Data streams][urls.elasticsearch_data_streams], set the `mode` to `data_stream`.
+				The `index` is not used but use the combination of `data_stream.type`, `data_stream.dataset` and `data_stream.namespace`.
 				"""
 		}
 
