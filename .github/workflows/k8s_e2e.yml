@@ -95,14 +95,12 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.20.0",
+              "v1.15.1",
             ]
             const kubernetes_version = [
-              { version: "v1.21.1", is_essential: true }, // Has a known performance issue on cluster startup. It might take 2 to 3 minutes for a cluster to start.
-              { version: "v1.20.7" }, // Has a known performance issue on cluster startup. It might take 2 to 3 minutes for a cluster to start.
-              { version: "v1.19.11" },
-              { version: "v1.18.19" },
-              { version: "v1.17.17" },
+              { version: "v1.19.2", is_essential: true },
+              { version: "v1.18.9" },
+              { version: "v1.17.12" },
               { version: "v1.16.15" },
               { version: "v1.15.12" },
             ]
