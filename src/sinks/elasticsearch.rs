@@ -71,12 +71,12 @@ pub struct ElasticSearchConfig {
 }
 
 impl ElasticSearchConfig {
-    fn bulk_action(&self) -> crate::Result<Template> {
-        let value = match self.mode {
-            ElasticSearchMode::Regular => self.bulk_action.as_deref().unwrap_or("index"),
-            ElasticSearchMode::DataStream => "create",
-        };
-        Ok(Template::try_from(value).context(BatchActionTemplate)?)
+    fn bulk_action(&self) -> crate::Result<Option<Template>> {
+        Ok(self
+            .bulk_action
+            .as_ref()
+            .map(|value| Template::try_from(value.as_str()).context(BatchActionTemplate))
+            .transpose()?)
     }
 
     fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
@@ -84,7 +84,8 @@ impl ElasticSearchConfig {
             ElasticSearchMode::Regular => {
                 let index = self.index.as_deref().unwrap_or("vector-%Y.%m.%d");
                 let index = Template::try_from(index).context(IndexTemplate)?;
-                Ok(ElasticSearchCommonMode::Regular { index })
+                let bulk_action = self.bulk_action()?;
+                Ok(ElasticSearchCommonMode::Regular { index, bulk_action })
             }
             ElasticSearchMode::DataStream => Ok(ElasticSearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
@@ -324,14 +325,17 @@ impl SinkConfig for ElasticSearchConfig {
 
 #[derive(Debug)]
 enum ElasticSearchCommonMode {
-    Regular { index: Template },
+    Regular {
+        index: Template,
+        bulk_action: Option<Template>,
+    },
     DataStream(DataStreamConfig),
 }
 
 impl ElasticSearchCommonMode {
     fn index(&self, event: &Event) -> Option<String> {
         match self {
-            Self::Regular { index } => index
+            Self::Regular { index, .. } => index
                 .render_string(event)
                 .map_err(|error| {
                     emit!(TemplateRenderingFailed {
@@ -342,6 +346,27 @@ impl ElasticSearchCommonMode {
                 })
                 .ok(),
             Self::DataStream(ds) => Some(ds.index(event)),
+        }
+    }
+
+    fn bulk_action(&self, event: &Event) -> Option<BulkAction> {
+        match self {
+            ElasticSearchCommonMode::Regular { bulk_action, .. } => match bulk_action {
+                Some(template) => template
+                    .render_string(event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingFailed {
+                            error,
+                            field: Some("bulk_action"),
+                            drop_event: true,
+                        });
+                    })
+                    .ok()
+                    .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
+                None => Some(BulkAction::Index),
+            },
+            // avoid the interpolation
+            ElasticSearchCommonMode::DataStream(_) => Some(BulkAction::Create),
         }
     }
 
@@ -368,7 +393,6 @@ pub struct ElasticSearchCommon {
     region: Region,
     request: RequestConfig,
     query_params: HashMap<String, String>,
-    bulk_action: Template,
 }
 
 #[derive(Debug, Snafu)]
@@ -386,20 +410,6 @@ enum ParseError {
 }
 
 impl ElasticSearchCommon {
-    fn bulk_action(&self, event: &Event) -> Option<BulkAction> {
-        self.bulk_action
-            .render_string(event)
-            .map_err(|error| {
-                emit!(TemplateRenderingFailed {
-                    error,
-                    field: Some("bulk_action"),
-                    drop_event: true,
-                });
-            })
-            .ok()
-            .and_then(|value| BulkAction::try_from(value.as_str()).ok())
-    }
-
     fn build_action(
         &self,
         index: &str,
@@ -434,7 +444,7 @@ impl HttpSink for ElasticSearchCommon {
             cfg.update_timestamp(&mut event);
         }
 
-        let bulk_action = self.bulk_action(&event)?;
+        let bulk_action = self.mode.bulk_action(&event)?;
         let action = self.build_action(&index, &bulk_action, &mut event);
 
         let mut body = serde_json::to_vec(&action).unwrap();
@@ -647,7 +657,6 @@ impl ElasticSearchCommon {
         }
         let bulk_url = format!("{}/_bulk?{}", base_url, query.finish());
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
-        let bulk_action = config.bulk_action()?;
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let mut config = config.clone();
@@ -657,7 +666,6 @@ impl ElasticSearchCommon {
         Ok(Self {
             authorization,
             base_url,
-            bulk_action,
             bulk_uri,
             compression,
             credentials,
@@ -932,7 +940,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("idx", "purple");
-        let action = es.bulk_action(&event);
+        let action = es.mode.bulk_action(&event);
         assert!(action.is_none());
     }
 
@@ -947,7 +955,7 @@ mod tests {
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
         let event = Event::from("hello there");
-        let action = es.bulk_action(&event).unwrap();
+        let action = es.mode.bulk_action(&event).unwrap();
         assert!(matches!(action, BulkAction::Create));
     }
 
