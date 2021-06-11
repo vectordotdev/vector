@@ -1,34 +1,16 @@
-{{/*
-Copyright 2020 HAProxy Technologies LLC
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/}}
-
-{{- if eq .Values.kind "Deployment" }}
+{{- if .Values.haproxy.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "haproxy.fullname" . }}
+  name: {{ include "libvector.fullname" . }}
   labels:
     {{- include "haproxy.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: {{ .Values.haproxy.replicaCount }}
   selector:
     matchLabels:
       {{- include "haproxy.selectorLabels" . | nindent 6 }}
-  {{- with .Values.strategy }}
+  {{- with .Values.haproxy.strategy }}
   strategy:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -36,94 +18,83 @@ spec:
     metadata:
       labels:
         {{- include "haproxy.selectorLabels" . | nindent 8 }}
-        {{- if .Values.podLabels }}
-{{ toYaml .Values.podLabels | indent 8 }}
+        {{- if .Values.haproxy.podLabels }}
+{{ toYaml .Values.haproxy.podLabels | indent 8 }}
         {{- end }}
       annotations:
-        checksum/environment: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-      {{- if .Values.podAnnotations }}
-{{ toYaml .Values.podAnnotations | indent 8 }}
+        checksum/environment: {{ include (print $.Template.BasePath "/haproxy/configmap.yaml") . | sha256sum }}
+      {{- if .Values.haproxy.podAnnotations }}
+{{ toYaml .Values.haproxy.podAnnotations | indent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ include "haproxy.serviceAccountName" . }}
-      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "libvector.serviceAccountName" . }}-haproxy
+      terminationGracePeriodSeconds: {{ .Values.haproxy.terminationGracePeriodSeconds }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-{{- if .Values.dnsConfig }}
-      dnsConfig:
-{{ toYaml .Values.dnsConfig | indent 8 }}
-{{- end }}
-      dnsPolicy: {{ .Values.dnsPolicy }}
-{{- if .Values.imageCredentials.registry }}
-      imagePullSecrets:
-      - name: {{ include "haproxy.fullname" . }}
-{{- else if .Values.existingImagePullSecret }}
-      imagePullSecrets:
-      - name: {{ .Values.existingImagePullSecret }}
-{{- end }}
-{{- if .Values.priorityClassName }}
-      priorityClassName: {{ .Values.priorityClassName }}
+        {{- toYaml .Values.haproxy.podSecurityContext | nindent 8 }}
+      {{- include "libvector.imagePullSecrets" . | indent 6 }}
+{{- if .Values.haproxy.priorityClassName }}
+      priorityClassName: {{ .Values.haproxy.priorityClassName }}
 {{- end }}
       volumes:
         - name: haproxy-config
           configMap:
-            name: {{ include "haproxy.fullname" . }}
-        {{- range $mountedSecret := .Values.mountedSecrets }}
+            name: {{ include "libvector.fullname" . }}-haproxy
+        {{- range $mountedSecret := .Values.haproxy.mountedSecrets }}
         - name: {{ $mountedSecret.volumeName }}
           secret:
             secretName: {{ $mountedSecret.secretName }}
         {{- end }}
-        {{- with.Values.extraVolumes }}
+        {{- with.Values.haproxy.extraVolumes }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
       containers:
-        - name: {{ .Chart.Name }}
-          {{- if .Values.securityContext.enabled }}
+        - name: haproxy
+          {{- if .Values.haproxy.securityContext.enabled }}
           securityContext:
-            runAsUser: {{ .Values.securityContext.runAsUser }}
-            runAsGroup: {{ .Values.securityContext.runAsGroup }}
+            runAsUser: {{ .Values.haproxy.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.haproxy.securityContext.runAsGroup }}
             capabilities:
               drop:
                 - ALL
               add:
                 - NET_BIND_SERVICE
           {{- end }}
-          image: "{{ .Values.image.repository }}:{{ tpl .Values.image.tag . }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.haproxy.image.repository }}:{{ .Values.haproxy.image.tag }}"
+          imagePullPolicy: {{ .Values.haproxy.image.pullPolicy }}
           args:
             - -f
             - /usr/local/etc/haproxy/haproxy.cfg
           ports:
-          {{- range $key, $value := .Values.containerPorts }}
+          {{- range $key, $value := .Values.haproxy.containerPorts }}
             - name: {{ $key }}
               containerPort: {{ $value }}
               protocol: TCP
           {{- end }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.haproxy.resources | nindent 12 }}
           volumeMounts:
             - name: haproxy-config
               mountPath: /usr/local/etc/haproxy
-            {{- with.Values.extraVolumeMounts }}
+            {{- with.Values.haproxy.extraVolumeMounts }}
               {{- toYaml . | nindent 12 }}
             {{- end }}
-            {{- range $mountedSecret := .Values.mountedSecrets }}
+            {{- range $mountedSecret := .Values.haproxy.mountedSecrets }}
             - name: {{ $mountedSecret.volumeName }}
               mountPath: {{ $mountedSecret.mountPath }}
             {{- end }}
-      {{- with.Values.initContainers }}
+      {{- with.Values.haproxy.initContainers }}
       initContainers:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.nodeSelector }}
+      {{- with .Values.haproxy.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with .Values.haproxy.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- with .Values.haproxy.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
