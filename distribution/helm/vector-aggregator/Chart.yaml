@@ -15,7 +15,3 @@ dependencies:
   - name: vector-shared
     version: "*"
     repository: file://../vector-shared
-  - name: haproxy
-    version: "~1.3.0"
-    repository: "https://haproxytech.github.io/helm-charts"
-    condition: haproxy.enabled
