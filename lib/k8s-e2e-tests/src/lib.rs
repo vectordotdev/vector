@@ -77,7 +77,7 @@ pub fn config_override_name(config: &str, name: &str, cleanup: bool) -> String {
           - name: var-lib
             mountPath: /var/writablelib
             readOnly: false
-         
+
         lifecycle:
           preStop:
             exec:
