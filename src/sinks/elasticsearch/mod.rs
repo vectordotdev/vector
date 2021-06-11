@@ -531,7 +531,7 @@ impl ElasticSearchCommon {
 
         emit!(ElasticSearchEventEncoded {
             byte_size: body.len(),
-            index: index.into(),
+            index,
         });
 
         Some(EncodedEvent::new(body))
