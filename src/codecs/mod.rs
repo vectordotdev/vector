@@ -12,15 +12,12 @@ use vector_core::{event::Event, transform::Transform};
 pub trait Codec: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn name(&self) -> &'static str;
 
-    fn build(&self, hint: CodecHint) -> crate::Result<CodecTransform>;
+    fn build_decoder(&self) -> crate::Result<CodecTransform>;
+
+    fn build_encoder(&self) -> crate::Result<CodecTransform>;
 }
 
 dyn_clone::clone_trait_object!(Codec);
-
-pub enum CodecHint {
-    Decoder,
-    Encoder,
-}
 
 pub struct CodecTransform {
     pub input_type: DataType,

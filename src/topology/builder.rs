@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    codecs::{CodecHint, CodecTransform},
+    codecs::CodecTransform,
     config::{DataType, SinkContext, SourceContext},
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
@@ -64,10 +64,10 @@ pub async fn build_pieces(
             let CodecTransform {
                 transform,
                 input_type,
-            } = match codec.build(CodecHint::Decoder) {
+            } = match codec.build_decoder() {
                 Ok(transform) => transform,
                 Err(error) => {
-                    errors.push(format!("Codec \"{}\": {}", name, error));
+                    errors.push(format!("Decoder \"{}\": {}", name, error));
                     continue;
                 }
             };

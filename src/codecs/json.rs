@@ -1,4 +1,4 @@
-use super::{Codec, CodecHint, CodecTransform};
+use super::{Codec, CodecTransform};
 use crate::{
     config::DataType,
     transforms::json_parser::{JsonParser, JsonParserConfig},
@@ -24,7 +24,12 @@ pub struct JsonCodec {
     overwrite_target: bool,
 }
 
-impl JsonCodec {
+#[typetag::serde(name = "json")]
+impl Codec for JsonCodec {
+    fn name(&self) -> &'static str {
+        "json"
+    }
+
     fn build_decoder(&self) -> crate::Result<CodecTransform> {
         let config = JsonParserConfig {
             field: self.field.clone(),
@@ -95,20 +100,6 @@ impl JsonCodec {
     }
 }
 
-#[typetag::serde(name = "json")]
-impl Codec for JsonCodec {
-    fn name(&self) -> &'static str {
-        "json"
-    }
-
-    fn build(&self, hint: CodecHint) -> crate::Result<CodecTransform> {
-        match (self.mode, hint) {
-            (Some(Mode::Decode), _) | (None, CodecHint::Decoder) => self.build_decoder(),
-            (Some(Mode::Encode), _) | (None, CodecHint::Encoder) => self.build_encoder(),
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Mode {
@@ -121,7 +112,7 @@ inventory::submit! {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use futures::stream::{self, StreamExt};
     use shared::btreemap;
@@ -129,7 +120,7 @@ mod test {
     #[tokio::test]
     async fn default_decoder() {
         let codec = JsonCodec::default();
-        let transform = codec.build(CodecHint::Decoder).unwrap().transform;
+        let transform = codec.build_decoder().unwrap().transform;
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
         log.insert(log_schema().message_key(), r#"{"foo":"bar"}"#);
@@ -150,7 +141,7 @@ mod test {
     #[tokio::test]
     async fn default_encoder() {
         let codec = JsonCodec::default();
-        let transform = codec.build(CodecHint::Encoder).unwrap().transform;
+        let transform = codec.build_encoder().unwrap().transform;
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
         log.insert(
