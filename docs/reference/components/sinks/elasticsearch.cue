@@ -271,8 +271,8 @@ components: sinks: elasticsearch: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: "regular"
-				examples: ["regular", "data_stream"]
+				default: "normal"
+				examples: ["normal", "data_stream"]
 				syntax: "literal"
 			}
 		}

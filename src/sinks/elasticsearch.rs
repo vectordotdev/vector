@@ -81,11 +81,11 @@ impl ElasticSearchConfig {
 
     fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
         match self.mode {
-            ElasticSearchMode::Regular => {
+            ElasticSearchMode::Normal => {
                 let index = self.index.as_deref().unwrap_or("vector-%Y.%m.%d");
                 let index = Template::try_from(index).context(IndexTemplate)?;
                 let bulk_action = self.bulk_action()?;
-                Ok(ElasticSearchCommonMode::Regular { index, bulk_action })
+                Ok(ElasticSearchCommonMode::Normal { index, bulk_action })
             }
             ElasticSearchMode::DataStream => Ok(ElasticSearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
@@ -229,13 +229,13 @@ pub enum ElasticSearchAuth {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticSearchMode {
-    Regular,
+    Normal,
     DataStream,
 }
 
 impl Default for ElasticSearchMode {
     fn default() -> Self {
-        Self::Regular
+        Self::Normal
     }
 }
 
@@ -325,7 +325,7 @@ impl SinkConfig for ElasticSearchConfig {
 
 #[derive(Debug)]
 enum ElasticSearchCommonMode {
-    Regular {
+    Normal {
         index: Template,
         bulk_action: Option<Template>,
     },
@@ -335,7 +335,7 @@ enum ElasticSearchCommonMode {
 impl ElasticSearchCommonMode {
     fn index(&self, event: &Event) -> Option<String> {
         match self {
-            Self::Regular { index, .. } => index
+            Self::Normal { index, .. } => index
                 .render_string(event)
                 .map_err(|error| {
                     emit!(TemplateRenderingFailed {
@@ -351,7 +351,7 @@ impl ElasticSearchCommonMode {
 
     fn bulk_action(&self, event: &Event) -> Option<BulkAction> {
         match self {
-            ElasticSearchCommonMode::Regular { bulk_action, .. } => match bulk_action {
+            ElasticSearchCommonMode::Normal { bulk_action, .. } => match bulk_action {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
