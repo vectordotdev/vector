@@ -14,16 +14,15 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
     collections::{BTreeMap, VecDeque},
+    convert::TryFrom,
     io::{self, Read},
 };
 use tokio_util::codec::Decoder;
 
 // TODO
-// * Handle acking
-// * Handle protocol version differences
-// * Handle Data frames
 // * usize casts bounds
-// * Integration tests
+// * docs
+// * e2e acking after pipelining
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogstashConfig {
@@ -91,13 +90,18 @@ impl TcpSource for LogstashSource {
         LogstashDecoder::new()
     }
 
-    fn build_event(
-        &self,
-        frame: BTreeMap<String, serde_json::Value>,
-        host: Bytes,
-    ) -> Option<Event> {
+    fn build_ack(&self, frame: &LogstashEventFrame) -> Bytes {
+        let mut bytes: Vec<u8> = Vec::with_capacity(6);
+        bytes.push(frame.protocol.into());
+        bytes.push(LogstashFrameType::Ack.into());
+        bytes.extend(frame.sequence_number.to_be_bytes().iter());
+        Bytes::from(bytes)
+    }
+
+    fn build_event(&self, frame: LogstashEventFrame, host: Bytes) -> Option<Event> {
         let mut log = LogEvent::from(
             frame
+                .fields
                 .into_iter()
                 .map(|(key, value)| (key, Value::from(value)))
                 .collect::<BTreeMap<_, _>>(),
@@ -115,15 +119,15 @@ impl TcpSource for LogstashSource {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum LogstashDecoderReadState {
     ReadProtocol,
     ReadType(LogstashProtocolVersion),
     ReadFrame(LogstashProtocolVersion, LogstashFrameType),
-    PendingFrames(VecDeque<BTreeMap<String, serde_json::Value>>),
+    PendingFrames(VecDeque<LogstashEventFrame>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct LogstashDecoder {
     state: LogstashDecoderReadState,
 }
@@ -142,8 +146,8 @@ pub enum DecodeError {
     IO { source: io::Error },
     #[snafu(display("Unknown logstash protocol version: {}", version))]
     UnknownProtocolVersion { version: char },
-    #[snafu(display("Unknown logstash protocol message type: {}", message_type))]
-    UnknownMessageType { message_type: char },
+    #[snafu(display("Unknown logstash protocol message type: {}", frame_type))]
+    UnknownFrameType { frame_type: char },
     #[snafu(display("Failed to decode JSON frame: {}", source))]
     JsonFrameFailedDecode { source: serde_json::Error },
     #[snafu(display("Failed to decompress compressed frame: {}", source))]
@@ -157,7 +161,7 @@ impl TcpIsErrorFatal for DecodeError {
         match self {
             IO { .. } => true,
             UnknownProtocolVersion { .. } => true,
-            UnknownMessageType { .. } => true,
+            UnknownFrameType { .. } => true,
             JsonFrameFailedDecode { .. } => false,
             DecompressionFailed { .. } => false,
         }
@@ -176,18 +180,86 @@ enum LogstashProtocolVersion {
     V2, // 2
 }
 
+impl From<LogstashProtocolVersion> for u8 {
+    fn from(frame_type: LogstashProtocolVersion) -> u8 {
+        use LogstashProtocolVersion::*;
+
+        match frame_type {
+            V1 => b'1',
+            V2 => b'2',
+        }
+    }
+}
+
+impl TryFrom<u8> for LogstashProtocolVersion {
+    type Error = DecodeError;
+
+    fn try_from(frame_type: u8) -> Result<LogstashProtocolVersion, DecodeError> {
+        use LogstashProtocolVersion::*;
+
+        match frame_type {
+            b'1' => Ok(V1),
+            b'2' => Ok(V2),
+            version => Err(DecodeError::UnknownProtocolVersion {
+                version: version as char,
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum LogstashFrameType {
+    Ack,        // A
     WindowSize, // W
     Data,       // D
     Json,       // J
     Compressed, // C
 }
 
+impl From<LogstashFrameType> for u8 {
+    fn from(frame_type: LogstashFrameType) -> u8 {
+        use LogstashFrameType::*;
+
+        match frame_type {
+            Ack => b'A',
+            WindowSize => b'W',
+            Data => b'D',
+            Json => b'J',
+            Compressed => b'C',
+        }
+    }
+}
+
+impl TryFrom<u8> for LogstashFrameType {
+    type Error = DecodeError;
+
+    fn try_from(frame_type: u8) -> Result<LogstashFrameType, DecodeError> {
+        use LogstashFrameType::*;
+
+        match frame_type {
+            b'A' => Ok(Ack),
+            b'W' => Ok(WindowSize),
+            b'D' => Ok(Data),
+            b'J' => Ok(Json),
+            b'C' => Ok(Compressed),
+            frame_type => Err(DecodeError::UnknownFrameType {
+                frame_type: frame_type as char,
+            }),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LogstashEventFrame {
+    protocol: LogstashProtocolVersion,
+    sequence_number: u32,
+    fields: BTreeMap<String, serde_json::Value>,
+}
+
 // Based on spec at: https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md
 // And implementation from logstash: https://github.com/logstash-plugins/logstash-input-beats/blob/27bad62a26a81fc000a9d21495b8dc7174ab63e9/src/main/java/org/logstash/beats/BeatsParser.java
 impl Decoder for LogstashDecoder {
-    type Item = BTreeMap<String, serde_json::Value>;
+    type Item = LogstashEventFrame;
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -205,63 +277,64 @@ impl Decoder for LogstashDecoder {
                     if src.remaining() < 1 {
                         return Ok(None);
                     }
-                    match src.get_u8() {
-                        b'1' => {
+
+                    use LogstashProtocolVersion::*;
+
+                    match LogstashProtocolVersion::try_from(src.get_u8())? {
+                        V1 => {
                             self.state =
                                 LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V1);
                         }
-                        b'2' => {
+                        V2 => {
                             self.state =
                                 LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V2);
                         }
-                        version => {
-                            return Err(DecodeError::UnknownProtocolVersion {
-                                version: version as char,
-                            });
-                        }
                     }
                 }
-                LogstashDecoderReadState::ReadType(version) => {
+                LogstashDecoderReadState::ReadType(protocol) => {
                     if src.remaining() < 1 {
                         return Ok(None);
                     }
 
-                    match src.get_u8() {
-                        b'W' => {
+                    use LogstashFrameType::*;
+
+                    match LogstashFrameType::try_from(src.get_u8())? {
+                        WindowSize => {
                             self.state = LogstashDecoderReadState::ReadFrame(
-                                version,
+                                protocol,
                                 LogstashFrameType::WindowSize,
                             );
                         }
-                        b'D' => {
+                        Data => {
                             self.state = LogstashDecoderReadState::ReadFrame(
-                                version,
+                                protocol,
                                 LogstashFrameType::Data,
                             )
                         }
-                        b'J' => {
+                        Json => {
                             self.state = LogstashDecoderReadState::ReadFrame(
-                                version,
+                                protocol,
                                 LogstashFrameType::Json,
                             )
                         }
-                        b'C' => {
+                        Compressed => {
                             self.state = LogstashDecoderReadState::ReadFrame(
-                                version,
+                                protocol,
                                 LogstashFrameType::Compressed,
                             )
                         }
-                        message_type => {
-                            return Err(DecodeError::UnknownMessageType {
-                                message_type: message_type as char,
-                            });
+                        Ack => {
+                            self.state = LogstashDecoderReadState::ReadFrame(
+                                protocol,
+                                LogstashFrameType::Ack,
+                            )
                         }
                     }
                 }
                 // The window size indicates how many events the writer will send before waiting
                 // for acks. As we forward events as we get them, and ack as they are receieved, we
                 // do not need to keep track of this.
-                LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::WindowSize) => {
+                LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::WindowSize) => {
                     if src.remaining() < 4 {
                         return Ok(None);
                     }
@@ -269,13 +342,22 @@ impl Decoder for LogstashDecoder {
                     let _window_size = src.get_u32();
                     self.state = LogstashDecoderReadState::ReadProtocol;
                 }
-                LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::Data) => {
+                // we shouldn't receive acks from the writer, just skip
+                LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Ack) => {
+                    if src.remaining() < 4 {
+                        return Ok(None);
+                    }
+
+                    let _sequence_number = src.get_u32();
+                    self.state = LogstashDecoderReadState::ReadProtocol;
+                }
+                LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data) => {
                     let mut rest = src.as_ref();
 
                     if rest.remaining() < 8 {
                         return Ok(None);
                     }
-                    let _sequence_number = rest.get_u32();
+                    let sequence_number = rest.get_u32();
                     let pair_count = rest.get_u32();
 
                     let mut fields: BTreeMap<String, serde_json::Value> = BTreeMap::new();
@@ -313,15 +395,19 @@ impl Decoder for LogstashDecoder {
 
                     self.state = LogstashDecoderReadState::ReadProtocol;
 
-                    return Ok(Some(fields));
+                    return Ok(Some(LogstashEventFrame {
+                        protocol,
+                        sequence_number,
+                        fields,
+                    }));
                 }
-                LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::Json) => {
+                LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json) => {
                     let mut rest = src.as_ref();
 
                     if rest.remaining() < 8 {
                         return Ok(None);
                     }
-                    let _sequence_number = rest.get_u32();
+                    let sequence_number = rest.get_u32();
                     let payload_size = rest.get_u32() as usize;
 
                     if rest.remaining() < payload_size {
@@ -341,9 +427,15 @@ impl Decoder for LogstashDecoder {
 
                     self.state = LogstashDecoderReadState::ReadProtocol;
 
-                    return fields_result.map(Option::Some);
+                    return fields_result.map(|fields| {
+                        Some(LogstashEventFrame {
+                            protocol,
+                            sequence_number,
+                            fields,
+                        })
+                    });
                 }
-                LogstashDecoderReadState::ReadFrame(_version, LogstashFrameType::Compressed) => {
+                LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Compressed) => {
                     let mut rest = src.as_ref();
 
                     if rest.remaining() < 4 {

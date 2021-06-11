@@ -8,12 +8,13 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use socket2::SockRef;
-use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
+use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
+    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
@@ -80,6 +81,10 @@ where
     fn decoder(&self) -> Self::Decoder;
 
     fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
+
+    fn build_ack(&self, _frame: &<Self::Decoder as Decoder>::Item) -> Bytes {
+        Bytes::new()
+    }
 
     fn run(
         self,
@@ -192,7 +197,7 @@ async fn handle_stream<T>(
     source: T,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
-    out: impl Sink<Event> + Send + 'static,
+    mut out: impl Sink<Event> + Send + 'static + Unpin,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -221,59 +226,67 @@ async fn handle_stream<T>(
         }
     }
 
-    let mut shutdown_token = None;
-    let mut reader = FramedRead::new(socket, source.decoder());
+    let reader = FramedRead::new(socket, source.decoder());
 
-    stream::poll_fn(|cx| {
-        if shutdown_token.is_none() {
-            match shutdown_signal.poll_unpin(cx) {
-                Poll::Ready(token) => {
-                    debug!("Start graceful shutdown.");
-                    // Close our write part of TCP socket to signal the other side
-                    // that it should stop writing and close the channel.
-                    let socket = reader.get_ref().get_ref();
-                    if let Some(stream) = socket {
-                        let socket = SockRef::from(stream);
-                        if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
-                        }
-                    } else {
-                        // Connection hasn't yet been established so we are done here.
-                        debug!("Closing connection that hasn't yet been fully established.");
-                        return Poll::Ready(None);
+    let mut shutdown_signal = shutdown_signal.fuse();
+    let mut reader = reader.fuse();
+    let mut tripwire = tripwire.fuse();
+    loop {
+        futures::select! {
+            _ = tripwire => break,
+            _ = shutdown_signal => {
+                debug!("Start graceful shutdown.");
+                // Close our write part of TCP socket to signal the other side
+                // that it should stop writing and close the channel.
+                let socket = reader.get_ref().get_ref();
+                if let Some(stream) = socket.get_ref() {
+                    let socket = SockRef::from(stream);
+                    if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
+                        warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
                     }
-
-                    shutdown_token = Some(token);
+                } else {
+                    // Connection hasn't yet been established so we are done here.
+                    debug!("Closing connection that hasn't yet been fully established.");
+                    break;
                 }
-                Poll::Pending => {}
-            }
-        }
+            },
+            res = reader.next() => {
+                match res {
+                    Some(Ok(frame)) => {
+                        let host = host.clone();
+                        let ack = source.build_ack(&frame);
 
-        reader.poll_next_unpin(cx)
-    })
-    .take_until(tripwire)
-    .take_while(move |frame| ready(
-        match frame {
-            Ok(_) => true,
-            Err(err) => {
-                !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(err)
+                        if let Some(event) = source.build_event(frame, host) {
+                            match out.send(event).await {
+                                Ok(_) => {
+                                    let stream = reader.get_mut().get_mut();
+                                    if let Err(err) = stream.write_all(&ack).await {
+                                        warn!("Failed to write ack: {}", err); // TODO internal event?
+                                        break;
+                                    }
+                                }
+                                Err(_) => {
+                                    warn!("Failed to send event.");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Some(Err(error)) => {
+                        if !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(&error) {
+                            warn!(message = "Failed to read data from TCP source.", %error);
+                            break;
+                        }
+                    }
+                    None => {
+                        debug!("Connection closed.");
+                        break
+                    },
+                }
             }
+            complete => break,
         }
-    ))
-    .filter_map(move |frame| ready(match frame {
-        Ok(frame) => {
-            let host = host.clone();
-            source.build_event(frame, host).map(Ok)
-        }
-        Err(error) => {
-            warn!(message = "Failed to read data from TCP source.", %error);
-            None
-        }
-    }))
-    .forward(out)
-    .map_err(|_| warn!(message = "Error received while processing TCP source."))
-    .map(|_| debug!("Connection closed."))
-    .await
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
