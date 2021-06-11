@@ -14,11 +14,11 @@
       Single binary, no dependencies, no runtime, memory safe.
     </p>
 
-    <div class="mt-6 inline-flex space-x-10">
+    <div class="mt-6 inline-flex space-x-10 items-center">
       {{ range $install }}
       {{ $logo := printf "/img/logos/%s" .logo }}
 
-      <div class="h-20 w-20">
+      <div class="fill-current w-20 h-auto">
         <a href="{{ .url }}">
           {{ partial "svg.html" (dict "src" $logo) }}
         </a>

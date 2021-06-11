@@ -53,6 +53,10 @@ installation: [
     logo: "docker.svg",
     url: "/docs/setup/installation/platforms/docker"
   },
+  {
+    logo: "windows.svg",
+    url: "/docs/setup/installation/operating-systems/windows"
+  }
 ]
 
 # Other methods
