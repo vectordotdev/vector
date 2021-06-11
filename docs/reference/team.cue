@@ -5,6 +5,7 @@ import "strings"
 #Member: {
 	id:        strings.ToLower(name)
 	name:      !=""
+	active:    bool | *true
 	_github:   !=""
 	_twitter?: !=""
 	_keybase?: !=""
@@ -23,13 +24,12 @@ import "strings"
 
 team: [#Member, ...#Member] & [
 	{
-		name:     "Ben"
+		name:     "Ben Johnson"
 		_github:  "binarylogic"
 		_keybase: "binarylogic"
 		_twitter: "binarylogic"
 		bio: """
-			Ben is the CTO/Co-Founder at Timber.io and a member of the
-			Vector team.
+			Ben is an engineering manager at Datadog mananging the Vector project (formerly the CTO/Co-Founder at Timber.io).
 			"""
 	},
 	{
@@ -40,79 +40,79 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:    "Bruce"
+		name:    "Bruce Guenter"
 		_github: "bruceg"
 		bio: """
-			Bruce is a senior engineer at Timber.io and a member of the	Vector team.
+			Bruce is a software engineer at Datadog on the Vector project (formely part of Timber.io).
 			"""
 	},
 	{
-		name:     "James"
+		name:     "James Turnball"
 		_github:  "jamtur01"
 		_keybase: "jamtur01"
 		_twitter: "kartar"
 		bio: """
-			James is the VP of Engineering at Timber.io and a member of the	Vector team.
+			James was the VP of Engineering at Timber.io.
 			"""
+		active: false
 	},
 	{
-		name:     "Jean"
+		name:     "Jean Mertz"
 		_github:  "JeanMertz"
 		_keybase: "JeanMertz"
 		_twitter: "JeanMertz"
 		bio: """
-			Jean is a senior engineer at Timber.io and a member of the	Vector team.
+			Jean is a senior engineer at Datadog (formerly part of Timber.io).
 			"""
 	},
 	{
-		name:     "Jesse"
+		name:     "Jesse Szwedko"
 		_github:  "jszwedko"
 		_keybase: "jszwedko"
 		_twitter: "jszwedko"
 		bio: """
-			Jesse is a senior engineer at Timber.io and a member of the	Vector team.
+			Jesse is an engineer at Datadog (formerly Timber.io).
 			"""
 	},
 	{
-		name:     "Kirill"
+		name:     "Kirill Fomichev"
 		_github:  "fanatid"
 		_keybase: "fanatid"
 		bio: """
-			Jean is an engineer at Timber.io and a member of the	Vector team.
+			Kirill was an engineer at Timber.io.
 			"""
+		active: false
 	},
 	{
-		name:    "Kruno"
+		name:    "Kruno Tomola Fabro"
 		_github: "ktff"
 		bio: """
-			Kruno is an engineer at Timber.io and a member of the	Vector team.
+			Kruno is a contractor for Datadog on the Vector project (formerly contracted with at Timber.io).
 			"""
 	},
 	{
-		name:     "Lee"
-		_github:  "leebenson"
-		_keybase: "leebenson"
-		_twitter: "leebenson"
+		name:    "Lee Benson"
+		_github: "leebenson"
 		bio: """
-			Lee is a senior engineer at Timber.io and a member of the	Vector team.
+			Lee is a senior engineer at Datadog (formerly part of Timber.io).
 			"""
 	},
 	{
-		name:     "Luc"
+		name:     "Luc Perkins"
 		_github:  "lucperkins"
 		_keybase: "lucperkins"
 		_twitter: "lucperkins"
 		bio: """
-			Luc is an engineer at Timber.io and a member of the	Vector team.
+			Luc is a technical writer at Datadog (formerly part of Timber.io).
 			"""
 	},
 	{
-		name:     "Luke"
+		name:     "Luke Steensen"
 		_github:  "lukesteensen"
 		_keybase: "lukesteensen"
 		_twitter: "lukesteensen"
 		bio: """
-			Luke is a Senior Engineer at Timber.io and a member of the Vector team.
+			Luke is the team lead of the Vector project at Datadog (formerly part of Timber.io).
 			Before Timber, Luke was an engineer at Braintree working on parts of their
 			observability infrastructure.
 			"""
@@ -123,16 +123,24 @@ team: [#Member, ...#Member] & [
 		_keybase: "MOZGIII"
 		_twitter: "MOZGIII"
 		bio: """
-			Mike is a senior engineer at Timber.io and a member of the	Vector team.
+			Mike was a senior engineer at Timber.io.
+			"""
+		active: false
+	},
+	{
+		name:    "Spencer Gilbert"
+		_github: "spencergilbert"
+		bio: """
+			Spencer is an engineer at Datadog.
 			"""
 	},
 	{
-		name:     "Steve"
+		name:     "Steve Hall"
 		_github:  "sghall"
 		_keybase: "sghall"
 		_twitter: "sghall"
 		bio: """
-			Steve is a senior engineer at Timber.io and a member of the	Vector team.
+			Steve is an engineer at Datadog (formerly part of Timber.io).
 			"""
 	},
 	{
@@ -143,12 +151,12 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Zach"
+		name:     "Zach Sherman"
 		_github:  "zsherman"
 		_keybase: "zsherman"
 		_twitter: "zsherman"
 		bio: """
-			Zach is the CEO/co-founder of Timber.io.
+			Zach is the product manager of the Vector project at Datadog (formerly the CEO/co-founder of Timber.io).
 			"""
 	},
 ]

@@ -53,17 +53,17 @@ async fn make_listener(
     }
 }
 pub trait IsErrorFatal {
-    fn is_error_fatal() -> bool;
+    fn is_error_fatal(&self) -> bool;
 }
 
 impl IsErrorFatal for LinesCodecError {
-    fn is_error_fatal() -> bool {
+    fn is_error_fatal(&self) -> bool {
         false
     }
 }
 
 impl IsErrorFatal for std::io::Error {
-    fn is_error_fatal() -> bool {
+    fn is_error_fatal(&self) -> bool {
         true
     }
 }
@@ -255,8 +255,8 @@ async fn handle_stream<T>(
     .take_while(move |frame| ready(
         match frame {
             Ok(_) => true,
-            Err(_) => {
-                !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal()
+            Err(err) => {
+                !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(err)
             }
         }
     ))

@@ -151,7 +151,6 @@ fi
 
 # Run the tests.
 cd lib/k8s-e2e-tests
-export RUST_LOG=debug
 cargo test \
   --no-fail-fast \
   --no-default-features \

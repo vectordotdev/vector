@@ -23,6 +23,8 @@ pub mod config;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
+#[cfg(feature = "docker")]
+pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "wasm")]

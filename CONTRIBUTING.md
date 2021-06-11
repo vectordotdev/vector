@@ -878,9 +878,6 @@ You can also pass additional parameters to adjust the behavior of the test:
 - `SCOPE` - pass a filter to the `cargo test` command to filter out the tests,
   effectively equivalent to `cargo test -- $SCOPE`.
 
-- `NAMESPACE` - specifies the k8s namespace to run the tests in. Some tests are
-  run in another namespace with this one prepended: `<NAMESPACE>-test-pod`.
-
 Passing additional commands is done like so:
 
 ```shell

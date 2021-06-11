@@ -17,6 +17,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-agent
 automountServiceAccountToken: true
 ---
 # Source: vector-agent/templates/configmap.yaml
@@ -30,6 +31,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-agent
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
@@ -102,6 +104,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -122,6 +125,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-agent
 spec:
   selector:
     matchLabels:

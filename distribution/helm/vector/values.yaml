@@ -9,6 +9,10 @@
 #
 # global:
 #   vector:
+#     # Additional labels to add to all resources
+#     commonLabels:
+#       app: vector
+#
 #     image:
 #       repository: <docker repo>
 #       # Overrides the image tag, the default is `{image.version}-{image.base}`.
