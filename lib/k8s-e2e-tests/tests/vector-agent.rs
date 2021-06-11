@@ -689,7 +689,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
 
-    let affinity_pod = create_affinity_pod(&framework, &pod_namespace, &affinity_label).await?;
+    let affinity_ns_name = format!("{}-affinity", pod_namespace);
+    let affinity_ns = framework.namespace(&affinity_ns_name).await?;
+    let affinity_pod = create_affinity_pod(&framework, &affinity_ns_name, &affinity_label).await?;
 
     let excluded_test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
@@ -699,7 +701,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             vec![("vector.dev/exclude", "true")],
             vec![],
             Some((&affinity_label, "yes")),
-            Some(&pod_namespace),
+            Some(&affinity_ns_name),
         ))?)
         .await?;
 
@@ -722,7 +724,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             vec![],
             vec![],
             Some((&affinity_label, "yes")),
-            Some(&pod_namespace),
+            Some(&affinity_ns_name),
         ))?)
         .await?;
     framework
@@ -832,6 +834,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     drop(excluded_test_pod);
     drop(control_test_pod);
     drop(affinity_pod);
+    drop(affinity_ns);
     drop(test_namespace);
     drop(vector);
     Ok(())
@@ -1397,8 +1400,9 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a pod for our other pods to have an affinity to to ensure they are all deployed on
     // the same node.
-    let affinity_ns = framework.namespace(&pod_namespace).await?;
-    let affinity_pod = create_affinity_pod(&framework, &pod_namespace, &affinity_label).await?;
+    let affinity_ns_name = format!("{}-affinity", pod_namespace);
+    let affinity_ns = framework.namespace(&affinity_ns_name).await?;
+    let affinity_pod = create_affinity_pod(&framework, &affinity_ns_name, &affinity_label).await?;
 
     let mut test_pods = vec![];
     for ns in &expected_namespaces {
@@ -1411,7 +1415,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
                 vec![],
                 vec![],
                 Some((affinity_label.as_str(), "yes")),
-                Some(&pod_namespace),
+                Some(&affinity_ns_name),
             ))?)
             .await?;
         framework
@@ -1427,7 +1431,12 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     // Make sure we read the correct nodes logs.
     let vector_pod = framework
-        .get_vector_pod_with_pod(&pod_namespace, "affinity-pod", &namespace, &override_name)
+        .get_vector_pod_with_pod(
+            &affinity_ns_name,
+            "affinity-pod",
+            &namespace,
+            &override_name,
+        )
         .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
