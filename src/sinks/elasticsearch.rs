@@ -413,7 +413,7 @@ impl ElasticSearchCommon {
     fn build_action(
         &self,
         index: &str,
-        bulk_action: &BulkAction,
+        bulk_action: BulkAction,
         event: &mut Event,
     ) -> serde_json::Value {
         let mut action = json!({
@@ -445,7 +445,7 @@ impl HttpSink for ElasticSearchCommon {
         }
 
         let bulk_action = self.mode.bulk_action(&event)?;
-        let action = self.build_action(&index, &bulk_action, &mut event);
+        let action = self.build_action(&index, bulk_action, &mut event);
 
         let mut body = serde_json::to_vec(&action).unwrap();
         body.push(b'\n');
