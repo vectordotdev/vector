@@ -1,9 +1,6 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
-echo "$PATH"
-cat $GITHUB_PATH
-
 rustup toolchain install "$(cat rust-toolchain)"
 rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
