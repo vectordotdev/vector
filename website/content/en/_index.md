@@ -55,15 +55,23 @@ installation: [
   },
 ]
 
-# Install commands
-commands: [
+# Other methods
+methods: [
   {
-    title: "For humans",
-    cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
+    title: "Platforms",
+    url: "/"
   },
   {
-    title: "For machines",
-    cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh -s -- -y"
+    title: "Package managers",
+    url: "/"
+  },
+  {
+    title: "Operating systems",
+    url: "/",
+  },
+  {
+    title: "Manual",
+    url: "/"
   }
 ]
 ---
