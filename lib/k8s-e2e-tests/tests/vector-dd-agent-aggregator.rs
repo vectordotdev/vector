@@ -82,6 +82,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
                 custom_helm_values: &config_override_name(
                     HELM_VALUES_DDOG_AGG_TOPOLOGY,
                     &override_name,
+                    false,
                 ),
                 ..Default::default()
             },
@@ -105,6 +106,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
                 custom_helm_values: &config_override_name(
                     datadog_chart_values,
                     &datadog_override_name,
+                    false,
                 ),
                 ..Default::default()
             },

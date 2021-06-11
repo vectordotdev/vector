@@ -67,7 +67,11 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -166,6 +170,7 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
                 custom_helm_values: &config_override_name(
                     HELM_VALUES_STDOUT_SINK_RAW_CONFIG,
                     &override_name,
+                    true,
                 ),
                 ..Default::default()
             },
@@ -258,7 +263,11 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -374,7 +383,11 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -447,7 +460,11 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -541,7 +558,11 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -674,7 +695,11 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -867,6 +892,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
                 custom_helm_values: &config_override_name(
                     &format!("{}\n{}", CONFIG, HELM_VALUES_STDOUT_SINK),
                     &override_name,
+                    true,
                 ),
                 ..Default::default()
             },
@@ -1056,7 +1082,11 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -1223,6 +1253,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
                 custom_helm_values: &config_override_name(
                     &format!("{}\n{}", config, HELM_VALUES_STDOUT_SINK),
                     &override_name,
+                    true,
                 ),
                 ..Default::default()
             },
@@ -1377,7 +1408,11 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -1503,6 +1538,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
                 custom_helm_values: &config_override_name(
                     HELM_VALUES_ADDITIONAL_CONFIGMAP,
                     &override_name,
+                    true,
                 ),
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
             },
@@ -1595,7 +1631,11 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK,
+                    &override_name,
+                    true,
+                ),
                 ..Default::default()
             },
         )
@@ -1738,7 +1778,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name("", &override_name),
+                custom_helm_values: &config_override_name("", &override_name, true),
                 ..Default::default()
             },
         )
