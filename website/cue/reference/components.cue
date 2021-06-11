@@ -455,16 +455,16 @@ components: {
 		_docs_tag: *_service | !=""
 
 		// For use in the view layer
-		platform_title: != ""
-		platform_link: != ""
+		platform_title: !=""
+		platform_link:  !=""
 
 		if platform == "aws" {
 			platform_title: "Amazon Web Services"
-			platform_link: "https://aws.amazon.com"
+			platform_link:  "https://aws.amazon.com"
 		}
 		if platform == "gcp" {
 			platform_title: "Google Cloud Platform"
-			platform_link: "https://cloud.google.com"
+			platform_link:  "https://cloud.google.com"
 		}
 	}
 

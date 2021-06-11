@@ -7,7 +7,7 @@ administration: management: {
 	#Interface: {
 		#Command: {
 			command?: string
-			info?: string
+			info?:    string
 		}
 
 		name:  string
@@ -38,13 +38,13 @@ administration: management: {
 	_interfaces: #Interfaces & {
 		_systemd: {
 			manage: {
-				start:   {
+				start: {
 					command: "sudo systemctl start vector"
 				}
-				stop:    {
+				stop: {
 					command: "sudo systemctl stop vector"
 				}
-				reload:  {
+				reload: {
 					command: "systemctl kill -s HUP --kill-who=main vector.service"
 				}
 				restart: {
@@ -93,10 +93,10 @@ administration: management: {
 						  timberio/vector:{version}-{variant}
 						"""#
 				}
-				stop:    {
+				stop: {
 					command: "docker stop timberio/vector"
 				}
-				reload:  {
+				reload: {
 					command: "docker kill --signal=HUP timberio/vector"
 				}
 				restart: {
