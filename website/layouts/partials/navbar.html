@@ -11,14 +11,20 @@
       <div class="flex items-center px-2 lg:px-0">
         <div class="flex-shrink-0">
           <a href="{{ site.BaseURL }}">
-            {{ partial "svg.html" (dict "src" "/img/logos/vector-logo-light.svg" "h" "auto" "w" 32) }}
+            <div x-show="$store.global.isDark()">
+              {{ partial "svg.html" (dict "src" "/img/logos/vector-logo-light.svg" "h" "auto" "w" 32) }}
+            </div>
+
+            <div x-show="$store.global.isLight()">
+              {{ partial "svg.html" (dict "src" "/img/logos/vector-logo-dark.svg" "h" "auto" "w" 32) }}
+            </div>
           </a>
         </div>
         <div class="hidden lg:block lg:ml-6">
           <div class="flex space-x-4">
             {{ range $menu }}
             {{ $isActive := hasPrefix $here .URL }}
-            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 py-1.5 rounded-sm text-normal font-normal">
+            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm text-normal font-normal">
               <span class="dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
                 {{ .Name }}
               </span>
@@ -54,7 +60,7 @@
                 <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
               </svg>
             </div>
-            <input id="search" name="search" class="dark:bg-gray-700 dark:text-gray-400 bg-gray-200 text-gray-800 block w-full pl-10 pr-3 py-2 border border-transparent rounded-md leading-5 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-white focus:ring-white focus:text-gray-900 sm:text-sm" placeholder="Search" type="search">
+            <input id="search" name="search" class="dark:bg-gray-700 dark:text-gray-400 bg-gray-200 text-gray-800 block w-full pl-10 pr-3 border border-transparent rounded-md leading-5 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-white focus:ring-white focus:text-gray-900 sm:text-sm" placeholder="Search" type="search">
           </div>
         </div>
       </div>
@@ -90,7 +96,7 @@
     <div class="px-2 pt-2 pb-3 space-y-1">
       {{ range $menu }}
       {{ $isActive := hasPrefix $here .URL }}
-      <a href="{{ .URL }}" class="block px-3 py-2 rounded-md text-base font-medium{{ if $isActive }} dark:bg-gray-700 bg-gray-900 text-white{{ else }} dark:text-gray-300 dark:hover:bg-gray-600 hover:bg-gray-700 text-gray-500 hover:text-white{{ end }}">
+      <a href="{{ .URL }}" class="block px-3 rounded-md text-base font-medium{{ if $isActive }} dark:bg-gray-700 bg-gray-900 text-white{{ else }} dark:text-gray-300 dark:hover:bg-gray-600 hover:bg-gray-700 text-gray-500 hover:text-white{{ end }}">
         {{ .Name }}
       </a>
       {{ end }}
