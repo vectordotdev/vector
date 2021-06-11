@@ -1,51 +1,43 @@
 // let g:cargo_makeprg_params = = '--lib --no-default-features --features=transforms-aggregate transforms::aggregate'
-use chrono::{DateTime, Utc};
 use crate::{
     internal_events::AggregateEventDiscarded,
     transforms::{
         TaskTransform,
         Transform,
     },
-};
-use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{
-        Event,
         metric,
+        Event,
+        EventMetadata,
     },
 };
-use futures::{Stream, StreamExt};
+use async_stream::stream;
+use futures::{stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    future::ready,
     pin::Pin,
+    time::{Duration},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[serde(deny_unknown_fields, default)]
 pub struct AggregateConfig {
-    pub interval: f64,
+    pub interval_ms: Option<u64>,
 }
 
 inventory::submit! {
     TransformDescription::new::<AggregateConfig>("aggregate")
 }
 
-impl GenerateConfig for AggregateConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            interval: 10.0,
-        })
-        .unwrap()
-    }
-}
+impl_generate_config_from_default!(AggregateConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
     async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        Ok(Transform::task(Aggregate::new(self.interval)))
+        Aggregate::new(self).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -61,103 +53,97 @@ impl TransformConfig for AggregateConfig {
     }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
-struct Key {
-    pub name: metric::MetricName,
-    pub tags: Option<metric::MetricTags>,
-}
-
-impl Key {
-    fn new(
-        name: metric::MetricName,
-        tags: Option<metric::MetricTags>,
-    ) -> Self {
-        Self {
-            name,
-            tags,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Record {
-    pub value: metric::MetricValue,
-    pub most_recent: DateTime<Utc>,
-}
-
-impl Record {
-    fn new(value: metric::MetricValue, most_recent: DateTime<Utc>) -> Self {
-        Self {
-            value,
-            most_recent,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Aggregate {
-    interval: f64,
-    map: HashMap<Key, Record>,
+    interval: Duration,
+    map: HashMap<metric::MetricSeries, Vec<metric::MetricData>>,
 }
 
 impl Aggregate {
-    pub fn new(interval: f64) -> Self {
+    pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         let map = HashMap::new();
-        Self {
-            interval,
-            map, 
-        }
+
+        Ok(Self {
+            interval: Duration::from_millis(config.interval_ms.unwrap_or(10 * 1000)),
+            map,
+        })
     }
 
-    fn record(&mut self, event: Event) -> Option<Event> {
+    fn record(&mut self, event: Event) {
         let metric = event.as_metric();
         let series = metric.series();
         let data = metric.data();
-        let key = Key::new(series.name.clone(), series.tags.clone());
 
-        let timestamp = match data.timestamp {
-            Some(datetime) => datetime,
-            None => Utc::now(),
-        };
-
-        match self.map.get_mut(&key) {
-            Some(record) => {
-                // Exists, add/increment or replace based on kind
-                match data.kind {
-                    metric::MetricKind::Incremental => record.value.add(&data.value),
-                    metric::MetricKind::Absolute => {
-                        record.value = data.value.clone();
-                        true
-                    },
-                };
-                record.most_recent = timestamp;
-            },
+        match self.map.get_mut(&series) {
+            Some(datum) => datum.push(data.clone()),
             _ => {
-                // Doesn't exist, insert a new record regardless
-                self.map.insert(key, Record::new(data.value.clone(), timestamp));
+                self.map.insert(series.clone(), vec![data.clone()]);
                 ()
             }
         };
 
         // TODO: discarded or recorded?
         emit!(AggregateEventDiscarded);
-        None
+    }
+
+    fn flush_into(&mut self, output: &mut Vec<Event>) {
+        // TODO: should we preserve one, there's no way to combine?
+        let metadata = EventMetadata::default();
+        for (series, datas) in &self.map {
+            for data in datas {
+                let metric = metric::Metric::from_parts(series.clone(), data.clone(), metadata.clone());
+                output.push(Event::Metric(metric));
+            }
+        }
+    }
+
+    fn flush_all_into(&mut self, _output: &mut Vec<Event>) {
+        // TODO?
     }
 }
 
 impl TaskTransform for Aggregate {
     fn transform(
         self: Box<Self>,
-        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+        mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
-        let mut inner = self;
-        println!("before");
-        let ret = Box::pin(task.filter_map(move |e| ready(inner.record(e))));
-        println!("after");
-        ret
+        let mut me = self;
+
+        let interval = me.interval;
+
+        let mut flush_stream = tokio::time::interval(interval);
+
+        Box::pin(
+            stream! {
+                loop {
+                    let mut output = Vec::new();
+                    let done = tokio::select! {
+                        _ = flush_stream.tick() => {
+                            me.flush_into(&mut output);
+                            false
+                        }
+                        maybe_event = input_rx.next() => {
+                            match maybe_event {
+                                None => {
+                                    me.flush_all_into(&mut output);
+                                    true
+                                }
+                                Some(event) => {
+                                    me.record(event);
+                                    false
+                                }
+                            }
+                        }
+                    };
+                    yield stream::iter(output.into_iter());
+                    if done { break }
+                }
+            }
+            .flatten(),
+        )
     }
 }
 
@@ -174,7 +160,8 @@ mod tests {
 
     #[test]
     fn counters() {
-        let mut agg = Aggregate::new(10.0);
+        /*
+        let mut agg = Aggregate::new(Duration::from_millis(10 * 1000));
 
         let counter_a = metric::MetricValue::Counter { value: 42.0 };
         let counter_b = metric::MetricValue::Counter { value: 43.0 };
@@ -235,8 +222,10 @@ mod tests {
                 _ => assert!(false),
             }
         }
+        */
     }
 
+    /*
     fn make_metric(
         name: &'static str,
         kind: metric::MetricKind,
@@ -252,6 +241,7 @@ mod tests {
             .with_tags(Some(tags)),
         )
     }
+    */
 
     /*
     use super::*;
