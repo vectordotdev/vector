@@ -158,8 +158,8 @@ components: sinks: elasticsearch: {
 			warnings: []
 			type: string: {
 				default: "index"
-				examples: ["index", "create"]
-				syntax: "literal"
+				examples: ["index", "create", "{{ action }}"]
+				syntax: "template"
 			}
 		}
 		doc_type: {
