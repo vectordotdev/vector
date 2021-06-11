@@ -56,16 +56,18 @@ impl TransformConfig for AggregateConfig {
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
-    map: HashMap<metric::MetricSeries, Vec<metric::MetricData>>,
+    map_a: HashMap<metric::MetricSeries, Vec<metric::MetricData>>,
+    map_b: HashMap<metric::MetricSeries, Vec<metric::MetricData>>,
+    using_b: bool,
 }
 
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
-        let map = HashMap::new();
-
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms.unwrap_or(10 * 1000)),
-            map,
+            map_a: HashMap::new(),
+            map_b: HashMap::new(),
+            using_b: false,
         })
     }
 
@@ -74,10 +76,15 @@ impl Aggregate {
         let series = metric.series();
         let data = metric.data();
 
-        match self.map.get_mut(&series) {
+        let map = match self.using_b {
+            true => &mut self.map_b,
+            false => &mut self.map_a,
+        };
+
+        match map.get_mut(&series) {
             Some(datum) => datum.push(data.clone()),
             _ => {
-                self.map.insert(series.clone(), vec![data.clone()]);
+                map.insert(series.clone(), vec![data.clone()]);
                 ()
             }
         };
@@ -87,11 +94,43 @@ impl Aggregate {
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
-        // TODO: should we preserve one, there's no way to combine?
+
+        // TODO: locking/safety etc...
+        let map = match self.using_b {
+            true => {
+                self.using_b = false;
+                &mut self.map_b
+            },
+            false => {
+                self.using_b = true;
+                &mut self.map_a
+            },
+        };
+
+        if map.len() == 0 {
+            return
+        }
+
+        // TODO: should we preserve one of these overall, per MetricSeries, ???
+        // TODO: Doesn't seem like there's a way to combine.
         let metadata = EventMetadata::default();
-        for (series, datas) in &self.map {
-            for data in datas {
-                let metric = metric::Metric::from_parts(series.clone(), data.clone(), metadata.clone());
+
+        for (series, datas) in map {
+            if let Some(mut last) = datas.pop() {
+                // We're assuming each series has a single kind, nothing forces that to be the
+                // case, but it's not really clear what we'd do if they vary so...
+                match last.kind {
+                    // Add them up
+                    metric::MetricKind::Incremental => {
+                        for data in datas {
+                            last.add(&data);
+                        }
+                    },
+                    // Last one wins
+                    metric::MetricKind::Absolute => (),
+                }
+
+                let metric = metric::Metric::from_parts(series.clone(), last, metadata.clone());
                 output.push(Event::Metric(metric));
             }
         }
@@ -149,6 +188,7 @@ impl TaskTransform for Aggregate {
 
 #[cfg(test)]
 mod tests {
+    /*
     use super::*;
     use crate::{event::metric, event::Event, event::Metric};
     use std::collections::BTreeMap;
@@ -157,6 +197,7 @@ mod tests {
     fn genreate_config() {
         crate::test_util::test_generate_config::<AggregateConfig>();
     }
+    */
 
     #[test]
     fn counters() {
