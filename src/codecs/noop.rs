@@ -1,4 +1,4 @@
-use super::{Codec, CodecHint, CodecTransform};
+use super::{Codec, CodecTransform};
 use crate::config::DataType;
 use serde::{Deserialize, Serialize};
 use vector_core::{
@@ -15,7 +15,14 @@ impl Codec for NoopCodec {
         "noop"
     }
 
-    fn build(&self, _: CodecHint) -> crate::Result<CodecTransform> {
+    fn build_decoder(&self) -> crate::Result<CodecTransform> {
+        Ok(CodecTransform {
+            input_type: DataType::Any,
+            transform: Transform::function(NoopTransform),
+        })
+    }
+
+    fn build_encoder(&self) -> crate::Result<CodecTransform> {
         Ok(CodecTransform {
             input_type: DataType::Any,
             transform: Transform::function(NoopTransform),
