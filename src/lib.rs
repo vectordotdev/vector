@@ -82,7 +82,7 @@ pub mod vector_windows;
 
 pub use pipeline::Pipeline;
 
-pub use vector_core::{event, mapping, metrics, Error, Result};
+pub use vector_core::{event, mapping, metrics, transform, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

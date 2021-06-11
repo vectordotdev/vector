@@ -10,6 +10,7 @@ use crate::{
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
+    transform::{TaskTransform, Transform},
     Pipeline,
 };
 use futures::{future, FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -76,7 +77,25 @@ pub async fn build_pieces(
             rx = transform.transform(filtered).boxed();
         }
 
-        let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
+        struct FramingTransform {
+            framing: Vec<Transform<Vec<u8>>>,
+        }
+
+        impl TaskTransform<Vec<u8>> for FramingTransform {
+            fn transform(
+                self: Box<Self>,
+                task: Pin<Box<dyn futures::Stream<Item = Vec<u8>> + Send>>,
+            ) -> Pin<Box<dyn futures::Stream<Item = Vec<u8>> + Send>>
+            where
+                Self: 'static,
+            {
+                let mut stream = task;
+                for framing in self.framing {
+                    stream = framing.transform(stream).boxed();
+                }
+                stream
+            }
+        }
 
         let framing = source
             .framing
@@ -91,9 +110,11 @@ pub async fn build_pieces(
             })
             .collect();
 
+        let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
+
         let context = SourceContext {
             name: name.into(),
-            framing,
+            framing: Transform::task(FramingTransform { framing }),
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,

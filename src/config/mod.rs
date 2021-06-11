@@ -1,3 +1,5 @@
+#[cfg(test)]
+use crate::framers::{Framer, NoopFramer};
 use crate::{
     buffers::Acker,
     conditions,
@@ -256,7 +258,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 
 pub struct SourceContext {
     pub name: String,
-    pub framing: Vec<Transform<Vec<u8>>>,
+    pub framing: Transform<Vec<u8>>,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -274,7 +276,7 @@ impl SourceContext {
         (
             Self {
                 name: name.into(),
-                framing: Default::default(),
+                framing: NoopFramer.build().unwrap(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -288,7 +290,7 @@ impl SourceContext {
     pub fn new_test(out: Pipeline) -> Self {
         Self {
             name: "default".into(),
-            framing: Default::default(),
+            framing: NoopFramer.build().unwrap(),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
