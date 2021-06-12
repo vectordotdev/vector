@@ -1,4 +1,5 @@
 {{ $latest := index site.Data.docs.versions 0 }}
+{{ $defaultPlatformTab := index site.Home.Params.platform_tabs 0 }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
 import 'tocbot/dist/tocbot';
@@ -37,6 +38,9 @@ const manageState = () => {
     versionBackup: '{{ $latest }}',
     // Release version
     release: 'stable',
+
+    // Home page platform tab
+    platformTab: '{{ $defaultPlatformTab }}',
 
     isDark() {
       return this.dark;

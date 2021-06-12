@@ -1,5 +1,4 @@
 {{ $tabs := .Params.platform_tabs }}
-{{ $defaultTab := index $tabs 0 }}
 <div class="py-12 md:py-16 lg:py-20 px-4 sm:px-6 mx-auto max-w-7xl text-center">
   <div class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary py-2">
     <h1 class="text-3xl md:text-4xl font-extrabold leading-looser">
@@ -13,11 +12,11 @@
     Deploy Vector in a variety of roles to suit your use case.<br />Get data from point A to point B without patching tools together.
   </p>
 
-  <div x-data="{ selected: '{{ $defaultTab }}' }" class="mt-6 text-center">
+  <div x-data="{ selected: $store.global.platformTab }" class="mt-6 text-center">
     {{/* Selector */}}
     <div class="inline-flex space-x-5 bg-dark dark:bg-white py-1.5 px-2.5 rounded-full shadow-sm">
       {{ range $tabs }}
-      <button @click="selected = '{{ . }}'" :class="{ 'rounded-full py-0.5 px-2.5 text-dark bg-primary dark:bg-dark dark:text-primary': selected === '{{ . }}' }" class="uppercase text-sm font-semibold text-smtracking-tight text-white dark:text-dark">
+      <button @click="$store.global.platformTab = '{{ . }}'" :class="{ 'rounded-full py-0.5 px-2.5 text-dark bg-primary dark:bg-dark dark:text-primary': $store.global.platformTab === '{{ . }}' }" class="uppercase text-sm font-semibold text-smtracking-tight text-white dark:text-dark">
         {{ . }}
       </button>
       {{ end }}
@@ -29,7 +28,7 @@
       {{ $name := . | lower | urlize }}
       {{ $svg := printf "/img/pipelines-%s.svg" (. | urlize) }}
       {{ $url := printf "/docs/setup/deployment/topologies/#%s" $name | relURL }}
-      <div x-show="selected === '{{ . }}'">
+      <div x-show="$store.global.platformTab === '{{ . }}'">
         <div class="max-w-full md:max-w-5xl">
           {{ partial "svg.html" (dict "src" $svg) }}
         </div>
