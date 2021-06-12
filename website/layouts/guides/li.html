@@ -1,5 +1,7 @@
 {{ $title := .Params.short | default .Title }}
 {{ $section := cond (eq .CurrentSection.Parent.Title "Integrate") "Integrate" .CurrentSection.Title }}
+
+
 <div class="py-5 px-6">
   <span class="uppercase text-xs tracking-tight text-gray-500 dark:text-gray-400">
     {{ $section }}

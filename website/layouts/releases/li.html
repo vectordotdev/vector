@@ -3,7 +3,7 @@
 {{ $isLatest := eq $version $latest }}
 {{ $release := index site.Data.docs.releases $version }}
 <a href="{{ .RelPermalink }}">
-  <div class="border shadow-sm rounded-md py-4 px-6 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
+  <div class="border shadow-sm rounded-md py-4 px-6 dark:border-gray-700 hover:border-secondary dark:hover:border-primary">
     <span class="flex items-center justify-between">
       <span class="flex items-center space-x-4">
         <span class="font-bold dark:text-gray-300 text-lg">
