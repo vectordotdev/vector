@@ -7,6 +7,9 @@ languageCode = "en-us"
 [build]
 writeStats = true
 
+[minify]
+disableSVG = true
+
 # Syntax highlighting
 [markup.highlight]
 noClasses = false
