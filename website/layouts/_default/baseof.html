@@ -32,6 +32,7 @@
     </title>
 
     {{ partial "css.html" . }}
+    {{ partial "javascript.html" . }}
   </head>
   <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
     <div class="flex-1 z-1">
@@ -51,7 +52,5 @@
     {{/* For the mobile nav footer */}}
     {{ block "subfooter" . }}
     {{ end }}
-
-    {{ partial "javascript.html" . }}
   </body>
 </html>
