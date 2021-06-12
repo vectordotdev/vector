@@ -7,20 +7,16 @@ use std::task::Poll;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::mpsc;
 
-pub(crate) struct Committer<T> {
+pub(crate) struct OrderedFinalizer<T> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
     shutdown_done: Tripwire,
 }
 
-impl<T: Send + 'static> Committer<T> {
+impl<T: Send + 'static> OrderedFinalizer<T> {
     pub(crate) fn new(apply_done: impl Fn(T) + Send + 'static) -> Self {
         let (shutdown_trigger, shutdown_done) = Tripwire::new();
         let (sender, receiver) = mpsc::unbounded_channel();
-        tokio::spawn(run_committer(
-            shutdown_trigger,
-            receiver,
-            apply_done, //move |entry: CommitterEntry| checkpoints.update(entry.file_id, entry.offset),
-        ));
+        tokio::spawn(run_finalizer(shutdown_trigger, receiver, apply_done));
         Self {
             sender: Some(sender),
             shutdown_done,
@@ -38,26 +34,26 @@ impl<T: Send + 'static> Committer<T> {
     pub(crate) fn add(&self, entry: T, receiver: BatchStatusReceiver) {
         if let Some(sender) = &self.sender {
             if let Err(error) = sender.send((receiver, entry)) {
-                error!(message = "Committer task ended prematurely.", %error);
+                error!(message = "OrderedFinalizer task ended prematurely.", %error);
             }
         }
     }
 }
 
-async fn run_committer<T>(
+async fn run_finalizer<T>(
     shutdown: Trigger,
     mut receiver: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
     apply_done: impl Fn(T),
 ) {
     let mut receivers = FuturesUnordered::default();
-    let mut store = CommitterStore::new();
+    let mut store = FinalizerStore::new();
 
     loop {
         if receivers.is_empty() {
             match receiver.recv().await {
                 Some((receiver, entry)) => {
                     let index = store.add_entry(entry);
-                    receivers.push(CommitterFuture { receiver, index });
+                    receivers.push(FinalizerFuture { receiver, index });
                 }
                 None => break,
             }
@@ -66,7 +62,7 @@ async fn run_committer<T>(
                 received = receiver.recv() => match received {
                     Some((receiver, entry)) => {
                         let index = store.add_entry(entry);
-                        receivers.push(CommitterFuture { receiver, index });
+                        receivers.push(FinalizerFuture { receiver, index });
                     }
                     None => break,
                 },
@@ -87,12 +83,12 @@ async fn run_committer<T>(
     drop(shutdown);
 }
 
-struct CommitterFuture {
+struct FinalizerFuture {
     receiver: BatchStatusReceiver,
     index: u64,
 }
 
-impl Future for CommitterFuture {
+impl Future for FinalizerFuture {
     type Output = (<BatchStatusReceiver as Future>::Output, u64);
     fn poll(mut self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         self.receiver
@@ -101,12 +97,12 @@ impl Future for CommitterFuture {
     }
 }
 
-struct CommitterStore<T> {
+struct FinalizerStore<T> {
     first: u64,
     entries: VecDeque<(bool, T)>,
 }
 
-impl<T> CommitterStore<T> {
+impl<T> FinalizerStore<T> {
     fn new() -> Self {
         Self {
             first: 0,

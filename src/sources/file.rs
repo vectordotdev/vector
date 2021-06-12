@@ -1,4 +1,4 @@
-use super::util::committer::Committer;
+use super::util::finalizer::OrderedFinalizer;
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
@@ -149,7 +149,7 @@ fn default_max_line_bytes() -> usize {
 }
 
 #[derive(Debug)]
-pub(crate) struct CommitterEntry {
+pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
 }
@@ -303,9 +303,11 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     let checkpoints = checkpointer.view();
-    let mut committer = acknowledgements.then(|| {
+    let mut finalizer = acknowledgements.then(|| {
         let checkpoints = checkpointer.view();
-        Committer::new(move |entry: CommitterEntry| checkpoints.update(entry.file_id, entry.offset))
+        OrderedFinalizer::new(move |entry: FinalizerEntry| {
+            checkpoints.update(entry.file_id, entry.offset)
+        })
     });
 
     Box::pin(async move {
@@ -354,14 +356,14 @@ pub fn file_source(
                 let _enter = span2.enter();
                 let mut event =
                     create_event(line.text, line.filename, &host_key, &hostname, &file_key);
-                if let Some(committer) = &committer {
+                if let Some(finalizer) = &finalizer {
                     let (batch, receiver) = BatchNotifier::new_with_receiver();
                     event = event.with_batch_notifier(&batch);
-                    let entry = CommitterEntry {
+                    let entry = FinalizerEntry {
                         file_id: line.file_id,
                         offset: line.offset,
                     };
-                    committer.add(entry, receiver);
+                    finalizer.add(entry, receiver);
                 } else {
                     checkpoints.update(line.file_id, line.offset);
                 }
