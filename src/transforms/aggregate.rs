@@ -86,7 +86,7 @@ impl Aggregate {
             metric::MetricKind::Incremental => {
                 match map.get_mut(&series) {
                     // We already have something, add to it
-                    Some(existing) => existing.add(data),
+                    Some(existing) => existing.update(data),
                     None => {
                         // New so store
                         map.insert(series.clone(), data.clone());
