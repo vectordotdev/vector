@@ -103,7 +103,9 @@ impl Aggregate {
         emit!(AggregateEventRecorded);
     }
 
-    fn flush_into(&mut self, output: &mut Vec<Event>) {
+    fn flush_into(&mut self, output: &mut Vec<Event>) -> u64 {
+        let mut count = 0_u64;
+
         // TODO: locking/safety etc... we can also only have 1 call into flush at a time
         let map = match self.using_b {
             true => {
@@ -116,20 +118,20 @@ impl Aggregate {
             },
         };
 
-        if map.len() == 0 {
-            return
-        }
+        if map.len() > 0 {
+            // TODO: not clear how this should work with aggregation so just stuffing a default one
+            // in for now.
+            let metadata = EventMetadata::default();
 
-        // TODO: not clear how this should work with aggregation so just stuffing a default one in
-        // for now.
-        let metadata = EventMetadata::default();
-
-        for (series, metric) in map.drain() {
-            let metric = metric::Metric::from_parts(series, metric, metadata.clone());
-            output.push(Event::Metric(metric));
+            for (series, metric) in map.drain() {
+                let metric = metric::Metric::from_parts(series, metric, metadata.clone());
+                output.push(Event::Metric(metric));
+                count += 1;
+            }
         }
 
         emit!(AggregateFlushed);
+        return count;
     }
 }
 
@@ -180,85 +182,15 @@ impl TaskTransform for Aggregate {
 
 #[cfg(test)]
 mod tests {
-    /*
     use super::*;
-    use crate::{event::metric, event::Event, event::Metric};
     use std::collections::BTreeMap;
+    use crate::{event::metric, event::Event, event::Metric};
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<AggregateConfig>();
     }
-    */
 
-    #[test]
-    fn counters() {
-        /*
-        let mut agg = Aggregate::new(Duration::from_millis(10 * 1000));
-
-        let counter_a = metric::MetricValue::Counter { value: 42.0 };
-        let counter_b = metric::MetricValue::Counter { value: 43.0 };
-        let summed = metric::MetricValue::Counter { value: 85.0 };
-        let tags: BTreeMap<String, String> =
-            vec![("tag1".into(), "val1".into())].into_iter().collect();
-
-        // Single item, just stored regardless of kind
-        agg.record(make_metric("counter", metric::MetricKind::Incremental,
-                counter_a.clone(), tags.clone()));
-        assert_eq!(1, agg.map.len());
-        match agg.map.values().next() {
-            Some(record) => assert_eq!(counter_a, record.value),
-            _ => assert!(false),
-        }
-
-        // When sent absolute, replaced, not incremented
-        agg.record(make_metric("counter", metric::MetricKind::Absolute,
-                counter_b.clone(), tags.clone()));
-        assert_eq!(1, agg.map.len());
-        match agg.map.values().next() {
-            Some(record) => assert_eq!(counter_b, record.value),
-            _ => assert!(false),
-        }
-
-        // Now back to incremental, expect them to be added
-        agg.record(make_metric("counter", metric::MetricKind::Incremental,
-                counter_a.clone(), tags.clone()));
-        assert_eq!(1, agg.map.len());
-        match agg.map.values().next() {
-            Some(record) => assert_eq!(summed, record.value),
-            _ => assert!(false),
-        };
-
-        // Different name should create a distinct entry
-        agg.record(make_metric("counter2", metric::MetricKind::Incremental,
-                counter_a.clone(), tags.clone()));
-        assert_eq!(2, agg.map.len());
-        for (key, record) in &agg.map {
-            match key.name.name.as_str() {
-                "counter" => assert_eq!(summed, record.value),
-                "counter2" => assert_eq!(counter_a, record.value),
-                _ => assert!(false),
-            }
-        }
-
-        // Different MetricValue type, guage, with same name & tags is ignored, first establishes
-        // type
-        let guage = metric::MetricValue::Gauge { value: 44.0 };
-        agg.record(make_metric("counter", metric::MetricKind::Incremental,
-                guage.clone(), tags.clone()));
-        // Nothing changed
-        assert_eq!(2, agg.map.len());
-        for (key, record) in &agg.map {
-            match key.name.name.as_str() {
-                "counter" => assert_eq!(summed, record.value),
-                "counter2" => assert_eq!(counter_a, record.value),
-                _ => assert!(false),
-            }
-        }
-        */
-    }
-
-    /*
     fn make_metric(
         name: &'static str,
         kind: metric::MetricKind,
@@ -274,183 +206,160 @@ mod tests {
             .with_tags(Some(tags)),
         )
     }
-    */
-
-    /*
-    use super::*;
-    use crate::{
-        conditions::check_fields::CheckFieldsPredicateArg, config::log_schema, event::Event,
-        test_util::random_lines, transforms::test::transform_one,
-    };
-    use approx::assert_relative_eq;
-    use indexmap::IndexMap;
-
-    fn condition_contains(pre: &str) -> Box<dyn Condition> {
-        condition(log_schema().message_key(), "contains", pre)
-    }
-
-    fn condition(field: &str, condition: &str, value: &str) -> Box<dyn Condition> {
-        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
-        preds.insert(
-            format!("{}.{}", field, condition),
-            CheckFieldsPredicateArg::String(value.into()),
-        );
-
-        CheckFieldsConfig::new(preds).build().unwrap()
-    }
 
     #[test]
-    fn genreate_config() {
-        crate::test_util::test_generate_config::<AggregateConfig>();
-    }
+    fn incremental() {
+        let mut agg = Aggregate::new(&AggregateConfig { interval_ms: Some(1000_u64) }).unwrap();
 
-    #[test]
-    fn hash_samples_at_roughly_the_configured_rate() {
-        let num_events = 10000;
+        let tags: BTreeMap<String, String> =
+            vec![("tag1".into(), "val1".into())].into_iter().collect();
+        let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 42.0 }, tags.clone());
+        let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 43.0 }, tags.clone());
+        let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 85.0 }, tags.clone());
 
-        let events = random_events(num_events);
-        let mut sampler = Aggregate::new(
-            2,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains("na")),
-        );
-        let total_passed = events
-            .into_iter()
-            .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
-                sampler.transform(&mut buf, event);
-                buf.pop()
-            })
-            .count();
-        let ideal = 1.0f64 / 2.0f64;
-        let actual = total_passed as f64 / num_events as f64;
-        assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
+        // Single item, just stored regardless of kind
+        agg.record(counter_a_1.clone());
+        let mut out = vec![];
+        // We should flush 1 item counter_a_1
+        assert_eq!(1, agg.flush_into(&mut out));
+        assert_eq!(1, out.len());
+        assert_eq!(&counter_a_1, &out[0]);
 
-        let events = random_events(num_events);
-        let mut sampler = Aggregate::new(
-            25,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains("na")),
-        );
-        let total_passed = events
-            .into_iter()
-            .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
-                sampler.transform(&mut buf, event);
-                buf.pop()
-            })
-            .count();
-        let ideal = 1.0f64 / 25.0f64;
-        let actual = total_passed as f64 / num_events as f64;
-        assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
-    }
+        // A subsequent flush doesn't send out anything
+        out.clear();
+        assert_eq!(0, agg.flush_into(&mut out));
+        assert_eq!(0, out.len());
 
-    #[test]
-    fn hash_consistently_samples_the_same_events() {
-        let events = random_events(1000);
-        let mut sampler = Aggregate::new(
-            2,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains("na")),
-        );
+        // One more just to make sure that we don't re-see from the other buffer
+        out.clear();
+        assert_eq!(0, agg.flush_into(&mut out));
+        assert_eq!(0, out.len());
 
-        let first_run = events
-            .clone()
-            .into_iter()
-            .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
-                sampler.transform(&mut buf, event);
-                buf.pop()
-            })
-            .collect::<Vec<_>>();
-        let second_run = events
-            .into_iter()
-            .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
-                sampler.transform(&mut buf, event);
-                buf.pop()
-            })
-            .collect::<Vec<_>>();
+        // Two increments with the same series, should sum into 1
+        agg.record(counter_a_1.clone());
+        agg.record(counter_a_2.clone());
+        out.clear();
+        assert_eq!(1, agg.flush_into(&mut out));
+        assert_eq!(1, out.len());
+        assert_eq!(&counter_a_summed, &out[0]);
 
-        assert_eq!(first_run, second_run);
-    }
-
-    #[test]
-    fn always_passes_events_matching_pass_list() {
-        for key_field in &[None, Some(log_schema().message_key().into())] {
-            let event = Event::from("i am important");
-            let mut sampler =
-                Aggregate::new(0, key_field.clone(), Some(condition_contains("important")));
-            let iterations = 0..1000;
-            let total_passed = iterations
-                .filter_map(|_| {
-                    transform_one(&mut sampler, event.clone())
-                        .map(|result| assert_eq!(result, event))
-                })
-                .count();
-            assert_eq!(total_passed, 1000);
+        let counter_b_1 = make_metric("counter_b", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 44.0 }, tags.clone());
+        // Two increments with the different series, should get each back as-is
+        agg.record(counter_a_1.clone());
+        agg.record(counter_b_1.clone());
+        out.clear();
+        assert_eq!(2, agg.flush_into(&mut out));
+        assert_eq!(2, out.len());
+        // B/c we don't know the order they'll come back
+        for event in out {
+            match event.as_metric().series().name.name.as_str() {
+                "counter_a" => assert_eq!(counter_a_1, event),
+                "counter_b" => assert_eq!(counter_b_1, event),
+                _ => assert!(false),
+            }
         }
     }
 
     #[test]
-    fn handles_key_field() {
-        for key_field in &[None, Some(log_schema().timestamp_key().into())] {
-            let event = Event::from("nananana");
-            let mut sampler = Aggregate::new(
-                0,
-                key_field.clone(),
-                Some(condition(log_schema().timestamp_key(), "contains", ":")),
-            );
-            let iterations = 0..1000;
-            let total_passed = iterations
-                .filter_map(|_| {
-                    transform_one(&mut sampler, event.clone())
-                        .map(|result| assert_eq!(result, event))
-                })
-                .count();
-            assert_eq!(total_passed, 1000);
+    fn absolute() {
+        let mut agg = Aggregate::new(&AggregateConfig { interval_ms: Some(1000_u64) }).unwrap();
+
+        let tags: BTreeMap<String, String> =
+            vec![("tag1".into(), "val1".into())].into_iter().collect();
+        let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 42.0 }, tags.clone());
+        let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 43.0 }, tags.clone());
+
+        // Single item, just stored regardless of kind
+        agg.record(gauge_a_1.clone());
+        let mut out = vec![];
+        // We should flush 1 item gauge_a_1
+        assert_eq!(1, agg.flush_into(&mut out));
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_1, &out[0]);
+
+        // A subsequent flush doesn't send out anything
+        out.clear();
+        assert_eq!(0, agg.flush_into(&mut out));
+        assert_eq!(0, out.len());
+
+        // One more just to make sure that we don't re-see from the other buffer
+        out.clear();
+        assert_eq!(0, agg.flush_into(&mut out));
+        assert_eq!(0, out.len());
+
+        // Two absolutes with the same series, should get the 2nd (last) back.
+        agg.record(gauge_a_1.clone());
+        agg.record(gauge_a_2.clone());
+        out.clear();
+        assert_eq!(1, agg.flush_into(&mut out));
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_2, &out[0]);
+
+        let gauge_b_1 = make_metric("gauge_b", metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 44.0 }, tags.clone());
+        // Two increments with the different series, should get each back as-is
+        agg.record(gauge_a_1.clone());
+        agg.record(gauge_b_1.clone());
+        out.clear();
+        assert_eq!(2, agg.flush_into(&mut out));
+        assert_eq!(2, out.len());
+        // B/c we don't know the order they'll come back
+        for event in out {
+            match event.as_metric().series().name.name.as_str() {
+                "gauge_a" => assert_eq!(gauge_a_1, event),
+                "gauge_b" => assert_eq!(gauge_b_1, event),
+                _ => assert!(false),
+            }
         }
     }
 
-    #[test]
-    fn sampler_adds_sampling_rate_to_event() {
-        for key_field in &[None, Some(log_schema().message_key().into())] {
-            let events = random_events(10000);
-            let mut sampler = Aggregate::new(10, key_field.clone(), Some(condition_contains("na")));
-            let passing = events
-                .into_iter()
-                .filter(|s| {
-                    !s.as_log()[log_schema().message_key()]
-                        .to_string_lossy()
-                        .contains("na")
-                })
-                .find_map(|event| transform_one(&mut sampler, event))
-                .unwrap();
-            assert_eq!(passing.as_log()["sample_rate"], "10".into());
+    #[tokio::test]
+    async fn transform() {
+        let agg = toml::from_str::<AggregateConfig>(
+            r#"
+interval_ms = 10
+"#,
+        )
+        .unwrap()
+        .build(&GlobalOptions::default())
+        .await
+        .unwrap();
+        let agg = agg.into_task();
 
-            let events = random_events(10000);
-            let mut sampler = Aggregate::new(25, key_field.clone(), Some(condition_contains("na")));
-            let passing = events
-                .into_iter()
-                .filter(|s| {
-                    !s.as_log()[log_schema().message_key()]
-                        .to_string_lossy()
-                        .contains("na")
-                })
-                .find_map(|event| transform_one(&mut sampler, event))
-                .unwrap();
-            assert_eq!(passing.as_log()["sample_rate"], "25".into());
+        let tags: BTreeMap<String, String> =
+            vec![("tag1".into(), "val1".into())].into_iter().collect();
+        let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 42.0 }, tags.clone());
+        let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 43.0 }, tags.clone());
+        let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 85.0 }, tags.clone());
+        let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 42.0 }, tags.clone());
+        let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 43.0 }, tags.clone());
+        let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
-            // If the event passed the regex check, don't include the sampling rate
-            let mut sampler = Aggregate::new(25, key_field.clone(), Some(condition_contains("na")));
-            let event = Event::from("nananana");
-            let passing = transform_one(&mut sampler, event).unwrap();
-            assert!(passing.as_log().get("sample_rate").is_none());
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = agg.transform(in_stream);
+
+        let mut count = 0;
+        while let Some(event) = out_stream.next().await {
+            count += 1;
+            match event.as_metric().series().name.name.as_str() {
+                "counter_a" => assert_eq!(counter_a_summed, event),
+                "gauge_a" => assert_eq!(gauge_a_2, event),
+                _ => assert!(false),
+            };
         }
-    }
 
-    fn random_events(n: usize) -> Vec<Event> {
-        random_lines(10).take(n).map(Event::from).collect()
+        // There were only 2
+        assert_eq!(2, count);
     }
-    */
 }
