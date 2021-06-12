@@ -1,6 +1,6 @@
 {{ $tabs := .Params.platform_tabs }}
 {{ $defaultTab := index $tabs 0 }}
-<div class="relative py-12 md:py-16 lg:py-20 px-4 sm:px-6 mx-auto max-w-7xl text-center">
+<div class="py-12 md:py-16 lg:py-20 px-4 sm:px-6 mx-auto max-w-7xl text-center">
   <div class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary py-2">
     <h1 class="text-3xl md:text-4xl font-extrabold leading-looser">
       A complete, end-to-end platform.
@@ -10,12 +10,12 @@
   </div>
 
   <p class="mt-2 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
-    Deploy Vector in a variety of roles to suit your use case
+    Deploy Vector in a variety of roles to suit your use case.<br />Get data from point A to point B without patching tools together.
   </p>
 
   <div x-data="{ selected: '{{ $defaultTab }}' }" class="mt-6 text-center">
     {{/* Selector */}}
-    <div class="inline-flex space-x-5 bg-dark dark:bg-white py-1 px-1.5 rounded-full shadow-sm">
+    <div class="inline-flex space-x-5 bg-dark dark:bg-white py-1.5 px-2.5 rounded-full shadow-sm">
       {{ range $tabs }}
       <button @click="selected = '{{ . }}'" :class="{ 'rounded-full py-0.5 px-2.5 text-dark bg-primary dark:bg-dark dark:text-primary': selected === '{{ . }}' }" class="uppercase text-sm font-semibold text-smtracking-tight text-white dark:text-dark">
         {{ . }}
@@ -24,11 +24,21 @@
     </div>
 
     {{/* Selectable images */}}
-    <div class="mt-12 text-center">
+    <div class="mt-12 mx-auto flex flex-col items-center">
       {{ range $tabs }}
+      {{ $name := . | lower | urlize }}
       {{ $svg := printf "/img/pipelines-%s.svg" (. | urlize) }}
-      <div x-show="selected === '{{ . }}'" class="inline-flex max-w-full md:max-w-5xl">
-        {{ partial "svg.html" (dict "src" $svg) }}
+      {{ $url := printf "/docs/setup/deployment/topologies/#%s" $name | relURL }}
+      <div x-show="selected === '{{ . }}'">
+        <div class="max-w-full md:max-w-5xl">
+          {{ partial "svg.html" (dict "src" $svg) }}
+        </div>
+
+        <div class="mt-8 md:mt-10 lg:mt-12 tracking-tight">
+          <p class="text-sm md:text-md lg:text-lg text-gray-500 dark:text-gray-400">
+            Learn more about the <a href="{{ $url }}" class="text-primary-dark dark:text-primary hover:text-secondary dark:hover:text-secondary">{{ $name }}</a> deployment topology for Vector
+          </p>
+        </div>
       </div>
       {{ end }}
     </div>
