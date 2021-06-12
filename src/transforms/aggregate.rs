@@ -24,6 +24,7 @@ use std::{
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct AggregateConfig {
+    /// The interval between flushes in milliseconds.
     pub interval_ms: Option<u64>,
 }
 
@@ -53,6 +54,7 @@ impl TransformConfig for AggregateConfig {
     }
 }
 
+//------------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub struct Aggregate {
@@ -85,7 +87,7 @@ impl Aggregate {
         match data.kind {
             metric::MetricKind::Incremental => {
                 match map.get_mut(&series) {
-                    // We already have something, add to it
+                    // We already have something, add to it, will update timestamp as well.
                     Some(existing) => existing.update(data),
                     None => {
                         // New so store
@@ -95,7 +97,7 @@ impl Aggregate {
                 };
             },
             metric::MetricKind::Absolute => {
-                // Always store
+                // Always replace/store
                 map.insert(series.clone(), data.clone());
             }
         };
