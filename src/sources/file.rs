@@ -1,8 +1,9 @@
+use super::util::committer::Committer;
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent},
+    event::{BatchNotifier, Event, LogEvent},
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -13,8 +14,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    Checkpointer, CheckpointsView, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter,
-    Line, ReadFrom,
+    Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
 use futures::{
     future::TryFutureExt,
@@ -24,10 +24,8 @@ use futures::{
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::task::spawn_blocking;
 
@@ -148,6 +146,12 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 
 fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
+}
+
+#[derive(Debug)]
+pub(crate) struct CommitterEntry {
+    pub(crate) file_id: FileFingerprint,
+    pub(crate) offset: u64,
 }
 
 impl Default for FileConfig {
@@ -299,7 +303,10 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     let checkpoints = checkpointer.view();
-    let committer = Committer::new(&checkpointer);
+    let mut committer = acknowledgements.then(|| {
+        let checkpoints = checkpointer.view();
+        Committer::new(move |entry: CommitterEntry| checkpoints.update(entry.file_id, entry.offset))
+    });
 
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
@@ -345,15 +352,18 @@ pub fn file_source(
         let mut messages = messages
             .map(move |line| {
                 let _enter = span2.enter();
-                let entry = CommitterEntry::from(&line);
                 let mut event =
                     create_event(line.text, line.filename, &host_key, &hostname, &file_key);
-                if acknowledgements {
+                if let Some(committer) = &committer {
                     let (batch, receiver) = BatchNotifier::new_with_receiver();
                     event = event.with_batch_notifier(&batch);
-                    committer.push(entry, receiver);
+                    let entry = CommitterEntry {
+                        file_id: line.file_id,
+                        offset: line.offset,
+                    };
+                    committer.add(entry, receiver);
                 } else {
-                    checkpoints.update(entry.file_id, entry.offset);
+                    checkpoints.update(line.file_id, line.offset);
                 }
                 event
             })
@@ -443,92 +453,6 @@ fn create_event(
     }
 
     event.into()
-}
-
-struct Committer {
-    checkpoints: Arc<CheckpointsView>,
-    store: Arc<Mutex<CommitterStore>>,
-}
-
-impl Committer {
-    fn new(checkpointer: &Checkpointer) -> Self {
-        Self {
-            checkpoints: checkpointer.view(),
-            store: Default::default(),
-        }
-    }
-
-    fn push(&self, msg: impl Into<CommitterEntry>, receiver: BatchStatusReceiver) {
-        const LOCK_ERROR: &str = "Poisoned file source commit store lock";
-
-        let mut store = self.store.lock().expect(LOCK_ERROR);
-        let index = store.add_msg(msg);
-        drop(store); // Unlock the store ASAP
-
-        let store = Arc::clone(&self.store);
-        let checkpoints = Arc::clone(&self.checkpoints);
-        tokio::spawn(async move {
-            let _status = receiver.await;
-            let mut store = store.lock().expect(LOCK_ERROR);
-            store.mark_done(index);
-            store.extract_done(checkpoints);
-        });
-    }
-}
-
-#[derive(Default)]
-struct CommitterStore {
-    first: u64,
-    entries: VecDeque<CommitterEntry>,
-}
-
-impl CommitterStore {
-    /// Add the needed data from the given message into the store and
-    /// return the index.
-    fn add_msg(&mut self, msg: impl Into<CommitterEntry>) -> u64 {
-        let index = self.first + self.entries.len() as u64;
-        self.entries.push_back(msg.into());
-        index
-    }
-
-    fn mark_done(&mut self, index: u64) {
-        // Under normal usage, both of these conditions should be true,
-        // but they are guarded to avoid panics.
-        if index >= self.first {
-            let offset = (index - self.first) as usize;
-            if let Some(entry) = self.entries.get_mut(offset) {
-                entry.done = true;
-            }
-        }
-    }
-
-    fn extract_done(&mut self, checkpoints: Arc<CheckpointsView>) {
-        while let Some(entry) = self.entries.front() {
-            if !entry.done {
-                break;
-            }
-            let entry = self.entries.pop_front().unwrap();
-            self.first += 1;
-            checkpoints.update(entry.file_id, entry.offset);
-        }
-    }
-}
-
-#[derive(Debug)]
-struct CommitterEntry {
-    done: bool,
-    file_id: FileFingerprint,
-    offset: u64,
-}
-
-impl From<&Line> for CommitterEntry {
-    fn from(line: &Line) -> Self {
-        Self {
-            done: false,
-            file_id: line.file_id,
-            offset: line.offset,
-        }
-    }
 }
 
 #[cfg(test)]
