@@ -5,8 +5,8 @@ components: transforms: aggregate: {
 
 	description: """
 		Aggregates multiple metric events into a single metric event based on a
-        the MetricKind. Incremental metrics are "added", Absolute uses last
-        value wins semantics.
+		the MetricKind. Incremental metrics are "added", Absolute uses last
+		value wins semantics.
 		"""
 
 	classes: {
@@ -40,8 +40,8 @@ components: transforms: aggregate: {
 		interval_ms: {
 			common: true
 			description: """
-                The interval over which metrics are aggregated in milliseconds. Over this period metrics with the 
-                same series data (name, namespace, tags, ...) will be aggregated.
+				The interval over which metrics are aggregated in milliseconds. Over this period metrics with the
+				same series data (name, namespace, tags, ...) will be aggregated.
 				"""
 			required: false
 			warnings: []
@@ -70,111 +70,111 @@ components: transforms: aggregate: {
 			input: [
 				{
 					metric: {
-                        kind:      "incremental"
-                        name:      "counter.1"
+						kind:      "incremental"
+						name:      "counter.1"
 						timestamp: "2021-07-12T07:58:44.223543Z"
-                        tags: {
-                            host: "my.host.com"
-                        }
-                        counter: {
-                            value: 1.1
-                        }
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 1.1
+						}
 					}
 				},
 				{
 					metric: {
-                        kind:      "incremental"
-                        name:      "counter.1"
+						kind:      "incremental"
+						name:      "counter.1"
 						timestamp: "2021-07-12T07:58:45.223543Z"
-                        tags: {
-                            host: "my.host.com"
-                        }
-                        counter: {
-                            value: 2.2
-                        }
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 2.2
+						}
 					}
 				},
 				{
 					metric: {
-                        kind:      "incremental"
-                        name:      "counter.1"
+						kind:      "incremental"
+						name:      "counter.1"
 						timestamp: "2021-07-12T07:58:45.223543Z"
-                        tags: {
-                            host: "different.host.com"
-                        }
-                        counter: {
-                            value: 1.1
-                        }
+						tags: {
+							host: "different.host.com"
+						}
+						counter: {
+							value: 1.1
+						}
 					}
 				},
 				{
 					metric: {
-                        kind:      "absolute"
-                        name:      "guage.1"
+						kind:      "absolute"
+						name:      "guage.1"
 						timestamp: "2021-07-12T07:58:47.223543Z"
-                        tags: {
-                            host: "my.host.com"
-                        }
-                        counter: {
-                            value: 22.33
-                        }
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 22.33
+						}
 					}
 				},
 				{
 					metric: {
-                        kind:      "absolute"
-                        name:      "guage.1"
+						kind:      "absolute"
+						name:      "guage.1"
 						timestamp: "2021-07-12T07:58:45.223543Z"
-                        tags: {
-                            host: "my.host.com"
-                        }
-                        counter: {
-                            value: 44.55
-                        }
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 44.55
+						}
 					}
 				},
 			]
 			configuration: {
-                interval_ms: 5000
+				interval_ms: 5000
 			}
 			output: [
 				{
 					metric: {
-                        kind:      "incremental"
-                        name:      "counter.1"
+						kind:      "incremental"
+						name:      "counter.1"
 						timestamp: "2021-07-12T07:58:45.223543Z"
-                        tags: {
-                            host: "my.host.com"
-                        }
-                        counter: {
-                            value: 3.3
-                        }
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 3.3
+						}
 					}
 				},
 				{
 					metric: {
-                        kind:      "incremental"
-                        name:      "counter.1"
+						kind:      "incremental"
+						name:      "counter.1"
 						timestamp: "2021-07-12T07:58:45.223543Z"
-                        tags: {
-                            host: "different.host.com"
-                        }
-                        counter: {
-                            value: 1.1
-                        }
+						tags: {
+							host: "different.host.com"
+						}
+						counter: {
+							value: 1.1
+						}
 					}
 				},
 				{
 					metric: {
-                        kind:      "absolute"
-                        name:      "guage.1"
+						kind:      "absolute"
+						name:      "guage.1"
 						timestamp: "2021-07-12T07:58:45.223543Z"
-                        tags: {
-                            host: "my.host.com"
-                        }
-                        counter: {
-                            value: 44.55
-                        }
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 44.55
+						}
 					}
 				},
 			]
