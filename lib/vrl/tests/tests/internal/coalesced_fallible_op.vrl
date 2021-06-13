@@ -52,5 +52,4 @@
  match(.bar, r'') ?? false && .zub == true && .foo == "thunk",
  .zub == true && match(.bar, r'') ?? false && .foo == "thunk",
  .zub == true && .foo == "thunk" && match(.bar, r'') ?? false,
-
  ]
