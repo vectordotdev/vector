@@ -1,9 +1,9 @@
 # object: { "foo": "bar" }
 # result:
 # error[E100]: unhandled error
-#   ┌─ :3:1
+#   ┌─ :2:1
 #   │
-# 3 │ (match(.bar, r'') || .foo == "this")
+# 2 │ (match(.bar, r'') || .foo == "this")
 #   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #   │ │
 #   │ expression can result in runtime error
