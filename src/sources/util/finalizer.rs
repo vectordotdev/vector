@@ -1,34 +1,34 @@
 use crate::event::BatchStatusReceiver;
-use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
+use crate::shutdown::ShutdownSignal;
+use futures::{future::Shared, stream::FuturesUnordered, FutureExt, StreamExt};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Poll;
-use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::mpsc;
 
+/// The `OrderedFinalizer` framework here is a mechanism for marking
+/// events from a source as done in a single background task *in the
+/// order they are received from the source*. The type `T` is the
+/// source-specific data associated with each entry to be used to
+/// complete the finalization.
 pub(crate) struct OrderedFinalizer<T> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
-    shutdown_done: Tripwire,
 }
 
+// TODO: Rewrite `apply_done` below into a trait once there are more
+// than one user of this framework. This works for now.
+
 impl<T: Send + 'static> OrderedFinalizer<T> {
-    pub(crate) fn new(apply_done: impl Fn(T) + Send + 'static) -> Self {
-        let (shutdown_trigger, shutdown_done) = Tripwire::new();
+    pub(crate) fn new(
+        shutdown: Shared<ShutdownSignal>,
+        apply_done: impl Fn(T) + Send + 'static,
+    ) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        tokio::spawn(run_finalizer(shutdown_trigger, receiver, apply_done));
+        tokio::spawn(run_finalizer(shutdown, receiver, apply_done));
         Self {
             sender: Some(sender),
-            shutdown_done,
         }
-    }
-
-    pub(crate) fn shutdown_done(&self) -> Tripwire {
-        self.shutdown_done.clone()
-    }
-
-    pub(crate) fn start_shutdown(&mut self) {
-        self.sender.take();
     }
 
     pub(crate) fn add(&self, entry: T, receiver: BatchStatusReceiver) {
@@ -41,42 +41,37 @@ impl<T: Send + 'static> OrderedFinalizer<T> {
 }
 
 async fn run_finalizer<T>(
-    shutdown: Trigger,
-    mut receiver: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
+    shutdown: Shared<ShutdownSignal>,
+    mut new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
     apply_done: impl Fn(T),
 ) {
-    let mut receivers = FuturesUnordered::default();
+    let mut status_receivers = FuturesUnordered::default();
     let mut store = FinalizerStore::new();
 
     loop {
-        if receivers.is_empty() {
-            match receiver.recv().await {
+        tokio::select! {
+            _ = shutdown.clone() => break,
+            new_entry = new_entries.recv() => match new_entry {
                 Some((receiver, entry)) => {
                     let index = store.add_entry(entry);
-                    receivers.push(FinalizerFuture { receiver, index });
+                    status_receivers.push(FinalizerFuture { receiver, index });
                 }
                 None => break,
-            }
-        } else {
-            tokio::select! {
-                received = receiver.recv() => match received {
-                    Some((receiver, entry)) => {
-                        let index = store.add_entry(entry);
-                        receivers.push(FinalizerFuture { receiver, index });
-                    }
-                    None => break,
-                },
-                result = receivers.next() => match result {
-                    Some((_status, index)) => {
-                        store.mark_done(index);
-                        store.extract_done(&apply_done);
-                    }
-                    None => break,
-                },
-            }
+            },
+            finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
+                Some((_status, index)) => {
+                    store.mark_done(index);
+                    store.extract_done(&apply_done);
+                }
+                // The is_empty guard above prevents this from being reachable.
+                None => unreachable!(),
+            },
         }
     }
-    while let Some((_status, index)) = receivers.next().await {
+    // We've either seen a shutdown signal or the new entry sender was
+    // closed. Wait for the last statuses to come in before indicating
+    // we are done.
+    while let Some((_status, index)) = status_receivers.next().await {
         store.mark_done(index);
         store.extract_done(&apply_done);
     }

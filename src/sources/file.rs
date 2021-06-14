@@ -19,7 +19,7 @@ use file_source::{
 use futures::{
     future::TryFutureExt,
     stream::{Stream, StreamExt},
-    SinkExt,
+    FutureExt, SinkExt,
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -303,9 +303,10 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     let checkpoints = checkpointer.view();
-    let mut finalizer = acknowledgements.then(|| {
+    let shutdown = shutdown.shared();
+    let finalizer = acknowledgements.then(|| {
         let checkpoints = checkpointer.view();
-        OrderedFinalizer::new(move |entry: FinalizerEntry| {
+        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
             checkpoints.update(entry.file_id, entry.offset)
         })
     });
