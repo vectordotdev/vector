@@ -21,8 +21,6 @@ use tokio_util::codec::Decoder;
 
 // TODO
 // * usize casts bounds
-// * docs
-// * e2e acking after pipelining
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogstashConfig {
