@@ -152,15 +152,8 @@ initial design, we will not allow any configuration and choose common defaults.
 
 ## Plan Of Attack
 
-// TODO.
-
-<!--
-Incremental steps that execute this change. Generally this is in the form of:
-
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-- [ ] Incremental change #1
-- [ ] Incremental change #2
-- [ ] ...
-
-Note: This can be filled out during the review process.
--->
+- Implement common structures for `Framer`s and `Codec`s in topology builder and
+  source/sink context
+- Integrate framing into sources and codecs into topology for sources and sinks
+- Implement commonly used framers and codecs that are centrally registered and
+  can be resolved by name from Vector configs
