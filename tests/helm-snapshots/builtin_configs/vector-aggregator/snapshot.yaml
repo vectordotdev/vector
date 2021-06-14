@@ -56,6 +56,7 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "vector"
+      version = "2"
       arbitrary text 1
     
     
@@ -96,6 +97,7 @@ spec:
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: aggregator
 ---
 # Source: vector-aggregator/templates/service.yaml
 apiVersion: v1
@@ -119,6 +121,7 @@ spec:
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: aggregator
 ---
 # Source: vector-aggregator/templates/statefulset.yaml
 apiVersion: apps/v1
@@ -138,6 +141,7 @@ spec:
     matchLabels:
       app.kubernetes.io/name: vector-aggregator
       app.kubernetes.io/instance: vector
+      app.kubernetes.io/component: aggregator
   podManagementPolicy: "Parallel"
   replicas: 1
   template:
@@ -149,6 +153,7 @@ spec:
       labels:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
+        app.kubernetes.io/component: aggregator
         vector.dev/exclude: "true"
     spec:      
       serviceAccountName: vector-aggregator
