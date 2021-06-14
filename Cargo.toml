@@ -290,7 +290,7 @@ assert_cmd = "1.0.5"
 base64 = "0.13.0"
 criterion = { version = "0.3.4", features = ["html_reports"] }
 httpmock = { version = "0.5.8", default-features = false }
-libc = "0.2.96"
+libc = "0.2.97"
 libz-sys = "1.1.3"
 matches = "0.1.8"
 pretty_assertions = "0.7.2"
