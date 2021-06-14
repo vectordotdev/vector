@@ -53,7 +53,7 @@ components: transforms: aggregate: {
 	}
 
 	input: {
-		logs:    false
+		logs: false
 		metrics: {
 			counter:      true
 			distribution: true
@@ -183,6 +183,6 @@ components: transforms: aggregate: {
 
 	telemetry: metrics: {
 		events_recorded_total: components.sources.internal_metrics.output.metrics.events_recorded_total
-		flushed_total: components.sources.internal_metrics.output.metrics.flushed_total
+		flushed_total:         components.sources.internal_metrics.output.metrics.flushed_total
 	}
 }
