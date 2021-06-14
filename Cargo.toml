@@ -19,6 +19,7 @@ required-features = ["default-no-api-client"]
 [profile.dev]
 split-debuginfo = "unpacked" # Faster debug builds on macOS
 
+# CI-based builds use full release optimization.  See scripts/environment/release-flags.sh.
 [profile.release]
 debug = false     # Do not include debug symbols in the executable.
 
