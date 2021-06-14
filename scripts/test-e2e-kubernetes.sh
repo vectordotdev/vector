@@ -18,13 +18,13 @@ random-string() {
   echo
 }
 
-# Detect if current kubectl context match the one from `minikube`.
+# Detect if current kubectl context matches the one from `minikube`.
 is_kubectl_context_minikube() {
   MINIKUBE_CLUSTER=$(minikube profile || true)
   [[ "$(kubectl config current-context || true)" == "${MINIKUBE_CLUSTER:-"minikube"}" ]]
 }
 
-# Detect if current kubectl context is `kind`.
+# Detect if current kubectl context matches a `kind` cluster.
 is_kubectl_context_kind() {
   for KIND_CLUSTER in $(kind get clusters || true); do
     if [[ "$(kubectl config current-context || true)" == "kind-${KIND_CLUSTER}" ]]; then
