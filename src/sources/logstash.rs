@@ -19,9 +19,6 @@ use std::{
 };
 use tokio_util::codec::Decoder;
 
-// TODO
-// * usize casts bounds
-
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogstashConfig {
     address: SocketListenAddr,
@@ -495,7 +492,7 @@ mod integration_tests {
     use crate::{
         config::SourceContext,
         docker::docker,
-        test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp},
+        test_util::{collect_n, next_addr_for_ip, trace_init, wait_for_tcp},
         tls::TlsOptions,
         Pipeline,
     };
@@ -507,7 +504,7 @@ mod integration_tests {
     };
     use futures::{channel::mpsc, StreamExt};
     use std::{collections::HashMap, fs::File, io::Write, net::SocketAddr, time::Duration};
-    use tokio::time::sleep;
+    use tokio::time::timeout;
     use uuid::Uuid;
 
     #[tokio::test]
@@ -566,9 +563,9 @@ output.logstash:
             .await
             .unwrap();
 
-        sleep(Duration::from_secs(5)).await;
-
-        let events = collect_ready(out).await;
+        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
+            .await
+            .unwrap();
 
         remove_container(&docker, &container.id).await;
 
@@ -661,17 +658,21 @@ output {
             .await
             .unwrap();
 
-        sleep(Duration::from_secs(30)).await; // logstash is sloooow to startup
-
-        let events = collect_ready(out).await;
+        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
+            .await
+            .unwrap();
 
         remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
 
         let log = events[0].as_log();
-        assert!(log.get("message").unwrap().contains("Hello World"));
-        assert!(log.get("timestamp").is_some());
+        assert!(log
+            .get("line")
+            .unwrap()
+            .to_string_lossy()
+            .contains("Hello World"));
+        assert!(log.get("host").is_some());
     }
 
     async fn pull_image(docker: &Docker, image: &str, tag: &str) {
