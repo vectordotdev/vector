@@ -72,8 +72,8 @@ data:
     
     # Send logs to the aggregator.
     [sinks.vector_sink]
-      address = "vector:9000"
-      inputs = ["kubernetes_logs", "generator"]
+      address = "vector-aggregator:9000"
+      inputs = ["kubernetes_logs"]
       type = "vector"
       version = "2"
     
@@ -98,12 +98,6 @@ data:
       address = "0.0.0.0:9090"
       inputs = ["internal_metrics", "host_metrics"]
       type = "prometheus"
-    
-    
-    [sources.generator]
-      format = "json"
-      interval = 0.5
-      type = "generator"
 ---
 # Source: vector/charts/vector-aggregator/templates/configmap.yaml
 apiVersion: v1
