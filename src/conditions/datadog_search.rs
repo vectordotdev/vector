@@ -5,20 +5,19 @@ use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
-pub struct DatadogConfig {
+pub struct DatadogSearchConfig {
     pub source: String,
 }
 
 inventory::submit! {
-    ConditionDescription::new::<DatadogConfig>("datadog")
+    ConditionDescription::new::<DatadogSearchConfig>("datadog_search")
 }
 
-impl_generate_config_from_default!(DatadogConfig);
+impl_generate_config_from_default!(DatadogSearchConfig);
 
-#[typetag::serde(name = "datadog")]
-impl ConditionConfig for DatadogConfig {
+#[typetag::serde(name = "datadog_search")]
+impl ConditionConfig for DatadogSearchConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        // Attempt to parse the Datadog search query.
         let query_node = parse(&self.source)?;
         let builder = Builder::new();
 
@@ -42,7 +41,7 @@ mod test {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<DatadogConfig>();
+        crate::test_util::test_generate_config::<DatadogSearchConfig>();
     }
 
     #[test]
@@ -123,14 +122,19 @@ mod test {
             // Keyword.
             ("bla", log_event!["message" => "bla"], log_event![]),
             (
-                "bla",
-                log_event!["message" => json!({"key": "bla"})],
+                "foo",
+                log_event!["message" => r#"{"key": "foo"}"#],
+                log_event![],
+            ),
+            (
+                "bar",
+                log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
                 log_event![],
             ),
         ];
 
         for (source, pass, fail) in checks {
-            let config = DatadogConfig {
+            let config = DatadogSearchConfig {
                 source: source.to_owned(),
             };
 
