@@ -23,9 +23,10 @@ vector-aggregator:
 
 ## Motivation
 
-We're duplicating the templating used to generate Vector's configuration file in Helm based deployments. While I was working on transitioning the
-currently TOML config to YAML realized the configuration building had several unexpected complications due to the separation between Vector's provided
-"default" configurations (listed in the Scope section) and a user provided configuration located under the `sources`, `transforms`, and `sinks` keys.
+Our current Helm chart for configuring Vector in Kubernetes provides shortcuts for configuring common
+sources and sinks, while also allowing users to specify their configuration in the more traditional "direct"
+fashion, similar to configuring Vector when running on a virtual machine. These two approaches being
+used simultaneously can lead to issues, and general confusion, about what the correct way to configure Vector is.
 
 ## Internal Proposal
 
