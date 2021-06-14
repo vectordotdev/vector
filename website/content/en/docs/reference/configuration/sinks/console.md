@@ -1,5 +1,6 @@
 ---
 title: Console
+description: Display observability events in the console, which can be useful for debugging purposes
 kind: sink
 layout: component
 ---

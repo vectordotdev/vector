@@ -1,5 +1,6 @@
 ---
 title: New Relic logs
+description: Deliver log events to [New Relic](https://newrelic.com)
 kind: sink
 layout: component
 ---

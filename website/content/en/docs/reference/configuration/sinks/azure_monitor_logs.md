@@ -1,5 +1,6 @@
 ---
-title: Azure Monitor logs
+title: Azure Monitor Logs
+description: Publish log events to the [Azure Monitor Logs](https://docs.microsoft.com/en-us/azure/azure-monitor/logs/data-platform-logs) service
 kind: sink
 layout: component
 ---

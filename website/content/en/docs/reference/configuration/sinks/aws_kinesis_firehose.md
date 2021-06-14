@@ -1,5 +1,6 @@
 ---
-title: AWS Kinesis Firehose logs
+title: AWS Kinesis Data Firehose logs
+description: Publish logs to [AWS Kinesis Data Firehose](https://aws.amazon.com/kinesis/data-firehose) topics
 kind: sink
 layout: component
 ---

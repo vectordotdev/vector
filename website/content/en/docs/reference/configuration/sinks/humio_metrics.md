@@ -1,5 +1,6 @@
 ---
 title: Humio metrics
+description: Deliver metric event data to [Humio](https://humio.com)
 kind: sink
 layout: component
 ---

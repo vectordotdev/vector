@@ -1,6 +1,6 @@
 ---
 title: Blackhole
-description: Send logs nowhere
+description: Send observability events nowhere, which can be useful for debugging purposes
 kind: sink
 layout: component
 ---

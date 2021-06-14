@@ -1,5 +1,6 @@
 ---
 title: AWS Cloudwatch metrics
+description: Publish metric events to [AWS Cloudwatch Metrics](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html)
 kind: sink
 layout: component
 ---

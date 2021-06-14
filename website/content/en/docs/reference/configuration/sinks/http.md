@@ -1,5 +1,6 @@
 ---
 title: HTTP
+description: Deliver observability event data to an HTTP server
 kind: sink
 layout: component
 ---

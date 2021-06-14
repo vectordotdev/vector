@@ -1,5 +1,6 @@
 ---
-title: GCP Cloud Monitoring (formerly Stackdrive)
+title: GCP Cloud Monitoring (formerly Stackdriver)
+description: Deliver metrics to GCP's [Cloud Monitoring](https://cloud.google.com/monitoring) system
 kind: sink
 layout: component
 ---

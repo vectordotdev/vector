@@ -1,5 +1,6 @@
 ---
 title: GCP PubSub
+description: Publish observability events to GCP's [PubSub](https://cloud.google.com/pubsub) messaging system
 kind: sink
 layout: component
 ---

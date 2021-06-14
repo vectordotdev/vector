@@ -1,5 +1,6 @@
 ---
 title: Vector
+description: Relay observability data to another Vector instance
 kind: sink
 layout: component
 ---

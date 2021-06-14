@@ -1,5 +1,6 @@
 ---
 title: Socket
+description: Deliver logs to a remote socket endpoint
 kind: sink
 layout: component
 ---

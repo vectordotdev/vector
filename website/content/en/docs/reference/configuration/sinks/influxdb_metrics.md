@@ -1,5 +1,6 @@
 ---
 title: InfluxDB metrics
+description: Deliver metric event data to [InfluxDB](https://influxdata.com)
 kind: sink
 layout: component
 ---

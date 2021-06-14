@@ -1,5 +1,6 @@
 ---
 title: Elasticsearch
+description: Index observability events in [Elasticsearch](https://www.elastic.co/elasticsearch)
 kind: sink
 layout: component
 ---

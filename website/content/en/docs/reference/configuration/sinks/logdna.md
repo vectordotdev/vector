@@ -1,5 +1,6 @@
 ---
 title: LogDNA
+description: Deliver log event data to [LogDNA](https://logdna.com)
 kind: sink
 layout: component
 ---

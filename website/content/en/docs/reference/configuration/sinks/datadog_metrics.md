@@ -1,5 +1,6 @@
 ---
 title: Datadog metrics
+description: Publish metric events to [Datadog](https://docs.datadoghq.com)
 kind: sink
 layout: component
 ---

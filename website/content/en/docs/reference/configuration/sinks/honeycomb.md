@@ -1,5 +1,6 @@
 ---
 title: Honeycomb
+description: Deliver log events to [Honeycomb](https://www.honeycomb.io)
 kind: sink
 layout: component
 ---

@@ -1,5 +1,6 @@
 ---
 title: File
+description: Output observability events into files
 kind: sink
 layout: component
 ---

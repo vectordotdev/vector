@@ -1,5 +1,6 @@
 ---
 title: Splunk HEC
+description: Deliver log data to Splunk's [HTTP Event Collector](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector)
 kind: sink
 layout: component
 ---

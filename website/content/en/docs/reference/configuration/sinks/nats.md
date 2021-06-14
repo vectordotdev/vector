@@ -1,5 +1,6 @@
 ---
 title: NATS
+description: Publish observability data to subjects on the [NATS](https://nats.io) messaging system
 kind: sink
 layout: component
 ---

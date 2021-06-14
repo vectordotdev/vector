@@ -1,5 +1,6 @@
 ---
 title: Prometheus Exporter
+description: Output metric events to a [Prometheus exporter](https://prometheus.io/docs/instrumenting/exporters) running on the host
 kind: sink
 layout: component
 ---
