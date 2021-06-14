@@ -2,21 +2,9 @@
 {{ $defaultPlatformTab := index site.Home.Params.platform_tabs 0 }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
-import 'tocbot/dist/tocbot';
 
 const sayHello = () => {
   console.log('Welcome to the Vector website and documentation!');
-}
-
-// Table of contents for documentation pages
-const tableOfContents = () => {
-  tocbot.init({
-    tocSelector: '#toc',
-    contentSelector: '#page-content',
-    headingSelector: 'h1, h2, h3, h4, h5',
-    ignoreSelector: 'no-toc',
-    scrollSmoothDuration: 400
-  });
 }
 
 /* Global state management */
@@ -132,7 +120,6 @@ const showCodeFilename = () => {
 const main = () => {
   sayHello();
   manageState();
-  tableOfContents();
   showCodeFilename();
 }
 
