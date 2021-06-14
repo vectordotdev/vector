@@ -124,7 +124,7 @@ components: sources: statsd: {
 				time metric", i.e. not a historical one. Normally such `null`
 				timestamps will be substituted by current time by downstream
 				sinks or 3rd party services during sending/ingestion. See the
-				[metric][docs.data-model.metric] data model page for more info.
+				[metric](\(urls.vector_metric)) data model page for more info.
 				"""#
 		}
 	}

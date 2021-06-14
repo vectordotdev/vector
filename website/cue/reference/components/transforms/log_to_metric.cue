@@ -87,7 +87,7 @@ components: transforms: log_to_metric: {
 						}
 					}
 					tags: {
-						description: "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
+						description: "Key/value pairs representing [metric tags](\(urls.vector_metric)#tags)."
 						required:    false
 						common:      true
 						warnings: []
@@ -102,7 +102,7 @@ components: transforms: log_to_metric: {
 							options: {
 								"*": {
 									description: """
-	                      Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+	                      Key/value pairs representing [metric tags](\(urls.vector_metric)#tags).
 	                      Environment variables and field interpolation is allowed.
 	                      """
 									required: true
@@ -118,11 +118,11 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							enum: {
-								counter:   "A [counter metric type][docs.data-model.metric#counter]."
-								gauge:     "A [gauge metric type][docs.data-model.metric#gauge]."
-								histogram: "A [distribution metric type][docs.data-model.metric#distribution] with histogram statistic."
-								set:       "A [set metric type][docs.data-model.metric#set]."
-								summary:   "A [distribution metric type][docs.data-model.metric#distribution] with summary statistic."
+								counter:   "A [counter metric type](\(urls.vector_metric)#counter)."
+								gauge:     "A [gauge metric type](\(urls.vector_metric)#gauge)."
+								histogram: "A [distribution metric type](\(urls.vector_metric)#histogram) with histogram statistic."
+								set:       "A [set metric type](\(urls.vector_metric)#set)."
+								summary:   "A [distribution metric type](\(urls.vector_metric)#distribution) with summary statistic."
 							}
 							syntax: "literal"
 						}
@@ -361,7 +361,7 @@ components: transforms: log_to_metric: {
 				to a single metric. Instead, this transform converts logs into granular
 				individual metrics that can then be reduced at the edge. Where the reduction
 				happens depends on your metrics storage. For example, the
-				[`prometheus_exporter` sink][docs.sinks.prometheus_exporter] will reduce logs in the sink itself
+				[`prometheus_exporter` sink](\(urls.vector_sinks)/prometheus-exporter) will reduce logs in the sink itself
 				for the next scrape, while other metrics sinks will proceed to forward the
 				individual metrics for reduction in the metrics storage itself.
 				"""

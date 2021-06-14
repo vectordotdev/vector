@@ -179,11 +179,11 @@ components: sources: journald: {
 			body: """
 				To ensure the `journald` source works across all platforms, Vector interacts
 				with the Systemd journal via the `journalctl` command. This is accomplished by
-				spawning a [subprocess][urls.rust_subprocess] that Vector interacts
+				spawning a [subprocess](\(urls.rust_subprocess)) that Vector interacts
 				with. If the `journalctl` command is not in the environment path you can
 				specify the exact location via the `journalctl_path` option. For more
 				information on this communication strategy please see
-				[issue #1473][urls.issue_1473].
+				[issue #1473](\(urls.vector_issues)/1437).
 				"""
 		}
 		non_ascii: {

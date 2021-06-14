@@ -185,7 +185,7 @@ components: sources: [Name=string]: {
 		_tls: {
 			title: "Transport Layer Security (TLS)"
 			body:  """
-				  Vector uses [Openssl](\(urls.openssl)) for TLS protocols. You can
+				  Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols. You can
 				  adjust TLS behavior via the `tls.*` options.
 				  """
 		}

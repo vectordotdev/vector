@@ -197,8 +197,8 @@ components: sources: syslog: {
 
 				If parsing fails, Vector will include the entire Syslog line in the `message`
 				key. If you find this happening often, we recommend using the
-				[`socket` source][docs.sources.socket] combined with the
-				[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
+				[`socket` source](\(urls.vector_socket_source)) combined with the
+				[`regex_parser` transform](\(urls.vector_regex_parser)) to implement your own
 				ingestion and parsing scheme. Or, [open an issue](\(urls.new_feature_request))
 				requesting support for your specific format.
 				"""

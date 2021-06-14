@@ -456,7 +456,7 @@ components: transforms: lua: {
 				The `process` hook takes an `event` as its first argument.
 				Events are represented as [tables](\(urls.lua_table)) in Lua
 				and follow Vector's data model exactly. Please refer to
-				Vector's [data model reference][docs.data-model] for the event
+				Vector's [data model reference](\(urls.vector_data_model)) for the event
 				schema. How Vector's types map to Lua's type are covered below.
 				"""
 			sub_sections: [

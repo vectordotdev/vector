@@ -7,19 +7,19 @@ releases: "0.9.0": {
 	whats_next: [
 		{
 			title:       "Kubernetes!"
-			description: "We're doing this integration right. We've been alpha testing with a number of large clusters and we've honed in on a very high-quality approach that reflects the UX Vector is going after. You can learn more in our [Kubernetes Integration RFC][urls.pr_2222]. Feedback is welcome!"
+			description: "We're doing this integration right. We've been alpha testing with a number of large clusters and we've honed in on a very high-quality approach that reflects the UX Vector is going after. You can learn more in our [Kubernetes Integration RFC](\(urls.vector_pull_requests)/2222). Feedback is welcome!"
 		},
 		{
 			title:       "WASM Driven Plugin Architecture"
-			description: "This release included an overhaul of our [`lua` transform][docs.transforms.lua], which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign module support, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC][urls.pr_2341] for more info."
+			description: "This release included an overhaul of our [`lua` transform](\(urls.vector_transforms)/lua), which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM](\(urls.wasm)) foreign module support, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC](\(urls.vector_pull_requests)/2341) for more info."
 		},
 		{
 			title:       "Dynamic HTTP Rate-Limiting (AIMD)"
-			description: "Fiddling with rate-limits is a frustratin endaevor. If you set them too high you risk overwhelming the service; too low and you're unecessarily limiting throughput. And what happens if you deploy a few more Vector instances? Vector is planning to solve this by automatically detecting the optimal rate limits, taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329]."
+			description: "Fiddling with rate-limits is a frustratin endaevor. If you set them too high you risk overwhelming the service; too low and you're unecessarily limiting throughput. And what happens if you deploy a few more Vector instances? Vector is planning to solve this by automatically detecting the optimal rate limits, taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC](\(urls.vector_pull_requests)/2329)."
 		},
 		{
 			title:       "Vector Observability"
-			description: "Did you know this release includes a new hidden `internal` source that emits metrics reflecting Vector's own internal state? 👀 We didn't highlight this source because we have not finished instrumenting Vector and we'll be changing the internal schema used.\n\nFun fact, we took an event-driven approach to Vector's internal observability, which we strongly believe in. We want Vector to be a good example of our own advice. Checkout the [Event-Driven Observability RFC][urls.pr_2093]."
+			description: "Did you know this release includes a new hidden `internal` source that emits metrics reflecting Vector's own internal state? 👀 We didn't highlight this source because we have not finished instrumenting Vector and we'll be changing the internal schema used.\n\nFun fact, we took an event-driven approach to Vector's internal observability, which we strongly believe in. We want Vector to be a good example of our own advice. Checkout the [Event-Driven Observability RFC](\(urls.vector_pull_requests)/2093)."
 		},
 	]
 

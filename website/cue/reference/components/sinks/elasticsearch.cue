@@ -139,7 +139,7 @@ components: sinks: elasticsearch: {
 				options: {
 					region: {
 						common:      true
-						description: "The [AWS region][urls.aws_regions] of the target service. This defaults to the region named in the endpoint parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
+						description: "The [AWS region](\(urls.aws_regions)) of the target service. This defaults to the region named in the endpoint parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
 						required:    false
 						warnings: []
 						type: string: {
@@ -183,7 +183,7 @@ components: sinks: elasticsearch: {
 		}
 		id_key: {
 			common:      false
-			description: "The name of the event key that should map to Elasticsearch's [`_id` field][urls.elasticsearch_id_field]. By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder perofrmance][urls.elasticsearch_id_performance]."
+			description: "The name of the event key that should map to Elasticsearch's [`_id` field](\(urls.elasticsearch_id_field)). By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder perofrmance](\(urls.elasticsearch_id_performance))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -236,7 +236,7 @@ components: sinks: elasticsearch: {
 			title: "Conflicts"
 			body: """
 				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's
-				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are
+				[`_bulk` API endpoint](\(urls.elasticsearch_bulk)). By default, all events are
 				inserted via the `index` action which will replace documents if an existing
 				one has the same `id`. If `bulk_action` is configured with `create`, Elasticsearch
 				will _not_ replace an existing document and instead return a conflict error.
@@ -247,7 +247,7 @@ components: sinks: elasticsearch: {
 			title: "Data streams"
 			body: """
 				By default, Vector will use the `index` action with Elasticsearch's Bulk API.
-				To use [Data streams][urls.elasticsearch_data_streams], `bulk_action` must be configured
+				To use [Data streams](\(urls.elasticsearch_data_streams)) `bulk_action` must be configured
 				with the `create` option.
 				"""
 		}

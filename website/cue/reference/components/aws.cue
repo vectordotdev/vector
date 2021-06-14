@@ -165,7 +165,7 @@ components: _aws: {
 				5. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance with an instance profile/role).
 
 				If no credentials are found, the [healt check](#healthchecks) will fail and an
-				error will be [logged][docs.monitoring#logs].
+				error will be [logged](\(urls.vector_monitoring)).
 				"""
 			sub_sections: [
 				{

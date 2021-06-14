@@ -64,7 +64,7 @@ components: sinks: _datadog: {
 		}
 		site: {
 			common:        false
-			description:   "The (Datadog site)[https://docs.datadoghq.com/getting_started/site/] to send data to. "
+			description:   "The [Datadog site](https://docs.datadoghq.com/getting_started/site) to send data to. "
 			required:      false
 			relevant_when: "endpoint is not set"
 			warnings: []

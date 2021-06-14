@@ -1,5 +1,6 @@
 ---
 title: Datadog logs
+description: Collect logs from
 kind: source
 layout: component
 ---

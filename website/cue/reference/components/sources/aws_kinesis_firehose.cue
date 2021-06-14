@@ -195,7 +195,7 @@ components: sources: aws_kinesis_firehose: {
 			body:  """
 				This source is the recommended way to ingest logs from AWS
 				CloudWatch logs via [AWS CloudWatch Log
-				subscriptions][aws_cloudwatch_logs_subscriptions]. To
+				subscriptions](\(urls.aws_cloudwatch_logs_subscriptions)). To
 				set this up:
 
 				1. Deploy vector with a publicly exposed HTTP endpoint using
@@ -229,7 +229,7 @@ components: sources: aws_kinesis_firehose: {
 				   HTTP Endpoint destination. Make sure to configure the
 				   same `access_key` you set earlier.
 				4. Setup a [CloudWatch Logs
-				   subscription][aws_cloudwatch_logs_subscriptions] to
+				   subscription](\(urls.aws_cloudwatch_logs_subscriptions)) to
 				   forward the events to your delivery stream
 				"""
 		}

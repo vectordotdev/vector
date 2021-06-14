@@ -91,7 +91,7 @@ components: sinks: gcp_stackdriver_metrics: {
 			}
 		}
 		project_id: {
-			description: "The project ID to which to publish logs. See the [Google Cloud Platform project management documentation][urls.gcp_projects] for more details.\n\nExactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set."
+			description: "The project ID to which to publish logs. See the [Google Cloud Platform project management documentation](\(urls.gcp_projects)) for more details.\n\nExactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set."
 			required:    true
 			warnings: []
 			type: string: {
@@ -125,7 +125,7 @@ components: sinks: gcp_stackdriver_metrics: {
 				]
 				options: {
 					type: {
-						description: "The monitored resource type. For example, the type of a Compute Engine VM instance is gce_instance.\n\nSee the [Google Cloud Platform monitored resource documentation][urls.gcp_resources] for more details."
+						description: "The monitored resource type. For example, the type of a Compute Engine VM instance is gce_instance.\n\nSee the [Google Cloud Platform monitored resource documentation](\(urls.gcp_resources)) for more details."
 						required:    true
 						warnings: []
 						type: string: {

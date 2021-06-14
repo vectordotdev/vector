@@ -121,17 +121,18 @@ components: sinks: aws_kinesis_streams: components._aws & {
 				To override this, you can supply the `partition_key_field` option. This option
 				presents an alternate field on your event to use as the partition key value instead.
 				This is useful if you have a field already on your event, and it also pairs
-				nicely with the [`add_fields` transform][docs.transforms.add_fields].
+				nicely with the [`remap` transform](\(urls.vector_remap_transform)), which enables you
+				to add partition-related metadata to events.
 				"""
 			sub_sections: [
 				{
 					title: "Missing partition keys"
 					body: """
-						Kenesis requires a value for the partition key and therefore if the key is
-						missing or the value is blank the event will be dropped and a
-						[`warning` level log event][docs.monitoring#logs] will be logged. As such,
-						the field specified in the `partition_key_field` option should always contain
-						a value.
+						Kinesis requires a value for the partition key. If the key is missing or the
+						value is blank, the event is dropped and a
+						[`warning`-level log event](\(urls.vector_monitoring)) is logged. The field
+						specified in the `partition_key_field` option should thus always contain a
+						value.
 						"""
 				},
 				{

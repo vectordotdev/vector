@@ -68,7 +68,7 @@ components: sinks: [Name=string]: {
 					options: {
 						max_events: {
 							common:        true
-							description:   "The maximum number of [events][docs.data-model] allowed in the buffer."
+							description:   "The maximum number of [events](\(urls.vector_data_model)) allowed in the buffer."
 							required:      false
 							relevant_when: "type = \"memory\""
 							type: uint: {

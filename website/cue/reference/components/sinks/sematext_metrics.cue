@@ -49,7 +49,7 @@ components: sinks: sematext_metrics: {
 			"""
 				[Sematext monitoring](\(urls.sematext_monitoring)) only accepts metrics which contain a single value.
 				Therefore, only `counter` and `gauge` metrics are supported. If you'd like to ingest other
-				metric types please consider using the [`metric_to_log` transform][docs.transforms.metric_to_log]
+				metric types please consider using the [`metric_to_log` transform](\(urls.vector_transforms)#metric_to_log)
 				with the `sematext_logs` sink.
 				""",
 		]
