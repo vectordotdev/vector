@@ -70,14 +70,17 @@ struct SourceContext {
 }
 ```
 
-In the context of Vector, decoders and encoders implement functions with the
-signature `fn decode(value: Value) -> Result<Value>` /
-`fn encode(value: Value) -> Result<Value>` where e.g. a `json` encoder can
-convert a `Value::Bytes` to `Value::Map`.
+In the context of Vector, decoders and encoders are implemented as `Transform`.
+That is, they either implement the `TaskTransform` or `FunctionTransform` trait.
 
-For the implementation of a framer, we can defer to Tokio's
-[`FramedRead`](https://docs.rs/tokio-util/0.6.6/tokio_util/codec/struct.FramedRead.html)
-trait which does exactly what we want here.
+Implementing framers as `Transform` would be possible - however, we want to
+restrict them to `FunctionTransform` at the moment. The reason here is that
+`TaskTransform`s can take any amount of input bytes before they output frames.
+If we would allow that, it wouldn't be clear how we merge metadata from multiple
+packages that compose a frame, e.g. the sender in UDP datagrams or partition key
+and offset in kafka messages. Using `FunctionTransform`, we know that a 1:n
+relationship between byte chunks and frames exist, and we can simply duplicate
+the metadata for each frame.
 
 ## Doc-level Proposal
 
