@@ -16,13 +16,13 @@
       Packaged as a single binary. No dependencies, no runtime, and memory safe.
     </p>
 
-    <div class="mt-6 inline-flex space-x-10 items-center">
+    <div class="mt-6 inline-flex space-x-3 md:space-x-5 lg:space-x-8">
       {{ range $install }}
       {{ $logo := printf "/img/logos/%s" .logo }}
 
-      <div class="fill-current w-20 h-auto">
+      <div class="fill-current w-16 md:w-20 lg:w-24 h-auto">
         <a href="{{ .url }}">
-          {{ partial "svg.html" (dict "src" $logo) }}
+          {{ partial "svg.html" (dict "src" $logo "class" "install-icon") }}
         </a>
       </div>
       {{ end }}

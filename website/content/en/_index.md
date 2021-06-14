@@ -54,8 +54,20 @@ installation: [
     url: "/docs/setup/installation/platforms/docker"
   },
   {
+    logo: "linux.svg",
+    url: "/docs/setup/installation/operating-systems/linux"
+  },
+  {
+    logo: "raspbian.svg",
+    url: "/docs/setup/installation/operating-systems/raspbian"
+  },
+  {
     logo: "windows.svg",
     url: "/docs/setup/installation/operating-systems/windows"
+  },
+  {
+    logo: "apple.svg",
+    url: "/docs/setup/installation/operating-systems/macos"
   }
 ]
 
