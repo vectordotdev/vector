@@ -84,12 +84,16 @@ the metadata for each frame.
 
 ## Doc-level Proposal
 
-// TODO.
+Sinks and sources will have additional `framing` and `codec` fields, e.g.:
 
-<!--
-- Optional. Only do this if your change is public facing.
-- Demonstrate how your change will look in the form of Vector's public docs.
--->
+```yaml
+framing = "octet"
+codec = ["syslog", { type = "json", target_field = "foo" }]
+```
+
+The specific short-hand names and options are defined in the implementation of
+framing / codec plugins, which are registered centrally and can be referenced
+from the Vector config.
 
 ## Rationale
 
