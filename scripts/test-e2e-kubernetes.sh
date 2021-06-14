@@ -18,9 +18,9 @@ random-string() {
   echo
 }
 
-# Detect if current kubectl context is `minikube`.
+# Detect if current kubectl context match the one from `minikube`.
 is_kubectl_context_minikube() {
-  [[ "$(kubectl config current-context || true)" == "minikube" ]]
+  [[ "$(kubectl config current-context || true)" == "$(minikube profile)" ]]
 }
 
 # Detect if current kubectl context is `kind`.
@@ -121,8 +121,8 @@ fi
 if [[ -z "${SKIP_CONTAINER_IMAGE_PUBLISHING:-}" ]]; then
   # Make the container image accessible to the k8s cluster.
   if is_minikube_cache_enabled; then
-    minikube cache add "$CONTAINER_IMAGE"
-    trap 'minikube cache delete "$CONTAINER_IMAGE"' EXIT
+    minikube image load "$CONTAINER_IMAGE"
+    trap 'minikube image rm "$CONTAINER_IMAGE"' EXIT
   else
     docker push "$CONTAINER_IMAGE"
   fi
