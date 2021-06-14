@@ -490,7 +490,7 @@ mod tests {
                 ignored_header_bytes: 0,
             },
             data_dir: Some(dir.path().to_path_buf()),
-            glob_minimum_cooldown_ms: 0, // millis
+            glob_minimum_cooldown_ms: 100, // millis
             ..Default::default()
         }
     }
@@ -1536,7 +1536,6 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             remove_after_secs: Some(remove_after_secs),
-            glob_minimum_cooldown_ms: 100,
             ..test_default_file_config(&dir)
         };
 
