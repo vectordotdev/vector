@@ -28,10 +28,18 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: cargo install cargo-flake
       - run: make slim-builds
       - run: cargo flake --features 'default benches metrics-benches remap-benches'
+      - name: Stop sccache
+        run: sccache --stop-server
