@@ -106,22 +106,21 @@ Introducing codecs may also shrink unnecessary noise in config files by removing
 transform steps / input indirections, when basic transforms were used that are
 only concerned with encoding formats.
 
-<!--
-- Why is this change worth it?
-- What is the impact of not doing this?
-- How does this position us for success in the future?
--->
-
 ## Prior Art
 
-// TODO.
+[Tokio Codecs](https://docs.rs/tokio-util/0.6.7/tokio_util/codec/index.html)
+provide traits to conveniently convert from `AsyncRead`/`AsyncWrite` to
+`Stream`/`Sink`. These are currently used in custom implementations of sources
+to frame byte streams. However, these codecs can only operate on byte input and
+would therefore be unsuitable to implement codecs that can be chained.
 
-- Tokio Codecs.
-
-<!--
-- List prior art, the good and bad.
-- Why can't we simply use or copy them?
--->
+[Logstash Codec Plugins](https://www.elastic.co/guide/en/logstash/current/codec-plugins.html)
+are interesting since they operate on a higher level than what has been proposed
+in this RFC. They don't distinguish between a framing and codec stage, but
+rather have codecs that support framing (e.g. `line` codec), compression (e.g.
+`gzip_lines` codec) and encoding (e.g. `protobuf` codec). Supporting these kind
+of codecs could be an interesting future thought but would require an
+architectural change, especially to the internal representation of an `Event`.
 
 ## Drawbacks
 
