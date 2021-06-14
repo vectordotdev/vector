@@ -124,28 +124,18 @@ architectural change, especially to the internal representation of an `Event`.
 
 ## Drawbacks
 
-// TODO.
+It is possible that the proposed abstraction is too rigid, in a sense that it is
+not possible to cleanly separate these stages into "framing" and "codec"
+responsibilites. This limits what codecs can do, e.g. applying framing after
+decoding/decompression would not be possible as there are no means to "go back"
+to the framing stage. However, the proposed solution is still strictly better
+than the status quo, as it provides a consistent interface.
 
-- Is this the right abstraction, is it possible to cleanly separate at these
-  boundaries for all our current and future use cases?
-- For the components that we expect benefit most from reusability enabled by
-  separating, will they always only differ by encoding in the future?
-- Does it hurt discoverability (e.g. predefined `syslog` source vs `socket` +
-  `octet-framing`)?
-
-<!--
-- Why should we not do this?
-- What kind on ongoing burden does this place on the team?
--->
-
-## Alternatives
-
-// TODO.
-
-<!--
-- What other approaches have been considered and why did you not choose them?
-- How about not doing this at all?
--->
+For the components that we expect to benefit most from the reusability of
+framing and codecs, will they always only differ by encoding in the future?
+Would it be possible that these components must be separated again since the
+overhead of maintaining an artificial abstraction is higher than having
+purposely-built components?
 
 ## Outstanding Questions
 
