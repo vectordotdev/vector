@@ -22,7 +22,9 @@
 
       <div class="fill-current w-16 md:w-20 lg:w-24 h-auto">
         <a href="{{ .url }}">
-          {{ partial "svg.html" (dict "src" $logo "class" "install-icon") }}
+          <div class="rounded-full hover:shadow-lg">
+            {{ partial "svg.html" (dict "src" $logo "class" "install-icon") }}
+          </div>
         </a>
       </div>
       {{ end }}
