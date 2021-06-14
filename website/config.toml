@@ -59,6 +59,22 @@ discord = "https://chat.vector.dev"
 
 ## Menus
 
+# Main page doc links
+[[menu.doc_quick_links]]
+name = "Quickstart"
+url = "/docs/setup/quickstart"
+weight = 1
+
+[[menu.doc_quick_links]]
+name = "Vector Remap Language"
+url = "/docs/reference/vrl"
+weight = 2
+
+[[menu.doc_quick_links]]
+name = "Components"
+url = "/components"
+weight = 3
+
 # Navbar menu
 [[menu.navbar]]
 name = "Docs"

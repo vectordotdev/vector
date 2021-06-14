@@ -3,6 +3,7 @@
 {{ $subtagline := site.Params.subtagline }}
 {{ $latest := index site.Data.docs.versions 0 }}
 {{ $link := printf "releases/%s" $latest | relURL }}
+{{ $links := site.Menus.doc_quick_links }}
 <div class="py-24 md:py-32 lg:py-48 relative">
   <div class="px-4 sm:px-6 text-center lg:text-left mx-auto max-w-7xl">
     <a href="{{ $link }}" class="dark:bg-gray-800 bg-gradient-to-r uppercase from-primary to-purple-v inline-flex items-center text-white rounded-full py-1 px-1.5 sm:text-base lg:text-sm xl:text-base hover:text-gray-100">
@@ -23,5 +24,13 @@
     <p class="dark:text-gray-300 text-gray-600 text-2xl lg:text-3xl">
       {{ site.Params.description }}
     </p>
+
+    <div class="mt-6 md:mt-8 lg:mt-10 inline-flex space-x-2">
+      {{ range $links }}
+      <a href="{{ .URL }}" class="text-sm md:text-md tracking-tight font-semibold shadow-md bg-gray-200 dark:bg-primary text-dark dark:text-dark py-1 px-2 rounded hover:bg-primary dark:hover:bg-secondary">
+        {{ .Name }}
+      </a>
+      {{ end }}
+    </div>
   </div>
 </div>
