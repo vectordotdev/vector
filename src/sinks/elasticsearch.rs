@@ -40,6 +40,7 @@ pub struct ElasticSearchConfig {
     // Deprecated name
     #[serde(alias = "host")]
     pub endpoint: String,
+    // Deprecated, use normal.index instead
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
@@ -66,7 +67,9 @@ pub struct ElasticSearchConfig {
 
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
+    // Deprecated, use normal.bulk_action instead
     pub bulk_action: Option<String>,
+    pub normal: Option<NormalConfig>,
     pub data_stream: Option<DataStreamConfig>,
 }
 
@@ -74,16 +77,22 @@ impl ElasticSearchConfig {
     fn bulk_action(&self) -> crate::Result<Option<Template>> {
         Ok(self
             .bulk_action
-            .as_ref()
-            .map(|value| Template::try_from(value.as_str()).context(BatchActionTemplate))
+            .as_deref()
+            .or_else(|| self.normal.as_ref().map(|n| n.bulk_action.as_str()))
+            .map(|value| Template::try_from(value).context(BatchActionTemplate))
             .transpose()?)
     }
 
     fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
         match self.mode {
             ElasticSearchMode::Normal => {
-                let index = self.index.as_deref().unwrap_or("vector-%Y.%m.%d");
-                let index = Template::try_from(index).context(IndexTemplate)?;
+                let index = self
+                    .index
+                    .as_deref()
+                    .or_else(|| self.normal.as_ref().map(|n| n.index.as_str()))
+                    .map(String::from)
+                    .unwrap_or_else(NormalConfig::default_index);
+                let index = Template::try_from(index.as_str()).context(IndexTemplate)?;
                 let bulk_action = self.bulk_action()?;
                 Ok(ElasticSearchCommonMode::Normal { index, bulk_action })
             }
@@ -91,6 +100,34 @@ impl ElasticSearchConfig {
                 self.data_stream.clone().unwrap_or_default(),
             )),
         }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct NormalConfig {
+    #[serde(default = "NormalConfig::default_bulk_action")]
+    bulk_action: String,
+    #[serde(default = "NormalConfig::default_index")]
+    index: String,
+}
+
+impl Default for NormalConfig {
+    fn default() -> Self {
+        Self {
+            bulk_action: Self::default_bulk_action(),
+            index: Self::default_index(),
+        }
+    }
+}
+
+impl NormalConfig {
+    fn default_bulk_action() -> String {
+        "index".into()
+    }
+
+    fn default_index() -> String {
+        "vector-%Y.%m.%d".into()
     }
 }
 
