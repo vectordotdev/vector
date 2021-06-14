@@ -221,5 +221,25 @@ mod tests {
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
         }
+
+        error_line_with_referrer {
+            args: func_args![value: r#"2021/06/03 09:30:50 [error] 32#32: *6 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 10.244.0.0, server: localhost, request: "GET /favicon.ico HTTP/1.1", host: "65.21.190.83:31256", referrer: "http://65.21.190.83:31256/""#,
+                             format: "error"
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T09:30:50Z").unwrap().into()),
+                "severity" => "error",
+                "pid" => 32,
+                "tid" => 32,
+                "cid" => 6,
+                "message" => "open() \"/usr/share/nginx/html/favicon.ico\" failed (2: No such file or directory)",
+                "client" => "10.244.0.0",
+                "server" => "localhost",
+                "request" => "GET /favicon.ico HTTP/1.1",
+                "host" => "65.21.190.83:31256",
+                "referrer" => "http://65.21.190.83:31256/",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+        }
     ];
 }
