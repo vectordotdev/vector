@@ -38,6 +38,7 @@ impl ConditionConfig for DatadogConfig {
 mod test {
     use super::*;
     use crate::log_event;
+    use serde_json::json;
 
     #[test]
     fn generate_config() {
@@ -53,6 +54,79 @@ mod test {
                 log_event!["tags" => vec!["a:foo"]], // Pass
                 log_event!["tags" => vec!["b:foo"]], // Fail
             ),
+            // Tag exists (negate).
+            (
+                "NOT _exists_:a",
+                log_event!["tags" => vec!["b:foo"]],
+                log_event!("tags" => vec!["a:foo"]),
+            ),
+            // Tag exists (negate w/-).
+            (
+                "-_exists_:a",
+                log_event!["tags" => vec!["b:foo"]],
+                log_event!["tags" => vec!["a:foo"]],
+            ),
+            // Facet exists.
+            (
+                "_exists_:@b",
+                log_event!["custom" => json!({"b": "foo"})],
+                log_event!["custom" => json!({"a": "foo"})],
+            ),
+            // Facet exists (negate).
+            (
+                "NOT _exists_:@b",
+                log_event!["custom" => json!({"a": "foo"})],
+                log_event!["custom" => json!({"b": "foo"})],
+            ),
+            // Facet exists (negate w/-).
+            (
+                "-_exists_:@b",
+                log_event!["custom" => json!({"a": "foo"})],
+                log_event!["custom" => json!({"b": "foo"})],
+            ),
+            // Tag doesn't exist.
+            (
+                "_missing_:a",
+                log_event![],
+                log_event!["tags" => vec!["a:foo"]],
+            ),
+            // Tag doesn't exist (negate).
+            (
+                "NOT _missing_:a",
+                log_event!["tags" => vec!["a:foo"]],
+                log_event![],
+            ),
+            // Tag doesn't exist (negate w/-).
+            (
+                "-_missing_:a",
+                log_event!["tags" => vec!["a:foo"]],
+                log_event![],
+            ),
+            // Facet doesn't exist.
+            (
+                "_missing_:@b",
+                log_event!["custom" => json!({"a": "foo"})],
+                log_event!["custom" => json!({"b": "foo"})],
+            ),
+            // Facet doesn't exist (negate).
+            (
+                "NOT _missing_:@b",
+                log_event!["custom" => json!({"b": "foo"})],
+                log_event!["custom" => json!({"a": "foo"})],
+            ),
+            // Facet doesn't exist (negate w/-).
+            (
+                "-_missing_:@b",
+                log_event!["custom" => json!({"b": "foo"})],
+                log_event!["custom" => json!({"a": "foo"})],
+            ),
+            // Keyword.
+            ("bla", log_event!["message" => "bla"], log_event![]),
+            (
+                "bla",
+                log_event!["message" => json!({"key": "bla"})],
+                log_event![],
+            ),
         ];
 
         for (source, pass, fail) in checks {
@@ -65,8 +139,18 @@ mod test {
                 .build()
                 .unwrap_or_else(|_| panic!("build failed: {}", source));
 
-            assert!(cond.check_with_context(&pass).is_ok());
-            assert!(cond.check_with_context(&fail).is_err());
+            assert!(
+                cond.check_with_context(&pass).is_ok(),
+                "should pass: {}\nevent: {:?}",
+                source,
+                pass
+            );
+            assert!(
+                cond.check_with_context(&fail).is_err(),
+                "should fail: {}\nevent: {:?}",
+                source,
+                fail
+            );
         }
     }
 }
