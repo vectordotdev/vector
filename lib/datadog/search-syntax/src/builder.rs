@@ -1,10 +1,9 @@
 use super::{
     field::Field,
-    grammar,
     node::{ComparisonValue, QueryNode},
     vrl::{
-        coalesce, make_container_group, make_function_call, make_node, make_not, make_op,
-        make_queries, make_regex, make_string_comparison, recurse, recurse_op,
+        coalesce, make_bool, make_container_group, make_function_call, make_node, make_not,
+        make_op, make_queries, make_regex, make_string_comparison, recurse, recurse_op,
     },
 };
 
@@ -51,15 +50,9 @@ impl Builder {
     fn parse_node(&mut self, node: &QueryNode) -> Vec<ast::Expr> {
         match node {
             // Match everything.
-            QueryNode::MatchAllDocs => make_queries(grammar::DEFAULT_FIELD)
-                .into_iter()
-                .map(|(_, query)| make_function_call("exists", vec![query]))
-                .collect(),
+            QueryNode::MatchAllDocs => vec![make_bool(true)],
             // Matching nothing.
-            QueryNode::MatchNoDocs => make_queries(grammar::DEFAULT_FIELD)
-                .into_iter()
-                .map(|(_, query)| make_not(make_function_call("exists", vec![query])))
-                .collect(),
+            QueryNode::MatchNoDocs => vec![make_bool(false)],
             // Field existence.
             QueryNode::AttributeExists { attr } => make_queries(attr)
                 .into_iter()
@@ -212,13 +205,13 @@ mod tests {
     // Lhs = Datadog syntax. Rhs = VRL equivalent.
     static TESTS: &[(&str, &str)] = &[
         // Match everything (empty).
-        ("", "(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
+        ("", "true"),
         // Match everything.
-        ("*:*", "(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
+        ("*:*", "true"),
         // Match everything (negate).
-        ("NOT(*:*)", "(!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_)))))"),
+        ("NOT(*:*)", "false"),
         // Match nothing.
-        ("-*:*", "(!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_)))))"),
+        ("-*:*", "false"),
         // Tag exists.
         ("_exists_:a", "exists(.__datadog_tags.a)"),
         // Tag exists (negate).

@@ -105,6 +105,11 @@ pub fn make_string_comparison<T: AsRef<str>>(expr: ast::Expr, op: Opcode, value:
     )
 }
 
+/// Makes a boolean literal.
+pub fn make_bool(value: bool) -> ast::Expr {
+    ast::Expr::Literal(make_node(ast::Literal::Boolean(value)))
+}
+
 /// Makes a container group, for wrapping logic for easier negation.
 pub(super) fn make_container_group(expr: ast::Expr) -> ast::Expr {
     ast::Expr::Container(make_node(ast::Container::Group(Box::new(make_node(
