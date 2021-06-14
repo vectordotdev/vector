@@ -24,7 +24,7 @@ Create the name of the `ServiceAccount` to use.
 {{- end }}
 
 {{/*
-Compact labels
+HAProxy labels
 */}}
 {{- define "haproxy.labels" -}}
 {{ include "libvector.labels" . }}
@@ -37,4 +37,35 @@ Selector labels
 {{- define "haproxy.selectorLabels" -}}
 {{ include "libvector.selectorLabels" . }}
 app.kubernetes.io/component: load-balancer
+{{- end }}
+
+{{/*
+Helper to create HAProxy server-templates to discover Vector endpoints
+*/}}
+{{- define "haproxy.vectorConfig" -}}
+{{- $values := .Values -}}
+{{- if $values.vectorSource.enabled }}
+frontend vector
+  bind *:{{ $values.vectorSource.listenPort }} proto h2
+  mode http
+  option httplog
+  default_backend vector
+
+backend vector
+  mode http
+  balance roundrobin
+  option tcp-check
+  server-template srv {{ $values.replicas }} _vector._tcp.{{ include "libvector.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.global.clusterDomain }} resolvers coredns proto h2 check
+{{- end }}
+{{ range $item := $values.service.ports }}
+frontend {{ $item.name }}
+  bind *:{{ $item.port }}
+  option httplog
+  default_backend {{ $item.name }}
+
+backend {{ $item.name }}
+  balance roundrobin
+  option tcp-check
+  server-template srv {{ $values.replicas }} _{{ $item.name }}._tcp.{{ include "libvector.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.global.clusterDomain }} resolvers coredns check
+{{ end }}
 {{- end }}

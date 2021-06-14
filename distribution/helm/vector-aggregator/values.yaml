@@ -4,6 +4,7 @@
 
 global:
   clusterDomain: "cluster.local"
+  kubeDNSAddress: "kube-dns.kube-system"
 # Additional labels to add to all resources
 # commonLabels:
 #   app.kubernetes.io/component: aggregator
@@ -29,7 +30,7 @@ fullnameOverride: ""
 
 podManagementPolicy: Parallel
 
-replicas: 2
+replicas: 1
 
 serviceAccount:
   # Specifies whether a service account should be created.
@@ -167,16 +168,11 @@ service:
   # Service type - defaults to `ClusterIP` (only relevant for the regular service).
   type: "ClusterIP"
   # Additional ports to expose.
-  ports:
-    - name: datadog-logs
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
-    #   nodePort: 1243  # (optional but useful with `service.type` is set to `NodePort`)
-    - name: syslog
-      port: 514
-      protocol: TCP
-      targetPort: 514
+  ports: []
+    # - name: http
+    #   port: 1234
+    #   protocol: TCP
+    #   targetPort: 1234
     #   nodePort: 1243  # (optional but useful with `service.type` is set to `NodePort`)
 
 # Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
@@ -284,14 +280,9 @@ prometheusSink:
     extraRelabelings: []
 
 # Sources to add to the generated `vector` config
-sources:
-  datadog_logs:
-    type: "datadog_logs"
-    address: "0.0.0.0:8080"
-  syslog:
-    type: "syslog"
-    address: "0.0.0.0:514"
-    mode: "tcp"
+sources: {}
+  # source_name:
+  #   type: "source_type"
   #   rawConfig: |
   #     option = "value"
 
@@ -304,17 +295,15 @@ transforms: {}
   #     option = "value"
 
 # Sinks to add to the generated `vector` config.
-sinks:
-  sink_name:
-    type: "console"
-    inputs: ["datadog_logs", "syslog", "vector"]
-    encoding:
-      codec: "json"
+sinks: {}
+  # sink_name:
+  #   type: "sink_type"
+  #   inputs: ["input1", "input2"]
   #   rawConfig: |
   #     option = "value"
 
 haproxy:
-  enabled: true
+  enabled: false
   ## Default values for HAProxy
   ## The included templates and values are heavily influenced by the haproxytech/haproxy chart
   ## ref: https://github.com/haproxytech/helm-charts/tree/main/haproxy
@@ -327,7 +316,7 @@ haproxy:
 
   ## Default values for image
   image:
-    repository: haproxytech/haproxy-alpine    # can be changed to use CE or EE images
+    repository: haproxytech/haproxy-alpine
     tag: 2.4.0
     pullPolicy: IfNotPresent
 
@@ -408,7 +397,7 @@ haproxy:
       timeout connect 5s
 
     resolvers coredns
-      nameserver dns1 kube-dns.kube-system.svc.{{ .Values.global.clusterDomain }}:53
+      nameserver dns1 {{ .Values.global.kubeDNSAddress }}.svc.{{ .Values.global.clusterDomain }}:53
       resolve_retries 3
       timeout resolve 2s
       timeout retry 1s
@@ -420,18 +409,7 @@ haproxy:
       mode http
       bind *:1024
       http-request use-service prometheus-exporter if { path /metrics }
-
-    frontend vector
-      bind *:9000 proto h2
-      mode http
-      option httplog
-      default_backend vector
-
-    backend vector
-      mode http
-      balance roundrobin
-      option tcp-check
-      server-template srv 5 _vector._tcp.{{ include "libvector.fullname" . }}-headless.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }} resolvers coredns proto h2 check
+    {{ include "haproxy.vectorConfig" . }}
 
   ## Additional secrets to mount as volumes
   ## This is expected to be an array of dictionaries specifying the volume name, secret name and mount path
