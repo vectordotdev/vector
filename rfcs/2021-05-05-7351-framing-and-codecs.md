@@ -137,15 +137,6 @@ Would it be possible that these components must be separated again since the
 overhead of maintaining an artificial abstraction is higher than having
 purposely-built components?
 
-## Outstanding Questions
-
-Is there a realistic chance that multiple framing / codec options might need be
-applied / composed?
-
-Now that we establish a pattern for encoding, do we want to make the distinction
-internally when we have bytes or (e.g. UTF-8) strings at hand? Currently we are
-just relying on the next component to handle possibly invalid encodings.
-
 ## Future Work
 
 In this first release, we plan to implement a variety of framing and codec
