@@ -50,28 +50,60 @@ pub fn is_multinode() -> bool {
 
 /// Adds a fullnameOverride entry to the given config. This allows multiple tests
 /// to be run against the same cluster without the role anmes clashing.
-pub fn config_override_name(config: &str, name: &str) -> String {
-    if is_multinode() {
+pub fn config_override_name(config: &str, name: &str, cleanup: bool) -> String {
+    let vectordir = if is_multinode() {
+        format!("{}-vector", name)
+    } else {
+        "vector".to_string()
+    };
+
+    let volumeconfig = if is_multinode() {
         formatdoc!(
             r#"
-            fullnameOverride: "{}"
             dataVolume:
               hostPath:
-                path: /var/lib/{}-vector/
-            {}"#,
-            name,
-            name,
-            config
+                path: /var/lib/{}/
+            "#,
+            vectordir,
         )
     } else {
+        String::new()
+    };
+
+    let cleanupconfig = if cleanup {
         formatdoc!(
             r#"
-            fullnameOverride: "{}"
-            {}"#,
-            name,
-            config
+        extraVolumeMounts:
+          - name: var-lib
+            mountPath: /var/writablelib
+            readOnly: false
+
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - sh
+                - -c
+                - rm -rf /var/writablelib/{}
+                "#,
+            vectordir,
         )
-    }
+    } else {
+        String::new()
+    };
+
+    formatdoc!(
+        r#"
+        fullnameOverride: "{}"
+        {}
+        {}
+        {}
+        "#,
+        name,
+        volumeconfig,
+        cleanupconfig,
+        config
+    )
 }
 
 pub fn make_framework() -> Framework {

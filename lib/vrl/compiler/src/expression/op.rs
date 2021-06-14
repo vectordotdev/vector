@@ -133,7 +133,7 @@ impl Expression for Op {
             Or if lhs_kind.is_null() => rhs_def,
 
             // not null || ...
-            Or if !lhs_kind.contains(K::Null) => lhs_def,
+            Or if !(lhs_kind.contains(K::Null) || lhs_kind.contains(K::Boolean)) => lhs_def,
 
             // ... || ...
             Or if !lhs_kind.is_boolean() => {
