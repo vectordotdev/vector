@@ -257,15 +257,15 @@ mod tests {
         (r#"-"bla""#, r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false"#),
         // Tag match.
         ("a:bla", r#".__datadog_tags.a == "bla""#),
-        // Reserved tag match
+        // Reserved tag match.
         ("host:foo", r#".host == "foo""#),
         // Tag match (negate).
         ("NOT a:bla", r#"!(.__datadog_tags.a == "bla")"#),
-        // Reserved tag match (negate)
+        // Reserved tag match (negate).
         ("NOT host:foo", r#"!(.host == "foo")"#),
         // Tag match (negate w/-).
         ("-a:bla", r#"!(.__datadog_tags.a == "bla")"#),
-        // Reserved tag match (negate w/-)
+        // Reserved tag match (negate w/-).
         ("-trace_id:foo", r#"!(.trace_id == "foo")"#),
         // Quoted tag match.
         (r#"a:"bla""#, r#".__datadog_tags.a == "bla""#),

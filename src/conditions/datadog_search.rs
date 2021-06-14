@@ -131,6 +131,116 @@ mod test {
                 log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
                 log_event![],
             ),
+            // Keyword (negate).
+            (
+                "NOT bla",
+                log_event!["message" => "nothing"],
+                log_event!["message" => "bla"],
+            ),
+            (
+                "NOT foo",
+                log_event![],
+                log_event!["message" => r#"{"key": "foo"}"#],
+            ),
+            (
+                "NOT bar",
+                log_event![],
+                log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
+            ),
+            // Keyword (negate w/-).
+            ("-bla", log_event!["message" => "bla"], log_event![]),
+            (
+                "-foo",
+                log_event![],
+                log_event!["message" => r#"{"key": "foo"}"#],
+            ),
+            (
+                "-bar",
+                log_event![],
+                log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
+            ),
+            // Quoted keyword.
+            (r#""bla""#, log_event!["message" => "bla"], log_event![]),
+            (
+                r#""foo""#,
+                log_event!["message" => r#"{"key": "foo"}"#],
+                log_event![],
+            ),
+            (
+                r#""bar""#,
+                log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
+                log_event![],
+            ),
+            // Quoted keyword (negate).
+            (r#"NOT "bla""#, log_event!["message" => "bla"], log_event![]),
+            (
+                r#"NOT "foo""#,
+                log_event![],
+                log_event!["message" => r#"{"key": "foo"}"#],
+            ),
+            (
+                r#"NOT "bar""#,
+                log_event![],
+                log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
+            ),
+            // Quoted keyword (negate w/-).
+            (r#"NOT "bla""#, log_event!["message" => "bla"], log_event![]),
+            (
+                r#"NOT "foo""#,
+                log_event![],
+                log_event!["message" => r#"{"key": "foo"}"#],
+            ),
+            (
+                r#"NOT "bar""#,
+                log_event![],
+                log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
+            ),
+            // Tag match.
+            (
+                "a:bla",
+                log_event!["tags" => vec!["a:bla"]],
+                log_event!["tags" => vec!["b:bla"]],
+            ),
+            // Reserved tag match.
+            (
+                "host:foo",
+                log_event!["host" => "foo"],
+                log_event!["tags" => vec!["host:foo"]],
+            ),
+            (
+                "host:foo",
+                log_event!["host" => "foo"],
+                log_event!["host" => "foobar"],
+            ),
+            (
+                "host:foo",
+                log_event!["host" => "foo"],
+                log_event!["host" => r#"{"value": "foo"}"#],
+            ),
+            // Tag match (negate).
+            (
+                "NOT a:bla",
+                log_event!["tags" => vec!["b:bla"]],
+                log_event!["tags" => vec!["a:bla"]],
+            ),
+            // Reserved tag match (negate).
+            (
+                "NOT host:foo",
+                log_event!["tags" => vec!["host:foo"]],
+                log_event!["host" => "foo"],
+            ),
+            // Tag match (negate w/-).
+            (
+                "-a:bla",
+                log_event!["tags" => vec!["b:bla"]],
+                log_event!["tags" => vec!["a:bla"]],
+            ),
+            // Reserved tag match (negate w/-).
+            (
+                "-trace_id:foo",
+                log_event![],
+                log_event!["trace_id" => "foo"],
+            ),
         ];
 
         for (source, pass, fail) in checks {
