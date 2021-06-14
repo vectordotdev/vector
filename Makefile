@@ -215,6 +215,16 @@ cross-enable: cargo-install-cross
 CARGO_HANDLES_FRESHNESS:
 	${EMPTY}
 
+# GNU Make < 3.82 pattern matching priority depends on the definition order
+# so cross-image-% must be defined before cross-%
+.PHONY: cross-image-%
+cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
+cross-image-%:
+	$(CONTAINER_TOOL) build \
+		--tag vector-cross-env:${TRIPLE} \
+		--file scripts/cross/${TRIPLE}.dockerfile \
+		scripts/cross
+
 # This is basically a shorthand for folks.
 # `cross-anything-triple` will call `cross anything --target triple` with the right features.
 .PHONY: cross-%
@@ -267,14 +277,6 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 		--directory target/scratch/ \
 		./vector-${TRIPLE}
 	rm -rf target/scratch/
-
-.PHONY: cross-image-%
-cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
-cross-image-%:
-	$(CONTAINER_TOOL) build \
-		--tag vector-cross-env:${TRIPLE} \
-		--file scripts/cross/${TRIPLE}.dockerfile \
-		scripts/cross
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 

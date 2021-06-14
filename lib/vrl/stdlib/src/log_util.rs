@@ -88,9 +88,9 @@ lazy_static! {
         )"\s+                                   # Match any non space character
         (?P<status>\d+)\s+                      # Match numbers
         (?P<size>\d+)\s+                        # Match numbers
-        "(-|(?P<referer>.+))"\s+                # Match `-` or any non space character
-        "(-|(?P<agent>.+))"\s+                  # Match `-` or any non space character
-        "(-|(?P<compression>\S+))"              # Match `-` or any non space character
+        "(-|(?P<referer>[^"]+))"\s+             # Match `-` or any non double-quote character
+        "(-|(?P<agent>[^"]+))"                  # Match `-` or any non double-quote character
+        (\s+"(-|(?P<compression>[^"]+))")?      # Match `-` or any non double-quote character
         \s*$                                    # Match any number of whitespaces (to be discarded).
     "#)
     .expect("failed compiling regex for Nginx combined log");
@@ -107,7 +107,8 @@ lazy_static! {
         (,\s+client:\s+(?P<client>.+))                  # Match any character after ', client: '
         (,\s+server:\s+(?P<server>.+))                  # Match any character after ', server: '
         (,\s+request:\s+"(?P<request>.+)")              # Match any character after ', request: '
-        (,\s+host:\s+"(?P<host>.+)")    # Match any character then ':' then any character after ', host: '
+        (,\s+host:\s+"(?P<host>[^"]+)")                 # Match any character then ':' then any character after ', host: '
+        (,\s+referrer:\s+"(?P<referrer>[^"]+)")?        # Match any character after ', referrer: '
         \s*$                                            # Match any number of whitespaces (to be discarded).
     "#)
     .expect("failed compiling regex for Nginx error log");

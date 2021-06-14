@@ -165,8 +165,9 @@ mod tests {
         parse_combined_log => ParseNginxLog;
 
         combined_line_valid {
-            args: func_args![value: r#"172.17.0.1 - - [31/Mar/2021:12:04:07 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.75.0" "-""#,
-                             format: "combined"
+            args: func_args![
+                value: r#"172.17.0.1 - - [31/Mar/2021:12:04:07 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.75.0" "-""#,
+                format: "combined"
             ],
             want: Ok(btreemap! {
                 "client" => "172.17.0.1",
@@ -182,9 +183,30 @@ mod tests {
             tdef: TypeDef::new().fallible().object(type_def_combined()),
         }
 
+        combined_line_valid_no_compression {
+            args: func_args![
+                value: r#"0.0.0.0 - - [23/Apr/2021:14:59:24 +0000] "GET /my-path/manifest.json HTTP/1.1" 200 504 "https://my-url.com/my-path" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36""#,
+                format: "combined"
+            ],
+            want: Ok(btreemap! {
+                "client" => "0.0.0.0",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-04-23T14:59:24Z").unwrap().into()),
+                "request" => "GET /my-path/manifest.json HTTP/1.1",
+                "method" => "GET",
+                "path" => "/my-path/manifest.json",
+                "protocol" => "HTTP/1.1",
+                "status" => 200,
+                "size" => 504,
+                "referer" => "https://my-url.com/my-path",
+                "agent" => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_combined()),
+        }
+
         combined_line_valid_all_fields {
-            args: func_args![value: r#"172.17.0.1 alice - [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
-                             format: "combined"
+            args: func_args![
+                value: r#"172.17.0.1 alice - [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
+                format: "combined"
             ],
             want: Ok(btreemap! {
                 "client" => "172.17.0.1",
@@ -204,8 +226,9 @@ mod tests {
         }
 
         error_line_valid {
-            args: func_args![value: r#"2021/04/01 13:02:31 [error] 31#31: *1 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081""#,
-            format: "error"
+            args: func_args![
+                value: r#"2021/04/01 13:02:31 [error] 31#31: *1 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081""#,
+                format: "error"
             ],
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-04-01T13:02:31Z").unwrap().into()),
@@ -218,6 +241,26 @@ mod tests {
                 "server" => "localhost",
                 "request" => "POST /not-found HTTP/1.1",
                 "host" => "localhost:8081",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+        }
+
+        error_line_with_referrer {
+            args: func_args![value: r#"2021/06/03 09:30:50 [error] 32#32: *6 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 10.244.0.0, server: localhost, request: "GET /favicon.ico HTTP/1.1", host: "65.21.190.83:31256", referrer: "http://65.21.190.83:31256/""#,
+                             format: "error"
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T09:30:50Z").unwrap().into()),
+                "severity" => "error",
+                "pid" => 32,
+                "tid" => 32,
+                "cid" => 6,
+                "message" => "open() \"/usr/share/nginx/html/favicon.ico\" failed (2: No such file or directory)",
+                "client" => "10.244.0.0",
+                "server" => "localhost",
+                "request" => "GET /favicon.ico HTTP/1.1",
+                "host" => "65.21.190.83:31256",
+                "referrer" => "http://65.21.190.83:31256/",
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
         }
