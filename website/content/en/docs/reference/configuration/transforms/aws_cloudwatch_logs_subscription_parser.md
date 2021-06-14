@@ -1,5 +1,6 @@
 ---
 title: AWS Cloudwatch Logs Subscription Parser
+description: Parse logs from [AWS Cloudwatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Subscriptions.html)
 kind: transform
 deprecated: true
 layout: component

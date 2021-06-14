@@ -1,6 +1,6 @@
 ---
 title: HTTP
-description: Receive logs via [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request)
+description: Collect logs emitted by an [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request) server
 kind: source
 layout: component
 ---

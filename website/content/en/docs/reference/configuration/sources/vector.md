@@ -1,5 +1,6 @@
 ---
 title: Vector
+description: Collect observability data from another Vector instance
 kind: source
 layout: component
 ---

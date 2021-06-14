@@ -1,5 +1,6 @@
 ---
 title: Route
+description: Split a stream of events into multiple sub-streams based on user-supplied conditions
 kind: transforms
 layout: component
 ---

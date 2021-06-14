@@ -1,5 +1,6 @@
 ---
 title: Exec
+description: Collect output from a process running on the host
 kind: source
 layout: component
 ---

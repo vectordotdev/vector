@@ -105,7 +105,7 @@ components: transforms: log_to_metric: {
 	                      Key/value pairs representing [metric tags](\(urls.vector_metric)#tags).
 	                      Environment variables and field interpolation is allowed.
 	                      """
-									required: true
+									required:    true
 									warnings: []
 									type: "*": {}
 								}
@@ -356,7 +356,7 @@ components: transforms: log_to_metric: {
 		}
 		reducing: {
 			title: "Reducing"
-			body: """
+			body:  """
 				It's important to understand that this transform does not reduce multiple logs
 				to a single metric. Instead, this transform converts logs into granular
 				individual metrics that can then be reduced at the edge. Where the reduction

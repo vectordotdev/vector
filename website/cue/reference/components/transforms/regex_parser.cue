@@ -187,13 +187,13 @@ components: transforms: regex_parser: {
 		}
 		regex_debugger: {
 			title: "Regex Debugger"
-			body: """
+			body:  """
 				If you are having difficulty with your regular expression not matching text, you may try debugging your patterns at [Regex 101](\(urls.regex_tester)). This site includes a regular expression tester and debugger. The regular expression engine used by Vector is most similar to the "Go" implementation, so make sure that is selected in the "Flavor" menu.
 				"""
 		}
 		regex_syntax: {
 			title: "Regex Syntax"
-			body: """
+			body:  """
 				Vector uses the Rust standard regular expression engine for pattern matching. Its syntax shares most of the features of Perl-style regular expressions, with a few exceptions. You can find examples of patterns in the [Rust regex module documentation](\(urls.rust_regex_syntax)).
 				"""
 		}

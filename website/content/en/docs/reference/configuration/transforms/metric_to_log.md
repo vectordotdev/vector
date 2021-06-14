@@ -1,5 +1,6 @@
 ---
 title: Metric to log
+description: Convert metric events to log events
 kind: transform
 layout: component
 ---

@@ -386,7 +386,7 @@ components: sources: internal_metrics: {
 					required:    false
 				}
 				uri: {
-					description: "The sanitized uri from which the event originates."
+					description: "The sanitized URI from which the event originates."
 					required:    false
 				}
 				container_name: {
@@ -634,7 +634,7 @@ components: sources: internal_metrics: {
 					required:    false
 				}
 				uri: {
-					description: "The sanitized uri from which the bytes originate."
+					description: "The sanitized URI from which the bytes originate."
 					required:    false
 				}
 				container_name: {

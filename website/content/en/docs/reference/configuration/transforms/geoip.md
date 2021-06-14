@@ -1,5 +1,6 @@
 ---
 title: GeoIP
+description: Enrich events with GeoIP metadata
 kind: transform
 layout: component
 ---

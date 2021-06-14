@@ -176,7 +176,7 @@ components: sources: journald: {
 	how_it_works: {
 		communication_strategy: {
 			title: "Communication Strategy"
-			body: """
+			body:  """
 				To ensure the `journald` source works across all platforms, Vector interacts
 				with the Systemd journal via the `journalctl` command. This is accomplished by
 				spawning a [subprocess](\(urls.rust_subprocess)) that Vector interacts

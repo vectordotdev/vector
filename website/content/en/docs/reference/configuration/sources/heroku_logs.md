@@ -1,5 +1,6 @@
 ---
 title: Heroku Logplex
+description: Collect logs from Heroku's [Logplex](https://devcenter.heroku.com/articles/logplex), the router responsible for receiving logs from your Heroku apps
 kind: source
 layout: component
 ---

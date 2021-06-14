@@ -1,5 +1,6 @@
 ---
 title: StatsD
+description: Collect logs emitted by the [StatsD](https://github.com/statsd/statsd) aggregator
 kind: source
 layout: component
 ---

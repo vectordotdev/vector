@@ -1,6 +1,6 @@
 ---
 title: Datadog logs
-description: Collect logs from
+description: Receive logs collected by a [Datadog Agent](https://docs.datadoghq.com/agent)
 kind: source
 layout: component
 ---

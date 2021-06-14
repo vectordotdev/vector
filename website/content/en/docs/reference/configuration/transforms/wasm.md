@@ -1,5 +1,6 @@
 ---
 title: WebAssembly (Wasm) transform
+description: Modify events using an embedded [WebAssembly](https://webassembly.org) (Wasm) virtual machine
 short: Wasm
 kind: transform
 layout: component

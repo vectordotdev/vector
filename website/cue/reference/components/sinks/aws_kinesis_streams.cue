@@ -127,7 +127,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			sub_sections: [
 				{
 					title: "Missing partition keys"
-					body: """
+					body:  """
 						Kinesis requires a value for the partition key. If the key is missing or the
 						value is blank, the event is dropped and a
 						[`warning`-level log event](\(urls.vector_monitoring)) is logged. The field
