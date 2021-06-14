@@ -34,7 +34,7 @@ inventory::submit! {
 impl GenerateConfig for LogstashConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            address: SocketListenAddr::SocketAddr("0.0.0.0:5000".parse().unwrap()),
+            address: SocketListenAddr::SocketAddr("0.0.0.0:5044".parse().unwrap()),
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
@@ -85,6 +85,7 @@ impl TcpSource for LogstashSource {
         LogstashDecoder::new()
     }
 
+    // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#ack-frame-type
     fn build_ack(&self, frame: &LogstashEventFrame) -> Bytes {
         let mut bytes: Vec<u8> = Vec::with_capacity(6);
         bytes.push(frame.protocol.into());
@@ -244,6 +245,7 @@ impl TryFrom<u8> for LogstashFrameType {
     }
 }
 
+/// Normalized event from logstash frame
 #[derive(Debug)]
 struct LogstashEventFrame {
     protocol: LogstashProtocolVersion,
@@ -258,8 +260,15 @@ impl Decoder for LogstashDecoder {
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        // This implements a sort of simple state machine to read the frames from the wire
+        //
+        // Each matched arm with either:
+        // * Return that there is not enough data
+        // * Return an error
+        // * Read some bytes and advance the state
         loop {
             match self.state {
+                // if we have any unsent frames, send them before reading new logstash frame
                 LogstashDecoderReadState::PendingFrames(ref mut frames) => {
                     match frames.pop_front() {
                         Some(frame) => return Ok(Some(frame)),
@@ -329,6 +338,8 @@ impl Decoder for LogstashDecoder {
                 // The window size indicates how many events the writer will send before waiting
                 // for acks. As we forward events as we get them, and ack as they are receieved, we
                 // do not need to keep track of this.
+                //
+                // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#window-size-frame-type
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::WindowSize) => {
                     if src.remaining() < 4 {
                         return Ok(None);
@@ -338,6 +349,8 @@ impl Decoder for LogstashDecoder {
                     self.state = LogstashDecoderReadState::ReadProtocol;
                 }
                 // we shouldn't receive acks from the writer, just skip
+                //
+                // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#ack-frame-type
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Ack) => {
                     if src.remaining() < 4 {
                         return Ok(None);
@@ -346,6 +359,7 @@ impl Decoder for LogstashDecoder {
                     let _sequence_number = src.get_u32();
                     self.state = LogstashDecoderReadState::ReadProtocol;
                 }
+                // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#data-frame-type
                 LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data) => {
                     let mut rest = src.as_ref();
 
@@ -396,6 +410,7 @@ impl Decoder for LogstashDecoder {
                         fields,
                     }));
                 }
+                // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#json-frame-type
                 LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json) => {
                     let mut rest = src.as_ref();
 
@@ -406,7 +421,6 @@ impl Decoder for LogstashDecoder {
                     let payload_size = rest.get_u32() as usize;
 
                     if rest.remaining() < payload_size {
-                        src.reserve(payload_size as usize);
                         return Ok(None);
                     }
 
@@ -430,6 +444,7 @@ impl Decoder for LogstashDecoder {
                         })
                     });
                 }
+                // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#compressed-frame-type
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Compressed) => {
                     let mut rest = src.as_ref();
 

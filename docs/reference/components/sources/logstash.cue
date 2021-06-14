@@ -111,7 +111,7 @@ components: sources: logstash: {
 
 				```text
 				{ "@version" => "1", "@timestamp" => 2021-06-14T20:57:14.230Z, "host" => "c082bb583445", "sequence" => 0, "message" => "Hello world!" }
-				```				```
+				```
 				"""
 			output: log: {
 				host: _values.remote_host
@@ -146,6 +146,7 @@ components: sources: logstash: {
 			output: log: {
 				{
 					"host":       _values.remote_host
+					"timestamp":  "2021-06-14T21:25:37.058Z"
 					"@timestamp": "2021-06-14T21:25:37.058Z"
 					"@metadata": {
 						"beat":    "heartbeat"
