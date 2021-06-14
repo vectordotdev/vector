@@ -41,7 +41,7 @@ impl Builder {
         }
     }
 
-    /// Indicate that coalescence is required in the final expression
+    /// Indicate that coalescence is required in the final expression.
     fn coalesce(&mut self) {
         self.coalesce = true;
     }
@@ -467,11 +467,10 @@ mod tests {
         // Range - alpha, exclusive (quoted)
         (r#"g:{"a" TO "z"}"#, r#"(.__datadog_tags.g > "a" && .__datadog_tags.g < "z") ?? false"#),
         // A bit of everything.
-        // TODO - This should work, but fails due to the arbitrary AND associativity. Feels like a VRL bug.
-        // (
-        //     "host:this OR ((@b:test* AND c:that) AND d:the_other e:[1 TO 5])",
-        //     r#"(.host == "this" || ((match(.custom.b, r'\btest.*\b') && .__datadog_tags.c == "that") && (.__datadog_tags.d == "the_other" && (.__datadog_tags.e >= 1 && .__datadog_tags.e <= 5)))) ?? false"#,
-        // ),
+        (
+            "host:this OR ((@b:test* AND c:that) AND d:the_other e:[1 TO 5])",
+            r#"(.host == "this" || ((match(.custom.b, r'\btest.*\b') && .__datadog_tags.c == "that") && (.__datadog_tags.d == "the_other" && (.__datadog_tags.e >= 1 && .__datadog_tags.e <= 5)))) ?? false"#,
+        ),
     ];
 
     #[test]
