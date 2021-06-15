@@ -15,9 +15,6 @@ pub(crate) struct OrderedFinalizer<T> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
 }
 
-// TODO: Rewrite `apply_done` below into a trait once there are more
-// than one user of this framework. This works for now.
-
 impl<T: Send + 'static> OrderedFinalizer<T> {
     pub(crate) fn new(
         shutdown: Shared<ShutdownSignal>,
