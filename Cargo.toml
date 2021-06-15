@@ -19,9 +19,10 @@ required-features = ["default-no-api-client"]
 [profile.dev]
 split-debuginfo = "unpacked" # Faster debug builds on macOS
 
+# CI-based builds use full release optimization.  See scripts/environment/release-flags.sh.
+# This results in roughly a 5% reduction in performance when compiling locally vs when
+# compiled via the CI pipeline.
 [profile.release]
-lto = true        # Optimize our binary at link stage.
-codegen-units = 1 # Increases compile time but improves optmization alternatives.
 debug = false     # Do not include debug symbols in the executable.
 
 [profile.bench]
