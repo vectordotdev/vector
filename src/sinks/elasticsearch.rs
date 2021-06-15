@@ -283,15 +283,16 @@ pub enum BulkAction {
     Create,
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 impl BulkAction {
-    pub fn as_str(self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
         }
     }
 
-    pub fn as_json_pointer(self) -> &'static str {
+    pub fn as_json_pointer(&self) -> &'static str {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
