@@ -212,7 +212,21 @@ name = "Security"
 url = "https://github.com/timberio/vector/security/policy"
 weight = 3
 
-# Mini icons in footer
+# Buttons in "community" section on main page
+[[menu.community]]
+name = "View GitHub repo"
+params = { color = "black", dark = "white", icon = "github" }
+url = "https://github.com/timberio/vector"
+weight = 1
+
+[[menu.community]]
+name = "Chat with us on Discord"
+params = { color = "discord-purple", icon = "discord" }
+url = "https://chat.vector.dev"
+weight = 2
+
+
+# Mini icons in navbar and footer
 [[menu.comms]]
 name = "Twitter"
 params = { color = "twitter-blue", icon = "twitter" }

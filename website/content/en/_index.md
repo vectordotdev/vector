@@ -106,6 +106,16 @@ community:
     {
       title: "Downloads",
       figure: "30m+"
+    },
+    {
+      title: "Countries",
+      figure: "40"
+    }
+  ]
+  buttons: [
+    {
+      title: "GitHub",
+      icon: "github"
     }
   ]
 ---
