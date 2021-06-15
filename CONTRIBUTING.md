@@ -614,11 +614,11 @@ it.  There are pre-built binaries for all major platforms to get you going quick
 environment to actually use it.  We recommend using the `.cargo/config` approach as this can help
 speed up all of your Rust development work, and not just developing on Vector.
 
-While `sccache` was originally designed to cache compilation assets in cloud storage, so that cached
-assets could be sharedd amongst many workers, `sccache` can also store assets locally, and this is
-indeed the default mode.  Local mode works well for local development as it is much easier to delete
-the cache directory if you ever encounter issues with the cached assets.  It also involves no extra
-infrastructure or spending.
+While `sccache` was originally designed to cache compilation assets in cloud storage, maximizing
+reusability amongst CI workers, `sccache` actually supports storing assets locally by default.
+Local mode works well for local development as it is much easier to delete the cache directory if
+you ever encounter issues with the cached assets.  It also involves no extra infrastructure or
+spending.
 
 ##### Testing Specific Components
 
