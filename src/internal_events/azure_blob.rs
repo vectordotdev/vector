@@ -26,7 +26,7 @@ impl InternalEvent for AzureBlobHttpError {
     fn emit_logs(&self) {
         error!(
             message = "Error processing request.",
-            error = ?self.error,
+            error = %self.error,
             internal_log_rate_secs = 10
         );
     }
@@ -43,7 +43,7 @@ pub(crate) struct AzureBlobEventSent {
 
 impl InternalEvent for AzureBlobEventSent {
     fn emit_logs(&self) {
-        trace!(message = "Event sent.", request_id = ?self.request_id);
+        trace!(message = "Event sent.", request_id = %self.request_id);
     }
 
     fn emit_metrics(&self) {

@@ -113,7 +113,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
         })
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -122,10 +122,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = self.create_client()?;
-        let healthcheck = self
-            .clone()
-            .healthcheck(Arc::<ContainerClient>::clone(&client))
-            .boxed();
+        let healthcheck = self.clone().healthcheck(Arc::clone(&client)).boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
     }
@@ -184,11 +181,7 @@ impl AzureBlobSinkConfig {
         match request {
             Ok(_) => Ok(()),
             Err(reason) => Err(match reason.downcast_ref::<HttpError>() {
-                Some(HttpError::UnexpectedStatusCode {
-                    expected: _,
-                    received,
-                    body: _,
-                }) => match *received {
+                Some(HttpError::UnexpectedStatusCode { received, .. }) => match *received {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                     StatusCode::NOT_FOUND => HealthcheckError::UnknownContainer {
                         container: container_name,
@@ -223,8 +216,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
     }
 
     fn call(&mut self, request: AzureBlobSinkRequest) -> Self::Future {
-        let client =
-            Arc::<ContainerClient>::clone(&self.client).as_blob_client(request.blob_name.as_str());
+        let client = Arc::clone(&self.client).as_blob_client(request.blob_name.as_str());
 
         Box::pin(async move {
             let byte_size = request.blob_data.len();
@@ -239,11 +231,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
             blob.execute()
                 .inspect_err(|reason| {
                     match reason.downcast_ref::<HttpError>() {
-                        Some(HttpError::UnexpectedStatusCode {
-                            expected: _,
-                            received,
-                            body: _,
-                        }) => {
+                        Some(HttpError::UnexpectedStatusCode { received, .. }) => {
                             emit!(AzureBlobErrorResponse { code: *received })
                         }
                         _ => emit!(AzureBlobHttpError {
@@ -280,11 +268,9 @@ impl RetryLogic for AzureBlobRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            HttpError::UnexpectedStatusCode {
-                expected: _,
-                received,
-                body: _,
-            } => received.is_server_error() || received == &StatusCode::TOO_MANY_REQUESTS,
+            HttpError::UnexpectedStatusCode { received, .. } => {
+                received.is_server_error() || received == &StatusCode::TOO_MANY_REQUESTS
+            }
             _ => false,
         }
     }
@@ -372,6 +358,7 @@ fn build_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LogEvent;
     use std::collections::BTreeMap;
 
     #[test]
@@ -382,7 +369,7 @@ mod tests {
     #[test]
     fn azure_blob_encode_event_text() {
         let message = String::from("hello world");
-        let event = Event::from(message.clone());
+        let log = LogEvent::from(message.clone());
         let blob_prefix = Template::try_from("logs/blob/%F").unwrap();
         let encoding = EncodingConfig {
             codec: Encoding::Text,
@@ -392,7 +379,7 @@ mod tests {
             timestamp_format: None,
         };
 
-        let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
+        let bytes = encode_event(log.into(), &blob_prefix, &encoding).unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.item.into_parts();
@@ -402,8 +389,8 @@ mod tests {
     #[test]
     fn azure_blob_encode_event_json() {
         let message = String::from("hello world");
-        let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
+        let mut log = LogEvent::from(message.clone());
+        log.insert("key", "value");
         let blob_prefix = Template::try_from("logs/blob/%F").unwrap();
         let encoding = EncodingConfig {
             codec: Encoding::Ndjson,
@@ -413,7 +400,7 @@ mod tests {
             timestamp_format: None,
         };
 
-        let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
+        let bytes = encode_event(log.into(), &blob_prefix, &encoding).unwrap();
 
         let (bytes, _) = bytes.item.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
@@ -424,8 +411,8 @@ mod tests {
     #[test]
     fn azure_blob_encode_event_with_removed_key() {
         let message = "hello world".to_string();
-        let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
+        let mut log = LogEvent::from(message.clone());
+        log.insert("key", "value");
         let blob_prefix = Template::try_from("logs/blob/%F").unwrap();
         let encoding = EncodingConfig {
             codec: Encoding::Ndjson,
@@ -435,11 +422,12 @@ mod tests {
             timestamp_format: None,
         };
 
-        let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
+        let bytes = encode_event(log.into(), &blob_prefix, &encoding).unwrap();
 
         let (bytes, _) = bytes.item.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
         assert_eq!(map[&log_schema().message_key().to_string()], message);
+        assert_eq!(map.contains_key("key"), false);
     }
 
     #[test]
@@ -540,6 +528,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
+        event::LogEvent,
         test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
     };
     use bytes::{Buf, BytesMut};
@@ -587,7 +576,7 @@ mod integration_tests {
 
         sink.run(input).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs(blob_prefix.as_str()).await;
+        let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -609,7 +598,7 @@ mod integration_tests {
 
         sink.run(input).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs(blob_prefix.as_str()).await;
+        let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -638,7 +627,7 @@ mod integration_tests {
 
         sink.run(events).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs(blob_prefix.as_str()).await;
+        let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log.gz"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -667,7 +656,7 @@ mod integration_tests {
 
         sink.run(input).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs(blob_prefix.as_str()).await;
+        let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log.gz"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -701,7 +690,7 @@ mod integration_tests {
 
         sink.run(input).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs(blob_prefix.as_str()).await;
+        let blobs = config.list_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 3);
         let response = stream::iter(blobs)
             .fold(Vec::new(), |mut acc, blob| async {
@@ -742,7 +731,7 @@ mod integration_tests {
             self.new(client, cx).expect("Failed to create sink")
         }
 
-        pub async fn get_blobs(&self, prefix: &str) -> Vec<String> {
+        pub async fn list_blobs(&self, prefix: &str) -> Vec<String> {
             let client = self.create_client().unwrap();
             let response = client
                 .list_blobs()
@@ -797,12 +786,8 @@ mod integration_tests {
             let response = match request.await {
                 Ok(_) => Ok(()),
                 Err(reason) => match reason.downcast_ref::<HttpError>() {
-                    Some(HttpError::UnexpectedStatusCode {
-                        expected: _,
-                        received,
-                        body: _,
-                    }) => match received {
-                        &StatusCode::CONFLICT => Ok(()),
+                    Some(HttpError::UnexpectedStatusCode { received, .. }) => match *received {
+                        StatusCode::CONFLICT => Ok(()),
                         status => Err(format!("Unexpected status code {}", status)),
                     },
                     _ => Err(format!("Unexpected error {}", reason.to_string())),
@@ -821,10 +806,10 @@ mod integration_tests {
         let key = count / groups;
         let lines = random_lines(len).take(count).collect::<Vec<_>>();
         let events = lines.clone().into_iter().enumerate().map(move |(i, line)| {
-            let mut event = Event::from(line);
+            let mut log = LogEvent::from(line);
             let i = ((i / key) + 1) as i32;
-            event.as_mut_log().insert("key", i);
-            event
+            log.insert("key", i);
+            log.into()
         });
 
         (lines, stream::iter(events))
