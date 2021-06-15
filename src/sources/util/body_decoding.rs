@@ -63,9 +63,7 @@ pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessag
                 .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
             json_parse_array_of_object(parsed_json)
         }
-        Encoding::Binary => std::iter::once(Ok(body))
-            .map(|r| Ok(LogEvent::from(r?).into()))
-            .collect::<Result<_, _>>(),
+        Encoding::Binary => Ok(vec![LogEvent::from(body).into()]),
     }
 }
 
