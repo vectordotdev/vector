@@ -1825,3 +1825,125 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     drop(vector);
     Ok(())
 }
+
+#[tokio::test]
+async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework
+        .vector(
+            "test-vector",
+            HELM_CHART_VECTOR_AGENT,
+            VectorConfig {
+                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                ..Default::default()
+            },
+        )
+        .await?;
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            // This allows us to read and checkpoint the first log
+            // then ensure we just read the new marker after restarting Vector
+            "echo CHECKED_MARKER; sleep 60; echo MARKER",
+            vec![],
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the rest of the log lines.
+    let mut got_marker = false;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            // A log from something other than our test pod, pretend we don't
+            // see it.
+            return FlowControlCommand::GoOn;
+        }
+
+        // Ensure we got the marker.
+        assert_eq!(val["message"], "CHECKED_MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+    assert!(got_marker);
+
+    framework
+        .restart_rollout("test-vector", "daemonset/vector-agent", vec![])
+        .await?;
+    // We need to wait for the new pod to start
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+    got_marker = false;
+    // We need to start reading from the newly started pod
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            return FlowControlCommand::GoOn;
+        }
+
+        if val["message"].eq("CHECKED_MARKER") {
+            panic!("Checkpointed marker should not be found");
+        };
+
+        assert_eq!(val["message"], "MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+
+    assert!(got_marker);
+
+    drop(test_pod);
+    drop(test_namespace);
+    drop(vector);
+    Ok(())
+}

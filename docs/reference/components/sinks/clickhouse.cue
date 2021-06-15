@@ -121,6 +121,12 @@ components: sinks: clickhouse: {
 				syntax: "literal"
 			}
 		}
+		skip_unknown_fields: {
+			common:      true
+			description: "Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema."
+			required:    false
+			type: bool: default: false
+		}
 	}
 
 	input: {

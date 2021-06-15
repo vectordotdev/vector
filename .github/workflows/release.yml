@@ -152,6 +152,9 @@ jobs:
       - name: "Set Vector build description"
         run: ./scripts/set-build-description.sh
         shell: bash
+      - name: "Set release flags"
+        run: ./scripts/environment/release-flags.sh
+        shell: bash
       - name: "Build archive"
         env:
           TARGET: "x86_64-apple-darwin"
@@ -166,6 +169,8 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     runs-on: windows-2019
+    env:
+      RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
     steps:
       - uses: actions/checkout@v2.3.4
       - name: "Add Vector version"
@@ -173,6 +178,9 @@ jobs:
         shell: bash
       - name: "Set Vector build description"
         run: ./scripts/set-build-description.sh
+        shell: bash
+      - name: "Set release flags"
+        run: ./scripts/environment/release-flags.sh
         shell: bash
       - name: "Download Perl"
         shell: bash
@@ -209,7 +217,6 @@ jobs:
         shell: bash
         run: |
           export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-          export RUSTFLAGS=-Ctarget-feature=+crt-static
           export FEATURES="default-msvc"
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"
