@@ -13,8 +13,14 @@ apt install --yes \
   apt-utils \
   apt-transport-https
 
+# We wrap these two commands such that we ignore errors in they fail.  Currently,
+# the commands work fine when run on a virtual machine, but not when run in a container.
+# Rather than explicitly try to figure out if we're in a container, which make itself
+# be a fragile check, we just ignore the errors because it's fine if it fails in that case.
+set +e
 apt-get install --yes grub-efi
 update-grub
+set -e
 
 apt upgrade --yes
 
