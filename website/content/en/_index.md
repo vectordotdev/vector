@@ -75,19 +75,19 @@ installation: [
 methods: [
   {
     title: "Platforms",
-    url: "/"
+    url: "/docs/setup/installation/platforms"
   },
   {
     title: "Package managers",
-    url: "/"
+    url: "/docs/setup/installation/package-managers"
   },
   {
     title: "Operating systems",
-    url: "/",
+    url: "/docs/setup/installation/operating-systems",
   },
   {
     title: "Manual",
-    url: "/"
+    url: "/docs/setup/installation/manual"
   }
 ]
 ---

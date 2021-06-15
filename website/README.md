@@ -4,7 +4,8 @@ This directory houses the assets used to build Vector's website and documentatio
 
 ## Prerequisites
 
-* [Hugo]. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`][netlify_toml].
+* The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`][netlify_toml].
+* The [CUE] configuration and validation tool
 * [Yarn]
 
 ## Run the site locally
@@ -19,6 +20,7 @@ make serve
 
 1. Add the new version to the `versions` list in [`cue/reference/versions.cue`][./cue/reference/versions.cue]
 
+[cue]: https://cue-lang.org
 [esbuild]: https://github.com/evanw/esbuild
 [hugo]: https://gohugo.io
 [netlify_toml]: ../netlify.toml
