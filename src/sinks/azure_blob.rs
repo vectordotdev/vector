@@ -122,7 +122,10 @@ impl GenerateConfig for AzureBlobSinkConfig {
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = self.create_client()?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+        let healthcheck = self
+            .clone()
+            .healthcheck(Arc::<ContainerClient>::clone(&client))
+            .boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
     }
@@ -185,15 +188,15 @@ impl AzureBlobSinkConfig {
                     expected: _,
                     received,
                     body: _,
-                }) => match received {
-                    &StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                    &StatusCode::NOT_FOUND => HealthcheckError::UnknownContainer {
+                }) => match *received {
+                    StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                    StatusCode::NOT_FOUND => HealthcheckError::UnknownContainer {
                         container: container_name,
                     }
                     .into(),
-                    &status => HealthcheckError::Unknown { status }.into(),
+                    status => HealthcheckError::Unknown { status }.into(),
                 },
-                _ => reason.into(),
+                _ => reason,
             }),
         }
     }
@@ -220,10 +223,8 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
     }
 
     fn call(&mut self, request: AzureBlobSinkRequest) -> Self::Future {
-        let client = self
-            .client
-            .clone()
-            .as_blob_client(request.blob_name.as_str());
+        let client =
+            Arc::<ContainerClient>::clone(&self.client).as_blob_client(request.blob_name.as_str());
 
         Box::pin(async move {
             let byte_size = request.blob_data.len();
