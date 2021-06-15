@@ -225,7 +225,15 @@ impl Builder {
                 .collect(),
             // Negation. If the node is an operation type, wrap in a container before negating.
             QueryNode::NegatedNode { node } => {
-                let expr = recurse(self.parse_node(node).into_iter());
+                let reset = self.coalesce;
+                let mut expr = recurse(self.parse_node(node).into_iter());
+
+                if self.coalesce {
+                    expr = coalesce(expr);
+
+                    // Set coalescence to its previous state.
+                    self.coalesce = reset;
+                }
 
                 let node = match expr {
                     ast::Expr::Op(_) => make_container_group(expr),
@@ -289,15 +297,15 @@ mod tests {
         // Keyword.
         ("bla", r#"(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false"#),
         // Keyword (negate).
-        ("NOT bla", r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false"#),
+        ("NOT bla", r#"!((match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false)"#),
         // Keyword (negate w/-).
-        ("-bla", r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false"#),
+        ("-bla", r#"!((match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false)"#),
         // Quoted keyword.
         (r#""bla""#, r#"(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false"#),
         // Quoted keyword (negate).
-        (r#"NOT "bla""#, r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false"#),
+        (r#"NOT "bla""#, r#"!((match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false)"#),
         // Quoted keyword (negate w/-).
-        (r#"-"bla""#, r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false"#),
+        (r#"-"bla""#, r#"!((match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))) ?? false)"#),
         // Tag match.
         ("a:bla", r#".__datadog_tags.a == "bla""#),
         // Reserved tag match
@@ -331,81 +339,81 @@ mod tests {
         // Wildcard prefix.
         ("*bla", r#"(match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b'))))) ?? false"#),
         // Wildcard prefix (negate).
-        ("NOT *bla", r#"!(match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b'))))) ?? false"#),
+        ("NOT *bla", r#"!((match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b'))))) ?? false)"#),
         // Wildcard prefix (negate w/-).
-        ("-*bla", r#"!(match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b'))))) ?? false"#),
+        ("-*bla", r#"!((match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b'))))) ?? false)"#),
         // Wildcard suffix.
         ("bla*", r#"(match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b'))))) ?? false"#),
         // Wildcard suffix (negate).
-        ("NOT bla*", r#"!(match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b'))))) ?? false"#),
+        ("NOT bla*", r#"!((match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b'))))) ?? false)"#),
         // Wildcard suffix (negate w/-).
-        ("-bla*", r#"!(match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b'))))) ?? false"#),
+        ("-bla*", r#"!((match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b'))))) ?? false)"#),
         // Multiple wildcards.
         ("*b*la*", r#"(match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b'))))) ?? false"#),
         // Multiple wildcards (negate).
-        ("NOT *b*la*", r#"!(match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b'))))) ?? false"#),
+        ("NOT *b*la*", r#"!((match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b'))))) ?? false)"#),
         // Multiple wildcards (negate w/-).
-        ("-*b*la*", r#"!(match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b'))))) ?? false"#),
+        ("-*b*la*", r#"!((match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b'))))) ?? false)"#),
         // Wildcard prefix - tag.
         ("a:*bla", r#"ends_with(.__datadog_tags.a, "bla") ?? false"#),
         // Wildcard prefix - tag (negate).
-        ("NOT a:*bla", r#"!ends_with(.__datadog_tags.a, "bla") ?? false"#),
+        ("NOT a:*bla", r#"!(ends_with(.__datadog_tags.a, "bla") ?? false)"#),
         // Wildcard prefix - tag (negate w/-).
-        ("-a:*bla", r#"!ends_with(.__datadog_tags.a, "bla") ?? false"#),
+        ("-a:*bla", r#"!(ends_with(.__datadog_tags.a, "bla") ?? false)"#),
         // Wildcard suffix - tag.
         ("b:bla*", r#"starts_with(.__datadog_tags.b, "bla") ?? false"#),
         // Wildcard suffix - tag (negate).
-        ("NOT b:bla*", r#"!starts_with(.__datadog_tags.b, "bla") ?? false"#),
+        ("NOT b:bla*", r#"!(starts_with(.__datadog_tags.b, "bla") ?? false)"#),
         // Wildcard suffix - tag (negate w/-).
-        ("-b:bla*", r#"!starts_with(.__datadog_tags.b, "bla") ?? false"#),
+        ("-b:bla*", r#"!(starts_with(.__datadog_tags.b, "bla") ?? false)"#),
         // Multiple wildcards - tag.
         ("c:*b*la*", r#"match(.__datadog_tags.c, r'^.*b.*la.*$') ?? false"#),
         // Multiple wildcards - tag (negate).
-        ("NOT c:*b*la*", r#"!match(.__datadog_tags.c, r'^.*b.*la.*$') ?? false"#),
+        ("NOT c:*b*la*", r#"!(match(.__datadog_tags.c, r'^.*b.*la.*$') ?? false)"#),
         // Multiple wildcards - tag (negate w/-).
-        ("-c:*b*la*", r#"!match(.__datadog_tags.c, r'^.*b.*la.*$') ?? false"#),
+        ("-c:*b*la*", r#"!(match(.__datadog_tags.c, r'^.*b.*la.*$') ?? false)"#),
         // Wildcard prefix - facet.
         ("@a:*bla", r#"ends_with(.custom.a, "bla") ?? false"#),
         // Wildcard prefix - facet (negate).
-        ("NOT @a:*bla", r#"!ends_with(.custom.a, "bla") ?? false"#),
+        ("NOT @a:*bla", r#"!(ends_with(.custom.a, "bla") ?? false)"#),
         // Wildcard prefix - facet (negate w/-).
-        ("-@a:*bla", r#"!ends_with(.custom.a, "bla") ?? false"#),
+        ("-@a:*bla", r#"!(ends_with(.custom.a, "bla") ?? false)"#),
         // Wildcard suffix - facet.
         ("@b:bla*", r#"starts_with(.custom.b, "bla") ?? false"#),
         // Wildcard suffix - facet (negate).
-        ("NOT @b:bla*", r#"!starts_with(.custom.b, "bla") ?? false"#),
+        ("NOT @b:bla*", r#"!(starts_with(.custom.b, "bla") ?? false)"#),
         // Wildcard suffix - facet (negate w/-).
-        ("-@b:bla*", r#"!starts_with(.custom.b, "bla") ?? false"#),
+        ("-@b:bla*", r#"!(starts_with(.custom.b, "bla") ?? false)"#),
         // Multiple wildcards - facet.
         ("@c:*b*la*", r#"match(.custom.c, r'^.*b.*la.*$') ?? false"#),
         // Multiple wildcards - facet (negate).
-        ("NOT @c:*b*la*", r#"!match(.custom.c, r'^.*b.*la.*$') ?? false"#),
+        ("NOT @c:*b*la*", r#"!(match(.custom.c, r'^.*b.*la.*$') ?? false)"#),
         // Multiple wildcards - facet (negate w/-).
-        ("-@c:*b*la*", r#"!match(.custom.c, r'^.*b.*la.*$') ?? false"#),
+        ("-@c:*b*la*", r#"!(match(.custom.c, r'^.*b.*la.*$') ?? false)"#),
         // Special case for tags.
         ("tags:a", r#"includes(.tags, "a") ?? false"#),
         // Special case for tags (negate).
-        ("NOT tags:a", r#"!includes(.tags, "a") ?? false"#),
+        ("NOT tags:a", r#"!(includes(.tags, "a") ?? false)"#),
         // Special case for tags (negate w/-).
-        ("-tags:a", r#"!includes(.tags, "a") ?? false"#),
+        ("-tags:a", r#"!(includes(.tags, "a") ?? false)"#),
         // Range - numeric, inclusive.
         ("[1 TO 10]", r#"((.message >= "1" && .message <= "10") || ((.custom.error.message >= "1" && .custom.error.message <= "10") || ((.custom.error.stack >= "1" && .custom.error.stack <= "10") || ((.custom.title >= "1" && .custom.title <= "10") || (._default_ >= "1" && ._default_ <= "10"))))) ?? false"#),
         // Range - numeric, inclusive (negate).
-        ("NOT [1 TO 10]", r#"!((.message >= "1" && .message <= "10") || ((.custom.error.message >= "1" && .custom.error.message <= "10") || ((.custom.error.stack >= "1" && .custom.error.stack <= "10") || ((.custom.title >= "1" && .custom.title <= "10") || (._default_ >= "1" && ._default_ <= "10"))))) ?? false"#),
+        ("NOT [1 TO 10]", r#"!(((.message >= "1" && .message <= "10") || ((.custom.error.message >= "1" && .custom.error.message <= "10") || ((.custom.error.stack >= "1" && .custom.error.stack <= "10") || ((.custom.title >= "1" && .custom.title <= "10") || (._default_ >= "1" && ._default_ <= "10"))))) ?? false)"#),
         // Range - numeric, inclusive (negate w/-).
-        ("-[1 TO 10]", r#"!((.message >= "1" && .message <= "10") || ((.custom.error.message >= "1" && .custom.error.message <= "10") || ((.custom.error.stack >= "1" && .custom.error.stack <= "10") || ((.custom.title >= "1" && .custom.title <= "10") || (._default_ >= "1" && ._default_ <= "10"))))) ?? false"#),
+        ("-[1 TO 10]", r#"!(((.message >= "1" && .message <= "10") || ((.custom.error.message >= "1" && .custom.error.message <= "10") || ((.custom.error.stack >= "1" && .custom.error.stack <= "10") || ((.custom.title >= "1" && .custom.title <= "10") || (._default_ >= "1" && ._default_ <= "10"))))) ?? false)"#),
         // Range - numeric, inclusive, unbounded (upper).
         ("[50 TO *]", r#"((.message >= "50") || ((.custom.error.message >= "50") || ((.custom.error.stack >= "50") || ((.custom.title >= "50") || (._default_ >= "50"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (upper) (negate).
-        ("NOT [50 TO *]", r#"!((.message >= "50") || ((.custom.error.message >= "50") || ((.custom.error.stack >= "50") || ((.custom.title >= "50") || (._default_ >= "50"))))) ?? false"#),
+        ("NOT [50 TO *]", r#"!(((.message >= "50") || ((.custom.error.message >= "50") || ((.custom.error.stack >= "50") || ((.custom.title >= "50") || (._default_ >= "50"))))) ?? false)"#),
         // Range - numeric, inclusive, unbounded (upper) (negate w/-).
-        ("-[50 TO *]", r#"!((.message >= "50") || ((.custom.error.message >= "50") || ((.custom.error.stack >= "50") || ((.custom.title >= "50") || (._default_ >= "50"))))) ?? false"#),
+        ("-[50 TO *]", r#"!(((.message >= "50") || ((.custom.error.message >= "50") || ((.custom.error.stack >= "50") || ((.custom.title >= "50") || (._default_ >= "50"))))) ?? false)"#),
         // Range - numeric, inclusive, unbounded (lower).
         ("[* TO 50]", r#"((.message <= "50") || ((.custom.error.message <= "50") || ((.custom.error.stack <= "50") || ((.custom.title <= "50") || (._default_ <= "50"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (lower) (negate).
-        ("NOT [* TO 50]", r#"!((.message <= "50") || ((.custom.error.message <= "50") || ((.custom.error.stack <= "50") || ((.custom.title <= "50") || (._default_ <= "50"))))) ?? false"#),
+        ("NOT [* TO 50]", r#"!(((.message <= "50") || ((.custom.error.message <= "50") || ((.custom.error.stack <= "50") || ((.custom.title <= "50") || (._default_ <= "50"))))) ?? false)"#),
         // Range - numeric, inclusive, unbounded (lower) (negate w/-).
-        ("-[* TO 50]", r#"!((.message <= "50") || ((.custom.error.message <= "50") || ((.custom.error.stack <= "50") || ((.custom.title <= "50") || (._default_ <= "50"))))) ?? false"#),
+        ("-[* TO 50]", r#"!(((.message <= "50") || ((.custom.error.message <= "50") || ((.custom.error.stack <= "50") || ((.custom.title <= "50") || (._default_ <= "50"))))) ?? false)"#),
         // Range - numeric, inclusive, unbounded (both).
         ("[* TO *]", "(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
         // Range - numeric, inclusive, unbounded (both) (negate).
@@ -415,21 +423,21 @@ mod tests {
         // Range - numeric, inclusive, tag.
         ("a:[1 TO 10]", r#"(.__datadog_tags.a >= "1" && .__datadog_tags.a <= "10") ?? false"#),
         // Range - numeric, inclusive, tag (negate).
-        ("NOT a:[1 TO 10]", r#"!(.__datadog_tags.a >= "1" && .__datadog_tags.a <= "10") ?? false"#),
+        ("NOT a:[1 TO 10]", r#"!((.__datadog_tags.a >= "1" && .__datadog_tags.a <= "10") ?? false)"#),
         // Range - numeric, inclusive, tag (negate w/-).
-        ("-a:[1 TO 10]", r#"!(.__datadog_tags.a >= "1" && .__datadog_tags.a <= "10") ?? false"#),
+        ("-a:[1 TO 10]", r#"!((.__datadog_tags.a >= "1" && .__datadog_tags.a <= "10") ?? false)"#),
         // Range - numeric, inclusive, unbounded (upper), tag.
         ("a:[50 TO *]", r#"(.__datadog_tags.a >= "50") ?? false"#),
         // Range - numeric, inclusive, unbounded (upper), tag (negate).
-        ("NOT a:[50 TO *]", r#"!(.__datadog_tags.a >= "50") ?? false"#),
+        ("NOT a:[50 TO *]", r#"!((.__datadog_tags.a >= "50") ?? false)"#),
         // Range - numeric, inclusive, unbounded (upper), tag (negate w/-).
-        ("-a:[50 TO *]", r#"!(.__datadog_tags.a >= "50") ?? false"#),
+        ("-a:[50 TO *]", r#"!((.__datadog_tags.a >= "50") ?? false)"#),
         // Range - numeric, inclusive, unbounded (lower), tag.
         ("a:[* TO 50]", r#"(.__datadog_tags.a <= "50") ?? false"#),
         // Range - numeric, inclusive, unbounded (lower), tag (negate).
-        ("NOT a:[* TO 50]", r#"!(.__datadog_tags.a <= "50") ?? false"#),
+        ("NOT a:[* TO 50]", r#"!((.__datadog_tags.a <= "50") ?? false)"#),
         // Range - numeric, inclusive, unbounded (lower), tag (negate w/-).
-        ("-a:[* TO 50]", r#"!(.__datadog_tags.a <= "50") ?? false"#),
+        ("-a:[* TO 50]", r#"!((.__datadog_tags.a <= "50") ?? false)"#),
         // Range - numeric, inclusive, unbounded (both), tag.
         ("a:[* TO *]", "exists(.__datadog_tags.a)"),
         // Range - numeric, inclusive, unbounded (both), tag (negate).
@@ -439,21 +447,21 @@ mod tests {
         // Range - numeric, inclusive, facet.
         ("@b:[1 TO 10]", "(.custom.b >= 1 && .custom.b <= 10) ?? false"),
         // Range - numeric, inclusive, facet (negate).
-        ("NOT @b:[1 TO 10]", "!(.custom.b >= 1 && .custom.b <= 10) ?? false"),
+        ("NOT @b:[1 TO 10]", "!((.custom.b >= 1 && .custom.b <= 10) ?? false)"),
         // Range - numeric, inclusive, facet (negate w/-).
-        ("-@b:[1 TO 10]", "!(.custom.b >= 1 && .custom.b <= 10) ?? false"),
+        ("-@b:[1 TO 10]", "!((.custom.b >= 1 && .custom.b <= 10) ?? false)"),
         // Range - numeric, inclusive, unbounded (upper), facet.
         ("@b:[50 TO *]", "(.custom.b >= 50) ?? false"),
         // Range - numeric, inclusive, unbounded (upper), facet (negate).
-        ("NOT @b:[50 TO *]", "!(.custom.b >= 50) ?? false"),
+        ("NOT @b:[50 TO *]", "!((.custom.b >= 50) ?? false)"),
         // Range - numeric, inclusive, unbounded (upper), facet (negate w/-).
-        ("-@b:[50 TO *]", "!(.custom.b >= 50) ?? false"),
+        ("-@b:[50 TO *]", "!((.custom.b >= 50) ?? false)"),
         // Range - numeric, inclusive, unbounded (lower), facet.
         ("@b:[* TO 50]", "(.custom.b <= 50) ?? false"),
         // Range - numeric, inclusive, unbounded (lower), facet (negate).
-        ("NOT @b:[* TO 50]", "!(.custom.b <= 50) ?? false"),
+        ("NOT @b:[* TO 50]", "!((.custom.b <= 50) ?? false)"),
         // Range - numeric, inclusive, unbounded (lower), facet (negate w/-).
-        ("-@b:[* TO 50]", "!(.custom.b <= 50) ?? false"),
+        ("-@b:[* TO 50]", "!((.custom.b <= 50) ?? false)"),
         // Range - numeric, inclusive, unbounded (both), facet.
         ("@b:[* TO *]", "exists(.custom.b)"),
         // Range - numeric, inclusive, unbounded (both), facet (negate).
@@ -495,12 +503,12 @@ mod tests {
         // AND match, keyword (negate last).
         (
             "this AND NOT that",
-            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) && !(match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b')))))) ?? false"#,
+            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) && !((match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))) ?? false)) ?? false"#,
         ),
         // AND match, keyword (negate last w/-).
         (
             "this AND -that",
-            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) && !(match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b')))))) ?? false"#,
+            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) && !((match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))) ?? false)) ?? false"#,
         ),
         // OR match, keyword, explicit.
         (
