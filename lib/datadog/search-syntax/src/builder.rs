@@ -142,8 +142,8 @@ impl Builder {
                 upper_inclusive,
             } => make_queries(&attr)
                 .into_iter()
-                .map(|(_, query)| {
-                    match (&lower, &upper) {
+                .map(|(field, query)| {
+                    match (lower, upper) {
                         // If both bounds are wildcards, it'll match everything; just check the field exists.
                         (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => {
                             make_function_call("exists", vec![query])
@@ -151,6 +151,12 @@ impl Builder {
                         // Unbounded lower. Wrapped in a container group for negation compatibility.
                         (ComparisonValue::Unbounded, _) => {
                             self.coalesce();
+
+                            let upper = match field {
+                                Field::Facet(_) => upper.clone().into(),
+                                _ => ComparisonValue::String(upper.to_string()).into(),
+                            };
+
                             make_container_group(make_op(
                                 make_node(query),
                                 if *upper_inclusive {
@@ -158,12 +164,18 @@ impl Builder {
                                 } else {
                                     ast::Opcode::Lt
                                 },
-                                make_node(ast::Expr::Literal(make_node(upper.clone().into()))),
+                                make_node(ast::Expr::Literal(make_node(upper))),
                             ))
                         }
                         // Unbounded upper. Wrapped in a container group for negation compatibility.
                         (_, ComparisonValue::Unbounded) => {
                             self.coalesce();
+
+                            let lower = match field {
+                                Field::Facet(_) => lower.clone().into(),
+                                _ => ComparisonValue::String(lower.to_string()).into(),
+                            };
+
                             make_container_group(make_op(
                                 make_node(query),
                                 if *lower_inclusive {
@@ -171,12 +183,21 @@ impl Builder {
                                 } else {
                                     ast::Opcode::Gt
                                 },
-                                make_node(ast::Expr::Literal(make_node(lower.clone().into()))),
+                                make_node(ast::Expr::Literal(make_node(lower))),
                             ))
                         }
                         // Definitive range.
                         _ => {
                             self.coalesce();
+
+                            let (lower, upper) = match field {
+                                Field::Facet(_) => (lower.clone().into(), upper.clone().into()),
+                                _ => (
+                                    ComparisonValue::String(lower.to_string()).into(),
+                                    ComparisonValue::String(upper.to_string()).into(),
+                                ),
+                            };
+
                             make_container_group(make_op(
                                 make_node(make_op(
                                     make_node(query.clone()),
@@ -185,7 +206,7 @@ impl Builder {
                                     } else {
                                         ast::Opcode::Gt
                                     },
-                                    make_node(ast::Expr::Literal(make_node(lower.clone().into()))),
+                                    make_node(ast::Expr::Literal(make_node(lower))),
                                 )),
                                 ast::Opcode::And,
                                 make_node(make_op(
@@ -195,7 +216,7 @@ impl Builder {
                                     } else {
                                         ast::Opcode::Lt
                                     },
-                                    make_node(ast::Expr::Literal(make_node(upper.clone().into()))),
+                                    make_node(ast::Expr::Literal(make_node(upper))),
                                 )),
                             ))
                         }
@@ -368,23 +389,23 @@ mod tests {
         // Special case for tags (negate w/-).
         ("-tags:a", r#"!includes(.tags, "a") ?? false"#),
         // Range - numeric, inclusive.
-        ("[1 TO 10]", "((.message >= 1 && .message <= 10) || ((.custom.error.message >= 1 && .custom.error.message <= 10) || ((.custom.error.stack >= 1 && .custom.error.stack <= 10) || ((.custom.title >= 1 && .custom.title <= 10) || (._default_ >= 1 && ._default_ <= 10))))) ?? false"),
+        ("[1 TO 10]", r#"((.message >= "1" && .message <= "10") || ((.custom.error.message >= "1" && .custom.error.message <= "10") || ((.custom.error.stack >= "1" && .custom.error.stack <= "10") || ((.custom.title >= "1" && .custom.title <= "10") || (._default_ >= "1" && ._default_ <= "10"))))) ?? false"#),
         // Range - numeric, inclusive (negate).
-        ("NOT [1 TO 10]", "!((.message >= 1 && .message <= 10) || ((.custom.error.message >= 1 && .custom.error.message <= 10) || ((.custom.error.stack >= 1 && .custom.error.stack <= 10) || ((.custom.title >= 1 && .custom.title <= 10) || (._default_ >= 1 && ._default_ <= 10))))) ?? false"),
+        ("NOT [1 TO 10]", r#"!((.message >= "1" && .message <= "10") || ((.custom.error.message >= "1" && .custom.error.message <= "10") || ((.custom.error.stack >= "1" && .custom.error.stack <= "10") || ((.custom.title >= "1" && .custom.title <= "10") || (._default_ >= "1" && ._default_ <= "10"))))) ?? false"#),
         // Range - numeric, inclusive (negate w/-).
-        ("-[1 TO 10]", "!((.message >= 1 && .message <= 10) || ((.custom.error.message >= 1 && .custom.error.message <= 10) || ((.custom.error.stack >= 1 && .custom.error.stack <= 10) || ((.custom.title >= 1 && .custom.title <= 10) || (._default_ >= 1 && ._default_ <= 10))))) ?? false"),
+        ("-[1 TO 10]", r#"!((.message >= "1" && .message <= "10") || ((.custom.error.message >= "1" && .custom.error.message <= "10") || ((.custom.error.stack >= "1" && .custom.error.stack <= "10") || ((.custom.title >= "1" && .custom.title <= "10") || (._default_ >= "1" && ._default_ <= "10"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (upper).
-        ("[50 TO *]", "((.message >= 50) || ((.custom.error.message >= 50) || ((.custom.error.stack >= 50) || ((.custom.title >= 50) || (._default_ >= 50))))) ?? false"),
+        ("[50 TO *]", r#"((.message >= "50") || ((.custom.error.message >= "50") || ((.custom.error.stack >= "50") || ((.custom.title >= "50") || (._default_ >= "50"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (upper) (negate).
-        ("NOT [50 TO *]", "!((.message >= 50) || ((.custom.error.message >= 50) || ((.custom.error.stack >= 50) || ((.custom.title >= 50) || (._default_ >= 50))))) ?? false"),
+        ("NOT [50 TO *]", r#"!((.message >= "50") || ((.custom.error.message >= "50") || ((.custom.error.stack >= "50") || ((.custom.title >= "50") || (._default_ >= "50"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (upper) (negate w/-).
-        ("-[50 TO *]", "!((.message >= 50) || ((.custom.error.message >= 50) || ((.custom.error.stack >= 50) || ((.custom.title >= 50) || (._default_ >= 50))))) ?? false"),
+        ("-[50 TO *]", r#"!((.message >= "50") || ((.custom.error.message >= "50") || ((.custom.error.stack >= "50") || ((.custom.title >= "50") || (._default_ >= "50"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (lower).
-        ("[* TO 50]", "((.message <= 50) || ((.custom.error.message <= 50) || ((.custom.error.stack <= 50) || ((.custom.title <= 50) || (._default_ <= 50))))) ?? false"),
+        ("[* TO 50]", r#"((.message <= "50") || ((.custom.error.message <= "50") || ((.custom.error.stack <= "50") || ((.custom.title <= "50") || (._default_ <= "50"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (lower) (negate).
-        ("NOT [* TO 50]", "!((.message <= 50) || ((.custom.error.message <= 50) || ((.custom.error.stack <= 50) || ((.custom.title <= 50) || (._default_ <= 50))))) ?? false"),
+        ("NOT [* TO 50]", r#"!((.message <= "50") || ((.custom.error.message <= "50") || ((.custom.error.stack <= "50") || ((.custom.title <= "50") || (._default_ <= "50"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (lower) (negate w/-).
-        ("-[* TO 50]", "!((.message <= 50) || ((.custom.error.message <= 50) || ((.custom.error.stack <= 50) || ((.custom.title <= 50) || (._default_ <= 50))))) ?? false"),
+        ("-[* TO 50]", r#"!((.message <= "50") || ((.custom.error.message <= "50") || ((.custom.error.stack <= "50") || ((.custom.title <= "50") || (._default_ <= "50"))))) ?? false"#),
         // Range - numeric, inclusive, unbounded (both).
         ("[* TO *]", "(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
         // Range - numeric, inclusive, unbounded (both) (negate).
@@ -392,23 +413,23 @@ mod tests {
         // Range - numeric, inclusive, unbounded (both) (negate w/-).
         ("-[* TO *]", "!(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
         // Range - numeric, inclusive, tag.
-        ("a:[1 TO 10]", "(.__datadog_tags.a >= 1 && .__datadog_tags.a <= 10) ?? false"),
+        ("a:[1 TO 10]", r#"(.__datadog_tags.a >= "1" && .__datadog_tags.a <= "10") ?? false"#),
         // Range - numeric, inclusive, tag (negate).
-        ("NOT a:[1 TO 10]", "!(.__datadog_tags.a >= 1 && .__datadog_tags.a <= 10) ?? false"),
+        ("NOT a:[1 TO 10]", r#"!(.__datadog_tags.a >= "1" && .__datadog_tags.a <= "10") ?? false"#),
         // Range - numeric, inclusive, tag (negate w/-).
-        ("-a:[1 TO 10]", "!(.__datadog_tags.a >= 1 && .__datadog_tags.a <= 10) ?? false"),
+        ("-a:[1 TO 10]", r#"!(.__datadog_tags.a >= "1" && .__datadog_tags.a <= "10") ?? false"#),
         // Range - numeric, inclusive, unbounded (upper), tag.
-        ("a:[50 TO *]", "(.__datadog_tags.a >= 50) ?? false"),
+        ("a:[50 TO *]", r#"(.__datadog_tags.a >= "50") ?? false"#),
         // Range - numeric, inclusive, unbounded (upper), tag (negate).
-        ("NOT a:[50 TO *]", "!(.__datadog_tags.a >= 50) ?? false"),
+        ("NOT a:[50 TO *]", r#"!(.__datadog_tags.a >= "50") ?? false"#),
         // Range - numeric, inclusive, unbounded (upper), tag (negate w/-).
-        ("-a:[50 TO *]", "!(.__datadog_tags.a >= 50) ?? false"),
+        ("-a:[50 TO *]", r#"!(.__datadog_tags.a >= "50") ?? false"#),
         // Range - numeric, inclusive, unbounded (lower), tag.
-        ("a:[* TO 50]", "(.__datadog_tags.a <= 50) ?? false"),
+        ("a:[* TO 50]", r#"(.__datadog_tags.a <= "50") ?? false"#),
         // Range - numeric, inclusive, unbounded (lower), tag (negate).
-        ("NOT a:[* TO 50]", "!(.__datadog_tags.a <= 50) ?? false"),
+        ("NOT a:[* TO 50]", r#"!(.__datadog_tags.a <= "50") ?? false"#),
         // Range - numeric, inclusive, unbounded (lower), tag (negate w/-).
-        ("-a:[* TO 50]", "!(.__datadog_tags.a <= 50) ?? false"),
+        ("-a:[* TO 50]", r#"!(.__datadog_tags.a <= "50") ?? false"#),
         // Range - numeric, inclusive, unbounded (both), tag.
         ("a:[* TO *]", "exists(.__datadog_tags.a)"),
         // Range - numeric, inclusive, unbounded (both), tag (negate).
@@ -439,6 +460,18 @@ mod tests {
         ("NOT @b:[* TO *]", "!exists(.custom.b)"),
         // Range - numeric, inclusive, unbounded (both), facet (negate w/-).
         ("-@b:[* TO *]", "!exists(.custom.b)"),
+        // Range - tag, exclusive
+        ("f:{1 TO 10}", r#"(.__datadog_tags.f > "1" && .__datadog_tags.f < "10") ?? false"#),
+        // Range - facet, exclusive
+        ("@f:{1 TO 10}", "(.custom.f > 1 && .custom.f < 10) ?? false"),
+        // Range - alpha, inclusive
+        (r#"g:[a TO z]"#, r#"(.__datadog_tags.g >= "a" && .__datadog_tags.g <= "z") ?? false"#),
+        // Range - alpha, exclusive
+        (r#"g:{a TO z}"#, r#"(.__datadog_tags.g > "a" && .__datadog_tags.g < "z") ?? false"#),
+        // Range - alpha, inclusive (quoted)
+        (r#"g:["a" TO "z"]"#, r#"(.__datadog_tags.g >= "a" && .__datadog_tags.g <= "z") ?? false"#),
+        // Range - alpha, exclusive (quoted)
+        (r#"g:{"a" TO "z"}"#, r#"(.__datadog_tags.g > "a" && .__datadog_tags.g < "z") ?? false"#),
         // AND match, known tags.
         (
             "message:this AND @title:that",
@@ -484,20 +517,10 @@ mod tests {
             "this OR (that AND the_other)",
             r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) || ((match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))) && (match(.message, r'\bthe_other\b') || (match(.custom.error.message, r'\bthe_other\b') || (match(.custom.error.stack, r'\bthe_other\b') || (match(.custom.title, r'\bthe_other\b') || match(._default_, r'\bthe_other\b'))))))) ?? false"#,
         ),
-        // Range - numeric, exclusive
-        ("f:{1 TO 10}", "(.__datadog_tags.f > 1 && .__datadog_tags.f < 10) ?? false"),
-        // Range - alpha, inclusive
-        (r#"g:[a TO z]"#, r#"(.__datadog_tags.g >= "a" && .__datadog_tags.g <= "z") ?? false"#),
-        // Range - alpha, exclusive
-        (r#"g:{a TO z}"#, r#"(.__datadog_tags.g > "a" && .__datadog_tags.g < "z") ?? false"#),
-        // Range - alpha, inclusive (quoted)
-        (r#"g:["a" TO "z"]"#, r#"(.__datadog_tags.g >= "a" && .__datadog_tags.g <= "z") ?? false"#),
-        // Range - alpha, exclusive (quoted)
-        (r#"g:{"a" TO "z"}"#, r#"(.__datadog_tags.g > "a" && .__datadog_tags.g < "z") ?? false"#),
         // A bit of everything.
         (
-            "host:this OR ((@b:test* AND c:that) AND d:the_other e:[1 TO 5])",
-            r#"(.host == "this" || ((starts_with(.custom.b, "test") && .__datadog_tags.c == "that") && (.__datadog_tags.d == "the_other" && (.__datadog_tags.e >= 1 && .__datadog_tags.e <= 5)))) ?? false"#,
+            "host:this OR ((@b:test* AND c:that) AND d:the_other @e:[1 TO 5])",
+            r#"(.host == "this" || ((starts_with(.custom.b, "test") && .__datadog_tags.c == "that") && (.__datadog_tags.d == "the_other" && (.custom.e >= 1 && .custom.e <= 5)))) ?? false"#,
         ),
     ];
 

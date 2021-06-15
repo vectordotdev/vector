@@ -1,5 +1,7 @@
 use crate::grammar::DEFAULT_FIELD;
 
+use regex::Regex;
+
 /// This enum represents value comparisons that Queries might perform
 #[derive(Debug, Copy, Clone)]
 pub enum Comparison {
@@ -32,7 +34,19 @@ impl Comparison {
 pub enum ComparisonValue {
     Unbounded,
     String(String),
-    Numeric(f64),
+    Integer(i64),
+    Float(f64),
+}
+
+impl std::fmt::Display for ComparisonValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String(s) => write!(f, "{}", s),
+            Self::Integer(num) => write!(f, "{}", num),
+            Self::Float(num) => write!(f, "{}", num),
+            Self::Unbounded => write!(f, "*"),
+        }
+    }
 }
 
 impl ComparisonValue {
@@ -40,8 +54,25 @@ impl ComparisonValue {
     pub fn to_lucene(&self) -> String {
         match self {
             Self::String(s) => QueryNode::lucene_escape(s),
-            Self::Numeric(num) => num.to_string(),
+            Self::Integer(num) => num.to_string(),
+            Self::Float(num) => num.to_string(),
             Self::Unbounded => "*".to_string(),
+        }
+    }
+}
+
+impl<T: AsRef<str>> From<T> for ComparisonValue {
+    fn from(s: T) -> Self {
+        let v = escape_quotes(s.as_ref());
+
+        if v == "*" {
+            ComparisonValue::Unbounded
+        } else if let Ok(v) = v.parse::<i64>() {
+            ComparisonValue::Integer(v)
+        } else if let Ok(v) = v.parse::<f64>() {
+            ComparisonValue::Float(v)
+        } else {
+            ComparisonValue::String(v)
         }
     }
 }
@@ -324,4 +355,13 @@ pub enum LuceneOccur {
 pub struct LuceneClause {
     pub occur: LuceneOccur,
     pub node: QueryNode,
+}
+
+/// Escapes surrounding `"` quotes when distinguishing between quoted terms isn't needed.
+fn escape_quotes<T: AsRef<str>>(value: T) -> String {
+    lazy_static::lazy_static! {
+        static ref RE: Regex = Regex::new("^\"(.+)\"$").unwrap();
+    }
+
+    RE.replace_all(value.as_ref(), "$1").to_string()
 }

@@ -2,9 +2,7 @@ use super::{
     field::{normalize_fields, Field},
     node::{BooleanType, Comparison, ComparisonValue},
 };
-use lazy_static::lazy_static;
 use ordered_float::NotNan;
-use regex::Regex;
 use vrl_parser::{
     ast::{self, Opcode},
     Span,
@@ -33,12 +31,9 @@ impl From<&Comparison> for ast::Opcode {
 impl From<ComparisonValue> for ast::Literal {
     fn from(cv: ComparisonValue) -> Self {
         match cv {
-            ComparisonValue::String(value) => value
-                .parse::<i64>()
-                .map(ast::Literal::Integer)
-                .unwrap_or_else(|_| ast::Literal::String(escape_quotes(value))),
-
-            ComparisonValue::Numeric(value) => {
+            ComparisonValue::String(value) => ast::Literal::String(value),
+            ComparisonValue::Integer(value) => ast::Literal::Integer(value),
+            ComparisonValue::Float(value) => {
                 ast::Literal::Float(NotNan::new(value).expect("should be a float"))
             }
             ComparisonValue::Unbounded => panic!("unbounded values have no equivalent literal"),
@@ -193,13 +188,4 @@ pub fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
         Opcode::Err,
         make_node(ast::Expr::Literal(make_node(ast::Literal::Boolean(false)))),
     )
-}
-
-/// Escapes surrounding `"` quotes when distinguishing between quoted terms isn't needed.
-pub fn escape_quotes<T: AsRef<str>>(value: T) -> String {
-    lazy_static! {
-        static ref RE: Regex = Regex::new("^\"(.+)\"$").unwrap();
-    }
-
-    RE.replace_all(value.as_ref(), "$1").to_string()
 }
