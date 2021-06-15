@@ -620,7 +620,10 @@ mod integration_tests {
         assert_eq!(expected, blob_lines);
     }
 
+    #[ignore]
     #[tokio::test]
+    // This test will fail with Azurite blob emulator because of this issue:
+    // https://github.com/Azure/Azurite/issues/629
     async fn azure_blob_insert_lines_into_blob_gzip() {
         let blob_prefix = String::from("lines-gzip/into/blob");
         let config = AzureBlobSinkConfig::new_emulator().await;
@@ -645,7 +648,10 @@ mod integration_tests {
         assert_eq!(lines, blob_lines);
     }
 
+    #[ignore]
     #[tokio::test]
+    // This test will fail with Azurite blob emulator because of this issue:
+    // https://github.com/Azure/Azurite/issues/629
     async fn azure_blob_insert_json_into_blob_gzip() {
         let blob_prefix = String::from("json-gzip/into/blob");
         let config = AzureBlobSinkConfig::new_emulator().await;
