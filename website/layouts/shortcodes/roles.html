@@ -1,4 +1,4 @@
-{{ $roles := site.Data.docs.installation.roles }}
+{{ $roles := site.Data.docs.administration.roles }}
 {{ range $k, $v := $roles }}
 {{ partial "heading.html" (dict "text" $v.title "level" 2) }}
 

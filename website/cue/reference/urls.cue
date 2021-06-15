@@ -444,6 +444,7 @@ urls: {
 	uuidv4:                                                   "\(wikipedia)/wiki/Universally_unique_identifier#Version_4_(random)"
 	url:                                                      "\(wikipedia)/wiki/URL"
 	us_social_security_number:                                "https://www.ssa.gov/history/ssn/geocard.html"
+	vector_agent_role:                                        "/docs/setup/deployment/roles/#agent"
 	vector_aggregator_role:                                   "/docs/setup/deployment/roles/#aggregator"
 	vector_blog:                                              "/blog/"
 	vector_bug_issues:                                        "\(vector_repo)/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22"
