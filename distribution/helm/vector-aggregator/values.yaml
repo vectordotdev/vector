@@ -401,7 +401,7 @@ haproxy:
 
     frontend stats
       mode http
-      bind *:1024
+      bind :::1024
       http-request use-service prometheus-exporter if { path /metrics }
     {{ include "haproxy.vectorConfig" . }}
 

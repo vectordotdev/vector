@@ -46,7 +46,7 @@ Helper to create HAProxy server-templates to discover Vector endpoints
 {{- $values := .Values -}}
 {{- if $values.vectorSource.enabled }}
 frontend vector
-  bind *:{{ $values.vectorSource.listenPort }} proto h2
+  bind :::{{ $values.vectorSource.listenPort }} proto h2
   mode http
   option httplog
   default_backend vector
@@ -59,7 +59,7 @@ backend vector
 {{- end }}
 {{ range $item := $values.service.ports }}
 frontend {{ $item.name }}
-  bind *:{{ $item.port }}
+  bind :::{{ $item.port }}
   option httplog
   default_backend {{ $item.name }}
 
