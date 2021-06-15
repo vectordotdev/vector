@@ -3,7 +3,8 @@ use super::{
     node::{ComparisonValue, QueryNode},
     vrl::{
         coalesce, make_bool, make_container_group, make_function_call, make_node, make_not,
-        make_op, make_queries, make_regex, make_string_comparison, recurse, recurse_op,
+        make_op, make_queries, make_regex, make_string, make_string_comparison, recurse,
+        recurse_op,
     },
 };
 
@@ -73,6 +74,11 @@ impl Builder {
                     Field::Default(_) => {
                         self.coalesce();
                         make_function_call("match", vec![query, make_regex(&value)])
+                    }
+                    // Special case for tags, which should be an array.
+                    Field::Reserved(f) if f == "tags" => {
+                        self.coalesce();
+                        make_function_call("includes", vec![query, make_string(value)])
                     }
                     _ => make_string_comparison(query, ast::Opcode::Eq, &value),
                 })
@@ -332,6 +338,12 @@ mod tests {
         ("NOT @c:*b*la*", r#"!match(.custom.c, r'\b.*b.*la.*\b') ?? false"#),
         // Multiple wildcards - facet (negate w/-).
         ("-@c:*b*la*", r#"!match(.custom.c, r'\b.*b.*la.*\b') ?? false"#),
+        // Special case for tags.
+        ("tags:a", r#"includes(.tags, "a") ?? false"#),
+        // Special case for tags (negate).
+        ("NOT tags:a", r#"!includes(.tags, "a") ?? false"#),
+        // Special case for tags (negate w/-).
+        ("-tags:a", r#"!includes(.tags, "a") ?? false"#),
         // Range - numeric, inclusive.
         ("[1 TO 10]", "((.message >= 1 && .message <= 10) || ((.custom.error.message >= 1 && .custom.error.message <= 10) || ((.custom.error.stack >= 1 && .custom.error.stack <= 10) || ((.custom.title >= 1 && .custom.title <= 10) || (._default_ >= 1 && ._default_ <= 10))))) ?? false"),
         // Range - numeric, inclusive (negate).

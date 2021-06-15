@@ -105,6 +105,11 @@ pub fn make_string_comparison<T: AsRef<str>>(expr: ast::Expr, op: Opcode, value:
     )
 }
 
+/// Makes a string literal.
+pub fn make_string<T: AsRef<str>>(value: T) -> ast::Expr {
+    ast::Expr::Literal(make_node(ast::Literal::String(value.as_ref().to_owned())))
+}
+
 /// Makes a boolean literal.
 pub fn make_bool(value: bool) -> ast::Expr {
     ast::Expr::Literal(make_node(ast::Literal::Boolean(value)))
