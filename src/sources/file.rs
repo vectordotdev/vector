@@ -840,7 +840,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_file_key() {
+    async fn file_file_key_acknowledged() {
+        file_file_key(Acks).await
+    }
+
+    #[tokio::test]
+    async fn file_file_key_nonacknowledged() {
+        file_file_key(NoAcks).await
+    }
+
+    async fn file_file_key(acks: AckingMode) {
         // Default
         {
             let dir = tempdir().unwrap();
@@ -850,7 +859,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, Acks, async {
+            let received = run_file_source(&config, true, acks, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -878,7 +887,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, Acks, async {
+            let received = run_file_source(&config, true, acks, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -906,7 +915,7 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, Acks, async {
+            let received = run_file_source(&config, true, acks, async {
                 let mut file = File::create(&path).unwrap();
 
                 sleep_500_millis().await;
@@ -1583,34 +1592,29 @@ mod tests {
         acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
-        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-
-        let wrapper = |tx: Pipeline| async move {
-            tokio::spawn(file::file_source(
-                &config,
-                config.data_dir.clone().unwrap(),
-                shutdown,
-                tx,
-                !matches!(acking_mode, NoAcks),
-            ));
-
-            inner.await;
-
-            drop(trigger_shutdown);
-            if wait_shutdown {
-                shutdown_done.await;
-            }
-        };
-
-        if acking_mode == Acks {
+        let (tx, rx) = if acking_mode == Acks {
             let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
-            wrapper(tx).await;
-            wait_with_timeout(rx.collect::<Vec<_>>()).await
+            (tx, rx.boxed())
         } else {
             let (tx, rx) = Pipeline::new_test();
-            wrapper(tx).await;
-            wait_with_timeout(rx.collect::<Vec<_>>()).await
+            (tx, rx.boxed())
+        };
+
+        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+        let data_dir = config.data_dir.clone().unwrap();
+        let acks = !matches!(acking_mode, NoAcks);
+
+        tokio::spawn(file::file_source(&config, data_dir, shutdown, tx, acks));
+
+        inner.await;
+
+        drop(trigger_shutdown);
+
+        let result = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+        if wait_shutdown {
+            shutdown_done.await;
         }
+        result
     }
 
     fn extract_messages_string(received: Vec<Event>) -> Vec<String> {
