@@ -1,7 +1,5 @@
 mod util;
 
-#[cfg(feature = "add_datadog_tags")]
-mod add_datadog_tags;
 #[cfg(feature = "append")]
 mod append;
 #[cfg(feature = "array")]
@@ -162,8 +160,6 @@ mod parse_url;
 mod push;
 #[cfg(feature = "redact")]
 mod redact;
-#[cfg(feature = "remove_datadog_tags")]
-mod remove_datadog_tags;
 #[cfg(feature = "replace")]
 mod replace;
 #[cfg(feature = "round")]
@@ -225,8 +221,6 @@ pub use crate::array::Array;
 pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
-#[cfg(feature = "add_datadog_tags")]
-pub use add_datadog_tags::AddDatadogTags;
 #[cfg(feature = "append")]
 pub use append::Append;
 #[cfg(feature = "assert")]
@@ -377,8 +371,6 @@ pub use push::Push;
 pub use r#match::Match;
 #[cfg(feature = "redact")]
 pub use redact::Redact;
-#[cfg(feature = "remove_datadog_tags")]
-pub use remove_datadog_tags::RemoveDatadogTags;
 #[cfg(feature = "replace")]
 pub use replace::Replace;
 #[cfg(feature = "round")]
@@ -432,8 +424,6 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
-        #[cfg(feature = "add_datadog_tags")]
-        Box::new(AddDatadogTags),
         #[cfg(feature = "array")]
         Box::new(Array),
         #[cfg(feature = "append")]
@@ -596,8 +586,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(MatchArray),
         #[cfg(feature = "redact")]
         Box::new(Redact),
-        #[cfg(feature = "remove_datadog_tags")]
-        Box::new(RemoveDatadogTags),
         #[cfg(feature = "replace")]
         Box::new(Replace),
         #[cfg(feature = "round")]

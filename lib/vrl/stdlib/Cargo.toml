@@ -41,7 +41,6 @@ criterion = "0.3"
 
 [features]
 default = [
-    "add_datadog_tags",
     "append",
     "array",
     "assert",
@@ -118,7 +117,6 @@ default = [
     "parse_url",
     "push",
     "redact",
-    "remove_datadog_tags",
     "replace",
     "round",
     "sha1",
@@ -147,7 +145,6 @@ default = [
     "uuid_v4",
 ]
 
-add_datadog_tags = []
 append = []
 array = []
 assert = []
@@ -224,7 +221,6 @@ parse_tokens = ["shared/tokenize"]
 parse_url = ["url"]
 push = []
 redact = []
-remove_datadog_tags = []
 replace = []
 round = []
 sha1 = ["sha-1", "hex"]
