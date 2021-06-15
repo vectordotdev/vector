@@ -596,6 +596,30 @@ You can run these tests within a PR as described in the [CI section](#ci).
 
 #### Tips and Tricks
 
+##### Faster Builds With `sccache`
+
+Vector is a large project with a plethora of dependencies.  Changing to a different branch, or
+running `cargo clean`, can sometimes necessitate rebuilding many of those dependencies, which has an
+impact on productivity.  One way to reduce some of this cycle time is to use `sccache`, which caches
+compilation assets to avoid recompiling them over and over.
+
+`sccache` works by being configured to sit in front of `rustc`, taking compilation requests from
+Cargo and checking the cache to see if it already has the cached compilation unit.  It handles
+making sure that different compiler flags, versions of Rust, etc, are taken into consideration
+before using a cached asset.
+
+In order to use `sccache`, you must first [install](https://github.com/mozilla/sccache#installation)
+it.  There are pre-built binaries for all major platforms to get you going quickly. The
+[usage](https://github.com/mozilla/sccache#usage) documentation also explains how to set up your
+environment to actually use it.  We recommend using the `.cargo/config` approach as this can help
+speed up all of your Rust development work, and not just developing on Vector.
+
+While `sccache` was originally designed to cache compilation assets in cloud storage, maximizing
+reusability amongst CI workers, `sccache` actually supports storing assets locally by default.
+Local mode works well for local development as it is much easier to delete the cache directory if
+you ever encounter issues with the cached assets.  It also involves no extra infrastructure or
+spending.
+
 ##### Testing Specific Components
 
 If you are developing a particular component and want to quickly iterate on unit
