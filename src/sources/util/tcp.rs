@@ -1,7 +1,7 @@
 use crate::{
     config::Resource,
     event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
+    internal_events::{ConnectionOpen, OpenGauge, TcpSendAckError, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
@@ -260,8 +260,8 @@ async fn handle_stream<T>(
                             match out.send(event).await {
                                 Ok(_) => {
                                     let stream = reader.get_mut().get_mut();
-                                    if let Err(err) = stream.write_all(&ack).await {
-                                        warn!("Failed to write ack: {}", err); // TODO internal event?
+                                    if let Err(error) = stream.write_all(&ack).await {
+                                        emit!(TcpSendAckError{ error });
                                         break;
                                     }
                                 }
