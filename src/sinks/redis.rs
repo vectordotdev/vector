@@ -7,7 +7,8 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{RetryAction, RetryLogic},
         sink::Response,
-        BatchSink, EncodedEvent, EncodedLength, ServiceBuilderExt, TowerRequestConfig, VecBuffer,
+        BatchSink, Concurrency, EncodedEvent, EncodedLength, ServiceBuilderExt, TowerRequestConfig,
+        VecBuffer,
     },
     template::{Template, TemplateParseError},
 };
@@ -63,8 +64,8 @@ pub enum DataType {
 #[serde(rename_all = "lowercase")]
 pub enum Method {
     #[derivative(Default)]
-    LPush,
     RPush,
+    LPush,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
@@ -75,8 +76,9 @@ pub enum Encoding {
 }
 
 lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig<Option<usize>> = TowerRequestConfig {
-        rate_limit_num: Option::from(u64::MAX),
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        concurrency: Concurrency::Fixed(1),
+        rate_limit_num: Some(u64::MAX),
         ..Default::default()
     };
 }
@@ -94,7 +96,7 @@ pub struct RedisSinkConfig {
     #[serde(default)]
     batch: BatchConfig,
     #[serde(default)]
-    request: TowerRequestConfig<Option<usize>>,
+    request: TowerRequestConfig,
 }
 
 impl GenerateConfig for RedisSinkConfig {
@@ -153,7 +155,7 @@ impl RedisSinkConfig {
 
         let data_type = match self.data_type {
             DataTypeConfig::Channel => DataType::Channel,
-            DataTypeConfig::List => DataType::List(method.unwrap()),
+            DataTypeConfig::List => DataType::List(method.unwrap_or_default()),
         };
 
         let batch = BatchSettings::default()

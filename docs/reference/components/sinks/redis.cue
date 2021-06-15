@@ -32,7 +32,7 @@ components: sinks: redis: {
 			}
 			request: {
 				enabled:                    true
-				concurrency:                5
+				concurrency:                1
 				rate_limit_duration_secs:   1
 				rate_limit_num:             65535
 				retry_initial_backoff_secs: 1
@@ -123,7 +123,7 @@ components: sinks: redis: {
 						description: "The method (`lpush` or `rpush`) to publish messages when `data_type` is list."
 						required:    false
 						type: string: {
-							default: "lpush"
+							default: "rpush"
 							enum: {
 								lpush: "Use the `lpush` method to publish messages."
 								rpush: "Use the `rpush` method to publish messages."
