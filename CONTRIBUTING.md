@@ -609,7 +609,7 @@ making sure that different compiler flags, versions of Rust, etc, are taken into
 before using a cached asset.
 
 In order to use `sccache`, you must first [install](https://github.com/mozilla/sccache#installation)
-it first.  There are pre-built binaries for all major platforms to get you going quickly. The
+it.  There are pre-built binaries for all major platforms to get you going quickly. The
 [usage](https://github.com/mozilla/sccache#usage) documentation also explains how to set up your
 environment to actually use it.  We recommend using the `.cargo/config` approach as this can help
 speed up all of your Rust development work, and not just developing on Vector.
