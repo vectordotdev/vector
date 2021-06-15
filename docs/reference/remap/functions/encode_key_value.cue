@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: encode_key_value: {
-	category:    "Codec"
+	category: "Codec"
 	description: #"""
 		Encodes the `value` to in key/value format with customizable delimiters. Default delimiters match
 		the [logfmt](\(urls.logfmt)) format.
@@ -20,7 +20,7 @@ remap: functions: encode_key_value: {
 			required:    false
 			type: ["array"]
 		},
-				{
+		{
 			name:        "key_value_delimiter"
 			description: "The string that separates the key from the value."
 			required:    false
@@ -56,7 +56,7 @@ remap: functions: encode_key_value: {
 			return: #"ts=2021-06-05T17:20:00Z lvl=info msg="This is a message" log_id=12345"#
 		},
 		{
-			title: "Encode with default delimiters  (nested fields)"
+			title: "Encode with default delimiters (nested fields)"
 			source: """
 				encode_key_value!({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
 				"""
