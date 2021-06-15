@@ -325,7 +325,7 @@ mod tests {
     async fn transform() {
         let agg = toml::from_str::<AggregateConfig>(
             r#"
-interval_ms = 10
+interval_ms = 10000
 "#,
         )
         .unwrap()
@@ -350,6 +350,11 @@ interval_ms = 10
 
         let in_stream = Box::pin(stream::iter(inputs));
         let mut out_stream = agg.transform(in_stream);
+
+        tokio::time::pause();
+        // 1s longer than our timeout configured up above
+        tokio::time::advance(Duration::from_secs(11)).await;
+        tokio::time::resume();
 
         let mut count = 0;
         while let Some(event) = out_stream.next().await {
