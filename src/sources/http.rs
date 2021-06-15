@@ -385,7 +385,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body\n\ntest body 2\n".into());
+            assert_eq!(
+                log[log_schema().message_key()],
+                "test body\n\ntest body 2\n".into()
+            );
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
             assert_eq!(log["http_path"], "/".into());
