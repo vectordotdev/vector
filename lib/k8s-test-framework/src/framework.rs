@@ -1,8 +1,9 @@
 //! The test framework main entry point.
 
 use super::{
-    exec_tail, kubernetes_version, log_lookup, namespace, pod, port_forward, test_pod, up_down,
-    vector, wait_for_resource, wait_for_rollout, Interface, PortForwarder, Reader, Result,
+    exec_tail, kubernetes_version, log_lookup, namespace, pod, port_forward, restart_rollout,
+    test_pod, up_down, vector, wait_for_resource, wait_for_rollout, Interface, PortForwarder,
+    Reader, Result,
 };
 
 /// Framework wraps the interface to the system with an easy-to-use rust API
@@ -160,6 +161,17 @@ impl Framework {
         extra: impl IntoIterator<Item = &'a str>,
     ) -> Result<()> {
         wait_for_rollout::run(&self.interface.kubectl_command, namespace, resource, extra).await
+    }
+
+    /// Trigger a restart for a rollout of a `resource`.
+    /// Use `extr
+    pub async fn restart_rollout<'a>(
+        &self,
+        namespace: &str,
+        resources: &str,
+        extra: impl IntoIterator<Item = &'a str>,
+    ) -> Result<()> {
+        restart_rollout::run(&self.interface.kubectl_command, namespace, resources, extra).await
     }
 
     /// Gets the node for a given pod.
