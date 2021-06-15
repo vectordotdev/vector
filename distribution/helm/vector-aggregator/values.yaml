@@ -339,14 +339,6 @@ haproxy:
   ## ref: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/
   terminationGracePeriodSeconds: 60
 
-  ## Container listener port configuration
-  ## ref: https://kubernetes.io/docs/concepts/services-networking/connect-applications-service/
-  containerPorts:
-    vector: 9000
-    datadog-logs: 8080
-    syslog: 514
-    stat: 1024
-
   ## Deployment strategy definition
   ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
   strategy: {}

@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "libvector.fullname" . }}
+  name: {{ include "haproxy.fullname" . }}
   labels:
     {{- include "haproxy.labels" . | nindent 4 }}
 spec:

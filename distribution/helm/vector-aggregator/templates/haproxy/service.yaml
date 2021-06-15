@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "libvector.fullname" . }}-haproxy
+  name: {{ include "haproxy.fullname" . }}
   labels:
     {{- include "haproxy.labels" . | nindent 4 }}
   annotations:
@@ -23,13 +23,10 @@ spec:
   loadBalancerSourceRanges:
   {{- toYaml . | nindent 2 }}
   {{- end }}
-  {{- with .Values.haproxy.containerPorts }}
   ports:
-  {{- range $key, $port := . }}
-  - name: {{ $key }}
+  {{- include "vector-aggregator.servicePorts" . | nindent 2 }}
+  - port: 1024
+    targetPort: 1024
+    name: metrics
     protocol: TCP
-    port: {{ $port }}
-    targetPort: {{ $key }}
-  {{- end }}
-  {{- end }}
 {{- end }}

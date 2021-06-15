@@ -17,7 +17,7 @@ Create the name of the `ServiceAccount` to use.
 */}}
 {{- define "haproxy.serviceAccountName" -}}
 {{- if .Values.haproxy.serviceAccount.create }}
-{{- default (include "libvector.fullname" .) .Values.haproxy.serviceAccount.name }}
+{{- default (include "haproxy.fullname" .) .Values.haproxy.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.haproxy.serviceAccount.name }}
 {{- end }}
