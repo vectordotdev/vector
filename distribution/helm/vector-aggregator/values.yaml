@@ -378,12 +378,14 @@ haproxy:
       log stdout local0
       maxconn 4096
       stats socket /tmp/haproxy
+      hard-stop-after {{ .Values.haproxy.terminationGracePeriodSeconds }}s
 
     defaults
       log     global
       option  dontlognull
       retries 3
       option  redispatch
+      option  allbackups
       timeout client 5s
       timeout server 5s
       timeout connect 5s
@@ -395,7 +397,7 @@ haproxy:
       timeout retry 1s
       accepted_payload_size 8192
       hold valid 10s
-      hold obsolete 60s
+      hold obsolete 15s
 
     frontend stats
       mode http
