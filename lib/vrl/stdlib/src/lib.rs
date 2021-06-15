@@ -28,6 +28,8 @@ mod downcase;
 mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
+#[cfg(feature = "encode_key_value")]
+mod encode_key_value;
 #[cfg(feature = "encode_logfmt")]
 mod encode_logfmt;
 #[cfg(feature = "encode_percent")]
@@ -247,6 +249,8 @@ pub use downcase::Downcase;
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
+#[cfg(feature = "encode_key_value")]
+pub use encode_key_value::EncodeKeyValue;
 #[cfg(feature = "encode_logfmt")]
 pub use encode_logfmt::EncodeLogfmt;
 #[cfg(feature = "encode_percent")]
@@ -452,6 +456,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
+        #[cfg(feature = "encode_key_value")]
+        Box::new(EncodeKeyValue),
         #[cfg(feature = "encode_logfmt")]
         Box::new(EncodeLogfmt),
         #[cfg(feature = "encode_percent")]

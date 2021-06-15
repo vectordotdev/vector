@@ -55,6 +55,7 @@ default = [
     "downcase",
     "encode_base64",
     "encode_json",
+    "encode_key_value",
     "encode_logfmt",
     "encode_percent",
     "ends_with",
@@ -159,8 +160,9 @@ del = []
 downcase = []
 encode_base64 = ["base64"]
 encode_json = ["serde_json"]
-encode_logfmt = []
-encode_percent= ["percent-encoding"]
+encode_key_value = []
+encode_logfmt = ["encode_key_value"]
+encode_percent = ["percent-encoding"]
 ends_with = []
 exists = []
 flatten = []
