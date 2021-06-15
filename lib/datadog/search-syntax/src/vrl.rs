@@ -2,9 +2,7 @@ use super::{
     field::{normalize_fields, Field},
     node::{BooleanType, Comparison, ComparisonValue},
 };
-use lazy_static::lazy_static;
 use ordered_float::NotNan;
-use regex::Regex;
 use vrl_parser::{
     ast::{self, Opcode},
     Span,
@@ -33,12 +31,9 @@ impl From<&Comparison> for ast::Opcode {
 impl From<ComparisonValue> for ast::Literal {
     fn from(cv: ComparisonValue) -> Self {
         match cv {
-            ComparisonValue::String(value) => value
-                .parse::<i64>()
-                .map(ast::Literal::Integer)
-                .unwrap_or_else(|_| ast::Literal::String(escape_quotes(value))),
-
-            ComparisonValue::Numeric(value) => {
+            ComparisonValue::String(value) => ast::Literal::String(value),
+            ComparisonValue::Integer(value) => ast::Literal::Integer(value),
+            ComparisonValue::Float(value) => {
                 ast::Literal::Float(NotNan::new(value).expect("should be a float"))
             }
             ComparisonValue::Unbounded => panic!("unbounded values have no equivalent literal"),
@@ -87,9 +82,17 @@ pub fn make_queries<T: AsRef<str>>(field: T) -> Vec<(Field, ast::Expr)> {
 }
 
 /// Makes a Regex string to be used with the `match` function for word boundary matching.
-pub fn make_regex<T: AsRef<str>>(value: T) -> ast::Expr {
+pub fn make_word_regex<T: AsRef<str>>(value: T) -> ast::Expr {
     ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
         "\\b{}\\b",
+        regex::escape(value.as_ref()).replace("\\*", ".*")
+    ))))
+}
+
+/// Makes a Regex string to be used with the `match` function for arbitrary wildcard matching
+pub fn make_wildcard_regex<T: AsRef<str>>(value: T) -> ast::Expr {
+    ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
+        "^{}$",
         regex::escape(value.as_ref()).replace("\\*", ".*")
     ))))
 }
@@ -103,6 +106,16 @@ pub fn make_string_comparison<T: AsRef<str>>(expr: ast::Expr, op: Opcode, value:
             String::from(value.as_ref()),
         )))),
     )
+}
+
+/// Makes a string literal.
+pub fn make_string<T: AsRef<str>>(value: T) -> ast::Expr {
+    ast::Expr::Literal(make_node(ast::Literal::String(value.as_ref().to_owned())))
+}
+
+/// Makes a boolean literal.
+pub fn make_bool(value: bool) -> ast::Expr {
+    ast::Expr::Literal(make_node(ast::Literal::Boolean(value)))
 }
 
 /// Makes a container group, for wrapping logic for easier negation.
@@ -175,13 +188,4 @@ pub fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
         Opcode::Err,
         make_node(ast::Expr::Literal(make_node(ast::Literal::Boolean(false)))),
     )
-}
-
-/// Escapes surrounding `"` quotes when distinguishing between quoted terms isn't needed.
-pub fn escape_quotes<T: AsRef<str>>(value: T) -> String {
-    lazy_static! {
-        static ref RE: Regex = Regex::new("^\"(.+)\"$").unwrap();
-    }
-
-    RE.replace_all(value.as_ref(), "$1").to_string()
 }

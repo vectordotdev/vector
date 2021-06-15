@@ -270,9 +270,7 @@ impl QueryVisitor {
                                 Rule::PHRASE => {
                                     ComparisonValue::String(Self::visit_phrase(comparison_value))
                                 }
-                                Rule::NUMERIC_TERM => {
-                                    ComparisonValue::Numeric(Self::visit_num_term(comparison_value))
-                                }
+                                Rule::NUMERIC_TERM => comparison_value.as_str().into(),
                                 _ => unreachable!(),
                             };
                             return QueryNode::AttributeComparison {
@@ -309,11 +307,7 @@ impl QueryVisitor {
 
     fn visit_range_value(token: Pair<Rule>) -> Range {
         match token.as_rule() {
-            Rule::RANGE_VALUE => Range::Value(if token.as_str() == "*" {
-                ComparisonValue::Unbounded
-            } else {
-                ComparisonValue::String(unescape(token.as_str()))
-            }),
+            Rule::RANGE_VALUE => Range::Value(token.as_str().into()),
             Rule::LBRACKET => Range::Comparison(Comparison::Gt),
             Rule::LSQRBRACKET => Range::Comparison(Comparison::Gte),
             Rule::RBRACKET => Range::Comparison(Comparison::Lt),
@@ -340,11 +334,6 @@ impl QueryVisitor {
         unescape(&quoted_string[1..quoted_string.len() - 1])
     }
 
-    fn visit_num_term(token: Pair<Rule>) -> f64 {
-        // TODO:  Error handling here should be better
-        unescape(token.as_str()).parse::<f64>().unwrap_or_default()
-    }
-
     fn visit_field(token: Pair<Rule>) -> &str {
         let inner = token.into_inner().next().unwrap();
         if let Rule::TERM = inner.as_rule() {
@@ -358,7 +347,7 @@ impl QueryVisitor {
 /// unescaped string.  At this point we do NOT distinguish between chars
 /// that REQUIRE escaping and those that don't, so we'll preserve anything
 /// with a '\' before it
-fn unescape(input: &str) -> String {
+pub fn unescape(input: &str) -> String {
     // Unescaping will only ever make a string shorter so let's go...
     let mut output = String::with_capacity(input.len());
     let mut escape_sequence = false;

@@ -128,7 +128,7 @@ mod tests {
             let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
-                QueryNode::AttributeComparison { ref attr, value: ComparisonValue::Numeric(ref compvalue), comparator: Comparison::Lt }
+                QueryNode::AttributeComparison { ref attr, value: ComparisonValue::Float(ref compvalue), comparator: Comparison::Lt }
                 if attr == "foo" && (*compvalue - 4.12345E-4).abs() < 0.001),
                 "Unable to properly parse '{:?}' - got {:?}",
                 query,
@@ -306,11 +306,11 @@ mod tests {
                 matches!(res,
                 QueryNode::AttributeRange {
                     ref attr,
-                    lower: ComparisonValue::String(ref lstr),
+                    lower: ComparisonValue::Integer(ref lstr),
                     lower_inclusive: true,
-                    upper: ComparisonValue::String(ref ustr),
+                    upper: ComparisonValue::Integer(ref ustr),
                     upper_inclusive: true
-                } if attr == "foo" && lstr == "10" && ustr == "20"),
+                } if attr == "foo" && *lstr == 10 && *ustr == 20),
                 "Unable to properly parse '{:?}' - got {:?}'",
                 query,
                 res
