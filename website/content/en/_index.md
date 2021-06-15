@@ -90,4 +90,22 @@ methods: [
     url: "/docs/setup/installation/manual"
   }
 ]
+
+# Community section
+community:
+  title: Backed by a strong open source community
+  stats: [
+    {
+      title: "GitHub stars",
+      figure: "6k+"
+    },
+    {
+      title: "Contributors",
+      figure: "146"
+    },
+    {
+      title: "Downloads",
+      figure: "30m+"
+    }
+  ]
 ---

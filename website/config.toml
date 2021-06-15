@@ -63,6 +63,7 @@ discord = "https://chat.vector.dev"
 [[menu.doc_quick_links]]
 name = "Quickstart"
 url = "/docs/setup/quickstart"
+params = { emphasis = true }
 weight = 1
 
 [[menu.doc_quick_links]]
