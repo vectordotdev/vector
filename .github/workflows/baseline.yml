@@ -44,7 +44,7 @@ jobs:
       - run: cargo clean
       - run: cargo build
 
-debug-rebuild:
+  debug-rebuild:
     name: "Debug Rebuild"
     runs-on: [self-hosted, linux, x64, general]
     steps:
