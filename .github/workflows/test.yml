@@ -281,8 +281,6 @@ jobs:
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: cargo install cargo-hack
       - run: make check-component-features
-        env:
-          RUSTFLAGS: "-D warnings"
       - name: Stop sccache
         run: sccache --stop-server
 
