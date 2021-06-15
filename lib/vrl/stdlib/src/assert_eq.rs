@@ -32,18 +32,20 @@ impl Function for AssertEq {
         &[
             Example {
                 title: "success",
-                source: "asserteq!(true, true)",
+                source: "assert_eq!(true, true)",
                 result: Ok("true"),
             },
             Example {
                 title: "failure",
-                source: "asserteq!(true, false)",
-                result: Err(r#"function call error for "assert_eq" at (0:22): assertion failed"#),
+                source: "assert_eq!(true, false)",
+                result: Err(
+                    r#"function call error for "assert_eq" at (0:23): assertion failed: true == false"#,
+                ),
             },
             Example {
                 title: "custom message",
-                source: "asserteq!(true, false, s'custom error')",
-                result: Err(r#"function call error for "assert_eq" at (0:31): custom error"#),
+                source: "assert_eq!(true, false, s'custom error')",
+                result: Err(r#"function call error for "assert_eq" at (0:40): custom error"#),
             },
         ]
     }
