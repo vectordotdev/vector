@@ -13,9 +13,6 @@ apt install --yes \
   apt-utils \
   apt-transport-https
 
-apt-get install --yes grub-efi
-update-grub
-
 apt upgrade --yes
 
 # Deps
