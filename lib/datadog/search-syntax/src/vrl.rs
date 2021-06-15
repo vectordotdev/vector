@@ -87,9 +87,17 @@ pub fn make_queries<T: AsRef<str>>(field: T) -> Vec<(Field, ast::Expr)> {
 }
 
 /// Makes a Regex string to be used with the `match` function for word boundary matching.
-pub fn make_regex<T: AsRef<str>>(value: T) -> ast::Expr {
+pub fn make_word_regex<T: AsRef<str>>(value: T) -> ast::Expr {
     ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
         "\\b{}\\b",
+        regex::escape(value.as_ref()).replace("\\*", ".*")
+    ))))
+}
+
+/// Makes a Regex string to be used with the `match` function for arbitrary wildcard matching
+pub fn make_wildcard_regex<T: AsRef<str>>(value: T) -> ast::Expr {
+    ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
+        "^{}$",
         regex::escape(value.as_ref()).replace("\\*", ".*")
     ))))
 }

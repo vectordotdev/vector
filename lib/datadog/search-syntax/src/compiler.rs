@@ -10,11 +10,13 @@ static TAGS_QUERY: &str = r#".__datadog_tags = parse_key_value(join!(.tags, ",")
 
 lazy_static! {
     static ref FUNCTIONS: Vec<Box<dyn Function>> = vec![
+        Box::new(f::EndsWith),
         Box::new(f::Exists),
         Box::new(f::Includes),
         Box::new(f::Join),
         Box::new(f::Match),
-        Box::new(f::ParseKeyValue)
+        Box::new(f::ParseKeyValue),
+        Box::new(f::StartsWith),
     ];
 }
 

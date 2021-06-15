@@ -3,8 +3,8 @@ use super::{
     node::{ComparisonValue, QueryNode},
     vrl::{
         coalesce, make_bool, make_container_group, make_function_call, make_node, make_not,
-        make_op, make_queries, make_regex, make_string, make_string_comparison, recurse,
-        recurse_op,
+        make_op, make_queries, make_string, make_string_comparison, make_wildcard_regex,
+        make_word_regex, recurse, recurse_op,
     },
 };
 
@@ -73,7 +73,7 @@ impl Builder {
                 .map(|(field, query)| match field {
                     Field::Default(_) => {
                         self.coalesce();
-                        make_function_call("match", vec![query, make_regex(&value)])
+                        make_function_call("match", vec![query, make_word_regex(&value)])
                     }
                     // Special case for tags, which should be an array.
                     Field::Reserved(f) if f == "tags" => {
@@ -97,17 +97,40 @@ impl Builder {
             // Wildcard suffix.
             QueryNode::AttributePrefix { attr, prefix } => make_queries(attr)
                 .into_iter()
-                .map(|(_, query)| {
+                .map(|(field, query)| {
                     self.coalesce();
-                    make_function_call("match", vec![query, make_regex(&format!("{}*", &prefix))])
+                    match field {
+                        Field::Default(_) => make_function_call(
+                            "match",
+                            vec![query, make_word_regex(&format!("{}*", &prefix))],
+                        ),
+                        _ => make_function_call("starts_with", vec![query, make_string(prefix)]),
+                    }
                 })
                 .collect(),
             // Arbitrary wildcard.
             QueryNode::AttributeWildcard { attr, wildcard } => make_queries(attr)
                 .into_iter()
-                .map(|(_, query)| {
+                .map(|(field, query)| {
                     self.coalesce();
-                    make_function_call("match", vec![query, make_regex(&wildcard)])
+
+                    match field {
+                        // Default fields use word boundary matching.
+                        Field::Default(_) => {
+                            make_function_call("match", vec![query, make_word_regex(&wildcard)])
+                        }
+                        // If there's only one `*` and it's at the beginning, `ends_with` is faster.
+                        _ if wildcard.starts_with('*') && wildcard.matches('*').count() == 1 => {
+                            make_function_call(
+                                "ends_with",
+                                vec![query, make_string(wildcard.replace('*', ""))],
+                            )
+                        }
+                        // Otherwise, default to non word boundary matching.
+                        _ => {
+                            make_function_call("match", vec![query, make_wildcard_regex(&wildcard)])
+                        }
+                    }
                 })
                 .collect(),
             // Range.
@@ -303,41 +326,41 @@ mod tests {
         // Multiple wildcards (negate w/-).
         ("-*b*la*", r#"!(match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b'))))) ?? false"#),
         // Wildcard prefix - tag.
-        ("a:*bla", r#"match(.__datadog_tags.a, r'\b.*bla\b') ?? false"#),
+        ("a:*bla", r#"ends_with(.__datadog_tags.a, "bla") ?? false"#),
         // Wildcard prefix - tag (negate).
-        ("NOT a:*bla", r#"!match(.__datadog_tags.a, r'\b.*bla\b') ?? false"#),
+        ("NOT a:*bla", r#"!ends_with(.__datadog_tags.a, "bla") ?? false"#),
         // Wildcard prefix - tag (negate w/-).
-        ("-a:*bla", r#"!match(.__datadog_tags.a, r'\b.*bla\b') ?? false"#),
+        ("-a:*bla", r#"!ends_with(.__datadog_tags.a, "bla") ?? false"#),
         // Wildcard suffix - tag.
-        ("b:bla*", r#"match(.__datadog_tags.b, r'\bbla.*\b') ?? false"#),
+        ("b:bla*", r#"starts_with(.__datadog_tags.b, "bla") ?? false"#),
         // Wildcard suffix - tag (negate).
-        ("NOT b:bla*", r#"!match(.__datadog_tags.b, r'\bbla.*\b') ?? false"#),
+        ("NOT b:bla*", r#"!starts_with(.__datadog_tags.b, "bla") ?? false"#),
         // Wildcard suffix - tag (negate w/-).
-        ("-b:bla*", r#"!match(.__datadog_tags.b, r'\bbla.*\b') ?? false"#),
+        ("-b:bla*", r#"!starts_with(.__datadog_tags.b, "bla") ?? false"#),
         // Multiple wildcards - tag.
-        ("c:*b*la*", r#"match(.__datadog_tags.c, r'\b.*b.*la.*\b') ?? false"#),
+        ("c:*b*la*", r#"match(.__datadog_tags.c, r'^.*b.*la.*$') ?? false"#),
         // Multiple wildcards - tag (negate).
-        ("NOT c:*b*la*", r#"!match(.__datadog_tags.c, r'\b.*b.*la.*\b') ?? false"#),
+        ("NOT c:*b*la*", r#"!match(.__datadog_tags.c, r'^.*b.*la.*$') ?? false"#),
         // Multiple wildcards - tag (negate w/-).
-        ("-c:*b*la*", r#"!match(.__datadog_tags.c, r'\b.*b.*la.*\b') ?? false"#),
+        ("-c:*b*la*", r#"!match(.__datadog_tags.c, r'^.*b.*la.*$') ?? false"#),
         // Wildcard prefix - facet.
-        ("@a:*bla", r#"match(.custom.a, r'\b.*bla\b') ?? false"#),
+        ("@a:*bla", r#"ends_with(.custom.a, "bla") ?? false"#),
         // Wildcard prefix - facet (negate).
-        ("NOT @a:*bla", r#"!match(.custom.a, r'\b.*bla\b') ?? false"#),
+        ("NOT @a:*bla", r#"!ends_with(.custom.a, "bla") ?? false"#),
         // Wildcard prefix - facet (negate w/-).
-        ("-@a:*bla", r#"!match(.custom.a, r'\b.*bla\b') ?? false"#),
+        ("-@a:*bla", r#"!ends_with(.custom.a, "bla") ?? false"#),
         // Wildcard suffix - facet.
-        ("@b:bla*", r#"match(.custom.b, r'\bbla.*\b') ?? false"#),
+        ("@b:bla*", r#"starts_with(.custom.b, "bla") ?? false"#),
         // Wildcard suffix - facet (negate).
-        ("NOT @b:bla*", r#"!match(.custom.b, r'\bbla.*\b') ?? false"#),
+        ("NOT @b:bla*", r#"!starts_with(.custom.b, "bla") ?? false"#),
         // Wildcard suffix - facet (negate w/-).
-        ("-@b:bla*", r#"!match(.custom.b, r'\bbla.*\b') ?? false"#),
+        ("-@b:bla*", r#"!starts_with(.custom.b, "bla") ?? false"#),
         // Multiple wildcards - facet.
-        ("@c:*b*la*", r#"match(.custom.c, r'\b.*b.*la.*\b') ?? false"#),
+        ("@c:*b*la*", r#"match(.custom.c, r'^.*b.*la.*$') ?? false"#),
         // Multiple wildcards - facet (negate).
-        ("NOT @c:*b*la*", r#"!match(.custom.c, r'\b.*b.*la.*\b') ?? false"#),
+        ("NOT @c:*b*la*", r#"!match(.custom.c, r'^.*b.*la.*$') ?? false"#),
         // Multiple wildcards - facet (negate w/-).
-        ("-@c:*b*la*", r#"!match(.custom.c, r'\b.*b.*la.*\b') ?? false"#),
+        ("-@c:*b*la*", r#"!match(.custom.c, r'^.*b.*la.*$') ?? false"#),
         // Special case for tags.
         ("tags:a", r#"includes(.tags, "a") ?? false"#),
         // Special case for tags (negate).
@@ -474,7 +497,7 @@ mod tests {
         // A bit of everything.
         (
             "host:this OR ((@b:test* AND c:that) AND d:the_other e:[1 TO 5])",
-            r#"(.host == "this" || ((match(.custom.b, r'\btest.*\b') && .__datadog_tags.c == "that") && (.__datadog_tags.d == "the_other" && (.__datadog_tags.e >= 1 && .__datadog_tags.e <= 5)))) ?? false"#,
+            r#"(.host == "this" || ((starts_with(.custom.b, "test") && .__datadog_tags.c == "that") && (.__datadog_tags.d == "the_other" && (.__datadog_tags.e >= 1 && .__datadog_tags.e <= 5)))) ?? false"#,
         ),
     ];
 
