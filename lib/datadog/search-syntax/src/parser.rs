@@ -304,11 +304,11 @@ mod tests {
                 matches!(res,
                 QueryNode::AttributeRange {
                     ref attr,
-                    lower: ComparisonValue::String(ref lstr),
+                    lower: ComparisonValue::Integer(ref lstr),
                     lower_inclusive: true,
-                    upper: ComparisonValue::String(ref ustr),
+                    upper: ComparisonValue::Integer(ref ustr),
                     upper_inclusive: true
-                } if attr == "foo" && lstr == "10" && ustr == "20"),
+                } if attr == "foo" && *lstr == 10 && *ustr == 20),
                 "Unable to properly parse '{:?}' - got {:?}'",
                 query,
                 res

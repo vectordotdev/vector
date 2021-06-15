@@ -1,4 +1,4 @@
-use crate::grammar::DEFAULT_FIELD;
+use crate::grammar::{unescape, DEFAULT_FIELD};
 
 use regex::Regex;
 
@@ -63,7 +63,7 @@ impl ComparisonValue {
 
 impl<T: AsRef<str>> From<T> for ComparisonValue {
     fn from(s: T) -> Self {
-        let v = escape_quotes(s.as_ref());
+        let v = escape_quotes(unescape(s.as_ref()));
 
         if v == "*" {
             ComparisonValue::Unbounded
