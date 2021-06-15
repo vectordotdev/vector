@@ -148,7 +148,11 @@ mod test {
                 log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
             ),
             // Keyword (negate w/-).
-            ("-bla", log_event!["message" => "bla"], log_event![]),
+            (
+                "-bla",
+                log_event!["message" => "nothing"],
+                log_event!["message" => "bla"],
+            ),
             (
                 "-foo",
                 log_event![],
@@ -172,7 +176,7 @@ mod test {
                 log_event![],
             ),
             // Quoted keyword (negate).
-            (r#"NOT "bla""#, log_event!["message" => "bla"], log_event![]),
+            (r#"NOT "bla""#, log_event![], log_event!["message" => "bla"]),
             (
                 r#"NOT "foo""#,
                 log_event![],
@@ -184,7 +188,7 @@ mod test {
                 log_event!["message" => r#"{"nested": {"value": ["foo", "bar"]}}"#],
             ),
             // Quoted keyword (negate w/-).
-            (r#"NOT "bla""#, log_event!["message" => "bla"], log_event![]),
+            (r#"-"bla""#, log_event![], log_event!["message" => "bla"]),
             (
                 r#"NOT "foo""#,
                 log_event![],
@@ -226,7 +230,7 @@ mod test {
             // Reserved tag match (negate).
             (
                 "NOT host:foo",
-                log_event!["tags" => vec!["host:foo"]],
+                log_event!["tags" => vec!["host:fo  o"]],
                 log_event!["host" => "foo"],
             ),
             // Tag match (negate w/-).
@@ -240,6 +244,114 @@ mod test {
                 "-trace_id:foo",
                 log_event![],
                 log_event!["trace_id" => "foo"],
+            ),
+            // Quoted tag match.
+            (
+                r#"a:"bla""#,
+                log_event!["tags" => vec!["a:bla"]],
+                log_event!["custom" => json!({"a": "bla"})],
+            ),
+            // Quoted tag match (negate).
+            (
+                r#"NOT a:"bla""#,
+                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["tags" => vec!["a:bla"]],
+            ),
+            // Quoted tag match (negate w/-).
+            (
+                r#"-a:"bla""#,
+                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["tags" => vec!["a:bla"]],
+            ),
+            // Facet match.
+            (
+                "@a:bla",
+                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["tags" => vec!["a:bla"]],
+            ),
+            // Facet match (negate).
+            (
+                "NOT @a:bla",
+                log_event!["tags" => vec!["a:bla"]],
+                log_event!["custom" => json!({"a": "bla"})],
+            ),
+            // Facet match (negate w/-).
+            (
+                "-@a:bla",
+                log_event!["tags" => vec!["a:bla"]],
+                log_event!["custom" => json!({"a": "bla"})],
+            ),
+            // Quoted facet match.
+            (
+                r#"@a:"bla""#,
+                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["tags" => vec!["a:bla"]],
+            ),
+            // Quoted facet match (negate).
+            (
+                r#"NOT @a:"bla""#,
+                log_event!["tags" => vec!["a:bla"]],
+                log_event!["custom" => json!({"a": "bla"})],
+            ),
+            // Quoted facet match (negate w/-).
+            (
+                r#"-@a:"bla""#,
+                log_event!["tags" => vec!["a:bla"]],
+                log_event!["custom" => json!({"a": "bla"})],
+            ),
+            // Wildcard prefix.
+            (
+                "*bla",
+                log_event!["message" => "foobla"],
+                log_event!["message" => "blafoo"],
+            ),
+            // Wildcard prefix (negate).
+            (
+                "NOT *bla",
+                log_event!["message" => "blafoo"],
+                log_event!["message" => "foobla"],
+            ),
+            // Wildcard prefix (negate w/-).
+            (
+                "-*bla",
+                log_event!["message" => "blafoo"],
+                log_event!["message" => "foobla"],
+            ),
+            // Wildcard suffix.
+            (
+                "bla*",
+                log_event!["message" => "blafoo"],
+                log_event!["message" => "foobla"],
+            ),
+            // Wildcard suffix (negate).
+            (
+                "NOT bla*",
+                log_event!["message" => "foobla"],
+                log_event!["message" => "blafoo"],
+            ),
+            // Wildcard suffix (negate w/-).
+            (
+                "-bla*",
+                log_event!["message" => "foobla"],
+                log_event!["message" => "blafoo"],
+            ),
+            // Multiple wildcards.
+            (
+                "*b*la*",
+                log_event!["custom" => json!({"title": "fooblablabaz"})],
+                log_event![],
+            ),
+            // Multiple wildcards (negate).
+            (
+                "NOT *b*la*",
+                log_event![],
+                log_event!["custom" => json!({"title": "fooblablabaz"})],
+            ),
+            // Multiple wildcards (negate w/-).
+            (
+                "-*b*la*",
+                log_event![],
+                log_event!["custom" => json!({"title": "fooblablabaz"})],
             ),
         ];
 

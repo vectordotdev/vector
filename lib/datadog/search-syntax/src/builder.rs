@@ -322,7 +322,7 @@ mod tests {
         (r#"a:"bla""#, r#".__datadog_tags.a == "bla""#),
         // Quoted tag match (negate).
         (r#"NOT a:"bla""#, r#"!(.__datadog_tags.a == "bla")"#),
-        // Quoted tag match (negate).
+        // Quoted tag match (negate w/-).
         (r#"-a:"bla""#, r#"!(.__datadog_tags.a == "bla")"#),
         // Facet match.
         ("@a:bla", r#".custom.a == "bla""#),
