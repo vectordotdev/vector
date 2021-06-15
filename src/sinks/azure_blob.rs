@@ -253,7 +253,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
                 .inspect_ok(|result| {
                     emit!(AzureBlobEventSent {
                         request_id: result.request_id,
-                        byte_size: byte_size
+                        byte_size
                     })
                 })
                 .instrument(info_span!("request"))
