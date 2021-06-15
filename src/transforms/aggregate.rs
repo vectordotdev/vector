@@ -59,18 +59,14 @@ impl TransformConfig for AggregateConfig {
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
-    map_a: HashMap<metric::MetricSeries, metric::MetricData>,
-    map_b: HashMap<metric::MetricSeries, metric::MetricData>,
-    using_b: bool,
+    map: HashMap<metric::MetricSeries, metric::MetricData>,
 }
 
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms.unwrap_or(10 * 1000)),
-            map_a: HashMap::new(),
-            map_b: HashMap::new(),
-            using_b: false,
+            map: HashMap::new(),
         })
     }
 
@@ -78,11 +74,7 @@ impl Aggregate {
         let metric = event.as_metric();
         let series = metric.series();
         let data = metric.data();
-
-        let map = match self.using_b {
-            true => &mut self.map_b,
-            false => &mut self.map_a,
-        };
+        let map = &mut self.map;
 
         match data.kind {
             metric::MetricKind::Incremental => {
@@ -107,18 +99,7 @@ impl Aggregate {
 
     fn flush_into(&mut self, output: &mut Vec<Event>) -> u64 {
         let mut count = 0_u64;
-
-        // TODO: locking/safety etc... we can also only have 1 call into flush at a time
-        let map = match self.using_b {
-            true => {
-                self.using_b = false;
-                &mut self.map_b
-            },
-            false => {
-                self.using_b = true;
-                &mut self.map_a
-            },
-        };
+        let map = &mut self.map;
 
         if map.len() > 0 {
             // TODO: not clear how this should work with aggregation so just stuffing a default one
