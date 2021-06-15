@@ -825,15 +825,17 @@ E2E (end-to-end) tests.
 Vector release artifacts are prepared for E2E tests, so the ability to do that
 is required too, see Vector [docs](https://vector.dev) for more details.
 
-> Note: `minikube` had a bug in the versions `1.12.x` that affected our test
-> process - see https://github.com/kubernetes/minikube/issues/8799.
-> Use version `1.13.0+` that has this bug fixed.
+Notes:
 
-Also:
-
-> Note: `minikube` has troubles running on ZFS systems. If you're using ZFS, we
-> suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
-> registry.
+> - `minikube` had a bug in the versions `1.12.x` that affected our test
+>   process - see https://github.com/kubernetes/minikube/issues/8799.
+>   Use version `1.13.0+` that has this bug fixed.
+> - `minikube` has troubles running on ZFS systems. If you're using ZFS, we
+>   suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
+>   registry.
+> - E2E tests expect to have enough resources to perform a full Vector build,
+>   usually 8GB of RAM with 2CPUs are sufficient to succesfully complete E2E tests
+>   locally.
 
 ##### Running the E2E tests
 
