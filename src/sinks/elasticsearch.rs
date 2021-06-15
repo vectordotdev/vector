@@ -76,23 +76,29 @@ pub struct ElasticSearchConfig {
 impl ElasticSearchConfig {
     fn bulk_action(&self) -> crate::Result<Option<Template>> {
         Ok(self
-            .bulk_action
-            .as_deref()
-            .or_else(|| self.normal.as_ref().map(|n| n.bulk_action.as_str()))
+            .normal
+            .as_ref()
+            .and_then(|n| n.bulk_action.as_deref())
+            .or_else(|| self.bulk_action.as_deref())
             .map(|value| Template::try_from(value).context(BatchActionTemplate))
             .transpose()?)
+    }
+
+    fn index(&self) -> crate::Result<Template> {
+        let index = self
+            .normal
+            .as_ref()
+            .and_then(|n| n.index.as_deref())
+            .or_else(|| self.index.as_deref())
+            .map(String::from)
+            .unwrap_or_else(NormalConfig::default_index);
+        Ok(Template::try_from(index.as_str()).context(IndexTemplate)?)
     }
 
     fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
         match self.mode {
             ElasticSearchMode::Normal => {
-                let index = self
-                    .index
-                    .as_deref()
-                    .or_else(|| self.normal.as_ref().map(|n| n.index.as_str()))
-                    .map(String::from)
-                    .unwrap_or_else(NormalConfig::default_index);
-                let index = Template::try_from(index.as_str()).context(IndexTemplate)?;
+                let index = self.index()?;
                 let bulk_action = self.bulk_action()?;
                 Ok(ElasticSearchCommonMode::Normal { index, bulk_action })
             }
@@ -103,29 +109,14 @@ impl ElasticSearchConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Default, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct NormalConfig {
-    #[serde(default = "NormalConfig::default_bulk_action")]
-    bulk_action: String,
-    #[serde(default = "NormalConfig::default_index")]
-    index: String,
-}
-
-impl Default for NormalConfig {
-    fn default() -> Self {
-        Self {
-            bulk_action: Self::default_bulk_action(),
-            index: Self::default_index(),
-        }
-    }
+    bulk_action: Option<String>,
+    index: Option<String>,
 }
 
 impl NormalConfig {
-    fn default_bulk_action() -> String {
-        "index".into()
-    }
-
     fn default_index() -> String {
         "vector-%Y.%m.%d".into()
     }
@@ -137,11 +128,11 @@ pub struct DataStreamConfig {
     #[serde(default = "DataStreamConfig::default_timestamp")]
     timestamp: String,
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
-    dtype: String,
+    dtype: Template,
     #[serde(default = "DataStreamConfig::default_dataset")]
-    dataset: String,
+    dataset: Template,
     #[serde(default = "DataStreamConfig::default_namespace")]
-    namespace: String,
+    namespace: Template,
     #[serde(default = "DataStreamConfig::default_auto_routing")]
     auto_routing: bool,
     #[serde(default = "DataStreamConfig::default_sync_fields")]
@@ -151,7 +142,7 @@ pub struct DataStreamConfig {
 impl Default for DataStreamConfig {
     fn default() -> Self {
         Self {
-            timestamp: Self::default_type(),
+            timestamp: Self::default_timestamp(),
             dtype: Self::default_type(),
             dataset: Self::default_dataset(),
             namespace: Self::default_namespace(),
@@ -166,16 +157,16 @@ impl DataStreamConfig {
         "@timestamp".into()
     }
 
-    fn default_type() -> String {
-        "logs".into()
+    fn default_type() -> Template {
+        Template::try_from("logs").expect("couldn't build default type template")
     }
 
-    fn default_dataset() -> String {
-        "generic".into()
+    fn default_dataset() -> Template {
+        Template::try_from("generic").expect("couldn't build default dataset template")
     }
 
-    fn default_namespace() -> String {
-        "default".into()
+    fn default_namespace() -> Template {
+        Template::try_from("default").expect("couldn't build default namespace template")
     }
 
     fn default_auto_routing() -> bool {
@@ -186,59 +177,113 @@ impl DataStreamConfig {
         true
     }
 
-    fn entries(&self) -> Vec<(String, Value)> {
-        vec![
-            ("type".into(), Value::from(self.dtype.clone())),
-            ("dataset".into(), Value::from(self.dataset.clone())),
-            ("namespace".into(), Value::from(self.namespace.clone())),
-        ]
-    }
-
-    fn update_timestamp(&self, event: &mut Event) {
+    fn update_timestamp(&self, mut event: Event) -> Event {
         // we keep it if the timestamp field is @timestamp
         if self.timestamp == Self::default_timestamp() {
-            return;
+            return event;
         }
         let log = event.as_mut_log().as_map_mut();
         if let Some(value) = log.remove(&self.timestamp) {
             log.insert(Self::default_timestamp(), value);
         }
+        event
     }
 
-    fn sync_fields(&self, event: &mut Event) {
+    fn dtype(&self, event: &Event) -> Option<String> {
+        self.dtype
+            .render_string(event)
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("data_stream.type"),
+                    drop_event: true,
+                });
+            })
+            .ok()
+    }
+
+    fn dataset(&self, event: &Event) -> Option<String> {
+        self.dataset
+            .render_string(event)
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("data_stream.dataset"),
+                    drop_event: true,
+                });
+            })
+            .ok()
+    }
+
+    fn namespace(&self, event: &Event) -> Option<String> {
+        self.namespace
+            .render_string(event)
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("data_stream.namespace"),
+                    drop_event: true,
+                });
+            })
+            .ok()
+    }
+
+    fn sync_fields(&self, mut event: Event) -> Event {
         if !self.sync_fields {
-            return;
+            return event;
         }
+        let dtype = self.dtype(&event);
+        let dataset = self.dataset(&event);
+        let namespace = self.namespace(&event);
+
         let existing = event
             .as_mut_log()
             .as_map_mut()
             .entry("data_stream".into())
             .or_insert_with(|| Value::Map(BTreeMap::new()))
             .as_map_mut();
-        for (key, value) in self.entries() {
-            existing.entry(key).or_insert(value);
+        if let Some(dtype) = dtype {
+            existing
+                .entry("type".into())
+                .or_insert_with(|| dtype.into());
         }
+        if let Some(dataset) = dataset {
+            existing
+                .entry("dataset".into())
+                .or_insert_with(|| dataset.into());
+        }
+        if let Some(namespace) = namespace {
+            existing
+                .entry("namespace".into())
+                .or_insert_with(|| namespace.into());
+        }
+        event
     }
 
-    fn index(&self, event: &Event) -> String {
-        if !self.auto_routing {
-            format!("{}-{}-{}", self.dtype, self.dataset, self.namespace)
+    fn index(&self, event: &Event) -> Option<String> {
+        let (dtype, dataset, namespace) = if !self.auto_routing {
+            (
+                self.dtype(event)?,
+                self.dataset(event)?,
+                self.namespace(event)?,
+            )
         } else {
             let data_stream = event.as_log().get("data_stream").and_then(|ds| ds.as_map());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
                 .map(|value| value.to_string_lossy())
-                .unwrap_or_else(|| self.dtype.clone());
+                .or_else(|| self.dtype(event))?;
             let dataset = data_stream
                 .and_then(|ds| ds.get("dataset"))
                 .map(|value| value.to_string_lossy())
-                .unwrap_or_else(|| self.dataset.clone());
+                .or_else(|| self.dataset(event))?;
             let namespace = data_stream
                 .and_then(|ds| ds.get("namespace"))
                 .map(|value| value.to_string_lossy())
-                .unwrap_or_else(|| self.namespace.clone());
-            format!("{}-{}-{}", dtype, dataset, namespace)
-        }
+                .or_else(|| self.namespace(event))?;
+            (dtype, dataset, namespace)
+        };
+        Some(format!("{}-{}-{}", dtype, dataset, namespace))
     }
 }
 
@@ -383,7 +428,7 @@ impl ElasticSearchCommonMode {
                     });
                 })
                 .ok(),
-            Self::DataStream(ds) => Some(ds.index(event)),
+            Self::DataStream(ds) => ds.index(event),
         }
     }
 
@@ -474,13 +519,14 @@ impl HttpSink for ElasticSearchCommon {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let index = self.mode.index(&event)?;
 
-        if let Some(cfg) = self.mode.as_data_stream_config() {
-            cfg.sync_fields(&mut event);
-            cfg.update_timestamp(&mut event);
-        }
+        let mut event = if let Some(cfg) = self.mode.as_data_stream_config() {
+            cfg.update_timestamp(cfg.sync_fields(event))
+        } else {
+            event
+        };
 
         let bulk_action = self.mode.bulk_action(&event)?;
         let action = self.build_action(&index, bulk_action, &mut event);
@@ -834,7 +880,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(config.mode, ElasticSearchMode::DataStream));
-        assert_eq!(config.data_stream.unwrap().dtype, "synthetics");
+        assert!(config.data_stream.is_some());
     }
 
     #[test]
@@ -944,7 +990,7 @@ mod tests {
             mode: ElasticSearchMode::DataStream,
             data_stream: Some(DataStreamConfig {
                 auto_routing: false,
-                namespace: "something".into(),
+                namespace: Template::try_from("something").unwrap(),
                 timestamp: log_schema().timestamp_key().into(),
                 ..Default::default()
             }),
@@ -1007,7 +1053,7 @@ mod tests {
             endpoint: String::from("https://example.com"),
             mode: ElasticSearchMode::DataStream,
             data_stream: Some(DataStreamConfig {
-                namespace: "something".into(),
+                namespace: Template::try_from("something").unwrap(),
                 sync_fields: false,
                 ..Default::default()
             }),

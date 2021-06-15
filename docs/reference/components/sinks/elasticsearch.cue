@@ -188,8 +188,8 @@ components: sinks: elasticsearch: {
 						warnings: []
 						type: string: {
 							default: "generic"
-							examples: ["generic", "nginx"]
-							syntax: "literal"
+							examples: ["generic", "nginx", "{{ service }}"]
+							syntax: "template"
 						}
 					}
 					namespace: {
@@ -199,8 +199,8 @@ components: sinks: elasticsearch: {
 						warnings: []
 						type: string: {
 							default: "default"
-							examples: ["default"]
-							syntax: "literal"
+							examples: ["default", "{{ environment }}"]
+							syntax: "template"
 						}
 					}
 					sync_fields: {
@@ -217,8 +217,8 @@ components: sinks: elasticsearch: {
 						warnings: []
 						type: string: {
 							default: "logs"
-							examples: ["logs", "metrics", "synthetics"]
-							syntax: "literal"
+							examples: ["logs", "metrics", "synthetics", "{{ type }}"]
+							syntax: "template"
 						}
 					}
 				}
