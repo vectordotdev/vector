@@ -263,7 +263,7 @@ mod tests {
             let mut sampler = Sample::new(
                 0,
                 key_field.clone(),
-                Some(condition_contains("other_field".into(), "foo")),
+                Some(condition_contains("other_field", "foo")),
             );
             let iterations = 0..1000;
             let total_passed = iterations
