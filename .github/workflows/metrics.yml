@@ -7,6 +7,7 @@ on:
       - 'Test Suite'
       - 'Integration Test Suite'
       - 'Nightly'
+      - 'Baseline Timings'
     types:
       - completed
 
