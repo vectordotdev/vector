@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::{Event, Value},
+    event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
     rusoto::{self, region_from_endpoint, AwsAuthentication, RegionOrEndpoint},
@@ -31,7 +31,7 @@ use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -40,13 +40,10 @@ pub struct ElasticSearchConfig {
     // Deprecated name
     #[serde(alias = "host")]
     pub endpoint: String,
-    // Deprecated, use normal.index instead
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub pipeline: Option<String>,
-    #[serde(default)]
-    pub mode: ElasticSearchMode,
 
     #[serde(default)]
     pub compression: Compression,
@@ -67,223 +64,13 @@ pub struct ElasticSearchConfig {
 
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
-    // Deprecated, use normal.bulk_action instead
     pub bulk_action: Option<String>,
-    pub normal: Option<NormalConfig>,
-    pub data_stream: Option<DataStreamConfig>,
 }
 
 impl ElasticSearchConfig {
-    fn bulk_action(&self) -> crate::Result<Option<Template>> {
-        Ok(self
-            .normal
-            .as_ref()
-            .and_then(|n| n.bulk_action.as_deref())
-            .or_else(|| self.bulk_action.as_deref())
-            .map(|value| Template::try_from(value).context(BatchActionTemplate))
-            .transpose()?)
-    }
-
-    fn index(&self) -> crate::Result<Template> {
-        let index = self
-            .normal
-            .as_ref()
-            .and_then(|n| n.index.as_deref())
-            .or_else(|| self.index.as_deref())
-            .map(String::from)
-            .unwrap_or_else(NormalConfig::default_index);
-        Ok(Template::try_from(index.as_str()).context(IndexTemplate)?)
-    }
-
-    fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
-        match self.mode {
-            ElasticSearchMode::Normal => {
-                let index = self.index()?;
-                let bulk_action = self.bulk_action()?;
-                Ok(ElasticSearchCommonMode::Normal { index, bulk_action })
-            }
-            ElasticSearchMode::DataStream => Ok(ElasticSearchCommonMode::DataStream(
-                self.data_stream.clone().unwrap_or_default(),
-            )),
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Clone, Default, Debug)]
-#[serde(rename_all = "snake_case")]
-pub struct NormalConfig {
-    bulk_action: Option<String>,
-    index: Option<String>,
-}
-
-impl NormalConfig {
-    fn default_index() -> String {
-        "vector-%Y.%m.%d".into()
-    }
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-pub struct DataStreamConfig {
-    #[serde(default = "DataStreamConfig::default_timestamp")]
-    timestamp: String,
-    #[serde(rename = "type", default = "DataStreamConfig::default_type")]
-    dtype: Template,
-    #[serde(default = "DataStreamConfig::default_dataset")]
-    dataset: Template,
-    #[serde(default = "DataStreamConfig::default_namespace")]
-    namespace: Template,
-    #[serde(default = "DataStreamConfig::default_auto_routing")]
-    auto_routing: bool,
-    #[serde(default = "DataStreamConfig::default_sync_fields")]
-    sync_fields: bool,
-}
-
-impl Default for DataStreamConfig {
-    fn default() -> Self {
-        Self {
-            timestamp: Self::default_timestamp(),
-            dtype: Self::default_type(),
-            dataset: Self::default_dataset(),
-            namespace: Self::default_namespace(),
-            auto_routing: Self::default_auto_routing(),
-            sync_fields: Self::default_sync_fields(),
-        }
-    }
-}
-
-impl DataStreamConfig {
-    fn default_timestamp() -> String {
-        "@timestamp".into()
-    }
-
-    fn default_type() -> Template {
-        Template::try_from("logs").expect("couldn't build default type template")
-    }
-
-    fn default_dataset() -> Template {
-        Template::try_from("generic").expect("couldn't build default dataset template")
-    }
-
-    fn default_namespace() -> Template {
-        Template::try_from("default").expect("couldn't build default namespace template")
-    }
-
-    fn default_auto_routing() -> bool {
-        true
-    }
-
-    fn default_sync_fields() -> bool {
-        true
-    }
-
-    fn update_timestamp(&self, mut event: Event) -> Event {
-        // we keep it if the timestamp field is @timestamp
-        if self.timestamp == Self::default_timestamp() {
-            return event;
-        }
-        let log = event.as_mut_log().as_map_mut();
-        if let Some(value) = log.remove(&self.timestamp) {
-            log.insert(Self::default_timestamp(), value);
-        }
-        event
-    }
-
-    fn dtype(&self, event: &Event) -> Option<String> {
-        self.dtype
-            .render_string(event)
-            .map_err(|error| {
-                emit!(TemplateRenderingFailed {
-                    error,
-                    field: Some("data_stream.type"),
-                    drop_event: true,
-                });
-            })
-            .ok()
-    }
-
-    fn dataset(&self, event: &Event) -> Option<String> {
-        self.dataset
-            .render_string(event)
-            .map_err(|error| {
-                emit!(TemplateRenderingFailed {
-                    error,
-                    field: Some("data_stream.dataset"),
-                    drop_event: true,
-                });
-            })
-            .ok()
-    }
-
-    fn namespace(&self, event: &Event) -> Option<String> {
-        self.namespace
-            .render_string(event)
-            .map_err(|error| {
-                emit!(TemplateRenderingFailed {
-                    error,
-                    field: Some("data_stream.namespace"),
-                    drop_event: true,
-                });
-            })
-            .ok()
-    }
-
-    fn sync_fields(&self, mut event: Event) -> Event {
-        if !self.sync_fields {
-            return event;
-        }
-        let dtype = self.dtype(&event);
-        let dataset = self.dataset(&event);
-        let namespace = self.namespace(&event);
-
-        let existing = event
-            .as_mut_log()
-            .as_map_mut()
-            .entry("data_stream".into())
-            .or_insert_with(|| Value::Map(BTreeMap::new()))
-            .as_map_mut();
-        if let Some(dtype) = dtype {
-            existing
-                .entry("type".into())
-                .or_insert_with(|| dtype.into());
-        }
-        if let Some(dataset) = dataset {
-            existing
-                .entry("dataset".into())
-                .or_insert_with(|| dataset.into());
-        }
-        if let Some(namespace) = namespace {
-            existing
-                .entry("namespace".into())
-                .or_insert_with(|| namespace.into());
-        }
-        event
-    }
-
-    fn index(&self, event: &Event) -> Option<String> {
-        let (dtype, dataset, namespace) = if !self.auto_routing {
-            (
-                self.dtype(event)?,
-                self.dataset(event)?,
-                self.namespace(event)?,
-            )
-        } else {
-            let data_stream = event.as_log().get("data_stream").and_then(|ds| ds.as_map());
-            let dtype = data_stream
-                .and_then(|ds| ds.get("type"))
-                .map(|value| value.to_string_lossy())
-                .or_else(|| self.dtype(event))?;
-            let dataset = data_stream
-                .and_then(|ds| ds.get("dataset"))
-                .map(|value| value.to_string_lossy())
-                .or_else(|| self.dataset(event))?;
-            let namespace = data_stream
-                .and_then(|ds| ds.get("namespace"))
-                .map(|value| value.to_string_lossy())
-                .or_else(|| self.namespace(event))?;
-            (dtype, dataset, namespace)
-        };
-        Some(format!("{}-{}-{}", dtype, dataset, namespace))
+    fn bulk_action(&self) -> crate::Result<Template> {
+        let value = self.bulk_action.as_deref().unwrap_or("index");
+        Ok(Template::try_from(value).context(BatchActionTemplate)?)
     }
 }
 
@@ -308,37 +95,25 @@ pub enum ElasticSearchAuth {
     Aws(AwsAuthentication),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-pub enum ElasticSearchMode {
-    Normal,
-    DataStream,
-}
-
-impl Default for ElasticSearchMode {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
-#[derive(Derivative, Deserialize, Serialize, Clone, Copy, Debug)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum BulkAction {
+    #[derivative(Default)]
     Index,
     Create,
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 impl BulkAction {
     pub fn as_str(&self) -> &'static str {
-        match self {
+        match *self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
         }
     }
 
     pub fn as_json_pointer(&self) -> &'static str {
-        match self {
+        match *self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
         }
@@ -373,7 +148,7 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let client = HttpClient::new(common.tls_settings.clone())?;
 
-        let healthcheck = common.healthcheck(client.clone()).boxed();
+        let healthcheck = healthcheck(client.clone(), common).boxed();
 
         let common = ElasticSearchCommon::parse_config(&self)?;
         let compression = common.compression;
@@ -407,75 +182,19 @@ impl SinkConfig for ElasticSearchConfig {
 }
 
 #[derive(Debug)]
-enum ElasticSearchCommonMode {
-    Normal {
-        index: Template,
-        bulk_action: Option<Template>,
-    },
-    DataStream(DataStreamConfig),
-}
-
-impl ElasticSearchCommonMode {
-    fn index(&self, event: &Event) -> Option<String> {
-        match self {
-            Self::Normal { index, .. } => index
-                .render_string(event)
-                .map_err(|error| {
-                    emit!(TemplateRenderingFailed {
-                        error,
-                        field: Some("index"),
-                        drop_event: true,
-                    });
-                })
-                .ok(),
-            Self::DataStream(ds) => ds.index(event),
-        }
-    }
-
-    fn bulk_action(&self, event: &Event) -> Option<BulkAction> {
-        match self {
-            ElasticSearchCommonMode::Normal { bulk_action, .. } => match bulk_action {
-                Some(template) => template
-                    .render_string(event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingFailed {
-                            error,
-                            field: Some("bulk_action"),
-                            drop_event: true,
-                        });
-                    })
-                    .ok()
-                    .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
-                None => Some(BulkAction::Index),
-            },
-            // avoid the interpolation
-            ElasticSearchCommonMode::DataStream(_) => Some(BulkAction::Create),
-        }
-    }
-
-    fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
-        match self {
-            Self::DataStream(value) => Some(value),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
-    id_key: Option<String>,
     bulk_uri: Uri,
     authorization: Option<Auth>,
     credentials: Option<rusoto::AwsCredentialsProvider>,
-    encoding: EncodingConfigWithDefault<Encoding>,
-    mode: ElasticSearchCommonMode,
+    index: Template,
     doc_type: String,
     tls_settings: TlsSettings,
+    config: ElasticSearchConfig,
     compression: Compression,
     region: Region,
-    request: RequestConfig,
     query_params: HashMap<String, String>,
+    bulk_action: Template,
 }
 
 #[derive(Debug, Snafu)]
@@ -493,24 +212,32 @@ enum ParseError {
 }
 
 impl ElasticSearchCommon {
-    fn build_action(
-        &self,
-        index: &str,
-        bulk_action: BulkAction,
-        event: &mut Event,
-    ) -> serde_json::Value {
-        let mut action = json!({
-            bulk_action.as_str(): {
-                "_index": index,
-                "_type": self.doc_type,
-            }
-        });
-        maybe_set_id(
-            self.id_key.as_ref(),
-            action.pointer_mut(bulk_action.as_json_pointer()).unwrap(),
-            event,
-        );
-        action
+    fn index(&self, event: &Event) -> Option<String> {
+        self.index
+            .render_string(event)
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("index"),
+                    drop_event: true,
+                });
+            })
+            .ok()
+    }
+
+    fn bulk_action(&self, event: &Event) -> Option<BulkAction> {
+        let value = self
+            .bulk_action
+            .render_string(event)
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("bulk_action"),
+                    drop_event: true,
+                });
+            })
+            .ok()?;
+        BulkAction::try_from(value.as_str()).ok()
     }
 }
 
@@ -519,22 +246,26 @@ impl HttpSink for ElasticSearchCommon {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
-        let index = self.mode.index(&event)?;
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+        let index = self.index(&event)?;
+        let bulk_action = self.bulk_action(&event)?;
 
-        let mut event = if let Some(cfg) = self.mode.as_data_stream_config() {
-            cfg.update_timestamp(cfg.sync_fields(event))
-        } else {
-            event
-        };
-
-        let bulk_action = self.mode.bulk_action(&event)?;
-        let action = self.build_action(&index, bulk_action, &mut event);
+        let mut action = json!({
+            bulk_action.as_str(): {
+                "_index": index,
+                "_type": self.doc_type,
+            }
+        });
+        maybe_set_id(
+            self.config.id_key.as_ref(),
+            action.pointer_mut(bulk_action.as_json_pointer()).unwrap(),
+            &mut event,
+        );
 
         let mut body = serde_json::to_vec(&action).unwrap();
         body.push(b'\n');
 
-        self.encoding.apply_rules(&mut event);
+        self.config.encoding.apply_rules(&mut event);
 
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
@@ -559,7 +290,7 @@ impl HttpSink for ElasticSearchCommon {
                 request.add_header("Content-Encoding", ce);
             }
 
-            for (header, value) in &self.request.headers {
+            for (header, value) in &self.config.request.headers {
                 request.add_header(header, value);
             }
 
@@ -584,7 +315,7 @@ impl HttpSink for ElasticSearchCommon {
                 builder = builder.header("Content-Encoding", ce);
             }
 
-            for (header, value) in &self.request.headers {
+            for (header, value) in &self.config.request.headers {
                 builder = builder.header(&header[..], &value[..]);
             }
 
@@ -719,17 +450,16 @@ impl ElasticSearchCommon {
         };
 
         let compression = config.compression;
-        let mode = config.common_mode()?;
+        let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
+        let index = Template::try_from(index).context(IndexTemplate)?;
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
+        let bulk_action = config.bulk_action()?;
 
-        let tower_request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
         let mut query_params = config.query.clone().unwrap_or_default();
-        query_params.insert(
-            "timeout".into(),
-            format!("{}s", tower_request.timeout.as_secs()),
-        );
+        query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
 
         if let Some(pipeline) = &config.pipeline {
             query_params.insert("pipeline".into(), pipeline.into());
@@ -744,23 +474,22 @@ impl ElasticSearchCommon {
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let mut config = config.clone();
-        let mut request = config.request;
-        request.add_old_option(config.headers.take());
+
+        config.request.add_old_option(config.headers.take());
 
         Ok(Self {
-            authorization,
             base_url,
             bulk_uri,
-            compression,
+            authorization,
             credentials,
+            index,
             doc_type,
-            encoding: config.encoding,
-            id_key: config.id_key,
-            mode,
-            query_params,
-            request,
-            region,
             tls_settings,
+            config,
+            compression,
+            region,
+            query_params,
+            bulk_action,
         })
     }
 
@@ -774,28 +503,28 @@ impl ElasticSearchCommon {
         }
         request
     }
+}
 
-    async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
-        let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
+async fn healthcheck(client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
+    let mut builder = Request::get(format!("{}/_cluster/health", common.base_url));
 
-        match &self.credentials {
-            None => {
-                if let Some(authorization) = &self.authorization {
-                    builder = authorization.apply_builder(builder);
-                }
-            }
-            Some(credentials_provider) => {
-                let mut signer = self.signed_request("GET", builder.uri_ref().unwrap(), false);
-                builder = finish_signer(&mut signer, &credentials_provider, builder).await?;
+    match &common.credentials {
+        None => {
+            if let Some(authorization) = &common.authorization {
+                builder = authorization.apply_builder(builder);
             }
         }
-        let request = builder.body(Body::empty())?;
-        let response = client.send(request).await?;
-
-        match response.status() {
-            StatusCode::OK => Ok(()),
-            status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+        Some(credentials_provider) => {
+            let mut signer = common.signed_request("GET", builder.uri_ref().unwrap(), false);
+            builder = finish_signer(&mut signer, &credentials_provider, builder).await?;
         }
+    }
+    let request = builder.body(Body::empty())?;
+    let response = client.send(request).await?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
     }
 }
 
@@ -838,11 +567,10 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::Event, event::Value, sinks::util::retries::RetryAction};
+    use crate::{event::Event, sinks::util::retries::RetryAction};
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {
@@ -867,20 +595,6 @@ mod tests {
         "#,
         )
         .unwrap();
-    }
-
-    #[test]
-    fn parse_mode() {
-        let config = toml::from_str::<ElasticSearchConfig>(
-            r#"
-            endpoint = ""
-            mode = "data_stream"
-            data_stream.type = "synthetics"
-        "#,
-        )
-        .unwrap();
-        assert!(matches!(config.mode, ElasticSearchMode::DataStream));
-        assert!(config.data_stream.is_some());
     }
 
     #[test]
@@ -926,7 +640,7 @@ mod tests {
         use chrono::{TimeZone, Utc};
 
         let config = ElasticSearchConfig {
-            bulk_action: Some(String::from("{{ action }}te")),
+            bulk_action: Some(String::from("create")),
             index: Some(String::from("vector")),
             endpoint: String::from("https://example.com"),
             ..Default::default()
@@ -934,79 +648,13 @@ mod tests {
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
         let mut event = Event::from("hello there");
-        event.as_mut_log().insert(
-            log_schema().timestamp_key(),
-            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
-        );
-        event.as_mut_log().insert("action", "crea");
-        let encoded = es.encode_event(event).unwrap().item;
-        let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
-{"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
-"#;
-        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
-    }
-
-    fn data_stream_body() -> BTreeMap<String, Value> {
-        let mut ds = BTreeMap::<String, Value>::new();
-        ds.insert("type".into(), Value::from("synthetics"));
-        ds.insert("dataset".into(), Value::from("testing"));
-        ds
-    }
-
-    #[test]
-    fn encode_datastream_mode() {
-        use crate::config::log_schema;
-        use chrono::{TimeZone, Utc};
-
-        let config = ElasticSearchConfig {
-            index: Some(String::from("vector")),
-            endpoint: String::from("https://example.com"),
-            mode: ElasticSearchMode::DataStream,
-            ..Default::default()
-        };
-        let es = ElasticSearchCommon::parse_config(&config).unwrap();
-
-        let mut event = Event::from("hello there");
-        event.as_mut_log().insert(
-            log_schema().timestamp_key(),
-            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
-        );
-        event.as_mut_log().insert("data_stream", data_stream_body());
-        let encoded = es.encode_event(event).unwrap().item;
-        let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
-{"data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
-"#;
-        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
-    }
-
-    #[test]
-    fn encode_datastream_mode_no_routing() {
-        use crate::config::log_schema;
-        use chrono::{TimeZone, Utc};
-
-        let config = ElasticSearchConfig {
-            index: Some(String::from("vector")),
-            endpoint: String::from("https://example.com"),
-            mode: ElasticSearchMode::DataStream,
-            data_stream: Some(DataStreamConfig {
-                auto_routing: false,
-                namespace: Template::try_from("something").unwrap(),
-                timestamp: log_schema().timestamp_key().into(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let es = ElasticSearchCommon::parse_config(&config).unwrap();
-
-        let mut event = Event::from("hello there");
-        event.as_mut_log().insert("data_stream", data_stream_body());
         event.as_mut_log().insert(
             log_schema().timestamp_key(),
             Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
         );
         let encoded = es.encode_event(event).unwrap().item;
-        let expected = r#"{"create":{"_index":"logs-generic-something","_type":"_doc"}}
-{"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there"}
+        let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
+{"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
@@ -1024,7 +672,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("idx", "purple");
-        let action = es.mode.bulk_action(&event);
+        let action = es.bulk_action(&event);
         assert!(action.is_none());
     }
 
@@ -1039,40 +687,8 @@ mod tests {
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
         let event = Event::from("hello there");
-        let action = es.mode.bulk_action(&event).unwrap();
+        let action = es.bulk_action(&event).unwrap();
         assert!(matches!(action, BulkAction::Create));
-    }
-
-    #[test]
-    fn encode_datastream_mode_no_sync() {
-        use crate::config::log_schema;
-        use chrono::{TimeZone, Utc};
-
-        let config = ElasticSearchConfig {
-            index: Some(String::from("vector")),
-            endpoint: String::from("https://example.com"),
-            mode: ElasticSearchMode::DataStream,
-            data_stream: Some(DataStreamConfig {
-                namespace: Template::try_from("something").unwrap(),
-                sync_fields: false,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let es = ElasticSearchCommon::parse_config(&config).unwrap();
-
-        let mut event = Event::from("hello there");
-        event.as_mut_log().insert("data_stream", data_stream_body());
-        event.as_mut_log().insert(
-            log_schema().timestamp_key(),
-            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
-        );
-        let encoded = es.encode_event(event).unwrap().item;
-        let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
-{"data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
-"#;
-        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
 
     #[test]
@@ -1337,38 +953,10 @@ mod integration_tests {
         .await;
     }
 
-    #[tokio::test]
-    async fn insert_events_in_data_stream() {
-        trace_init();
-        let template_index = format!("my-template-{}", gen_index());
-        let stream_index = format!("my-stream-{}", gen_index());
-
-        let cfg = ElasticSearchConfig {
-            endpoint: "http://localhost:9200".into(),
-            mode: ElasticSearchMode::DataStream,
-            index: Some(stream_index.clone()),
-            ..config()
-        };
-        let common = ElasticSearchCommon::parse_config(&cfg).expect("Config error");
-
-        create_template_index(&common, &template_index)
-            .await
-            .expect("Template index creation error");
-        create_data_stream(&common, &stream_index)
-            .await
-            .expect("Data stream creation error");
-
-        run_insert_tests_with_config(&cfg, true).await;
-    }
-
     async fn run_insert_tests(mut config: ElasticSearchConfig, break_events: bool) {
-        config.index = Some(gen_index());
-        run_insert_tests_with_config(&config, break_events).await;
-    }
-
-    async fn run_insert_tests_with_config(config: &ElasticSearchConfig, break_events: bool) {
+        let index = gen_index();
+        config.index = Some(index.clone());
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
-        let index = config.index.clone().unwrap();
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
@@ -1463,32 +1051,6 @@ mod integration_tests {
             StatusCode::OK => Ok(()),
             status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
         }
-    }
-
-    async fn create_template_index(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {
-        let uri = format!("{}/_index_template/{}", common.base_url, name);
-        let response = reqwest::Client::new()
-            .put(uri)
-            .json(&json!({
-                "index_patterns": ["my-*-*"],
-                "data_stream": {},
-                "composed_of": ["logs-mapping", "logs-settings"],
-            }))
-            .send()
-            .await?;
-        assert_eq!(response.status(), StatusCode::OK);
-        Ok(())
-    }
-
-    async fn create_data_stream(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {
-        let uri = format!("{}/_data_stream/{}", common.base_url, name);
-        let response = reqwest::Client::new()
-            .put(uri)
-            .header("Content-Type", "application/json")
-            .send()
-            .await?;
-        assert_eq!(response.status(), StatusCode::OK);
-        Ok(())
     }
 
     fn config() -> ElasticSearchConfig {
