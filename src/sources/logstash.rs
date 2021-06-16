@@ -7,6 +7,7 @@ use crate::{
     event::{Event, LogEvent, Value},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
+    types,
 };
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
@@ -47,7 +48,9 @@ impl GenerateConfig for LogstashConfig {
 #[typetag::serde(name = "logstash")]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = LogstashSource {};
+        let source = LogstashSource {
+            timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone),
+        };
         let shutdown_secs = 30;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         source.run(
@@ -75,7 +78,9 @@ impl SourceConfig for LogstashConfig {
 }
 
 #[derive(Debug, Clone)]
-struct LogstashSource {}
+struct LogstashSource {
+    timestamp_converter: crate::types::Conversion,
+}
 
 impl TcpSource for LogstashSource {
     type Error = DecodeError;
@@ -106,10 +111,16 @@ impl TcpSource for LogstashSource {
             log.insert(log_schema().host_key(), host);
         }
         if log.get(log_schema().timestamp_key()).is_none() {
-            if let Some(timestamp) = log.get("@timestamp") {
-                let timestamp = timestamp.clone();
-                log.insert(log_schema().timestamp_key(), timestamp);
-            }
+            // attempt to parse @timestamp if it exists; otherwise set to receipt time
+            let timestamp = log
+                .get("@timestamp")
+                .and_then(|timestamp| {
+                    self.timestamp_converter
+                        .convert::<Value>(timestamp.as_bytes())
+                        .ok()
+                })
+                .unwrap_or(Value::from(chrono::Utc::now()));
+            log.insert(log_schema().timestamp_key(), timestamp);
         }
         Some(Event::from(log))
     }
@@ -267,14 +278,12 @@ impl Decoder for LogstashDecoder {
         // * Return an error
         // * Read some bytes and advance the state
         loop {
-            match self.state {
+            self.state = match self.state {
                 // if we have any unsent frames, send them before reading new logstash frame
                 LogstashDecoderReadState::PendingFrames(ref mut frames) => {
                     match frames.pop_front() {
                         Some(frame) => return Ok(Some(frame)),
-                        None => {
-                            self.state = LogstashDecoderReadState::ReadProtocol;
-                        }
+                        None => LogstashDecoderReadState::ReadProtocol,
                     }
                 }
                 LogstashDecoderReadState::ReadProtocol => {
@@ -285,14 +294,8 @@ impl Decoder for LogstashDecoder {
                     use LogstashProtocolVersion::*;
 
                     match LogstashProtocolVersion::try_from(src.get_u8())? {
-                        V1 => {
-                            self.state =
-                                LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V1);
-                        }
-                        V2 => {
-                            self.state =
-                                LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V2);
-                        }
+                        V1 => LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V1),
+                        V2 => LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V2),
                     }
                 }
                 LogstashDecoderReadState::ReadType(protocol) => {
@@ -303,35 +306,22 @@ impl Decoder for LogstashDecoder {
                     use LogstashFrameType::*;
 
                     match LogstashFrameType::try_from(src.get_u8())? {
-                        WindowSize => {
-                            self.state = LogstashDecoderReadState::ReadFrame(
-                                protocol,
-                                LogstashFrameType::WindowSize,
-                            );
-                        }
+                        WindowSize => LogstashDecoderReadState::ReadFrame(
+                            protocol,
+                            LogstashFrameType::WindowSize,
+                        ),
                         Data => {
-                            self.state = LogstashDecoderReadState::ReadFrame(
-                                protocol,
-                                LogstashFrameType::Data,
-                            )
+                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data)
                         }
                         Json => {
-                            self.state = LogstashDecoderReadState::ReadFrame(
-                                protocol,
-                                LogstashFrameType::Json,
-                            )
+                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json)
                         }
-                        Compressed => {
-                            self.state = LogstashDecoderReadState::ReadFrame(
-                                protocol,
-                                LogstashFrameType::Compressed,
-                            )
-                        }
+                        Compressed => LogstashDecoderReadState::ReadFrame(
+                            protocol,
+                            LogstashFrameType::Compressed,
+                        ),
                         Ack => {
-                            self.state = LogstashDecoderReadState::ReadFrame(
-                                protocol,
-                                LogstashFrameType::Ack,
-                            )
+                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Ack)
                         }
                     }
                 }
@@ -346,7 +336,8 @@ impl Decoder for LogstashDecoder {
                     }
 
                     let _window_size = src.get_u32();
-                    self.state = LogstashDecoderReadState::ReadProtocol;
+
+                    LogstashDecoderReadState::ReadProtocol
                 }
                 // we shouldn't receive acks from the writer, just skip
                 //
@@ -357,7 +348,8 @@ impl Decoder for LogstashDecoder {
                     }
 
                     let _sequence_number = src.get_u32();
-                    self.state = LogstashDecoderReadState::ReadProtocol;
+
+                    LogstashDecoderReadState::ReadProtocol
                 }
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#data-frame-type
                 LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data) => {
@@ -402,13 +394,14 @@ impl Decoder for LogstashDecoder {
 
                     src.advance(src.remaining() - remaining);
 
-                    self.state = LogstashDecoderReadState::ReadProtocol;
-
-                    return Ok(Some(LogstashEventFrame {
+                    let frames = vec![LogstashEventFrame {
                         protocol,
                         sequence_number,
                         fields,
-                    }));
+                    }]
+                    .into();
+
+                    LogstashDecoderReadState::PendingFrames(frames)
                 }
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#json-frame-type
                 LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json) => {
@@ -434,15 +427,19 @@ impl Decoder for LogstashDecoder {
 
                     src.advance(src.remaining() - remaining);
 
-                    self.state = LogstashDecoderReadState::ReadProtocol;
+                    match fields_result {
+                        Ok(fields) => {
+                            let frames = vec![LogstashEventFrame {
+                                protocol,
+                                sequence_number,
+                                fields,
+                            }]
+                            .into();
 
-                    return fields_result.map(|fields| {
-                        Some(LogstashEventFrame {
-                            protocol,
-                            sequence_number,
-                            fields,
-                        })
-                    });
+                            LogstashDecoderReadState::PendingFrames(frames)
+                        }
+                        Err(err) => return Err(err),
+                    }
                 }
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#compressed-frame-type
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Compressed) => {
@@ -484,7 +481,7 @@ impl Decoder for LogstashDecoder {
                         frames.push_back(s);
                     }
 
-                    self.state = LogstashDecoderReadState::PendingFrames(frames);
+                    LogstashDecoderReadState::PendingFrames(frames)
                 }
             };
         }

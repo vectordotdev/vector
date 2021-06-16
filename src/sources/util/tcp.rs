@@ -195,7 +195,7 @@ async fn handle_stream<T>(
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
     source: T,
-    tripwire: BoxFuture<'static, ()>,
+    mut tripwire: BoxFuture<'static, ()>,
     host: Bytes,
     mut out: impl Sink<Event> + Send + 'static + Unpin,
 ) where
@@ -226,19 +226,16 @@ async fn handle_stream<T>(
         }
     }
 
-    let reader = FramedRead::new(socket, source.decoder());
+    let mut reader = FramedRead::new(socket, source.decoder());
 
-    let mut shutdown_signal = shutdown_signal.fuse();
-    let mut reader = reader.fuse();
-    let mut tripwire = tripwire.fuse();
     loop {
-        futures::select! {
-            _ = tripwire => break,
-            _ = shutdown_signal => {
+        tokio::select! {
+            _ = &mut tripwire => break,
+            _ = &mut shutdown_signal => {
                 debug!("Start graceful shutdown.");
                 // Close our write part of TCP socket to signal the other side
                 // that it should stop writing and close the channel.
-                let socket = reader.get_ref().get_ref();
+                let socket = reader.get_ref();
                 if let Some(stream) = socket.get_ref() {
                     let socket = SockRef::from(stream);
                     if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
@@ -259,7 +256,7 @@ async fn handle_stream<T>(
                         if let Some(event) = source.build_event(frame, host) {
                             match out.send(event).await {
                                 Ok(_) => {
-                                    let stream = reader.get_mut().get_mut();
+                                    let stream = reader.get_mut();
                                     if let Err(error) = stream.write_all(&ack).await {
                                         emit!(TcpSendAckError{ error });
                                         break;
@@ -284,7 +281,7 @@ async fn handle_stream<T>(
                     },
                 }
             }
-            complete => break,
+            else => break,
         }
     }
 }
