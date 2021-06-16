@@ -338,20 +338,296 @@ mod test {
             // Multiple wildcards.
             (
                 "*b*la*",
-                log_event!["custom" => json!({"title": "fooblablabaz"})],
+                log_event!["custom" => r#"{"title": "foobla"}"#],
                 log_event![],
             ),
             // Multiple wildcards (negate).
             (
                 "NOT *b*la*",
                 log_event![],
-                log_event!["custom" => json!({"title": "fooblablabaz"})],
+                log_event!["custom" => r#"{"title": "foobla"}"#],
             ),
             // Multiple wildcards (negate w/-).
             (
                 "-*b*la*",
                 log_event![],
-                log_event!["custom" => json!({"title": "fooblablabaz"})],
+                log_event!["custom" => r#"{"title": "foobla"}"#],
+            ),
+            // Wildcard prefix - tag.
+            (
+                "a:*bla",
+                log_event!["tags" => vec!["foobla"]],
+                log_event!["tags" => vec!["blafoo"]],
+            ),
+            // Wildcard prefix - tag (negate).
+            (
+                "NOT a:*bla",
+                log_event!["tags" => vec!["blafoo"]],
+                log_event!["tags" => vec!["foobla"]],
+            ),
+            // Wildcard prefix - tag (negate w/-).
+            (
+                "-a:*bla",
+                log_event!["tags" => vec!["blafoo"]],
+                log_event!["tags" => vec!["foobla"]],
+            ),
+            // Wildcard suffix - tag.
+            (
+                "b:bla*",
+                log_event!["tags" => vec!["b:blabop"]],
+                log_event!["tags" => vec!["b:bopbla"]],
+            ),
+            // Wildcard suffix - tag (negate).
+            (
+                "NOT b:bla*",
+                log_event!["tags" => vec!["b:blabop"]],
+                log_event!["tags" => vec!["b:bopbla"]],
+            ),
+            // Wildcard suffix - tag (negate w/-).
+            (
+                "-b:bla*",
+                log_event!["tags" => vec!["b:blabop"]],
+                log_event!["tags" => vec!["b:bopbla"]],
+            ),
+            // Multiple wildcards - tag.
+            (
+                "c:*b*la*",
+                log_event!["tags" => vec!["c:foobla"]],
+                log_event!["custom" => r#"{"title": "foobla"}"#],
+            ),
+            // Multiple wildcards - tag (negate).
+            (
+                "NOT c:*b*la*",
+                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["tags" => vec!["c:foobla"]],
+            ),
+            // Multiple wildcards - tag (negate w/-).
+            (
+                "-c:*b*la*",
+                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["tags" => vec!["c:foobla"]],
+            ),
+            // Wildcard prefix - facet.
+            (
+                "@a:*bla",
+                log_event!["custom" => r#"{"a": "foobla"}"#],
+                log_event!["tags" => vec!["a:foobla"]],
+            ),
+            // Wildcard prefix - facet (negate).
+            (
+                "NOT @a:*bla",
+                log_event!["tags" => vec!["a:foobla"]],
+                log_event!["custom" => r#"{"a": "foobla"}"#],
+            ),
+            // Wildcard prefix - facet (negate w/-).
+            (
+                "-@a:*bla",
+                log_event!["tags" => vec!["a:foobla"]],
+                log_event!["custom" => r#"{"a": "foobla"}"#],
+            ),
+            // Wildcard suffix - facet.
+            (
+                "@b:bla*",
+                log_event!["custom" => r#"{"b": "blabop"}"#],
+                log_event!["tags" => vec!["b:blabop"]],
+            ),
+            // Wildcard suffix - facet (negate).
+            (
+                "NOT @b:bla*",
+                log_event!["tags" => vec!["b:blabop"]],
+                log_event!["custom" => r#"{"b": "blabop"}"#],
+            ),
+            // Wildcard suffix - facet (negate w/-).
+            (
+                "-@b:bla*",
+                log_event!["tags" => vec!["b:blabop"]],
+                log_event!["custom" => r#"{"b": "blabop"}"#],
+            ),
+            // Multiple wildcards - facet.
+            (
+                "@c:*b*la*",
+                log_event!["custom" => r#"{"c": "foobla"}"#],
+                log_event!["tags" => vec!["c:foobla"]],
+            ),
+            // Multiple wildcards - facet (negate).
+            (
+                "NOT @c:*b*la*",
+                log_event!["tags" => vec!["c:foobla"]],
+                log_event!["custom" => r#"{"c": "foobla"}"#],
+            ),
+            // Multiple wildcards - facet (negate w/-).
+            (
+                "-@c:*b*la*",
+                log_event!["custom" => r#"{"c": "foobla"}"#],
+                log_event!["tags" => vec!["c:foobla"]],
+            ),
+            // Special case for tags.
+            (
+                "tags:a",
+                log_event!["tags" => vec!["a", "b", "c"]],
+                log_event!["tags" => vec!["d", "e", "f"]],
+            ),
+            // Special case for tags (negate).
+            (
+                "NOT tags:a",
+                log_event!["tags" => vec!["d", "e", "f"]],
+                log_event!["tags" => vec!["a", "b", "c"]],
+            ),
+            // Special case for tags (negate w/-).
+            (
+                "-tags:a",
+                log_event!["tags" => vec!["d", "e", "f"]],
+                log_event!["tags" => vec!["a", "b", "c"]],
+            ),
+            // Range - numeric, inclusive.
+            (
+                "[1 TO 10]",
+                log_event!["message" => "1"],
+                log_event!["message" => "2"],
+            ),
+            // Range - numeric, inclusive (negate).
+            (
+                "NOT [1 TO 10]",
+                log_event!["message" => "2"],
+                log_event!["message" => "1"],
+            ),
+            // Range - numeric, inclusive (negate w/-).
+            (
+                "-[1 TO 10]",
+                log_event!["message" => "2"],
+                log_event!["message" => "1"],
+            ),
+            // Range - numeric, inclusive, unbounded (upper).
+            (
+                "[50 TO *]",
+                log_event!["message" => "6"],
+                log_event!["message" => "40"],
+            ),
+            // Range - numeric, inclusive, unbounded (upper) (negate).
+            (
+                "NOT [50 TO *]",
+                log_event!["message" => "40"],
+                log_event!["message" => "6"],
+            ),
+            // Range - numeric, inclusive, unbounded (upper) (negate w/-).
+            (
+                "-[50 TO *]",
+                log_event!["message" => "40"],
+                log_event!["message" => "6"],
+            ),
+            // Range - numeric, inclusive, unbounded (lower).
+            (
+                "[* TO 50]",
+                log_event!["message" => "3"],
+                log_event!["message" => "6"],
+            ),
+            // Range - numeric, inclusive, unbounded (lower) (negate).
+            (
+                "NOT [* TO 50]",
+                log_event!["message" => "6"],
+                log_event!["message" => "3"],
+            ),
+            // Range - numeric, inclusive, unbounded (lower) (negate w/-).
+            (
+                "-[* TO 50]",
+                log_event!["message" => "6"],
+                log_event!["message" => "3"],
+            ),
+            // Range - numeric, inclusive, unbounded (both).
+            ("[* TO *]", log_event!["message" => "foo"], log_event![]),
+            // Range - numeric, inclusive, unbounded (both) (negate).
+            ("NOT [* TO *]", log_event![], log_event!["message" => "foo"]),
+            // Range - numeric, inclusive, unbounded (both) (negate w/-i).
+            ("-[* TO *]", log_event![], log_event!["message" => "foo"]),
+            // Range - numeric, inclusive, tag.
+            (
+                "a:[1 TO 10]",
+                log_event!["tags" => vec!["a:1"]],
+                log_event!["tags" => vec!["a:2"]],
+            ),
+            // Range - numeric, inclusive, tag (negate).
+            (
+                "NOT a:[1 TO 10]",
+                log_event!["tags" => vec!["a:2"]],
+                log_event!["tags" => vec!["a:1"]],
+            ),
+            // Range - numeric, inclusive, tag (negate w/-).
+            (
+                "-a:[1 TO 10]",
+                log_event!["tags" => vec!["a:2"]],
+                log_event!["tags" => vec!["a:1"]],
+            ),
+            // Range - numeric, inclusive, unbounded (upper), tag.
+            (
+                "a:[50 TO *]",
+                log_event!["tags" => vec!["a:6"]],
+                log_event!["tags" => vec!["a:40"]],
+            ),
+            // Range - numeric, inclusive, unbounded (upper), tag (negate).
+            (
+                "NOT a:[50 TO *]",
+                log_event!["tags" => vec!["a:40"]],
+                log_event!["tags" => vec!["a:6"]],
+            ),
+            // Range - numeric, inclusive, unbounded (upper), tag (negate w/-).
+            (
+                "-a:[50 TO *]",
+                log_event!["tags" => vec!["a:40"]],
+                log_event!["tags" => vec!["a:6"]],
+            ),
+            // Range - numeric, inclusive, unbounded (lower), tag.
+            (
+                "a:[* TO 50]",
+                log_event!["tags" => vec!["a:400"]],
+                log_event!["tags" => vec!["a:600"]],
+            ),
+            // Range - numeric, inclusive, unbounded (lower), tag (negate).
+            (
+                "NOT a:[* TO 50]",
+                log_event!["tags" => vec!["a:600"]],
+                log_event!["tags" => vec!["a:400"]],
+            ),
+            // Range - numeric, inclusive, unbounded (lower), tag (negate w/-).
+            (
+                "-a:[* TO 50]",
+                log_event!["tags" => vec!["a:600"]],
+                log_event!["tags" => vec!["a:400"]],
+            ),
+            // Range - numeric, inclusive, unbounded (both), tag.
+            (
+                "a:[* TO *]",
+                log_event!["tags" => vec!["a:test"]],
+                log_event!["tags" => vec!["b:test"]],
+            ),
+            // Range - numeric, inclusive, unbounded (both), tag (negate).
+            (
+                "NOT a:[* TO *]",
+                log_event!["tags" => vec!["b:test"]],
+                log_event!["tags" => vec!["a:test"]],
+            ),
+            // Range - numeric, inclusive, unbounded (both), tag (negate w/-).
+            (
+                "-a:[* TO *]",
+                log_event!["tags" => vec!["b:test"]],
+                log_event!["tags" => vec!["a:test"]],
+            ),
+            // Range - numeric, inclusive, facet.
+            (
+                "@b:[1 TO 10]",
+                log_event!["custom" => json!({"b": 5})],
+                log_event!["custom" => json!({"b": 11})],
+            ),
+            // Range - numeric, inclusive, facet (negate).
+            (
+                "NOT @b:[1 TO 10]",
+                log_event!["custom" => json!({"b": 11})],
+                log_event!["custom" => json!({"b": 5})],
+            ),
+            // Range - numeric, inclusive, facet (negate w/-).
+            (
+                "-@b:[1 TO 10]",
+                log_event!["custom" => json!({"b": 11})],
+                log_event!["custom" => json!({"b": 5})],
             ),
         ];
 
