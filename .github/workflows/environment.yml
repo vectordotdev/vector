@@ -1,8 +1,10 @@
 name: Environment Suite
 
 on:
+  pull_request: {}
   push:
-    branches: master
+    branches:
+      - master
   workflow_dispatch:
 
 env:
@@ -29,5 +31,5 @@ jobs:
         with:
           context: .
           file: ./scripts/environment/Dockerfile
-          push: true
+          push: github.ref == 'refs/heads/master'
           tags: timberio/ci_image:latest
