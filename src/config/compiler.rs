@@ -110,7 +110,7 @@ enum InputMatcher {
 
 impl InputMatcher {
     fn matches(&self, candidate: &str) -> bool {
-        use Matcher::*;
+        use InputMatcher::*;
 
         match self {
             Pattern(pattern) => pattern.matches(candidate),
