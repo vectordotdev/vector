@@ -4,9 +4,9 @@ use indexmap::IndexMap;
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
-    expand_globs(&mut builder);
-
     let expansions = expand_macros(&mut builder)?;
+
+    expand_globs(&mut builder);
 
     let warnings = validation::warnings(&builder);
 
