@@ -150,10 +150,6 @@ Vector yet. Adding a system that would allow custom-defined codecs could be
 considered in the future, for now this is can be accomplished by the `wasm` or
 `lua` transform.
 
-Codecs are very close to transform steps. When looking at e.g. the existing
-`json` transform, it is apparent that it can be further configured. In this
-initial design, we will not allow any configuration and choose common defaults.
-
 ## Plan Of Attack
 
 - Implement common structures for `Framer`s and `Codec`s in topology builder and
