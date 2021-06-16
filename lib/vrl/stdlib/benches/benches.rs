@@ -10,6 +10,7 @@ criterion_group!(
     // https://github.com/timberio/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
     targets = assert,
+              assert_eq,
               ceil,
               compact,
               contains,
@@ -118,6 +119,15 @@ bench_function! {
 
     literal {
         args: func_args![condition: value!(true), message: "must be true"],
+        want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
+    assert_eq=> vrl_stdlib::AssertEq;
+
+    literal {
+        args: func_args![left: value!(true), right: value!(true), message: "must be true"],
         want: Ok(value!(true)),
     }
 }
