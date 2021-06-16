@@ -58,18 +58,15 @@ impl<'de> Deserialize<'de> for CodecsConfig {
             /// Represents a single codec config.
             Single(CodecConfig),
             /// Represents multiple codec configs.
-            Multiple(Vec<CodecConfig>),
+            Multiple(Box<[CodecConfig]>),
         }
 
         let config = CodecsConfig::deserialize(deserializer)?;
 
-        Ok(Self(
-            match config {
-                CodecsConfig::Single(config) => vec![config],
-                CodecsConfig::Multiple(configs) => configs,
-            }
-            .into(),
-        ))
+        Ok(Self(match config {
+            CodecsConfig::Single(config) => vec![config].into(),
+            CodecsConfig::Multiple(configs) => configs,
+        }))
     }
 }
 

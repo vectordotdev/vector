@@ -58,18 +58,15 @@ impl<'de> Deserialize<'de> for FramingsConfig {
             /// Represents a single framing config.
             Single(FramingConfig),
             /// Represents multiple framing configs.
-            Multiple(Vec<FramingConfig>),
+            Multiple(Box<[FramingConfig]>),
         }
 
         let config = FramingsConfig::deserialize(deserializer)?;
 
-        Ok(Self(
-            match config {
-                FramingsConfig::Single(config) => vec![config],
-                FramingsConfig::Multiple(configs) => configs,
-            }
-            .into(),
-        ))
+        Ok(Self(match config {
+            FramingsConfig::Single(config) => vec![config].into(),
+            FramingsConfig::Multiple(configs) => configs,
+        }))
     }
 }
 
