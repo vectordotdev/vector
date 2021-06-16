@@ -206,8 +206,8 @@ async fn nonexistant_input() {
     assert_eq!(
         err,
         vec![
-            "Input \"asdf\" for sink \"out\" doesn't exist.",
-            "Input \"qwerty\" for transform \"sample\" doesn't exist.",
+            "Sink \"out\" has no inputs",
+            "Transform \"sample\" has no inputs"
         ]
     );
 }
