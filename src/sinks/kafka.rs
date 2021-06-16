@@ -355,7 +355,7 @@ impl Sink<Event> for KafkaSink {
                             trace!(message = "Produced message.", ?partition, ?offset);
                         }
                         Err(error) => {
-                            metadata.update_status(EventStatus::Errored); // should this be `Failed`?
+                            metadata.update_status(EventStatus::Errored);
                             error!(message = "Kafka error.", %error);
                         }
                     }
