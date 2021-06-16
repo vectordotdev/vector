@@ -2,11 +2,11 @@
 {{ $v1 := cond (eq $version "nightly") "nightly/latest" $version }}
 {{ $host := site.Data.matrix.host }}
 {{ $matrix := site.Data.docs.administration.downloads }}
-<div class="flex flex-col space-y-1.5">
+<div class="flex flex-col space-y-4">
   {{ range $matrix }}
   {{ $file := .file }}
   {{ $prefix := .prefix }}
-  <div class="grid grid-cols-8 items-center">
+  <div class="space-y-1 md:grid md:grid-cols-8 items-center">
     <div class="col-span-2">
       {{/* Platform */}}
       <span class="text-gray-700 dark:text-gray-300 text-lg font-semibold tracking-tight">
@@ -14,16 +14,16 @@
       </span>
     </div>
 
-    <div class="col-span-1">
+    <div class="">
       {{/* File type */}}
       <span class="font-mono text-xs text-dark dark:text-gray-300">
         {{ .file_type }}
       </span>
     </div>
 
-    <div class="col-span-5">
+    <div class="">
       {{/* Targets (ARM, x86_64, etc.) */}}
-      <div class="flex space-x-1.5">
+      <div class="flex space-x-1">
         {{ range .options }}
         {{ $vector := cond (eq $version "nightly") "vector/nightly" "vector" }}
         {{ $url := .download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
@@ -31,7 +31,7 @@
         <a
           type="button"
           href="{{ $url }}"
-          class="flex items-center space-x-1 py-1.5 px-2.5 border dark:border-gray-700 rounded-md dark:bg-dark hover:bg-gray-50 dark:hover:bg-black"
+          class="flex items-center space-x-1 py-1 px-2 border dark:border-gray-700 rounded-md dark:bg-dark hover:bg-gray-50 dark:hover:bg-black"
           download>
 
           {{/* Heroicon: outline/download */}}
@@ -53,7 +53,7 @@
 
 {{ $version = cond (eq $version "nightly") "nightly/latest" $version }}
 {{ $link := printf "https://packages.timber.io/vector/%s" $version }}
-<div class="mt-4">
+<div class="mt-8">
   <a href="{{ $link }}" class="text-sm text-gray-500 hover:text-dark dark:text-gray-300" target="_blank">
     browse all files...
   </a>

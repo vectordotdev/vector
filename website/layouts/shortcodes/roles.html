@@ -16,7 +16,7 @@
 
 
 {{ define "role-image" }}
-{{ $svg := printf "img/%s-role.svg" . }}
+{{ $svg := printf "img/roles/%s.svg" . }}
 {{ partial "svg.html" (dict "src" $svg) }}
 {{ end }}
 

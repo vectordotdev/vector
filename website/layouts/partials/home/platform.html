@@ -26,7 +26,7 @@
     <div class="mt-12 mx-auto flex flex-col items-center">
       {{ range $tabs }}
       {{ $name := . | lower | urlize }}
-      {{ $svg := printf "/img/pipelines-%s.svg" (. | urlize) }}
+      {{ $svg := printf "/img/topologies/%s.svg" (. | urlize) }}
       {{ $url := printf "/docs/setup/deployment/topologies/#%s" $name | relURL }}
       <div x-show="$store.global.platformTab === '{{ . }}'">
         <div class="max-w-full md:max-w-5xl">

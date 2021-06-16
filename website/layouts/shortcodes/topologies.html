@@ -27,6 +27,6 @@
 {{ end }}
 
 {{ define "topology-image" }}
-{{ $svg := printf "img/pipelines-%s.svg" (. | urlize) }}
+{{ $svg := printf "img/topologies/%s.svg" (. | urlize) }}
 {{ partial "svg.html" (dict "src" $svg) }}
 {{ end }}
