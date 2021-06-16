@@ -43,6 +43,7 @@ default = [
     "append",
     "array",
     "assert",
+    "assert_eq",
     "boolean",
     "ceil",
     "compact",
@@ -144,6 +145,7 @@ default = [
 append = []
 array = []
 assert = []
+assert_eq = []
 boolean = []
 ceil = []
 compact = []
