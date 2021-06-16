@@ -12,6 +12,7 @@ use crate::service;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
+#[structopt(name = "collector")]
 pub struct Opts {
     #[structopt(flatten)]
     pub root: RootOpts,
