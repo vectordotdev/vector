@@ -4,7 +4,7 @@ administration: topologies: centralized: {
 	title: "Centralized"
 	order: 2
 	description: """
-		A good balance of simplicity, stability, and control. For manu use cases, a centralized deployment topology is
+		A good balance of simplicity, stability, and control. For many use cases, a centralized deployment topology is
 		a good compromise between the [distributed](#distributed) and [stream-based](#stream-based) topologies, as it
 		offers many of the advantages of a stream-based topology, such as a clean separation of responsibilities,
 		without the management overheard incurred by a stream-based setup, which often involves using Vector in
@@ -32,8 +32,8 @@ administration: topologies: centralized: {
 			title: "Has multi-host context"
 			description: """
 				Because your data is centralized, you can perform operations across hosts, such as reducing logs to
-				global metrics. This can be advantageous for large deployments in which individual host metrics don't
-				provide much useful information.
+				global metrics. This can be advantageous for large deployments in which metrics aggregated across many
+				hosts are more informative than isolated per-host metrics.
 				"""
 		}
 	]
@@ -50,9 +50,10 @@ administration: topologies: centralized: {
 			title: "Less durable"
 			description: """
 				[Agent](\(urls.vector_agent_role)) nodes are designed to get data off of the machine as quickly as
-				possible. While this is fine for some use cases, it does bear the potential for data loss since the
-				central Vector service could go down and thus lose buffered data. If this type of outage is unacceptable
-				for your requirements, we recommend running a [stream-based](#stream-based) topology.
+				possible. While this is fine for some use cases, it does bear the possibility of data loss since the
+				central Vector service could go down and thus lose any buffered data. If this type of outage is
+				unacceptable for your requirements, we recommend running a [stream-based](#stream-based) topology
+				instead.
 				"""
 		},
 	]

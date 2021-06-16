@@ -15,4 +15,4 @@ const main = () => {
   tableOfContents();
 }
 
-main();
+document.addEventListener('DOMContentLoaded', main());

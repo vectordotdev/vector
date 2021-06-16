@@ -7,7 +7,7 @@
   {{ .description | markdownify }}
 </div>
 
-{{ partial "heading.html" (dict "text" "Pros" "level" 3) }}
+{{ partial "heading.html" (dict "text" "Pros" "level" 3 "id" (printf "pros-%s" (.title | urlize))) }}
 <ul>
   {{ range .pros }}
   <li>
@@ -16,7 +16,7 @@
   {{ end }}
 </ul>
 
-{{ partial "heading.html" (dict "text" "Cons" "level" 3) }}
+{{ partial "heading.html" (dict "text" "Cons" "level" 3 "id" (printf "cons-%s" (.title | urlize))) }}
 <ul>
   {{ range .cons }}
   <li>

@@ -1,4 +1,4 @@
 {{ $tocJs   := "js/toc.js"}}
 {{ $tocJsOpts := dict "targetPath" $tocJs "minify" true }}
-{{ $toc  := resources.Get $tocJs | resources.ExecuteAsTemplate $tocJs . | js.Build $tocJsOpts }}
+{{ $toc  := resources.Get $tocJs | js.Build $tocJsOpts }}
 <script type="text/javascript" src="{{ $toc.RelPermalink }}" integrity="{{ $toc.Data.Integrity }}"></script>
