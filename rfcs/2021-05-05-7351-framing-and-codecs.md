@@ -97,8 +97,13 @@ from the Vector config.
 
 ## Rationale
 
-One prime example where a source's implementation may be reused with a different
-codec is the `syslog` source (see
+One often request feature is reading JSON-encoded messages from Kafka.
+Currently, this can only be accomplished by configuring and wiring together two
+separate components, where with codecs it could be a simple one-line change to
+the config.
+
+Introducing framing/codecs, a source's implementation may also be reused
+internally. One example would be the `syslog` source (see
 [#7046](https://github.com/timberio/vector/pull/7046)), or the upcoming `syslog`
 sink in [#7106](https://github.com/timberio/vector/issues/7106). Instead of
 re-implementing socket-based connection handling, the `syslog` components could
