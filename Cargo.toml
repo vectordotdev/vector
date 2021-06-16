@@ -16,6 +16,11 @@ name = "graphql-schema"
 path = "src/api/schema/gen.rs"
 required-features = ["default-no-api-client"]
 
+[[bin]]
+name = "collector"
+path = "src/collector.rs"
+edition = "2018"
+
 [profile.dev]
 split-debuginfo = "unpacked" # Faster debug builds on macOS
 

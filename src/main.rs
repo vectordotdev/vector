@@ -2,7 +2,7 @@ extern crate vector;
 use vector::app::Application;
 
 #[cfg(unix)]
-fn main() {
+pub fn main() {
     let app = Application::prepare().unwrap_or_else(|code| {
         std::process::exit(code);
     });
