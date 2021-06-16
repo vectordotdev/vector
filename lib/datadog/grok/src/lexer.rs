@@ -160,22 +160,6 @@ impl<'input> Lexer<'input> {
         self.peek().as_ref().map_or(self.input.len(), |l| l.0)
     }
 
-    fn escape_code(&mut self, start: usize) -> Result<char, Error> {
-        match self.bump() {
-            Some((_, '\'')) => Ok('\''),
-            Some((_, '"')) => Ok('"'),
-            Some((_, '\\')) => Ok('\\'),
-            Some((_, 'n')) => Ok('\n'),
-            Some((_, 'r')) => Ok('\r'),
-            Some((_, 't')) => Ok('\t'),
-            Some((start, ch)) => Err(Error::EscapeChar {
-                start,
-                ch: Some(ch),
-            }),
-            None => Err(Error::EscapeChar { start, ch: None }),
-        }
-    }
-
     fn token(&mut self, start: usize, token: Token<&'input str>) -> Spanned<'input, usize> {
         let end = self.next_index();
         self.token2(start, end, token)

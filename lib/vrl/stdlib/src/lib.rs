@@ -179,7 +179,7 @@ mod to_bool;
 #[cfg(feature = "to_float")]
 mod to_float;
 #[cfg(feature = "to_int")]
-pub mod to_int;
+mod to_int;
 #[cfg(feature = "to_regex")]
 mod to_regex;
 #[cfg(feature = "to_string")]
@@ -287,7 +287,6 @@ pub use is_timestamp::IsTimestamp;
 pub use join::Join;
 #[cfg(feature = "length")]
 pub use length::Length;
-pub use length::LengthFn;
 #[cfg(feature = "log")]
 pub use log::Log;
 #[cfg(feature = "merge")]
@@ -378,7 +377,6 @@ pub use to_bool::ToBool;
 pub use to_float::ToFloat;
 #[cfg(feature = "to_int")]
 pub use to_int::ToInt;
-pub use to_int::ToIntFn;
 #[cfg(feature = "to_regex")]
 pub use to_regex::ToRegex;
 #[cfg(feature = "to_string")]

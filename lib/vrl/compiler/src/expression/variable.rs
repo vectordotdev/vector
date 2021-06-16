@@ -5,8 +5,8 @@ use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
-    pub ident: Ident,
-    pub value: Option<Value>,
+    ident: Ident,
+    value: Option<Value>,
 }
 
 impl Variable {

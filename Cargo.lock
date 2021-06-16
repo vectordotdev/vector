@@ -1705,7 +1705,11 @@ name = "datadog-grok"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "derivative 2.2.0",
  "grok",
+ "indoc",
+ "inventory",
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
@@ -1716,6 +1720,7 @@ dependencies = [
  "shared",
  "thiserror",
  "tokio",
+ "typetag",
  "vector_core",
  "vrl",
  "vrl-compiler",
@@ -7808,6 +7813,7 @@ dependencies = [
  "criterion",
  "crossterm",
  "dashmap",
+ "datadog-grok",
  "derivative 2.2.0",
  "dirs-next",
  "dyn-clone",

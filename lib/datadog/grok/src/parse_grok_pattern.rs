@@ -2,9 +2,12 @@ use crate::ast::GrokPattern;
 use crate::lexer::Lexer;
 lalrpop_mod!(pub parser);
 
-pub fn parse_grok_pattern(input: &str) -> GrokPattern {
+/// Parses grok patterns as %{MATCHER:FIELD:FILTER}
+pub fn parse_grok_pattern(input: &str) -> Result<GrokPattern, &str> {
     let lexer = Lexer::new(input);
-    parser::GrokFilterParser::new().parse(input, lexer).unwrap() // TODO return Result, handle errors,
+    parser::GrokFilterParser::new()
+        .parse(input, lexer)
+        .map_err(|_| input) // just return the original string containing an error
 }
 
 #[cfg(test)]
@@ -13,8 +16,7 @@ mod tests {
     use crate::ast::FunctionArgument;
 
     use lookup::{LookupBuf, SegmentBuf};
-    use vrl::prelude::*;
-    use vrl::Function;
+    use vrl_core::prelude::*;
 
     fn from_path_segments(path_segments: Vec<&str>) -> LookupBuf {
         LookupBuf::from_segments(

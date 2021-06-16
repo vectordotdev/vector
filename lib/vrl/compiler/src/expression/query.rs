@@ -7,8 +7,8 @@ use std::fmt;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
-    pub target: Target,
-    pub path: LookupBuf,
+    target: Target,
+    path: LookupBuf,
 }
 
 impl Query {

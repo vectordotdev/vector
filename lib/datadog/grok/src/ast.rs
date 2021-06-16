@@ -1,7 +1,7 @@
 use lookup::LookupBuf;
 use vrl::Value;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct GrokPattern {
     pub match_fn: Function,
     pub destination: Option<Destination>,
@@ -24,13 +24,3 @@ pub enum FunctionArgument {
     FUNCTION(Function),
     ARG(Value),
 }
-// #[derive(Debug)]
-// pub struct RawRegex {
-//     pub(crate) pattern: String,
-// }
-//
-// #[derive(Debug)]
-// pub enum Rule {
-//     RawRegex(String),
-//     FunctionOrRef(Vec<String>),
-// }

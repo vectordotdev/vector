@@ -11,7 +11,7 @@ use std::fmt;
 
 #[derive(Clone, PartialEq)]
 pub struct Assignment {
-    pub variant: Variant<Target, Expr>, //TODO
+    variant: Variant<Target, Expr>,
 }
 
 impl Assignment {

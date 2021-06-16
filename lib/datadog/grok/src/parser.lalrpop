@@ -1,7 +1,5 @@
 use crate::ast::*;
 use crate::lexer::*;
-use std::fmt;
-use std::str::FromStr;
 use vrl::prelude::Value;
 use vrl::prelude::NotNan;
 use lookup::{LookupBuf, SegmentBuf, FieldBuf};
@@ -18,9 +16,6 @@ extern {
         "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
-
-         "sign" => Token::Sign(<&'input str>),
-         "e" => Token::Exponent,
 
         "null" => Token::Null,
         "true" => Token::True,

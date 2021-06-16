@@ -6,9 +6,9 @@ use std::fmt;
 
 #[derive(Clone, PartialEq)]
 pub struct Op {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-    pub opcode: ast::Opcode,
+    pub(crate) lhs: Box<Expr>,
+    pub(crate) rhs: Box<Expr>,
+    pub(crate) opcode: ast::Opcode,
 }
 
 impl Op {
