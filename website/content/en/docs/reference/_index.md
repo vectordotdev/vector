@@ -1,6 +1,5 @@
 ---
 title: Reference
-icon: fas fa-asterisk
 weight: 3
 ---
 

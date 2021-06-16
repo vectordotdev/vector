@@ -5,17 +5,14 @@ description: >
 buttons:
 - title: Discord chat
   description: Ask questions and get help
-  icon: fab fa-discord
   icon_color: discord-purple
   url: https://chat.vector.dev
 - title: "@vectordotdev"
   description: Follow us in real time
-  icon: fab fa-twitter
   icon_color: twitter-blue
   url: https://twitter.com/vectordotdev
 - title: timberio/vector
   description: Issues, code, and development
-  icon: fab fa-github
   icon_color: black
   url: https://github.com/timberio/vector
 ---

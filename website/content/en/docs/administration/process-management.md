@@ -1,19 +1,179 @@
 ---
 title: Process management
+description: Basic tasks involving your Vector instance, such as starting and stopping
 short: Management
 weight: 1
 ---
 
-This document shows you how to manage the Vector process using various platforms. *How* you manage the Vector process is largely dependent on how you installed it.
+This document shows you how to manage the Vector process on various platforms. *How* you manage the Vector process is largely dependent on how you installed it.
 
 ## Administrate
 
-{{< administration/manage >}}
+The sections below show you how to administer your Vector instance—start, stop, reload, etc.—on these available platforms:
+
+* [Vector executable](#vector-executable) (no process manager)
+* [Linux](#linux)
+* [macOS](#macos)
+* [Windows](#windows)
+* [Docker](#docker)
+
+### Vector executable
+
+To manage the Vector executable directly, without a process manager:
+
+{{< tabs default="Start" >}}
+
+{{< tab title="Start" >}}
+```bash
+vector --config /etc/vector/vector.toml
+
+# Or supply a JSON or YAML config file
+```
+{{< /tab >}}
+{{< tab title="Reload" >}}
+```bash
+killall -s SIGHUP vector
+```
+{{< /tab >}}
+{{< /tabs >}}
+
+### Linux
+
+#### APT, dpkg, RPM, YUM
+
+If you've installed Vector using [APT], [dpkg], [RPM], or [YUM], you can manage it using [systemctl].
+
+{{< tabs default="Start" >}}
+{{< tab title="Start" >}}
+```bash
+sudo systemctl start vector
+```
+{{< /tab >}}
+{{< tab title="Stop" >}}
+```bash
+sudo systemctl stop vector
+```
+{{< /tab >}}
+{{< tab title="Reload" >}}
+```bash
+systemctl kill -s HUP --kill-who=main vector.service
+```
+{{< /tab >}}
+{{< tab title="Restart" >}}
+```bash
+sudo systemctl restart vector
+```
+{{< /tab >}}
+{{< /tabs >}}
+
+#### Nix
+
+If you've installed Vector using [Nix], you can manage it using the commands laid out in the [Vector
+executable](#vector-executable) section.
+
+### macOS
+
+If you're running Vector on macOS, you can manage it either using the [executable](#vector-executable) commands or using
+[Homebrew](#homebrew).
+
+#### Homebrew
+
+If you've installed Vector using [Homebrew], you can manage it using Homebrew's [services][brew_services] utility.
+
+{{< tabs default="Start" >}}
+{{< tab title="Start" >}}
+```bash
+brew services start vector
+```
+{{< /tab >}}
+{{< tab title="Stop" >}}
+```bash
+brew services stop vector
+```
+{{< /tab >}}
+{{< tab title="Reload" >}}
+```bash
+killall -S SIGHUP vector
+```
+{{< /tab >}}
+{{< tab title="Restart" >}}
+```bash
+brew services restart vector
+```
+{{< /tab >}}
+{{< /tabs >}}
+
+### Windows
+
+If you're running Vector on Windows (perhaps you installed it using [MSI]), you can manage it using these commands:
+
+{{< tabs default="Start" >}}
+{{< tab title="Start" >}}
+```powershell
+C:\Program Files\Vector\bin\vector \
+  --config C:\Program Files\Vector\config\vector.toml
+
+# Or supply a JSON or YAML config file
+```
+{{< /tab >}}
+{{< /tabs >}}
+
+### Docker
+
+If you're running Vector using [Docker], the command interface is the same across all platforms.
+
+{{< tabs default="Start" >}}
+{{< tab title="Start" >}}
+```bash
+docker run \
+  -d \
+  -v ~/vector.toml:/etc/vector/vector.toml:ro \
+  -p 8686:8686 \
+  timberio/vector:0.13.1-alpine
+```
+{{< /tab >}}
+{{< tab title="Stop" >}}
+```bash
+docker stop timberio/vector
+```
+{{< /tab >}}
+{{< tab title="Reload" >}}
+```bash
+docker kill --signal=HUP timberio/vector
+```
+{{< /tab >}}
+{{< tab title="Restart" >}}
+```bash
+docker restart -f $(docker ps -aqf "name=vector")
+```
+{{< /tab >}}
+{{< /tabs >}}
+
+The commands above involve configuring Vector using TOML, but you can also use JSON or YAML. You can also use one of
+three image variants (the commands assume `alpine`):
+
+Variant | Image basis
+:-------|:-----------
+`alpine` | [Alpine](https://hub.docker.com/_/alpine), a Linux distro built around [musl libc](https://www.musl-libc.org) and [BusyBox](https://busybox.net)
+`debian` | The [`debian-slim`](https://hub.docker.com/_/debian) image, which is a smaller and more compact version of the standard `debian` image
+`distroless` | The [Distroless](https://github.com/GoogleContainerTools/distroless) project, which provides extremely lean images with no package managers, shells, or other inessential utilities
 
 ## How it works
 
+Running Vector instances accept the IPC [signals](#signals) and produce the [exit codes](#exit-codes) listed below.
+
 {{< administration/process >}}
 
+[apt]: /docs/setup/installation/package-managers/apt
+[brew_services]: https://github.com/Homebrew/homebrew-services
 [bug]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug
 [configuration]: /docs/reference/configuration
+[docker]: /docs/setup/installation/platforms/docker
+[dpkg]: /docs/setup/installation/package-managers/dpkg
+[homebrew]: /docs/setup/installation/package-managers/homebrew
+[msi]: /docs/setup/installation/package-managers/msi
+[nix]: /docs/setup/installation/package-managers/nix
+[rpm]: /docs/setup/installation/package-managers/rpm
 [sources]: /docs/reference/configuration/sources
+[systemctl]: https://man7.org/linux/man-pages//man1/systemctl.1.html
+[yum]: /docs/setup/installation/package-managers/yum

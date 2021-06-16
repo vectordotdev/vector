@@ -1,4 +1,4 @@
-// One-liner installation commands
+// One-liner installation commands. Currently displayed only on the main page.
 package metadata
 
 #Command: {

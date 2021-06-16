@@ -8,16 +8,12 @@ administration: interfaces: [string]: role_implementations: _vector_aggregator: 
 		}
 	}
 	description: #"""
-				The aggregator role is designed to receive and
-				process data from multiple upstream agents.
-				Typically these are other Vector agents, but it
-				could be anything, including non-Vector agents.
-				By default, we recommend the [`vector` source](\#(urls.vector_source))
-				since it supports all data types, but it is
-				recommended to adjust your pipeline as necessary
-				using Vector's [sources](\#(urls.vector_sources)),
-				[transforms](\#(urls.vector_transforms)), and
-				[sinks](\#(urls.vector_sinks)).
-				"""#
+		The aggregator role is designed to receive and process data from multiple upstream agents.
+		Those agents are typically other Vector instances but could also be non-Vector data sources.
+		By default, we recommend the [`vector` source](\#(urls.vector_source)) since it supports all
+		data types, but we recommend that you adjust your pipeline as necessary using Vector's
+		[sources](\#(urls.vector_sources)), [transforms](\#(urls.vector_transforms)), and
+		[sinks](\#(urls.vector_sinks)).
+		"""#
 	title:       "Aggregator"
 }
