@@ -1231,7 +1231,8 @@ mod integration_tests {
 
         let total = response["hits"]["total"]
             .as_u64()
-            .expect("Elasticsearch response does not include hits->total");
+            .or_else(|| response["hits"]["total"]["value"].as_u64())
+            .expect("Elasticsearch response does not include hits->total nor hits->total->value");
         assert_eq!(1, total);
 
         let hits = response["hits"]["hits"]
@@ -1354,6 +1355,7 @@ mod integration_tests {
         create_template_index(&common, &template_index)
             .await
             .expect("Template index creation error");
+
         create_data_stream(&common, &stream_index)
             .await
             .expect("Data stream creation error");
@@ -1364,6 +1366,20 @@ mod integration_tests {
     async fn run_insert_tests(mut config: ElasticSearchConfig, break_events: bool) {
         config.index = Some(gen_index());
         run_insert_tests_with_config(&config, break_events).await;
+    }
+
+    fn create_http_client() -> reqwest::Client {
+        let mut test_ca = Vec::<u8>::new();
+        File::open(tls::TEST_PEM_CA_PATH)
+            .unwrap()
+            .read_to_end(&mut test_ca)
+            .unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+
+        reqwest::Client::builder()
+            .add_root_certificate(test_ca)
+            .build()
+            .expect("Could not build HTTP client")
     }
 
     async fn run_insert_tests_with_config(config: &ElasticSearchConfig, break_events: bool) {
@@ -1399,17 +1415,7 @@ mod integration_tests {
         // make sure writes all all visible
         flush(common).await.expect("Flushing writes failed");
 
-        let mut test_ca = Vec::<u8>::new();
-        File::open(tls::TEST_PEM_CA_PATH)
-            .unwrap()
-            .read_to_end(&mut test_ca)
-            .unwrap();
-        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
-
-        let client = reqwest::Client::builder()
-            .add_root_certificate(test_ca)
-            .build()
-            .expect("Could not build HTTP client");
+        let client = create_http_client();
 
         let response = client
             .get(&format!("{}/{}/_search", base_url, index))
@@ -1423,9 +1429,10 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let total = response["hits"]["total"]
+        let total = response["hits"]["total"]["value"]
             .as_u64()
-            .expect("Elasticsearch response does not include hits->total");
+            .or_else(|| response["hits"]["total"].as_u64())
+            .expect("Elasticsearch response does not include hits->total nor hits->total->value");
 
         if break_events {
             assert_ne!(input.len() as u64, total);
@@ -1466,13 +1473,13 @@ mod integration_tests {
     }
 
     async fn create_template_index(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {
+        let client = create_http_client();
         let uri = format!("{}/_index_template/{}", common.base_url, name);
-        let response = reqwest::Client::new()
+        let response = client
             .put(uri)
             .json(&json!({
                 "index_patterns": ["my-*-*"],
                 "data_stream": {},
-                "composed_of": ["logs-mapping", "logs-settings"],
             }))
             .send()
             .await?;
@@ -1481,8 +1488,9 @@ mod integration_tests {
     }
 
     async fn create_data_stream(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {
+        let client = create_http_client();
         let uri = format!("{}/_data_stream/{}", common.base_url, name);
-        let response = reqwest::Client::new()
+        let response = client
             .put(uri)
             .header("Content-Type", "application/json")
             .send()
