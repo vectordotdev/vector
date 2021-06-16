@@ -18,6 +18,19 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
         hostPath:
           path: /var/lib/{}-vector/
 
+      extraVolumeMounts:
+        - name: var-lib
+          mountPath: /var/writablelib
+          readOnly: false
+
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - sh
+              - -c
+              - rm -rf /var/writablelib/{}-vector
+
     vector-aggregator:
       fullnameOverride: "{}"
       vectorSource:
@@ -32,6 +45,7 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
     "#,
             agent_override_name,
             aggregator_override_name,
+            agent_override_name,
             agent_override_name,
             aggregator_override_name
         )
