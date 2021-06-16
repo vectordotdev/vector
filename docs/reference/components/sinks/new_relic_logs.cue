@@ -100,6 +100,21 @@ components: sinks: new_relic_logs: {
 				syntax: "literal"
 			}
 		}
+		region: {
+			common:      true
+			description: "The region to send data to."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "us"
+				enum: {
+					us: "United States"
+					eu: "Europe"
+				}
+				syntax: "literal"
+			}
+		}
+
 	}
 
 	input: {
