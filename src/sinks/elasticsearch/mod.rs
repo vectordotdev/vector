@@ -1,3 +1,4 @@
+mod ilm;
 mod retry;
 
 use crate::{
@@ -20,7 +21,7 @@ use futures::{FutureExt, SinkExt};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
-    Request, StatusCode, Uri,
+    Request, Response, StatusCode, Uri,
 };
 use hyper::Body;
 use indexmap::IndexMap;
@@ -690,8 +691,12 @@ impl ElasticSearchCommon {
         request
     }
 
-    async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
-        let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
+    async fn execute_get_request(
+        &self,
+        client: &HttpClient,
+        url: String,
+    ) -> crate::Result<Response<Body>> {
+        let mut builder = Request::get(url);
 
         match &self.credentials {
             None => {
@@ -703,9 +708,16 @@ impl ElasticSearchCommon {
                 let mut signer = self.signed_request("GET", builder.uri_ref().unwrap(), false);
                 builder = finish_signer(&mut signer, &credentials_provider, builder).await?;
             }
-        }
+        };
         let request = builder.body(Body::empty())?;
         let response = client.send(request).await?;
+
+        Ok(response)
+    }
+
+    async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
+        let url = format!("{}/_cluster/health", self.base_url);
+        let response = self.execute_get_request(&client, url).await?;
 
         match response.status() {
             StatusCode::OK => Ok(()),
