@@ -1901,6 +1901,10 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     assert!(got_marker);
 
+    dbg!("Starting to sleep");
+    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+    dbg!("Finished sleep");
+
     framework
         .restart_rollout("test-vector", "daemonset/vector-agent", vec![])
         .await?;
