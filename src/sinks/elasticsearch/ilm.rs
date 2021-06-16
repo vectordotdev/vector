@@ -38,6 +38,8 @@ impl IndexLifecycleManagementConfig {
     }
 }
 
+// ILM feature
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct XPackFeature {
     available: bool,
@@ -62,5 +64,40 @@ impl ElasticSearchCommon {
         let body: XPackResponse = serde_json::from_slice(bytes.as_ref())?;
 
         Ok(body.features)
+    }
+}
+
+// Elasticsearch version
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ElasticVersion {
+    number: String,
+}
+
+impl ElasticVersion {
+    fn major(&self) -> Option<u8> {
+        self.number
+            .split('.')
+            .next()
+            .and_then(|major| major.parse::<u8>().ok())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ElasticStatusResponse {
+    version: ElasticVersion,
+}
+
+impl ElasticSearchCommon {
+    async fn get_version(&self, client: &HttpClient) -> crate::Result<Option<u8>> {
+        let response = self
+            .execute_get_request(client, self.base_url.clone())
+            .await?;
+
+        let body = response.into_body();
+        let bytes = hyper::body::to_bytes(body).await?;
+        let body: ElasticStatusResponse = serde_json::from_slice(bytes.as_ref())?;
+
+        Ok(body.version.major())
     }
 }
