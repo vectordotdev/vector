@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::tls::TlsError;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -53,12 +54,25 @@ impl InternalEvent for TcpSocketConnectionShutdown {
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionError {
-    pub error: crate::tls::TlsError,
+    pub error: TlsError,
 }
 
 impl InternalEvent for TcpSocketConnectionError {
     fn emit_logs(&self) {
-        warn!(message = "Connection error.", error = %self.error, internal_log_rate_secs = 10);
+        match self.error {
+            // Specific error that occures when the other side is only
+            // doing SYN/SYN-ACK connections for healthcheck.
+            // https://github.com/timberio/vector/issues/7318
+            TlsError::Handshake { ref source }
+                if source.code() == openssl::ssl::ErrorCode::SYSCALL
+                    && source.io_error().is_none() =>
+            {
+                debug!(message = "Connection error, probably a healthcheck.", error = %self.error, internal_log_rate_secs = 10);
+            }
+            _ => {
+                warn!(message = "Connection error.", error = %self.error, internal_log_rate_secs = 10)
+            }
+        }
     }
 
     fn emit_metrics(&self) {

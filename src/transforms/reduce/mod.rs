@@ -155,7 +155,7 @@ pub struct Reduce {
 }
 
 impl Reduce {
-    fn new(config: &ReduceConfig) -> crate::Result<Self> {
+    pub fn new(config: &ReduceConfig) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
         }

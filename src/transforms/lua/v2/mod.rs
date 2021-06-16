@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, CONFIG_PATHS},
+    config::{self, DataType, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     transforms::Transform,
@@ -55,9 +55,12 @@ fn default_config_paths() -> Vec<PathBuf> {
         Some(config_paths) => config_paths
             .clone()
             .into_iter()
-            .map(|(mut path_buf, _format)| {
-                path_buf.pop();
-                path_buf
+            .map(|config_path| match config_path {
+                config::ConfigPath::File(mut path, _format) => {
+                    path.pop();
+                    path
+                }
+                config::ConfigPath::Dir(path) => path,
             })
             .collect(),
         None => vec![],

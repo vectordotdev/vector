@@ -109,6 +109,8 @@ urls: {
 	datadog_agent:                                            "https://github.com/DataDog/datadog-agent"
 	datadog_distribution:                                     "\(datadog_docs)/developers/metrics/types/?tab=distribution#definition"
 	datadog_docs:                                             "https://docs.datadoghq.com"
+	datadog_events:                                           "\(datadog_docs)/events/"
+	datadog_events_endpoints:                                 "\(datadog_docs)/api/latest/events/#post-an-event"
 	datadog_logs:                                             "\(datadog_docs)/logs/"
 	datadog_logs_endpoints:                                   "\(datadog_docs)/logs/log_collection/?tab=http#datadog-logs-endpoints"
 	datadog_metrics:                                          "\(datadog_docs)/metrics/"

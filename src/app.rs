@@ -32,7 +32,7 @@ use crate::internal_events::{
 };
 
 pub struct ApplicationConfig {
-    pub config_paths: Vec<(PathBuf, config::FormatHint)>,
+    pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -142,7 +142,7 @@ impl Application {
 
                 if watch_config {
                     // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(config_paths.iter().map(|(path, _)| path), None)
+                    config::watcher::spawn_thread(config_paths.iter().map(Into::into), None)
                         .map_err(|error| {
                             error!(message = "Unable to start config watcher.", %error);
                             exitcode::CONFIG
@@ -151,7 +151,7 @@ impl Application {
 
                 info!(
                     message = "Loading configs.",
-                    path = ?config_paths
+                    paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
