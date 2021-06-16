@@ -119,7 +119,7 @@ impl TcpSource for LogstashSource {
                         .convert::<Value>(timestamp.as_bytes())
                         .ok()
                 })
-                .unwrap_or(Value::from(chrono::Utc::now()));
+                .unwrap_or_else(|| Value::from(chrono::Utc::now()));
             log.insert(log_schema().timestamp_key(), timestamp);
         }
         Some(Event::from(log))
