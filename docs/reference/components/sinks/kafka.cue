@@ -54,7 +54,7 @@ components: sinks: kafka: {
 	configuration: {
 		bootstrap_servers: components._kafka.configuration.bootstrap_servers
 		key_field: {
-			description: "The log field name or tags key to use for the topic key. If the field does not exist on the log or in tags, a blank value will be used. If key_field is not set, the key is not send. Kafka uses a hash of the key to choose the partition or uses a round-robin if the record has no key."
+			description: "The log field name or tags key to use for the topic key. If the field does not exist on the log or in tags, a blank value will be used. If unspecified, the key is not send. Kafka uses a hash of the key to choose the partition or uses a round-robin if the record has no key."
 			required:    false
 			warnings: []
 			type: string: {
