@@ -10,7 +10,7 @@ criterion_group!(
     // https://github.com/timberio/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
     targets = assert,
-    assert_eq,
+              assert_eq,
               ceil,
               compact,
               contains,
