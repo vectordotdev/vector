@@ -30,6 +30,23 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
 
+  build-x86_64-unknown-linux-gnu-debug-tarball:
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
+      - env:
+          PASS_FEATURES: "default"
+          CARGO_PROFILE_RELEASE_DEBUG: 2 # https://doc.rust-lang.org/cargo/reference/profiles.html#debug
+        run: make package-x86_64-unknown-linux-gnu
+      - uses: actions/upload-artifact@v1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz"
+
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
@@ -376,6 +393,7 @@ jobs:
   release-s3:
     runs-on: ubuntu-18.04
     needs:
+      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
@@ -390,6 +408,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
@@ -589,6 +611,7 @@ jobs:
     name: nightly-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
+      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
