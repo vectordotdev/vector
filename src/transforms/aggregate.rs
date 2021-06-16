@@ -166,8 +166,13 @@ impl TaskTransform for Aggregate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
     use crate::{event::metric, event::Event, event::Metric};
+    use futures::SinkExt;
+    use std::{
+        collections::BTreeMap,
+        task::Poll,
+    };
+    use tokio::task::yield_now;
 
     #[test]
     fn generate_config() {
@@ -303,16 +308,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn transform() {
+    async fn transform_shutdown() {
         let agg = toml::from_str::<AggregateConfig>(
             r#"
-interval_ms = 10000
+interval_ms = 999999
 "#,
         )
         .unwrap()
         .build(&GlobalOptions::default())
         .await
         .unwrap();
+
         let agg = agg.into_task();
 
         let tags: BTreeMap<String, String> =
@@ -329,15 +335,15 @@ interval_ms = 10000
             metric::MetricValue::Gauge { value: 43.0 }, tags.clone());
         let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
+        // Queue up some events to be consummed & recorded
         let in_stream = Box::pin(stream::iter(inputs));
+        // Kick off the transform process which should consume & record them
         let mut out_stream = agg.transform(in_stream);
 
-        tokio::time::pause();
-        // 1s longer than our timeout configured up above
-        tokio::time::advance(Duration::from_secs(11)).await;
-        tokio::time::resume();
-
-        let mut count = 0;
+        // B/c the input stream has ended we will have gone through the `input_rx.next() => None`
+        // part of the loop and do the shutting down final flush immediately. We'll already be able
+        // to read our expected bits on the output.
+        let mut count = 0_u8;
         while let Some(event) = out_stream.next().await {
             count += 1;
             match event.as_metric().series().name.name.as_str() {
@@ -346,8 +352,89 @@ interval_ms = 10000
                 _ => assert!(false),
             };
         }
-
         // There were only 2
         assert_eq!(2, count);
+    }
+
+    #[tokio::test]
+    async fn transform_interval() {
+        let agg = toml::from_str::<AggregateConfig>(
+            r#"
+interval_ms = 10000
+"#,
+        )
+        .unwrap()
+        .build(&GlobalOptions::default())
+        .await
+        .unwrap();
+
+        let agg = agg.into_task();
+
+        let tags: BTreeMap<String, String> =
+            vec![("tag1".into(), "val1".into())].into_iter().collect();
+        let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 42.0 }, tags.clone());
+        let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 43.0 }, tags.clone());
+        let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 85.0 }, tags.clone());
+        let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 42.0 }, tags.clone());
+        let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 43.0 }, tags.clone());
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = agg.transform(Box::pin(rx));
+
+        // Don't advance time
+        tokio::time::pause();
+
+        // Yeild so our first (at t0) tick can happen and see nothing
+        yield_now().await;
+
+        // Send our events
+        tx.send(counter_a_1.into()).await.unwrap();
+        tx.send(counter_a_2.into()).await.unwrap();
+        tx.send(gauge_a_1.into()).await.unwrap();
+        tx.send(gauge_a_2.clone().into()).await.unwrap();
+
+        // Give things a chance to run, flush shouldn't trigger, but give it an opportunity
+        yield_now().await;
+
+        // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Now fast foward time enough that our flush should triggered.
+        yield_now().await;
+        tokio::time::advance(Duration::from_secs(11)).await;
+        tokio::time::resume();
+        yield_now().await;
+
+        // B/c the input stream has ended we will have gone through the `input_rx.next() => None`
+        // part of the loop and do the shutting down final flush immediately. We'll already be able
+        // to read our expected bits on the output.
+        let mut count = 0_u8;
+        while count < 2 {
+            if let Some(event) = out_stream.next().await {
+                match event.as_metric().series().name.name.as_str() {
+                    "counter_a" => assert_eq!(counter_a_summed, event),
+                    "gauge_a" => assert_eq!(gauge_a_2, event),
+                    _ => assert!(false),
+                };
+                count += 1;
+            } else {
+                assert!(false);
+            }
+        }
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Close the input stream which should trigger the shutting down flush
+        assert!(tx.close().await.is_ok());
+        // Give the flush a chance to run
+        yield_now().await;
+        // And still nothing there
+        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
     }
 }
