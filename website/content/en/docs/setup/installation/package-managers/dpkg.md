@@ -8,43 +8,32 @@ weight: 2
 
 ## Installation
 
-Install Vector:
-
 ```shell
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{{< version >}}/vector-{{< version >}}-amd64.deb && \
-  sudo dpkg -i vector-{{< version >}}-amd64.deb
+curl \
+  --proto '=https' \
+  --tlsv1.2 -O \
+  https://packages.timber.io/vector/{{< version >}}/vector-{{< version >}}-amd64.deb
+
+sudo dpkg -i vector-{{< version >}}-amd64.deb
 ```
 
-## Deployment
+## Other actions
 
-Vector is an end-to-end observability data pipeline designed to deploy under various roles. You mix and match these roles to create topologies. The intent is to make Vector as flexible as possible, allowing you to fluidly integrate Vector into your infrastructure over time. The deployment section demonstrates common Vector pipelines:
-
-{{< jump "/docs/setup/deployment/topologies" >}}
-
-## Administration
-
-### Start
-
+{{< tabs default="Upgrade Vector" >}}
+{{< tab title="Upgrade Vector" >}}
 ```shell
-sudo systemctl start vector
+dpkg -i vector-{{< version >}}-amd64
 ```
-
-### Stop
-
+{{< /tab >}}
+{{< tab title="Uninstall Vector" >}}
 ```shell
-sudo systemctl stop vector
+dpkg -r vector-{{< version >}}-amd64
 ```
+{{< /tab >}}
+{{< /tabs >}}
 
-### Reload
+## Management
 
-```shell
-systemctl kill -s HUP --kill-who=main vector.service
-```
-
-### Restart
-
-```shell
-sudo systemctl restart vector
-```
+{{< jump "/docs/administration/process-management" "apt-dpkg-rpm-yum" >}}
 
 [dpkg]: https://wiki.debian.org/dpkg

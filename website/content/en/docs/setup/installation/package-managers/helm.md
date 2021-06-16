@@ -58,36 +58,23 @@ helm install timberio/vector-agent \
   --values values.yaml
 ```
 
-## Deployment
+## Other actions
 
-Vector is an end-to-end observability data pipeline designed to deploy under various roles. You mix and match these roles to create topologies. The intent is to make Vector as flexible as possible, allowing you to fluidly integrate Vector into your infrastructure over time. The deployment section demonstrates common Vector pipelines:
-
-{{< jump "/docs/setup/deployment/topologies" >}}
-
-## Administration
-
-### Restart
-
-```shell
-kubectl rollout restart --namespace vector daemonset/vector-agent
-```
-
-### Observe
-
-```shell
-kubectl logs --namespace vector daemonset/vector-agent
-```
-
-### Upgrade
-
+{{< tabs default="Upgrade Vector" >}}
+{{< tab title="Upgrade Vector" >}}
 ```shell
 helm repo update && helm upgrade --namespace vector vector timberio/vector-agent --reuse-values
 ```
-
-### Uninstall
-
+{{< /tab >}}
+{{< tab title="Uninstall Vector" >}}
 ```shell
 helm uninstall --namespace vector vector
 ```
+{{< /tab >}}
+{{< /tabs >}}
+
+## Management
+
+{{< jump "/docs/administration/process-management" "helm" >}}
 
 [helm]: https://helm.sh

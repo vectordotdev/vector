@@ -6,7 +6,7 @@ weight: 6
 
 [Nix] is a cross-platform package manager implemented on a functional deployment model where software is installed into unique directories generated through cryptographic hashes, it is also the name of the programming language. This page covers installing and managing Vector through the Nix package repository.
 
-{{< warning title="Nix releases are delayed" >}}
+{{< warning title="Nix releases are typically delayed" >}}
 Because Nix releases for Vector must be manually updated, expect delays between official Vector releases and release of the Nix package. New Vector packages for Nix are typically available within a few days.
 {{< /warning >}}
 
@@ -24,31 +24,24 @@ Vector is an end-to-end observability data pipeline designed to deploy under var
 
 {{< jump "/docs/setup/deployment/topologies" >}}
 
-## Administration
+## Other actions
 
-### Start
-
-```shell
-vector --config /etc/vector/vector.toml
-```
-
-### Reload
-
-```shell
-killall -s SIGHUP vector
-```
-
-### Upgrade
-
+{{< tabs default="Upgrade Vector" >}}
+{{< tab title="Upgrade Vector" >}}
 ```shell
 nix-env --upgrade vector \
   --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz
 ```
-
-### Uninstall
-
+{{< /tab >}}
+{{< tab title="Uninstall Vector" >}}
 ```shell
 nix-env --uninstall vector
 ```
+{{< /tab >}}
+{{< /tabs >}}
+
+## Management
+
+{{< jump "/docs/administration/process-management" "nix" >}}
 
 [nix]: https://nixos.org

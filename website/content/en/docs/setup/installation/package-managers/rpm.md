@@ -18,12 +18,18 @@ Make sure to replace `{arch}` with one of the following:
 * `arm64`
 * `armv7`
 
-## Administration
+## Other actions
 
-### Uninstall
-
+{{< tabs default="Uninstall Vector" >}}
+{{< tab title="Uninstall Vector" >}}
 ```shell
 sudo rpm -e vector
 ```
+{{< /tab >}}
+{{< /tabs >}}
+
+## Management
+
+{{< jump "/docs/administration/process-management" "apt-dpkg-rpm-yum" >}}
 
 [rpm]: https://rpm.org/

@@ -8,3 +8,7 @@ The Vector installer enables you to install Vector using a platform-agnostic ins
 ```
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 ```
+
+## Management
+
+{{< jump "/docs/administration/process-management" "vector-executable" >}}

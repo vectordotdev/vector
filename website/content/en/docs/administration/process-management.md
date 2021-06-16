@@ -1,6 +1,6 @@
 ---
 title: Process management
-description: Basic tasks involving your Vector instance, such as starting and stopping
+description: Something
 short: Management
 weight: 1
 ---
@@ -16,13 +16,13 @@ The sections below show you how to administer your Vector instance—start, stop
 * [macOS](#macos)
 * [Windows](#windows)
 * [Docker](#docker)
+* [Kubernetes with Helm](#helm)
 
 ### Vector executable
 
 To manage the Vector executable directly, without a process manager:
 
 {{< tabs default="Start" >}}
-
 {{< tab title="Start" >}}
 ```bash
 vector --config /etc/vector/vector.toml
@@ -158,6 +158,22 @@ Variant | Image basis
 `debian` | The [`debian-slim`](https://hub.docker.com/_/debian) image, which is a smaller and more compact version of the standard `debian` image
 `distroless` | The [Distroless](https://github.com/GoogleContainerTools/distroless) project, which provides extremely lean images with no package managers, shells, or other inessential utilities
 
+### Helm
+
+To get Vector running on [Kubernetes] using the [Helm] package manager:
+
+{{< jump "/docs/setup/installation/package-managers/helm" >}}
+
+Once Vector is running in Kubernetes, you can manage it using [kubectl]:
+
+{{< tabs default="Restart" >}}
+{{< tab title="Restart" >}}
+```shell
+kubectl rollout restart --namespace vector daemonset/vector-agent
+```
+{{< /tab >}}
+{{< /tabs >}}
+
 ## How it works
 
 Running Vector instances accept the IPC [signals](#signals) and produce the [exit codes](#exit-codes) listed below.
@@ -170,7 +186,10 @@ Running Vector instances accept the IPC [signals](#signals) and produce the [exi
 [configuration]: /docs/reference/configuration
 [docker]: /docs/setup/installation/platforms/docker
 [dpkg]: /docs/setup/installation/package-managers/dpkg
+[helm]: https://helm.sh
 [homebrew]: /docs/setup/installation/package-managers/homebrew
+[kubectl]: https://kubernetes.io/docs/reference/kubectl
+[kubernetes]: https://kubernetes.io
 [msi]: /docs/setup/installation/package-managers/msi
 [nix]: /docs/setup/installation/package-managers/nix
 [rpm]: /docs/setup/installation/package-managers/rpm

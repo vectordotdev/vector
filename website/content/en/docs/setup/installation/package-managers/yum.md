@@ -23,25 +23,24 @@ Then you can install Vector:
 sudo yum install vector
 ```
 
-## Deployment
+## Other actions
 
-Vector is an end-to-end observability data pipeline designed to deploy under various roles. You mix and match these roles to create topologies. The intent is to make Vector as flexible as possible, allowing you to fluidly integrate Vector into your infrastructure over time. The deployment section demonstrates common Vector pipelines:
-
-{{< jump "/docs/setup/deployment/topologies" >}}
-
-## Administration
-
-### Upgrade
-
+{{< tabs default="Upgrade Vector" >}}
+{{< tab title="Upgrade Vector" >}}
 ```shell
 sudo yum upgrade vector
 ```
-
-### Uninstall
-
+{{< /tab >}}
+{{< tab title="Uninstall Vector" >}}
 ```shell
 sudo yum remove vector
 ```
+{{< /tab >}}
+{{< /tabs >}}
+
+## Management
+
+{{< jump "/docs/administration/process-management" "apt-dpkg-rpm-yum" >}}
 
 [add_repo]: https://cloudsmith.io/~timber/repos/vector/setup/#formats-rpm
 [cloudsmith]: https://cloudsmith.io/~timber/repos/vector/packages/

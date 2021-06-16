@@ -16,6 +16,8 @@ The preferred way to access Vector's logs is based on your [installation method]
 
 {{< administration/logs >}}
 
+kubectl logs --namespace vector daemonset/vector-agent
+
 ### Routing logs
 
 By default, Vector emits its logs over `STDOUT`. This allows you to redirect logs through system-level utilities like any other service. If you're using a process manager like Systemd, logs should be collected for you and made available through utilities like [Journald]. This means that you can collect Vector's logs like other logs on your host. In the case of Systemd/Journald, you can use Vector's [`journald` source][journald_source]:

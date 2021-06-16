@@ -16,7 +16,7 @@ Our APT repositories are provided by [Cloudsmith] and you can find [instructions
 
 ## Installation
 
-Add the Vector repo:
+First, add the Vector repo:
 
 ```shell
 curl -1sLf \
@@ -24,31 +24,30 @@ curl -1sLf \
 | sudo -E bash
 ```
 
-Install the `vector` package:
+Then you can install the `vector` package:
 
 ```shell
 sudo apt-get install vector
 ```
 
-## Deployment
-
-Vector is an end-to-end observability data pipeline designed to deploy under various roles. You mix and match these roles to create topologies. The intent is to make Vector as flexible as possible, allowing you to fluidly integrate Vector into your infrastructure over time. The deployment section demonstrates common Vector pipelines:
-
-{{< jump "/docs/setup/deployment/topologies" >}}
-
 ## Other actions
 
-### Uninstall Vector
-
-```shell
-sudo apt remove vector
-```
-
-### Upgrade Vector
-
-```shell
+{{< tabs default="Upgrade Vector" >}}
+{{< tab title="Upgrade Vector" >}}
+```bash
 sudo apt-get upgrade vector
 ```
+{{< /tab >}}
+{{< tab title="Uninstall Vector" >}}
+```bash
+sudo apt remove vector
+```
+{{< /tab >}}
+{{< /tabs >}}
+
+## Management
+
+{{< jump "/docs/administration/process-management" "apt-dpkg-rpm-yum" >}}
 
 [apt]: https://en.wikipedia.org/wiki/APT_(software)
 [cloudsmith]: https://cloudsmith.io/~timber/repos/vector/packages
