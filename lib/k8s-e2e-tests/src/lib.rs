@@ -113,23 +113,20 @@ pub fn make_framework() -> Framework {
 
 pub fn collect_btree<'a>(
     items: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
-) -> Option<std::collections::BTreeMap<String, String>> {
+) -> std::collections::BTreeMap<String, String> {
     let collected: std::collections::BTreeMap<String, String> = items
         .into_iter()
         .map(|(key, val)| (key.to_owned(), val.to_owned()))
         .collect();
-    if collected.is_empty() {
-        return None;
-    }
-    Some(collected)
+    collected
 }
 
 pub fn make_test_container<'a>(name: &'a str, command: &'a str) -> Container {
     Container {
         name: name.to_owned(),
         image: Some(BUSYBOX_IMAGE.to_owned()),
-        command: Some(vec!["sh".to_owned()]),
-        args: Some(vec!["-c".to_owned(), command.to_owned()]),
+        command: vec!["sh".to_owned()],
+        args: vec!["-c".to_owned(), command.to_owned()],
         ..Container::default()
     }
 }
@@ -173,23 +170,23 @@ pub fn make_test_pod_with_affinity<'a>(
 ) -> Pod {
     let affinity = affinity_label.map(|(label, value)| {
         let selector = LabelSelector {
-            match_expressions: None,
-            match_labels: Some({
+            match_expressions: vec![],
+            match_labels: {
                 let mut map = BTreeMap::new();
                 map.insert(label.to_string(), value.to_string());
                 map
-            }),
+            },
         };
 
         Affinity {
             node_affinity: None,
             pod_affinity: Some(PodAffinity {
-                preferred_during_scheduling_ignored_during_execution: None,
-                required_during_scheduling_ignored_during_execution: Some(vec![PodAffinityTerm {
+                preferred_during_scheduling_ignored_during_execution: vec![],
+                required_during_scheduling_ignored_during_execution: vec![PodAffinityTerm {
                     label_selector: Some(selector),
-                    namespaces: Some(vec![affinity_namespace.unwrap_or(namespace).to_string()]),
+                    namespaces: vec![affinity_namespace.unwrap_or(namespace).to_string()],
                     topology_key: "kubernetes.io/hostname".to_string(),
-                }]),
+                }],
             }),
             pod_anti_affinity: None,
         }
