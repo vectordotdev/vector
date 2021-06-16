@@ -186,6 +186,12 @@ components: _aws: {
 						account access.
 						"""
 				},
+				{
+					title: "Expiration"
+					body: """
+						Vector will again search for AWS credentials once they expire.
+						"""
+				},
 			]
 		}
 	}
