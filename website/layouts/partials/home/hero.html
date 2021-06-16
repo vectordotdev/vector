@@ -4,9 +4,9 @@
 {{ $latest := index site.Data.docs.versions 0 }}
 {{ $link := printf "releases/%s" $latest | relURL }}
 {{ $links := site.Menus.doc_quick_links }}
-<div class="py-24 md:py-32 lg:py-48 relative">
+<div class="py-24 md:py-32 lg:py-48 relative" x-data="{ active: false }">
   <div class="px-4 sm:px-6 text-center lg:text-left mx-auto max-w-7xl">
-    <a href="{{ $link }}" class="dark:bg-gray-800 bg-gradient-to-r uppercase from-primary to-purple-v inline-flex items-center text-white rounded-full py-1 px-1.5 sm:text-base lg:text-sm xl:text-base hover:text-gray-100">
+    <a href="{{ $link }}" @mouseover="active = true" @mouseover.away="active = false" class="dark:bg-gray-800 bg-gradient-to-r uppercase from-primary to-purple-v inline-flex items-center text-white rounded-full py-1 px-1.5 sm:text-base lg:text-sm xl:text-base">
       <span class="bg-black text-white font-semibold px-2.5 py-0 lg:py-0.5 text-xs leading-5 tracking-tight rounded-full">
         New
       </span>
@@ -14,7 +14,7 @@
         Vector version <span class="font-extrabold">{{ $latest }}</span>
       </span>
       {{/* Heroicon name: solid/chevron-right */}}
-      <svg xmlns="http://www.w3.org/2000/svg" class="text-white ml-2 w-4 h-4 transition transform hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg xmlns="http://www.w3.org/2000/svg" :class="{ 'translate-x-0.5': active }" class="text-white ml-2 w-4 h-4 transition transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
       </svg>
     </a>
