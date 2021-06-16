@@ -177,11 +177,9 @@ fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
     match key {
         "name" => Some(metric.name().into()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => metric
-            .series
-            .tags
-            .as_ref()
-            .and_then(|tags| tags.get(&key[5..]).cloned()),
+        _ if key.starts_with("tags.") => {
+            metric.tags().and_then(|tags| tags.get(&key[5..]).cloned())
+        }
         _ => None,
     }
 }
@@ -190,8 +188,9 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
     let timestamp = match event {
         EventRef::Log(log) => log
             .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp),
-        EventRef::Metric(metric) => metric.data.timestamp.as_ref(),
+            .and_then(Value::as_timestamp)
+            .copied(),
+        EventRef::Metric(metric) => metric.timestamp(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()

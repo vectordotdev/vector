@@ -92,6 +92,8 @@ mod log_util;
 mod r#match;
 #[cfg(feature = "match_any")]
 mod match_any;
+#[cfg(feature = "match_array")]
+mod match_array;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -138,6 +140,8 @@ mod parse_query_string;
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
 mod parse_regex_all;
+#[cfg(feature = "parse_ruby_hash")]
+mod parse_ruby_hash;
 #[cfg(feature = "parse_syslog")]
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
@@ -293,6 +297,8 @@ pub use length::Length;
 pub use log::Log;
 #[cfg(feature = "match_any")]
 pub use match_any::MatchAny;
+#[cfg(feature = "match_array")]
+pub use match_array::MatchArray;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -337,6 +343,8 @@ pub use parse_query_string::ParseQueryString;
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
 pub use parse_regex_all::ParseRegexAll;
+#[cfg(feature = "parse_ruby_hash")]
+pub use parse_ruby_hash::ParseRubyHash;
 #[cfg(feature = "parse_syslog")]
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
@@ -488,8 +496,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Log),
         #[cfg(feature = "match")]
         Box::new(Match),
-        #[cfg(feature = "match")]
+        #[cfg(feature = "match_any")]
         Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -538,6 +548,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseRegex),
         #[cfg(feature = "parse_regex_all")]
         Box::new(ParseRegexAll),
+        #[cfg(feature = "parse_ruby_hash")]
+        Box::new(ParseRubyHash),
         #[cfg(feature = "parse_syslog")]
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
@@ -550,8 +562,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Push),
         #[cfg(feature = "match")]
         Box::new(Match),
-        #[cfg(feature = "match")]
+        #[cfg(feature = "match_any")]
         Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "replace")]

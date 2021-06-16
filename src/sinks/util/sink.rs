@@ -39,14 +39,10 @@ use super::{
 };
 use crate::{
     buffers::Acker,
-    event::{Event, EventMetadata, EventStatus},
+    event::{EventMetadata, EventStatus},
 };
-use async_trait::async_trait;
 use futures::{
-    future::BoxFuture,
-    ready,
-    stream::{BoxStream, FuturesUnordered},
-    FutureExt, Sink, Stream, TryFutureExt,
+    future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
 };
 use pin_project::pin_project;
 use std::{
@@ -66,10 +62,7 @@ use tracing_futures::Instrument;
 
 // === StreamSink ===
 
-#[async_trait]
-pub trait StreamSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
-}
+pub use vector_core::sink::StreamSink;
 
 // === BatchSink ===
 

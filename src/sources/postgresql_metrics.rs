@@ -927,9 +927,8 @@ mod integration_tests {
                 .map(|e| e.as_metric())
                 .find(|e| e.name() == "up")
                 .unwrap()
-                .data
-                .value,
-            gauge!(1)
+                .value(),
+            &gauge!(1)
         );
 
         // test namespace and tags

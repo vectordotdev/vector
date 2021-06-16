@@ -120,16 +120,6 @@ impl<'a> Lookup<'a> {
     pub fn into_buf(self) -> LookupBuf {
         LookupBuf::from(self)
     }
-
-    /// Return a borrow of the Segment set.
-    pub fn as_segments(&self) -> &VecDeque<Segment<'_>> {
-        &self.segments
-    }
-
-    /// Return the Segment set.
-    pub fn into_segments(self) -> VecDeque<Segment<'a>> {
-        self.segments
-    }
 }
 
 #[inherent(pub)]

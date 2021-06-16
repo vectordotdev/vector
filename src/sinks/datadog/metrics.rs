@@ -1,3 +1,4 @@
+use super::healthcheck;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, Sample, StatisticKind},
@@ -12,12 +13,12 @@ use crate::{
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError, UriParseError, VectorSink,
+        Healthcheck, UriParseError, VectorSink,
     },
 };
 use chrono::{DateTime, Utc};
 use futures::{stream, FutureExt, SinkExt};
-use http::{uri::InvalidUri, Request, StatusCode, Uri};
+use http::{uri::InvalidUri, Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -161,7 +162,7 @@ impl DatadogEndpoint {
     }
 
     fn from_metric(metric: &Metric) -> Self {
-        match metric.data.value {
+        match metric.value() {
             MetricValue::Distribution {
                 statistic: StatisticKind::Summary,
                 ..
@@ -182,7 +183,12 @@ impl_generate_config_from_default!(DatadogConfig);
 impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(None)?;
-        let healthcheck = healthcheck(self.clone(), client.clone()).boxed();
+        let healthcheck = healthcheck(
+            self.get_api_endpoint(),
+            self.api_key.clone(),
+            client.clone(),
+        )
+        .boxed();
 
         let batch = BatchSettings::default()
             .events(20)
@@ -288,24 +294,6 @@ fn build_uri(host: &str, endpoint: &'static str) -> crate::Result<Uri> {
     Ok(uri)
 }
 
-async fn healthcheck(config: DatadogConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}/api/v1/validate", config.get_api_endpoint())
-        .parse::<Uri>()
-        .context(UriParseError)?;
-
-    let request = Request::get(uri)
-        .header("DD-API-KEY", config.api_key)
-        .body(hyper::Body::empty())
-        .unwrap();
-
-    let response = client.send(request).await?;
-
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
-    }
-}
-
 fn encode_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter()
@@ -375,7 +363,7 @@ struct DatadogMetricNormalize;
 
 impl MetricNormalize for DatadogMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
+        match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
         }
@@ -393,15 +381,15 @@ fn encode_events(
         .filter_map(|event| {
             let fullname =
                 encode_namespace(event.namespace().or(default_namespace), '.', event.name());
-            let ts = encode_timestamp(event.data.timestamp);
+            let ts = encode_timestamp(event.timestamp());
             let tags = event.tags().map(encode_tags);
             // DatadogMetricNormalize converts these to the right MetricKind
-            match event.data.value {
+            match event.value() {
                 MetricValue::Counter { value } => Some(vec![DatadogMetric {
                     metric: fullname,
                     r#type: DatadogMetricType::Count,
                     interval: Some(interval),
-                    points: vec![DatadogPoint(ts, value)],
+                    points: vec![DatadogPoint(ts, *value)],
                     tags,
                 }]),
                 MetricValue::Distribution {
@@ -472,7 +460,7 @@ fn encode_events(
                     metric: fullname,
                     r#type: DatadogMetricType::Gauge,
                     interval: None,
-                    points: vec![DatadogPoint(ts, value)],
+                    points: vec![DatadogPoint(ts, *value)],
                     tags,
                 }]),
                 _ => None,
@@ -495,10 +483,10 @@ fn encode_distribution_events(
         .filter_map(|event| {
             let fullname =
                 encode_namespace(event.namespace().or(default_namespace), '.', event.name());
-            let ts = encode_timestamp(event.data.timestamp);
+            let ts = encode_timestamp(event.timestamp());
             let tags = event.tags().map(encode_tags);
-            match event.data.kind {
-                MetricKind::Incremental => match event.data.value {
+            match event.kind() {
+                MetricKind::Incremental => match event.value() {
                     MetricValue::Distribution {
                         samples,
                         statistic: StatisticKind::Summary,

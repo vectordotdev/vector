@@ -108,35 +108,6 @@ impl Lookup {
     }
 
     #[instrument(level = "trace")]
-    pub fn from_indexmap(
-        values: IndexMap<String, TomlValue>,
-    ) -> crate::Result<IndexMap<Lookup, Value>> {
-        let mut discoveries = IndexMap::new();
-        for (key, value) in values {
-            Self::recursive_step(Lookup::try_from(key)?, value, &mut discoveries)?;
-        }
-        Ok(discoveries)
-    }
-
-    #[instrument(level = "trace")]
-    pub fn from_toml_table(value: TomlValue) -> crate::Result<IndexMap<Lookup, Value>> {
-        let mut discoveries = IndexMap::new();
-        match value {
-            TomlValue::Table(map) => {
-                for (key, value) in map {
-                    Self::recursive_step(Lookup::try_from(key)?, value, &mut discoveries)?;
-                }
-                Ok(discoveries)
-            }
-            _ => Err(format!(
-                "A TOML table must be passed to the `from_toml_table` function. Passed: {:?}",
-                value
-            )
-            .into()),
-        }
-    }
-
-    #[instrument(level = "trace")]
     fn recursive_step(
         lookup: Lookup,
         value: TomlValue,
