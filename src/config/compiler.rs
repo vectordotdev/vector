@@ -103,20 +103,34 @@ fn expand_globs(config: &mut ConfigBuilder) {
     }
 }
 
+enum InputMatcher {
+    Pattern(glob::Pattern),
+    String(String),
+}
+
+impl InputMatcher {
+    fn matches(&self, candidate: &str) -> bool {
+        use Matcher::*;
+
+        match self {
+            Pattern(pattern) => pattern.matches(candidate),
+            String(s) => s == candidate,
+        }
+    }
+}
+
 fn expand_globs_inner(inputs: &mut Vec<String>, name: &str, candidates: &[String]) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
-        match glob::Pattern::new(&raw_input) {
-            Ok(pattern) => {
-                for input in candidates {
-                    if pattern.matches(input) && input != name {
-                        inputs.push(input.clone())
-                    }
-                }
-            }
-            Err(error) => {
-                error!(message = "Invalid glob pattern for input.", component_name = name, %error);
-                continue;
+        let matcher = glob::Pattern::new(&raw_input)
+            .map(InputMatcher::Pattern)
+            .unwrap_or_else(|error| {
+                warn!(message = "Invalid glob pattern for input.", component_name = name, %error);
+                InputMatcher::String(raw_input)
+            });
+        for input in candidates {
+            if matcher.matches(input) && input != name {
+                inputs.push(input.clone())
             }
         }
     }
