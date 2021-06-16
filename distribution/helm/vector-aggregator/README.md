@@ -12,7 +12,14 @@ To get started check out our [documentation](https://master.vector.dev/docs/setu
 As of the 0.15.0 release we've included a HAProxy deployment to load balance traffic to Vector instances running in the [aggregator](https://vector.dev/docs/setup/deployment/roles/#aggregator) role.
 Using an external proxy allows us to scale aggregators horizontally in a `source` agnostic way, making it easy to migrate existing infrastructure to use Vector.
 
-To enable the HAProxy deployment you can adjust the `haproxy.enabled` value to `true`, by default this will create `frontend` and [server-template](http://cbonte.github.io/haproxy-dconv/2.4/configuration.html#4-server-template) configurations generated from your `service.ports` entries.
+To enable the HAProxy deployment you can pass `--set haproxy.enabled=true` with your `helm` command[^1], by default this will create `frontend` and [server-template](http://cbonte.github.io/haproxy-dconv/2.4/configuration.html#4-server-template) configurations generated from your `service.ports` entries.
 With HAProxy we leverage its builtin [resolvers](http://cbonte.github.io/haproxy-dconv/2.4/configuration.html#5.3.2) configuration and Kubernetes DNS to dynamically populate the backend Vector instances.
 
 Our default configurations are designed to work out of the box, but we recommend production deployments should optimize their configuration based on the specific needs of that environment and configuration.
+
+[^1]: Or set it in your values file with:
+
+	```yaml
+	haproxy:
+	  enabled: true
+	```
