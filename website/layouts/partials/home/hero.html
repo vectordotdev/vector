@@ -26,8 +26,9 @@
     </p>
 
     <div class="mt-6 md:mt-8 lg:mt-10 inline-flex space-x-2">
-      {{ range $links }}
-      <a href="{{ .URL }}" class="text-sm md:text-md tracking-tight font-semibold shadow-md bg-gray-200 dark:bg-primary text-dark dark:text-dark py-1 px-2 rounded hover:bg-primary dark:hover:bg-secondary">
+      {{ $numLinks := len $links }}
+      {{ range $idx, $link := $links }}
+      <a href="{{ .URL }}" class="text-sm md:text-md tracking-tight shadow-sm py-1 px-3.5 rounded-full hover:shadow bg-gray-200 text-dark hover:bg-purple-v hover:text-white dark:bg-primary dark:hover:bg-purple-v">
         {{ .Name }}
       </a>
       {{ end }}
