@@ -162,9 +162,9 @@ remap: #Remap & {
 				}
 			}
 			source: #"""
-				.environment = get_env_var!("ENV") # add
-				.hostname = del(.host) # rename
-				del(.email)
+				.tags.environment = get_env_var!("ENV") # add
+				.tags.hostname = del(.tags.host) # rename
+				del(.tags.email)
 				"""#
 			output: metric: {
 				kind: "incremental"
