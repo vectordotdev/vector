@@ -167,21 +167,6 @@ components: sinks: [Name=string]: {
 							}
 						}
 
-						region: {
-							common:      true
-							description: "The region to send data to."
-							required:    false
-							warnings: []
-							type: string: {
-								default: "us"
-								enum: {
-									us: "United States"
-									eu: "Europe"
-								}
-								syntax: "literal"
-							}
-						}
-
 						except_fields: {
 							common:      false
 							description: "Prevent the sink from encoding the specified fields."
