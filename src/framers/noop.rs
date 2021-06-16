@@ -1,7 +1,10 @@
+#![deny(missing_docs)]
+
 use super::Framer;
 use serde::{Deserialize, Serialize};
 use vector_core::transform::{FunctionTransform, Transform};
 
+/// A framer which returns its input as-is.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoopFramer;
 
@@ -16,6 +19,7 @@ impl Framer for NoopFramer {
     }
 }
 
+/// A transform which returns its input as-is.
 #[derive(Debug, Copy, Clone)]
 struct NoopTransform;
 

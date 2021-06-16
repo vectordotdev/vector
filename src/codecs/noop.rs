@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 use super::{Codec, CodecTransform};
 use crate::config::DataType;
 use serde::{Deserialize, Serialize};
@@ -6,6 +8,7 @@ use vector_core::{
     transform::{FunctionTransform, Transform},
 };
 
+/// A codec which returns its input as-is.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoopCodec;
 
@@ -30,6 +33,7 @@ impl Codec for NoopCodec {
     }
 }
 
+/// A transform which returns its input as-is.
 #[derive(Debug, Copy, Clone)]
 struct NoopTransform;
 

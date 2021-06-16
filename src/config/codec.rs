@@ -1,9 +1,18 @@
+//! Definition of a common codec configuration which is able to resolve `Codec`
+//! implementations that are registered in the global inventory.
+
+#![deny(missing_docs)]
+
 use crate::codecs::CodecTransform;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
 lazy_static! {
+    /// A hashmap that resolves from shorthand name to `Codec` implementation.
+    ///
+    /// The `Codec` implementations must register themselves in the global
+    /// inventory using `inventory::submit!` to be resolved at this point.
     static ref CODECS: HashMap<&'static str, &'static dyn crate::codecs::Codec> =
         inventory::iter::<Box<dyn crate::codecs::Codec>>
             .into_iter()
@@ -11,6 +20,28 @@ lazy_static! {
             .collect();
 }
 
+/// A collection of codec configurations.
+///
+/// Codecs may be specified alone or as multiple (which will be chained
+/// together), by shorthand name only or with options, e.g:
+///
+/// ```toml
+/// # Single codec by shorthand name.
+/// codec = "json"
+/// ```
+///
+/// ```toml
+/// # Single codec with options.
+/// codec = { type = "json", target_field = "foo" }
+/// ```
+///
+/// ```toml
+/// # Multiple codecs, by shorthand name and with options.
+/// codec = ["syslog", { type = "json", target_field = "foo" }]
+/// ```
+///
+/// The shorthand name and available options are determined by the `Codec`
+/// implementations which are registered in the global inventory.
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct CodecsConfig(pub Box<[CodecConfig]>);
 
@@ -19,10 +50,14 @@ impl<'de> Deserialize<'de> for CodecsConfig {
     where
         D: Deserializer<'de>,
     {
+        /// A helper enum to uniformly deserialize one or many codec
+        /// configurations.
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum CodecsConfig {
+            /// Represents a single codec config.
             Single(CodecConfig),
+            /// Represents multiple codec configs.
             Multiple(Vec<CodecConfig>),
         }
 
@@ -53,38 +88,46 @@ impl From<Vec<CodecConfig>> for CodecsConfig {
     }
 }
 
+/// A codec configuration, either by shorthand name or fully resolved with
+/// options.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CodecConfig {
-    String(String),
-    Object(Box<dyn crate::codecs::Codec>),
+    /// A shorthand name which is used to resolve the codec from the
+    /// global inventory.
+    Name(String),
+    /// A fully resolved codec with options applied.
+    Codec(Box<dyn crate::codecs::Codec>),
 }
 
 impl CodecConfig {
+    /// Returns the shorthand name of this codec.
     pub fn name(&self) -> String {
         match &self {
-            Self::String(string) => string.into(),
-            Self::Object(codec) => codec.name().to_owned(),
+            Self::Name(name) => name.into(),
+            Self::Codec(codec) => codec.name().to_owned(),
         }
     }
 
+    /// Builds the decoder associated to this codec.
     pub fn build_decoder(&self) -> crate::Result<CodecTransform> {
         match &self {
-            Self::String(string) => match CODECS.get(string.as_str()) {
+            Self::Name(name) => match CODECS.get(name.as_str()) {
                 Some(codec) => codec.build_decoder(),
-                _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
+                _ => Err(format!(r#"Unknown codec "{}""#, name).into()),
             },
-            Self::Object(codec) => codec.build_decoder(),
+            Self::Codec(codec) => codec.build_decoder(),
         }
     }
 
+    /// Builds the decoder associated to this codec.
     pub fn build_encoder(&self) -> crate::Result<CodecTransform> {
         match &self {
-            Self::String(string) => match CODECS.get(string.as_str()) {
+            Self::Name(name) => match CODECS.get(name.as_str()) {
                 Some(codec) => codec.build_encoder(),
-                _ => Err(format!(r#"Unknown codec "{}""#, string).into()),
+                _ => Err(format!(r#"Unknown codec "{}""#, name).into()),
             },
-            Self::Object(codec) => codec.build_encoder(),
+            Self::Codec(codec) => codec.build_encoder(),
         }
     }
 }
@@ -94,8 +137,11 @@ mod tests {
     use super::*;
     use indoc::indoc;
 
+    /// A helper struct to test deserializing `CodecsConfig` from the context of
+    /// a valid TOML configuration.
     #[derive(Debug, Deserialize)]
     struct Config {
+        /// The codec to be tested.
         pub codec: CodecsConfig,
     }
 

@@ -60,23 +60,8 @@ pub async fn build_pieces(
 
         let typetag = source.inner.source_type();
 
-        let mut rx = rx.boxed();
-        for codec in source.codec.clone() {
-            let CodecTransform {
-                transform,
-                input_type,
-            } = match codec.build_decoder() {
-                Ok(transform) => transform,
-                Err(error) => {
-                    errors.push(format!("Decoder \"{}\": {}", name, error));
-                    continue;
-                }
-            };
-
-            let filtered = rx.filter(move |event| ready(filter_event_type(event, input_type)));
-            rx = transform.transform(filtered).boxed();
-        }
-
+        /// Helper struct used to chain multiple framing transformations
+        /// together, resulting in a single transform.
         struct FramingTransform {
             framing: Vec<Transform<Vec<u8>>>,
         }
@@ -97,29 +82,34 @@ pub async fn build_pieces(
             }
         }
 
-        let framing = source
-            .framing
-            .clone()
-            .into_iter()
-            .filter_map(|config| match config.build() {
-                Ok(framer) => Some(framer),
-                Err(error) => {
-                    errors.push(format!("Framer \"{}\": {}", name, error));
-                    None
-                }
-            })
-            .collect();
+        // Build framers and merge them into a single transform that can be
+        // passed into the source context.
+        let framing = Transform::task(FramingTransform {
+            framing: source
+                .framing
+                .clone()
+                .into_iter()
+                .filter_map(|config| match config.build() {
+                    Ok(framer) => Some(framer),
+                    Err(error) => {
+                        errors.push(format!("Framer \"{}\": {}", name, error));
+                        None
+                    }
+                })
+                .collect(),
+        });
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let context = SourceContext {
             name: name.into(),
-            framing: Transform::task(FramingTransform { framing }),
+            framing,
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,
             acknowledgements: source.acknowledgements,
         };
+
         let server = match source.inner.build(context).await {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
@@ -129,6 +119,26 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
+
+        // Build and apply codecs to the receiver stream before it is forwarded
+        // into the output.
+        let mut rx = rx.boxed();
+        for codec in source.codec.clone() {
+            let CodecTransform {
+                transform,
+                input_type,
+            } = match codec.build_decoder() {
+                Ok(transform) => transform,
+                Err(error) => {
+                    errors.push(format!("Decoder \"{}\": {}", name, error));
+                    continue;
+                }
+            };
+
+            let filtered = rx.filter(move |event| ready(filter_event_type(event, input_type)));
+            rx = transform.transform(filtered).boxed();
+        }
+
         let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
         let pump = Task::new(name, typetag, pump);
 

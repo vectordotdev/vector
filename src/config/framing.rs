@@ -1,9 +1,18 @@
+//! Definition of a common framing configuration which is able to resolve
+//! `Framer` implementations that are registered in the global inventory.
+
+#![deny(missing_docs)]
+
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use vector_core::transform::Transform;
 
 lazy_static! {
+    /// A hashmap that resolves from shorthand name to `Framer` implementation.
+    ///
+    /// The `Framer` implementations must register themselves in the global
+    /// inventory using `inventory::submit!` to be resolved at this point.
     static ref FRAMERS: HashMap<&'static str, &'static dyn crate::framers::Framer> =
         inventory::iter::<Box<dyn crate::framers::Framer>>
             .into_iter()
@@ -11,6 +20,28 @@ lazy_static! {
             .collect();
 }
 
+/// A collection of framing configurations.
+///
+/// Framers may be specified alone or as multiple (which will be chained
+/// together), by shorthand name only or with options, e.g:
+///
+/// ```toml
+/// # Single framer by shorthand name.
+/// framing = "line_delimited"
+/// ```
+///
+/// ```toml
+/// # Single framer with options.
+/// framing = { type = "character_delimited", character = "\n" }
+/// ```
+///
+/// ```toml
+/// # Multiple framers, by shorthand name and with options.
+/// framing = ["line_delimited", { type = "character_delimited", character = " " }]
+/// ```
+///
+/// The shorthand name and available options are determined by the `Framer`
+/// implementations which are registered in the global inventory.
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct FramingsConfig(pub Box<[FramingConfig]>);
 
@@ -19,10 +50,14 @@ impl<'de> Deserialize<'de> for FramingsConfig {
     where
         D: Deserializer<'de>,
     {
+        /// A helper enum to uniformly deserialize one or many framing
+        /// configurations.
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum FramingsConfig {
+            /// Represents a single framing config.
             Single(FramingConfig),
+            /// Represents multiple framing configs.
             Multiple(Vec<FramingConfig>),
         }
 
@@ -53,28 +88,35 @@ impl From<Vec<FramingConfig>> for FramingsConfig {
     }
 }
 
+/// A framing configuration, either by shorthand name or fully resolved with
+/// options.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum FramingConfig {
-    String(String),
-    Object(Box<dyn crate::framers::Framer>),
+    /// A shorthand name which is used to resolve the framer from the
+    /// global inventory.
+    Name(String),
+    /// A fully resolved framer with options applied.
+    Framer(Box<dyn crate::framers::Framer>),
 }
 
 impl FramingConfig {
+    /// Returns the shorthand name of this framer.
     pub fn name(&self) -> String {
         match &self {
-            Self::String(string) => string.into(),
-            Self::Object(framer) => framer.name().to_owned(),
+            Self::Name(name) => name.into(),
+            Self::Framer(framer) => framer.name().to_owned(),
         }
     }
 
+    /// Builds the transformation associated to this framer.
     pub fn build(&self) -> crate::Result<Transform<Vec<u8>>> {
         match &self {
-            Self::String(string) => match FRAMERS.get(string.as_str()) {
+            Self::Name(name) => match FRAMERS.get(name.as_str()) {
                 Some(framer) => framer.build(),
-                _ => Err(format!(r#"Unknown framer "{}""#, string).into()),
+                _ => Err(format!(r#"Unknown framer "{}""#, name).into()),
             },
-            Self::Object(framer) => framer.build(),
+            Self::Framer(framer) => framer.build(),
         }
     }
 }
@@ -84,8 +126,11 @@ mod tests {
     use super::*;
     use indoc::indoc;
 
+    /// A helper struct to test deserializing `FramingsConfig` from the context
+    /// of a valid TOML configuration.
     #[derive(Debug, Deserialize)]
     struct Config {
+        /// The framing to be tested.
         pub framing: FramingsConfig,
     }
 
