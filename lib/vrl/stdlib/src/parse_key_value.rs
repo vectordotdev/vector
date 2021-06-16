@@ -3,9 +3,9 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_until, take_while1},
     character::complete::{char, satisfy, space0},
-    combinator::{eof, map, opt, peek, rest},
+    combinator::{eof, map, opt, peek, rest, verify},
     error::{ContextError, ParseError, VerboseError},
-    multi::{many1, separated_list1},
+    multi::{many1, many_m_n, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -228,6 +228,7 @@ fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 }
 
 /// Parse a single `key=value` tuple.
+/// Accepts `key=` and standalone `key`
 fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
@@ -237,17 +238,35 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
         map(
             |input| match whitespace {
                 Whitespace::Strict => tuple((
-                    preceded(space0, parse_key(key_value_delimiter)),
-                    tag(key_value_delimiter),
+                    alt((
+                        verify(
+                            preceded(space0, parse_key(key_value_delimiter)),
+                            |s: &str| !s.contains(field_delimiter),
+                        ),
+                        preceded(space0, parse_key(field_delimiter)),
+                    )),
+                    many_m_n(0, 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter),
                 ))(input),
                 Whitespace::Lenient => tuple((
-                    preceded(space0, parse_key(key_value_delimiter)),
-                    preceded(space0, tag(key_value_delimiter)),
+                    alt((
+                        verify(
+                            preceded(space0, parse_key(key_value_delimiter)),
+                            |s: &str| !s.contains(field_delimiter),
+                        ),
+                        preceded(space0, parse_key(field_delimiter)),
+                    )),
+                    many_m_n(0, 1, preceded(space0, tag(key_value_delimiter))),
                     preceded(space0, parse_value(field_delimiter)),
                 ))(input),
             },
-            |(field, _, value): (&str, &str, Value)| (field.to_string(), value),
+            |(field, sep, value): (&str, Vec<&str>, Value)| {
+                if sep.len() == 1 {
+                    (field.to_string(), value)
+                } else {
+                    (field.to_string(), value!(true))
+                }
+            },
         )(input)
     }
 }
@@ -386,6 +405,28 @@ mod test {
                 ("onk".to_string(), "ponk".into())
             ]),
             parse("ook= onk=ponk", "=", " ", Whitespace::Strict)
+        );
+    }
+
+    #[test]
+    fn test_parse_standalone_key() {
+        assert_eq!(
+            Ok(vec![
+                ("foo".to_string(), "bar".into()),
+                ("foobar".to_string(), value!(true))
+            ]),
+            parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Lenient)
+        );
+    }
+
+    #[test]
+    fn test_parse_standalone_key_strict() {
+        assert_eq!(
+            Ok(vec![
+                ("foo".to_string(), "bar".into()),
+                ("foobar".to_string(), value!(true))
+            ]),
+            parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Strict)
         );
     }
 
@@ -575,13 +616,13 @@ mod test {
             }),
         }
 
-        error {
+        not_an_error {
             args: func_args! [
-                value: r#"I am not a valid line."#,
+                value: r#"I am a valid line."#,
                 key_value_delimiter: "--",
                 field_delimiter: "||",
             ],
-            want: Err("0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n"),
+            want: Ok(value!({"I am a valid line.": true})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
