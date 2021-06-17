@@ -5,7 +5,7 @@
 
 #![deny(missing_docs)]
 
-use crate::event::Event;
+use crate::event::{Event, LogEvent};
 use crate::internal_events::{
     FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
     KubernetesLogsEventReceived,
@@ -20,7 +20,10 @@ use crate::{
     transforms::{FunctionTransform, TaskTransform},
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
+use file_source::{
+    Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
+    ReadFrom,
+};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
@@ -257,6 +260,7 @@ impl Source {
 
         // TODO: maybe more of the parameters have to be configurable.
 
+        let checkpointer = Checkpointer::new(&data_dir);
         let file_server = FileServer {
             // Use our special paths provider.
             paths_provider,
@@ -313,21 +317,25 @@ impl Source {
             handle: tokio::runtime::Handle::current(),
         };
 
-        let (file_source_tx, file_source_rx) =
-            futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
         let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
+        let checkpoints = checkpointer.view();
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
-        let events = events.map(move |(bytes, file)| {
-            let byte_size = bytes.len();
-            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
-            let file_info = annotator.annotate(&mut event, &file);
+        let events = events.map(move |line| {
+            let byte_size = line.text.len();
+            let mut event = create_event(
+                line.text,
+                &line.filename,
+                ingestion_timestamp_field.as_deref(),
+            );
+            let file_info = annotator.annotate(&mut event, &line.filename);
 
             emit!(KubernetesLogsEventReceived {
-                file: &file,
+                file: &line.filename,
                 byte_size,
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
@@ -335,6 +343,7 @@ impl Source {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
 
+            checkpoints.update(line.file_id, line.offset);
             event
         });
         let events = events.flat_map(move |event| {
@@ -362,12 +371,11 @@ impl Source {
         }
         {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
-                match result {
+            let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
+                .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
                     Err(error) => error!(message = "File server exited with an error.", %error),
-                }
-            });
+                });
             slot.bind(Box::pin(fut));
         }
         {
@@ -400,25 +408,23 @@ impl Source {
 }
 
 fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
-    let mut event = Event::from(line);
+    let mut event = LogEvent::from(line);
 
     // Add source type.
-    event.as_mut_log().insert(
+    event.insert(
         crate::config::log_schema().source_type_key(),
         COMPONENT_NAME.to_owned(),
     );
 
     // Add file.
-    event.as_mut_log().insert(FILE_KEY, file.to_owned());
+    event.insert(FILE_KEY, file.to_owned());
 
     // Add ingestion timestamp if requested.
     if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event
-            .as_mut_log()
-            .insert(ingestion_timestamp_field, chrono::Utc::now());
+        event.insert(ingestion_timestamp_field, chrono::Utc::now());
     }
 
-    event
+    event.into()
 }
 
 /// This function returns the default value for `self_node_name` variable
