@@ -4,6 +4,7 @@ frontend:
     preBuild:
       commands:
         - HUGO_VERSION=0.83.1
+        - CUE_VERSION=0.4.0-beta.1
         - cd website
         # install golang for hugo ext
         - curl -OL https://golang.org/dl/go1.15.7.linux-amd64.tar.gz
@@ -17,7 +18,7 @@ frontend:
         - GOPATH=/usr/local/go:/usr/local/go/bin
         - PATH=$PATH:$GOPATH
         # install cue as go module
-        - GO111MODULE=on go get cuelang.org/go/cmd/cue
+        - GO111MODULE=on go get cuelang.org/go/cmd/cue@v${CUE_VERSION}
         # output versions
         - cue version
         - hugo version

@@ -5,7 +5,7 @@ This directory houses the assets used to build Vector's website and documentatio
 ## Prerequisites
 
 * The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`][netlify_toml].
-* The [CUE] configuration and validation tool
+* The [CUE] configuration and validation tool. See the value of `CUE_VERSION` in [`amplify.yml`](./amplify.yml) to see which version of CUE is currently being used for the docs.
 * [Yarn]
 
 ## Run the site locally
@@ -18,7 +18,18 @@ make serve
 
 ### Add a new version of Vector
 
-1. Add the new version to the `versions` list in [`cue/reference/versions.cue`][./cue/reference/versions.cue].
+1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue). Make sure to preserve reverse ordering.
+1. Generate a new CUE file for the release by running `make release-prepare` in the root directory of the Vector repo.
+1. Add a new Markdown file to [`content/en/releases`](./content/en/releases), where the filename is `{version}.md` (e.g. `0.12.0.md`) and the file has metadata that looks like this:
+
+    ```markdown
+    ---
+    title: Vector v0.13.0 release notes
+    weight: 19
+    ---
+    ```
+
+    The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit.
 
 [cue]: https://cue-lang.org
 [esbuild]: https://github.com/evanw/esbuild
