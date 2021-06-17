@@ -32,6 +32,8 @@ mod encode_logfmt;
 mod ends_with;
 #[cfg(feature = "exists")]
 mod exists;
+#[cfg(feature = "filter_array")]
+mod filter_array;
 #[cfg(feature = "flatten")]
 mod flatten;
 #[cfg(feature = "float")]
@@ -247,6 +249,8 @@ pub use encode_logfmt::EncodeLogfmt;
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
+#[cfg(feature = "filter_array")]
+pub use filter_array::FilterArray;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
 #[cfg(feature = "float")]

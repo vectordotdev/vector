@@ -56,6 +56,7 @@ default = [
     "encode_logfmt",
     "ends_with",
     "exists",
+    "filter_array",
     "flatten",
     "float",
     "floor",
@@ -158,6 +159,7 @@ encode_json = ["serde_json"]
 encode_logfmt = []
 ends_with = []
 exists = []
+filter_array = ["regex"]
 flatten = []
 float = []
 floor = []
