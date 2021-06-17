@@ -169,7 +169,6 @@ mod tests {
         collections::BTreeMap,
         task::Poll,
     };
-    use tokio::task::yield_now;
 
     #[test]
     fn generate_config() {
@@ -383,33 +382,23 @@ interval_ms = 10000
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
         let mut out_stream = agg.transform(Box::pin(rx));
 
-        // Don't advance time
         tokio::time::pause();
 
-        // Yeild so our first (at t0) tick can happen and see nothing
-        yield_now().await;
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        // Send our events
+        // Now send our events
         tx.send(counter_a_1.into()).await.unwrap();
         tx.send(counter_a_2.into()).await.unwrap();
         tx.send(gauge_a_1.into()).await.unwrap();
         tx.send(gauge_a_2.clone().into()).await.unwrap();
-
-        // Give things a chance to run, flush shouldn't trigger, but give it an opportunity
-        yield_now().await;
-
         // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-
-        // Now fast foward time enough that our flush should triggered.
-        yield_now().await;
+        // Now fast foward time enough that our flush should trigger.
         tokio::time::advance(Duration::from_secs(11)).await;
-        tokio::time::resume();
-        yield_now().await;
-
-        // B/c the input stream has ended we will have gone through the `input_rx.next() => None`
-        // part of the loop and do the shutting down final flush immediately. We'll already be able
-        // to read our expected bits on the output.
+        // We should have had an interval fire now and our output aggregate events should be
+        // available.
         let mut count = 0_u8;
         while count < 2 {
             if let Some(event) = out_stream.next().await {
@@ -423,14 +412,11 @@ interval_ms = 10000
                 assert!(false);
             }
         }
-
         // We should be back to pending, having nothing waiting for us
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-
         // Close the input stream which should trigger the shutting down flush
-        assert!(tx.close().await.is_ok());
-        // Give the flush a chance to run
-        yield_now().await;
+        tx.disconnect();
+
         // And still nothing there
         assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
     }
