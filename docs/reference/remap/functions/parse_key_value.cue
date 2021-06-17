@@ -104,7 +104,7 @@ remap: functions: parse_key_value: {
 					"env:prod,service:backend,region:eu-east1,beta",
 					field_delimiter: ",",
 					key_value_delimiter: ":",
-					standalone_key: true
+					accept_standalone_key: true
 				)
 				"""#
 			return: {
