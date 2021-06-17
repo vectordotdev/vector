@@ -69,6 +69,11 @@ impl Function for ParseKeyValue {
                     r#"{"app": "my-app", "ip": "1.2.3.4", "user": "", "msg": "hello-world"}"#,
                 ),
             },
+            Example {
+                title: "standalone key",
+                source: r#"parse_key_value!(s'foo=bar foobar', whitespace: "strict", accept_standalone_key: true)"#,
+                result: Ok(r#"{"foo": "bar", "foobar": true}"#),
+            },
         ]
     }
 
