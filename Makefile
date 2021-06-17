@@ -482,7 +482,7 @@ test-integration-pulsar: ## Runs Pulsar integration tests
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 	@scripts/setup_integration_env.sh pulsar start
-	sleep 10 # Many services are very slow... Give them a sec..
+	sleep 15 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features pulsar-integration-tests --lib ::pulsar::
 ifeq ($(AUTODESPAWN), true)

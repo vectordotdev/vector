@@ -423,9 +423,14 @@ mod integration_tests {
             .with_consumer_name("VectorTestConsumer")
             .with_subscription_type(SubType::Shared)
             .with_subscription("VectorTestSub")
+            .with_options(pulsar::consumer::ConsumerOptions {
+                read_compacted: Some(false),
+                ..Default::default()
+            })
             .build::<String>()
             .await
             .unwrap();
+        dbg!("Pulsar.consumer");
 
         let (acker, ack_counter) = Acker::new_for_testing();
         let producer = cnf.create_pulsar_producer().await.unwrap();
