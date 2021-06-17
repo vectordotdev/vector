@@ -423,6 +423,10 @@ mod integration_tests {
             .with_consumer_name("VectorTestConsumer")
             .with_subscription_type(SubType::Shared)
             .with_subscription("VectorTestSub")
+            .with_options(pulsar::consumer::ConsumerOptions {
+                read_compacted: Some(false),
+                ..Default::default()
+            })
             .build::<String>()
             .await
             .unwrap();
