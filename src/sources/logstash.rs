@@ -555,6 +555,13 @@ output.logstash:
         });
         let config = ContainerConfig {
             image: Some(format!("{}:{}", image, tag)),
+            // adding `-strict.perms=false to the default cmd as otherwise heartbeat was
+            // complaining about the file permissions when running in CI
+            // https://www.elastic.co/guide/en/beats/libbeat/5.3/config-file-permissions.html
+            cmd: Some(vec![
+                String::from("-environment=container"),
+                String::from("-strict.perms=false"),
+            ]),
             host_config: Some(HostConfig {
                 network_mode: Some(String::from("host")),
                 extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
