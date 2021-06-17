@@ -1,4 +1,4 @@
-package metadata
+ metadata
 
 installation: roles: agent: {
 	title: "Agent"
