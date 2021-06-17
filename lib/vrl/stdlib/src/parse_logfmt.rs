@@ -33,12 +33,14 @@ impl Function for ParseLogFmt {
         let key_value_delimiter = expr!("=");
         let field_delimiter = expr!(" ");
         let whitespace = Whitespace::Lenient;
+        let standalone_key = expr!(false);
 
         Ok(Box::new(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
             whitespace,
+            standalone_key,
         }))
     }
 }
