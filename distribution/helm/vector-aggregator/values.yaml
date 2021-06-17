@@ -275,6 +275,8 @@ prometheusSink:
     additionalLabels: {}
     # Additional relabelings to include in the `PodMonitor`.
     extraRelabelings: []
+    # metricRelabelings to include in the `PodMonitor`.
+    metricRelabelings: []
 
 # Sources to add to the generated `vector` config
 sources: {}
