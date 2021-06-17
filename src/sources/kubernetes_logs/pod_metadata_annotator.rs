@@ -186,6 +186,7 @@ fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, contain
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::Value;
     use k8s_openapi::api::core::v1::PodIP;
     use shared::assert_event_data_eq;
 
@@ -368,11 +369,11 @@ mod tests {
     #[test]
     fn test_annotate_from_pod_status() {
         let cases = vec![
-            (
-                FieldsSpec::default(),
-                PodStatus::default(),
-                LogEvent::default(),
-            ),
+            (FieldsSpec::default(), PodStatus::default(), {
+                let mut log = LogEvent::default();
+                log.insert("kubernetes.pod_ips", Vec::<Value>::new());
+                log
+            }),
             (
                 FieldsSpec::default(),
                 PodStatus {
@@ -382,6 +383,7 @@ mod tests {
                 {
                     let mut log = LogEvent::default();
                     log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log.insert("kubernetes.pod_ips", Vec::<Value>::new());
                     log
                 },
             ),
