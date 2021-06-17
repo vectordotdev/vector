@@ -131,31 +131,28 @@ impl TaskTransform for Aggregate {
 
         Box::pin(
             stream! {
-                loop {
-                    let mut output = Vec::new();
-                    let done = tokio::select! {
+                let mut output = Vec::new();
+                let mut done = false;
+                while !done {
+                    tokio::select! {
                         _ = flush_stream.tick() => {
                             me.flush_into(&mut output);
-                            false
-                        }
+                        },
                         maybe_event = input_rx.next() => {
                             match maybe_event {
                                 None => {
                                     me.flush_into(&mut output);
-                                    true
+                                    done = true;
                                 }
-                                Some(event) => {
-                                    me.record(event);
-                                    false
-                                }
+                                Some(event) => me.record(event),
                             }
                         }
                     };
-                    yield stream::iter(output.into_iter());
-                    if done { break }
+                    for event in output.drain(..) {
+                        yield event;
+                    }
                 }
             }
-            .flatten(),
         )
     }
 }
