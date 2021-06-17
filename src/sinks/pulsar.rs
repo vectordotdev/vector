@@ -430,7 +430,6 @@ mod integration_tests {
             .build::<String>()
             .await
             .unwrap();
-        dbg!("Pulsar.consumer");
 
         let (acker, ack_counter) = Acker::new_for_testing();
         let producer = cnf.create_pulsar_producer().await.unwrap();
