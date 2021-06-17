@@ -1,10 +1,23 @@
 {{ $latest := index site.Data.docs.versions 0 }}
 {{ $defaultPlatformTab := index site.Home.Params.platform_tabs 0 }}
+{{ $siteGeneration := site.Params.site_generation }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
 
 const sayHello = () => {
   console.log('Welcome to the Vector website and documentation!');
+}
+
+const clearLocalStorageOnNewGeneration = () => {
+  const currentGeneration = {{ $siteGeneration }};
+  const storedGeneration = localStorage.getItem('generation');
+
+  if ((storedGeneration != null) && (storedGeneration < currentGeneration)) {
+    ['__spruce:ui', '__spruce:global'].forEach((item) => localStorage.removeItem(item));
+    console.log('Removing current localStorage');
+  }
+
+  localStorage.setItem('generation', currentGeneration);
 }
 
 /* Global state management */
@@ -119,6 +132,7 @@ const showCodeFilename = () => {
 
 const main = () => {
   sayHello();
+  clearLocalStorageOnNewGeneration();
   manageState();
   showCodeFilename();
 }
