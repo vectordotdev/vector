@@ -258,8 +258,8 @@ and a `last_name` field coming from a source, and we'd like to output a `name` f
 What if you had to do this in reverse? Try using the [`regex_parser`][docs.transforms.regex_parser] or
 [`split`][docs.transforms.split] transforms.
 
-[docs.transforms.regex_parser]: /docs/reference/configuration/transforms/regex_parser
-[docs.transforms.split]: /docs/reference/configuration/transforms/split
+[docs.transforms.regex_parser]: /docs/reference/vrl/functions/#parse_regex
+[docs.transforms.split]: /docs/reference/vrl/functions/#split
 {{< /info >}}
 
 ## Coercing Data Types
@@ -337,7 +337,7 @@ Where are you deploying Vector? Let us know, maybe we can help optimize it!
 
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources]: /docs/reference/configuration/sources/
-[docs.transforms.grok_parser]: /docs/reference/configuration/transforms/grok_parser/
-[docs.transforms.json_parser]: /docs/reference/configuration/transforms/json_parser/
+[docs.transforms.grok_parser]: /docs/reference/vrl/functions/#parse_grok
+[docs.transforms.json_parser]: /docs/reference/vrl/functions/#parse_json
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
 

@@ -15,7 +15,7 @@ weight: 1
 
 [docs.about.concepts]: /docs/about/concepts
 [docs.setup.quickstart]: /docs/setup/quickstart
-[unit_tests]: /guides/advanced/unit-testing
+[unit_tests]: /guides/level-up/unit-testing
 [wasm_guide]: /guides/advanced/wasm-hello
 {{< /requirement >}}
 

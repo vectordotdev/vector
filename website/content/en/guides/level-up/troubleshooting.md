@@ -81,10 +81,8 @@ If you don't see an error in your Vector logs and the Vector logs appear
 to be frozen, then you'll want to drop your log level to `debug`:
 
 {{< info >}}
-Vector [rate limits][rate] logs in the hot path. As a result, dropping to the
+Vector rate limits logs in the hot path. As a result, dropping to the
 `debug` level is safe for production environments.
-
-[rate]: /docs/administration/monitoring/#rate-limiting
 {{< /info >}}
 
 {{< tabs default="Env Var" >}}

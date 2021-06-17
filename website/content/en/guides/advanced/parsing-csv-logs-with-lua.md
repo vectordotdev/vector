@@ -90,8 +90,7 @@ source = """
 ```
 
 With this `source` the `csv` module is loaded when Vector is started up (or if the `lua` transform is added later and the
-config is [automatically reloaded][docs.administration.process-management#automatic-reload-on-changes]) and can
-be used through the global variable `csv`.
+config is automatically reloaded) and can be used through the global variable `csv`.
 
 ## Implementing Custom Parsing
 
@@ -235,16 +234,15 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [`coercer`][docs.transforms.coercer] transform after the `lua` transform, for example, to
 [parse timestamps][docs.transforms.coercer#timestamps].
 
-[docs.about.concepts]: /docs/about/concepts/
-[docs.administration.process-management#automatic-reload-on-changes]: /docs/administration/process-management/#automatic-reload-on-changes
-[docs.meta.glossary#pipeline]: /docs/meta/glossary/#pipeline
+[docs.about.concepts]: /docs/about/concepts
+[docs.meta.glossary#pipeline]: /docs/reference/glossary/#pipeline
 [docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources.file#multiline]: /docs/reference/configuration/sources/file/#multiline
 [docs.sources.file]: /docs/reference/configuration/sources/file/
-[docs.transforms.coercer#timestamps]: /docs/reference/configuration/transforms/coercer/#timestamps
-[docs.transforms.coercer]: /docs/reference/configuration/transforms/coercer/
-[docs.transforms.lua#data-types]: /docs/reference/configuration/transforms/lua/#data-types
+[docs.transforms.coercer#timestamps]: /docs/reference/vrl/functions/#to_timestamp
+[docs.transforms.coercer]: /docs/reference/vrl/functions/#coerce-functions
+[docs.transforms.lua#data-types]: /docs/reference/configuration/transforms/lua/#event-data-model
 [docs.transforms.lua#process]: /docs/reference/configuration/transforms/lua/#process
 [docs.transforms.lua#source]: /docs/reference/configuration/transforms/lua/#source
 [docs.transforms.lua]: /docs/reference/configuration/transforms/lua/

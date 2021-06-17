@@ -28,5 +28,11 @@ preview-build:
 
 ci-preview-build: setup build-cue preview-build
 
-check-links:
+run-link-checker:
 	htmltest
+
+# Check links without rebuilding the CUE sources. Optimal for fixing links locally.
+check-links: production-build run-link-checker
+
+# Check links in the CI environment
+check-links-ci: ci-production-build run-link-checker
