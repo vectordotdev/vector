@@ -110,7 +110,7 @@ components: transforms: aggregate: {
 				{
 					metric: {
 						kind:      "absolute"
-						name:      "guage.1"
+						name:      "gauge.1"
 						timestamp: "2021-07-12T07:58:47.223543Z"
 						tags: {
 							host: "my.host.com"
@@ -123,7 +123,7 @@ components: transforms: aggregate: {
 				{
 					metric: {
 						kind:      "absolute"
-						name:      "guage.1"
+						name:      "gauge.1"
 						timestamp: "2021-07-12T07:58:45.223543Z"
 						tags: {
 							host: "my.host.com"
@@ -167,7 +167,7 @@ components: transforms: aggregate: {
 				{
 					metric: {
 						kind:      "absolute"
-						name:      "guage.1"
+						name:      "gauge.1"
 						timestamp: "2021-07-12T07:58:45.223543Z"
 						tags: {
 							host: "my.host.com"
