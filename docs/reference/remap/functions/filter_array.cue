@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: filter_array: {
-	category: "Enumerate"
+	category: "Array"
 	description: """
 		Filters elements from the `value` array. It returns an array containint the elements matching the `pattern`.
 		"""
