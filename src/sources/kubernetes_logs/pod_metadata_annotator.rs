@@ -94,13 +94,12 @@ impl PodMetadataAnnotator {
 
         if let Some(ref pod_status) = pod.status {
             annotate_from_pod_status(log, &self.fields_spec, pod_status);
-            if let Some(ref container_statuses) = pod_status.container_statuses {
-                let container_status = container_statuses
-                    .iter()
-                    .find(|c| c.name == file_info.container_name);
-                if let Some(container_status) = container_status {
-                    annotate_from_container_status(log, &self.fields_spec, container_status)
-                }
+            let container_status = pod_status
+                .container_statuses
+                .iter()
+                .find(|c| c.name == file_info.container_name);
+            if let Some(container_status) = container_status {
+                annotate_from_container_status(log, &self.fields_spec, container_status)
             }
         }
         Some(file_info)
@@ -131,14 +130,12 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         }
     }
 
-    if let Some(labels) = &metadata.labels {
-        // Calculate and cache the prefix path.
-        let prefix_path = PathIter::new(fields_spec.pod_labels.as_ref()).collect::<Vec<_>>();
-        for (key, val) in labels.iter() {
-            let mut path = prefix_path.clone();
-            path.push(PathComponent::Key(key.clone()));
-            log.insert_path(path, val.to_owned());
-        }
+    // Calculate and cache the prefix path.
+    let prefix_path = PathIter::new(fields_spec.pod_labels.as_ref()).collect::<Vec<_>>();
+    for (key, val) in metadata.labels.iter() {
+        let mut path = prefix_path.clone();
+        path.push(PathComponent::Key(key.clone()));
+        log.insert_path(path, val.to_owned());
     }
 }
 
@@ -158,13 +155,11 @@ fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_st
     }
 
     for (ref key, ref val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
-        if let Some(val) = val {
-            let inner: Vec<String> = val
-                .iter()
-                .filter_map(|v| v.ip.clone())
-                .collect::<Vec<String>>();
-            log.insert(key, inner);
-        }
+        let inner: Vec<String> = val
+            .iter()
+            .filter_map(|v| v.ip.clone())
+            .collect::<Vec<String>>();
+        log.insert(key, inner);
     }
 }
 
@@ -191,6 +186,7 @@ fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, contain
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::Value;
     use k8s_openapi::api::core::v1::PodIP;
     use shared::assert_event_data_eq;
 
@@ -208,14 +204,12 @@ mod tests {
                     name: Some("sandbox0-name".to_owned()),
                     namespace: Some("sandbox0-ns".to_owned()),
                     uid: Some("sandbox0-uid".to_owned()),
-                    labels: Some(
-                        vec![
-                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
-                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
-                        ]
-                        .into_iter()
-                        .collect(),
-                    ),
+                    labels: vec![
+                        ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                        ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
                     ..ObjectMeta::default()
                 },
                 {
@@ -240,14 +234,12 @@ mod tests {
                     name: Some("sandbox0-name".to_owned()),
                     namespace: Some("sandbox0-ns".to_owned()),
                     uid: Some("sandbox0-uid".to_owned()),
-                    labels: Some(
-                        vec![
-                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
-                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
-                        ]
-                        .into_iter()
-                        .collect(),
-                    ),
+                    labels: vec![
+                        ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                        ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
                     ..ObjectMeta::default()
                 },
                 {
@@ -267,16 +259,15 @@ mod tests {
                     name: Some("sandbox0-name".to_owned()),
                     namespace: Some("sandbox0-ns".to_owned()),
                     uid: Some("sandbox0-uid".to_owned()),
-                    labels: Some(
-                        vec![
-                            ("nested0.label0".to_owned(), "val0".to_owned()),
-                            ("nested0.label1".to_owned(), "val1".to_owned()),
-                            ("nested1.label0".to_owned(), "val2".to_owned()),
-                            ("nested2.label0.deep0".to_owned(), "val3".to_owned()),
-                        ]
-                        .into_iter()
-                        .collect(),
-                    ),
+                    labels: vec![
+                        ("nested0.label0".to_owned(), "val0".to_owned()),
+                        ("nested0.label1".to_owned(), "val1".to_owned()),
+                        ("nested1.label0".to_owned(), "val2".to_owned()),
+                        ("nested2.label0.deep0".to_owned(), "val3".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+
                     ..ObjectMeta::default()
                 },
                 {
@@ -378,11 +369,11 @@ mod tests {
     #[test]
     fn test_annotate_from_pod_status() {
         let cases = vec![
-            (
-                FieldsSpec::default(),
-                PodStatus::default(),
-                LogEvent::default(),
-            ),
+            (FieldsSpec::default(), PodStatus::default(), {
+                let mut log = LogEvent::default();
+                log.insert("kubernetes.pod_ips", Vec::<Value>::new());
+                log
+            }),
             (
                 FieldsSpec::default(),
                 PodStatus {
@@ -392,15 +383,16 @@ mod tests {
                 {
                     let mut log = LogEvent::default();
                     log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log.insert("kubernetes.pod_ips", Vec::<Value>::new());
                     log
                 },
             ),
             (
                 FieldsSpec::default(),
                 PodStatus {
-                    pod_ips: Some(vec![PodIP {
+                    pod_ips: vec![PodIP {
                         ip: Some("192.168.1.2".to_owned()),
-                    }]),
+                    }],
                     ..Default::default()
                 },
                 {
@@ -418,14 +410,14 @@ mod tests {
                 },
                 PodStatus {
                     pod_ip: Some("192.168.1.2".to_owned()),
-                    pod_ips: Some(vec![
+                    pod_ips: vec![
                         PodIP {
                             ip: Some("192.168.1.2".to_owned()),
                         },
                         PodIP {
                             ip: Some("192.168.1.3".to_owned()),
                         },
-                    ]),
+                    ],
                     ..Default::default()
                 },
                 {
@@ -443,14 +435,14 @@ mod tests {
                 },
                 PodStatus {
                     pod_ip: Some("192.168.1.2".to_owned()),
-                    pod_ips: Some(vec![
+                    pod_ips: vec![
                         PodIP {
                             ip: Some("192.168.1.2".to_owned()),
                         },
                         PodIP {
                             ip: Some("192.168.1.3".to_owned()),
                         },
-                    ]),
+                    ],
                     ..Default::default()
                 },
                 {
