@@ -74,23 +74,22 @@ impl Aggregate {
         let metric = event.as_metric();
         let series = metric.series();
         let data = metric.data();
-        let map = &mut self.map;
 
         match data.kind {
             metric::MetricKind::Incremental => {
-                match map.get_mut(&series) {
+                match self.map.get_mut(&series) {
                     // We already have something, add to it, will update timestamp as well.
                     Some(existing) => existing.update(data),
                     None => {
                         // New so store
-                        map.insert(series.clone(), data.clone());
+                        self.map.insert(series.clone(), data.clone());
                         true
                     }
                 };
             },
             metric::MetricKind::Absolute => {
                 // Always replace/store
-                map.insert(series.clone(), data.clone());
+                self.map.insert(series.clone(), data.clone());
             }
         };
 
@@ -99,14 +98,13 @@ impl Aggregate {
 
     fn flush_into(&mut self, output: &mut Vec<Event>) -> u64 {
         let mut count = 0_u64;
-        let map = &mut self.map;
 
-        if map.len() > 0 {
+        if self.map.len() > 0 {
             // TODO: not clear how this should work with aggregation so just stuffing a default one
             // in for now.
             let metadata = EventMetadata::default();
 
-            for (series, metric) in map.drain() {
+            for (series, metric) in self.map.drain() {
                 let metric = metric::Metric::from_parts(series, metric, metadata.clone());
                 output.push(Event::Metric(metric));
                 count += 1;
