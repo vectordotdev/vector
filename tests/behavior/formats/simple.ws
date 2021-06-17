@@ -1,0 +1,38 @@
+
+  "transforms": 
+    "add_fields_nested_json": 
+      "inputs": []
+      "type": "add_fields"
+      "fields": 
+        "a.b": 123
+        "x": 
+          "y": 456
+        
+        "x.z": 789
+      
+    
+  
+  "tests": 
+    
+      "name": "add_fields_nested_json",l
+      "input": 
+        "insert_at": "add_fields_nested_json",l
+        "type": "raw"
+        "value": ""
+      
+      "outputs": 
+        
+          "extract_from": "add_fields_nested_json"
+          "conditions": 
+            
+              "type": "remap"
+              "source": ".a.b == 123 && .x.y == 456 && .x.z == 789"
+            
+          
+        
+
+      
+    
+  
+
+
