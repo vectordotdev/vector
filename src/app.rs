@@ -87,6 +87,8 @@ impl Application {
             LogFormat::Json => true,
         };
 
+        let enable_datadog_tracing = root_opts.enable_datadog_tracing;
+
         metrics::init().expect("metrics initialization failed");
 
         if let Some(threads) = root_opts.threads {
@@ -107,8 +109,12 @@ impl Application {
 
         // We need a runtime to initiate the datadog tracing exporter
         rt.block_on(async move {
-            trace::init(color, json, &level);
-            info!(message = "Log level is enabled.", level = ?level);
+            trace::init(color, json, &level, enable_datadog_tracing);
+            info!(
+                message = "Log level is enabled.",
+                ?level,
+                ?enable_datadog_tracing
+            );
         });
 
         let config = {

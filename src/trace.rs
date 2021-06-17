@@ -31,7 +31,26 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-pub fn init(color: bool, json: bool, levels: &str) {
+// This is a macro because `$subscriber` can be different, opaque types in different branches
+macro_rules! send_to_dd {
+    ($subscriber:ident) => {
+        let tracer = opentelemetry_datadog::new_pipeline()
+            .with_service_name("vector")
+            .with_version(opentelemetry_datadog::ApiVersion::Version05)
+            .with_trace_config(
+                opentelemetry::sdk::trace::config()
+                    .with_sampler(opentelemetry::sdk::trace::Sampler::AlwaysOn),
+            )
+            .install_batch(opentelemetry::runtime::Tokio)
+            .expect("building tracer");
+
+        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        let $subscriber = $subscriber.with(telemetry);
+    };
+}
+
+pub fn init(color: bool, json: bool, levels: &str, enable_datadog_tracing: bool) {
     let _ = BUFFER.set(Mutex::new(Some(Vec::new())));
 
     // An escape hatch to disable injecting a mertics layer into tracing.
@@ -60,25 +79,21 @@ pub fn init(color: bool, json: bool, levels: &str) {
 
         let subscriber = subscriber.with(RateLimitedLayer::new(formatter));
 
-        let tracer = opentelemetry_datadog::new_pipeline()
-            .with_service_name("vector")
-            .with_version(opentelemetry_datadog::ApiVersion::Version05)
-            .with_trace_config(
-                opentelemetry::sdk::trace::config()
-                    .with_sampler(opentelemetry::sdk::trace::Sampler::AlwaysOn),
-            )
-            .install_batch(opentelemetry::runtime::Tokio)
-            .expect("building tracer");
-
-        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-
-        let subscriber = subscriber.with(telemetry);
-
         if metrics_layer_enabled {
             let subscriber = subscriber.with(MetricsLayer::new());
-            Dispatch::new(BroadcastSubscriber { subscriber })
+            if enable_datadog_tracing {
+                send_to_dd!(subscriber);
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            } else {
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            }
         } else {
-            Dispatch::new(BroadcastSubscriber { subscriber })
+            if enable_datadog_tracing {
+                send_to_dd!(subscriber);
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            } else {
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            }
         }
     } else {
         #[cfg(not(test))]
@@ -91,25 +106,21 @@ pub fn init(color: bool, json: bool, levels: &str) {
 
         let subscriber = subscriber.with(RateLimitedLayer::new(formatter));
 
-        let tracer = opentelemetry_datadog::new_pipeline()
-            .with_service_name("vector")
-            .with_version(opentelemetry_datadog::ApiVersion::Version05)
-            .with_trace_config(
-                opentelemetry::sdk::trace::config()
-                    .with_sampler(opentelemetry::sdk::trace::Sampler::AlwaysOn),
-            )
-            .install_batch(opentelemetry::runtime::Tokio)
-            .expect("building tracer");
-
-        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-
-        let subscriber = subscriber.with(telemetry);
-
         if metrics_layer_enabled {
             let subscriber = subscriber.with(MetricsLayer::new());
-            Dispatch::new(BroadcastSubscriber { subscriber })
+            if enable_datadog_tracing {
+                send_to_dd!(subscriber);
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            } else {
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            }
         } else {
-            Dispatch::new(BroadcastSubscriber { subscriber })
+            if enable_datadog_tracing {
+                send_to_dd!(subscriber);
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            } else {
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            }
         }
     };
 
