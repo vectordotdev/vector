@@ -1460,12 +1460,15 @@ mod integration_tests {
     }
 
     async fn flush(common: ElasticSearchCommon) -> crate::Result<()> {
+        use tokio::time::{sleep, Duration};
+        sleep(Duration::from_secs(2)).await;
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
         let client =
             HttpClient::new(common.tls_settings.clone()).expect("Could not build client to flush");
         let response = client.send(request).await?;
+        sleep(Duration::from_secs(2)).await;
         match response.status() {
             StatusCode::OK => Ok(()),
             status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
