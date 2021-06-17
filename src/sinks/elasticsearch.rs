@@ -1164,6 +1164,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         event::Event,
         http::HttpClient,
+        sinks::HealthcheckError,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::{self, TlsOptions},
     };
@@ -1172,6 +1173,75 @@ mod integration_tests {
     use hyper::Body;
     use serde_json::{json, Value};
     use std::{fs::File, future::ready, io::Read};
+
+    impl ElasticSearchCommon {
+        async fn flush_request(&self) -> crate::Result<()> {
+            let url = format!("{}/_flush", self.base_url)
+                .parse::<hyper::Uri>()
+                .unwrap();
+            let mut builder = Request::post(&url);
+
+            if let Some(credentials_provider) = &self.credentials {
+                let mut request = self.signed_request("POST", &url, true);
+
+                if let Some(ce) = self.compression.content_encoding() {
+                    request.add_header("Content-Encoding", ce);
+                }
+
+                for (header, value) in &self.request.headers {
+                    request.add_header(header, value);
+                }
+
+                builder = finish_signer(&mut request, &credentials_provider, builder).await?;
+            } else {
+                if let Some(ce) = self.compression.content_encoding() {
+                    builder = builder.header("Content-Encoding", ce);
+                }
+
+                for (header, value) in &self.request.headers {
+                    builder = builder.header(&header[..], &value[..]);
+                }
+
+                if let Some(auth) = &self.authorization {
+                    builder = auth.apply_builder(builder);
+                }
+            }
+
+            let request = builder.body(Body::empty())?;
+            let client = HttpClient::new(self.tls_settings.clone())
+                .expect("Could not build client to flush");
+            let response = client.send(request).await?;
+
+            match response.status() {
+                StatusCode::OK => Ok(()),
+                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+            }
+        }
+    }
+
+    async fn flush(common: ElasticSearchCommon) -> crate::Result<()> {
+        use tokio::time::{sleep, Duration};
+        sleep(Duration::from_secs(2)).await;
+        common.flush_request().await?;
+        sleep(Duration::from_secs(2)).await;
+
+        Ok(())
+    }
+
+    async fn create_template_index(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {
+        let client = create_http_client();
+        let uri = format!("{}/_index_template/{}", common.base_url, name);
+        let response = client
+            .put(uri)
+            .json(&json!({
+                "index_patterns": ["my-*-*"],
+                "data_stream": {},
+            }))
+            .send()
+            .await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        Ok(())
+    }
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -1277,6 +1347,10 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
+                auth: Some(ElasticSearchAuth::Basic {
+                    user: "elastic".into(),
+                    password: "vector".into(),
+                }),
                 endpoint: "https://localhost:9201".into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
@@ -1378,6 +1452,7 @@ mod integration_tests {
 
         reqwest::Client::builder()
             .add_root_certificate(test_ca)
+            .danger_accept_invalid_certs(true)
             .build()
             .expect("Could not build HTTP client")
     }
@@ -1416,9 +1491,9 @@ mod integration_tests {
         flush(common).await.expect("Flushing writes failed");
 
         let client = create_http_client();
-
         let response = client
             .get(&format!("{}/{}/_search", base_url, index))
+            .basic_auth("elastic", Some("vector"))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
@@ -1457,37 +1532,6 @@ mod integration_tests {
 
     fn gen_index() -> String {
         format!("test-{}", random_string(10).to_lowercase())
-    }
-
-    async fn flush(common: ElasticSearchCommon) -> crate::Result<()> {
-        use tokio::time::{sleep, Duration};
-        sleep(Duration::from_secs(2)).await;
-        let uri = format!("{}/_flush", common.base_url);
-        let request = Request::post(uri).body(Body::empty()).unwrap();
-
-        let client =
-            HttpClient::new(common.tls_settings.clone()).expect("Could not build client to flush");
-        let response = client.send(request).await?;
-        sleep(Duration::from_secs(2)).await;
-        match response.status() {
-            StatusCode::OK => Ok(()),
-            status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
-        }
-    }
-
-    async fn create_template_index(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {
-        let client = create_http_client();
-        let uri = format!("{}/_index_template/{}", common.base_url, name);
-        let response = client
-            .put(uri)
-            .json(&json!({
-                "index_patterns": ["my-*-*"],
-                "data_stream": {},
-            }))
-            .send()
-            .await?;
-        assert_eq!(response.status(), StatusCode::OK);
-        Ok(())
     }
 
     async fn create_data_stream(common: &ElasticSearchCommon, name: &str) -> crate::Result<()> {

@@ -39,9 +39,16 @@ start_docker () {
   docker run -d --network=vector-test-integration-elasticsearch -p 9200:9200 -p 9300:9300 \
 	 --name vector_elasticsearch -e discovery.type=single-node -e ES_JAVA_OPTS="-Xms400m -Xmx400m" elasticsearch:7.13.1
   docker run -d --network=vector-test-integration-elasticsearch -p 9201:9200 -p 9301:9300 \
-	 --name vector_elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true \
-	 -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true \
-	 -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key \
+	 --name vector_elasticsearch-tls \
+   -e ELASTIC_PASSWORD=vector \
+   -e discovery.type=single-node \
+   -e xpack.security.enabled=true \
+	 -e xpack.security.http.ssl.enabled=true \
+	 -e xpack.security.http.ssl.certificate=certs/localhost.crt \
+   -e xpack.security.http.ssl.key=certs/localhost.key \
+   -e xpack.security.transport.ssl.enabled=true \
+	 -e xpack.security.transport.ssl.certificate=certs/localhost.crt \
+   -e xpack.security.transport.ssl.key=certs/localhost.key \
 	 -e ES_JAVA_OPTS="-Xms400m -Xmx400m" \
 	 -v "$(pwd)"/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:7.13.1
 }
