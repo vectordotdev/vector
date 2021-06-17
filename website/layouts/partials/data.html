@@ -56,7 +56,7 @@
           <span class="flex justify-between items-center">
             <span class="font-mono font-semibold">
               {{ $text := printf "%s.%s" $name $k }}
-              {{ partial "heading.html" (dict "text" $text "level" 4 "anchor" true "icon" false "id" $k) }}
+              {{ partial "heading.html" (dict "text" $text "level" 4 "anchor" true "icon" false "id" $text) }}
             </span>
 
             <span class="flex space-x-1">
@@ -214,7 +214,7 @@
 
     {{ with .logs }}
     <span class="flex items-center justify-between">
-      {{ partial "heading.html" (dict "text" "Logs" "level" 3 "id" "output-logs" "href" "output-logs") }}
+      {{ partial "heading.html" (dict "text" "Logs" "level" 3 "id" "output-logs" "href" "#output-logs") }}
 
       <a href="/docs/about/under-the-hood/architecture/data-model/log">
         link
@@ -316,7 +316,7 @@
     <div class="py-4 px-6">
       <span class="flex justify-between items-center">
         <span class="font-mono">
-          {{ $href := printf "#%s" $k }}
+          {{ $href := printf "#%s" $k | urlize }}
           {{ partial "heading.html" (dict "text" $k "level" 3 "href" $href) }}
         </span>
 

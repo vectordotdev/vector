@@ -189,18 +189,18 @@ components: sources: syslog: {
 		parsing: {
 			title: "Parsing"
 			body:  """
-				Vector makes a _best effort_ to parse the various Syslog formats out in the
-				wild. This includes [RFC 6587](\(urls.syslog_6587)), [RFC 5424](\(urls.syslog_5424)),
+				Vector makes a _best effort_ to parse the various Syslog formats out in the wild.
+				This includes [RFC 6587](\(urls.syslog_6587)), [RFC 5424](\(urls.syslog_5424)),
 				[RFC 3164](\(urls.syslog_3164)), and other common variations (such as the Nginx
-				Syslog style). It's unfortunate that the Syslog specification is not more
-				accurately followed, but we hope Vector insulates you from these deviations.
+				Syslog style). It's unfortunate that the Syslog specification isn't more
+				accurately followed, but we hope that Vector insulates you from these deviations.
 
-				If parsing fails, Vector will include the entire Syslog line in the `message`
+				If parsing fails, Vector includes the entire Syslog line in the `message`
 				key. If you find this happening often, we recommend using the
-				[`socket` source](\(urls.vector_socket_source)) combined with the
-				[`regex_parser` transform](\(urls.vector_regex_parser)) to implement your own
-				ingestion and parsing scheme. Or, [open an issue](\(urls.new_feature_request))
-				requesting support for your specific format.
+				[`socket` source](\(urls.vector_socket_source)) combined with
+				[regex parsing](\(urls.vrl_functions)/#parse_regex) to implement your own custom
+				ingestion and parsing scheme. Alternatively, you can [open an
+				issue](\(urls.new_feature_request)) to request support for your specific format.
 				"""
 		}
 	}

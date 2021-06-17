@@ -124,7 +124,7 @@ components: sources: file: {
 			common:      false
 			description: """
 				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#host_key).
+				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
 			type: string: {
@@ -383,7 +383,7 @@ components: sources: file: {
 			title: "fingerprint"
 			body: """
 				By default, Vector identifies files by creating a
-				[cyclic redundancy check](urls.crc) (CRC) on the first 256 bytes of
+				[cyclic redundancy check](\(urls.crc)) (CRC) on the first 256 bytes of
 				the file. This serves as a fingerprint to uniquely identify the file.
 				The amount of bytes read can be controlled via the `fingerprint_bytes`
 				and `ignored_header_bytes` options.

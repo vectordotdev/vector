@@ -13,6 +13,6 @@ Vector's metric data model favors accuracy and correctness over ideological puri
 
 {{< config/metric-schema >}}
 
-[logs]: /docs/about/architecture/data-model/log
+[logs]: /docs/about/under-the-hood/architecture/data-model/log
 [prometheus]: https://prometheus.io
 [statsd]: https://github.com/statsd/statsd

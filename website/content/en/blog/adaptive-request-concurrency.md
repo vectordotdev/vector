@@ -26,9 +26,9 @@ Users typically have two questions about this:
 1. What does it mean?
 1. How can I fix it?
 
-The answer to the first question is simple: Vector has _internally_ rate-limited processing to respect user-configured limits—[`request.rate_limit_duration_secs`][rate_limit_duration_secs], [`request.rate_limit_num`][rate_limit_num], and [`request.in_flight_limit`][in_flight_limit]—for that particular [sink][sinks]. In other words, Vector has intentionally reduced performance to stay within static limits.
+The answer to the first question is simple: Vector has _internally_ rate-limited processing to respect user-configured limits—[`request.rate_limit_duration_secs`][rate_limit_duration_secs] and [`request.rate_limit_num`][rate_limit_num]—for that particular [sink][sinks]. In other words, Vector has intentionally reduced performance to stay within static limits.
 
-The answer to the second question—how to fix it—is more complex because it depends on a variety of factors that change over time (covered in more detail [below](#the-second-problem-rate-limiting-is-not-a-panacea)). Telling the user to raise their limits would be irresponsible since we'd then risk overwhelming the downstream service and causing an outage; but not changing them could mean limiting performance in a dramatic way.
+The answer to the second question—how to fix it—is more complex because it depends on a variety of factors that change over time (covered in more detail [below](#rate-limiting-problem)). Telling the user to raise their limits would be irresponsible since we'd then risk overwhelming the downstream service and causing an outage; but not changing them could mean limiting performance in a dramatic way.
 
 {{< quote >}}
 In one case, we found that rate limits were limiting performance by over 80%.
@@ -38,7 +38,7 @@ The crux of the matter is that Vector's high throughput presents a major challen
 
 In versions of Vector prior to 0.11, you could address this problem by setting [**rate limits**][rate limit] on outbound HTTP traffic to downstream services. Rate limiting certainly *does* help prevent certain worst-case scenarios but customer feedback and our own internal QA has revealed that this approach also has deep limitations.
 
-## The problem: rate limiting is not a panacea
+## The problem: rate limiting is not a panacea {#rate-limiting-problem}
 
 Rate limiting is nice to have as a fallback but it's a blunt instrument, a static half-solution to a dynamic problem. The core problem is that configuring your own rate limits locks you into a perpetual loop:
 
@@ -91,7 +91,7 @@ This decision tree is always active and Vector always "knows" what to do, even i
 
 ### The role of configuration
 
-Vector never stops quietly making the linear up vs. exponential down decision in the background, and it works out of the box with zero configuration beyond enabling the feature, which is currently on an opt-in basis in version 0.11. You can enable ARC in an HTTP sink by setting the [`request.concurrency`](request_concurrency) parameter to `adaptive`. Here's an example for a Clickhouse sink:
+Vector never stops quietly making the linear up vs. exponential down decision in the background, and it works out of the box with zero configuration beyond enabling the feature, which is currently on an opt-in basis in version 0.11. You can enable ARC in an HTTP sink by setting the [`request.concurrency`][request_concurrency] parameter to `adaptive`. Here's an example for a Clickhouse sink:
 
 ```toml
 [sinks.clickhouse_internal]
@@ -135,28 +135,27 @@ For now, we're quite confident that ARC in Vector 0.11, even in its initial stat
 [aimd]: https://en.wikipedia.org/wiki/Additive_increase/multiplicative_decrease
 [adaptive_concurrency]: https://github.com/timberio/vector/tree/master/src/sinks/util/adaptive_concurrency
 [bruce guenter]: https://github.com/bruceg
-[buffer]: /docs/reference/sinks/http/#buffer
-[clickhouse]: /docs/reference/sinks/clickhouse
+[buffer]: /docs/reference/configuration/sinks/http/#buffer
+[clickhouse]: /docs/reference/configuration/sinks/clickhouse
 [congestion control]: https://en.wikipedia.org/wiki/TCP_congestion_control
 [controller]: https://github.com/timberio/vector/blob/master/src/sinks/util/adaptive_concurrency/controller.rs#L23-L31
 [dead ends]: https://github.com/timberio/vector/pull/3671
-[elasticsearch]: /docs/reference/sinks/elasticsearch
+[elasticsearch]: /docs/reference/configuration/sinks/elasticsearch
 [http_test_server]: https://github.com/timberio/http_test_server
-[in_flight_limit]: /docs/reference/sinks/http/#in_flight_limit
 [issue_325]: https://github.com/timberio/vector/issues/3255
 [kubernetes]: https://kubernetes.io
-[max_size]: /docs/reference/sinks/http/#max_size
+[max_size]: /docs/reference/configuration/sinks/http/#buffer.max_size
 [open issue]: https://github.com/timberio/vector/issues/3887
 [performance under load]: https://medium.com/@NetflixTechBlog/performance-under-load-3e6fa9a60581
 [prior_art]: https://github.com/timberio/vector/blob/master/rfcs/2020-04-06-1858-automatically-adjust-request-limits.md#prior-art
-[rate limit]: /docs/reference/sinks/http/#rate-limits
-[rate_limit_duration_secs]: /docs/reference/sinks/http/#rate_limit_duration_secs
-[rate_limit_num]: /docs/reference/sinks/http/#rate_limit_num
-[request_concurrency]: /docs/reference/sinks/http/#concurrency
+[rate limit]: /docs/reference/configuration/sinks/http/#rate-limits-adapative-concurrency
+[rate_limit_duration_secs]: /docs/reference/configuration/sinks/http/#request.rate_limit_duration_secs
+[rate_limit_num]: /docs/reference/configuration/sinks/http/#request.rate_limit_num
+[request_concurrency]: /docs/reference/configuration/sinks/http/#request.concurrency
 [rfc 1858]: https://github.com/timberio/vector/blob/master/rfcs/2020-04-06-1858-automatically-adjust-request-limits.md
 [rust]: https://rust-lang.org
-[sinks]: /docs/reference/sinks
-[sources]: /docs/reference/sources
+[sinks]: /docs/reference/configuration/sinks
+[sources]: /docs/reference/configuration/sources
 [splunk]: https://splunk.com
-[transforms]: /docs/reference/transforms
+[transforms]: /docs/reference/configuration/transforms
 [vector]: /

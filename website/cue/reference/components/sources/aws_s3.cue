@@ -267,7 +267,7 @@ components: sources: aws_s3: components._aws & {
 				},
 				{
 					_action:       "DeleteMessage"
-					required_when: "[`strategy`](#strategy) is set to `sqs` and [`delete_message`](#delete_message) is set to `true`"
+					required_when: "[`strategy`](#strategy) is set to `sqs` and [`delete_message`](#sqs.delete_message) is set to `true`"
 				},
 			]
 		},

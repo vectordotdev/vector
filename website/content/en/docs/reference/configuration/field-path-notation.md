@@ -4,7 +4,7 @@ short: Field paths
 weight: 7
 ---
 
-Throughout Vector's configuration you'll notice that certain options take field paths as values, such as the [`rename_fields`][rename_fields] transform. In order to reference nested or array values, you can use Vector's field path notation. This notation is not anything special, it simply uses `.` and `[<index>]` to access nested and array values, respectively.
+Throughout Vector's configuration you'll notice that certain options take field paths as values. In order to reference nested or array values, you can use Vector's field path notation. This notation is not anything special, it simply uses `.` and `[<index>]` to access nested and array values, respectively.
 
 ## Example
 
@@ -74,5 +74,3 @@ field\.with\.dots
 The above name is treated literally.
 
 The `\` character, if used literally, must be escaped with a `\` as well.
-
-[rename_fields]: /docs/reference/configuration/transforms/rename_fields

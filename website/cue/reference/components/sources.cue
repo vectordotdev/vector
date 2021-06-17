@@ -210,7 +210,7 @@ components: sources: [Name=string]: {
 			title: "Context"
 			body:  """
 				By default, the `\( Name )` source augments events with helpful
-				context keys as shown in the [Output](#output) section.
+				context keys.
 				"""
 		}
 

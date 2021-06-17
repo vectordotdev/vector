@@ -4,7 +4,7 @@ short: Errors
 weight: 3
 ---
 
-VRL is a [fail-safe](#fail-safety) language, which means that a VRL program doesn't compile unless every potential error is handled. Observability data is notoriously unpredictable and fail safety ensures that your VRL programs elegantly handle malformed data.
+VRL is a [fail-safe][fail_safety] language, which means that a VRL program doesn't compile unless every potential error is handled. Observability data is notoriously unpredictable and fail safety ensures that your VRL programs elegantly handle malformed data.
 
 ## Compile-time errors
 
@@ -93,3 +93,4 @@ While raising errors can simplfy your program, you should think carefully before
 [assign]: /docs/reference/vrl/expressions/#assignment
 [call]: /docs/reference/vrl/expressions/#function-call
 [coalesce]: /docs/reference/vrl/expressions/#coalesce
+[fail_safety]: /docs/reference/vrl/#fail-safety

@@ -100,7 +100,7 @@ components: sinks: splunk_hec: {
 			common:      true
 			description: """
 				The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#host_key).
+				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
 			warnings: []

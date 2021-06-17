@@ -72,5 +72,5 @@ Vector rate limits log events in the hot path. This enables you to get granular 
 [journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [journald_source]: /docs/reference/configuration/sources/journald
 [rfc_2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-[starting]: /docs/administration/process-management/#start
+[starting]: /docs/administration/process-management
 [troubleshooting]: /guides/level-up/troubleshooting/

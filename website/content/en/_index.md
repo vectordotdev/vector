@@ -13,17 +13,17 @@ platform_tabs: [
 why: [
   {
     title: "Ultra fast and reliable",
-    description: "Built in [Rust](https://rust-lang.org), Vector is [blistering fast and memory efficient](#performance). It's designed to handle the most demanding environments.",
+    description: "Built in [Rust](https://rust-lang.org), Vector is blistering fast, memory efficient, and designed to handle the most demanding environments.",
     icon: "clock.svg"
   },
   {
     title: "End to end",
-    description: "Vector strives to be the only tool you need to get observability data from A to B, [deploying](/docs/setup/deployment) as a [daemon](/docs/setup/deployment/strategies#daemon), [sidecar](/docs/setup/deployment/strategies#daemon), or [service](/docs/setup/deployment/strategies#daemon).",
+    description: "Vector strives to be the only tool you need to get observability data from A to B, [deploying](/docs/setup/deployment) as an [daemon](/docs/setup/deployment/roles/#daemon)), [sidecar](/docs/setup/deployment/roles/#sidecar), or [aggregator](/docs/setup/deployment/roles/#aggregator).",
     icon: "chart.svg"
   },
   {
     title: "Unified",
-    description: "Vector supports [logs](/docs/about/data-model/log), [metrics](/docs/about/data-model/metric), and [events](/docs/about/data-model/#event), making it easy to collect and process all observability data.",
+    description: "Vector supports [logs](/docs/about/under-the-hood/architecture/data-model/log) and [metrics](/docs/about/under-the-hood/architecture/data-model/metric), making it easy to collect and process all your observability data.",
     icon: "hex.svg"
   },
   {
@@ -33,12 +33,12 @@ why: [
   },
   {
     title: "Programmable transforms",
-    description: "[Programmable transforms](/docs/reference/transforms) give you the full power of programmable runtimes. Handle complex use cases without limitation.",
+    description: "[Programmable transforms](/docs/reference/configuration/transforms) give you the full power of programmable runtimes. Handle complex use cases without limitation.",
     icon: "code.svg"
   },
   {
     title: "Clear guarantees",
-    description: "Guarantees matter, and Vector is [clear on its guarantees](/docs/about/guarantees), helping you to make the appropriate trade offs for your use case.",
+    description: "Guarantees matter, and Vector is [clear on its guarantees](/docs/about/under-the-hood/guarantees), helping you to make the appropriate trade offs for your use case.",
     icon: "laptop.svg"
   }
 ]
@@ -55,7 +55,7 @@ installation: [
   },
   {
     logo: "linux.svg",
-    url: "/docs/setup/installation/operating-systems/linux"
+    url: "/docs/setup/installation/operating-systems"
   },
   {
     logo: "raspbian.svg",

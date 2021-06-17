@@ -109,7 +109,7 @@ Feature | Safety | Performance
 [Fail safety](#fail-safety) | ✅ |
 [Memory safety](#memory-safety) | ✅ |
 [Vector and Rust native](#vector-rust-native) | ✅ | ✅
-[Statelessness](#statelessness) | ✅ | ✅
+[Statelessness](#stateless) | ✅ | ✅
 
 ## Concepts
 

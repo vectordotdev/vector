@@ -50,7 +50,7 @@ Up to the 0.12 release, Vector has provided two types of transforms: **static
 transforms** and **runtime transforms**.
 
 * Static transforms do exactly *one* particular thing and are configuration
-  based. The [`remove_fields`][remove_fields] transform, for example, removes
+  based. The now-deprecated `remove_fields` transform, for example, would remove
   the fields that you specify in your Vector configuration.
 
 * Runtime transforms enable you to modify event data using full-blown language
@@ -221,7 +221,7 @@ separates them, allowing you to choose your preferred configuration language
 transformation (VRL). But is VRL really necessary? Couldn't you leverage Lua,
 Javascript, or any other existing language?
 
-### Runtime transforms are slow and unsafe
+### Runtime transforms are slow and unsafe {#runtime-problems}
 
 **Runtime** transforms enable you to modify event data using the full power of a
 programming language runtime, such as Lua or Javascript. They're robust enough
@@ -331,7 +331,7 @@ For more info on each click on the feature, but for the purposes of
 demonstrating how VRL is unique, let's touch on the first two: *progressive type
 safety* and *fail safety*.
 
-### Progressive type & fail safety
+### Progressive type and fail safety
 
 A unique design decision behind VRL is its implementation of type and fail
 safety. After seeing many users deal with pipeline instability due to runtime
@@ -496,12 +496,11 @@ with us [on Discord][chat] if you have any issues, comments, or suggestions.
 [lua]: https://vector.dev/docs/reference/transforms/lua/
 [Memory safety]: /docs/reference/vrl/#memory-safety
 [Progressive type safety]: /docs/reference/vrl/#progressive-type-safety
-[remove_fields]: /docs/reference/configuration/transforms/remove_fields/
 [route_transform]: /docs/reference/configuration/transforms/route/
 [wasm]: /docs/reference/configuration/transforms/wasm/
 [Stateless]: /docs/reference/vrl/#stateless
 [stephen]: https://github.com/FungusHumungus
-[Vector/Rust native]: /docs/reference/vrl/#native
+[Vector/Rust native]: /docs/reference/vrl/#vector-rust-native
 [vrl_examples]: /docs/reference/vrl/examples/
 [vrl_expressions]: /docs/reference/vrl/expressions/
 [vrl_functions]: /docs/reference/vrl/functions/

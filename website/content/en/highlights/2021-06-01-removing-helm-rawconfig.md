@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2021-06-01"
-$schema: ".schema.json"
+date: "2021-06-01"
 title: "Deprecating Helm `rawConfig` option"
 description: "The `rawConfig` option in the Vector Helm charts will be fully deprecated in an upcoming release"
-author_github: "https://github.com/spencergilbert"
+authors: ["spencergilbert"]
 pr_numbers: [7671]
 release: "0.14.0"
 hide_on_release_notes: false
-tags: ["type: deprecation", "platform: kubernetes", "domain: config"]
+tags:
+  type: "deprecation"
+  platforms: ["kubernetes"]
+  domains: ["config"]
 ---
 
 With the release of Vector 0.14.0, we are announcing the planned deprecation of the `rawConfig` option

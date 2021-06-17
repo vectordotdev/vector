@@ -25,9 +25,9 @@ Vector supports [hot reloading][reloading] to apply any configuration changes. T
 
 Vector also includes an [API] that allows for real-time observation and manipulation of a running Vector instance.
 
-[api]: /docs/reference/api/
+[api]: /docs/reference/api
 [components]: /components
-[configuration]: /docs/configuration
+[configuration]: /docs/reference/configuration
 [cue]: https://cuelang.org
 [dag]: https://en.wikipedia.org/wiki/Directed_acyclic_graph
 [events]: /docs/about/under-the-hood/architecture/data-model

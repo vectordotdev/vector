@@ -38,10 +38,10 @@ components: transforms: wasm: {
 		}
 
 		requirements: [
-			#"""
-				Vector must be built with the `wasm` feature. *This is not enabled by default.
-				Review [Building Vector](\(urls.contributing))*.
-				"""#,
+			"""
+			Vector must be built with the `wasm` feature. This is *not* enabled by default. See the
+			[Building Vector](\(urls.contributing)) docs for more info.*
+			""",
 		]
 		warnings: []
 		notices: [

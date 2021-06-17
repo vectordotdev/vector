@@ -13,8 +13,8 @@ Helm support for the [aggregator] role is currently in private beta. We're curre
 
 As an alternative, you can still manually deploy Vector in the aggregator role. Instructions throughout this doc will be for the [agent] role only.
 
-[agent]: /docs/about/setup/deployment/roles/#agent
-[aggregator]: /docs/about/setup/deployment/roles/#aggregator
+[agent]: /docs/setup/deployment/roles/#agent
+[aggregator]: /docs/setup/deployment/roles/#aggregator
 [chat]: https://chat.vector.dev
 {{< /warning >}}
 

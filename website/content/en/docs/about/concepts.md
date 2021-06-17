@@ -73,11 +73,11 @@ A **topology** is the end result of deploying Vector into your infrastructure. A
 
 {{< jump "/docs/setup/deployment/topologies" >}}
 
-[components]: /docs/components
+[components]: /components
 [dag]: https://en.wikipedia.org/wiki/Directed_acyclic_graph
 [events]: #events
 [pipelines]: #pipeline
 [sinks]: #sinks
 [sources]: #sources
-[topologies]: #topologies
+[topologies]: #topology
 [transforms]: #transforms

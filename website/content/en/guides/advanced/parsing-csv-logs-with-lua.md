@@ -243,7 +243,7 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [docs.transforms.coercer#timestamps]: /docs/reference/vrl/functions/#to_timestamp
 [docs.transforms.coercer]: /docs/reference/vrl/functions/#coerce-functions
 [docs.transforms.lua#data-types]: /docs/reference/configuration/transforms/lua/#event-data-model
-[docs.transforms.lua#process]: /docs/reference/configuration/transforms/lua/#process
+[docs.transforms.lua#process]: /docs/reference/configuration/transforms/lua/#hooks.process
 [docs.transforms.lua#source]: /docs/reference/configuration/transforms/lua/#source
 [docs.transforms.lua]: /docs/reference/configuration/transforms/lua/
 [guides.advanced.custom-aggregations-with-lua]: /guides/advanced/custom-aggregations-with-lua/

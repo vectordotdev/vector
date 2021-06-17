@@ -117,5 +117,5 @@ option = "{{ parent.child[0] }}"
 [log]: /docs/about/under-the-hood/architecture/data-model/log
 [paths]: /docs/reference/configuration/field-path-notation
 [strftime]: https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html#specifiers
-[timestamp]: /docs/about/under-the-hood/architecture/data-model/log/#timestamp
-[timestamp_key]: /docs/reference/configuration/global-options/#timestamp_key
+[timestamp]: /docs/about/under-the-hood/architecture/data-model/log/#timestamps
+[timestamp_key]: /docs/reference/configuration/global-options/#log_schema.timestamp_key

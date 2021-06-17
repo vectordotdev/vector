@@ -158,14 +158,13 @@ components: _aws: {
 			body:  """
 				Vector checks for AWS credentials in the following order:
 
-				1. The [`access_key_id`](#access_key_id) and [`secret_access_key`](#secret_access_key) options.
-				2. The [`AWS_ACCESS_KEY_ID`](#AWS_ACCESS_KEY_ID) and [`AWS_SECRET_ACCESS_KEY`](#AWS_SECRET_ACCESS_KEY) environment variables.
+				1. The [`access_key_id`](#auth.access_key_id) and [`secret_access_key`](#auth.secret_access_key) options.
+				2. The [`AWS_ACCESS_KEY_ID`](#auth.access_key_id) and [`AWS_SECRET_ACCESS_KEY`](#auth.secret_access_key) environment variables.
 				3. The [`credential_process` command](\(urls.aws_credential_process)) in the AWS config file (usually located at `~/.aws/config`).
 				4. The [AWS credentials file](\(urls.aws_credentials_file)) (usually located at `~/.aws/credentials`).
 				5. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance with an instance profile/role).
 
-				If no credentials are found, the [healt check](#healthchecks) will fail and an
-				error will be [logged](\(urls.vector_monitoring)).
+				If no credentials are found, the health check fails and an error is [logged](\(urls.vector_monitoring)).
 				"""
 			sub_sections: [
 				{
@@ -174,14 +173,14 @@ components: _aws: {
 						In general, we recommend using instance profiles/roles whenever possible. In
 						cases where this is not possible you can generate an AWS access key for any user
 						within your AWS account. AWS provides a [detailed guide](\(urls.aws_access_keys)) on
-						how to do this. Such created AWS access keys can be used via [`access_key_id`](#access_key_id)
-						and [`secret_access_key`](#secret_access_key) options.
+						how to do this. Such created AWS access keys can be used via [`access_key_id`](#auth.access_key_id)
+						and [`secret_access_key`](#auth.secret_access_key) options.
 						"""
 				},
 				{
 					title: "Assuming roles"
 					body: """
-						Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
+						Vector can assume an AWS IAM role via the [`assume_role`](#auth.assume_role) option. This is an
 						optional setting that is helpful for a variety of use cases, such as cross
 						account access.
 						"""

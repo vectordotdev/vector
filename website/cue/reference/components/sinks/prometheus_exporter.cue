@@ -343,14 +343,14 @@ components: sinks: prometheus_exporter: {
 	how_it_works: {
 		histogram_buckets: {
 			title: "Histogram Buckets"
-			body: #"""
-				Choosing the appropriate buckets for Prometheus histograms is a complicated
-				point of discussion. The [Histograms and Summaries Prometheus guide](\(urls.prometheus_histograms_guide)) provides a good overview of histograms,
-				buckets, summaries, and how you should think about configuring them. The buckets
-				you choose should align with your known range and distribution of values as
-				well as how you plan to report on them. The aforementioned guide provides
-				examples on how you should align them.
-				"""#
+			body: """
+				Choosing the appropriate buckets for Prometheus histograms is a complicated point of
+				discussion. The [Histograms and Summaries Prometheus guide](\(urls.prometheus_histograms_guide))
+				provides a good overview of histograms, buckets, summaries, and how you should think
+				about configuring them. The buckets you choose should align with your known range
+				and distribution of values as well as how you plan to report on them. The
+				aforementioned guide provides examples on how you should align them.
+				"""
 			sub_sections: [
 				{
 					title: "Default Buckets"

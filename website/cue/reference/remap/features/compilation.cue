@@ -17,7 +17,7 @@ remap: features: compilation: {
 		fail_safety_checks: {
 			title:       "Fail safety checks"
 			description: """
-				At compile time, Vector performs [fail safety](#\(features.fail_safety.anchor)) checks to ensure that
+				At compile time, Vector performs [fail safety](#fail-safety) checks to ensure that
 				all errors thrown by fallible functions are [handled](\(urls.vrl_error_handling)). If you fail to pass a
 				string to the `parse_syslog` function, for example, the VRL compiler aborts and provides a helpful error
 				message. Fail safety means that you need to make explicit decisions about how to handle potentially
@@ -29,7 +29,7 @@ remap: features: compilation: {
 		type_safety_checks: {
 			title:       "Type safety checks"
 			description: """
-				At compile time, Vector performs [type safety](#\(features.type_safety.anchor)) checks to catch runtime
+				At compile time, Vector performs [type safety](#type-safety)) checks to catch runtime
 				errors stemming from type mismatches, for example passing an integer to the `parse_syslog` function,
 				which can only take a string. VRL essentially forces you to write programs around the assumption that
 				every incoming event could be malformed, which provides a strong bulwark against both human error and

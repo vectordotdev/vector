@@ -117,15 +117,14 @@ components: sources: statsd: {
 	how_it_works: {
 		timestamps: {
 			title: "Timestamps"
-			body: #"""
-				StatsD protocol does not provide support for sending metric
-				timestamps. You'll notice that each parsed metric is assigned a
-				`null` timestamp, which is a special value which means "a real
-				time metric", i.e. not a historical one. Normally such `null`
-				timestamps will be substituted by current time by downstream
-				sinks or 3rd party services during sending/ingestion. See the
-				[metric](\(urls.vector_metric)) data model page for more info.
-				"""#
+			body: """
+				The StatsD protocol doesn't provide support for sending metric timestamps. You may
+				notice that each parsed metric is assigned a `null` timestmap, which is a special
+				value indicating a realtime metric (i.e. not a historical metric). Normally, such
+				`null` timestamps are substituted with the current time by downstream sinks or
+				third-party services during sending/ingestion. See the
+				[metric data model](\(urls.vector_metric)) page for more info.
+				"""
 		}
 	}
 

@@ -31,8 +31,8 @@ components: sinks: [Name=string]: {
 						1. If the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) envrionment variable is set.
 						1. Finally, Vector will check for an [instance service account](\(urls.gcp_authentication_service_account)).
 
-						If credentials are not found the [healtcheck](#healthchecks) will fail and an
-						error will be [logged](\(urls.vector_monitoring)).
+						If credentials aren't found, Vector's health checks fail and an error is
+						[logged](\(urls.vector_monitoring)).
 						"""
 			}
 		}

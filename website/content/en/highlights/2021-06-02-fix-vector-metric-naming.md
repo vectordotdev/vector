@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2021-06-02"
-$schema: ".schema.json"
+date: "2021-06-02"
 title: "Telemetry units for duration metrics fixed"
 description: "A few telemetry metric names incorrectly had `nanoseconds_total` in their name when they are actually `seconds`"
-author_github: "https://github.com/jszwedko"
+authors: ["jszwedko"]
 pr_numbers: [7373]
 release: "0.14.0"
 hide_on_release_notes: false
-tags: ["type: breaking change", "domain: metrics"]
+tags:
+  type: breaking change
+  domains: ["metrics"]
 ---
 
 The following internal histogram metrics, accessible via the `internal_metrics` source were incorrectly suffixed with

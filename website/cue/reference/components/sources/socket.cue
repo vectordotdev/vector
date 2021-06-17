@@ -76,7 +76,7 @@ components: sources: socket: {
 			common:      false
 			description: """
 				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#host_key).
+				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
 			warnings: []

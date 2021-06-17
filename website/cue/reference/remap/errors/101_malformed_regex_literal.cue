@@ -11,7 +11,7 @@ remap: errors: "101": {
 		"""
 	resolution: """
 		Regular expressions are difficult to write and commonly result in syntax errors. If you're parsing a common
-		log format we recommend using one of VRL's [`parse_*` functions](\(urls.vrl_functions)#parsing). If
+		log format we recommend using one of VRL's [`parse_*` functions](\(urls.vrl_functions)/#parse-functions). If
 		you don't see a function for your format please [request it](\(urls.new_feature_request)). Otherwise, use the
 		[Rust regex tester](\(urls.regex_tester)) to test and correct your regular expression.
 		"""

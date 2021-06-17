@@ -9,4 +9,4 @@ Installing Vector manually should be a last resort if you can't install it throu
 {{< pages >}}
 
 [os]: /docs/setup/installation/operating-systems
-[platform]: /docs/setup/installation/platform
+[platform]: /docs/setup/installation/platforms

@@ -174,6 +174,10 @@ kubectl rollout restart --namespace vector daemonset/vector-agent
 {{< /tab >}}
 {{< /tabs >}}
 
+## Reloading
+
+TODO
+
 ## How it works
 
 Running Vector instances accept the IPC [signals](#signals) and produce the [exit codes](#exit-codes) listed below.

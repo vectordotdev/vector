@@ -144,9 +144,9 @@ We're just scatching the surface in this post. To get your hands dirty with Vect
 [console]: /docs/reference/configuration/sinks/console
 [config]: /docs/reference/configuration
 [deployment]: /docs/setup/deployment
-[generator]: /docs/reference/configuration/source/generator
+[generator]: /docs/reference/configuration/sources/generator
 [install]: /docs/setup/installation
-[parse_syslog]: /docs/reference/vrl/functions/parse_syslog
+[parse_syslog]: /docs/reference/vrl/functions/#parse_syslog
 [remap]: /docs/reference/configuration/transforms/remap
 [sinks]: /docs/reference/configuration/sinks
 [sources]: /docs/reference/configuration/sources
