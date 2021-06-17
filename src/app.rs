@@ -91,7 +91,9 @@ impl Application {
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
-                error!("The `threads` argument must be greater or equal to 1.");
+                // Unforunately we can't `error!` here because we haven't yet called `trace::init`,
+                // and we can't call that without a runtime available.
+                println!("Config error: The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             }
         }
