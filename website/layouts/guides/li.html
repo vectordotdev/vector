@@ -8,14 +8,16 @@
         {{ $section }}
       </span>
 
-      <div class="mt-2 text-xl font-semibold leading-7 text-dark dark:text-gray-200">
-        {{ with .Weight }}
-        <span class="mr-0.5">
-          {{ . }}.
-        </span>
-        {{ end }}
-        <span>
-          {{ $title }}
+      <div class="mt-2 text-xl font-semibold text-dark dark:text-gray-200">
+        <span class="leading-tight">
+          {{ with .Weight }}
+          <span class="mr-0.5">
+            {{ . }}.
+          </span>
+          {{ end }}
+          <span>
+            {{ $title }}
+          </span>
         </span>
       </div>
 

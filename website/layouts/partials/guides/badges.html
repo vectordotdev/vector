@@ -6,15 +6,18 @@
 {{ end }}
 
 {{ range .Params.transforms }}
-{{ partial "badge.html" (dict "prefix" "transform" "word" . "color" "blue" "inline" true) }}
+{{ $href := printf "/docs/reference/configuration/transforms/%s" . | relURL }}
+{{ partial "badge.html" (dict "prefix" "transform" "word" . "color" "blue" "inline" true "href" $href) }}
 {{ end }}
 
 {{ range .Params.sources }}
-{{ partial "badge.html" (dict "prefix" "source" "word" . "color" "blue" "inline" true) }}
+{{ $href := printf "/docs/reference/configuration/sources/%s" . | relURL }}
+{{ partial "badge.html" (dict "prefix" "source" "word" . "color" "blue" "inline" true "href" $href) }}
 {{ end }}
 
 {{ range .Params.sinks }}
-{{ partial "badge.html" (dict "prefix" "sink" "word"  . "color" "blue" "inline" true) }}
+{{ $href := printf "/docs/reference/configuration/sinks/%s" . | relURL }}
+{{ partial "badge.html" (dict "prefix" "sink" "word"  . "color" "blue" "inline" true "href" $href) }}
 {{ end }}
 
 {{ with .Params.platform }}

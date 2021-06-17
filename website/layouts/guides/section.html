@@ -24,7 +24,7 @@
         </span>
 
         {{ with .Description }}
-        <div class="mt-4 dark:text-gray-200 text-lg leading-tight">
+        <div class="mt-4 text-lg leading-tight prose dark:prose-dark">
           {{ . | markdownify }}
         </div>
         {{ end }}
@@ -37,22 +37,22 @@
     </div>
 
     {{ range $fullWidthSections }}
-    <div class="mt-8">
+    <div class="mt-12">
       <span class="prose dark:prose-dark">
-        {{ partial "heading.html" (dict "text" .Title "level" 1 "href" .RelPermalink "icon" false) }}
+        {{ partial "heading.html" (dict "text" .Title "level" 2 "href" .RelPermalink "icon" false) }}
       </span>
 
       {{ with .Description }}
-      <div class="mt-2 prose-lg dark:prose-dark leading-tight">
-        {{ . | markdownify }}
-      </div>
-      {{ end }}
+        <div class="mt-4 text-lg leading-tight prose dark:prose-dark">
+          {{ . | markdownify }}
+        </div>
+        {{ end }}
 
-      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-2">
         {{ range .Sections }}
         <div>
           <span class="prose dark:prose-dark">
-            {{ partial "heading.html" (dict "text" .Title "level" 2 "href" .RelPermalink "icon" false) }}
+            {{ partial "heading.html" (dict "text" .Title "level" 3 "href" .RelPermalink "icon" false) }}
           </span>
 
           {{ with .Description }}
@@ -76,7 +76,7 @@
         {{ range . }}
         <div>
           <span class="prose dark:prose-dark">
-            {{ partial "heading.html" (dict "text" .Title "level" 2 "href" .RelPermalink "icon" false) }}
+            {{ partial "heading.html" (dict "text" .Title "level" 3 "href" .RelPermalink "icon" false) }}
           </span>
 
           {{ with .Description }}
