@@ -36,5 +36,5 @@ Instead, we are working to support an open metrics format that the `kafka`
 source and sink will support. See [issue 5809] for more info.
 
 [issue 5809]: https://github.com/timberio/vector/issues/5809
-[kafka_sink]: https://vector.dev/docs/reference/sinks/kafka/
-[metrics data model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#schema
+[kafka_sink]: /docs/reference/configuration/sinks/kafka/
+[metrics data model]: /docs/about/under-the-hood/architecture/data-model/metric/#schema

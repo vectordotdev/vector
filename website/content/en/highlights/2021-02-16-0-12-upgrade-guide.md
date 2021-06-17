@@ -65,7 +65,7 @@ While `check_fields` is deprecated and still supported, you will need to explici
 
 ```diff
  [transforms.route]
- type = "swimlanes"
+ type = "route"
 +lanes.errors.type = "check_field"
  lanes.errors."level.eq" = "error"
 ```
@@ -74,7 +74,7 @@ Alteratively, we recommend migrating to the new VRL syntax:
 
 ```diff
  [transforms.route]
- type = "swimlanes"
+ type = "route"
 -lanes.errors."level.eq" = "error"
 +lanes.errors = '.level = "error"'
 ```
@@ -147,33 +147,33 @@ Migrating is easy:
 
 Adjust as necessary. The above values are the defaults and are not required to be specified.
 
-[add_fields_transform]: /docs/reference/configuration/transforms/add_fields/
-[add_tags_transform]: /docs/reference/configuration/transforms/add_tags/
-[ansi_stripper_transform]: /docs/reference/configuration/transforms/ansi_stripper/
-[aws_cloudwatch_logs_subscription_parser_transform]: /docs/reference/configuration/transforms/aws_cloudwatch_logs_subscription_parser_transform/
+[add_fields_transform]: /docs/reference/configuration/transforms/remap
+[add_tags_transform]: /docs/reference/configuration/transforms/remap
+[ansi_stripper_transform]: /docs/reference/vrl/functions/#strip_ansi_escape_codes
+[aws_cloudwatch_logs_subscription_parser_transform]: /docs/reference/vrl/functions/#parse_aws_cloudwatch_log_subscription_message
 [chat]: https://chat.vector.dev
-[coercer_transform]: /docs/reference/configuration/transforms/coercer/
-[concat_transform]: /docs/reference/configuration/transforms/concat/
-[config_synytax_pitfalls]: /blog/vector-remap-language/#configuration-langauges-are-bad-at-expressing-data-transformations
+[coercer_transform]: /docs/reference/vrl/functions/#coerce-functions
+[concat_transform]: /docs/reference/configuration/transforms/remap
+[config_synytax_pitfalls]: /blog/vector-remap-language/#config-languages
 [file_source_highlight]: /highlights/2021-01-31-file-source-checkpointing
-[grok_parser_transform]: /docs/reference/configuration/transforms/grok_parser/
-[json_parser_transform]: /docs/reference/configuration/transforms/json_parser/
-[key_value_parser_transform]: /docs/reference/configuration/transforms/key_value_parser/
-[logfmt_parser_transform]: /docs/reference/configuration/transforms/logfmt_parser/
-[merge_transform]: /docs/reference/configuration/transforms/merge/
+[grok_parser_transform]: /docs/reference/vrl/functions/#parse_grok
+[json_parser_transform]: /docs/reference/vrl/functions/#parse_json
+[key_value_parser_transform]: /docs/reference/vrl/functions/#parse_key_value
+[logfmt_parser_transform]: /docs/reference/vrl/functions/#parse_logfmt
+[merge_transform]: /docs/reference/vrl/functions/#merge
 [pr_5281]: https://github.com/timberio/vector/pull/5281
 [pr_5978]: https://github.com/timberio/vector/pull/5978
 [filter_transform]: /docs/reference/configuration/transforms/filter/
 [ignore_checkpoints]: /docs/reference/configuration/sources/file/#ignore_checkpoints
 [read_from]: /docs/reference/configuration/sources/file/#read_from
 [reduce_transform]: /docs/reference/configuration/transforms/reduce/
-[regex_parser_transform]: /docs/reference/configuration/transforms/regex_parser/
-[remove_fields_transform]: /docs/reference/configuration/transforms/remove_fields/
-[remove_tags_transform]: /docs/reference/configuration/transforms/remove_tags/
-[rename_fields_transform]: /docs/reference/configuration/transforms/rename_fields/
+[regex_parser_transform]: /docs/reference/vrl/functions/#parse_regex
+[remove_fields_transform]: /docs/reference/vrl/functions/#del
+[remove_tags_transform]: /docs/reference/configuration/transforms/remap
+[rename_fields_transform]: /docs/reference/configuration/transforms/remap
 [route_transform]: /docs/reference/configuration/transforms/route/
-[split_transform]: /docs/reference/configuration/transforms/split/
-[tokenizer_transform]: /docs/reference/configuration/transforms/tokenizer/
+[split_transform]: /docs/reference/vrl/functions/#split
+[tokenizer_transform]: /docs/reference/vrl/functions/#parse_tokens
 [vrl_announcement]: /blog/vector-remap-language/
 [vrl_boolean_expression]: /docs/reference/vrl/expressions/#comparison
 [vrl_reference]: /docs/reference/vrl/

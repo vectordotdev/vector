@@ -7,8 +7,6 @@ layout: components
 weight: 2
 ---
 
-Vector **transforms** enable you to...
-
 ## Available transforms
 
 {{< components "transform" >}}

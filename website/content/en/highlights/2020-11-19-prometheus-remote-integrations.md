@@ -83,8 +83,8 @@ your metrics to [Datadog][datadog], [New Relic][new_relic], [Influx][influx],
 [influx]: https://www.influxdata.com/
 [kubernetes_highlight]: /highlights/2020-10-27-kubernetes-integration
 [new_relic]: https://newrelic.com
-[prometheus_remote_write_sink]: /docs/reference/sinks/prometheus_remote_write
-[prometheus_remote_write_source]: /docs/reference/sources/prometheus_remote_write
-[sinks]: /docs/reference/sinks/
+[prometheus_remote_write_sink]: /docs/reference/configuration/sinks/prometheus_remote_write
+[prometheus_remote_write_source]: /docs/reference/configuration/sources/prometheus_remote_write
+[sinks]: /docs/reference/configuration/sinks/
 [timescale]: https://www.timescale.com/
 [victoria_metrics]: https://victoriametrics.com/

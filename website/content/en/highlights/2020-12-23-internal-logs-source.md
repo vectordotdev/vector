@@ -58,6 +58,6 @@ inputs = ["vector_metrics"]
 address = "0.0.0.0:9090"
 ```
 
-[internal_logs]: https://vector.dev/docs/reference/sources/internal_logs
-[internal_metrics]: https://vector.dev/docs/reference/sources/internal_metrics
+[internal_logs]: /docs/reference/configuration/sources/internal_logs
+[internal_metrics]: /docs/reference/configuration/sources/internal_metrics
 [prometheus]: https://prometheus.io

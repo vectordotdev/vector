@@ -38,4 +38,4 @@ Just drop your token in, and you're done.
 
 [urls.ietf_rfc_6750]: https://tools.ietf.org/html/rfc6750
 [urls.twelve_factor_app]: https://12factor.net/
-[urls.vector_http_auth_token]: https://vector.dev/docs/reference/sinks/http/#token
+[urls.vector_http_auth_token]: /docs/reference/configuration/sinks/http/#token

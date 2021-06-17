@@ -32,12 +32,12 @@ CloudWatch logs to any supported Vector [sink][sinks].
 We're eager to hear what you think about these sources! [Join our chat][chat]
 and let us know.
 
-[aws_cloudwatch_logs_subscription_parser_transform]: /docs/reference/transforms/aws_cloudwatch_logs_subscription_parser/
-[aws_ecs_metrics_source]: /docs/reference/sources/aws_ecs_metrics/
-[aws_kinesis_firehose_source]: /docs/reference/sources/aws_kinesis_firehose/
-[aws_s3_source]: /docs/reference/sources/aws_s3/
-[aws_sqs_sink]: /docs/reference/sinks/aws_sqs/
+[aws_cloudwatch_logs_subscription_parser_transform]: /docs/reference/configuration/transforms/aws_cloudwatch_logs_subscription_parser/
+[aws_ecs_metrics_source]: /docs/reference/configuration/sources/aws_ecs_metrics/
+[aws_kinesis_firehose_source]: /docs/reference/configuration/sources/aws_kinesis_firehose/
+[aws_s3_source]: /docs/reference/configuration/sources/aws_s3/
+[aws_sqs_sink]: /docs/reference/configuration/sinks/aws_sqs/
 [chat]: https://chat.vector.dev
 [cloudwatch_guide]: /guides/advanced/cloudwatch-logs-firehose/
 [rube_goldberg]: https://en.wikipedia.org/wiki/Rube_Goldberg_machine
-[sinks]: /docs/reference/sinks/
+[sinks]: /docs/reference/configuration/sinks/

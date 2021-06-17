@@ -29,4 +29,4 @@ sink][docs.sinks.elasticsearch] in favor of using the `host` option.
 You can find your AWS ES domain in the AWS console. Simply provide the full
 domain URL as the `host` value.
 
-[docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/
+[docs.sinks.elasticsearch]: /docs/reference/configuration/sinks/elasticsearch/

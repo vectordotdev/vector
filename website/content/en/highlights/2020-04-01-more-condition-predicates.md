@@ -39,6 +39,6 @@ the new `contains` predicate:
 
 The world is your oyster.
 
-[docs.transforms.filter]: /docs/reference/transforms/filter/
-[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
-[guides.unit-testing]: /guides/advanced/unit-testing/
+[docs.transforms.filter]: /docs/reference/configuration/transforms/filter/
+[docs.transforms.swimlanes]: /docs/reference/configuration/transforms/route/
+[guides.unit-testing]: /guides/level-up/unit-testing/

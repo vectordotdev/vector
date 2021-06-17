@@ -35,24 +35,24 @@ remap: functions: redact: {
 		{
 			name: "filters"
 			description: #"""
-					List of filters to be applied to the `value`.
+				List of filters to be applied to the `value`.
 
-					Each filter can be specified in one of three ways:
+				Each filter can be specified in one of three ways:
 
-					- As a regular expression directly, which will be used to redact text matching it
-					- As an object with a `type` key that corresponds to a named filter and additional keys for customizing that filter
-					- As a named filter, if it has no required parameters
+				- As a regular expression directly, which will be used to redact text matching it
+				- As an object with a `type` key that corresponds to a named filter and additional keys for customizing that filter
+				- As a named filter, if it has no required parameters
 
-					Named filters are:
+				Named filters are:
 
-					- `pattern`: Redact text matching any regular expressions specified in the, required, `patterns`
-					   key. This is the expanded form of just passing a regular expression as a filter.
-					- `us_social_security_number`: Redact US social security card numbers.
+				- `pattern`: Redact text matching any regular expressions specified in the, required, `patterns`
+					key. This is the expanded form of just passing a regular expression as a filter.
+				- `us_social_security_number`: Redact US social security card numbers.
 
-					See examples for more details.
+				See examples for more details.
 
-					This parameter must be a static expression. You cannot use variables or other dynamic expressions
-					with it. This allows us to validate the argument at compile-time to avoid runtime errors.
+				This parameter must be a static expression. You cannot use variables or other dynamic expressions
+				with it. This allows us to validate the argument at compile-time to avoid runtime errors.
 				"""#
 			required: false
 			type: ["array"]

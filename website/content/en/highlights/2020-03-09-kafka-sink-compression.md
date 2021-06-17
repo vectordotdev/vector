@@ -19,7 +19,7 @@ we just mapped the appropriate options. In addition, we added a
 [new `librdkafka_options`][docs.sinks.kafka#librdkafka_options] that enables
 transparent pass-through of [`librdkafka`'s options][urls.librdkafka_config].
 
-[docs.sinks.kafka#librdkafka_options]: /docs/reference/sinks/kafka/#librdkafka_options
-[docs.sinks.kafka]: /docs/reference/sinks/kafka/
+[docs.sinks.kafka#librdkafka_options]: /docs/reference/configuration/sinks/kafka/#librdkafka_options
+[docs.sinks.kafka]: /docs/reference/configuration/sinks/kafka/
 [urls.librdkafka]: https://github.com/edenhill/librdkafka
 [urls.librdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md

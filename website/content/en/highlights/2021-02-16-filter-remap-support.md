@@ -40,5 +40,5 @@ condition.type = "remap"
 condition.source = '.status_code != 200 && !includes(["info", "debug"], .severity)'
 ```
 
-[filter]: https://vector.dev/docs/reference/transforms/filter
-[remap]: https://vector.dev/docs/reference/transforms/remap
+[filter]: /docs/reference/configuration/transforms/filter
+[remap]: /docs/reference/configuration/transforms/remap

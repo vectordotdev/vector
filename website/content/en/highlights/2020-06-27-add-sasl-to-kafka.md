@@ -35,4 +35,4 @@ This feature isn't yet supported on Windows.
 {{< /warning >}}
 
 [urls.kafka_sasl]: https://docs.confluent.io/current/kafka/authentication_sasl/index.html
-[urls.vector_sink_kafka_sasl]: https://vector.dev/docs/reference/sources/kafka/#sasl
+[urls.vector_sink_kafka_sasl]: /docs/reference/configuration/sources/kafka/#sasl

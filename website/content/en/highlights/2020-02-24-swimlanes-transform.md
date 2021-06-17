@@ -30,5 +30,5 @@ easily create [if/else pipelines][docs.transforms.swimlanes#examples].
 Remember to occasionally let your branches mingle so that they don't completely
 lose touch.
 
-[docs.transforms.swimlanes#examples]: /docs/reference/transforms/swimlanes/#examples
-[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
+[docs.transforms.swimlanes#examples]: /docs/reference/configuration/transforms/route/#examples
+[docs.transforms.swimlanes]: /docs/reference/configuration/transforms/route/

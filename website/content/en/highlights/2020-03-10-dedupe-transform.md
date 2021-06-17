@@ -36,4 +36,4 @@ Simply add the transform to your pipeline:
 The `fields.match` option lets you control which fields are compared to determine if events are equal.
 {{< /success >}}
 
-[docs.transforms.dedupe]: /docs/reference/transforms/dedupe/
+[docs.transforms.dedupe]: /docs/reference/configuration/transforms/dedupe/

@@ -13,7 +13,7 @@ tags:
 ---
 
 We love [Prometheus][urls.prometheus], but we also love [options](https://www.mms.com/en-us/shop/single-color)
-and so we've added a [`prometheus` source][docs.sources.prometheus] to let you
+and so we've added a [`prometheus_scrape` source][docs.sources.prometheus] to let you
 send Prometheus format metrics anywhere you like.
 
 <!--more-->
@@ -26,7 +26,7 @@ to scrape:
 
 ```toml
 [sources.my_source_id]
-  type = "prometheus"
+  type = "prometheus_scrape"
   hosts = ["http://localhost:9090"]
   scrape_interval_secs = 1
 ```
@@ -38,6 +38,6 @@ For more guidance get on the [reference page][docs.sources.prometheus].
 We believe the most common use cases for this source will be backups and
 migration, if you have an interesting use case we'd [love to hear about it][urls.vector_chat].
 
-[docs.sources.prometheus]: /docs/reference/sources/prometheus/
+[docs.sources.prometheus]: /docs/reference/configuration/sources/prometheus_scrape
 [urls.prometheus]: https://prometheus.io/
 [urls.vector_chat]: https://chat.vector.dev

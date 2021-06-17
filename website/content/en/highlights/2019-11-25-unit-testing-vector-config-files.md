@@ -94,9 +94,9 @@ works well for everyone. Please let us know what you think either in our
 [community chat](https://chat.vector.dev/) or by
 [raising an issue](https://github.com/timberio/vector/issues/new).
 
-[docs.reference.tests]: /docs/reference/configuration/tests/
-[docs.sinks.aws_cloudwatch_logs]: /docs/reference/configuration/sinks/aws_cloudwatch_logs/
-[docs.sources.file]: /docs/reference/configuration/sources/file/
-[docs.transforms.regex_parser]: /docs/reference/configuration/transforms/regex_parser/
-[docs.transforms]: /docs/reference/configuration/transforms/
-[guides.advanced.unit_testing]: /guides/advanced/unit-testing/
+[docs.reference.tests]: /docs/reference/configuration/tests
+[docs.sinks.aws_cloudwatch_logs]: /docs/reference/configuration/sinks/aws_cloudwatch_logs
+[docs.sources.file]: /docs/reference/configuration/sources/file
+[docs.transforms.regex_parser]: /docs/reference/vrl/functions/#parse_regex
+[docs.transforms]: /docs/reference/configuration/transforms
+[guides.advanced.unit_testing]: /guides/level-up/unit-testing

@@ -13,7 +13,7 @@ tags:
 ---
 
 We recently introduced a concept of conditions, which you can see in our
-[`swimlanes` transform][docs.transforms.swimlanes] as well as our [unit
+[`route` transform][docs.transforms.route] as well as our [unit
 tests feature][docs.reference.tests]. This paved the way for a new `filter`
 transform, allowing you to filter events based on a set of conditions. This
 is replaces our old `field_filter` transform since it is much more expressive.
@@ -34,6 +34,6 @@ is replaces our old `field_filter` transform since it is much more expressive.
 Check out the [docs][docs.transforms.filter] for a fill list of available
 conditions.
 
-[docs.reference.tests]: /docs/reference/tests/
-[docs.transforms.filter]: /docs/reference/transforms/filter/
-[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
+[docs.reference.tests]: /docs/reference/configuration/tests
+[docs.transforms.filter]: /docs/reference/configuration/transforms/filter/
+[docs.transforms.route]: /docs/reference/configuration/transforms/route/

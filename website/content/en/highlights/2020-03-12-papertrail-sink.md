@@ -15,4 +15,4 @@ tags:
 Tried, true, and simple. Our new [`papertrail` sink][docs.sinks.papertrail]
 lets you send logs to the [Papertrail][urls.papertrail] logging service.
 
-[docs.sinks.papertrail]: /docs/reference/sinks/papertrail/
+[docs.sinks.papertrail]: /docs/reference/configuration/sinks/papertrail

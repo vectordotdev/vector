@@ -18,7 +18,7 @@ make serve
 
 ### Add a new version of Vector
 
-1. Add the new version to the `versions` list in [`cue/reference/versions.cue`][./cue/reference/versions.cue]
+1. Add the new version to the `versions` list in [`cue/reference/versions.cue`][./cue/reference/versions.cue].
 
 [cue]: https://cue-lang.org
 [esbuild]: https://github.com/evanw/esbuild

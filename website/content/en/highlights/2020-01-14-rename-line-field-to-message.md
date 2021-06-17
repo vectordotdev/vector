@@ -21,4 +21,4 @@ options][docs.reference.configuration.global-options#log_schema].
 There are no changes you need to make. Just be aware that your events will
 no longer have a `line` field.
 
-[docs.reference.configuration.global-options#log_schema]: /docs/reference/global-options/#log_schema
+[docs.reference.configuration.global-options#log_schema]: /docs/reference/configuration/global-options/#log_schema

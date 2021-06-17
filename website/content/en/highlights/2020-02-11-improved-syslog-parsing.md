@@ -22,8 +22,8 @@ format you can always use the [`socket` source][docs.sources.socket] and the
 [`regex_parser` transform][docs.transforms.regex_parser] to roll your own
 collection parsing pipeline.
 
-[docs.sources.socket]: /docs/reference/sources/socket/
-[docs.sources.syslog]: /docs/reference/sources/syslog/
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.sources.socket]: /docs/reference/configuration/sources/socket/
+[docs.sources.syslog]: /docs/reference/configuration/sources/syslog/
+[docs.transforms.regex_parser]: /docs/reference/vrl/functions/#parse_regex
 [urls.syslog_3164]: https://tools.ietf.org/html/rfc3164
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

@@ -12,7 +12,7 @@ tags:
   transforms: ["regex_parser"]
 ---
 
-Contributor [Mattias Endler (@mre)][urls.endler_dev] taught the [`regex_parser` transform][urls.vector_regex_parser] how to handle multiple regex'es at a time efficiently!
+Contributor [Mattias Endler (@mre)][urls.endler_dev] taught the [`regex_parser` transform][urls.vector_regex_parser] how to handle multiple regexes at a time efficiently!
 
 ## Get Started
 
@@ -33,4 +33,4 @@ In order to avoid a **deprecation warning** you should update any `regex_parser`
 You should also review your pipelines for instances where you have a `regex_parser -> [... ->] regex_parser` step, you may be able to collapse these now and shave a few a nanoseconds off your events. 😉
 
 [urls.endler_dev]: https://endler.dev/
-[urls.vector_regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
+[urls.vector_regex_parser]: /docs/reference/vrl/functions/#parse_regex

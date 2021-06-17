@@ -45,5 +45,5 @@ system (`check_fields`) and the new system (`remap`):
 +starts_when.source = 'match(.message, /^\\w.*/) && .severity == "info"'
 ```
 
-[reduce]: https://vector.dev/docs/reference/transforms/reduce
-[remap]: https://vector.dev/docs/reference/transforms/remap
+[reduce]: /docs/reference/configuration/transforms/reduce
+[remap]: /docs/reference/configuration/transforms/remap

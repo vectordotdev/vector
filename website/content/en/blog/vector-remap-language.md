@@ -76,7 +76,7 @@ The classic quadrant analysis looks something like this:
 
 VRL eliminates this trade-off. Let's dig deeper on each of these points.
 
-### Configuration languages are bad at expressing data transformations
+### Configuration languages are bad at expressing data transformations {#config-languages}
 
 It's commonplace for observability pipelines to offer a rigid list of *static*
 transforms that leverage a configuration syntax. Some call them "transforms",

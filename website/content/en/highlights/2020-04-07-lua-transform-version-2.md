@@ -16,7 +16,7 @@ v2 of our [`lua` transform][docs.transforms.lua] has been released! This is a
 complete overhaul that provides a new and improved API, better data processing
 ergonomics, and faster processing. Specific improvements include:
 
-1. Events are [represented as Lua tables][docs.transforms.lua#representation-of-events] with proper type conversion.
+1. Events are [represented as Lua tables][docs.transforms.lua#event-data-model] with proper type conversion.
 2. Introduction of [hooks][docs.transforms.lua#hooks] to maintain global state.
 3. Introduction of [timers][docs.transforms.lua#timers] to facilitate timed flushing. Useful for aggregations.
 4. The ability to accept and work with metric events in addition to log events.
@@ -40,8 +40,8 @@ Did you know we're also [working on a WASM integration][urls.pr_2006] 👀
 
 And for the curious, check out [Vector's Lua RFC][urls.rfc].
 
-[docs.transforms.lua#hooks]: /docs/reference/transforms/lua/#hooks
-[docs.transforms.lua#representation-of-events]: /docs/reference/transforms/lua/#representation-of-events
-[docs.transforms.lua#timers]: /docs/reference/transforms/lua/#timers
-[docs.transforms.lua]: /docs/reference/transforms/lua/
+[docs.transforms.lua#hooks]: /docs/reference/configuration/transforms/lua/#hooks
+[docs.transforms.lua#event-data-model]: /docs/reference/configuration/transforms/lua/#event-data-model
+[docs.transforms.lua#timers]: /docs/reference/configuration/transforms/lua/#timers
+[docs.transforms.lua]: /docs/reference/configuration/transforms/lua/
 [urls.rfc]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-06-1999-api-extensions-for-lua-transform.md

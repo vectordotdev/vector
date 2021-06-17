@@ -41,5 +41,5 @@ old system (`check_fields`) and the new system (`remap`):
 +lanes.success.source = '.status_code == 200 && .severity == "info"'
 ```
 
-[swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes
-[remap]: https://vector.dev/docs/reference/transforms/remap
+[swimlanes]: /docs/reference/configuration/transforms/route
+[remap]: /docs/reference/configuration/transforms/remap

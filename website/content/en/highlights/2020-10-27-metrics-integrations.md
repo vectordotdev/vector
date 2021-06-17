@@ -58,12 +58,12 @@ We'd love to chat! We're eager to unblock the transition. If Vector is missing
 a metrics integration or feature, [chat with us][chat]. We are working closely
 with a number of organizations to assist with this transition.
 
-[apache_metrics_source]: /docs/reference/sources/apache_metrics/
-[aws_ecs_metrics_source]: /docs/reference/sources/aws_ecs_metrics/
+[apache_metrics_source]: /docs/reference/configuration/sources/apache_metrics/
+[aws_ecs_metrics_source]: /docs/reference/configuration/sources/aws_ecs_metrics/
 [chat]: https://chat.vector.dev
-[docs]: /docs/
-[host_metrics_source]: /docs/reference/sources/host_metrics/
-[internal_metrics_source]: /docs/reference/sources/internal_metrics/
+[docs]: /docs
+[host_metrics_source]: /docs/reference/configuration/sources/host_metrics/
+[internal_metrics_source]: /docs/reference/configuration/sources/internal_metrics/
 [kubernetes_announcement]: /blog/kubernetes-integration/
-[mongodb_metrics_source]: /docs/reference/sources/mongodb_metrics/
-[nginx_metrics_source]: /docs/reference/sources/nginx_metrics/
+[mongodb_metrics_source]: /docs/reference/configuration/sources/mongodb_metrics/
+[nginx_metrics_source]: /docs/reference/configuration/sources/nginx_metrics/
