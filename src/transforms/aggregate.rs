@@ -1,4 +1,3 @@
-// let g:cargo_makeprg_params = = '--lib --no-default-features --features=transforms-aggregate transforms::aggregate'
 use crate::{
     internal_events::{AggregateEventRecorded, AggregateFlushed},
     transforms::{
