@@ -60,6 +60,20 @@ pub fn init(color: bool, json: bool, levels: &str) {
 
         let subscriber = subscriber.with(RateLimitedLayer::new(formatter));
 
+        let tracer = opentelemetry_datadog::new_pipeline()
+            .with_service_name("vector")
+            .with_version(opentelemetry_datadog::ApiVersion::Version05)
+            .with_trace_config(
+                opentelemetry::sdk::trace::config()
+                    .with_sampler(opentelemetry::sdk::trace::Sampler::AlwaysOn),
+            )
+            .install_batch(opentelemetry::runtime::Tokio)
+            .expect("building tracer");
+
+        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        let subscriber = subscriber.with(telemetry);
+
         if metrics_layer_enabled {
             let subscriber = subscriber.with(MetricsLayer::new());
             Dispatch::new(BroadcastSubscriber { subscriber })
@@ -76,6 +90,20 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .with_test_writer(); // ensures output is captured
 
         let subscriber = subscriber.with(RateLimitedLayer::new(formatter));
+
+        let tracer = opentelemetry_datadog::new_pipeline()
+            .with_service_name("vector")
+            .with_version(opentelemetry_datadog::ApiVersion::Version05)
+            .with_trace_config(
+                opentelemetry::sdk::trace::config()
+                    .with_sampler(opentelemetry::sdk::trace::Sampler::AlwaysOn),
+            )
+            .install_batch(opentelemetry::runtime::Tokio)
+            .expect("building tracer");
+
+        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        let subscriber = subscriber.with(telemetry);
 
         if metrics_layer_enabled {
             let subscriber = subscriber.with(MetricsLayer::new());

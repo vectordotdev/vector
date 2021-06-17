@@ -88,7 +88,6 @@ impl Application {
         };
 
         metrics::init().expect("metrics initialization failed");
-        trace::init(color, json, &level);
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
@@ -103,6 +102,12 @@ impl Application {
                 .build()
                 .expect("Unable to create async runtime")
         };
+
+        // We need a runtime to initiate the datadog tracing exporter
+        rt.block_on(async move {
+            trace::init(color, json, &level);
+            info!(message = "Log level is enabled.", level = ?level);
+        });
 
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
@@ -132,8 +137,6 @@ impl Application {
 
                     return Err(code);
                 };
-
-                info!(message = "Log level is enabled.", level = ?level);
 
                 #[cfg(feature = "sources-host_metrics")]
                 host_metrics::init_roots();
@@ -341,6 +344,8 @@ impl Application {
                 }
                 _ => unreachable!(),
             }
+
+            opentelemetry::global::shutdown_tracer_provider();
         });
     }
 }
