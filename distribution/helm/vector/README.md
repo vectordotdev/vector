@@ -23,7 +23,7 @@ Our default configurations are designed to work out of the box, but we recommend
         vector-agent:
           vectorSink:
             host: "vector-aggregator-haproxy"
-	vector-aggregator:
+        vector-aggregator:
           haproxy:
             enabled: true
         ```
