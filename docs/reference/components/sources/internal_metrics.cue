@@ -161,13 +161,13 @@ components: sources: internal_metrics: {
 		// Metrics emitted by one or more components
 		// Reusable metric definitions
 		adaptive_concurrency_averaged_rtt: {
-			description:       "The average round-trip time (RTT) from the HTTP sink across the current window."
+			description:       "The average round-trip time (RTT) for the current window."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
 		adaptive_concurrency_in_flight: {
-			description:       "The number of outbound requests from the HTTP sink currently awaiting a response."
+			description:       "The number of outbound requests currently awaiting a response."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -179,7 +179,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		adaptive_concurrency_observed_rtt: {
-			description:       "The observed round-trip time (RTT) for requests from this HTTP sink."
+			description:       "The observed round-trip time (RTT) for requests."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -559,6 +559,28 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
+		}
+		http_client_response_rtt_seconds: {
+			description:       "The round-trip time (RTT) of HTTP requests, tagged with the response code."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				status: _status
+			}
+		}
+		http_client_responses_total: {
+			description:       "The total number of HTTP requests, tagged with the response code."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				status: _status
+			}
+		}
+		http_client_rtt_seconds: {
+			description:       "The round-trip time (RTT) of HTTP requests."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
 		}
 		http_error_response_total: {
 			description:       "The total number of HTTP error responses for this component."
@@ -966,6 +988,10 @@ components: sources: internal_metrics: {
 				tcp:  "Transmission Control Protocol"
 				unix: "Unix domain socket"
 			}
+		}
+		_status: {
+			description: "The HTTP status code of the request."
+			required:    false
 		}
 		_path: {
 			description: "The path that produced the error."
