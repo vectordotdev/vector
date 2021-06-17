@@ -20,9 +20,9 @@ Our default configurations are designed to work out of the box, but we recommend
 [^1]: Or set it in your values file with:
 
         ```yaml
-	vector-agent:
-	  vectorSink:
-	    host: "vector-aggregator-haproxy"
+        vector-agent:
+          vectorSink:
+            host: "vector-aggregator-haproxy"
 	vector-aggregator:
           haproxy:
             enabled: true
