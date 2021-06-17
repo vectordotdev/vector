@@ -17,7 +17,7 @@ production-build:
 	hugo \
 	--minify
 
-ci-production-build: setup build-cue production-build
+ci-production-build: setup build-cue production-build run-link-checker
 
 # Preview site
 preview-build:
@@ -33,6 +33,3 @@ run-link-checker:
 
 # Check links without rebuilding the CUE sources. Optimal for fixing links locally.
 check-links: production-build run-link-checker
-
-# Check links in the CI environment
-check-links-ci: ci-production-build run-link-checker
