@@ -397,6 +397,7 @@ sources-logs = [
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes-logs",
+  "sources-logstash",
   "sources-socket",
   "sources-splunk_hec",
   "sources-stdin",
@@ -434,6 +435,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
+sources-logstash = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
 sources-kubernetes-logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = ["nom"]
@@ -621,6 +623,7 @@ all-integration-tests = [
   "humio-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
+  "logstash-integration-tests",
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
@@ -661,6 +664,7 @@ gcp-pubsub-integration-tests = ["sinks-gcp"]
 humio-integration-tests = ["sinks-humio"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
+logstash-integration-tests = ["docker", "sources-logstash", "uuid"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats"]

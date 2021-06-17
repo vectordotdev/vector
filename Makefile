@@ -303,7 +303,7 @@ test-behavior: ## Runs behaviorial test
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
-test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
+test-integration: test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-splunk test-integration-dnstap
 
@@ -334,7 +334,6 @@ endif
 .PHONY: test-integration-docker-logs
 test-integration-docker-logs: ## Runs Docker Logs integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs::
-
 
 .PHONY: test-integration-elasticsearch
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
@@ -411,6 +410,10 @@ endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh loki stop
 endif
+
+.PHONY: test-integration-logstash
+test-integration-logstash: ## Runs Logstash integration tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features logstash-integration-tests --lib ::logstash:: -- --nocapture
 
 .PHONY: test-integration-mongodb_metrics
 test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
