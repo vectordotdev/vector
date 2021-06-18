@@ -98,9 +98,7 @@ impl Aggregate {
         emit!(AggregateEventRecorded);
     }
 
-    fn flush_into(&mut self, output: &mut Vec<Event>) -> u64 {
-        let mut count = 0_u64;
-
+    fn flush_into(&mut self, output: &mut Vec<Event>) {
         if self.map.len() > 0 {
             // TODO: not clear how this should work with aggregation so just stuffing a default one
             // in for now.
@@ -109,12 +107,10 @@ impl Aggregate {
             for (series, metric) in self.map.drain() {
                 let metric = metric::Metric::from_parts(series, metric, metadata.clone());
                 output.push(Event::Metric(metric));
-                count += 1;
             }
         }
 
         emit!(AggregateFlushed);
-        return count;
     }
 }
 
@@ -208,25 +204,25 @@ mod tests {
         agg.record(counter_a_1.clone());
         let mut out = vec![];
         // We should flush 1 item counter_a_1
-        assert_eq!(1, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&counter_a_1, &out[0]);
 
         // A subsequent flush doesn't send out anything
         out.clear();
-        assert_eq!(0, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(0, out.len());
 
         // One more just to make sure that we don't re-see from the other buffer
         out.clear();
-        assert_eq!(0, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(0, out.len());
 
         // Two increments with the same series, should sum into 1
         agg.record(counter_a_1.clone());
         agg.record(counter_a_2.clone());
         out.clear();
-        assert_eq!(1, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&counter_a_summed, &out[0]);
 
@@ -236,7 +232,7 @@ mod tests {
         agg.record(counter_a_1.clone());
         agg.record(counter_b_1.clone());
         out.clear();
-        assert_eq!(2, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(2, out.len());
         // B/c we don't know the order they'll come back
         for event in out {
@@ -263,25 +259,25 @@ mod tests {
         agg.record(gauge_a_1.clone());
         let mut out = vec![];
         // We should flush 1 item gauge_a_1
-        assert_eq!(1, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&gauge_a_1, &out[0]);
 
         // A subsequent flush doesn't send out anything
         out.clear();
-        assert_eq!(0, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(0, out.len());
 
         // One more just to make sure that we don't re-see from the other buffer
         out.clear();
-        assert_eq!(0, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(0, out.len());
 
         // Two absolutes with the same series, should get the 2nd (last) back.
         agg.record(gauge_a_1.clone());
         agg.record(gauge_a_2.clone());
         out.clear();
-        assert_eq!(1, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&gauge_a_2, &out[0]);
 
@@ -291,7 +287,7 @@ mod tests {
         agg.record(gauge_a_1.clone());
         agg.record(gauge_b_1.clone());
         out.clear();
-        assert_eq!(2, agg.flush_into(&mut out));
+        agg.flush_into(&mut out);
         assert_eq!(2, out.len());
         // B/c we don't know the order they'll come back
         for event in out {
