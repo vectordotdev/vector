@@ -61,7 +61,7 @@ impl Function for EncodeKeyValue {
         &[
             Example {
                 title: "encode object",
-                source: r#"encode_key_value!({"lvl": "info", "msg": "This is a message", "log_id": 12345})"#,
+                source: r#"encode_key_value({"lvl": "info", "msg": "This is a message", "log_id": 12345})"#,
                 result: Ok(r#"s'log_id=12345 lvl=info msg="This is a message"'"#),
             },
             Example {
@@ -71,7 +71,7 @@ impl Function for EncodeKeyValue {
             },
             Example {
                 title: "custom delimiters",
-                source: r#"encode_key_value!({"start": "ool", "end": "kul", "stop1": "yyc", "stop2" : "gdx"}, key_value_delimiter: ":", field_delimiter: ",")"#,
+                source: r#"encode_key_value({"start": "ool", "end": "kul", "stop1": "yyc", "stop2" : "gdx"}, key_value_delimiter: ":", field_delimiter: ",")"#,
                 result: Ok(r#"s'end:kul,start:ool,stop1:yyc,stop2:gdx'"#),
             },
         ]
@@ -121,7 +121,10 @@ impl Expression for EncodeKeyValueFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new().bytes().fallible()
+        match &self.fields {
+            None => TypeDef::new().bytes().infallible(),
+            Some(_) => TypeDef::new().bytes().fallible(),
+        }
     }
 }
 
@@ -237,7 +240,7 @@ mod tests {
                 }
             ],
             want: Ok("lvl=info"),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         multiple_elements {
@@ -248,7 +251,7 @@ mod tests {
                 }
             ],
             want: Ok("log_id=12345 lvl=info"),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         string_with_spaces {
@@ -258,7 +261,7 @@ mod tests {
                     "msg" => "This is a log message"
                 }],
             want: Ok(r#"lvl=info msg="This is a log message""#),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         string_with_characters_to_escape {
@@ -270,7 +273,7 @@ mod tests {
                     "space key" => "foo"
                 }],
             want: Ok(r#"another_field="some\\nfield\\and things" lvl=info msg="payload: {\"code\": 200}\\n" "space key"=foo"#),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         nested_fields {
@@ -292,7 +295,7 @@ mod tests {
                     "event" => "log"
                 }],
                 want: Ok("agent.id=1234 agent.name=vector event=log log.file.path=encode_key_value.rs network.ip.0=127 network.ip.1=0 network.ip.2=0 network.ip.3=1 network.proto=tcp"),
-                tdef: TypeDef::new().bytes().fallible(),
+                tdef: TypeDef::new().bytes().infallible(),
         }
 
         fields_ordering {

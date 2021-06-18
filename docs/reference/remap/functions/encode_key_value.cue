@@ -6,6 +6,11 @@ remap: functions: encode_key_value: {
 		Encodes the `value` to in key/value format with customizable delimiters. Default delimiters match
 		the [logfmt](\(urls.logfmt)) format.
 		"""#
+	notices: [
+		"""
+			If `fields_ordering` is specified then the function is fallible else it is infallible.
+			""",
+	]
 
 	arguments: [
 		{
@@ -44,7 +49,7 @@ remap: functions: encode_key_value: {
 		{
 			title: "Encode with default delimiters (no ordering)"
 			source: """
-				encode_key_value!({"ts": "2021-06-05T17:20:00Z", "msg": "This is a message", "lvl": "info"})
+				encode_key_value({"ts": "2021-06-05T17:20:00Z", "msg": "This is a message", "lvl": "info"})
 				"""
 			return: #"lvl=info msg="This is a message" ts=2021-06-05T17:20:00Z"#
 		},
@@ -58,7 +63,7 @@ remap: functions: encode_key_value: {
 		{
 			title: "Encode with default delimiters (nested fields)"
 			source: """
-				encode_key_value!({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
+				encode_key_value({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
 				"""
 			return: #"agent.name=vector event=log log.file.path=my.log"#
 		},
@@ -72,7 +77,7 @@ remap: functions: encode_key_value: {
 		{
 			title: "Encode with custom delimiters (no ordering)"
 			source: """
-				encode_key_value!(
+				encode_key_value(
 					{"ts": "2021-06-05T17:20:00Z", "msg": "This is a message", "lvl": "info"},
 					field_delimiter: ",",
 					key_value_delimiter: ":"
