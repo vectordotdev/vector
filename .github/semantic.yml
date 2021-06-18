@@ -67,6 +67,7 @@ scopes:
   - topology # Anything related to Vector's topology code
   - traces # Anything related to Vectors' trace events
   - transforms # Anything related to Vector's transform components
+  - unit tests # Anything related to Vector's unit testing feature
   - vrl # Anything related to the Vector Remap Language
 
   # platforms
