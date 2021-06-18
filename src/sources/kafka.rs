@@ -370,15 +370,16 @@ mod integration_test {
     use std::time::Duration;
     use vector_core::event::EventStatus;
 
-    const BOOTSTRAP_SERVER: &str = "localhost:9091";
-
-    fn client_config<T: FromClientConfig>() -> T {
-        ClientConfig::new()
-            .set("bootstrap.servers", BOOTSTRAP_SERVER)
-            .set("produce.offset.report", "true")
-            .set("message.timeout.ms", "5000")
-            .create()
-            .expect("Producer creation error")
+    fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
+        let mut client = ClientConfig::new();
+        client.set("bootstrap.servers", BOOTSTRAP_SERVER);
+        client.set("produce.offset.report", "true");
+        client.set("message.timeout.ms", "5000");
+        client.set("auto.commit.interval.ms", "1");
+        if let Some(group) = group {
+            client.set("group.id", group);
+        }
+        client.create().expect("Producer creation error")
     }
 
     async fn send_events(
@@ -390,7 +391,7 @@ mod integration_test {
         header_key: &str,
         header_value: &str,
     ) {
-        let producer: FutureProducer = client_config();
+        let producer: FutureProducer = client_config(None);
 
         for i in 0..count {
             let text = format!("{} {}", text, i);
@@ -434,6 +435,7 @@ mod integration_test {
         )
         .await;
 
+        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
         tokio::spawn(kafka_source(
             create_consumer(&config).unwrap(),
@@ -442,17 +444,28 @@ mod integration_test {
             config.partition_key,
             config.offset_key,
             config.headers_key,
-            ShutdownSignal::noop(),
+            shutdown,
             tx,
             acknowledgements,
         ));
         let events = collect_n(rx, 10).await;
+        drop(trigger_shutdown);
+        shutdown_done.await;
 
-        let client: BaseConsumer = client_config();
-        let watermarks = client
-            .fetch_watermarks(&topic, 0, Duration::from_secs(1))
-            .expect("Could not fetch watermarks");
-        assert_eq!(watermarks, (0, 10));
+        let client: BaseConsumer = client_config(Some(&group_id));
+        client.subscribe(&[&topic]).expect("Subscribing failed");
+
+        let mut tpl = TopicPartitionList::new();
+        tpl.add_partition(&topic, 0);
+        let tpl = client
+            .committed_offsets(tpl, Duration::from_secs(1))
+            .expect("Getting committed offsets failed");
+        assert_eq!(
+            tpl.find_partition(&topic, 0)
+                .expect("TPL is missing topic")
+                .offset(),
+            Offset::from_raw(10)
+        );
 
         assert_eq!(events.len(), 10);
         for (i, event) in events.into_iter().enumerate() {
