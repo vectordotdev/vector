@@ -228,7 +228,7 @@ mod tests {
             match event.as_metric().series().name.name.as_str() {
                 "counter_a" => assert_eq!(counter_a_1, event),
                 "counter_b" => assert_eq!(counter_b_1, event),
-                _ => assert!(false),
+                _ => panic!("Unexpected metric name in aggregate output"),
             }
         }
     }
@@ -281,7 +281,7 @@ mod tests {
             match event.as_metric().series().name.name.as_str() {
                 "gauge_a" => assert_eq!(gauge_a_1, event),
                 "gauge_b" => assert_eq!(gauge_b_1, event),
-                _ => assert!(false),
+                _ => panic!("Unexpected metric name in aggregate output"),
             }
         }
     }
@@ -326,7 +326,7 @@ interval_ms = 999999
             match event.as_metric().series().name.name.as_str() {
                 "counter_a" => assert_eq!(counter_a_summed, event),
                 "gauge_a" => assert_eq!(gauge_a_2, event),
-                _ => assert!(false),
+                _ => panic!("Unexpected metric name in aggregate output"),
             };
         }
         // There were only 2
@@ -383,11 +383,11 @@ interval_ms = 999999
                 match event.as_metric().series().name.name.as_str() {
                     "counter_a" => assert_eq!(counter_a_summed, event),
                     "gauge_a" => assert_eq!(gauge_a_2, event),
-                    _ => assert!(false),
+                    _ => panic!("Unexpected metric name in aggregate output"),
                 };
                 count += 1;
             } else {
-                assert!(false);
+                panic!("Unexpectedly recieved None in output stream");
             }
         }
         // We should be back to pending, having nothing waiting for us
