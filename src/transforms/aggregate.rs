@@ -157,10 +157,7 @@ mod tests {
     use super::*;
     use crate::{event::metric, event::Event, event::Metric};
     use futures::SinkExt;
-    use std::{
-        collections::BTreeMap,
-        task::Poll,
-    };
+    use std::task::Poll;
 
     #[test]
     fn generate_config() {
@@ -171,7 +168,6 @@ mod tests {
         name: &'static str,
         kind: metric::MetricKind,
         value: metric::MetricValue,
-        tags: BTreeMap<String, String>,
     ) -> Event {
         Event::Metric(
             Metric::new(
@@ -179,7 +175,6 @@ mod tests {
                 kind,
                 value,
             )
-            .with_tags(Some(tags)),
         )
     }
 
@@ -187,14 +182,12 @@ mod tests {
     fn incremental() {
         let mut agg = Aggregate::new(&AggregateConfig { interval_ms: 1000_u64 }).unwrap();
 
-        let tags: BTreeMap<String, String> =
-            vec![("tag1".into(), "val1".into())].into_iter().collect();
         let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 42.0 });
         let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 43.0 });
         let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 85.0 });
 
         // Single item, just stored regardless of kind
         agg.record(counter_a_1.clone());
@@ -223,7 +216,7 @@ mod tests {
         assert_eq!(&counter_a_summed, &out[0]);
 
         let counter_b_1 = make_metric("counter_b", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 44.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 44.0 });
         // Two increments with the different series, should get each back as-is
         agg.record(counter_a_1.clone());
         agg.record(counter_b_1.clone());
@@ -244,12 +237,10 @@ mod tests {
     fn absolute() {
         let mut agg = Aggregate::new(&AggregateConfig { interval_ms: 1000_u64 }).unwrap();
 
-        let tags: BTreeMap<String, String> =
-            vec![("tag1".into(), "val1".into())].into_iter().collect();
         let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 }, tags.clone());
+            metric::MetricValue::Gauge { value: 42.0 });
         let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 }, tags.clone());
+            metric::MetricValue::Gauge { value: 43.0 });
 
         // Single item, just stored regardless of kind
         agg.record(gauge_a_1.clone());
@@ -278,7 +269,7 @@ mod tests {
         assert_eq!(&gauge_a_2, &out[0]);
 
         let gauge_b_1 = make_metric("gauge_b", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 44.0 }, tags.clone());
+            metric::MetricValue::Gauge { value: 44.0 });
         // Two increments with the different series, should get each back as-is
         agg.record(gauge_a_1.clone());
         agg.record(gauge_b_1.clone());
@@ -309,18 +300,16 @@ interval_ms = 999999
 
         let agg = agg.into_task();
 
-        let tags: BTreeMap<String, String> =
-            vec![("tag1".into(), "val1".into())].into_iter().collect();
         let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 42.0 });
         let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 43.0 });
         let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 85.0 });
         let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 }, tags.clone());
+            metric::MetricValue::Gauge { value: 42.0 });
         let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 }, tags.clone());
+            metric::MetricValue::Gauge { value: 43.0 });
         let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
         // Queue up some events to be consummed & recorded
@@ -357,18 +346,16 @@ interval_ms = 999999
 
         let agg = agg.into_task();
 
-        let tags: BTreeMap<String, String> =
-            vec![("tag1".into(), "val1".into())].into_iter().collect();
         let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 42.0 });
         let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 43.0 });
         let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 }, tags.clone());
+            metric::MetricValue::Counter { value: 85.0 });
         let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 }, tags.clone());
+            metric::MetricValue::Gauge { value: 42.0 });
         let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 }, tags.clone());
+            metric::MetricValue::Gauge { value: 43.0 });
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
         let mut out_stream = agg.transform(Box::pin(rx));
