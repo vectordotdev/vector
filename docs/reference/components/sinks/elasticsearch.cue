@@ -153,13 +153,75 @@ components: sinks: elasticsearch: {
 		}
 		bulk_action: {
 			common:      false
-			description: "Action to use when making requests to the [Elasticsearch Bulk API](elasticsearch_bulk). Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported."
+			description: "Action to use when making requests to the [Elasticsearch Bulk API](elasticsearch_bulk). Currently, Vector only supports `index` and `create` in the `regular` mode and `create` in `data_stream` mode. `update` and `delete` actions are not supported."
 			required:    false
 			warnings: []
 			type: string: {
 				default: "index"
 				examples: ["index", "create", "{{ action }}"]
 				syntax: "template"
+			}
+		}
+		data_stream: {
+			common:      false
+			description: "Options for the data stream mode."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					auto_routing: {
+						common: false
+						description: """
+							Automatically routes events by deriving the data stream name using specific event fields with the `data_stream.type-data_stream.dataset-data_stream.namespace` format.
+
+							If enabled, the data_stream.* event fields will take precedence over the data_stream.type, data_stream.dataset, and data_stream.namespace settings, but will fall back to them if any of the fields are missing from the event.
+						"""
+						required: false
+						warnings: []
+						type: bool: default: true
+					}
+					dataset: {
+						common:      false
+						description: "The data stream dataset used to construct the data stream at index time."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "generic"
+							examples: ["generic", "nginx", "{{ service }}"]
+							syntax: "template"
+						}
+					}
+					namespace: {
+						common:      false
+						description: "The data stream namespace used to construct the data stream at index time."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "default"
+							examples: ["default", "{{ environment }}"]
+							syntax: "template"
+						}
+					}
+					sync_fields: {
+						common:      false
+						description: "Automatically adds and syncs the data_stream.* event fields if they are missing from the event. This ensures that fields match the name of the data stream that is receiving events."
+						required:    false
+						warnings: []
+						type: bool: default: true
+					}
+					type: {
+						common:      false
+						description: "The data stream type used to construct the data stream at index time."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "logs"
+							examples: ["logs", "metrics", "synthetics", "{{ type }}"]
+							syntax: "template"
+						}
+					}
+				}
 			}
 		}
 		doc_type: {
@@ -201,6 +263,17 @@ components: sinks: elasticsearch: {
 				default: "vector-%F"
 				examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
 				syntax: "template"
+			}
+		}
+		mode: {
+			common:      true
+			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk_action` is set to `create`."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "normal"
+				examples: ["normal", "data_stream"]
+				syntax: "literal"
 			}
 		}
 		pipeline: {
@@ -246,9 +319,8 @@ components: sinks: elasticsearch: {
 		data_streams: {
 			title: "Data streams"
 			body: """
-				By default, Vector will use the `index` action with Elasticsearch's Bulk API.
-				To use [Data streams][urls.elasticsearch_data_streams], `bulk_action` must be configured
-				with the `create` option.
+				To use [Data streams][urls.elasticsearch_data_streams], set the `mode` to `data_stream`.
+				The `index` is not used but use the combination of `data_stream.type`, `data_stream.dataset` and `data_stream.namespace`.
 				"""
 		}
 

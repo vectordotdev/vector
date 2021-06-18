@@ -109,5 +109,9 @@ spec:
         {{- with .Values.prometheusSink.podMonitor.extraRelabelings }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      metricRelabelings:
+        {{- with .Values.prometheusSink.podMonitor.metricRelabelings }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
 {{- end }}
 {{- end }}

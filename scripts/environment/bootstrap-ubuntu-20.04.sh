@@ -13,9 +13,6 @@ apt install --yes \
   apt-utils \
   apt-transport-https
 
-apt-get install --yes grub-efi
-update-grub
-
 apt upgrade --yes
 
 # Deps
@@ -72,6 +69,12 @@ cp "${TEMP}/grease/bin/grease" /usr/bin/grease
 # Locales
 locale-gen en_US.UTF-8
 dpkg-reconfigure locales
+
+if ! command -v rustup ; then
+  # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 20.04 images _and_
+  # by our own Ubuntu 20.04 images
+  curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+fi
 
 # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 20.04 images _and_
 # by our own Ubuntu 20.04 images, so this is really just make sure the path is configured.

@@ -6,6 +6,8 @@ mod append;
 mod array;
 #[cfg(feature = "assert")]
 mod assert;
+#[cfg(feature = "assert_eq")]
+mod assert_eq;
 #[cfg(feature = "boolean")]
 mod boolean;
 #[cfg(feature = "ceil")]
@@ -219,6 +221,8 @@ pub use crate::sha1::Sha1;
 pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
+#[cfg(feature = "assert_eq")]
+pub use assert_eq::AssertEq;
 #[cfg(feature = "boolean")]
 pub use boolean::Boolean;
 #[cfg(feature = "ceil")]
@@ -418,6 +422,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Append),
         #[cfg(feature = "assert")]
         Box::new(Assert),
+        #[cfg(feature = "assert_eq")]
+        Box::new(AssertEq),
         #[cfg(feature = "boolean")]
         Box::new(Boolean),
         #[cfg(feature = "ceil")]

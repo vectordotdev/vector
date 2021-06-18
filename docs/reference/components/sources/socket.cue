@@ -159,12 +159,13 @@ components: sources: socket: {
 	]
 
 	telemetry: metrics: {
-		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
-		connection_errors_total:      components.sources.internal_metrics.output.metrics.connection_errors_total
-		connection_failed_total:      components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
-		connection_failed_total:      components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_send_errors_total: components.sources.internal_metrics.output.metrics.connection_send_errors_total
-		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
+		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
+		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_established_total:     components.sources.internal_metrics.output.metrics.connection_established_total
+		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_send_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_errors_total
+		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
+		connection_shutdown_total:        components.sources.internal_metrics.output.metrics.connection_shutdown_total
 	}
 }
