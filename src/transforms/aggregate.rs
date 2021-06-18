@@ -75,25 +75,23 @@ impl Aggregate {
     }
 
     fn record(&mut self, event: Event) {
-        let metric = event.as_metric();
-        let series = metric.series();
-        let data = metric.data();
+        let (series, data, _metadata) = event.into_metric().into_parts();
 
         match data.kind {
             metric::MetricKind::Incremental => {
                 match self.map.get_mut(&series) {
                     // We already have something, add to it, will update timestamp as well.
-                    Some(existing) => existing.update(data),
+                    Some(existing) => existing.update(&data),
                     None => {
                         // New so store
-                        self.map.insert(series.clone(), data.clone());
+                        self.map.insert(series, data);
                         true
                     }
                 };
             },
             metric::MetricKind::Absolute => {
                 // Always replace/store
-                self.map.insert(series.clone(), data.clone());
+                self.map.insert(series, data);
             }
         };
 
