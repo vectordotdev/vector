@@ -3,7 +3,7 @@ package metadata
 remap: functions: filter_array: {
 	category: "Array"
 	description: """
-		Filters elements from the `value` array. It returns an array containint the elements matching the `pattern`.
+		Filters elements from the `value` array. It returns an array containing the elements matching the `pattern`.
 		"""
 
 	arguments: [
