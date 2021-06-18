@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 pub mod check_fields;
 pub mod is_log;
 pub mod is_metric;
-pub mod remap;
+pub mod vrl;
 
 pub use check_fields::CheckFieldsConfig;
 
-pub use self::remap::RemapConfig;
+pub use self::vrl::VrlConfig;
 
 pub trait Condition: Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
@@ -40,7 +40,7 @@ inventory::collect!(ConditionDescription);
 
 /// A condition can either be a raw string such as
 /// `condition = '.message == "hooray"'`.
-/// In this case it is turned into a Remap condition.
+/// In this case it is turned into a VRL condition.
 /// Otherwise it is a condition such as:
 ///
 /// condition.type = 'check_fields'
@@ -67,7 +67,7 @@ pub enum AnyCondition {
 impl AnyCondition {
     pub fn build(&self) -> crate::Result<Box<dyn Condition>> {
         match self {
-            AnyCondition::String(s) => RemapConfig { source: s.clone() }.build(),
+            AnyCondition::String(s) => VrlConfig { source: s.clone() }.build(),
             AnyCondition::Map(m) => m.build(),
         }
     }
@@ -107,15 +107,15 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_anycondition_remap() {
+    fn deserialize_anycondition_vrl() {
         let conf: Test = toml::from_str(indoc! {r#"
-            condition.type = "remap"
+            condition.type = "vrl"
             condition.source = '.nork == true'
         "#})
         .unwrap();
 
         assert_eq!(
-            r#"Map(RemapConfig { source: ".nork == true" })"#,
+            r#"Map(VrlConfig { source: ".nork == true" })"#,
             format!("{:?}", conf.condition)
         )
     }

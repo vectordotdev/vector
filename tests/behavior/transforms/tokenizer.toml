@@ -11,7 +11,7 @@
   [[tests.outputs]]
     extract_from = "tokenizer_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .timestamp == "2020-01-01T12:34:56Z" &&
         .level == "INFO" &&
@@ -32,7 +32,7 @@
   [[tests.outputs]]
     extract_from = "tokenizer_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .nested.timestamp == "2020-01-01T12:34:56Z" &&
         .nested.level == "INFO" &&
