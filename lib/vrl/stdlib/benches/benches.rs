@@ -993,6 +993,20 @@ bench_function! {
             module: "kafka.consumer.ConsumerFetcherManager"
         }))
     }
+
+    standalone_key_disabled {
+        args: func_args! [
+            value: r#"level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"#,
+            accept_standalone_key: false
+        ],
+        want: Ok(value!({
+            level: "info",
+            msg: "Stopping all fetchers",
+            tag: "stopping_fetchers",
+            id: "ConsumerFetcherManager-1382721708341",
+            module: "kafka.consumer.ConsumerFetcherManager"
+        }))
+    }
 }
 
 bench_function! {

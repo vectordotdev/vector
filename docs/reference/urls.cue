@@ -265,6 +265,7 @@ urls: {
 	linux_capability:                                         "https://man7.org/linux/man-pages/man7/capabilities.7.html"
 	logdna:                                                   "https://logdna.com/"
 	logfmt:                                                   "https://brandur.org/logfmt"
+	logfmt_specs:                                             "https://pkg.go.dev/github.com/kr/logfmt#section-documentation"
 	logstash:                                                 "https://www.elastic.co/logstash"
 	logstash_protocol:                                        "https://github.com/elastic/logstash-forwarder/blob/master/PROTOCOL.md"
 	loki:                                                     "https://grafana.com/oss/loki/"

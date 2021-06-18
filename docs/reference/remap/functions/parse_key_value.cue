@@ -51,7 +51,7 @@ remap: functions: parse_key_value: {
 			description: "Whether a standalone key should be accepted, the resulting object will associate such keys with boolean value `true`"
 			required:    false
 			type: ["boolean"]
-			default: false
+			default: true
 		},
 	]
 	internal_failure_reasons: [
@@ -104,7 +104,6 @@ remap: functions: parse_key_value: {
 					"env:prod,service:backend,region:eu-east1,beta",
 					field_delimiter: ",",
 					key_value_delimiter: ":",
-					accept_standalone_key: true
 				)
 				"""#
 			return: {
