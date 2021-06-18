@@ -26,12 +26,12 @@ impl Function for EncodeKeyValue {
             },
             Parameter {
                 keyword: "key_value_delimiter",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: false,
             },
             Parameter {
                 keyword: "field_delimiter",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: false,
             },
         ]
