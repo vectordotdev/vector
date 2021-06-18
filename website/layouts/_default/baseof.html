@@ -32,7 +32,9 @@
     </title>
 
     {{ partial "css.html" . }}
-    {{ partial "head-js.html" . }}
+
+    {{/* JS that needs to load at the start */}}
+    {{ partial "javascript/head.html" . }}
   </head>
   <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
     <div class="flex-1 z-1">
@@ -53,6 +55,10 @@
     {{ block "subfooter" . }}
     {{ end }}
 
-    {{ partial "foot-js.html" . }}
+    {{/* JS that needs to load last */}}
+    {{ partial "javascript/footer.html" . }}
+
+    {{/* JS that's solely for the front page React.js shenanigans */}}
+    {{ partial "javascript/home.html" . }}
   </body>
 </html>
