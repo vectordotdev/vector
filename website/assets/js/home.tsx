@@ -1,3 +1,7 @@
+import "core-js/stable";
+import "regenerator-runtime/runtime";
+
+// React, etc.
 import React from "react";
 import ReactDOM from "react-dom";
 import { useInterval } from "react-use";

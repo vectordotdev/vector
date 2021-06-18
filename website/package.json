@@ -14,6 +14,7 @@
     "alpinejs": "^2.8.2",
     "autoprefixer": "^10.2.5",
     "babel-preset-next": "^1.4.0",
+    "core-js": "^3.14.0",
     "d3-geo": "^3.0.1",
     "minireset.css": "^0.0.7",
     "postcss-cli": "^8.3.1",
@@ -22,16 +23,12 @@
     "react-dom": "^17.0.2",
     "react-spring": "^9.2.3",
     "react-use": "^17.2.4",
+    "regenerator-runtime": "^0.13.7",
     "tailwindcss": "^2.1.4",
     "tocbot": "^4.12.2",
     "topojson-client": "^3.1.0"
   },
   "browserslist": [
-    ">3%",
-    "not dead",
-    "defaults",
-    "safari >= 10.1",
-    "ios >= 10.3",
-    "ie >= 11"
+    "since 2017-06"
   ]
 }

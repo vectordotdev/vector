@@ -5,8 +5,8 @@ module.exports = function (api) {
     [
       require('@babel/preset-env'),
       {
-        useBuiltIns: 'entry',
-        corejs: 3
+        "useBuiltIns": 'entry',
+        "corejs": 3
       }
     ],
     [
@@ -25,7 +25,10 @@ module.exports = function (api) {
     ]
   ];
 
+  const plugins = [];
+
   return {
-    presets
+    presets,
+    plugins
   };
 }
