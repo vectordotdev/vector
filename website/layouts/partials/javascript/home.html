@@ -1,3 +1,4 @@
-<script>
-  window.alert("This is home!");
-</script>
+{{ $homeJs := "js/home.tsx" }}
+{{ $babelOpts := dict "noComments" true }}
+{{ $compiled := resources.Get $homeJs | js.Build | babel $babelOpts }}
+<script src="{{ $compiled.RelPermalink }}"></script>

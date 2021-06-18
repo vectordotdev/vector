@@ -11,8 +11,4 @@ const tableOfContents = () => {
   });
 }
 
-const main = () => {
-  tableOfContents();
-}
-
-document.addEventListener('DOMContentLoaded', main());
+document.addEventListener('DOMContentLoaded', tableOfContents());

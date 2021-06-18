@@ -11,3 +11,6 @@ data/docs.json
 
 # htmltest generated
 tmp/
+
+# Yarn errors
+yarn-error.log
