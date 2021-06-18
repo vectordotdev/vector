@@ -18,3 +18,12 @@ impl InternalEvent for AggregateFlushed {
         counter!("aggregate_flushes_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct AggregateUpdateFailed;
+
+impl InternalEvent for AggregateUpdateFailed {
+    fn emit_metrics(&self) {
+        counter!("aggregate_failed_updates", 1);
+    }
+}

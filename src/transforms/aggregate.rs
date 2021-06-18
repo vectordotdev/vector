@@ -1,5 +1,5 @@
 use crate::{
-    internal_events::{AggregateEventRecorded, AggregateFlushed},
+    internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     transforms::{
         TaskTransform,
         Transform,
@@ -79,15 +79,12 @@ impl Aggregate {
 
         match data.kind {
             metric::MetricKind::Incremental => {
-                match self.map.get_mut(&series) {
-                    // We already have something, add to it, will update timestamp as well.
-                    Some(existing) => existing.update(&data),
-                    None => {
-                        // New so store
-                        self.map.insert(series, data);
-                        true
-                    }
-                };
+                self.map.entry(series)
+                    .and_modify(|existing| {
+                        if ! existing.update(&data) {
+                            emit!(AggregateUpdateFailed);
+                        }
+                    }).or_insert(data);
             },
             metric::MetricKind::Absolute => {
                 // Always replace/store
