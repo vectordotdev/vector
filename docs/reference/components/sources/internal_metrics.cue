@@ -73,6 +73,18 @@ components: sources: internal_metrics: {
 		}
 
 		// Instance-level "process" metrics
+		aggregate_events_recorded_total: {
+			description:       "The number of events recorded by the aggregate transform."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		aggregate_flushes_total: {
+			description:       "The number of flushes done by the aggregate transform."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		api_started_total: {
 			description:       "The number of times the Vector GraphQL API has been started."
 			type:              "counter"

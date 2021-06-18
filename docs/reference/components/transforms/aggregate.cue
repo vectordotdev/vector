@@ -4,9 +4,9 @@ components: transforms: aggregate: {
 	title: "Aggregate"
 
 	description: """
-		Aggregates multiple metric events into a single metric event based on a
-		the MetricKind. Incremental metrics are "added", Absolute uses last
-		value wins semantics.
+			Aggregates multiple metric events into a single metric event based
+			on a defined interval window. This helps to reduce metric volume at
+			the cost of granularity.
 		"""
 
 	classes: {
@@ -181,8 +181,36 @@ components: transforms: aggregate: {
 		},
 	]
 
+	how_it_works: {
+		aggregation_behavior: {
+			title: "Aggregation Behavior"
+			body: """
+					Metrics are aggregated based their kind. During an interval `incremental` metrics
+					are "added" and `absolute` metrics use most recent value wins semantics. This results in a reduction
+					of volume, less granularity, while maintaining numerical correctness. As an example two
+					`incremental` `counter`s with values 10 and 13 processed by the transform during a period would be
+					aggregated into a single `incremental` `counter` with a value of 23. Two `absolute` `gauge`s with
+					values 93 and 95 would result in a single `absolute` `gauge` with the value of 95. More complex
+					types like `distribution`, `histogram`, `set`, and `summary` behave similarly with `incremental`
+					values being combined in a manner that makes sense based on their type.
+				"""
+		}
+
+		advantages: {
+			title: "Advantages of Use"
+			body: """
+					The major advantage to aggregation is the reduction of volume. It may reduce costs
+					directly in situations that charge by metric event volume, or indirectly by requiring less CPU to
+					process and/or less network bandwidth to transmit and receive. In systems that are constrained by
+					the processing required to ingest metric events it may help to reduce the processing overhead. This
+					may apply to transforms and sinks downstream of the aggregate transform as well.
+				"""
+		}
+
+	}
+
 	telemetry: metrics: {
-		events_recorded_total: components.sources.internal_metrics.output.metrics.events_recorded_total
-		flushed_total:         components.sources.internal_metrics.output.metrics.flushed_total
+		aggregate_events_recorded_total: components.sources.internal_metrics.output.metrics.aggregate_events_recorded_total
+		aggregate_flushes_total:         components.sources.internal_metrics.output.metrics.aggregate_flushes_total
 	}
 }

@@ -6,7 +6,7 @@ pub struct AggregateEventRecorded;
 
 impl InternalEvent for AggregateEventRecorded {
     fn emit_metrics(&self) {
-        counter!("events_recorded_total", 1);
+        counter!("aggregate_events_recorded_total", 1);
     }
 }
 
@@ -15,6 +15,6 @@ pub struct AggregateFlushed;
 
 impl InternalEvent for AggregateFlushed {
     fn emit_metrics(&self) {
-        counter!("flushed_total", 1);
+        counter!("aggregate_flushes_total", 1);
     }
 }

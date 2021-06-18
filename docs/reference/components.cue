@@ -173,15 +173,16 @@ components: {
 		}
 
 		if Args.kind == "transform" {
-			convert?:  #FeaturesConvert
-			enrich?:   #FeaturesEnrich
-			filter?:   #FeaturesFilter
-			parse?:    #FeaturesParse
-			program?:  #FeaturesProgram
-			reduce?:   #FeaturesReduce
-			route?:    #FeaturesRoute
-			sanitize?: #FeaturesSanitize
-			shape?:    #FeaturesShape
+			aggregate?: #FeaturesAggregate
+			convert?:   #FeaturesConvert
+			enrich?:    #FeaturesEnrich
+			filter?:    #FeaturesFilter
+			parse?:     #FeaturesParse
+			program?:   #FeaturesProgram
+			reduce?:    #FeaturesReduce
+			route?:     #FeaturesRoute
+			sanitize?:  #FeaturesSanitize
+			shape?:     #FeaturesShape
 		}
 
 		if Args.kind == "sink" {
@@ -200,6 +201,9 @@ components: {
 		}
 
 		descriptions: [Name=string]: string
+	}
+
+	#FeaturesAggregate: {
 	}
 
 	#FeaturesCollect: {
