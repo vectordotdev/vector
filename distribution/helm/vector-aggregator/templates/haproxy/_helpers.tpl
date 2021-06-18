@@ -55,7 +55,7 @@ backend vector
   mode http
   balance roundrobin
   option tcp-check
-  server-template srv {{ $values.replicas }} _vector._tcp.{{ include "libvector.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.global.clusterDomain }} resolvers coredns proto h2 check
+  server-template srv {{ max 100 (int $values.replicas) }} _vector._tcp.{{ include "libvector.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.global.clusterDomain }} resolvers coredns proto h2 check
 {{- end }}
 {{ range $item := $values.service.ports }}
 frontend {{ $item.name }}
@@ -66,6 +66,6 @@ frontend {{ $item.name }}
 backend {{ $item.name }}
   balance roundrobin
   option tcp-check
-  server-template srv {{ $values.replicas }} _{{ $item.name }}._tcp.{{ include "libvector.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.global.clusterDomain }} resolvers coredns check
+  server-template srv {{ max 100 (int $values.replicas) }} _{{ $item.name }}._tcp.{{ include "libvector.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.global.clusterDomain }} resolvers coredns check
 {{ end }}
 {{- end }}
