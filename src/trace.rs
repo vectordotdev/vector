@@ -87,13 +87,11 @@ pub fn init(color: bool, json: bool, levels: &str, enable_datadog_tracing: bool)
             } else {
                 Dispatch::new(BroadcastSubscriber { subscriber })
             }
+        } else if enable_datadog_tracing {
+            send_to_dd!(subscriber);
+            Dispatch::new(BroadcastSubscriber { subscriber })
         } else {
-            if enable_datadog_tracing {
-                send_to_dd!(subscriber);
-                Dispatch::new(BroadcastSubscriber { subscriber })
-            } else {
-                Dispatch::new(BroadcastSubscriber { subscriber })
-            }
+            Dispatch::new(BroadcastSubscriber { subscriber })
         }
     } else {
         #[cfg(not(test))]
@@ -114,13 +112,11 @@ pub fn init(color: bool, json: bool, levels: &str, enable_datadog_tracing: bool)
             } else {
                 Dispatch::new(BroadcastSubscriber { subscriber })
             }
+        } else if enable_datadog_tracing {
+            send_to_dd!(subscriber);
+            Dispatch::new(BroadcastSubscriber { subscriber })
         } else {
-            if enable_datadog_tracing {
-                send_to_dd!(subscriber);
-                Dispatch::new(BroadcastSubscriber { subscriber })
-            } else {
-                Dispatch::new(BroadcastSubscriber { subscriber })
-            }
+            Dispatch::new(BroadcastSubscriber { subscriber })
         }
     };
 
