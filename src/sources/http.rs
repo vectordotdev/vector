@@ -1,23 +1,19 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{Event, Value},
-    shutdown::ShutdownSignal,
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsConfig,
-    Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use chrono::Utc;
-use codec::BytesDelimitedCodec;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
 use std::{collections::HashMap, net::SocketAddr};
 
-use tokio_util::codec::Decoder;
-use warp::http::{HeaderMap, HeaderValue, StatusCode};
+use warp::http::{HeaderMap, HeaderValue};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
@@ -59,11 +55,11 @@ impl GenerateConfig for SimpleHttpConfig {
     }
 }
 
-pub fn default_path() -> String {
+fn default_path() -> String {
     "/".to_string()
 }
 
-pub fn default_path_key() -> String {
+fn default_path_key() -> String {
     "path".to_string()
 }
 
@@ -75,18 +71,8 @@ struct SimpleHttpSource {
     path_key: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Text,
-    Ndjson,
-    Json,
-}
-
 impl HttpSource for SimpleHttpSource {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
@@ -100,7 +86,7 @@ impl HttpSource for SimpleHttpSource {
             .map(|mut events| {
                 // Add source type
                 let key = log_schema().source_type_key();
-                for event in events.iter_mut() {
+                for event in &mut events {
                     event.as_mut_log().try_insert(key, Bytes::from("http"));
                 }
                 events
@@ -111,13 +97,7 @@ impl HttpSource for SimpleHttpSource {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
-    async fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = SimpleHttpSource {
             encoding: self.encoding,
             headers: self.headers.clone(),
@@ -130,8 +110,7 @@ impl SourceConfig for SimpleHttpConfig {
             self.strict_path,
             &self.tls,
             &self.auth,
-            out,
-            shutdown,
+            cx,
         )
     }
 
@@ -177,119 +156,25 @@ fn add_headers(
     events
 }
 
-fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
-    let mut body = BytesMut::new();
-    body.extend_from_slice(&buf);
-
-    let mut decoder = BytesDelimitedCodec::new(b'\n');
-    std::iter::from_fn(move || {
-        match decoder.decode_eof(&mut body) {
-            Err(error) => Some(Err(ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Bad request: {}", error),
-            ))),
-            Ok(Some(b)) => Some(Ok(b)),
-            Ok(None) => None, // actually done
-        }
-    })
-    .filter(|s| match s {
-        // filter empty lines
-        Ok(b) => !b.is_empty(),
-        _ => true,
-    })
-}
-
-fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
-    match enc {
-        Encoding::Text => body_to_lines(body)
-            .map(|r| Ok(Event::from(r?)))
-            .collect::<Result<_, _>>(),
-        Encoding::Ndjson => body_to_lines(body)
-            .map(|j| {
-                let parsed_json = serde_json::from_slice(&j?)
-                    .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))?;
-                json_parse_object(parsed_json)
-            })
-            .collect::<Result<_, _>>(),
-        Encoding::Json => {
-            let parsed_json = serde_json::from_slice(&body)
-                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
-            json_parse_array_of_object(parsed_json)
-        }
-    }
-}
-
-fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
-    let mut event = Event::new_empty_log();
-    let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
-    match value {
-        JsonValue::Object(map) => {
-            for (k, v) in map {
-                log.insert_flat(k, v);
-            }
-            Ok(event)
-        }
-        _ => Err(json_error(format!(
-            "Expected Object, got {}",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
-    match value {
-        JsonValue::Array(v) => v
-            .into_iter()
-            .map(json_parse_object)
-            .collect::<Result<_, _>>(),
-        JsonValue::Object(map) => {
-            //treat like an array of one object
-            Ok(vec![json_parse_object(JsonValue::Object(map))?])
-        }
-        _ => Err(json_error(format!(
-            "Expected Array or Object, got {}.",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_error(s: String) -> ErrorMessage {
-    ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
-}
-
-fn json_value_to_type_string(value: &JsonValue) -> &'static str {
-    match value {
-        JsonValue::Object(_) => "Object",
-        JsonValue::Array(_) => "Array",
-        JsonValue::String(_) => "String",
-        JsonValue::Number(_) => "Number",
-        JsonValue::Bool(_) => "Bool",
-        JsonValue::Null => "Null",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{Encoding, SimpleHttpConfig};
-
-    use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
-        event::{Event, Value},
-        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
+        config::{log_schema, SourceConfig, SourceContext},
+        event::{Event, EventStatus, Value},
+        test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
     use flate2::{
         write::{DeflateEncoder, GzEncoder},
         Compression,
     };
+    use futures::Stream;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
     use std::io::Write;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -303,11 +188,15 @@ mod tests {
         path_key: &str,
         path: &str,
         strict_path: bool,
-    ) -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+        status: EventStatus,
+        acknowledgements: bool,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
         let path_key = path_key.to_owned();
+        let mut context = SourceContext::new_test(sender);
+        context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,
@@ -320,12 +209,7 @@ mod tests {
                 path_key,
                 path,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(context)
             .await
             .unwrap()
             .await
@@ -392,17 +276,34 @@ mod tests {
             .as_u16()
     }
 
+    async fn spawn_ok_collect_n(
+        send: impl std::future::Future<Output = u16> + Send + 'static,
+        rx: impl Stream<Item = Event> + Unpin,
+        n: usize,
+    ) -> Vec<Event> {
+        spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await
+    }
+
     #[tokio::test]
     async fn http_multiline_text() {
         trace_init();
 
         let body = "test body\n\ntest body 2";
 
-        let (rx, addr) = source(Encoding::default(), vec![], vec![], "http_path", "/", true).await;
+        let (rx, addr) = source(
+            Encoding::default(),
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
 
-        assert_eq!(200, send(addr, body).await);
+        let mut events = spawn_ok_collect_n(send(addr, body), rx, 2).await;
 
-        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -428,11 +329,20 @@ mod tests {
         //same as above test but with a newline at the end
         let body = "test body\n\ntest body 2\n";
 
-        let (rx, addr) = source(Encoding::default(), vec![], vec![], "http_path", "/", true).await;
+        let (rx, addr) = source(
+            Encoding::default(),
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
 
-        assert_eq!(200, send(addr, body).await);
+        let mut events = spawn_ok_collect_n(send(addr, body), rx, 2).await;
 
-        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -452,18 +362,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_multiline_text3() {
+        trace_init();
+
+        //same as above test but with a binary encoding
+        let body = "test body\n\ntest body 2\n";
+
+        let (rx, addr) = source(
+            Encoding::Binary,
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
+
+        let mut events = spawn_ok_collect_n(send(addr, body), rx, 1).await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(
+                log[log_schema().message_key()],
+                "test body\n\ntest body 2\n".into()
+            );
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
+        }
+    }
+
+    #[tokio::test]
     async fn http_json_parsing() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![], vec![], "http_path", "/", true).await;
+        let (rx, addr) = source(
+            Encoding::Json,
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
 
-        assert_eq!(400, send(addr, "{").await); //malformed
-        assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(400, send(addr, "{").await); //malformed
+                assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
 
-        assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
-        assert_eq!(200, send(addr, "[{},{},{}]").await);
+                assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
+                assert_eq!(200, send(addr, "[{},{},{}]").await);
+            },
+            rx,
+            2,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 2).await;
         assert!(events
             .remove(1)
             .as_log()
@@ -480,12 +440,28 @@ mod tests {
     async fn http_json_values() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![], vec![], "http_path", "/", true).await;
+        let (rx, addr) = source(
+            Encoding::Json,
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
 
-        assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
-        assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
+                assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
+            },
+            rx,
+            2,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -508,15 +484,31 @@ mod tests {
     async fn http_json_dotted_keys() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![], vec![], "http_path", "/", true).await;
+        let (rx, addr) = source(
+            Encoding::Json,
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
 
-        assert_eq!(200, send(addr, r#"[{"dotted.key":"value"}]"#).await);
-        assert_eq!(
-            200,
-            send(addr, r#"{"nested":{"dotted.key2":"value2"}}"#).await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(200, send(addr, r#"[{"dotted.key":"value"}]"#).await);
+                assert_eq!(
+                    200,
+                    send(addr, r#"{"nested":{"dotted.key2":"value2"}}"#).await
+                );
+            },
+            rx,
+            2,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -535,16 +527,32 @@ mod tests {
     async fn http_ndjson() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Ndjson, vec![], vec![], "http_path", "/", true).await;
+        let (rx, addr) = source(
+            Encoding::Ndjson,
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
 
-        assert_eq!(400, send(addr, r#"[{"key":"value"}]"#).await); //one object per line
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(400, send(addr, r#"[{"key":"value"}]"#).await); //one object per line
 
-        assert_eq!(
-            200,
-            send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
-        );
+                assert_eq!(
+                    200,
+                    send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
+                );
+            },
+            rx,
+            2,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -582,15 +590,18 @@ mod tests {
             "http_path",
             "/",
             true,
+            EventStatus::Delivered,
+            true,
         )
         .await;
 
-        assert_eq!(
-            200,
-            send_with_headers(addr, "{\"key1\":\"value1\"}", headers).await
-        );
+        let mut events = spawn_ok_collect_n(
+            send_with_headers(addr, "{\"key1\":\"value1\"}", headers),
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -618,15 +629,18 @@ mod tests {
             "http_path",
             "/",
             true,
+            EventStatus::Delivered,
+            true,
         )
         .await;
 
-        assert_eq!(
-            200,
-            send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb").await
-        );
+        let mut events = spawn_ok_collect_n(
+            send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb"),
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -657,11 +671,20 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Encoding", "gzip, deflate".parse().unwrap());
 
-        let (rx, addr) = source(Encoding::default(), vec![], vec![], "http_path", "/", true).await;
+        let (rx, addr) = source(
+            Encoding::default(),
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+        )
+        .await;
 
-        assert_eq!(200, send_bytes(addr, body, headers).await);
+        let mut events = spawn_ok_collect_n(send_bytes(addr, body, headers), rx, 1).await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -682,15 +705,18 @@ mod tests {
             "vector_http_path",
             "/event/path",
             true,
+            EventStatus::Delivered,
+            true,
         )
         .await;
 
-        assert_eq!(
-            200,
-            send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path").await
-        );
+        let mut events = spawn_ok_collect_n(
+            send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path"),
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -711,19 +737,27 @@ mod tests {
             "vector_http_path",
             "/event",
             false,
+            EventStatus::Delivered,
+            true,
         )
         .await;
 
-        assert_eq!(
-            200,
-            send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path1").await
-        );
-        assert_eq!(
-            200,
-            send_with_path(addr, "{\"key2\":\"value2\"}", "/event/path2").await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path1").await
+                );
+                assert_eq!(
+                    200,
+                    send_with_path(addr, "{\"key2\":\"value2\"}", "/event/path2").await
+                );
+            },
+            rx,
+            2,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -752,6 +786,8 @@ mod tests {
             "vector_http_path",
             "/",
             true,
+            EventStatus::Delivered,
+            true,
         )
         .await;
 
@@ -759,5 +795,59 @@ mod tests {
             404,
             send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path").await
         );
+    }
+
+    #[tokio::test]
+    async fn http_delivery_failure() {
+        trace_init();
+
+        let (rx, addr) = source(
+            Encoding::default(),
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Failed,
+            true,
+        )
+        .await;
+
+        spawn_collect_n(
+            async move {
+                assert_eq!(400, send(addr, "test body\n").await);
+            },
+            rx,
+            1,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn ignores_disabled_acknowledgements() {
+        trace_init();
+
+        let (rx, addr) = source(
+            Encoding::default(),
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Failed,
+            false,
+        )
+        .await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(200, send(addr, "test body\n").await);
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        assert_eq!(events.len(), 1);
     }
 }

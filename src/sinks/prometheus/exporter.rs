@@ -1,14 +1,14 @@
 use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
-    event::metric::MetricKind,
+    event::metric::{Metric, MetricData, MetricKind, MetricValue},
+    event::Event,
     internal_events::PrometheusServerRequestComplete,
     sinks::{
-        util::{statistic::validate_quantiles, MetricEntry, StreamSink},
+        util::{statistic::validate_quantiles, StreamSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
-    Event,
 };
 use async_trait::async_trait;
 use chrono::Utc;
@@ -23,7 +23,10 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     convert::Infallible,
+    hash::{Hash, Hasher},
+    mem::discriminant,
     net::SocketAddr,
+    ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
 };
 use stream_cancel::{Trigger, Tripwire};
@@ -303,21 +306,24 @@ impl StreamSink for PrometheusExporter {
                     .drain(..)
                     .map(|(MetricEntry(mut metric), is_incremental_set)| {
                         if is_incremental_set {
-                            metric.data.value = metric.data.value.zero();
+                            metric.zero();
                         }
                         (MetricEntry(metric), is_incremental_set)
                     })
                     .collect();
             }
 
-            match item.data.kind {
+            match item.kind() {
                 MetricKind::Incremental => {
                     let mut entry = MetricEntry(item.into_absolute());
                     if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&entry) {
-                        existing.data.update(&entry.data);
-                        entry = MetricEntry(existing);
+                        if existing.update(&entry) {
+                            entry = MetricEntry(existing);
+                        } else {
+                            warn!(message = "Metric changed type, dropping old value.", series = %entry.series());
+                        }
                     }
-                    let is_set = entry.data.value.is_set();
+                    let is_set = matches!(entry.value(), MetricValue::Set { .. });
                     metrics.map.insert(entry, is_set);
                 }
                 MetricKind::Absolute => {
@@ -333,22 +339,110 @@ impl StreamSink for PrometheusExporter {
     }
 }
 
+struct MetricEntry(Metric);
+
+impl Deref for MetricEntry {
+    type Target = Metric;
+    fn deref(&self) -> &Metric {
+        &self.0
+    }
+}
+
+impl DerefMut for MetricEntry {
+    fn deref_mut(&mut self) -> &mut Metric {
+        &mut self.0
+    }
+}
+
+impl AsRef<MetricData> for MetricEntry {
+    fn as_ref(&self) -> &MetricData {
+        self.0.as_ref()
+    }
+}
+
+impl Eq for MetricEntry {}
+
+impl Hash for MetricEntry {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let metric = &self.0;
+        metric.series().hash(state);
+        metric.kind().hash(state);
+        discriminant(metric.value()).hash(state);
+
+        match metric.value() {
+            MetricValue::AggregatedHistogram { buckets, .. } => {
+                for bucket in buckets {
+                    bucket.upper_limit.to_bits().hash(state);
+                }
+            }
+            MetricValue::AggregatedSummary { quantiles, .. } => {
+                for quantile in quantiles {
+                    quantile.upper_limit.to_bits().hash(state);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl PartialEq for MetricEntry {
+    fn eq(&self, other: &Self) -> bool {
+        // This differs from a straightforward implementation of `eq` by
+        // comparing only the "shape" bits (name, tags, and type) while
+        // allowing the contained values to be different.
+        self.series() == other.series()
+            && self.kind() == other.kind()
+            && discriminant(self.value()) == discriminant(other.value())
+            && match (self.value(), other.value()) {
+                (
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets1, ..
+                    },
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets2, ..
+                    },
+                ) => {
+                    buckets1.len() == buckets2.len()
+                        && buckets1
+                            .iter()
+                            .zip(buckets2.iter())
+                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                }
+                (
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles1,
+                        ..
+                    },
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles2,
+                        ..
+                    },
+                ) => {
+                    quantiles1.len() == quantiles2.len()
+                        && quantiles1
+                            .iter()
+                            .zip(quantiles2.iter())
+                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                }
+                _ => true,
+            }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        event::metric::{Metric, MetricData, MetricSeries, MetricValue},
+        event::metric::{Metric, MetricValue},
         http::HttpClient,
-        test_util::{random_string, trace_init},
+        test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
     };
     use chrono::Duration;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tokio::{sync::mpsc, time};
-
-    const PROMETHEUS_ADDRESS_TLS: &str = "127.0.0.1:9102";
-    const PROMETHEUS_ADDRESS_NOTLS: &str = "127.0.0.1:9103";
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -357,14 +451,14 @@ mod tests {
 
     #[tokio::test]
     async fn prometheus_notls() {
-        export_and_fetch_simple(PROMETHEUS_ADDRESS_NOTLS, None).await;
+        export_and_fetch_simple(None).await;
     }
 
     #[tokio::test]
     async fn prometheus_tls() {
         let mut tls_config = TlsConfig::test_config();
         tls_config.options.verify_hostname = Some(false);
-        export_and_fetch_simple(PROMETHEUS_ADDRESS_TLS, Some(tls_config)).await;
+        export_and_fetch_simple(Some(tls_config)).await;
     }
 
     #[tokio::test]
@@ -377,7 +471,7 @@ mod tests {
         let event2 = Event::from(event2.into_metric().with_timestamp(Some(timestamp2)));
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(PROMETHEUS_ADDRESS_NOTLS, None, events).await;
+        let body = export_and_fetch(None, events).await;
         let timestamp = timestamp2.timestamp_millis();
         assert_eq!(
             body,
@@ -393,11 +487,7 @@ mod tests {
         );
     }
 
-    async fn export_and_fetch(
-        address: &str,
-        tls_config: Option<TlsConfig>,
-        events: Vec<Event>,
-    ) -> String {
+    async fn export_and_fetch(tls_config: Option<TlsConfig>, events: Vec<Event>) -> String {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
@@ -406,20 +496,21 @@ mod tests {
             None => "http",
         };
 
+        let address = next_addr();
         let config = PrometheusExporterConfig {
-            address: address.parse().unwrap(),
+            address,
             tls: tls_config,
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         for event in events {
             tx.send(event).expect("Failed to send event.");
         }
 
-        time::delay_for(time::Duration::from_millis(100)).await;
+        time::sleep(time::Duration::from_millis(100)).await;
 
         let request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
@@ -439,12 +530,12 @@ mod tests {
         String::from_utf8(bytes.to_vec()).unwrap()
     }
 
-    async fn export_and_fetch_simple(address: &str, tls_config: Option<TlsConfig>) {
+    async fn export_and_fetch_simple(tls_config: Option<TlsConfig>) {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(address, tls_config, events).await;
+        let body = export_and_fetch(tls_config, events).await;
 
         assert!(body.contains(&format!(
             indoc! {r#"
@@ -492,7 +583,7 @@ mod tests {
     #[tokio::test]
     async fn sink_absolute() {
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS_TLS.parse().unwrap(),
+            address: next_addr(), // Not actually bound, just needed to fill config
             tls: None,
             ..Default::default()
         };
@@ -511,40 +602,16 @@ mod tests {
                 .collect(),
         ));
 
-        let m2 = Metric {
-            series: MetricSeries {
-                tags: Some(
-                    vec![("tag1".to_owned(), "value2".to_owned())]
-                        .into_iter()
-                        .collect(),
-                ),
-                ..m1.series.clone()
-            },
-            data: m1.data.clone(),
-        };
+        let m2 = m1.clone().with_tags(Some(
+            vec![("tag1".to_owned(), "value2".to_owned())]
+                .into_iter()
+                .collect(),
+        ));
 
         let metrics = vec![
-            Event::Metric(Metric {
-                series: m1.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 32. },
-                    ..m1.data.clone()
-                },
-            }),
-            Event::Metric(Metric {
-                series: m2.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 33. },
-                    ..m2.data.clone()
-                },
-            }),
-            Event::Metric(Metric {
-                series: m1.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 40. },
-                    ..m1.data.clone()
-                },
-            }),
+            Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 32. })),
+            Event::Metric(m2.clone().with_value(MetricValue::Counter { value: 33. })),
+            Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
         ];
 
         sink.run(Box::pin(futures::stream::iter(metrics)))
@@ -554,13 +621,13 @@ mod tests {
         let map = &sink.metrics.read().unwrap().map;
 
         assert_eq!(
-            map.get_full(&MetricEntry(m1)).unwrap().1.data.value,
-            MetricValue::Counter { value: 40. }
+            map.get_full(&MetricEntry(m1)).unwrap().1.value(),
+            &MetricValue::Counter { value: 40. }
         );
 
         assert_eq!(
-            map.get_full(&MetricEntry(m2)).unwrap().1.data.value,
-            MetricValue::Counter { value: 33. }
+            map.get_full(&MetricEntry(m2)).unwrap().1.value(),
+            &MetricValue::Counter { value: 33. }
         );
     }
 }
@@ -572,6 +639,7 @@ mod integration_tests {
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
 
@@ -580,7 +648,7 @@ mod integration_tests {
         trace_init();
 
         prometheus_scrapes_metrics().await;
-        time::delay_for(time::Duration::from_millis(500)).await;
+        time::sleep(time::Duration::from_millis(500)).await;
         reset_on_flush_period().await;
     }
 
@@ -593,13 +661,13 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name).await;
@@ -626,7 +694,7 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         tx.send(event).expect("Failed to send.");
@@ -634,7 +702,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name1).await;
@@ -649,7 +717,7 @@ mod integration_tests {
         );
 
         // Wait a bit for expired metrics
-        time::delay_for(time::Duration::from_secs(3)).await;
+        time::sleep(time::Duration::from_secs(3)).await;
 
         let (name1, event) = tests::create_metric_set(Some(name1), vec!["6", "7"]);
         tx.send(event).expect("Failed to send.");
@@ -657,7 +725,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name1).await;

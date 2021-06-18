@@ -11,7 +11,7 @@ use crate::{
     sinks::util::{
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         http::{HttpBatchService, HttpRetryLogic},
-        BatchConfig, BatchSettings, TowerRequestConfig,
+        BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
@@ -156,7 +156,13 @@ impl SematextMetricsService {
                 batch.timeout,
                 cx.acker(),
             )
-            .with_flat_map(move |event: Event| stream::iter(normalizer.apply(event).map(Ok)))
+            .with_flat_map(move |event: Event| {
+                stream::iter(
+                    normalizer
+                        .apply(event)
+                        .map(|item| Ok(EncodedEvent::new(item))),
+                )
+            })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
         Ok(VectorSink::Sink(Box::new(sink)))
@@ -177,7 +183,7 @@ impl Service<Vec<Metric>> for SematextMetricsService {
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = encode_events(&self.config.token, &self.config.default_namespace, items);
-        let body: Vec<u8> = input.into_bytes();
+        let body: Vec<u8> = input.item.into_bytes();
 
         self.inner.call(body)
     }
@@ -187,7 +193,7 @@ struct SematextMetricNormalize;
 
 impl MetricNormalize for SematextMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
+        match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
@@ -211,22 +217,26 @@ fn create_build_request(
     }
 }
 
-fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> String {
+fn encode_events(
+    token: &str,
+    default_namespace: &str,
+    metrics: Vec<Metric>,
+) -> EncodedEvent<String> {
     let mut output = String::new();
-    for event in events.into_iter() {
-        let namespace = event
-            .series
+    for metric in metrics.into_iter() {
+        let (series, data, _metadata) = metric.into_parts();
+        let namespace = series
             .name
             .namespace
             .unwrap_or_else(|| default_namespace.into());
-        let label = event.series.name.name;
-        let ts = encode_timestamp(event.data.timestamp);
+        let label = series.name.name;
+        let ts = encode_timestamp(data.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
-        let mut tags = event.series.tags.clone().unwrap_or_default();
+        let mut tags = series.tags.unwrap_or_default();
         tags.insert("token".into(), token.into());
 
-        let (metric_type, fields) = match event.data.value {
+        let (metric_type, fields) = match data.value {
             MetricValue::Counter { value } => ("counter", to_fields(label, value)),
             MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
             _ => unreachable!(), // handled by SematextMetricNormalize
@@ -246,7 +256,7 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
     }
 
     output.pop();
-    output
+    EncodedEvent::new(output)
 }
 
 fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
@@ -284,7 +294,7 @@ mod tests {
 
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000",
-            encode_events("aaa", "ns", events)
+            encode_events("aaa", "ns", events).item
         );
     }
 
@@ -299,7 +309,7 @@ mod tests {
 
         assert_eq!(
             "ns,metric_type=counter,token=aaa used=42 1597784400000000000",
-            encode_events("aaa", "ns", events)
+            encode_events("aaa", "ns", events).item
         );
     }
 
@@ -325,7 +335,7 @@ mod tests {
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000\n\
              jvm,metric_type=counter,token=aaa pool.committed=18874368 1597784400000000001",
-            encode_events("aaa", "ns", events)
+            encode_events("aaa", "ns", events).item
         );
     }
 

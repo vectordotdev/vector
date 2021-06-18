@@ -54,13 +54,6 @@ pub struct MergeFn {
     deep: Box<dyn Expression>,
 }
 
-// impl MergeFn {
-//     #[cfg(test)]
-//     pub fn new(to: Path, from: Box<dyn Expression>, deep: Option<Box<dyn Expression>>) -> Self {
-//         Self { to, from, deep }
-//     }
-// }
-
 impl Expression for MergeFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let mut to_value = self.to.resolve(ctx)?.try_object()?;

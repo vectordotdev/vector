@@ -1,8 +1,9 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    docker::{docker, DockerTlsConfig},
     event::merge_state::LogEventMergeState,
-    event::{self, Event, LogEvent, Value},
+    event::{self, Event, LogEvent, PathComponent, PathIter, Value},
     internal_events::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
@@ -18,28 +19,22 @@ use bollard::{
     errors::Error as DockerError,
     service::{ContainerInspectResponse, SystemEventsResponse},
     system::EventsOptions,
-    Docker, API_DEFAULT_VERSION,
+    Docker,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use http::uri::Uri;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use std::{
     future::ready,
-    path::PathBuf,
     pin::Pin,
     sync::Arc,
     time::Duration,
-    {collections::HashMap, convert::TryFrom, env},
+    {collections::HashMap, convert::TryFrom},
 };
 
 use tokio::sync::mpsc;
-
-// From bollard source.
-const DEFAULT_TIMEOUT: u64 = 120;
 
 const IMAGE: &str = "image";
 const CREATED_AT: &str = "container_created_at";
@@ -52,12 +47,7 @@ const MIN_HOSTNAME_LENGTH: usize = 6;
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
-}
-
-#[derive(Debug, Snafu)]
-enum Error {
-    #[snafu(display("URL has no host."))]
-    NoHost,
+    static ref CONSOLE: Bytes = "console".into();
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -75,14 +65,6 @@ pub struct DockerLogsConfig {
     auto_partial_merge: bool,
     multiline: Option<MultilineConfig>,
     retry_backoff_secs: u64,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct DockerTlsConfig {
-    ca_file: PathBuf,
-    crt_file: PathBuf,
-    key_file: PathBuf,
 }
 
 impl Default for DockerLogsConfig {
@@ -152,17 +134,11 @@ impl_generate_config_from_default!(DockerLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = DockerLogsSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
-            out,
-            shutdown.clone(),
+            cx.out,
+            cx.shutdown.clone(),
         )?;
 
         // Capture currently running containers, and do main future(run)
@@ -178,6 +154,7 @@ impl SourceConfig for DockerLogsConfig {
             }
         };
 
+        let shutdown = cx.shutdown;
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
         Ok(Box::pin(async move {
             Ok(tokio::select! {
@@ -207,14 +184,8 @@ struct DockerCompatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerCompatConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        self.config.build(_name, _globals, shutdown, out).await
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.config.build(cx).await
     }
 
     fn output_type(&self) -> DataType {
@@ -434,7 +405,7 @@ impl DockerLogsSource {
     async fn run(mut self) {
         loop {
             tokio::select! {
-                value = self.main_recv.next() => {
+                value = self.main_recv.recv() => {
                     match value {
                         Some(message) => {
                             match message {
@@ -547,7 +518,7 @@ impl EventStreamBuilder {
         let this = self.clone();
         tokio::spawn(async move {
             if let Some(duration) = backoff {
-                tokio::time::delay_for(duration).await;
+                tokio::time::sleep(duration).await;
             }
             match this
                 .core
@@ -605,13 +576,15 @@ impl EventStreamBuilder {
         // Create event streamer
         let mut partial_event_merge_state = None;
 
+        let core = Arc::clone(&self.core);
+
         let events_stream = stream
             .map(|value| {
                 match value {
                     Ok(message) => Ok(info.new_event(
                         message,
-                        self.core.config.partial_event_marker_field.clone(),
-                        self.core.config.auto_partial_merge,
+                        core.config.partial_event_marker_field.clone(),
+                        core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
                     )),
                     Err(error) => {
@@ -630,7 +603,6 @@ impl EventStreamBuilder {
                                 container_id: Some(info.id.as_str())
                             }),
                         };
-
                         Err(())
                     }
                 }
@@ -640,7 +612,7 @@ impl EventStreamBuilder {
             .take_until(self.shutdown.clone());
 
         let events_stream: Box<dyn Stream<Item = Event> + Unpin + Send> =
-            if let Some(ref line_agg_config) = self.core.line_agg_config {
+            if let Some(ref line_agg_config) = core.line_agg_config {
                 Box::new(line_agg_adapter(
                     events_stream,
                     line_agg::Logic::new(line_agg_config.clone()),
@@ -800,7 +772,8 @@ impl ContainerLogInfo {
         let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
             LogOutput::StdOut { message } => (STDOUT.clone(), message),
-            _ => return None,
+            LogOutput::Console { message } => (CONSOLE.clone(), message),
+            LogOutput::StdIn { message: _ } => return None,
         };
 
         let byte_size = bytes_message.len();
@@ -859,6 +832,13 @@ impl ContainerLogInfo {
             .unwrap_or(false)
         {
             bytes_message.truncate(bytes_message.len() - 1);
+            if bytes_message
+                .last()
+                .map(|&b| b as char == '\r')
+                .unwrap_or(false)
+            {
+                bytes_message.truncate(bytes_message.len() - 1);
+            }
             false
         } else {
             true
@@ -886,8 +866,13 @@ impl ContainerLogInfo {
             log_event.insert(CONTAINER, self.id.0.clone());
 
             // Labels.
-            for (key, value) in self.metadata.labels.iter() {
-                log_event.insert(key.clone(), value.clone());
+            if !self.metadata.labels.is_empty() {
+                let prefix_path = PathIter::new("label").collect::<Vec<_>>();
+                for (key, value) in self.metadata.labels.iter() {
+                    let mut path = prefix_path.clone();
+                    path.push(PathComponent::Key(key.clone()));
+                    log_event.insert_path(path, value.clone());
+                }
             }
 
             // Container name.
@@ -952,7 +937,8 @@ impl ContainerLogInfo {
 
         emit!(DockerLogsEventReceived {
             byte_size,
-            container_id: self.id.as_str()
+            container_id: self.id.as_str(),
+            container_name: &self.metadata.name_str
         });
 
         Some(event)
@@ -961,9 +947,11 @@ impl ContainerLogInfo {
 
 struct ContainerMetadata {
     /// label.key -> String
-    labels: Vec<(String, Value)>,
+    labels: HashMap<String, String>,
     /// name -> String
     name: Value,
+    /// name
+    name_str: String,
     /// image -> String
     image: Value,
     /// created_at
@@ -976,88 +964,15 @@ impl ContainerMetadata {
         let name = details.name.unwrap();
         let created = details.created.unwrap();
 
-        let labels = config
-            .labels
-            .as_ref()
-            .map(|map| {
-                map.iter()
-                    .map(|(key, value)| {
-                        (("label.".to_owned() + key), Value::from(value.to_owned()))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let labels = config.labels.unwrap_or_default();
 
         Ok(ContainerMetadata {
             labels,
             name: name.as_str().trim_start_matches('/').to_owned().into(),
+            name_str: name,
             image: config.image.unwrap().into(),
             created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })
-    }
-}
-
-// From bollard source, unfortunately they don't export this function.
-fn default_certs() -> Option<DockerTlsConfig> {
-    let from_env = env::var("DOCKER_CERT_PATH").or_else(|_| env::var("DOCKER_CONFIG"));
-    let base = match from_env {
-        Ok(path) => PathBuf::from(path),
-        Err(_) => dirs_next::home_dir()?.join(".docker"),
-    };
-    Some(DockerTlsConfig {
-        ca_file: base.join("ca.pem"),
-        key_file: base.join("key.pem"),
-        crt_file: base.join("cert.pem"),
-    })
-}
-
-fn get_authority(url: &str) -> Result<String, Error> {
-    url.parse::<Uri>()
-        .ok()
-        .and_then(|uri| uri.authority().map(<_>::to_string))
-        .ok_or(Error::NoHost)
-}
-
-fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
-    let host = host.or_else(|| env::var("DOCKER_HOST").ok());
-
-    match host {
-        None => Docker::connect_with_local_defaults().map_err(Into::into),
-
-        Some(host) => {
-            let scheme = host
-                .parse::<Uri>()
-                .ok()
-                .and_then(|uri| uri.into_parts().scheme);
-
-            match scheme.as_ref().map(|scheme| scheme.as_str()) {
-                Some("http") => {
-                    let host = get_authority(&host)?;
-                    Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
-                        .map_err(Into::into)
-                }
-                Some("https") => {
-                    let host = get_authority(&host)?;
-                    let tls = tls
-                        .or_else(default_certs)
-                        .ok_or(DockerError::NoCertPathError)?;
-                    Docker::connect_with_ssl(
-                        &host,
-                        &tls.key_file,
-                        &tls.crt_file,
-                        &tls.ca_file,
-                        DEFAULT_TIMEOUT,
-                        API_DEFAULT_VERSION,
-                    )
-                    .map_err(Into::into)
-                }
-                Some("unix") | Some("npipe") | None => {
-                    Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
-                        .map_err(Into::into)
-                }
-                Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
-            }
-        }
     }
 }
 
@@ -1125,8 +1040,7 @@ mod integration_tests {
         },
         image::{CreateImageOptions, ListImagesOptions},
     };
-    use futures::stream::TryStreamExt;
-    use tokio::sync::mpsc;
+    use futures::{channel::mpsc, stream::TryStreamExt, FutureExt};
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -1144,12 +1058,7 @@ mod integration_tests {
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
             config
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    sender,
-                )
+                .build(SourceContext::new_test(sender))
                 .await
                 .unwrap()
                 .await
@@ -1159,8 +1068,14 @@ mod integration_tests {
     }
 
     /// Users should ensure to remove container before exiting.
-    async fn log_container(name: &str, label: Option<&str>, log: &str, docker: &Docker) -> String {
-        cmd_container(name, label, vec!["echo", log], docker).await
+    async fn log_container(
+        name: &str,
+        label: Option<&str>,
+        log: &str,
+        docker: &Docker,
+        tty: bool,
+    ) -> String {
+        cmd_container(name, label, vec!["echo", log], docker, tty).await
     }
 
     /// Users should ensure to remove container before exiting.
@@ -1180,6 +1095,7 @@ mod integration_tests {
                 format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log).as_str(),
             ],
             docker,
+            false
         ).await
     }
 
@@ -1189,8 +1105,9 @@ mod integration_tests {
         label: Option<&str>,
         cmd: Vec<&str>,
         docker: &Docker,
+        tty: bool,
     ) -> String {
-        if let Some(id) = cmd_container_for_real(name, label, cmd, docker).await {
+        if let Some(id) = cmd_container_for_real(name, label, cmd, docker, tty).await {
             id
         } else {
             // Maybe a before created container is present
@@ -1208,6 +1125,7 @@ mod integration_tests {
         label: Option<&str>,
         cmd: Vec<&str>,
         docker: &Docker,
+        tty: bool,
     ) -> Option<String> {
         pull_busybox(docker).await;
 
@@ -1218,6 +1136,7 @@ mod integration_tests {
             image: Some("busybox"),
             cmd: Some(cmd),
             labels: label.map(|label| vec![(label, "")].into_iter().collect()),
+            tty: Some(tty),
             ..Default::default()
         };
 
@@ -1310,7 +1229,17 @@ mod integration_tests {
         log: &str,
         docker: &Docker,
     ) -> String {
-        let id = log_container(name, label, log, docker).await;
+        container_with_optional_tty_log_n(n, name, label, log, docker, false).await
+    }
+    async fn container_with_optional_tty_log_n(
+        n: usize,
+        name: &str,
+        label: Option<&str>,
+        log: &str,
+        docker: &Docker,
+        tty: bool,
+    ) -> String {
+        let id = log_container(name, label, log, docker, tty).await;
         for _ in 0..n {
             if let Err(error) = container_run(&id, docker).await {
                 container_remove(&id, docker).await;
@@ -1347,12 +1276,29 @@ mod integration_tests {
         id
     }
 
-    async fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> Result<bool, ()> {
-        match rx.try_recv() {
-            Ok(_) => Ok(false),
-            Err(mpsc::error::TryRecvError::Empty) => Ok(true),
-            Err(mpsc::error::TryRecvError::Closed) => Err(()),
-        }
+    fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> bool {
+        rx.next().now_or_never().is_none()
+    }
+
+    #[tokio::test]
+    async fn container_with_tty() {
+        trace_init();
+
+        let message = "log container_with_tty";
+        let name = "container_with_tty";
+
+        let out = source_with(&[name], None);
+
+        let docker = docker(None, None).unwrap();
+
+        let id = container_with_optional_tty_log_n(1, name, None, message, &docker, true).await;
+        let events = collect_n(out, 1).await;
+        container_remove(&id, &docker).await;
+
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            message.into()
+        );
     }
 
     #[tokio::test]
@@ -1455,7 +1401,7 @@ mod integration_tests {
         let id0 = container_log_n(1, &excluded0, None, "will not be read", &docker).await;
         let id1 = container_log_n(1, &included0, None, will_be_read, &docker).await;
         let id2 = container_log_n(1, &included1, None, will_be_read, &docker).await;
-        tokio::time::delay_for(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
         let events = collect_ready(out).await;
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
@@ -1571,7 +1517,7 @@ mod integration_tests {
         let id = container_log_n(1, name, None, message, &docker).await;
         container_remove(&id, &docker).await;
 
-        assert!(is_empty(exclude_out).await.unwrap());
+        assert!(is_empty(exclude_out));
     }
 
     #[tokio::test]
@@ -1600,7 +1546,42 @@ mod integration_tests {
         let _ = container_kill(&id, &docker).await;
         container_remove(&id, &docker).await;
 
-        assert!(is_empty(exclude_out).await.unwrap());
+        assert!(is_empty(exclude_out));
+    }
+
+    #[tokio::test]
+    async fn flat_labels() {
+        trace_init();
+
+        let message = "18";
+        let name = "vector_test_flat_labels";
+        let label = "vector.test.label.flat.labels";
+
+        let docker = docker(None, None).unwrap();
+        let id = running_container(name, Some(label), message, &docker).await;
+        let out = source_with(&[name], None);
+
+        let events = collect_n(out, 1).await;
+        let _ = container_kill(&id, &docker).await;
+        container_remove(&id, &docker).await;
+
+        let log = events[0].as_log();
+        assert_eq!(log[log_schema().message_key()], message.into());
+        assert_eq!(log[&*super::CONTAINER], id.into());
+        assert!(log.get(&*super::CREATED_AT).is_some());
+        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert!(log
+            .get("label")
+            .unwrap()
+            .as_map()
+            .unwrap()
+            .get(label)
+            .is_some());
+        assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert_eq!(
+            events[0].as_log()[log_schema().source_type_key()],
+            "docker".into()
+        );
     }
 
     #[tokio::test]
@@ -1662,7 +1643,7 @@ mod integration_tests {
             .collect::<Box<_>>()
             .join(" && ");
 
-        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker).await;
+        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
         if let Err(error) = container_run(&id, &docker).await {
             container_remove(&id, &docker).await;
             panic!("Container failed to start with error: {:?}", error);

@@ -4,7 +4,7 @@ use crate::{
     internal_events::aws_s3::source::{
         SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
         SqsMessageProcessingSucceeded, SqsMessageReceiveFailed, SqsMessageReceiveSucceeded,
-        SqsS3EventRecordInvalidEventIgnored,
+        SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -13,7 +13,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use codec::BytesDelimitedCodec;
-use futures::{SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
@@ -23,8 +23,8 @@ use rusoto_sqs::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
-use std::{future::ready, time::Duration};
-use tokio::time;
+use std::{cmp, future::ready, panic, sync::Arc};
+use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 
 lazy_static! {
@@ -32,32 +32,46 @@ lazy_static! {
         semver::VersionReq::parse("~2").unwrap();
 }
 
-#[derive(Derivative, Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Derivative, Clone, Debug, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
     pub(super) queue_url: String,
 
-    #[serde(default = "default_poll_interval_secs")]
-    #[derivative(Default(value = "default_poll_interval_secs()"))]
-    pub(super) poll_secs: u64,
+    // restricted to u32 for safe conversion to i64 later
+    #[serde(default = "default_poll_secs")]
+    #[derivative(Default(value = "default_poll_secs()"))]
+    pub(super) poll_secs: u32,
+
+    // restricted to u32 for safe conversion to i64 later
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
-    // restricted to u32 for safe conversion to i64 later
     pub(super) visibility_timeout_secs: u32,
+
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
+
+    // number of tasks spawned for running the SQS/S3 receive loop
+    #[serde(default = "default_client_concurrency")]
+    #[derivative(Default(value = "default_client_concurrency()"))]
+    pub(super) client_concurrency: u32,
 }
 
-const fn default_poll_interval_secs() -> u64 {
+const fn default_poll_secs() -> u32 {
     15
 }
 
 const fn default_visibility_timeout_secs() -> u32 {
     300
 }
+
 const fn default_true() -> bool {
     true
+}
+
+fn default_client_concurrency() -> u32 {
+    cmp::max(1, num_cpus::get() as u32)
 }
 
 #[derive(Debug, Snafu)]
@@ -113,7 +127,7 @@ pub enum ProcessingError {
     UnsupportedS3EventVersion { version: semver::Version },
 }
 
-pub(super) struct Ingestor {
+pub struct State {
     region: Region,
 
     s3_client: S3Client,
@@ -123,9 +137,14 @@ pub(super) struct Ingestor {
     compression: super::Compression,
 
     queue_url: String,
-    poll_interval: Duration,
+    poll_secs: u32,
+    client_concurrency: u32,
     visibility_timeout_secs: i64,
     delete_message: bool,
+}
+
+pub(super) struct Ingestor {
+    state: Arc<State>,
 }
 
 impl Ingestor {
@@ -139,7 +158,7 @@ impl Ingestor {
     ) -> Result<Ingestor, IngestorNewError> {
         let visibility_timeout_secs: i64 = config.visibility_timeout_secs.into();
 
-        Ok(Ingestor {
+        let state = Arc::new(State {
             region,
 
             s3_client,
@@ -149,33 +168,78 @@ impl Ingestor {
             multiline,
 
             queue_url: config.queue_url,
-            poll_interval: Duration::from_secs(config.poll_secs),
+            poll_secs: config.poll_secs,
+            client_concurrency: config.client_concurrency,
             visibility_timeout_secs,
             delete_message: config.delete_message,
-        })
+        });
+
+        Ok(Ingestor { state })
     }
 
     pub(super) async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-        time::interval(self.poll_interval)
-            .take_until(shutdown)
-            .for_each(|_| self.run_once(&out))
-            .await;
+        let mut handles = Vec::new();
+        for _ in 0..self.state.client_concurrency {
+            let process =
+                IngestorProcess::new(Arc::clone(&self.state), out.clone(), shutdown.clone());
+            let handle = tokio::spawn(async move { process.run().await });
+            handles.push(handle);
+        }
+
+        // Wait for all of the processes to finish.  If any one of them panics, we resume
+        // that panic here to properly shutdown Vector.
+        for handle in handles.drain(..) {
+            if let Err(e) = handle.await {
+                if e.is_panic() {
+                    panic::resume_unwind(e.into_panic());
+                }
+            }
+        }
 
         Ok(())
     }
+}
 
-    async fn run_once(&self, out: &Pipeline) {
-        let messages = self
-            .receive_messages()
-            .inspect_ok(|messages| {
+pub struct IngestorProcess {
+    state: Arc<State>,
+    out: Pipeline,
+    shutdown: ShutdownSignal,
+}
+
+impl IngestorProcess {
+    pub fn new(state: Arc<State>, out: Pipeline, shutdown: ShutdownSignal) -> Self {
+        Self {
+            state,
+            out,
+            shutdown,
+        }
+    }
+
+    async fn run(mut self) {
+        let shutdown = self.shutdown.clone().fuse();
+        pin!(shutdown);
+
+        loop {
+            select! {
+                _ = &mut shutdown => break,
+                _ = self.run_once() => {},
+            }
+        }
+    }
+
+    async fn run_once(&mut self) {
+        let messages = self.receive_messages().await;
+        let messages = messages
+            .map(|messages| {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
+                messages
             })
-            .inspect_err(|err| {
-                emit!(SqsMessageReceiveFailed { error: err });
+            .map_err(|err| {
+                emit!(SqsMessageReceiveFailed { error: &err });
+                err
             })
-            .await
             .unwrap_or_default();
 
         for message in messages {
@@ -195,12 +259,15 @@ impl Ingestor {
                 .clone()
                 .unwrap_or_else(|| "<unknown>".to_owned());
 
-            match self.handle_sqs_message(message, out.clone()).await {
+            match self.handle_sqs_message(message).await {
                 Ok(()) => {
                     emit!(SqsMessageProcessingSucceeded {
                         message_id: &message_id
                     });
-                    if self.delete_message {
+                    if self.state.delete_message {
+                        // TODO: SQS supports DeleteMessageBatch, so we could collapse this from 10
+                        // delete calls in serial to a single batch of 10 deletes.  not sure how
+                        // this would interact with E2E acknowledgements, though, in the future.
                         match self.delete_message(receipt_handle).await {
                             Ok(_) => {
                                 emit!(SqsMessageDeleteSucceeded {
@@ -226,34 +293,25 @@ impl Ingestor {
         }
     }
 
-    async fn handle_sqs_message(
-        &self,
-        message: Message,
-        out: Pipeline,
-    ) -> Result<(), ProcessingError> {
+    async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let s3_event: S3Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
             .context(InvalidSqsMessage {
                 message_id: message.message_id.unwrap_or_else(|| "<empty>".to_owned()),
             })?;
 
-        self.handle_s3_event(s3_event, out).await
+        self.handle_s3_event(s3_event).await
     }
 
-    async fn handle_s3_event(
-        &self,
-        s3_event: S3Event,
-        mut out: Pipeline,
-    ) -> Result<(), ProcessingError> {
+    async fn handle_s3_event(&mut self, s3_event: S3Event) -> Result<(), ProcessingError> {
         for record in s3_event.records {
-            self.handle_s3_event_record(record, &mut out).await?
+            self.handle_s3_event_record(record).await?
         }
         Ok(())
     }
 
     async fn handle_s3_event_record(
-        &self,
+        &mut self,
         s3_event: S3EventRecord,
-        out: &mut Pipeline,
     ) -> Result<(), ProcessingError> {
         let event_version: semver::Version = s3_event.event_version.clone().into();
         if !SUPPORTED_S3S_EVENT_VERSION.matches(&event_version) {
@@ -274,7 +332,7 @@ impl Ingestor {
 
         // S3 has to send notifications to a queue in the same region so I don't think this will
         // actually ever be hit unless messages are being forwarded from one queue to another
-        if self.region.name() != s3_event.aws_region {
+        if self.state.region.name() != s3_event.aws_region {
             return Err(ProcessingError::WrongRegion {
                 bucket: s3_event.s3.bucket.name.clone(),
                 key: s3_event.s3.object.key.clone(),
@@ -283,6 +341,7 @@ impl Ingestor {
         }
 
         let object = self
+            .state
             .s3_client
             .get_object(GetObjectRequest {
                 bucket: s3_event.s3.bucket.name.clone(),
@@ -308,7 +367,7 @@ impl Ingestor {
         match object.body {
             Some(body) => {
                 let object_reader = super::s3_object_decoder(
-                    self.compression,
+                    self.state.compression,
                     &s3_event.s3.object.key,
                     object.content_encoding.as_deref(),
                     object.content_type.as_deref(),
@@ -340,7 +399,7 @@ impl Ingestor {
                         .map(|r| r.expect("validated by take_while")),
                 );
 
-                let lines = match &self.multiline {
+                let lines = match &self.state.multiline {
                     Some(config) => Box::new(
                         LineAgg::new(
                             lines.map(|line| ((), line, ())),
@@ -351,7 +410,11 @@ impl Ingestor {
                     None => lines,
                 };
 
-                let stream = lines.filter_map(|line| {
+                let mut stream = lines.filter_map(|line| {
+                    emit!(SqsS3EventReceived {
+                        byte_size: line.len()
+                    });
+
                     let mut event = Event::from(line);
 
                     let log = event.as_mut_log();
@@ -369,13 +432,14 @@ impl Ingestor {
                     ready(Some(Ok(event)))
                 });
 
-                let mut send_error: Option<crate::pipeline::ClosedError> = None;
-                out.send_all(&mut Box::pin(stream))
-                    .await
-                    .map_err(|err| {
-                        send_error = Some(err);
-                    })
-                    .ok();
+                let send_error = match self.out.send_all(&mut stream).await {
+                    Ok(_) => None,
+                    Err(_) => Some(crate::pipeline::ClosedError),
+                };
+
+                // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
+                // so we explicitly drop it so that we can again utilize `read_error` below.
+                drop(stream);
 
                 read_error
                     .map(|error| {
@@ -401,12 +465,14 @@ impl Ingestor {
         }
     }
 
-    async fn receive_messages(&self) -> Result<Vec<Message>, RusotoError<ReceiveMessageError>> {
-        self.sqs_client
+    async fn receive_messages(&mut self) -> Result<Vec<Message>, RusotoError<ReceiveMessageError>> {
+        self.state
+            .sqs_client
             .receive_message(ReceiveMessageRequest {
-                queue_url: self.queue_url.clone(),
+                queue_url: self.state.queue_url.clone(),
                 max_number_of_messages: Some(10),
-                visibility_timeout: Some(self.visibility_timeout_secs),
+                visibility_timeout: Some(self.state.visibility_timeout_secs),
+                wait_time_seconds: Some(i64::from(self.state.poll_secs)),
                 ..Default::default()
             })
             .map_ok(|res| res.messages.unwrap_or_default())
@@ -414,12 +480,13 @@ impl Ingestor {
     }
 
     async fn delete_message(
-        &self,
+        &mut self,
         receipt_handle: String,
     ) -> Result<(), RusotoError<DeleteMessageError>> {
-        self.sqs_client
+        self.state
+            .sqs_client
             .delete_message(DeleteMessageRequest {
-                queue_url: self.queue_url.clone(),
+                queue_url: self.state.queue_url.clone(),
                 receipt_handle,
             })
             .await
@@ -556,5 +623,37 @@ struct S3Bucket {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct S3Object {
+    // S3ObjectKeys are URL encoded
+    // https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-content-structure.html
+    #[serde(with = "urlencoded_string")]
     key: String,
+}
+
+mod urlencoded_string {
+    use percent_encoding::{percent_decode, utf8_percent_encode};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        serde::de::Deserialize::deserialize(deserializer).and_then(|s| {
+            percent_decode(s)
+                .decode_utf8()
+                .map(Into::into)
+                .map_err(|err| {
+                    D::Error::custom(format!("error url decoding S3 object key: {}", err))
+                })
+        })
+    }
+
+    pub fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(
+            &utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).collect::<String>(),
+        )
+    }
 }

@@ -6,9 +6,9 @@ use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{GlobalOptions, TransformConfig},
+    event::Event,
     test_util::{collect_ready, runtime},
     transforms::{self, Transform},
-    Event,
 };
 
 fn bench_add_fields(c: &mut Criterion) {
@@ -17,7 +17,7 @@ fn bench_add_fields(c: &mut Criterion) {
     let key = "the key";
     let value = "this is the value";
 
-    let mut group = c.benchmark_group("lua_add_fields");
+    let mut group = c.benchmark_group("lua/add_fields");
     group.throughput(Throughput::Elements(1));
 
     let benchmarks: Vec<(&str, Transform)> = vec![
@@ -95,12 +95,12 @@ fn bench_field_filter(c: &mut Criterion) {
         })
         .collect::<Vec<_>>();
 
-    let mut group = c.benchmark_group("lua_field_filter");
+    let mut group = c.benchmark_group("lua/field_filter");
     group.throughput(Throughput::Elements(num_events));
 
     let benchmarks: Vec<(&str, Transform)> = vec![
         ("native", {
-            let mut rt = runtime();
+            let rt = runtime();
             rt.block_on(async move {
                 transforms::field_filter::FieldFilterConfig {
                     field: "the_field".to_string(),

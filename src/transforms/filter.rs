@@ -72,8 +72,26 @@ impl FunctionTransform for Filter {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::{
+        conditions::{is_log::IsLogConfig, ConditionConfig},
+        event::Event,
+        transforms::test::transform_one,
+    };
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::FilterConfig>();
+    }
+
+    #[test]
+    fn passes_metadata() {
+        let mut filter = Filter {
+            condition: IsLogConfig {}.build().unwrap(),
+        };
+        let event = Event::from("message");
+        let metadata = event.metadata().clone();
+        let result = transform_one(&mut filter, event).unwrap();
+        assert_eq!(result.metadata(), &metadata);
     }
 }

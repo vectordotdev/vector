@@ -1,13 +1,13 @@
-//! Health queries/subscriptions, for asserting a GraphQL API server is alive
+//! Health queries/subscriptions, for asserting a GraphQL API server is alive.
 
 use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
 
-/// Shorthand for a Chrono datetime, set to UTC
+/// Shorthand for a Chrono datetime, set to UTC.
 type DateTime = chrono::DateTime<chrono::Utc>;
 
 /// HealthQuery is generally used to assert that the GraphQL API server is alive.
-/// The `health` field returns true
+/// The `health` field returns true.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -19,7 +19,7 @@ pub struct HealthQuery;
 /// HeartbeatSubscription is a subscription that returns a 'heartbeat' in the form
 /// of a UTC timestamp. The use-case is allowing a client to assert that the server is
 /// sending regular payloads, by using the timestamp to determine when the last healthcheck
-/// was successful
+/// was successful.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -28,16 +28,16 @@ pub struct HealthQuery;
 )]
 pub struct HeartbeatSubscription;
 
-/// Extension methods for health queries
+/// Extension methods for health queries.
 #[async_trait]
 pub trait HealthQueryExt {
-    /// Executes a health query
+    /// Executes a health query.
     async fn health_query(&self) -> crate::QueryResult<HealthQuery>;
 }
 
 #[async_trait]
 impl HealthQueryExt for crate::Client {
-    /// Executes a health query
+    /// Executes a health query.
     async fn health_query(&self) -> crate::QueryResult<HealthQuery> {
         self.query::<HealthQuery>(&HealthQuery::build_query(health_query::Variables))
             .await
@@ -46,7 +46,7 @@ impl HealthQueryExt for crate::Client {
 
 /// Extension methods for health subscriptions
 pub trait HealthSubscriptionExt {
-    /// Executes a heartbeart subscription, on a millisecond `interval`
+    /// Executes a heartbeart subscription, on a millisecond `interval`.
     fn heartbeat_subscription(
         &self,
         interval: i64,
@@ -54,7 +54,7 @@ pub trait HealthSubscriptionExt {
 }
 
 impl HealthSubscriptionExt for crate::SubscriptionClient {
-    /// Executes a heartbeart subscription, on a millisecond `interval`
+    /// Executes a heartbeart subscription, on a millisecond `interval`.
     fn heartbeat_subscription(
         &self,
         interval: i64,

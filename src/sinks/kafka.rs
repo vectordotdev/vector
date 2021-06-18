@@ -2,14 +2,13 @@ use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     internal_events::TemplateRenderingFailed,
-    kafka::{KafkaAuthConfig, KafkaCompression},
+    kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsContext},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         BatchConfig,
     },
     template::{Template, TemplateParseError},
-    Event,
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
@@ -17,7 +16,7 @@ use futures::{
 };
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
-    error::{KafkaError, RDKafkaError},
+    error::{KafkaError, RDKafkaErrorCode},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
     ClientConfig,
 };
@@ -30,7 +29,8 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
+use vector_core::event::{Event, EventMetadata, EventStatus};
 
 // Maximum number of futures blocked by [send_result](https://docs.rs/rdkafka/0.24.0/rdkafka/producer/future_producer/struct.FutureProducer.html#method.send_result)
 const SEND_RESULT_LIMIT: usize = 5;
@@ -80,13 +80,22 @@ pub enum Encoding {
 }
 
 pub struct KafkaSink {
-    producer: Arc<FutureProducer>,
+    producer: Arc<FutureProducer<KafkaStatisticsContext>>,
     topic: Template,
     key_field: Option<String>,
     encoding: EncodingConfig<Encoding>,
-    delivery_fut: FuturesUnordered<BoxFuture<'static, (usize, Result<DeliveryFuture, KafkaError>)>>,
+    delivery_fut: FuturesUnordered<
+        BoxFuture<'static, (usize, Result<DeliveryFuture, KafkaError>, EventMetadata)>,
+    >,
     in_flight: FuturesUnordered<
-        BoxFuture<'static, (usize, Result<Result<(i32, i64), KafkaError>, Canceled>)>,
+        BoxFuture<
+            'static,
+            (
+                usize,
+                Result<Result<(i32, i64), KafkaError>, Canceled>,
+                EventMetadata,
+            ),
+        >,
     >,
 
     acker: Acker,
@@ -147,7 +156,8 @@ impl KafkaSinkConfig {
             .set("bootstrap.servers", &self.bootstrap_servers)
             .set("compression.codec", &to_string(self.compression))
             .set("socket.timeout.ms", &self.socket_timeout_ms.to_string())
-            .set("message.timeout.ms", &self.message_timeout_ms.to_string());
+            .set("message.timeout.ms", &self.message_timeout_ms.to_string())
+            .set("statistics.interval.ms", "1000");
 
         self.auth.apply(&mut client_config)?;
 
@@ -226,7 +236,9 @@ impl KafkaSinkConfig {
 impl KafkaSink {
     fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
-        let producer = producer_config.create().context(KafkaCreateFailed)?;
+        let producer = producer_config
+            .create_with_context(KafkaStatisticsContext)
+            .context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer: Arc::new(producer),
             topic: Template::try_from(config.topic).context(TopicTemplate)?,
@@ -244,7 +256,8 @@ impl KafkaSink {
     fn poll_delivery_fut(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         while !self.delivery_fut.is_empty() {
             let result = Pin::new(&mut self.delivery_fut).poll_next(cx);
-            let (seqno, result) = ready!(result).expect("`delivery_fut` is endless stream");
+            let (seqno, result, metadata) =
+                ready!(result).expect("`delivery_fut` is endless stream");
             self.in_flight.push(Box::pin(async move {
                 let result = match result {
                     Ok(fut) => {
@@ -254,7 +267,7 @@ impl KafkaSink {
                     Err(error) => Ok(Err(error)),
                 };
 
-                (seqno, result)
+                (seqno, result, metadata)
             }));
         }
 
@@ -289,11 +302,12 @@ impl Sink<Event> for KafkaSink {
         let timestamp_ms = match &item {
             Event::Log(log) => log
                 .get(log_schema().timestamp_key())
-                .and_then(|v| v.as_timestamp()),
-            Event::Metric(metric) => metric.data.timestamp.as_ref(),
+                .and_then(|v| v.as_timestamp())
+                .copied(),
+            Event::Metric(metric) => metric.timestamp(),
         }
         .map(|ts| ts.timestamp_millis());
-        let (key, body) = encode_event(item, &self.key_field, &self.encoding);
+        let (key, body, metadata) = encode_event(item, &self.key_field, &self.encoding);
 
         let seqno = self.seq_head;
         self.seq_head += 1;
@@ -313,17 +327,17 @@ impl Sink<Event> for KafkaSink {
                     // See item 4 on GitHub: https://github.com/timberio/vector/pull/101#issue-257150924
                     // https://docs.rs/rdkafka/0.24.0/src/rdkafka/producer/future_producer.rs.html#296
                     Err((error, future_record))
-                        if error == KafkaError::MessageProduction(RDKafkaError::QueueFull) =>
+                        if error == KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) =>
                     {
                         debug!(message = "The rdkafka queue full.", %error, %seqno, internal_log_rate_secs = 1);
                         record = future_record;
-                        delay_for(Duration::from_millis(10)).await;
+                        sleep(Duration::from_millis(10)).await;
                     }
                     Err((error, _)) => break Err(error),
                 }
             };
 
-            (seqno, result)
+            (seqno, result, metadata)
         }));
 
         Ok(())
@@ -335,13 +349,17 @@ impl Sink<Event> for KafkaSink {
         let this = Pin::into_inner(self);
         while !this.in_flight.is_empty() {
             match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
-                Some((seqno, Ok(result))) => {
+                Some((seqno, Ok(result), metadata)) => {
                     match result {
                         Ok((partition, offset)) => {
-                            trace!(message = "Produced message.", ?partition, ?offset)
+                            metadata.update_status(EventStatus::Delivered);
+                            trace!(message = "Produced message.", ?partition, ?offset);
                         }
-                        Err(error) => error!(message = "Kafka error.", %error),
-                    };
+                        Err(error) => {
+                            metadata.update_status(EventStatus::Errored);
+                            error!(message = "Kafka error.", %error);
+                        }
+                    }
 
                     this.pending_acks.insert(seqno);
 
@@ -352,8 +370,9 @@ impl Sink<Event> for KafkaSink {
                     }
                     this.acker.ack(num_to_ack);
                 }
-                Some((_, Err(Canceled))) => {
+                Some((_, Err(Canceled), metadata)) => {
                     error!(message = "Request canceled.");
+                    metadata.update_status(EventStatus::Errored);
                     return Poll::Ready(Err(()));
                 }
                 None => break,
@@ -402,7 +421,7 @@ fn encode_event(
     mut event: Event,
     key_field: &Option<String>,
     encoding: &EncodingConfig<Encoding>,
-) -> (Vec<u8>, Vec<u8>) {
+) -> (Vec<u8>, Vec<u8>, EventMetadata) {
     let key = key_field
         .as_ref()
         .and_then(|f| match &event {
@@ -416,7 +435,7 @@ fn encode_event(
 
     encoding.apply_rules(&mut event);
 
-    let body = match event {
+    let body = match &event {
         Event::Log(log) => match encoding.codec() {
             Encoding::Json => serde_json::to_vec(&log).unwrap(),
             Encoding::Text => log
@@ -430,7 +449,8 @@ fn encode_event(
         },
     };
 
-    (key, body)
+    let metadata = event.into_metadata();
+    (key, body, metadata)
 }
 
 #[cfg(test)]
@@ -449,7 +469,7 @@ mod tests {
         crate::test_util::trace_init();
         let key = "";
         let message = "hello world".to_string();
-        let (key_bytes, bytes) = encode_event(
+        let (key_bytes, bytes, _metadata) = encode_event(
             message.clone().into(),
             &None,
             &EncodingConfig::from(Encoding::Text),
@@ -467,7 +487,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         event.as_mut_log().insert("foo", "bar");
 
-        let (key, bytes) = encode_event(
+        let (key, bytes, _metadata) = encode_event(
             event,
             &Some("key".into()),
             &EncodingConfig::from(Encoding::Json),
@@ -488,7 +508,7 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.0 },
         );
-        let (key_bytes, bytes) = encode_event(
+        let (key_bytes, bytes, _metadata) = encode_event(
             metric.clone().into(),
             &None,
             &EncodingConfig::from(Encoding::Text),
@@ -505,7 +525,7 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.0 },
         );
-        let (key_bytes, bytes) = encode_event(
+        let (key_bytes, bytes, _metadata) = encode_event(
             metric.clone().into(),
             &None,
             &EncodingConfig::from(Encoding::Json),
@@ -524,7 +544,7 @@ mod tests {
         let mut event = Event::from("hello");
         event.as_mut_log().insert("key", "value");
 
-        let (key, bytes) = encode_event(
+        let (key, bytes, _metadata) = encode_event(
             event,
             &Some("key".into()),
             &EncodingConfig {
@@ -559,6 +579,7 @@ mod integration_test {
         Message, Offset, TopicPartitionList,
     };
     use std::{future::ready, thread, time::Duration};
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[tokio::test]
     async fn healthcheck() {
@@ -787,8 +808,10 @@ mod integration_test {
         let sink = KafkaSink::new(config, acker).unwrap();
 
         let num_events = 1000;
-        let (input, events) = random_lines_with_stream(100, num_events);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input, events) = random_lines_with_stream(100, num_events, Some(batch));
         events.map(Ok).forward(sink).await.unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();
@@ -798,18 +821,23 @@ mod integration_test {
         let _ = kafka_auth.apply(&mut client_config).unwrap();
 
         let mut tpl = TopicPartitionList::new();
-        tpl.add_partition(&topic, 0).set_offset(Offset::Beginning);
+        tpl.add_partition(&topic, 0)
+            .set_offset(Offset::Beginning)
+            .unwrap();
 
         let consumer: BaseConsumer = client_config.create().unwrap();
         consumer.assign(&tpl).unwrap();
 
         // wait for messages to show up
-        wait_for(|| {
-            let (_low, high) = consumer
-                .fetch_watermarks(&topic, 0, Duration::from_secs(3))
-                .unwrap();
-            ready(high > 0)
-        })
+        wait_for(
+            || match consumer.fetch_watermarks(&topic, 0, Duration::from_secs(3)) {
+                Ok((_low, high)) => ready(high > 0),
+                Err(err) => {
+                    println!("retrying due to error fetching watermarks: {}", err);
+                    ready(false)
+                }
+            },
+        )
         .await;
 
         // check we have the expected number of messages in the topic

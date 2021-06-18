@@ -1,12 +1,13 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedEvent, EncodedLength, TowerRequestConfig,
+        VecBuffer,
     },
 };
 use bytes::Bytes;
@@ -49,7 +50,7 @@ pub struct KinesisFirehoseSinkConfig {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    pub auth: AWSAuthentication,
+    pub auth: AwsAuthentication,
 }
 
 lazy_static! {
@@ -240,7 +241,7 @@ enum HealthcheckError {
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Record {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> EncodedEvent<Record> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     let data = match encoding.codec() {
@@ -254,7 +255,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Record
 
     let data = Bytes::from(data);
 
-    Record { data }
+    EncodedEvent::new(Record { data })
 }
 
 #[cfg(test)]
@@ -272,7 +273,7 @@ mod tests {
         let message = "hello world".to_string();
         let event = encode_event(message.clone().into(), &Encoding::Text.into());
 
-        assert_eq!(&event.data[..], message.as_bytes());
+        assert_eq!(&event.item.data[..], message.as_bytes());
     }
 
     #[test]
@@ -282,7 +283,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &Encoding::Json.into());
 
-        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&event.item.data[..]).unwrap();
 
         assert_eq!(
             map[&crate::config::log_schema().message_key().to_string()],
@@ -305,7 +306,7 @@ mod integration_tests {
     use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
     use rusoto_firehose::{CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration};
     use serde_json::{json, Value};
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn firehose_put_records() {
@@ -344,15 +345,15 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let mut sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
-        let (input, events) = random_events_with_stream(100, 100);
+        let (input, events) = random_events_with_stream(100, 100, None);
         let mut events = events.map(Ok);
 
         let _ = sink.send_all(&mut events).await.unwrap();
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+            auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
             endpoint: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()

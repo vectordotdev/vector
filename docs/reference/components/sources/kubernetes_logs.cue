@@ -153,6 +153,15 @@ components: sources: kubernetes_logs: {
 			required:    false
 			type: bool: default: true
 		}
+		ingestion_timestamp_field: {
+			common:      false
+			description: "The exact time the event was ingested into Vector."
+			required:    false
+			type: string: {
+				default: null
+				syntax:  "literal"
+			}
+		}
 		kube_config_file: {
 			common:      false
 			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
@@ -211,6 +220,24 @@ components: sources: kubernetes_logs: {
 				syntax: "literal"
 			}
 		}
+		max_line_bytes: {
+			common:      false
+			description: "The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
+			required:    false
+			type: uint: {
+				default: 32_768
+				unit:    "bytes"
+			}
+		}
+		glob_minimum_cooldown_ms: {
+			common:      false
+			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files within a single pod."
+			required:    false
+			type: uint: {
+				default: 1_000
+				unit:    "milliseconds"
+			}
+		}
 		timezone: configuration._timezone
 	}
 
@@ -266,7 +293,7 @@ components: sources: kubernetes_logs: {
 				}
 			}
 			"kubernetes.pod_labels": {
-				description: "Pod labels name."
+				description: "Set of labels attached to the Pod."
 				required:    false
 				common:      true
 				type: object: {
@@ -338,7 +365,9 @@ components: sources: kubernetes_logs: {
 					syntax: "literal"
 				}
 			}
-			timestamp: fields._current_timestamp
+			timestamp: fields._current_timestamp & {
+				description: "The exact time the event was processed by Kubernetes."
+			}
 		}
 	}
 
@@ -522,7 +551,7 @@ components: sources: kubernetes_logs: {
 				Vector is tested extensively against Kubernetes. In addition to Kubernetes
 				being Vector's most popular installation method, Vector implements a
 				comprehensive end-to-end test suite for all minor Kubernetes versions starting
-				with `1.14.
+				with `1.15`.
 				"""
 		}
 
@@ -556,9 +585,19 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
+		k8s_reflector_desyncs_total:            components.sources.internal_metrics.output.metrics.k8s_reflector_desyncs_total
+		k8s_state_ops_total:                    components.sources.internal_metrics.output.metrics.k8s_state_ops_total
+		k8s_stream_chunks_processed_total:      components.sources.internal_metrics.output.metrics.k8s_stream_chunks_processed_total
+		k8s_stream_processed_bytes_total:       components.sources.internal_metrics.output.metrics.k8s_stream_processed_bytes_total
+		k8s_watch_requests_invoked_total:       components.sources.internal_metrics.output.metrics.k8s_watch_requests_invoked_total
+		k8s_watch_requests_failed_total:        components.sources.internal_metrics.output.metrics.k8s_watch_requests_failed_total
+		k8s_watch_stream_failed_total:          components.sources.internal_metrics.output.metrics.k8s_watch_stream_failed_total
+		k8s_watch_stream_items_obtained_total:  components.sources.internal_metrics.output.metrics.k8s_watch_stream_items_obtained_total
+		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
 		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
 	}

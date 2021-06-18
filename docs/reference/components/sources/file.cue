@@ -40,7 +40,14 @@ components: sources: file: {
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
 		}
-		requirements: []
+		requirements: [
+			"""
+				The `vector` process must have the ability to read the files
+				listed in `include` and execute any of the parent directories
+				for these files. Please see [File
+				permissions](#file-permissions) for more details.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
@@ -50,6 +57,7 @@ components: sources: file: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		exclude: {
 			common:      false
 			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"
@@ -291,7 +299,7 @@ components: sources: file: {
 				currently will not attempt to make further reads from a file for
 				which it has already stored a checkpoint in a previous run. For
 				this reason, users should take care to allow Vector to fully
-				process anycompressed files before shutting the process down or moving the
+				process any compressed files before shutting the process down or moving the
 				files to another location on disk.
 				"""
 		}
@@ -539,9 +547,49 @@ components: sources: file: {
 				starting read position of a file.
 				"""
 		}
+
+		permissions: {
+			title: "File permissions"
+			body:  """
+				To be able to source events from the files, Vector must be able
+				to read the files and execute their parent directories.
+
+				If you have deployed Vector as using one our distributed
+				packages, then you will find Vector running as the `vector`
+				user. You should ensure this user has read access to the desired
+				files used as `include`. Strategies for this include:
+
+				* Create a new unix group, make it the group owner of the
+				  target files, with read access, and  add `vector` to that
+				  group
+				* Use [POSIX ACLs](\(urls.posix_acls)) to grant access to the
+				  files to the `vector` user
+				* Grant the `CAP_DAC_READ_SEARCH` [Linux
+				  capability](\(urls.linux_capability)]. This capability
+				  bypasses the file system permissions checks to allow
+				  Vector to read any file. This is not recommended as it gives
+				  Vector more permissions than it requires, but it is
+				  recommended over running Vector as `root` which would grant it
+				  even broader permissions. This can be granted via SystemD by
+				  creating an override file using `systemctl edit vector` and
+				  adding:
+
+				  ```
+				  AmbientCapabilities=CAP_DAC_READ_SEARCH
+				  CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+				  ```
+
+				On Debian-based distributions, the `vector` user is
+				automatically added to the [`adm`
+				group](\(urls.debian_system_groups)), if it exists, which has
+				permissions to read `/var/log`.
+				"""
+		}
+
 	}
 
 	telemetry: metrics: {
+		events_in_total:               components.sources.internal_metrics.output.metrics.events_in_total
 		checkpoint_write_errors_total: components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
 		checkpoints_total:             components.sources.internal_metrics.output.metrics.checkpoints_total
 		checksum_errors_total:         components.sources.internal_metrics.output.metrics.checksum_errors_total

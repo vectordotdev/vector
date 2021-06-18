@@ -2,14 +2,15 @@ use super::{
     errors::{Parse, RequestError},
     handlers,
     models::{FirehoseRequest, FirehoseResponse},
+    Compression,
 };
 use crate::{
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
     Pipeline,
 };
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::Utc;
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use snafu::ResultExt;
 use std::{convert::Infallible, io};
 use warp::{http::StatusCode, Filter};
@@ -17,6 +18,7 @@ use warp::{http::StatusCode, Filter};
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
     access_key: Option<String>,
+    record_compression: Compression,
     out: Pipeline,
 ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
     warp::post()
@@ -37,6 +39,7 @@ pub fn firehose(
                 .untuple_one(),
         )
         .and(parse_body())
+        .and(warp::any().map(move || record_compression))
         .and(warp::any().map(move || out.clone()))
         .and_then(handlers::firehose)
         .recover(handle_firehose_rejection)
@@ -55,7 +58,7 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
             |encoding: Option<String>, request_id: String, body: Bytes| async move {
                 match encoding {
                     Some(s) if s == "gzip" => {
-                        Ok(Box::new(GzDecoder::new(body.reader())) as Box<dyn io::Read>)
+                        Ok(Box::new(MultiGzDecoder::new(body.reader())) as Box<dyn io::Read>)
                     }
                     Some(s) => Err(warp::reject::Rejection::from(
                         RequestError::UnsupportedEncoding {

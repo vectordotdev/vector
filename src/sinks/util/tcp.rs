@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     dns,
+    event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
         TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
@@ -11,13 +12,12 @@ use crate::{
         util::{
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
-            SinkBuildError, StreamSink,
+            EncodedEvent, SinkBuildError, StreamSink,
         },
         Healthcheck, VectorSink,
     },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
-    Event,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -32,7 +32,11 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::{io::AsyncRead, net::TcpStream, time::delay_for};
+use tokio::{
+    io::{AsyncRead, ReadBuf},
+    net::TcpStream,
+    time::sleep,
+};
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -82,7 +86,7 @@ impl TcpSinkConfig {
     pub fn build(
         &self,
         cx: SinkContext,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -178,7 +182,7 @@ impl TcpConnector {
                 }
                 Err(error) => {
                     emit!(TcpSocketConnectionFailed { error });
-                    delay_for(backoff.next().unwrap()).await;
+                    sleep(backoff.next().unwrap()).await;
                 }
             }
         }
@@ -192,14 +196,14 @@ impl TcpConnector {
 struct TcpSink {
     connector: TcpConnector,
     acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    encode_event: Arc<dyn Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync>,
 }
 
 impl TcpSink {
     fn new(
         connector: TcpConnector,
         acker: Acker,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
     ) -> Self {
         Self {
             connector,
@@ -228,9 +232,11 @@ impl TcpSink {
         // If this returns `Poll::Pending` we know the connection is still
         // valid and the write will most likely succeed.
         let mut cx = Context::from_waker(noop_waker_ref());
-        match Pin::new(stream).poll_read(&mut cx, &mut [0u8; 1]) {
+        let mut buf = [0u8; 1];
+        let mut buf = ReadBuf::new(&mut buf);
+        match Pin::new(stream).poll_read(&mut cx, &mut buf) {
             Poll::Ready(Err(error)) => ShutdownCheck::Error(error),
-            Poll::Ready(Ok(0)) => {
+            Poll::Ready(Ok(())) if buf.filled().is_empty() => {
                 // Maybe this is only a sign to close the channel,
                 // in which case we should try to flush our buffers
                 // before disconnecting.
@@ -248,14 +254,17 @@ impl StreamSink for TcpSink {
         // connection only when we have something to send.
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
-            .map(|event| encode_event(event).unwrap_or_else(Bytes::new))
+            .map(|event| encode_event(event).unwrap_or_else(|| EncodedEvent::new(Bytes::new())))
             .peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink.send_all_peekable(&mut input).await {
+            let result = match sink
+                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
+                .await
+            {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };

@@ -35,7 +35,7 @@ fn disable_metrics_tracing_integration() {
 
 #[inline]
 fn boot() {
-    vector::trace::init(false, false, "warn");
+    vector::trace::init(false, false, "warn", false);
     vector::metrics::init().expect("metrics initialization failed");
 }
 
@@ -50,9 +50,9 @@ pub enum Mode {
 impl Mode {
     fn as_str(&self) -> &'static str {
         match self {
-            Mode::MetricsOff => "metrics_off",
-            Mode::MetricsNoTracingIntegration => "metrics_no_tracing_integration",
-            Mode::MetricsOn => "metrics_on",
+            Mode::MetricsOff => "metrics/off",
+            Mode::MetricsNoTracingIntegration => "metrics/no_tracing_integration",
+            Mode::MetricsOn => "metrics/on",
         }
     }
 }
@@ -142,7 +142,7 @@ fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
                             ),
                         );
 
-                        let mut rt = runtime();
+                        let rt = runtime();
                         let (output_lines, topology) = rt.block_on(async move {
                             let output_lines = CountReceiver::receive_lines(out_addr);
                             let (topology, _crash) =
@@ -153,7 +153,7 @@ fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
 
                         (input_lines, rt, topology, output_lines)
                     },
-                    |(input_lines, mut rt, topology, output_lines)| {
+                    |(input_lines, rt, topology, output_lines)| {
                         rt.block_on(async move {
                             let sends = stream::iter(input_lines)
                                 .map(|lines| send_lines(in_addr, lines))

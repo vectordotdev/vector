@@ -11,6 +11,7 @@ use std::time::Instant;
 pub struct PrometheusEventReceived {
     pub byte_size: usize,
     pub count: usize,
+    pub uri: http::Uri,
 }
 
 impl InternalEvent for PrometheusEventReceived {
@@ -19,8 +20,14 @@ impl InternalEvent for PrometheusEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("processed_events_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!(
+            "events_in_total", self.count as u64,
+            "uri" => format!("{}",self.uri),
+        );
+        counter!(
+            "processed_bytes_total", self.byte_size as u64,
+            "uri" => format!("{}",self.uri),
+        );
     }
 }
 
@@ -37,7 +44,7 @@ impl InternalEvent for PrometheusRequestCompleted {
 
     fn emit_metrics(&self) {
         counter!("requests_completed_total", 1);
-        histogram!("request_duration_nanoseconds", self.end - self.start);
+        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 

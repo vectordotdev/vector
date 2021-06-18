@@ -125,7 +125,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
             log.insert(
                 $name.into(),
                 match get_value!($name, $parser).into() {
-                    Value::Bytes(bytes) if bytes == &"-" => Value::Null,
+                    Value::Bytes(bytes) if bytes == "-" => Value::Null,
                     value => value,
                 },
             )
@@ -156,11 +156,23 @@ fn parse_log(mut input: &str) -> Result<Value> {
     field_parse!("sent_bytes", '0'..='9' | '-', i64);
     let request = get_value!("request", take_quoted1);
     let mut iter = request.splitn(2, ' ');
-    log.insert("request_method".to_owned(), iter.next().unwrap().into()); // split always have at least 1 item
+    log.insert(
+        "request_method".to_owned(),
+        match iter.next().unwrap().into() {
+            Value::Bytes(bytes) if bytes == "-" => Value::Null,
+            value => value,
+        },
+    ); // split always have at least 1 item
     match iter.next() {
         Some(value) => {
             let mut iter = value.rsplitn(2, ' ');
-            log.insert("request_protocol".into(), iter.next().unwrap().into()); // same as previous one
+            log.insert(
+                "request_protocol".to_owned(),
+                match iter.next().unwrap().into() {
+                    Value::Bytes(bytes) if bytes == "-" => Value::Null,
+                    value => value,
+                },
+            ); // same as previous one
             match iter.next() {
                 Some(value) => log.insert("request_url".into(), value.into()),
                 None => return Err("failed to get field `request_url`".into()),
@@ -185,11 +197,11 @@ fn parse_log(mut input: &str) -> Result<Value> {
     field_raw!("error_reason", take_quoted1);
     field_raw!(
         "target_port_list",
-        take_list(|c| matches!(c, '0'..='9' | '.' | ':' | '-'))
+        take_maybe_quoted_list(|c| matches!(c, '0'..='9' | '.' | ':' | '-'))
     );
     field_raw!(
         "target_status_code_list",
-        take_list(|c| matches!(c, '0'..='9'))
+        take_maybe_quoted_list(|c| matches!(c, '0'..='9'))
     );
     field_raw!("classification", take_quoted1);
     field_raw!("classification_reason", take_quoted1);
@@ -226,17 +238,21 @@ fn until_quote(input: &str) -> SResult<String> {
     Err(nom::Err::Incomplete(nom::Needed::Unknown))
 }
 
-fn take_list(cond: impl Fn(char) -> bool) -> impl FnOnce(&str) -> SResult<Vec<&str>> {
-    move |input: &str| {
-        alt((
-            map_res(tag(r#" "-""#), |_| {
-                Ok::<_, std::convert::Infallible>(vec![])
-            }),
-            map_res(preceded(char(' '), take_while1(cond)), |v: &str| {
-                Ok::<_, std::convert::Infallible>(vec![v])
-            }),
-        ))(input)
-    }
+fn take_maybe_quoted_list<'a>(
+    cond: impl Fn(char) -> bool + Clone,
+) -> impl FnOnce(&'a str) -> SResult<Vec<&'a str>> {
+    alt((
+        map_res(tag(r#" "-""#), |_| {
+            Ok::<_, std::convert::Infallible>(vec![])
+        }),
+        map_res(
+            delimited(tag(" \""), take_while1(cond.clone()), char('"')),
+            |v: &str| Ok::<_, std::convert::Infallible>(vec![v]),
+        ),
+        map_res(preceded(char(' '), take_while1(cond)), |v: &str| {
+            Ok::<_, std::convert::Infallible>(vec![v])
+        }),
+    ))
 }
 
 #[cfg(test)]
@@ -497,6 +513,114 @@ mod tests {
                              trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                              type: "http",
                              user_agent: "curl/7.46.0"})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        eight {
+            args: func_args![value: r#"https 2021-03-16T20:20:00.135052Z app/awseb-AWSEB-1MVD8OW91UMOH/a32a5528b8fdaa6b 10.209.14.140:50599 10.119.5.47:80 0.001 0.052 0.000 200 200 589 2084 "POST https://test.domain.com:443/api/deposits/transactions:search?detailsLevel=FULL&offset=0&limit=50 HTTP/1.1" "User 1.0" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:us-east-1:755269215481:targetgroup/awseb-AWSEB-91MZX0WA1A0F/5a03cc723870f039 "Root=1-605112f0-31f367be4fd3da651daa4157" "some.domain.com" "arn:aws:acm:us-east-1:765229915481:certificate/d8450a8a-b4f6-4714-8535-17c625c36899" 0 2021-03-16T20:20:00.081000Z "waf,forward" "-" "-" "10.229.5.47:80" "200" "-" "-""#],
+            want: Ok(value!({type: "https",
+                             timestamp: "2021-03-16T20:20:00.135052Z",
+                             elb: "app/awseb-AWSEB-1MVD8OW91UMOH/a32a5528b8fdaa6b",
+                             client_host: "10.209.14.140:50599",
+                             target_host: "10.119.5.47:80",
+                             request_processing_time: 0.001,
+                             target_processing_time: 0.052,
+                             response_processing_time: 0.0,
+                             elb_status_code: "200",
+                             target_status_code: "200",
+                             received_bytes: 589,
+                             sent_bytes: 2084,
+                             request_method: "POST",
+                             request_url: "https://test.domain.com:443/api/deposits/transactions:search?detailsLevel=FULL&offset=0&limit=50",
+                             request_protocol: "HTTP/1.1",
+                             user_agent: "User 1.0",
+                             ssl_cipher: "ECDHE-RSA-AES128-GCM-SHA256",
+                             ssl_protocol: "TLSv1.2",
+                             target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:755269215481:targetgroup/awseb-AWSEB-91MZX0WA1A0F/5a03cc723870f039",
+                             trace_id: "Root=1-605112f0-31f367be4fd3da651daa4157",
+                             domain_name: "some.domain.com",
+                             chosen_cert_arn: "arn:aws:acm:us-east-1:765229915481:certificate/d8450a8a-b4f6-4714-8535-17c625c36899",
+                             matched_rule_priority: "0",
+                             request_creation_time: "2021-03-16T20:20:00.081000Z",
+                             actions_executed: "waf,forward",
+                             redirect_url: null,
+                             error_reason: null,
+                             target_port_list: ["10.229.5.47:80"],
+                             target_status_code_list: ["200"],
+                             classification: null,
+                             classification_reason: null})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        nine {
+            args: func_args![value: r#"http 2021-03-17T18:54:14.216357Z app/awseb-AWSEB-1KGU6EBAG3FAD/7f0dc2b05788640f 113.241.19.90:15070 - -1 -1 -1 400 - 0 272 "- http://awseb-awseb-1kgu6fbag3fad-640112591.us-east-1.elb.amazonaws.com:80- -" "-" - - - "-" "-" "-" - 2021-03-17T18:54:13.967000Z "-" "-" "-" "-" "-" "-" "-""#],
+            want: Ok(value!({type: "http",
+                             timestamp: "2021-03-17T18:54:14.216357Z",
+                             elb: "app/awseb-AWSEB-1KGU6EBAG3FAD/7f0dc2b05788640f",
+                             client_host: "113.241.19.90:15070",
+                             target_host: null,
+                             request_processing_time: (-1.0),
+                             target_processing_time: (-1.0),
+                             response_processing_time: (-1.0),
+                             elb_status_code: "400",
+                             target_status_code: null,
+                             received_bytes: 0,
+                             sent_bytes: 272,
+                             request_method: null,
+                             request_url: "http://awseb-awseb-1kgu6fbag3fad-640112591.us-east-1.elb.amazonaws.com:80-",
+                             request_protocol: null,
+                             user_agent: null,
+                             ssl_cipher: null,
+                             ssl_protocol: null,
+                             target_group_arn: null,
+                             trace_id: null,
+                             domain_name: null,
+                             chosen_cert_arn: null,
+                             matched_rule_priority: null,
+                             request_creation_time: "2021-03-17T18:54:13.967000Z",
+                             actions_executed: null,
+                             redirect_url: null,
+                             error_reason: null,
+                             target_port_list: [],
+                             target_status_code_list: [],
+                             classification: null,
+                             classification_reason: null})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        ten {
+            args: func_args![value: r#"http 2021-03-18T04:00:26.920977Z app/awseb-AWSEB-1KGU6EBAG3FAD/7f0dc2b05788640f 31.211.20.175:57720 - -1 -1 -1 400 - 191 272 "POST http://awseb-awseb-1kgu6fbag3fad-640112591.us-east-1.elb.amazonaws.com:80/cgi-bin/login.cgi HTTP/1.1" "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0" - - - "-" "-" "-" - 2021-03-18T04:00:26.599000Z "-" "-" "-" "-" "-" "-" "-""#],
+            want: Ok(value!({type: "http",
+                             timestamp: "2021-03-18T04:00:26.920977Z",
+                             elb: "app/awseb-AWSEB-1KGU6EBAG3FAD/7f0dc2b05788640f",
+                             client_host: "31.211.20.175:57720",
+                             target_host: null,
+                             request_processing_time: (-1.0),
+                             target_processing_time: (-1.0),
+                             response_processing_time: (-1.0),
+                             elb_status_code: "400",
+                             target_status_code: null,
+                             received_bytes: 191,
+                             sent_bytes: 272,
+                             request_method: "POST",
+                             request_url: "http://awseb-awseb-1kgu6fbag3fad-640112591.us-east-1.elb.amazonaws.com:80/cgi-bin/login.cgi",
+                             request_protocol: "HTTP/1.1",
+                             user_agent: "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0",
+                             ssl_cipher: null,
+                             ssl_protocol: null,
+                             target_group_arn: null,
+                             trace_id: null,
+                             domain_name: null,
+                             chosen_cert_arn: null,
+                             matched_rule_priority: null,
+                             request_creation_time: "2021-03-18T04:00:26.599000Z",
+                             actions_executed: null,
+                             redirect_url: null,
+                             error_reason: null,
+                             target_port_list: [],
+                             target_status_code_list: [],
+                             classification: null,
+                             classification_reason: null})),
             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
         }
     ];

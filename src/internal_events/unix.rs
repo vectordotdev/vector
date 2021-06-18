@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use std::{io::Error, path::Path};
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
@@ -59,5 +60,21 @@ where
 
     fn emit_metrics(&self) {
         counter!("connection_errors_total", 1, "mode" => "unix");
+    }
+}
+
+#[derive(Debug)]
+pub struct UnixSocketFileDeleteFailed<'a> {
+    pub path: &'a Path,
+    pub error: Error,
+}
+
+impl<'a> InternalEvent for UnixSocketFileDeleteFailed<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Failed in deleting unix socket file.",
+            path = %self.path.display(),
+            error = %self.error,
+        );
     }
 }

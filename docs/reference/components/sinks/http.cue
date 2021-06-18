@@ -19,8 +19,7 @@ components: sinks: http: {
 			batch: {
 				enabled:      true
 				common:       true
-				max_bytes:    1049000
-				max_events:   null
+				max_bytes:    10485760
 				timeout_secs: 1
 			}
 			compression: {

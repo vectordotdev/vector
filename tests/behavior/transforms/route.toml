@@ -2,12 +2,12 @@
   inputs = ["ignored"]
   type = "route"
   [transforms.foo.route.first]
-    type = "remap"
+    type = "vrl"
     source = '''
       .message == "test swimlane 1"
     '''
   [transforms.foo.route.second]
-    type = "remap"
+    type = "vrl"
     source = '''
       .message == "test swimlane 2"
     '''
@@ -31,7 +31,7 @@
   [[tests.outputs]]
     extract_from = "foo.first"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "test swimlane 1"
       '''
@@ -39,7 +39,7 @@
   [[tests.outputs]]
     extract_from = "bar"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "test swimlane 1"
         .new_field == "new field added"
@@ -48,7 +48,7 @@
   [[tests.outputs]]
     extract_from = "foo.third"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "test swimlane 1"
       '''
@@ -64,7 +64,7 @@
   [[tests.outputs]]
     extract_from = "foo.second"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "test swimlane 2"
       '''
@@ -72,7 +72,7 @@
   [[tests.outputs]]
     extract_from = "foo.third"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "test swimlane 2"
       '''

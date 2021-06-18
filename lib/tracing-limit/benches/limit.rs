@@ -4,7 +4,7 @@ extern crate tracing;
 #[macro_use]
 extern crate criterion;
 
-use criterion::{black_box, Criterion};
+use criterion::{black_box, BenchmarkId, Criterion};
 use std::{
     fmt,
     sync::{Mutex, MutexGuard},
@@ -17,33 +17,35 @@ use tracing_subscriber::layer::{Context, Layer};
 const INPUTS: &[usize] = &[1, 100, 500, 1000];
 
 fn bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("No Limit");
+    let mut group = c.benchmark_group("tracing-limit");
     for input in INPUTS {
-        group.bench_with_input(input.to_string(), input, |b, n| {
-            let sub = tracing_subscriber::registry::Registry::default().with(
-                RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::from("")))),
-            );
-            let n = black_box(n);
-            tracing::subscriber::with_default(sub, || {
-                b.iter(|| {
-                    for _ in 0..*n {
-                        info!(
-                            message = "Hello world!",
-                            foo = "foo",
-                            bar = "bar",
-                            baz = 3,
-                            quuux = ?0.99,
-                        )
-                    }
-                })
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("none", input.to_string()),
+            input,
+            |b, n| {
+                let sub = tracing_subscriber::registry::Registry::default().with(
+                    RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::from("")))),
+                );
+                let n = black_box(n);
+                tracing::subscriber::with_default(sub, || {
+                    b.iter(|| {
+                        for _ in 0..*n {
+                            info!(
+                                message = "Hello world!",
+                                foo = "foo",
+                                bar = "bar",
+                                baz = 3,
+                                quuux = ?0.99,
+                            )
+                        }
+                    })
+                });
+            },
+        );
     }
-    group.finish();
 
-    let mut group = c.benchmark_group("Limit 5 seconds");
     for input in INPUTS {
-        group.bench_with_input(input.to_string(), input, |b, n| {
+        group.bench_with_input(BenchmarkId::new("5s", input.to_string()), input, |b, n| {
             let sub = tracing_subscriber::registry::Registry::default().with(
                 RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::from("")))),
             );

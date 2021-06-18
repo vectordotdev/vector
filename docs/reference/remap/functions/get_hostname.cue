@@ -7,7 +7,9 @@ remap: functions: get_hostname: {
 		"""
 
 	arguments: []
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+		"Internal hostname resolution failed.",
+	]
 	return: types: ["string"]
 
 	examples: [

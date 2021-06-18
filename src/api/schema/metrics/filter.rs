@@ -1,4 +1,4 @@
-use super::{ProcessedBytesTotal, ProcessedEventsTotal};
+use super::{EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal};
 use crate::{
     event::{Event, Metric, MetricValue},
     metrics::{capture_metrics, get_controller, Controller},
@@ -6,31 +6,46 @@ use crate::{
 use async_stream::stream;
 use lazy_static::lazy_static;
 use std::{collections::BTreeMap, sync::Arc};
-use tokio::{
-    stream::{Stream, StreamExt},
-    time::Duration,
-};
+use tokio::time::Duration;
+use tokio_stream::{Stream, StreamExt};
 
 lazy_static! {
     static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =
         Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
 }
 
-/// Sums an iteratable of `Metric`, by folding metric values. Convenience function typically
+/// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically
 /// used to get aggregate metrics.
 fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Metric> {
     let mut iter = metrics.into_iter();
     let m = iter.next()?;
 
-    Some(iter.fold(m.clone(), |mut m1, m2| {
-        m1.data.update(&m2.data);
-        m1
-    }))
+    Some(iter.fold(
+        m.clone(),
+        |mut m1, m2| {
+            if m1.update(&m2) {
+                m1
+            } else {
+                m2.clone()
+            }
+        },
+    ))
+}
+
+/// Sums an iteratable of `Metric`, by folding metric values. Convenience function typically
+/// used to get aggregate metrics.
+fn sum_metrics_owned<I: IntoIterator<Item = Metric>>(metrics: I) -> Option<Metric> {
+    let mut iter = metrics.into_iter();
+    let m = iter.next()?;
+
+    Some(iter.fold(m, |mut m1, m2| if m1.update(&m2) { m1 } else { m2 }))
 }
 
 pub trait MetricsFilter<'a> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
     fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal>;
+    fn events_in_total(&self) -> Option<EventsInTotal>;
+    fn events_out_total(&self) -> Option<EventsOutTotal>;
 }
 
 impl<'a> MetricsFilter<'a> for Vec<Metric> {
@@ -44,6 +59,18 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
         let sum = sum_metrics(self.iter().filter(|m| m.name() == "processed_bytes_total"))?;
 
         Some(ProcessedBytesTotal::new(sum))
+    }
+
+    fn events_in_total(&self) -> Option<EventsInTotal> {
+        let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_in_total"))?;
+
+        Some(EventsInTotal::new(sum))
+    }
+
+    fn events_out_total(&self) -> Option<EventsOutTotal> {
+        let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_out_total"))?;
+
+        Some(EventsOutTotal::new(sum))
     }
 }
 
@@ -66,6 +93,26 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
         )?;
 
         Some(ProcessedBytesTotal::new(sum))
+    }
+
+    fn events_in_total(&self) -> Option<EventsInTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "events_in_total")
+                .copied(),
+        )?;
+
+        Some(EventsInTotal::new(sum))
+    }
+
+    fn events_out_total(&self) -> Option<EventsOutTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "events_out_total")
+                .copied(),
+        )?;
+
+        Some(EventsOutTotal::new(sum))
     }
 }
 
@@ -129,26 +176,17 @@ pub fn component_counter_metrics(
     get_all_metrics(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
-            .filter_map(|m| match m.tag_value("component_name") {
-                Some(name) => Some((name, m)),
-                _ => None,
-            })
+            .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
             .fold(BTreeMap::new(), |mut map, (name, m)| {
                 map.entry(name).or_insert_with(Vec::new).push(m);
                 map
             })
             .into_iter()
             .filter_map(|(name, metrics)| {
-                let mut iter = metrics.into_iter();
-                let mut m = iter.next()?;
-                m = iter.fold(m, |mut m1, m2| {
-                    m1.data.update(&m2.data);
-                    m1
-                });
-
-                match m.data.value {
+                let m = sum_metrics_owned(metrics)?;
+                match m.value() {
                     MetricValue::Counter { value }
-                        if cache.insert(name, value).unwrap_or(0.00) < value =>
+                        if cache.insert(name, *value).unwrap_or(0.00) < *value =>
                     {
                         Some(m)
                     }
@@ -169,10 +207,10 @@ pub fn counter_throughput(
 
     get_metrics(interval)
         .filter(filter_fn)
-        .filter_map(move |m| match m.data.value {
-            MetricValue::Counter { value } if value > last => {
+        .filter_map(move |m| match m.value() {
+            MetricValue::Counter { value } if *value > last => {
                 let throughput = value - last;
-                last = value;
+                last = *value;
                 Some((m, throughput))
             }
             _ => None,
@@ -193,26 +231,17 @@ pub fn component_counter_throughputs(
         .map(move |m| {
             m.into_iter()
                 .filter(filter_fn)
-                .filter_map(|m| match m.tag_value("component_name") {
-                    Some(name) => Some((name, m)),
-                    _ => None,
-                })
+                .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
                 .fold(BTreeMap::new(), |mut map, (name, m)| {
                     map.entry(name).or_insert_with(Vec::new).push(m);
                     map
                 })
                 .into_iter()
                 .filter_map(|(name, metrics)| {
-                    let mut iter = metrics.into_iter();
-                    let mut m = iter.next()?;
-                    m = iter.fold(m, |mut m1, m2| {
-                        m1.data.update(&m2.data);
-                        m1
-                    });
-
-                    match m.data.value {
+                    let m = sum_metrics_owned(metrics)?;
+                    match m.value() {
                         MetricValue::Counter { value } => {
-                            let last = cache.insert(name, value).unwrap_or(0.00);
+                            let last = cache.insert(name, *value).unwrap_or(0.00);
                             let throughput = value - last;
                             Some((m, throughput))
                         }

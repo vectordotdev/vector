@@ -1,13 +1,13 @@
 use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
         encoding::EncodingConfigWithDefault, http::RequestConfig, BatchConfig, Compression,
         TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
-    Event,
 };
 use futures::{
     future::{self, BoxFuture},
@@ -148,7 +148,7 @@ mod tests {
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, events) = random_lines_with_stream(100, 10);
+        let (expected, events) = random_lines_with_stream(100, 10, None);
         sink.run(events).await.unwrap();
 
         let output = rx.next().await.unwrap();

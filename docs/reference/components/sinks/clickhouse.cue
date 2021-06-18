@@ -19,8 +19,7 @@ components: sinks: clickhouse: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    1049000
-				max_events:   null
+				max_bytes:    10485760
 				timeout_secs: 1
 			}
 			compression: {
@@ -121,6 +120,12 @@ components: sinks: clickhouse: {
 				examples: ["mytable"]
 				syntax: "literal"
 			}
+		}
+		skip_unknown_fields: {
+			common:      true
+			description: "Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema."
+			required:    false
+			type: bool: default: false
 		}
 	}
 

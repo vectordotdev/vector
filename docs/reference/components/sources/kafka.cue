@@ -79,45 +79,56 @@ components: sources: kafka: {
 		}
 		key_field: {
 			common:      true
-			description: "The log field name to use for the Kafka message key. If unspecified, the key would not be added to the log event. If the message has null key, then this field would not be added to the log event."
+			description: "The log field name to use for the Kafka message key."
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "message_key"
 				examples: ["message_key"]
 				syntax: "literal"
 			}
 		}
 		topic_key: {
 			common:      false
-			description: "The log field name to use for the Kafka topic. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka topic."
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "topic"
 				examples: ["topic"]
 				syntax: "literal"
 			}
 		}
 		partition_key: {
 			common:      false
-			description: "The log field name to use for the Kafka partition name. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka partition name."
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "partition"
 				examples: ["partition"]
 				syntax: "literal"
 			}
 		}
 		offset_key: {
 			common:      false
-			description: "The log field name to use for the Kafka offset. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka offset."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "offset"
+				examples: ["offset"]
+				syntax: "literal"
+			}
+		}
+		headers_key: {
+			common:      false
+			description: "The log field name to use for the Kafka headers."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["offset"]
+				examples: ["headers"]
 				syntax: "literal"
 			}
 		}
@@ -238,10 +249,21 @@ components: sources: kafka: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
 		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
 		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		kafka_queue_messages:                 components.sources.internal_metrics.output.metrics.kafka_queue_messages
+		kafka_queue_messages_bytes:           components.sources.internal_metrics.output.metrics.kafka_queue_messages_bytes
+		kafka_requests_total:                 components.sources.internal_metrics.output.metrics.kafka_requests_total
+		kafka_requests_bytes_total:           components.sources.internal_metrics.output.metrics.kafka_requests_bytes_total
+		kafka_responses_total:                components.sources.internal_metrics.output.metrics.kafka_responses_total
+		kafka_responses_bytes_total:          components.sources.internal_metrics.output.metrics.kafka_responses_bytes_total
+		kafka_produced_messages_total:        components.sources.internal_metrics.output.metrics.kafka_produced_messages_total
+		kafka_produced_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_produced_messages_bytes_total
+		kafka_consumed_messages_total:        components.sources.internal_metrics.output.metrics.kafka_consumed_messages_total
+		kafka_consumed_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_consumed_messages_bytes_total
 	}
 
 	how_it_works: components._kafka.how_it_works

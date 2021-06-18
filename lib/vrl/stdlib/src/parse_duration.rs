@@ -11,7 +11,7 @@ lazy_static! {
             \A
             (?P<value>[0-9]*\.?[0-9]+) # value: integer or float
             \s?                        # optional space between value and unit
-            (?P<unit>[a-z]{1,2})       # unit: one or two letters
+            (?P<unit>[µa-z]{1,2})      # unit: one or two letters
             \z"
     )
     .unwrap();
@@ -164,9 +164,16 @@ mod tests {
             tdef: TypeDef::new().fallible().float(),
         }
 
-        error_us {
+        us_ms {
+            args: func_args![value: "1 µs",
+                             unit: "ms"],
+            want: Ok(0.001),
+            tdef: TypeDef::new().fallible().float(),
+        }
+
+        error_invalid {
             args: func_args![value: "foo",
-                             unit: "µs"],
+                             unit: "ms"],
             want: Err("unable to parse duration: 'foo'"),
             tdef: TypeDef::new().fallible().float(),
         }

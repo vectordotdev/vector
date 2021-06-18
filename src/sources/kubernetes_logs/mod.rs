@@ -5,21 +5,25 @@
 
 #![deny(missing_docs)]
 
-use crate::event::Event;
+use crate::event::{Event, LogEvent};
 use crate::internal_events::{
     FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
     KubernetesLogsEventReceived,
 };
 use crate::kubernetes as k8s;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext, SourceDescription,
+    },
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
-    Pipeline,
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
+use file_source::{
+    Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
+    ReadFrom,
+};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
@@ -69,6 +73,9 @@ pub struct Config {
     #[serde(default = "crate::serde::default_true")]
     auto_partial_merge: bool,
 
+    /// Override global data_dir
+    data_dir: Option<PathBuf>,
+
     /// Specifies the field names for metadata annotation.
     annotation_fields: pod_metadata_annotator::FieldsSpec,
 
@@ -81,6 +88,11 @@ pub struct Config {
     /// the files.
     #[serde(default = "default_max_read_bytes")]
     max_read_bytes: usize,
+
+    /// The maximum number of a bytes a line can contain before being discarded. This protects
+    /// against malformed lines or tailing incorrect files.
+    #[serde(default = "default_max_line_bytes")]
+    max_line_bytes: usize,
 
     /// This value specifies not exactly the globbing, but interval
     /// between the polling the files to watch from the `paths_provider`.
@@ -125,15 +137,9 @@ const COMPONENT_NAME: &str = "kubernetes_logs";
 #[async_trait::async_trait]
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
-    async fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source> {
-        let source = Source::new(self, globals, name)?;
-        Ok(Box::pin(source.run(out, shutdown).map(|result| {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let source = Source::new(self, &cx.globals, &cx.name)?;
+        Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
             })
@@ -159,6 +165,7 @@ struct Source {
     label_selector: String,
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
+    max_line_bytes: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
@@ -175,7 +182,7 @@ impl Source {
         };
         let client = k8s::client::Client::new(k8s_config)?;
 
-        let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), name)?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = config
@@ -203,6 +210,7 @@ impl Source {
             label_selector,
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
+            max_line_bytes: config.max_line_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
@@ -223,6 +231,7 @@ impl Source {
             label_selector,
             exclude_paths,
             max_read_bytes,
+            max_line_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             timezone,
@@ -251,12 +260,7 @@ impl Source {
 
         // TODO: maybe more of the parameters have to be configurable.
 
-        // The 16KB is the maximum size of the payload at single line for both
-        // docker and CRI log formats.
-        // We take a double of that to account for metadata and padding, and to
-        // have a power of two rounding. Line splitting is countered at the
-        // parsers, see the `partial_events_merger` logic.
-        let max_line_bytes = 32 * 1024; // 32 KiB
+        let checkpointer = Checkpointer::new(&data_dir);
         let file_server = FileServer {
             // Use our special paths provider.
             paths_provider,
@@ -276,8 +280,8 @@ impl Source {
             // be other, more sound ways for users considering the use of this
             // option to solve their use case, so take consideration.
             ignore_before: None,
-            // Max line length to expect during regular log reads, see the
-            // explanation above.
+            // The maximum number of a bytes a line can contain before being discarded. This
+            // protects against malformed lines or tailing incorrect files.
             max_line_bytes,
             // Delimiter bytes that is used to read the file line-by-line
             line_delimiter: Bytes::from("\n"),
@@ -313,23 +317,33 @@ impl Source {
             handle: tokio::runtime::Handle::current(),
         };
 
-        let (file_source_tx, file_source_rx) =
-            futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
         let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
+        let checkpoints = checkpointer.view();
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
-        let events = events.map(move |(bytes, file)| {
+        let events = events.map(move |line| {
+            let byte_size = line.text.len();
+            let mut event = create_event(
+                line.text,
+                &line.filename,
+                ingestion_timestamp_field.as_deref(),
+            );
+            let file_info = annotator.annotate(&mut event, &line.filename);
+
             emit!(KubernetesLogsEventReceived {
-                file: &file,
-                byte_size: bytes.len(),
+                file: &line.filename,
+                byte_size,
+                pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
-            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
-            if annotator.annotate(&mut event, &file).is_none() {
+            if file_info.is_none() {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
+
+            checkpoints.update(line.file_id, line.offset);
             event
         });
         let events = events.flat_map(move |event| {
@@ -357,12 +371,11 @@ impl Source {
         }
         {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
-                match result {
+            let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
+                .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
                     Err(error) => error!(message = "File server exited with an error.", %error),
-                }
-            });
+                });
             slot.bind(Box::pin(fut));
         }
         {
@@ -395,25 +408,23 @@ impl Source {
 }
 
 fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
-    let mut event = Event::from(line);
+    let mut event = LogEvent::from(line);
 
     // Add source type.
-    event.as_mut_log().insert(
+    event.insert(
         crate::config::log_schema().source_type_key(),
         COMPONENT_NAME.to_owned(),
     );
 
     // Add file.
-    event.as_mut_log().insert(FILE_KEY, file.to_owned());
+    event.insert(FILE_KEY, file.to_owned());
 
     // Add ingestion timestamp if requested.
     if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event
-            .as_mut_log()
-            .insert(ingestion_timestamp_field, chrono::Utc::now());
+        event.insert(ingestion_timestamp_field, chrono::Utc::now());
     }
 
-    event
+    event.into()
 }
 
 /// This function returns the default value for `self_node_name` variable
@@ -426,8 +437,21 @@ fn default_max_read_bytes() -> usize {
     2048
 }
 
+fn default_max_line_bytes() -> usize {
+    // NOTE: The below comment documents an incorrect assumption, see
+    // https://github.com/timberio/vector/issues/6967
+    //
+    // The 16KB is the maximum size of the payload at single line for both
+    // docker and CRI log formats.
+    // We take a double of that to account for metadata and padding, and to
+    // have a power of two rounding. Line splitting is countered at the
+    // parsers, see the `partial_events_merger` logic.
+
+    32 * 1024 // 32 KiB
+}
+
 fn default_glob_minimum_cooldown_ms() -> usize {
-    60000
+    5000
 }
 
 /// This function construct the effective field selector to use, based on

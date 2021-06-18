@@ -1,4 +1,3 @@
-#[cfg(unix)]
 use crate::udp;
 use crate::{
     event::Event,
@@ -27,7 +26,6 @@ pub struct UdpConfig {
     max_length: usize,
     #[get = "pub"]
     host_key: Option<String>,
-    #[cfg(unix)]
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
 }
@@ -42,7 +40,6 @@ impl UdpConfig {
             address,
             max_length: default_max_length(),
             host_key: None,
-            #[cfg(unix)]
             receive_buffer_bytes: None,
         }
     }
@@ -52,23 +49,23 @@ pub fn udp(
     address: SocketAddr,
     max_length: usize,
     host_key: String,
-    #[cfg(unix)] receive_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: Option<usize>,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
 
     Box::pin(async move {
-        let mut socket = UdpSocket::bind(&address)
+        let socket = UdpSocket::bind(&address)
             .await
             .expect("Failed to bind to udp listener socket");
 
-        #[cfg(unix)]
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
+            }
         }
 
-        #[cfg(unix)]
         let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
             std::cmp::min(max_length, receive_buffer_bytes)
         } else {

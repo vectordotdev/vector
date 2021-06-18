@@ -30,18 +30,21 @@ impl InternalEvent for RemapMappingError {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct RemapConditionExecutionError;
+#[derive(Debug)]
+pub struct RemapMappingAbort {
+    /// If set to true, the remap transform has dropped the event after an abort
+    /// during mapping. This internal event will reflect that in its messaging.
+    pub event_dropped: bool,
+}
 
-impl InternalEvent for RemapConditionExecutionError {
+impl InternalEvent for RemapMappingAbort {
     fn emit_logs(&self) {
-        warn!(
-            message = "Remap condition execution failed.",
-            internal_log_rate_secs = 120
-        )
-    }
+        let message = if self.event_dropped {
+            "Event mapping aborted; discarding event."
+        } else {
+            "Event mapping aborted."
+        };
 
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
+        debug!(message, internal_log_rate_secs = 30)
     }
 }

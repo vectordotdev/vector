@@ -8,14 +8,14 @@ use crate::{
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
-            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
             statistic::{validate_quantiles, DistributionStatistic},
-            BatchConfig, BatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -33,22 +33,22 @@ use std::{
 use tower::Service;
 
 #[derive(Clone)]
-struct InfluxDBSvc {
-    config: InfluxDBConfig,
+struct InfluxDbSvc {
+    config: InfluxDbConfig,
     protocol_version: ProtocolVersion,
     inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct InfluxDBConfig {
+pub struct InfluxDbConfig {
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
     pub endpoint: String,
     #[serde(flatten)]
-    pub influxdb1_settings: Option<InfluxDB1Settings>,
+    pub influxdb1_settings: Option<InfluxDb1Settings>,
     #[serde(flatten)]
-    pub influxdb2_settings: Option<InfluxDB2Settings>,
+    pub influxdb2_settings: Option<InfluxDb2Settings>,
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
@@ -72,19 +72,19 @@ lazy_static! {
 
 // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
 #[derive(Debug, Clone, PartialEq, Serialize)]
-struct InfluxDBRequest {
+struct InfluxDbRequest {
     series: Vec<String>,
 }
 
 inventory::submit! {
-    SinkDescription::new::<InfluxDBConfig>("influxdb_metrics")
+    SinkDescription::new::<InfluxDbConfig>("influxdb_metrics")
 }
 
-impl_generate_config_from_default!(InfluxDBConfig);
+impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
-impl SinkConfig for InfluxDBConfig {
+impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
@@ -95,7 +95,7 @@ impl SinkConfig for InfluxDBConfig {
             client.clone(),
         )?;
         validate_quantiles(&self.quantiles)?;
-        let sink = InfluxDBSvc::new(self.clone(), cx, client)?;
+        let sink = InfluxDbSvc::new(self.clone(), cx, client)?;
         Ok((sink, healthcheck))
     }
 
@@ -108,9 +108,9 @@ impl SinkConfig for InfluxDBConfig {
     }
 }
 
-impl InfluxDBSvc {
+impl InfluxDbSvc {
     pub fn new(
-        config: InfluxDBConfig,
+        config: InfluxDbConfig,
         cx: SinkContext,
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
@@ -133,7 +133,7 @@ impl InfluxDBSvc {
 
         let http_service = HttpBatchService::new(client, create_build_request(uri, token));
 
-        let influxdb_http_service = InfluxDBSvc {
+        let influxdb_http_service = InfluxDbSvc {
             config,
             protocol_version,
             inner: http_service,
@@ -148,14 +148,20 @@ impl InfluxDBSvc {
                 batch.timeout,
                 cx.acker(),
             )
-            .with_flat_map(move |event: Event| stream::iter(normalizer.apply(event).map(Ok)))
+            .with_flat_map(move |event: Event| {
+                stream::iter(
+                    normalizer
+                        .apply(event)
+                        .map(|metric| Ok(EncodedEvent::new(metric))),
+                )
+            })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
         Ok(VectorSink::Sink(Box::new(sink)))
     }
 }
 
-impl Service<Vec<Metric>> for InfluxDBSvc {
+impl Service<Vec<Metric>> for InfluxDbSvc {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -199,13 +205,12 @@ fn merge_tags(
     event: &Metric,
     tags: Option<&HashMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
-    match (&event.series.tags, tags) {
-        (Some(ref event_tags), Some(ref config_tags)) => {
-            let mut event_tags = event_tags.clone();
+    match (event.tags().cloned(), tags) {
+        (Some(mut event_tags), Some(ref config_tags)) => {
             event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(event_tags)
         }
-        (Some(ref event_tags), None) => Some(event_tags.clone()),
+        (Some(event_tags), None) => Some(event_tags),
         (None, Some(config_tags)) => Some(
             config_tags
                 .iter()
@@ -220,7 +225,7 @@ pub struct InfluxMetricNormalize;
 
 impl MetricNormalize for InfluxMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match (metric.data.kind, &metric.data.value) {
+        match (metric.kind(), &metric.value()) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
             (_, MetricValue::Counter { .. }) => state.make_incremental(metric),
@@ -242,9 +247,9 @@ fn encode_events(
     let mut output = String::new();
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
-        let ts = encode_timestamp(event.data.timestamp);
+        let ts = encode_timestamp(event.timestamp());
         let tags = merge_tags(&event, tags);
-        let (metric_type, fields) = get_type_and_fields(event.data.value, &quantiles);
+        let (metric_type, fields) = get_type_and_fields(event.value(), &quantiles);
 
         if let Err(error) = influx_line_protocol(
             protocol_version,
@@ -265,12 +270,12 @@ fn encode_events(
 }
 
 fn get_type_and_fields(
-    value: MetricValue,
+    value: &MetricValue,
     quantiles: &[f64],
 ) -> (&'static str, Option<HashMap<String, Field>>) {
     match value {
-        MetricValue::Counter { value } => ("counter", Some(to_fields(value))),
-        MetricValue::Gauge { value } => ("gauge", Some(to_fields(value))),
+        MetricValue::Counter { value } => ("counter", Some(to_fields(*value))),
+        MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
         MetricValue::Set { values } => ("set", Some(to_fields(values.len() as f64))),
         MetricValue::AggregatedHistogram {
             buckets,
@@ -286,8 +291,8 @@ fn get_type_and_fields(
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(count));
-            fields.insert("sum".to_owned(), Field::Float(sum));
+            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
+            fields.insert("sum".to_owned(), Field::Float(*sum));
 
             ("histogram", Some(fields))
         }
@@ -305,8 +310,8 @@ fn get_type_and_fields(
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(count));
-            fields.insert("sum".to_owned(), Field::Float(sum));
+            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
+            fields.insert("sum".to_owned(), Field::Float(*sum));
 
             ("summary", Some(fields))
         }
@@ -360,7 +365,7 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<InfluxDBConfig>();
+        crate::test_util::test_generate_config::<InfluxDbConfig>();
     }
 
     #[test]
@@ -435,7 +440,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -474,7 +479,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -513,7 +518,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -552,7 +557,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -592,7 +597,7 @@ mod tests {
                 "requests",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                    samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                     statistic: StatisticKind::Histogram,
                 },
             )
@@ -717,7 +722,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 0, 2.0 => 0],
+                samples: vector_core::samples![1.0 => 0, 2.0 => 0],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -735,7 +740,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )
@@ -831,28 +836,48 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         event::metric::{Metric, MetricKind, MetricValue},
+        event::Event,
         http::HttpClient,
         sinks::influxdb::{
-            metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
-            test_util::{cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG, TOKEN},
-            InfluxDB1Settings, InfluxDB2Settings,
+            metrics::{default_summary_quantiles, InfluxDbConfig, InfluxDbSvc},
+            test_util::{
+                cleanup_v1, format_timestamp, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG,
+                TOKEN,
+            },
+            InfluxDb1Settings, InfluxDb2Settings,
         },
         tls::{self, TlsOptions},
-        Event,
     };
-    use chrono::Utc;
+    use chrono::{SecondsFormat, Utc};
     use futures::stream;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test]
-    async fn insert_metrics_over_https() {
+    async fn inserts_metrics_v1_over_https() {
+        insert_metrics_v1(
+            "https://localhost:8087",
+            Some(TlsOptions {
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            }),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn inserts_metrics_v1_over_http() {
+        insert_metrics_v1("http://localhost:8086", None).await
+    }
+
+    async fn insert_metrics_v1(url: &str, tls: Option<TlsOptions>) {
         crate::test_util::trace_init();
-        let database = onboarding_v1("https://localhost:8087").await;
+        let database = onboarding_v1(url).await;
 
         let cx = SinkContext::new_test();
 
-        let config = InfluxDBConfig {
-            endpoint: "https://localhost:8087".to_string(),
-            influxdb1_settings: Some(InfluxDB1Settings {
+        let config = InfluxDbConfig {
+            endpoint: url.to_string(),
+            influxdb1_settings: Some(InfluxDb1Settings {
                 consistency: None,
                 database: database.clone(),
                 retention_policy_name: Some("autogen".to_string()),
@@ -862,10 +887,7 @@ mod integration_tests {
             influxdb2_settings: None,
             batch: Default::default(),
             request: Default::default(),
-            tls: Some(TlsOptions {
-                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-                ..Default::default()
-            }),
+            tls,
             quantiles: default_summary_quantiles(),
             tags: None,
             default_namespace: None,
@@ -873,16 +895,9 @@ mod integration_tests {
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run(stream::iter(events.clone())).await.unwrap();
 
-        let res = query_v1(
-            "https://localhost:8087",
-            &format!("show series on {}", database),
-        )
-        .await;
-        let string = res.text().await.unwrap();
-        let res: serde_json::Value =
-            serde_json::from_str(&string).expect("error when parsing InfluxDB response JSON");
+        let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
         //
         // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
@@ -905,10 +920,45 @@ mod integration_tests {
                 .as_array()
                 .unwrap()
                 .len(),
-            10
+            events.len()
         );
 
-        cleanup_v1("https://localhost:8087", &database).await;
+        for event in events {
+            let metric = event.into_metric();
+            let name = format!("{}.{}", metric.namespace().unwrap(), metric.name());
+            let value = match metric.value() {
+                MetricValue::Counter { value } => *value,
+                _ => unreachable!(),
+            };
+            let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
+            let res =
+                query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
+
+            assert_eq!(
+                res,
+                serde_json::json! {
+                    {"results": [{
+                        "statement_id": 0,
+                        "series": [{
+                            "name": name,
+                            "columns": ["time", "metric_type", "production", "region", "value"],
+                            "values": [[timestamp, "counter", "true", "us-west-1", value as isize]]
+                        }]
+                    }]}
+                }
+            );
+        }
+
+        cleanup_v1(url, &database).await;
+    }
+
+    async fn query_v1_json(url: &str, query: &str) -> serde_json::Value {
+        let string = query_v1(url, query)
+            .await
+            .text()
+            .await
+            .expect("Fetching text from InfluxDB query failed");
+        serde_json::from_str(&string).expect("Error when parsing InfluxDB response JSON")
     }
 
     #[tokio::test]
@@ -918,10 +968,10 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let config = InfluxDBConfig {
+        let config = InfluxDbConfig {
             endpoint: "http://localhost:9999".to_string(),
             influxdb1_settings: None,
-            influxdb2_settings: Some(InfluxDB2Settings {
+            influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
                 token: TOKEN.to_string(),
@@ -957,7 +1007,7 @@ mod integration_tests {
         }
 
         let client = HttpClient::new(None).unwrap();
-        let sink = InfluxDBSvc::new(config, cx, client).unwrap();
+        let sink = InfluxDbSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
@@ -1036,7 +1086,8 @@ mod integration_tests {
                 ]
                 .into_iter()
                 .collect(),
-            )),
+            ))
+            .with_timestamp(Some(Utc::now())),
         )
     }
 }

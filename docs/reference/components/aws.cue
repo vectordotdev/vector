@@ -146,7 +146,7 @@ components: _aws: {
 			description: "The AWS session token. Used for AWS authentication when communicating with AWS services."
 			type: string: {
 				default: null
-				examples: ["/path/to/credentials.json"]
+				examples: ["AQoEXAMPLEH4aoAH0gNCAPy...truncated...zrkuWJOgQs8IZZaIv2BXIa2R4Olgk"]
 				syntax: "literal"
 			}
 		}

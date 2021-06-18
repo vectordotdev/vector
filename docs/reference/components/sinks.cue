@@ -19,7 +19,7 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							if features.send.batch.max_bytes != null {
+							if features.send.batch.max_bytes != _|_ {
 								max_bytes: {
 									common:      true
 									description: "The maximum size of a batch, in bytes, before it is flushed."
@@ -30,7 +30,7 @@ components: sinks: [Name=string]: {
 									}
 								}
 							}
-							if features.send.batch.max_events != null {
+							if features.send.batch.max_events != _|_ {
 								max_events: {
 									common:      true
 									description: "The maximum size of a batch, in events, before it is flushed."
@@ -93,7 +93,13 @@ components: sinks: [Name=string]: {
 								default: "memory"
 								enum: {
 									memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
-									disk:   "Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."
+									disk: """
+									Stores the sink's buffer on disk. This is less performant, but durable.
+									Data will not be lost between restarts.
+									Will also hold data in memory to enhance performance.
+									WARNING: This may stall the sink if disk performance isn't on par with the throughput.
+									For comparison, AWS gp2 volumes are usually too slow for common cases.
+									"""
 								}
 								syntax: "literal"
 							}
@@ -161,9 +167,9 @@ components: sinks: [Name=string]: {
 							}
 						}
 
-						if features.healthcheck.enabled {except_fields: {
+						except_fields: {
 							common:      false
-							description: "Prevent the sink from encoding the specified labels."
+							description: "Prevent the sink from encoding the specified fields."
 							required:    false
 							type: array: {
 								default: null
@@ -174,31 +180,30 @@ components: sinks: [Name=string]: {
 							}
 						}
 
-							only_fields: {
-								common:      false
-								description: "Prevent the sink from encoding the specified labels."
-								required:    false
-								type: array: {
-									default: null
-									items: type: string: {
-										examples: ["message", "parent.child"]
-										syntax: "field_path"
-									}
+						only_fields: {
+							common:      false
+							description: "Makes the sink encode only the specified fields."
+							required:    false
+							type: array: {
+								default: null
+								items: type: string: {
+									examples: ["message", "parent.child"]
+									syntax: "field_path"
 								}
 							}
+						}
 
-							timestamp_format: {
-								common:      false
-								description: "How to format event timestamps."
-								required:    false
-								type: string: {
-									default: "rfc3339"
-									enum: {
-										rfc3339: "Formats as a RFC3339 string"
-										unix:    "Formats as a unix timestamp"
-									}
-									syntax: "literal"
+						timestamp_format: {
+							common:      false
+							description: "How to format event timestamps."
+							required:    false
+							type: string: {
+								default: "rfc3339"
+								enum: {
+									rfc3339: "Formats as a RFC3339 string"
+									unix:    "Formats as a unix timestamp"
 								}
+								syntax: "literal"
 							}
 						}
 					}
@@ -408,8 +413,18 @@ components: sinks: [Name=string]: {
 				if features.send.batch != _|_ {
 					if features.send.batch.enabled {
 						buffers_batches: {
+							_parameter: string
+							if features.send.batch.max_bytes != _|_ && features.send.batch.max_events == _|_ {
+								_parameter: "`max_bytes`"
+							}
+							if features.send.batch.max_bytes == _|_ && features.send.batch.max_events != _|_ {
+								_parameter: "`max_events`"
+							}
+							if features.send.batch.max_bytes != _|_ && features.send.batch.max_events != _|_ {
+								_parameter: "`max_bytes` or `max_events`"
+							}
 							title: "Buffers & batches"
-							body: #"""
+							body:  """
 									<SVG src="/optimized_svg/buffers-and-batches-serial_538_160.svg" />
 
 									This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
@@ -420,10 +435,10 @@ components: sinks: [Name=string]: {
 									*Batches* are flushed when 1 of 2 conditions are met:
 
 									1. The batch age meets or exceeds the configured `timeout_secs`.
-									2. The batch size meets or exceeds the configured <% if component.options.batch.children.respond_to?(:max_size) %>`max_size`<% else %>`max_events`<% end %>.
+									2. The batch meets or exceeds the configured \(_parameter)
 
 									*Buffers* are controlled via the [`buffer.*`](#buffer) options.
-									"""#
+									"""
 						}
 					}
 				}

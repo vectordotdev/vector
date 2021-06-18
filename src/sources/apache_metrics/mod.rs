@@ -1,13 +1,14 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
+    event::Event,
     http::HttpClient,
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
         ApacheMetricsParseError, ApacheMetricsRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    Event, Pipeline,
+    Pipeline,
 };
 use chrono::Utc;
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -19,6 +20,7 @@ use std::{
     future::ready,
     time::{Duration, Instant},
 };
+use tokio_stream::wrappers::IntervalStream;
 
 mod parser;
 
@@ -59,13 +61,7 @@ impl GenerateConfig for ApacheMetricsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self
             .endpoints
             .iter()
@@ -79,8 +75,8 @@ impl SourceConfig for ApacheMetricsConfig {
             urls,
             self.scrape_interval_secs,
             namespace,
-            shutdown,
-            out,
+            cx.shutdown,
+            cx.out,
         ))
     }
 
@@ -145,7 +141,7 @@ fn apache_metrics(
     let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
     Box::pin(
-        tokio::time::interval(Duration::from_secs(interval))
+        IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
@@ -214,6 +210,7 @@ fn apache_metrics(
                                 emit!(ApacheMetricsEventReceived {
                                     byte_size,
                                     count: metrics.len(),
+                                    uri: &sanitized_url,
                                 });
                                 Some(stream::iter(metrics).map(Event::Metric).map(Ok))
                             }
@@ -267,7 +264,7 @@ fn apache_metrics(
 mod test {
     use super::*;
     use crate::{
-        config::{GlobalOptions, SourceConfig},
+        config::SourceConfig,
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Error,
     };
@@ -276,7 +273,7 @@ mod test {
         {Body, Response, Server},
     };
     use pretty_assertions::assert_eq;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generate_config() {
@@ -347,17 +344,12 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
             .await
@@ -367,7 +359,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         match metrics.iter().find(|m| m.name() == "up") {
             Some(m) => {
-                assert_eq!(m.data.value, MetricValue::Gauge { value: 1.0 });
+                assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 });
 
                 match m.tags() {
                     Some(tags) => {
@@ -413,17 +405,12 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "apache".to_string(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
             .await
@@ -435,7 +422,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         //
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
         match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => assert_eq!(m.data.value, MetricValue::Gauge { value: 1.0 }),
+            Some(m) => assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 }),
             None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
@@ -452,17 +439,12 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
             .await
@@ -471,7 +453,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .collect::<Vec<_>>();
 
         match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => assert_eq!(m.data.value, MetricValue::Gauge { value: 0.0 }),
+            Some(m) => assert_eq!(m.value(), &MetricValue::Gauge { value: 0.0 }),
             None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }

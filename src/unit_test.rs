@@ -7,30 +7,51 @@ use structopt::StructOpt;
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
     /// Vector config files in TOML format to test.
-    #[structopt(name = "config-toml", long)]
+    #[structopt(name = "config-toml", long, use_delimiter(true))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to test.
-    #[structopt(name = "config-json", long)]
+    #[structopt(name = "config-json", long, use_delimiter(true))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to test.
-    #[structopt(name = "config-yaml", long)]
+    #[structopt(name = "config-yaml", long, use_delimiter(true))]
     paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to test. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
+    #[structopt(use_delimiter(true))]
     paths: Vec<PathBuf>,
+
+    /// Read configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "config-dir",
+        short = "C",
+        long,
+        env = "VECTOR_CONFIG_DIR",
+        use_delimiter(true)
+    )]
+    pub config_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
-    fn paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
+    fn paths_with_formats(&self) -> Vec<config::ConfigPath> {
         config::merge_path_lists(vec![
             (&self.paths, None),
-            (&self.paths_toml, Some(config::Format::TOML)),
-            (&self.paths_json, Some(config::Format::JSON)),
-            (&self.paths_yaml, Some(config::Format::YAML)),
+            (&self.paths_toml, Some(config::Format::Toml)),
+            (&self.paths_json, Some(config::Format::Json)),
+            (&self.paths_yaml, Some(config::Format::Yaml)),
         ])
+        .map(|(path, hint)| config::ConfigPath::File(path, hint))
+        .chain(
+            self.config_dirs
+                .iter()
+                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+        )
+        .collect()
     }
 }
 

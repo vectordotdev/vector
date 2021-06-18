@@ -1,9 +1,9 @@
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
-    trace, Event,
+    trace,
 };
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use futures::{
     ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
@@ -18,7 +18,7 @@ use std::{
     future::{ready, Future},
     io::Read,
     iter,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
     sync::{
@@ -28,14 +28,18 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::{
-    io::{AsyncRead, AsyncWrite, Result as IoResult},
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
     net::{TcpListener, TcpStream},
     runtime,
-    sync::{mpsc, oneshot},
+    sync::oneshot,
     task::JoinHandle,
-    time::{delay_for, Duration, Instant},
+    time::{sleep, Duration, Instant},
 };
+use tokio_stream::wrappers::TcpListenerStream;
+#[cfg(unix)]
+use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
+use vector_core::event::{BatchNotifier, Event, LogEvent};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
@@ -85,14 +89,17 @@ pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> 
     Ok(value)
 }
 
+pub fn next_addr_for_ip(ip: IpAddr) -> SocketAddr {
+    let port = pick_unused_port(ip);
+    SocketAddr::new(ip, port)
+}
+
 pub fn next_addr() -> SocketAddr {
-    let port = pick_unused_port();
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+    next_addr_for_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    let port = pick_unused_port();
-    SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
+    next_addr_for_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)))
 }
 
 pub fn trace_init() {
@@ -105,7 +112,7 @@ pub fn trace_init() {
 
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels);
+    trace::init(color, false, &levels, false);
 }
 
 pub async fn send_lines(
@@ -127,7 +134,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut();
-    stream.shutdown(Shutdown::Both).unwrap();
+    stream.shutdown().await.unwrap();
 
     Ok(())
 }
@@ -147,16 +154,22 @@ pub async fn send_lines_tls(
         connector.set_verify(SslVerifyMode::NONE);
     }
 
-    let config = connector.build().configure().unwrap();
+    let ssl = connector
+        .build()
+        .configure()
+        .unwrap()
+        .into_ssl(&host)
+        .unwrap();
 
-    let stream = tokio_openssl::connect(config, &host, stream).await.unwrap();
+    let mut stream = tokio_openssl::SslStream::new(ssl, stream).unwrap();
+    Pin::new(&mut stream).connect().await.unwrap();
     let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
     let mut lines = stream::iter(lines).map(Ok);
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut().get_mut();
-    stream.shutdown(Shutdown::Both).unwrap();
+    stream.shutdown().await.unwrap();
 
     Ok(())
 }
@@ -173,32 +186,42 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+fn map_batch_stream(
+    stream: impl Stream<Item = LogEvent>,
+    batch: Option<Arc<BatchNotifier>>,
+) -> impl Stream<Item = Event> {
+    stream.map(move |log| {
+        match &batch {
+            None => log,
+            Some(batch) => log.with_batch_notifier(batch),
+        }
+        .into()
+    })
+}
+
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
+    batch: Option<Arc<BatchNotifier>>,
 ) -> (Vec<String>, impl Stream<Item = Event>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter(lines.clone()).map(Event::from);
+    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
     (lines, stream)
-}
-
-fn random_events_with_stream_generic<F>(
-    count: usize,
-    generator: F,
-) -> (Vec<Event>, impl Stream<Item = Event>)
-where
-    F: Fn() -> Event,
-{
-    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream::iter(events.clone());
-    (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
+    batch: Option<Arc<BatchNotifier>>,
 ) -> (Vec<Event>, impl Stream<Item = Event>) {
-    random_events_with_stream_generic(count, move || Event::from(random_string(len)))
+    let events = (0..count)
+        .map(|_| Event::from(random_string(len)))
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
 }
 
 pub fn random_string(len: usize) -> String {
@@ -228,8 +251,21 @@ pub fn random_maps(
     iter::repeat(()).map(move |_| random_map(max_size, field_len))
 }
 
-pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Vec<T> {
+pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
+where
+    S: Stream + Unpin,
+{
     rx.take(n).collect().await
+}
+
+pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
+    let mut events = Vec::new();
+
+    while events.len() < n {
+        let e = stream.next().await.unwrap();
+        events.push(e);
+    }
+    events
 }
 
 pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
@@ -262,15 +298,27 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     let mut gzip_bytes = Vec::new();
     file.read_to_end(&mut gzip_bytes).unwrap();
     let mut output = String::new();
-    GzDecoder::new(&gzip_bytes[..])
+    MultiGzDecoder::new(&gzip_bytes[..])
+        .read_to_string(&mut output)
+        .unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
+}
+
+pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading zst file.", path = %path.as_ref().display());
+    let mut file = File::open(path).unwrap();
+    let mut zst_bytes = Vec::new();
+    file.read_to_end(&mut zst_bytes).unwrap();
+    let mut output = String::new();
+    zstd::stream::Decoder::new(&zst_bytes[..])
+        .unwrap()
         .read_to_string(&mut output)
         .unwrap();
     output.lines().map(|s| s.to_owned()).collect()
 }
 
 pub fn runtime() -> runtime::Runtime {
-    runtime::Builder::new()
-        .threaded_scheduler()
+    runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
@@ -285,7 +333,7 @@ where
     let started = Instant::now();
     let mut delay = WAIT_FOR_MIN_MILLIS;
     while !f().await {
-        delay_for(Duration::from_millis(delay)).await;
+        sleep(Duration::from_millis(delay)).await;
         if started.elapsed() > duration {
             panic!("Timed out while waiting");
         }
@@ -336,7 +384,7 @@ where
     while started.elapsed() < until {
         match f().await {
             Ok(res) => return res,
-            Err(_) => tokio::time::delay_for(retry).await,
+            Err(_) => tokio::time::sleep(retry).await,
         }
     }
     panic!("Timeout")
@@ -426,9 +474,9 @@ impl<T> Future for CountReceiver<T> {
 impl CountReceiver<String> {
     pub fn receive_lines(addr: SocketAddr) -> CountReceiver<String> {
         CountReceiver::new(|count, tripwire, connected| async move {
-            let mut listener = TcpListener::bind(addr).await.unwrap();
+            let listener = TcpListener::bind(addr).await.unwrap();
             CountReceiver::receive_lines_stream(
-                listener.incoming(),
+                TcpListenerStream::new(listener),
                 count,
                 tripwire,
                 Some(connected),
@@ -443,9 +491,9 @@ impl CountReceiver<String> {
         P: AsRef<Path> + Send + 'static,
     {
         CountReceiver::new(|count, tripwire, connected| async move {
-            let mut listener = tokio::net::UnixListener::bind(path).unwrap();
+            let listener = tokio::net::UnixListener::bind(path).unwrap();
             CountReceiver::receive_lines_stream(
-                listener.incoming(),
+                UnixListenerStream::new(listener),
                 count,
                 tripwire,
                 Some(connected),
@@ -511,4 +559,37 @@ pub async fn start_topology(
     topology::start_validated(config, diff, pieces)
         .await
         .unwrap()
+}
+
+/// Collect the first `n` events from a stream while a future is spawned
+/// in the background. This is used for tests where the collect has to
+/// happen concurrent with the sending process (ie the stream is
+/// handling finalization, which is required for the future to receive
+/// an acknowledgement).
+pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
+where
+    F: Future<Output = ()> + Send + 'static,
+    S: Stream<Item = Event> + Unpin,
+{
+    let sender = tokio::spawn(future);
+    let events = collect_n(stream, n).await;
+    sender.await.expect("Failed to send data");
+    events
+}
+
+/// Collect all the ready events from a stream after spawning a future
+/// in the background and letting it run for a given interval. This is
+/// used for tests where the collect has to happen concurrent with the
+/// sending process (ie the stream is handling finalization, which is
+/// required for the future to receive an acknowledgement).
+pub async fn spawn_collect_ready<F, S>(future: F, stream: S, sleep: u64) -> Vec<Event>
+where
+    F: Future<Output = ()> + Send + 'static,
+    S: Stream<Item = Event> + Unpin,
+{
+    let sender = tokio::spawn(future);
+    tokio::time::sleep(Duration::from_secs(sleep)).await;
+    let events = collect_ready(stream).await;
+    sender.await.expect("Failed to send data");
+    events
 }

@@ -271,7 +271,7 @@ Since not everyone has a full working native environment, we took our environmen
 
 This is ideal for users who want it to "Just work" and just want to start contributing. It's also what we use for our CI, so you know if it breaks we can't do anything else until we fix it. 😉
 
-**Before you go farther, install Docker or Podman through your official package manager, or from the [Docker](https://docs.docker.com/get-docker/) or [Podman](https://podman.io/) sites.**
+**Before you go further, install Docker or Podman through your official package manager, or from the [Docker](https://docs.docker.com/get-docker/) or [Podman](https://podman.io/) sites.**
 
 ```bash
 # Optional: Only if you use `podman`
@@ -330,9 +330,9 @@ We use explicit environment opt-in as many contributors choose to keep their Rus
 
 To build Vector on your own host will require a fairly complete development environment!
 
-We keep an up to date list of all dependencies used in our CI environment inside our `default.nix` file. Loosely, you'll need the following:
+Loosely, you'll need the following:
 
-- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`. (Full list in [`scripts/environment/definition.nix`](./scripts/environment/definition.nix).
+- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`.
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
 
@@ -596,6 +596,30 @@ You can run these tests within a PR as described in the [CI section](#ci).
 
 #### Tips and Tricks
 
+##### Faster Builds With `sccache`
+
+Vector is a large project with a plethora of dependencies.  Changing to a different branch, or
+running `cargo clean`, can sometimes necessitate rebuilding many of those dependencies, which has an
+impact on productivity.  One way to reduce some of this cycle time is to use `sccache`, which caches
+compilation assets to avoid recompiling them over and over.
+
+`sccache` works by being configured to sit in front of `rustc`, taking compilation requests from
+Cargo and checking the cache to see if it already has the cached compilation unit.  It handles
+making sure that different compiler flags, versions of Rust, etc, are taken into consideration
+before using a cached asset.
+
+In order to use `sccache`, you must first [install](https://github.com/mozilla/sccache#installation)
+it.  There are pre-built binaries for all major platforms to get you going quickly. The
+[usage](https://github.com/mozilla/sccache#usage) documentation also explains how to set up your
+environment to actually use it.  We recommend using the `.cargo/config` approach as this can help
+speed up all of your Rust development work, and not just developing on Vector.
+
+While `sccache` was originally designed to cache compilation assets in cloud storage, maximizing
+reusability amongst CI workers, `sccache` actually supports storing assets locally by default.
+Local mode works well for local development as it is much easier to delete the cache directory if
+you ever encounter issues with the cached assets.  It also involves no extra infrastructure or
+spending.
+
 ##### Testing Specific Components
 
 If you are developing a particular component and want to quickly iterate on unit
@@ -819,19 +843,23 @@ E2E (end-to-end) tests.
 - `docker`
 - `kubectl`
 - `bash`
+- `cross` - `cargo install cross`
+- [`helm`](https://helm.sh/)
 
 Vector release artifacts are prepared for E2E tests, so the ability to do that
 is required too, see Vector [docs](https://vector.dev) for more details.
 
-> Note: `minikube` had a bug in the versions `1.12.x` that affected our test
-> process - see https://github.com/kubernetes/minikube/issues/8799.
-> Use version `1.13.0+` that has this bug fixed.
+Notes:
 
-Also:
-
-> Note: `minikube` has troubles running on ZFS systems. If you're using ZFS, we
-> suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
-> registry.
+> - `minikube` had a bug in the versions `1.12.x` that affected our test
+>   process - see https://github.com/kubernetes/minikube/issues/8799.
+>   Use version `1.13.0+` that has this bug fixed.
+> - `minikube` has troubles running on ZFS systems. If you're using ZFS, we
+>   suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
+>   registry.
+> - E2E tests expect to have enough resources to perform a full Vector build,
+>   usually 8GB of RAM with 2CPUs are sufficient to succesfully complete E2E tests
+>   locally.
 
 ##### Running the E2E tests
 
@@ -937,7 +965,7 @@ docs at https://vector.dev/docs are built using structured data written in
 [CUE], a language designed for data templating and validation. All of Vector's
 CUE sources are in the `/docs` folder.
 
-> Vector is currently using CUE version **0.3.0-beta.6**. Be sure to use
+> Vector is currently using CUE version **0.3.2**. Be sure to use
 > precisely this version, as CUE is evolving quickly and you can expect breaking
 > changes in each release.
 
@@ -1005,11 +1033,9 @@ Highlights are not blog posts. They are short one, maybe two, paragraph
 announcements. Highlights should allude to, or link to, a blog post if
 relevant.
 
-For example, [this performance increase announcement][urls.performance_highlight]
+For example, [this adaptive concurrency announcement][urls.adaptive_concurrency]
 is noteworthy, but also deserves an in-depth blog post covering the work that
-resulted in the performance benefit. Notice that the highlight alludes to an
-upcoming blog post. This allows us to communicate a high-value performance
-improvement without being blocked by an in-depth blog post.
+resulted in the performance and reliability benefit.
 
 ## Security
 
@@ -1075,13 +1101,13 @@ contact us at vector@timber.io.
 
 [urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
-[urls.cue]: https://cuelang.org
+[CUE]: https://cuelang.org
 [urls.existing_issues]: https://github.com/timberio/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
 [urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits
 [urls.new_issue]: https://github.com/timberio/vector/issues/new
 [urls.push_it_to_the_limit]: https://www.youtube.com/watch?v=ueRzA9GUj9c
-[urls.performance_highlight]: https://vector.dev/highlights/2020-04-11-overall-performance-increase
+[urls.adaptive_concurrency]: https://vector.dev/highlights/2020-09-18-adaptive-concurrency
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.watchexec]: https://github.com/watchexec/watchexec

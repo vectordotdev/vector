@@ -23,6 +23,74 @@ configuration: {
 			}
 		}
 
+		log_schema: {
+			common: false
+			description: """
+				Configures default log schema for all events. This is used by
+				Vector source components to assign the fields on incoming
+				events.
+				"""
+			required: false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					message_key: {
+						common: true
+						description: """
+							Sets the event key to use for the event message field.
+							"""
+						required: false
+						type: string: {
+							default: "message"
+							examples: ["message", "@message"]
+							syntax: "literal"
+						}
+					}
+
+					timestamp_key: {
+						common: true
+						description: """
+							Sets the event key to use for the event timestamp field.
+							"""
+						required: false
+						type: string: {
+							default: "timestamp"
+							examples: ["timestamp", "@timestamp"]
+							syntax: "literal"
+						}
+					}
+
+					host_key: {
+						common: true
+						description: """
+							Sets the event key to use for the event host field.
+							"""
+						required: false
+						type: string: {
+							default: "host"
+							examples: ["host", "@host"]
+							syntax: "literal"
+						}
+					}
+
+					source_type_key: {
+						common: true
+						description: """
+							Sets the event key to use for the event source type
+							field that is set by some sources.
+							"""
+						required: false
+						type: string: {
+							default: "source_type"
+							examples: ["source_type", "@source_type"]
+							syntax: "literal"
+						}
+					}
+				}
+			}
+		}
+
 		healthchecks: {
 			common: false
 			description: """
@@ -148,8 +216,9 @@ configuration: {
 		wildcards: {
 			title: "Wildcards in identifiers"
 			body: """
-				Vector supports wildcards (`*`) in component identifiers when building your topology, but only supports
-				them as the last character. For example:
+				Vector supports wildcard characters (`*`) in component identifiers when building your topology.
+
+				For example:
 
 				```toml
 				[sources.app1_logs]
@@ -170,7 +239,7 @@ configuration: {
 
 				[sinks.archive]
 				type = "aws_s3"
-				inputs = ["app*", "system_logs"]
+				inputs = ["*_logs"]
 				```
 				"""
 		}

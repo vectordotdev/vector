@@ -20,7 +20,6 @@ components: sinks: new_relic_logs: {
 				enabled:      true
 				common:       false
 				max_bytes:    5240000
-				max_events:   null
 				timeout_secs: 1
 			}
 			compression: {
@@ -101,6 +100,21 @@ components: sinks: new_relic_logs: {
 				syntax: "literal"
 			}
 		}
+		region: {
+			common:      true
+			description: "The region to send data to."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "us"
+				enum: {
+					us: "United States"
+					eu: "Europe"
+				}
+				syntax: "literal"
+			}
+		}
+
 	}
 
 	input: {

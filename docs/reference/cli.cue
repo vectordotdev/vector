@@ -103,6 +103,13 @@ cli: {
 			description: "Watch for changes in the configuration file, and reload accordingly"
 			env_var:     "VECTOR_WATCH_CONFIG"
 		}
+		"enable-datadog-tracing": {
+			description: """
+				  [experimental] Send internal tracing spans to a local APM-enabled
+				  Datadog agent with a granularity matching the current log level.
+				"""
+			env_var: "VECTOR_ENABLE_DATADOG_TRACING"
+		}
 	}
 
 	options: {
@@ -114,6 +121,7 @@ cli: {
 				auto:   "Detect ANSI terminal formatting and enable if supported."
 				never:  "Disable ANSI terminal formatting."
 			}
+			env_var: "VECTOR_COLOR"
 		}
 		"config": {
 			_short: "c"
@@ -171,6 +179,7 @@ cli: {
 				json: "Output Vector's logs as JSON."
 				text: "Output Vector's logs as text."
 			}
+			env_var: "VECTOR_LOG_FORMAT"
 		}
 	}
 
@@ -227,7 +236,7 @@ cli: {
 			description: """
 				Run Vector config unit tests, then exit. This command is experimental and
 				therefore subject to change. For guidance on how to write unit tests check
-				out: https://vector.dev/docs/setup/guides/unit-testing/
+				out: \(urls.vector_unit_testing)
 				"""
 
 			options: {
@@ -263,6 +272,54 @@ cli: {
 						Any number of Vector config files to test. If none are specified
 						the default config path `/etc/vector/vector.toml` will be targeted
 						"""
+				}
+			}
+		}
+
+		"tap": {
+			description: """
+				Observe log events from topology components.
+				"""
+
+			flags: _default_flags
+
+			options: {
+				"interval": {
+					_short:      "i"
+					description: "Interval to sample metrics at, in milliseconds"
+					type:        "integer"
+					default:     500
+				}
+				"url": {
+					_short:      "u"
+					description: "Vector GraphQL API server endpoint"
+					type:        "string"
+				}
+				"limit": {
+					_short:      "l"
+					description: "Sample log events to the provided limit"
+					type:        "integer"
+					default:     100
+				}
+				"format": {
+					_short:      "f"
+					description: "Encoding format for logs printed to screen"
+					type:        "enum"
+					default:     "json"
+					enum: {
+						json: "Output events as JSON"
+						yaml: "Output events as YAML"
+					}
+				}
+			}
+
+			args: {
+				components: {
+					type: "list"
+					description: """
+						    Components to observe (comma-separated; accepts glob patterns).
+						"""
+					default: "*"
 				}
 			}
 		}

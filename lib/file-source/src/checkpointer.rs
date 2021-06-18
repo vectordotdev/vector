@@ -8,13 +8,15 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use tracing::{error, info, warn};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 const STABLE_FILE_NAME: &str = "checkpoints.json";
 
-/// This enum represents the file format of checkpoints persisted to disk. Right now there is only
-/// one variant, but any incompatible changes will require and additional variant to be added here
-/// and handled anywhere that we transit this format.
+/// This enum represents the file format of checkpoints persisted to disk. Right
+/// now there is only one variant, but any incompatible changes will require and
+/// additional variant to be added here and handled anywhere that we transit
+/// this format.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "version", rename_all = "snake_case")]
 enum State {
@@ -22,8 +24,8 @@ enum State {
     V1 { checkpoints: Vec<Checkpoint> },
 }
 
-/// A simple JSON-friendly struct of the fingerprint/position pair, since fingerprints as objects
-/// cannot be keys in a plain JSON map.
+/// A simple JSON-friendly struct of the fingerprint/position pair, since
+/// fingerprints as objects cannot be keys in a plain JSON map.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 struct Checkpoint {
@@ -40,7 +42,8 @@ pub struct Checkpointer {
     checkpoints: Arc<CheckpointsView>,
 }
 
-/// A thread-safe handle for reading and writing checkpoints in-memory across multiple threads.
+/// A thread-safe handle for reading and writing checkpoints in-memory across
+/// multiple threads.
 #[derive(Debug, Default)]
 pub struct CheckpointsView {
     checkpoints: DashMap<FileFingerprint, FilePosition>,
@@ -86,8 +89,9 @@ impl CheckpointsView {
     pub fn remove_expired(&self) {
         let now = Utc::now();
 
-        // Collect all of the expired keys. Removing them while iterating can lead to deadlocks,
-        // the set should be small, and this is not a performance-sensitive path.
+        // Collect all of the expired keys. Removing them while iterating can
+        // lead to deadlocks, the set should be small, and this is not a
+        // performance-sensitive path.
         let to_remove = self
             .removed_times
             .iter()
@@ -184,9 +188,9 @@ impl Checkpointer {
 
     /// Encode a fingerprint to a file name, including legacy Unknown values
     ///
-    /// For each of the non-legacy variants, prepend an identifier byte that falls outside of the
-    /// hex range used by the legacy implementation. This allows them to be differentiated by
-    /// simply peeking at the first byte.
+    /// For each of the non-legacy variants, prepend an identifier byte that
+    /// falls outside of the hex range used by the legacy implementation. This
+    /// allows them to be differentiated by simply peeking at the first byte.
     #[cfg(test)]
     fn encode(&self, fng: FileFingerprint, pos: FilePosition) -> PathBuf {
         use FileFingerprint::*;
@@ -203,9 +207,10 @@ impl Checkpointer {
     /// Decode a fingerprint from a file name, accounting for unknowns due to the legacy
     /// implementation.
     ///
-    /// The trick here is to rely on the hex encoding of the legacy format. Because hex encoding
-    /// only allows [0-9a-f], we can use any character outside of that range as a magic byte
-    /// identifier for the newer formats.
+    /// The trick here is to rely on the hex encoding of the legacy
+    /// format. Because hex encoding only allows [0-9a-f], we can use any
+    /// character outside of that range as a magic byte identifier for the newer
+    /// formats.
     fn decode(&self, path: &Path) -> (FileFingerprint, FilePosition) {
         use FileFingerprint::*;
 
@@ -242,37 +247,43 @@ impl Checkpointer {
         self.checkpoints.get(fng)
     }
 
-    /// Scan through a given list of fresh fingerprints (i.e. not legacy Unknown) to see if any
-    /// match an existing legacy fingerprint. If so, upgrade the existing fingerprint.
+    /// Scan through a given list of fresh fingerprints (i.e. not legacy
+    /// Unknown) to see if any match an existing legacy fingerprint. If so,
+    /// upgrade the existing fingerprint.
     pub fn maybe_upgrade(&mut self, fresh: impl Iterator<Item = FileFingerprint>) {
         self.checkpoints.maybe_upgrade(fresh)
     }
 
-    /// Persist the current checkpoints state to disk, making our best effort to do so in an atomic
-    /// way that allow for recovering the previous state in the event of a crash.
+    /// Persist the current checkpoints state to disk, making our best effort to
+    /// do so in an atomic way that allow for recovering the previous state in
+    /// the event of a crash.
     pub fn write_checkpoints(&self) -> Result<usize, io::Error> {
-        // First drop any checkpoints for files that were removed more than 60 seconds ago. This
-        // keeps our working set as small as possible and makes sure we don't spend time and IO
-        // writing checkpoints that don't matter anymore.
+        // First drop any checkpoints for files that were removed more than 60
+        // seconds ago. This keeps our working set as small as possible and
+        // makes sure we don't spend time and IO writing checkpoints that don't
+        // matter anymore.
         self.checkpoints.remove_expired();
 
-        // Write the new checkpoints to a tmp file and flush it fully to disk. If vector
-        // dies anywhere during this section, the existing stable file will still be in its current
-        // valid state and we'll be able to recover.
+        // Write the new checkpoints to a tmp file and flush it fully to
+        // disk. If vector dies anywhere during this section, the existing
+        // stable file will still be in its current valid state and we'll be
+        // able to recover.
         let mut f = io::BufWriter::new(fs::File::create(&self.tmp_file_path)?);
         serde_json::to_writer(&mut f, &self.checkpoints.get_state())?;
         f.into_inner()?.sync_all()?;
 
-        // Once the temp file is fully flushed, rename the tmp file to replace the previous stable
-        // file. This is an atomic operation on POSIX systems (and the stdlib claims to provide
-        // equivalent behavior on Windows), which should prevent scenarios where we don't have at
-        // least one full valid file to recover from.
+        // Once the temp file is fully flushed, rename the tmp file to replace
+        // the previous stable file. This is an atomic operation on POSIX
+        // systems (and the stdlib claims to provide equivalent behavior on
+        // Windows), which should prevent scenarios where we don't have at least
+        // one full valid file to recover from.
         fs::rename(&self.tmp_file_path, &self.stable_file_path)?;
 
         Ok(self.checkpoints.checkpoints.len())
     }
 
-    /// Write checkpoints to disk in the legacy format. Used for compatibility testing only.
+    /// Write checkpoints to disk in the legacy format. Used for compatibility
+    /// testing only.
     #[cfg(test)]
     pub fn write_legacy_checkpoints(&mut self) -> Result<usize, io::Error> {
         fs::remove_dir_all(&self.directory).ok();
@@ -283,19 +294,21 @@ impl Checkpointer {
         Ok(self.checkpoints.checkpoints.len())
     }
 
-    /// Read persisted checkpoints from disk, preferring the new JSON file format but falling back
-    /// to the legacy system when those files are found instead.
+    /// Read persisted checkpoints from disk, preferring the new JSON file
+    /// format but falling back to the legacy system when those files are found
+    /// instead.
     pub fn read_checkpoints(&mut self, ignore_before: Option<DateTime<Utc>>) {
-        // First try reading from the tmp file location. If this works, it means that the previous
-        // process was interrupted in the process of checkpointing and the tmp file should contain
-        // more recent data that should be preferred.
+        // First try reading from the tmp file location. If this works, it means
+        // that the previous process was interrupted in the process of
+        // checkpointing and the tmp file should contain more recent data that
+        // should be preferred.
         match self.read_checkpoints_file(&self.tmp_file_path) {
             Ok(state) => {
                 warn!(message = "Recovered checkpoint data from interrupted process.");
                 self.checkpoints.set_state(state, ignore_before);
 
-                // Try to move this tmp file to the stable location so we don't immediately overwrite
-                // it when we next persist checkpoints.
+                // Try to move this tmp file to the stable location so we don't
+                // immediately overwrite it when we next persist checkpoints.
                 if let Err(error) = fs::rename(&self.tmp_file_path, &self.stable_file_path) {
                     warn!(message = "Error persisting recovered checkpoint file.", %error);
                 }
@@ -309,8 +322,9 @@ impl Checkpointer {
             }
         }
 
-        // Next, attempt to read checkpoints from the stable file location. This is the
-        // expected location, so warn more aggressively if something goes wrong.
+        // Next, attempt to read checkpoints from the stable file location. This
+        // is the expected location, so warn more aggressively if something goes
+        // wrong.
         match self.read_checkpoints_file(&self.stable_file_path) {
             Ok(state) => {
                 info!(message = "Loaded checkpoint data.");
@@ -326,7 +340,8 @@ impl Checkpointer {
             }
         }
 
-        // If we haven't returned yet, go ahead and look for the legacy files and try to read them.
+        // If we haven't returned yet, go ahead and look for the legacy files
+        // and try to read them.
         info!("Attempting to read legacy checkpoint files.");
         self.read_legacy_checkpoints(ignore_before);
 

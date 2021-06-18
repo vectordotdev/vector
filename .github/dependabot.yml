@@ -3,13 +3,12 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "saturday"
+      interval: "daily"
       time: "04:00" # UTC
     reviewers:
-      - "fanatid"
+      - "timberio/vector-support"
     assignees:
-      - "fanatid"
+      - "timberio/vector-support"
     labels:
       - "domain: deps"
     commit-message:
@@ -17,7 +16,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     labels:
       - "domain: ci"
     commit-message:

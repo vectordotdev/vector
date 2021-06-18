@@ -1,12 +1,10 @@
-use bytes::{Buf, BufMut};
 use pin_project::pin_project;
 use std::{
     fmt,
-    mem::MaybeUninit,
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::io::{self, AsyncRead, AsyncWrite};
+use tokio::io::{self, AsyncRead, AsyncWrite, ReadBuf};
 
 /// A type wrapper for objects that can exist in either a raw state or
 /// wrapped by TLS handling.
@@ -73,29 +71,11 @@ impl<R: AsyncRead, T: AsyncRead> AsyncRead for MaybeTls<R, T> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         match self.project() {
             MaybeTlsProj::Tls(s) => s.poll_read(cx, buf),
             MaybeTlsProj::Raw(s) => s.poll_read(cx, buf),
-        }
-    }
-
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
-        match self {
-            MaybeTls::Tls(s) => s.prepare_uninitialized_buffer(buf),
-            MaybeTls::Raw(s) => s.prepare_uninitialized_buffer(buf),
-        }
-    }
-
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        match self.project() {
-            MaybeTlsProj::Tls(s) => s.poll_read_buf(cx, buf),
-            MaybeTlsProj::Raw(s) => s.poll_read_buf(cx, buf),
         }
     }
 }
@@ -119,17 +99,6 @@ impl<R: AsyncWrite, T: AsyncWrite> AsyncWrite for MaybeTls<R, T> {
         match self.project() {
             MaybeTlsProj::Tls(s) => s.poll_shutdown(cx),
             MaybeTlsProj::Raw(s) => s.poll_shutdown(cx),
-        }
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        match self.project() {
-            MaybeTlsProj::Tls(s) => s.poll_write_buf(cx, buf),
-            MaybeTlsProj::Raw(s) => s.poll_write_buf(cx, buf),
         }
     }
 }

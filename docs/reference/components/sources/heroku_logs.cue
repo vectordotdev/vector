@@ -68,6 +68,7 @@ components: sources: heroku_logs: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		address:          sources.http.configuration.address
 		auth:             sources.http.configuration.auth
 		query_parameters: sources.http.configuration.query_parameters
@@ -106,6 +107,8 @@ components: sources: heroku_logs: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
 		request_read_errors_total: components.sources.internal_metrics.output.metrics.request_read_errors_total
 		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}

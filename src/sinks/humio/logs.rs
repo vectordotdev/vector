@@ -128,13 +128,15 @@ mod tests {
         .unwrap();
         let config = config.build_hec_config();
 
-        let bytes = config.encode_event(event).unwrap();
+        let bytes = config.encode_event(event).unwrap().item;
         let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
         assert!(
             (hec_event.time - now).abs() < 0.2,
-            format!("hec_event.time = {}, now = {}", hec_event.time, now)
+            "hec_event.time = {}, now = {}",
+            hec_event.time,
+            now
         );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
@@ -146,9 +148,9 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
+        event::Event,
         sinks::util::Compression,
         test_util::random_string,
-        Event,
     };
     use chrono::Utc;
     use futures::stream;

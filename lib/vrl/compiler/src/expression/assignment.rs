@@ -3,8 +3,9 @@ use crate::parser::{
     ast::{self, Ident},
     Node,
 };
-use crate::{Context, Expression, Path, Span, State, TypeDef, Value};
+use crate::{Context, Expression, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
+use lookup::LookupBuf;
 use std::convert::TryFrom;
 use std::fmt;
 
@@ -30,7 +31,10 @@ impl Assignment {
                 // Fallible expressions require infallible assignment.
                 if type_def.is_fallible() {
                     return Err(Error {
-                        variant: ErrorVariant::UnhandledError(target.to_string(), expr.to_string()),
+                        variant: ErrorVariant::FallibleAssignment(
+                            target.to_string(),
+                            expr.to_string(),
+                        ),
                         span,
                         expr_span,
                         assignment_span,
@@ -181,8 +185,8 @@ impl fmt::Debug for Assignment {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Target {
     Noop,
-    Internal(Ident, Option<Path>),
-    External(Option<Path>),
+    Internal(Ident, Option<LookupBuf>),
+    External(Option<LookupBuf>),
 }
 
 impl Target {
@@ -192,20 +196,14 @@ impl Target {
         fn set_type_def(
             current_type_def: &TypeDef,
             new_type_def: TypeDef,
-            path: &Option<Path>,
+            path: &Option<LookupBuf>,
         ) -> TypeDef {
-            // If the assignment is into a specific index, we want to keep the
-            // existing type def, and only update the type def at the provided
-            // index.
-            let is_index_assignment = path
-                .as_ref()
-                .and_then(|p| p.segments().last().map(|s| s.is_index()))
-                .unwrap_or_default();
-
-            if is_index_assignment {
-                current_type_def.clone().merge_overwrite(new_type_def)
-            } else {
+            // If the assignment is onto root or has no path (root variable assignment), use the
+            // new type def, otherwise merge the type defs.
+            if path.as_ref().map(|path| path.is_root()).unwrap_or(true) {
                 new_type_def
+            } else {
+                current_type_def.clone().merge_overwrite(new_type_def)
             }
         }
 
@@ -271,7 +269,7 @@ impl Target {
             External(path) => {
                 let _ = ctx
                     .target_mut()
-                    .insert(path.as_ref().unwrap_or(&Path::root()), value);
+                    .insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
             }
         }
     }
@@ -284,9 +282,9 @@ impl fmt::Display for Target {
         match self {
             Noop => f.write_str("_"),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
-            Internal(ident, _) => ident.fmt(f),
-            External(Some(path)) => path.fmt(f),
-            External(_) => f.write_str("."),
+            Internal(ident, None) => ident.fmt(f),
+            External(Some(path)) => write!(f, ".{}", path),
+            External(None) => f.write_str("."),
         }
     }
 }
@@ -322,8 +320,8 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 let span = Span::new(target_span.start(), path_span.end());
 
                 match target {
-                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path.into())),
-                    ast::QueryTarget::External => External(Some(path.into())),
+                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path)),
+                    ast::QueryTarget::External => External(Some(path)),
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
@@ -444,8 +442,8 @@ pub enum ErrorVariant {
     #[error("unnecessary no-op assignment")]
     UnnecessaryNoop(Span),
 
-    #[error("unhandled error")]
-    UnhandledError(String, String),
+    #[error("unhandled fallible assignment")]
+    FallibleAssignment(String, String),
 
     #[error("unnecessary error assignment")]
     InfallibleAssignment(String, String, Span, Span),
@@ -472,7 +470,7 @@ impl DiagnosticError for Error {
 
         match &self.variant {
             UnnecessaryNoop(..) => 640,
-            UnhandledError(..) => 103,
+            FallibleAssignment(..) => 103,
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
         }
@@ -487,7 +485,7 @@ impl DiagnosticError for Error {
                 Label::context("either assign to a path or variable here", *target_span),
                 Label::context("or remove the assignment", self.assignment_span),
             ],
-            UnhandledError(target, expr) => vec![
+            FallibleAssignment(target, expr) => vec![
                 Label::primary("this expression is fallible", self.expr_span),
                 Label::context("update the expression to be infallible", self.expr_span),
                 Label::context(
@@ -512,7 +510,7 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match &self.variant {
-            UnhandledError(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
+            FallibleAssignment(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
             _ => vec![],
         }
     }

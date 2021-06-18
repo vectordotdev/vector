@@ -13,7 +13,7 @@ use k8s_openapi::{
 use snafu::Snafu;
 use std::convert::Infallible;
 use std::time::Duration;
-use tokio::{select, time::delay_for};
+use tokio::{select, time::sleep};
 
 /// Watches remote Kubernetes resources and maintains a local representation of
 /// the remote state. "Reflects" the remote state locally.
@@ -52,8 +52,8 @@ where
         Self {
             watcher,
             state_writer,
-            label_selector,
             field_selector,
+            label_selector,
             resource_version,
             pause_between_requests,
         }
@@ -77,7 +77,7 @@ where
         'outer: loop {
             // For the next pause duration we won't get any updates.
             // This is better than flooding k8s api server with requests.
-            delay_for(self.pause_between_requests).await;
+            sleep(self.pause_between_requests).await;
 
             let invocation_result = self.issue_request().await;
             let stream = match invocation_result {
@@ -89,8 +89,14 @@ where
                     self.state_writer.resync().await;
                     continue;
                 }
+                Err(watcher::invocation::Error::Recoverable { source }) => {
+                    emit!(internal_events::InvocationHttpErrorReceived { error: source });
+                    continue;
+                }
                 Err(watcher::invocation::Error::Other { source }) => {
-                    // Not a desync, fail everything.
+                    // Unrecoverable error
+                    // TODO: retry these errors
+                    // https://github.com/timberio/vector/issues/7149
                     error!(message = "Watcher error.", error = ?source);
                     return Err(Error::Invocation { source });
                 }
@@ -126,12 +132,10 @@ where
                             self.state_writer.resync().await;
                             continue 'outer;
                         }
-                        // Any other streaming error means the protocol is in
-                        // an unxpected state.
-                        // This is considered a fatal error, do not attempt
-                        // to retry and just quit.
-                        Err(watcher::stream::Error::Other { source }) => {
-                            return Err(Error::Streaming { source });
+                        // We have an error, attempt to recover from this error and continue the outer loop.
+                        Err(watcher::stream::Error::Recoverable { source }) => {
+                            emit!(internal_events::InvocationHttpErrorReceived { error: source });
+                            continue 'outer;
                         }
                         // A fine watch respose arrived, we just pass it down.
                         Ok(val) => val,
@@ -293,6 +297,7 @@ mod tests {
     enum ExpInvRes {
         Stream(Vec<ExpStmRes>),
         Desync,
+        Recoverable,
     }
 
     // A helper enum to encode expected mock watcher stream.
@@ -441,6 +446,89 @@ mod tests {
             ),
         ];
         let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
+
+        // Use standard flow test logic.
+        run_flow_test(invocations, expected_resulting_state).await;
+    }
+
+    // Test
+    #[tokio::test]
+    async fn invocation_recoverable_test() {
+        trace_init();
+
+        let invocations = vec![
+            (
+                vec![],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Recoverable,
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
+                ]),
+            ),
+        ];
+        let expected_resulting_state = vec![
+            make_pod("uid0", "10"),
+            make_pod("uid1", "15"),
+            make_pod("uid20", "1000"),
+            make_pod("uid21", "1005"),
+        ];
+
+        // Use standard flow test logic.
+        run_flow_test(invocations, expected_resulting_state).await;
+    }
+
+    // Test
+    #[tokio::test]
+    async fn consecutive_invocation_recoverable_test() {
+        trace_init();
+
+        let invocations = vec![
+            (
+                vec![],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Recoverable,
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Recoverable,
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
+                ]),
+            ),
+        ];
+        let expected_resulting_state = vec![
+            make_pod("uid0", "10"),
+            make_pod("uid1", "15"),
+            make_pod("uid20", "1000"),
+            make_pod("uid21", "1005"),
+        ];
 
         // Use standard flow test logic.
         run_flow_test(invocations, expected_resulting_state).await;
@@ -831,7 +919,20 @@ mod tests {
 
             // Send an error to the stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::ErrOther)
+                .send(mock_watcher::ScenarioActionStream::ErrRecoverable)
+                .await
+                .unwrap();
+
+            // Wait for watcher to request next item from the stream.
+            assert!(matches!(
+                watcher_events_rx.next().await.unwrap(),
+                mock_watcher::ScenarioEvent::Invocation(_)
+            ));
+
+            // We're done with the test, send the error to terminate the
+            // reflector.
+            watcher_invocations_tx
+                .send(mock_watcher::ScenarioActionInvocation::ErrOther)
                 .await
                 .unwrap();
         });
@@ -844,12 +945,7 @@ mod tests {
         logic.await.unwrap();
 
         // Assert that the reflector properly passed the error.
-        assert!(matches!(
-            result.unwrap_err(),
-            Error::Streaming {
-                source: mock_watcher::StreamError
-            }
-        ));
+        assert!(matches!(result.unwrap_err(), Error::Invocation { .. }));
 
         // Explicitly drop the reflector at the very end.
         drop(reflector);
@@ -1037,9 +1133,18 @@ mod tests {
                     ExpInvRes::Stream(actions) => actions,
                     // Desync is requested, complete the invocation with the desync.
                     ExpInvRes::Desync => {
-                        // Send the desync action to mock watcher.
+                        // Send the desync error to mock watcher.
                         watcher_invocations_tx
                             .send(mock_watcher::ScenarioActionInvocation::ErrDesync)
+                            .await
+                            .unwrap();
+                        continue;
+                    }
+                    // Recoverable error is requested, complete the invocation with the error.
+                    ExpInvRes::Recoverable => {
+                        // Send the recoverable error to mock watcher.
+                        watcher_invocations_tx
+                            .send(mock_watcher::ScenarioActionInvocation::ErrRecoverable)
                             .await
                             .unwrap();
                         continue;

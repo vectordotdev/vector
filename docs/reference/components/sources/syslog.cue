@@ -27,7 +27,7 @@ components: sources: syslog: {
 			}
 			receive_buffer_bytes: {
 				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+				relevant_when: "mode = `tcp` or mode = `udp`"
 			}
 			keepalive: enabled: true
 			tls: sources.socket.features.receive.tls
@@ -118,7 +118,11 @@ components: sources: syslog: {
 					syntax: "literal"
 				}
 			}
-			timestamp: fields._current_timestamp
+			timestamp: {
+				description: "The time extracted from the Syslog formatted line. If parsing fails, then the exact time the event was ingested into Vector is used."
+				required:    true
+				type: timestamp: {}
+			}
 			version: {
 				description: "The version extracted from the Syslog line. If a version is not found, then the key will not be added."
 				required:    true
@@ -202,6 +206,7 @@ components: sources: syslog: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		connection_read_errors_total: components.sources.internal_metrics.output.metrics.connection_read_errors_total
 		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total

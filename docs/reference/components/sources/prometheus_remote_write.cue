@@ -59,6 +59,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
@@ -94,13 +95,14 @@ components: sources: prometheus_remote_write: {
 	}
 
 	telemetry: metrics: {
-		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
-		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
-		requests_received_total:      components.sources.internal_metrics.output.metrics.requests_received_total
-		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
+		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
+		http_error_response_total: components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:        components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:    components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:  components.sources.internal_metrics.output.metrics.requests_completed_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
+		request_duration_seconds:  components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

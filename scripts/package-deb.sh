@@ -71,13 +71,14 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 #   --no-build
 #     because this stop should follow a build
 
-cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build --no-strip
+cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --variant "$TARGET" --no-build --no-strip
 
-# Rename the resulting .deb file to use - instead of _ since this
-# is consistent with our package naming scheme.
+# Rename the resulting .deb file to remove TARGET from name and use - instead of
+# _ since this is consistent with our package naming scheme.
 for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
-  nbase=${base//_/-}
+  nbase=${base//-${TARGET}/}
+  nbase=${nbase//_/-}
   mv "${file}" target/"${TARGET}"/debian/"${nbase}";
 done
 

@@ -5,10 +5,10 @@ use crate::config::{
 use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
+use std::path::{Path, PathBuf};
 use std::{
     fs::{create_dir_all, File},
     io::Write,
-    path::PathBuf,
 };
 use structopt::StructOpt;
 use toml::{map::Map, Value};
@@ -353,7 +353,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-fn write_config(filepath: &PathBuf, body: &str) -> Result<usize, crate::Error> {
+fn write_config(filepath: &Path, body: &str) -> Result<usize, crate::Error> {
     if filepath.exists() {
         // If the file exists, we don't want to overwrite, that's just rude.
         Err(format!("{:?} already exists", &filepath).into())

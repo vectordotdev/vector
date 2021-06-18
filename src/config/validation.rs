@@ -1,6 +1,19 @@
 use super::{builder::ConfigBuilder, DataType, Resource};
 use std::collections::HashMap;
 
+/// Check that provide + topology config aren't present in the same builder, which is an error.
+pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    if config.provider.is_some()
+        && (!config.sources.is_empty() || !config.transforms.is_empty() || !config.sinks.is_empty())
+    {
+        Err(vec![
+            "No sources/transforms/sinks are allowed if provider config is present.".to_owned(),
+        ])
+    } else {
+        Ok(())
+    }
+}
+
 pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
@@ -77,7 +90,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let source_resources = config
         .sources
         .iter()
-        .map(|(name, config)| (name, config.resources()));
+        .map(|(name, config)| (name, config.inner.resources()));
     let sink_resources = config
         .sinks
         .iter()
@@ -256,7 +269,7 @@ impl From<&ConfigBuilder> for Graph {
 
         // TODO: validate that node names are unique across sources/transforms/sinks?
         for (name, config) in config.sources.iter() {
-            graph.add_source(name, config.output_type());
+            graph.add_source(name, config.inner.output_type());
         }
 
         for (name, config) in config.transforms.iter() {

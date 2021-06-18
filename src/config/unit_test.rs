@@ -1,16 +1,14 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{self, GlobalOptions, TransformConfig};
+use crate::config::{self, ConfigPath, GlobalOptions, TransformConfig};
 use crate::{
     conditions::Condition,
     event::{Event, Value},
     transforms::Transform,
 };
 use indexmap::IndexMap;
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
-pub async fn build_unit_tests_main(
-    paths: &[(PathBuf, config::FormatHint)],
-) -> Result<Vec<UnitTest>, Vec<String>> {
+pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
 
     let (config, _) = super::loading::load_builder_from_paths(paths)?;

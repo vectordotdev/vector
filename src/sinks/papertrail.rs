@@ -1,13 +1,13 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSinkConfig,
-        Encoding, UriSerde,
+        EncodedEvent, Encoding, UriSerde,
     },
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
-    Event,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -77,12 +77,15 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Bytes {
-    let host = if let Some(host) = event.as_mut_log().remove(log_schema().host_key()) {
-        Some(host.to_string_lossy())
-    } else {
-        None
-    };
+fn encode_event(
+    mut event: Event,
+    pid: u32,
+    encoding: &EncodingConfig<Encoding>,
+) -> EncodedEvent<Bytes> {
+    let host = event
+        .as_mut_log()
+        .remove(log_schema().host_key())
+        .map(|host| host.to_string_lossy());
 
     let formatter = Formatter3164 {
         facility: Facility::LOG_USER,
@@ -110,7 +113,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 
     s.push(b'\n');
 
-    Bytes::from(s)
+    EncodedEvent::new(Bytes::from(s))
 }
 
 #[cfg(test)]
@@ -137,7 +140,8 @@ mod tests {
                 except_fields: Some(vec!["magic".into()]),
                 timestamp_format: None,
             },
-        );
+        )
+        .item;
 
         let msg =
             bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len() - 1);

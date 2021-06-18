@@ -7,7 +7,7 @@
 #   │     ^
 #   │     │
 #   │     unexpected end of query path
-#   │     expected one of: "(", "identifier", "path field", "string literal"
+#   │     expected one of: "(", "abort", "identifier", "path field", "string literal"
 #   │
 #   = see language documentation at https://vrl.dev
 

@@ -54,7 +54,7 @@ lazy_static! {
         ")))                                    # Match the closing quote
         #\s*$                                   # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for common log");
+    .expect("failed compiling regex for combined log");
 
     // It is possible to customise the format output by apache. This function just handles the default defined here.
     // https://github.com/mingrammer/flog/blob/9bc83b14408ca446e934c32e4a88a81a46e78d83/log.go#L16
@@ -71,8 +71,47 @@ lazy_static! {
         (-|(?P<message>.*))                         # Match `-` or any character.
         \s*$                                        # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for common log");
+    .expect("failed compiling regex for error log");
 
+    // - Nginx HTTP Server docs: http://nginx.org/en/docs/http/ngx_http_log_module.html
+    pub static ref REGEX_NGINX_COMBINED_LOG: Regex = Regex::new(
+        r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
+        ^\s*                                    # Start with any number of whitespaces.
+        (-|(?P<client>\S+))\s+                  # Match `-` or any non space character
+        (-|(?P<user>\S+))\s+                    # Match `-` or any non space character
+        \-\s+                                   # Always a dash
+        \[(?P<timestamp>.+)\]\s+                # Match date between brackets
+        "(?P<request>
+        (?P<method>\w+)\s+                      # Match at least a word
+        (?P<path>\S+)\s+                        # Match any non space character
+        (?P<protocol>\S+)
+        )"\s+                                   # Match any non space character
+        (?P<status>\d+)\s+                      # Match numbers
+        (?P<size>\d+)\s+                        # Match numbers
+        "(-|(?P<referer>[^"]+))"\s+             # Match `-` or any non double-quote character
+        "(-|(?P<agent>[^"]+))"                  # Match `-` or any non double-quote character
+        (\s+"(-|(?P<compression>[^"]+))")?      # Match `-` or any non double-quote character
+        \s*$                                    # Match any number of whitespaces (to be discarded).
+    "#)
+    .expect("failed compiling regex for Nginx combined log");
+
+    pub static ref REGEX_NGINX_ERROR_LOG: Regex = Regex::new(
+        r#"(?x)                                         # Ignore whitespace and comments in the regex expression.
+        ^\s*                                            # Start with any number of whitespaces.
+        (?P<timestamp>.+)\s+                            # Match any character until [
+        \[(?P<severity>\w+)\]\s+                        # Match any word character
+        (?P<pid>\d+)\#                                  # Match any number
+        (?P<tid>\d+):                                   # Match any number
+        (\s+\*(?P<cid>\d+))?                            # Match any number
+        \s+(?P<message>[^,]*)                           # Match any character
+        (,\s+client:\s+(?P<client>[^,]+))?              # Match any character after ', client: '
+        (,\s+server:\s+(?P<server>[^,]+))?              # Match any character after ', server: '
+        (,\s+request:\s+"(?P<request>[^"]+)")?          # Match any character after ', request: '
+        (,\s+host:\s+"(?P<host>[^"]+)")?                # Match any character then ':' then any character after ', host: '
+        (,\s+referrer:\s+"(?P<referrer>[^"]+)")?        # Match any character after ', referrer: '
+        \s*$                                            # Match any number of whitespaces (to be discarded).
+    "#)
+    .expect("failed compiling regex for Nginx error log");
 }
 
 // Parse the time as Utc if we can extract the timezone.
@@ -108,7 +147,7 @@ fn capture_value(
 ) -> std::result::Result<Value, String> {
     Ok(match name {
         "timestamp" => Value::Timestamp(parse_time(&value, &timestamp_format)?),
-        "status" | "size" | "pid" | "port" => Value::Integer(
+        "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
             value
                 .parse()
                 .map_err(|_| format!("failed parsing {}", name))?,

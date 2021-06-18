@@ -1,13 +1,9 @@
 pub mod prelude;
 mod runtime;
 
-pub use compiler::{
-    function,
-    path::{self, Path},
-    state, value, Context, Expression, Function, Program, Target, Value,
-};
+pub use compiler::{function, state, value, Context, Expression, Function, Program, Target, Value};
 pub use diagnostic;
-pub use runtime::{Runtime, RuntimeResult};
+pub use runtime::{Runtime, RuntimeResult, Terminate};
 
 /// Compile a given source into the final [`Program`].
 pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {

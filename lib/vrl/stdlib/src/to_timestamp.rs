@@ -110,13 +110,29 @@ impl Expression for ToTimestampFn {
 
         let value = match self.value.resolve(ctx)? {
             v @ Timestamp(_) => v,
-            Integer(v) => Utc.timestamp(v, 0).into(),
-            Float(v) => Utc
-                .timestamp(
-                    v.trunc() as i64,
-                    (v.fract() * 1_000_000_000.0).round() as u32,
-                )
-                .into(),
+            Integer(v) => {
+                let t = Utc.timestamp_opt(v, 0).single();
+                match t {
+                    Some(time) => time.into(),
+                    None => {
+                        return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into())
+                    }
+                }
+            }
+            Float(v) => {
+                let t = Utc
+                    .timestamp_opt(
+                        v.trunc() as i64,
+                        (v.fract() * 1_000_000_000.0).round() as u32,
+                    )
+                    .single();
+                match t {
+                    Some(time) => time.into(),
+                    None => {
+                        return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into())
+                    }
+                }
+            }
             Bytes(v) => Conversion::Timestamp(TimeZone::Local)
                 .convert::<Value>(v)
                 .map_err(|err| err.to_string())?,
@@ -135,8 +151,38 @@ impl Expression for ToTimestampFn {
 }
 
 #[cfg(test)]
+#[allow(overflowing_literals)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
+    use vrl::prelude::expression::Literal;
+
+    #[test]
+    fn out_of_range_integer() {
+        let mut object: Value = BTreeMap::new().into();
+        let mut runtime_state = vrl::state::Runtime::default();
+        let mut ctx = Context::new(&mut object, &mut runtime_state);
+        let f = ToTimestampFn {
+            value: Box::new(Literal::Integer(9999999999999)),
+        };
+        let string = f.resolve(&mut ctx).err().unwrap().message();
+        assert_eq!(string, r#"unable to coerce 9999999999999 into "timestamp""#)
+    }
+
+    #[test]
+    fn out_of_range_float() {
+        let mut object: Value = BTreeMap::new().into();
+        let mut runtime_state = vrl::state::Runtime::default();
+        let mut ctx = Context::new(&mut object, &mut runtime_state);
+        let f = ToTimestampFn {
+            value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),
+        };
+        let string = f.resolve(&mut ctx).err().unwrap().message();
+        assert_eq!(
+            string,
+            r#"unable to coerce 9999999999999.9 into "timestamp""#
+        )
+    }
 
     test_function![
         to_timestamp => ToTimestamp;
@@ -151,6 +197,6 @@ mod tests {
              args: func_args![value: 1431648000.5],
              want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_milli(0, 0, 0, 500)),
              tdef: TypeDef::new().timestamp(),
-         }
+        }
     ];
 }

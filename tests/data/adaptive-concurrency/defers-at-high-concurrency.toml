@@ -15,8 +15,8 @@ mode = [4, 6]
 mean = [3.5, 5.0]
 
 [stats.rate]
-max = [55, 55]
-mean = [42, 43]
+max = [52, 52]
+mean = [43, 44]
 
 [controller.in_flight]
 max = [5, 7]

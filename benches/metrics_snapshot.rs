@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
+use criterion::{criterion_group, BenchmarkId, Criterion};
 
 fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("metrics_snapshot");
@@ -10,11 +10,7 @@ fn benchmark(c: &mut Criterion) {
             &cardinality,
             |b, &cardinality| {
                 let controller = prepare_metrics(cardinality);
-                b.iter(|| {
-                    let iter = vector::metrics::capture_metrics(controller);
-                    assert_cardinality_matches(&iter, cardinality);
-                    iter
-                });
+                b.iter(|| vector::metrics::capture_metrics(controller));
             },
         );
     }
@@ -30,18 +26,7 @@ fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
         metrics::counter!("test", 1, "idx" => format!("{}", idx));
     }
 
-    assert_cardinality_matches(&vector::metrics::capture_metrics(controller), cardinality);
-
     controller
-}
-
-/// This call has negligible (and cosistent) performance compared to the rest
-/// of the benches, however it performs the assertion over the data, effectively
-/// acting as an implicit blackbox.
-fn assert_cardinality_matches(iter: &impl Iterator, cardinality: usize) {
-    let iter = black_box(iter);
-    assert_eq!(iter.size_hint().0, cardinality);
-    assert_eq!(iter.size_hint().1.unwrap(), cardinality);
 }
 
 criterion_group!(benches, benchmark);

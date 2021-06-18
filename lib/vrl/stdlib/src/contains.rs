@@ -31,7 +31,7 @@ impl Function for Contains {
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
-        let case_sensitive = arguments.optional("case_sensitive");
+        let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
 
         Ok(Box::new(ContainsFn {
             value,
@@ -44,8 +44,8 @@ impl Function for Contains {
         &[
             Example {
                 title: "case sensitive",
-                source: r#"contains("banana", "ana")"#,
-                result: Ok(r#"true"#),
+                source: r#"contains("banana", "AnA")"#,
+                result: Ok(r#"false"#),
             },
             Example {
                 title: "case insensitive",
@@ -60,15 +60,12 @@ impl Function for Contains {
 struct ContainsFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,
-    case_sensitive: Option<Box<dyn Expression>>,
+    case_sensitive: Box<dyn Expression>,
 }
 
 impl Expression for ContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let case_sensitive = match &self.case_sensitive {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
-        };
+        let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
         let substring = {
             let bytes = self.substring.resolve(ctx)?.try_bytes()?;
@@ -150,7 +147,6 @@ mod tests {
         case_sensitive_yes {
             args: func_args![value: value!("fooBAR"),
                              substring: value!("BAR"),
-                             case_sensitive: true
             ],
             want: Ok(value!(true)),
             tdef: TypeDef::new().boolean().infallible(),
@@ -168,7 +164,6 @@ mod tests {
         case_sensitive_no_uppercase {
             args: func_args![value: value!("foobar"),
                              substring: value!("BAR"),
-                             case_sensitive: true
             ],
             want: Ok(value!(false)),
             tdef: TypeDef::new().boolean().infallible(),

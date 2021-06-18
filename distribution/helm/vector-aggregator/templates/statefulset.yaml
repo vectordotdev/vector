@@ -26,13 +26,13 @@ spec:
         {{- include "libvector.selectorLabels" . | nindent 8 }}
         vector.dev/exclude: "true"
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "libvector.imagePullSecrets" . | indent 6 }}
       serviceAccountName: {{ include "libvector.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.podPriorityClassName }}
+      priorityClassName: {{ .Values.podPriorityClassName }}
+      {{- end }}
       containers:
         - name: vector
           securityContext:

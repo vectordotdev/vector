@@ -38,8 +38,8 @@ components: transforms: lua: {
 		requirements: []
 		warnings: [
 			"""
-			The `lua` transform is ~60% slower than the [`remap` transform](\(urls.vector_remap_transform)), so we
-			recommended that you use the `remap` transform whenever possible. The `lua` transform is
+			The `lua` transform is ~60% slower than the [`remap` transform](\(urls.vector_remap_transform)); we
+			recommend that you use the `remap` transform whenever possible. The `lua` transform is
 			designed solely for edge cases not covered by the `remap` transform and not as a go-to option. If the
 			`remap` transform doesn't cover your use case, please [open an issue](\(urls.new_feature_request)) and let
 			us know.

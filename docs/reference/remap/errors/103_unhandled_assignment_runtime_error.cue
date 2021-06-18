@@ -1,7 +1,7 @@
 package metadata
 
 remap: errors: "103": {
-	title:       "Unhandled error"
+	title:       "Unhandled fallible assignment"
 	description: """
 		The right-hand side of this [assignment](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
 		is fallible (that is, it can produce a [runtime error](\(urls.vrl_runtime_errors))), but the error isn't
@@ -17,7 +17,7 @@ remap: errors: "103": {
 	examples: [...{
 		input: log: message: "key=value"
 		source: #"""
-			. |= parse_key_value(.message)
+			. = parse_key_value(.message)
 			"""#
 	}]
 
@@ -25,22 +25,22 @@ remap: errors: "103": {
 		{
 			"title": "\(title) (coalescing)"
 			diff: #"""
-				-. |= parse_key_value(.message)
-				+. |= parse_key_value(.message) ?? {}
+				-. = parse_key_value(.message)
+				+. = parse_key_value(.message) ?? {}
 				"""#
 		},
 		{
 			"title": "\(title) (raising)"
 			diff: #"""
-				-. |= parse_key_value(.message)
-				+. |= parse_key_value!(.message)
+				-. = parse_key_value(.message)
+				+. = parse_key_value!(.message)
 				"""#
 		},
 		{
 			"title": "\(title) (assigning)"
 			diff: #"""
-				-. |= parse_key_value(.message)
-				+., err |= parse_key_value(.message)
+				-. = parse_key_value(.message)
+				+., err = parse_key_value(.message)
 				"""#
 		},
 	]

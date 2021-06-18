@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    Event,
+    event::Event,
 };
 
 //------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ mod test {
     use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
-        Event,
+        event::Event,
     };
 
     #[test]

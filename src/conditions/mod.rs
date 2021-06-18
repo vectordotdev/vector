@@ -1,15 +1,15 @@
 use crate::config::component::ComponentDescription;
-use crate::Event;
+use crate::event::Event;
 use serde::{Deserialize, Serialize};
 
 pub mod check_fields;
 pub mod is_log;
 pub mod is_metric;
-pub mod remap;
+pub mod vrl;
 
 pub use check_fields::CheckFieldsConfig;
 
-use self::remap::RemapConfig;
+pub use self::vrl::VrlConfig;
 
 pub trait Condition: Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
@@ -38,6 +38,25 @@ pub type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
 
 inventory::collect!(ConditionDescription);
 
+/// A condition can either be a raw string such as
+/// `condition = '.message == "hooray"'`.
+/// In this case it is turned into a VRL condition.
+/// Otherwise it is a condition such as:
+///
+/// condition.type = 'check_fields'
+/// condition."message.equals" = 'hooray'
+///
+///
+/// It is important to note that because the way this is
+/// structured, it is wrong to flatten a field that contains
+/// an AnyCondition:
+///
+/// #[serde(flatten)]
+/// condition: AnyCondition,
+///
+/// This will result in an error when serializing to json
+/// which we need to do when determining which transforms have changed
+/// when a config is reloaded.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum AnyCondition {
@@ -48,7 +67,7 @@ pub enum AnyCondition {
 impl AnyCondition {
     pub fn build(&self) -> crate::Result<Box<dyn Condition>> {
         match self {
-            AnyCondition::String(s) => RemapConfig { source: s.clone() }.build(),
+            AnyCondition::String(s) => VrlConfig { source: s.clone() }.build(),
             AnyCondition::Map(m) => m.build(),
         }
     }
@@ -88,15 +107,15 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_anycondition_remap() {
+    fn deserialize_anycondition_vrl() {
         let conf: Test = toml::from_str(indoc! {r#"
-            condition.type = "remap"
+            condition.type = "vrl"
             condition.source = '.nork == true'
         "#})
         .unwrap();
 
         assert_eq!(
-            r#"Map(RemapConfig { source: ".nork == true" })"#,
+            r#"Map(VrlConfig { source: ".nork == true" })"#,
             format!("{:?}", conf.condition)
         )
     }

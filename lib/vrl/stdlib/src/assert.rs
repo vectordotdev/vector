@@ -57,15 +57,6 @@ struct AssertFn {
     message: Option<Box<dyn Expression>>,
 }
 
-impl AssertFn {
-    /*
-    #[cfg(test)]
-    fn new(condition: Box<dyn Expression>, message: Option<Box<dyn Expression>>) -> Self {
-        Self { condition, message }
-    }
-    */
-}
-
 impl Expression for AssertFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.condition.resolve(ctx)?.try_boolean()? {

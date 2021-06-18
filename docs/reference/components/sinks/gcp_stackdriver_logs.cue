@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: gcp_stackdriver_logs: {
-	title: "GCP Operations (formerly Stackdrive) Logs"
+	title: "GCP Operations (formerly Stackdriver) Logs"
 
 	classes: {
 		commonly_used: true
@@ -20,7 +20,6 @@ components: sinks: gcp_stackdriver_logs: {
 				enabled:      true
 				common:       false
 				max_bytes:    5242880
-				max_events:   null
 				timeout_secs: 1
 			}
 			compression: enabled: false

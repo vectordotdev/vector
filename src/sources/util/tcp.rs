@@ -1,19 +1,22 @@
 use crate::{
     config::Resource,
-    internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
+    event::Event,
+    internal_events::{ConnectionOpen, OpenGauge, TcpSendAckError, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    Event, Pipeline,
+    Pipeline,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
+use socket2::SockRef;
+use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
+    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
-    time::delay_for,
+    time::sleep,
 };
 use tokio_util::codec::{Decoder, FramedRead, LinesCodecError};
 use tracing_futures::Instrument;
@@ -51,17 +54,17 @@ async fn make_listener(
     }
 }
 pub trait IsErrorFatal {
-    fn is_error_fatal() -> bool;
+    fn is_error_fatal(&self) -> bool;
 }
 
 impl IsErrorFatal for LinesCodecError {
-    fn is_error_fatal() -> bool {
+    fn is_error_fatal(&self) -> bool {
         false
     }
 }
 
 impl IsErrorFatal for std::io::Error {
-    fn is_error_fatal() -> bool {
+    fn is_error_fatal(&self) -> bool {
         true
     }
 }
@@ -79,6 +82,10 @@ where
 
     fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
 
+    fn build_ack(&self, _frame: &<Self::Decoder as Decoder>::Item) -> Bytes {
+        Bytes::new()
+    }
+
     fn run(
         self,
         addr: SocketListenAddr,
@@ -86,7 +93,7 @@ where
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         receive_buffer_bytes: Option<usize>,
-        shutdown: ShutdownSignal,
+        shutdown_signal: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
@@ -107,20 +114,21 @@ where
                     .unwrap_or(addr)
             );
 
-            let tripwire = shutdown.clone();
+            let tripwire = shutdown_signal.clone();
             let tripwire = async move {
                 let _ = tripwire.await;
-                delay_for(Duration::from_secs(shutdown_timeout_secs)).await;
+                sleep(Duration::from_secs(shutdown_timeout_secs)).await;
             }
             .shared();
 
             let connection_gauge = OpenGauge::new();
+            let shutdown_clone = shutdown_signal.clone();
 
             listener
                 .accept_stream()
-                .take_until(shutdown.clone())
-                .for_each(|connection| {
-                    let shutdown = shutdown.clone();
+                .take_until(shutdown_clone)
+                .for_each(move |connection| {
+                    let shutdown_signal = shutdown_signal.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
                     let out = out.clone();
@@ -159,7 +167,7 @@ where
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
                             let fut = handle_stream(
-                                shutdown,
+                                shutdown_signal,
                                 socket,
                                 keepalive,
                                 receive_buffer_bytes,
@@ -182,14 +190,14 @@ where
 }
 
 async fn handle_stream<T>(
-    mut shutdown: ShutdownSignal,
+    mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
     source: T,
-    tripwire: BoxFuture<'static, ()>,
+    mut tripwire: BoxFuture<'static, ()>,
     host: Bytes,
-    out: impl Sink<Event> + Send + 'static,
+    mut out: impl Sink<Event> + Send + 'static + Unpin,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -201,7 +209,7 @@ async fn handle_stream<T>(
                 return;
             }
         },
-        _ = &mut shutdown => {
+        _ = &mut shutdown_signal => {
             return;
         }
     };
@@ -218,59 +226,64 @@ async fn handle_stream<T>(
         }
     }
 
-    let mut _token = None;
-    let mut shutdown = Some(shutdown);
     let mut reader = FramedRead::new(socket, source.decoder());
-    stream::poll_fn(move |cx| {
-        if let Some(fut) = shutdown.as_mut() {
-            match fut.poll_unpin(cx) {
-                Poll::Ready(token) => {
-                    debug!("Start graceful shutdown.");
-                    // Close our write part of TCP socket to signal the other side
-                    // that it should stop writing and close the channel.
-                    let socket: Option<&TcpStream> = reader.get_ref().get_ref();
-                    if let Some(socket) = socket {
-                        if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
-                        }
-                    } else {
-                        // Connection hasn't yet been established so we are done here.
-                        debug!("Closing connection that hasn't yet been fully established.");
-                        return Poll::Ready(None);
+
+    loop {
+        tokio::select! {
+            _ = &mut tripwire => break,
+            _ = &mut shutdown_signal => {
+                debug!("Start graceful shutdown.");
+                // Close our write part of TCP socket to signal the other side
+                // that it should stop writing and close the channel.
+                let socket = reader.get_ref();
+                if let Some(stream) = socket.get_ref() {
+                    let socket = SockRef::from(stream);
+                    if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
+                        warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
                     }
-
-                    _token = Some(token);
-                    shutdown = None;
+                } else {
+                    // Connection hasn't yet been established so we are done here.
+                    debug!("Closing connection that hasn't yet been fully established.");
+                    break;
                 }
-                Poll::Pending => {}
-            }
-        }
+            },
+            res = reader.next() => {
+                match res {
+                    Some(Ok(frame)) => {
+                        let host = host.clone();
+                        let ack = source.build_ack(&frame);
 
-        reader.poll_next_unpin(cx)
-    })
-    .take_until(tripwire)
-    .take_while(move |frame| ready(
-        match frame {
-            Ok(_) => true,
-            Err(_) => {
-                !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal()
+                        if let Some(event) = source.build_event(frame, host) {
+                            match out.send(event).await {
+                                Ok(_) => {
+                                    let stream = reader.get_mut();
+                                    if let Err(error) = stream.write_all(&ack).await {
+                                        emit!(TcpSendAckError{ error });
+                                        break;
+                                    }
+                                }
+                                Err(_) => {
+                                    warn!("Failed to send event.");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Some(Err(error)) => {
+                        if <<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(&error) {
+                            warn!(message = "Failed to read data from TCP source.", %error);
+                            break;
+                        }
+                    }
+                    None => {
+                        debug!("Connection closed.");
+                        break
+                    },
+                }
             }
+            else => break,
         }
-    ))
-    .filter_map(move |frame| ready(match frame {
-        Ok(frame) => {
-            let host = host.clone();
-            source.build_event(frame, host).map(Ok)
-        }
-        Err(error) => {
-            warn!(message = "Failed to read data from TCP source.", %error);
-            None
-        }
-    }))
-    .forward(out)
-    .map_err(|_| warn!(message = "Error received while processing TCP source."))
-    .map(|_| debug!("Connection closed."))
-    .await
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]

@@ -15,6 +15,7 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
+  - docs                # A documentation change
 
 scopes:
   - new source
@@ -54,7 +55,6 @@ scopes:
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
-  - remap # Anything related to the Vector Remap Language
   - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector
@@ -67,6 +67,8 @@ scopes:
   - topology # Anything related to Vector's topology code
   - traces # Anything related to Vectors' trace events
   - transforms # Anything related to Vector's transform components
+  - unit tests # Anything related to Vector's unit testing feature
+  - vrl # Anything related to the Vector Remap Language
 
   # platforms
   - amazon-linux platform # Anything `amazon-linux` platform related
@@ -76,6 +78,7 @@ scopes:
   - debian platform # Anything `debian` platform related
   - docker platform # Anything `docker` platform related
   - dpkg platform # Anything `dpkg` platform related
+  - helm platform # Anything `helm` platform related
   - heroku platform # Anything `heroku` platform related
   - homebrew platform # Anything `homebrew` platform related
   - kubernetes platform # Anything `kubernetes` platform related
@@ -161,9 +164,9 @@ scopes:
   - remove_fields transform # Anything `remove_fields` transform related
   - remove_tags transform # Anything `remove_tags` transform related
   - rename_fields transform # Anything `rename_fields` transform related
+  - route transform # Anything `route` transform related
   - sample transform # Anything `sample` transform related
   - split transform # Anything `split` transform related
-  - route transform # Anything `route` transform related
   - tag_cardinality_limit transform # Anything `tag_cardinality_limit` transform related
   - tokenizer transform # Anything `tokenizer` transform related
   - wasm transform # Anything `wasm` transform related

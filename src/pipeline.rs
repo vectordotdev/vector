@@ -1,7 +1,11 @@
-use crate::{internal_events::EventOut, transforms::FunctionTransform, Event};
-use futures::{task::Poll, Sink};
+use crate::{internal_events::EventOut, transforms::FunctionTransform};
+use futures::{channel::mpsc, task::Poll, Sink};
+#[cfg(test)]
+use futures::{Stream, StreamExt};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
-use tokio::sync::mpsc;
+use vector_core::event::Event;
+#[cfg(test)]
+use vector_core::event::EventStatus;
 
 #[derive(Debug)]
 pub struct ClosedError;
@@ -31,8 +35,6 @@ impl Pipeline {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
-        use mpsc::error::TrySendError::*;
-
         while let Some(event) = self.enqueued.pop_front() {
             match self.inner.poll_ready(cx) {
                 Poll::Pending => {
@@ -45,19 +47,20 @@ impl Pipeline {
                 Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
             }
 
-            match self.inner.try_send(event) {
+            match self.inner.start_send(event) {
                 Ok(()) => {
                     // we good, keep looping
                 }
-                Err(Full(_item)) => {
+                Err(error) if error.is_full() => {
                     // We only try to send after a successful call to poll_ready, which reserves
                     // space for us in the channel. That makes this branch unreachable as long as
                     // the channel implementation fulfills its own contract.
                     panic!("Channel was both ready and full; this is a bug.")
                 }
-                Err(Closed(_item)) => {
+                Err(error) if error.is_disconnected() => {
                     return Poll::Ready(Err(ClosedError));
                 }
+                Err(_) => unreachable!(),
             }
         }
         Poll::Ready(Ok(()))
@@ -106,6 +109,21 @@ impl Pipeline {
         Self::new_with_buffer(100, vec![])
     }
 
+    #[cfg(test)]
+    pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
+        let (pipe, recv) = Self::new_with_buffer(100, vec![]);
+        // In a source test pipeline, there is no sink to acknowledge
+        // events, so we have to add a map to the receiver to handle the
+        // finalization.
+        let recv = recv.map(move |mut event| {
+            let metadata = event.metadata_mut();
+            metadata.update_status(status);
+            metadata.update_sources();
+            event
+        });
+        (pipe, recv)
+    }
+
     pub fn new_with_buffer(
         n: usize,
         inlines: Vec<Box<dyn FunctionTransform>>,
@@ -132,9 +150,9 @@ impl Pipeline {
 mod test {
     use super::Pipeline;
     use crate::{
+        event::{Event, Value},
         test_util::collect_ready,
         transforms::{add_fields::AddFields, filter::Filter},
-        Event, Value,
     };
     use futures::SinkExt;
     use serde_json::json;

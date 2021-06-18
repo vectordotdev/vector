@@ -53,12 +53,11 @@ components: transforms: "remap": {
 			type: string: {
 				examples: [
 					"""
-						. = parse_json(.message)
+						. = parse_json!(.message)
 						.new_field = "new value"
-						.status = to_int(.status)
-						.duration = parse_duration(.duration, "s")
-						.new_name = .old_name
-						del(.old_name)
+						.status = to_int!(.status)
+						.duration = parse_duration!(.duration, "s")
+						.new_name = del(.old_name)
 						""",
 				]
 				syntax: "remap_program"
@@ -70,9 +69,15 @@ components: transforms: "remap": {
 			description: """
 				Drop the event if the VRL program returns an error at runtime.
 				"""
-			type: bool: {
-				default: false
-			}
+			type: bool: default: false
+		}
+		drop_on_abort: {
+			common:   false
+			required: false
+			description: """
+				Drop the event if the VRL program is manually aborted through the `abort` statement.
+				"""
+			type: bool: default: true
 		}
 	}
 
@@ -131,6 +136,18 @@ components: transforms: "remap": {
 
 				Learn more about Runtime Errors in the [Vector Remap Language
 				reference](\#(urls.vrl_runtime_errors)).
+				"""#
+		}
+		emitting_multiple_events: {
+			title: "Emitting multiple log events"
+			body: #"""
+				Multiple log events can be emitted from remap by assigning an array
+				to the root path `.`. One log event will be emitted for each input
+				element of the array.
+
+				If any of the array elements is not an object, a log event will
+				be created that uses the element value as the `message` key. For
+				example, `123` will be emitted as `{ "message": 123 }`
 				"""#
 		}
 	}

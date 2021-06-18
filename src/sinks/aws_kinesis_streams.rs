@@ -2,12 +2,13 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedEvent, EncodedLength, TowerRequestConfig,
+        VecBuffer,
     },
 };
 use bytes::Bytes;
@@ -52,7 +53,7 @@ pub struct KinesisSinkConfig {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    pub auth: AWSAuthentication,
+    pub auth: AwsAuthentication,
 }
 
 lazy_static! {
@@ -269,7 +270,7 @@ fn encode_event(
     mut event: Event,
     partition_key_field: &Option<String>,
     encoding: &EncodingConfig<Encoding>,
-) -> Option<PutRecordsRequestEntry> {
+) -> Option<EncodedEvent<PutRecordsRequestEntry>> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {
         if let Some(v) = event.as_log().get(&partition_key_field) {
             v.to_string_lossy()
@@ -302,11 +303,11 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
-    Some(PutRecordsRequestEntry {
+    Some(EncodedEvent::new(PutRecordsRequestEntry {
         data: Bytes::from(data),
         partition_key,
         ..Default::default()
-    })
+    }))
 }
 
 fn gen_partition_key() -> String {
@@ -334,7 +335,7 @@ mod tests {
         let message = "hello world".to_string();
         let event = encode_event(message.clone().into(), &None, &Encoding::Text.into()).unwrap();
 
-        assert_eq!(&event.data[..], message.as_bytes());
+        assert_eq!(&event.item.data[..], message.as_bytes());
     }
 
     #[test]
@@ -344,7 +345,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &None, &Encoding::Json.into()).unwrap();
 
-        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&event.item.data[..]).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
@@ -356,8 +357,8 @@ mod tests {
         event.as_mut_log().insert("key", "some_key");
         let event = encode_event(event, &Some("key".into()), &Encoding::Text.into()).unwrap();
 
-        assert_eq!(&event.data[..], b"hello world");
-        assert_eq!(&event.partition_key, &"some_key".to_string());
+        assert_eq!(&event.item.data[..], b"hello world");
+        assert_eq!(&event.item.partition_key, &"some_key".to_string());
     }
 
     #[test]
@@ -366,8 +367,8 @@ mod tests {
         event.as_mut_log().insert("key", random_string(300));
         let event = encode_event(event, &Some("key".into()), &Encoding::Text.into()).unwrap();
 
-        assert_eq!(&event.data[..], b"hello world");
-        assert_eq!(event.partition_key.len(), 256);
+        assert_eq!(&event.item.data[..], b"hello world");
+        assert_eq!(event.item.partition_key.len(), 256);
     }
 
     #[test]
@@ -379,9 +380,9 @@ mod tests {
         encoding.except_fields = Some(vec!["key".into()]);
 
         let event = encode_event(event, &Some("key".into()), &encoding).unwrap();
-        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&event.item.data[..]).unwrap();
 
-        assert_eq!(&event.partition_key, &"some_key".to_string());
+        assert_eq!(&event.item.partition_key, &"some_key".to_string());
         assert!(!map.contains_key("key"));
     }
 }
@@ -398,7 +399,7 @@ mod integration_tests {
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn kinesis_put_records() {
@@ -433,12 +434,12 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
         let mut events = events.map(Ok);
 
         let _ = sink.send_all(&mut events).await.unwrap();
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let timestamp = timestamp as f64 / 1000.0;
         let records = fetch_records(stream, timestamp, region).await.unwrap();
@@ -509,7 +510,7 @@ mod integration_tests {
         //
         // I initially tried using `wait_for` with `DescribeStream` but localstack would
         // successfully return the stream before it was able to accept PutRecords requests
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
     }
 
     fn gen_stream() -> String {

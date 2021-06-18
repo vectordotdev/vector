@@ -42,9 +42,10 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.8.0
+      - uses: styfle/cancel-workflow-action@0.9.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
+          all_but_latest: true # can cancel workflows scheduled later
 
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
@@ -54,15 +55,15 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
@@ -88,21 +89,20 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
-      - uses: actions/github-script@v3.1
+      - uses: actions/github-script@v4.0.2
         id: set-matrix
         with:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.15.1",
+              "v1.21.0",
             ]
             const kubernetes_version = [
               { version: "v1.19.2", is_essential: true },
               { version: "v1.18.9" },
               { version: "v1.17.12" },
-              { version: "v1.16.15" }, // v1.16.13 is broken, see https://github.com/kubernetes/kubernetes/issues/93194
+              { version: "v1.16.15" },
               { version: "v1.15.12" },
-              { version: "v1.14.10" },
             ]
             const container_runtime = [
               "docker",
@@ -144,7 +144,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
       - uses: actions/download-artifact@v2
         with:
           name: e2e-test-deb-package

@@ -245,6 +245,7 @@ pub enum Token<S> {
     Null,
     False,
     True,
+    Abort,
 
     // tokens
     Colon,
@@ -325,6 +326,7 @@ impl<S> Token<S> {
             If => If,
             Null => Null,
             True => True,
+            Abort => Abort,
 
             // tokens
             Colon => Colon,
@@ -378,6 +380,7 @@ where
             If => "If",
             Null => "Null",
             True => "True",
+            Abort => "Abort",
 
             // tokens
             Colon => "Colon",
@@ -418,13 +421,15 @@ impl<'input> Token<&'input str> {
             "true" => True,
             "false" => False,
             "null" => Null,
+            "abort" => Abort,
 
             // reserved identifiers
-            "abort" | "array" | "bool" | "boolean" | "break" | "continue" | "do" | "emit"
-            | "float" | "for" | "forall" | "foreach" | "all" | "each" | "any" | "try"
-            | "undefined" | "int" | "integer" | "iter" | "object" | "regex" | "return"
-            | "string" | "traverse" | "timestamp" | "duration" | "unless" | "walk" | "while"
-            | "loop" => ReservedIdentifier(s),
+            "array" | "bool" | "boolean" | "break" | "continue" | "do" | "emit" | "float"
+            | "for" | "forall" | "foreach" | "all" | "each" | "any" | "try" | "undefined"
+            | "int" | "integer" | "iter" | "object" | "regex" | "return" | "string"
+            | "traverse" | "timestamp" | "duration" | "unless" | "walk" | "while" | "loop" => {
+                ReservedIdentifier(s)
+            }
 
             _ if s.contains('@') => PathField(s),
 
@@ -465,9 +470,13 @@ impl<'input> Iterator for Lexer<'input> {
             //
             // We don't advance the internal iterator, because this token does not
             // represent a physical character, instead it is a boundary marker.
-            if self.query_start(start) {
-                // dbg!("LQuery"); // NOTE: uncomment this for debugging
-                return Some(Ok(self.token2(start, start + 1, LQuery)));
+            match self.query_start(start) {
+                Err(err) => return Some(Err(err)),
+                Ok(true) => {
+                    // dbg!("LQuery"); // NOTE: uncomment this for debugging
+                    return Some(Ok(self.token2(start, start + 1, LQuery)));
+                }
+                Ok(false) => (),
             }
 
             // Check if we need to emit a `RQuery` token.
@@ -523,7 +532,7 @@ impl<'input> Iterator for Lexer<'input> {
 
                     ch if is_ident_start(ch) => Some(Ok(self.identifier_or_function_call(start))),
                     ch if is_digit(ch) || (ch == '-' && self.test_peek(is_digit)) => {
-                        Some(self.numeric_literal(start))
+                        Some(self.numeric_literal_or_identifier(start))
                     }
                     ch if is_operator(ch) => Some(Ok(self.operator(start))),
                     ch if ch.is_whitespace() => continue,
@@ -596,16 +605,16 @@ impl<'input> Lexer<'input> {
         }
     }
 
-    fn query_start(&mut self, start: usize) -> bool {
+    fn query_start(&mut self, start: usize) -> Result<bool, Error> {
         // If we already opened a query for the current position, we don't want
         // to open another one.
         if self.rquery_indices.last() == Some(&start) {
-            return false;
+            return Ok(false);
         }
 
         // If the iterator is at the end, we don't want to open another one
         if self.peek().is_none() {
-            return false;
+            return Ok(false);
         }
 
         // Take a clone of the existing chars iterator, to allow us to look
@@ -618,7 +627,7 @@ impl<'input> Lexer<'input> {
         // character. We know there's at least one more char, given the above
         // assertion.
         if !is_query_start(chars.peek().unwrap().1) {
-            return false;
+            return Ok(false);
         }
 
         // Track if the current chain is a valid one.
@@ -746,49 +755,70 @@ impl<'input> Lexer<'input> {
                     while let Some((pos, ch)) = chars.peek() {
                         let pos = *pos;
 
-                        let literal_check = |result: SpannedResult<'input, usize>, chars: &mut Peekable<CharIndices<'input>>| match result {
-                            Err(_) => Err(()),
-                            Ok((_, _, new)) => {
-                                #[allow(clippy::while_let_on_iterator)]
-                                while let Some((i, _)) = chars.next() {
-                                    if i == new + pos {
-                                        break;
-                                    }
+                        let literal_check = |result: Spanned<'input, usize>, chars: &mut Peekable<CharIndices<'input>>| {
+                            let (_, _, new) = result;
+
+                            #[allow(clippy::while_let_on_iterator)]
+                            while let Some((i, _)) = chars.next() {
+                                if i == new + pos {
+                                    break;
                                 }
-                                match chars.peek().map(|(_, ch)| ch) {
-                                    Some(ch) => Ok(*ch),
-                                    None => Err(()),
-                                }
+                            }
+                            match chars.peek().map(|(_, ch)| ch) {
+                                Some(ch) => Ok(*ch),
+                                None => Err(()),
                             }
                         };
 
                         let ch = match &self.input[pos..] {
                             s if s.starts_with('"') => {
-                                let r = Lexer::new(&self.input[pos + 1..]).string_literal(0);
+                                let r = Lexer::new(&self.input[pos + 1..]).string_literal(0)?;
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
-                                    Err(_) => continue,
+                                    Err(_) => {
+                                        // The call to lexer above should have raised an appropriate error by now,
+                                        // so these errors should only occur if there is a bug somewhere previously.
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of string literal."
+                                                .to_string(),
+                                        ));
+                                    }
                                 }
                             }
                             s if s.starts_with("s'") => {
-                                let r = Lexer::new(&self.input[pos + 1..]).raw_string_literal(0);
+                                let r = Lexer::new(&self.input[pos + 1..]).raw_string_literal(0)?;
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
-                                    Err(_) => continue,
+                                    Err(_) => {
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of raw string literal."
+                                                .to_string(),
+                                        ));
+                                    }
                                 }
                             }
                             s if s.starts_with("r'") => {
-                                let r = Lexer::new(&self.input[pos + 1..]).regex_literal(0);
+                                let r = Lexer::new(&self.input[pos + 1..]).regex_literal(0)?;
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
-                                    Err(_) => continue,
+                                    Err(_) => {
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of regex literal."
+                                                .to_string(),
+                                        ));
+                                    }
                                 }
                             }
                             s if s.starts_with("t'") => {
-                                let r = Lexer::new(&self.input[pos + 1..]).timestamp_literal(0);
+                                let r = Lexer::new(&self.input[pos + 1..]).timestamp_literal(0)?;
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
-                                    Err(_) => continue,
+                                    Err(_) => {
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of timestamp literal."
+                                                .to_string(),
+                                        ));
+                                    }
                                 }
                             }
                             _ => *ch,
@@ -854,16 +884,16 @@ impl<'input> Lexer<'input> {
 
         // Skip invalid query chains
         if !valid {
-            return false;
+            return Ok(false);
         }
 
         // If we already tracked the current chain, we want to ignore another one.
         if self.rquery_indices.contains(&end) {
-            return false;
+            return Ok(false);
         }
 
         self.rquery_indices.push(end);
-        true
+        Ok(true)
     }
 
     fn string_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
@@ -900,10 +930,16 @@ impl<'input> Lexer<'input> {
         self.quoted_literal(start, Token::TimestampLiteral)
     }
 
-    fn numeric_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
+    fn numeric_literal_or_identifier(&mut self, start: usize) -> SpannedResult<'input, usize> {
         let (end, int) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
+        let negative = self.input.get(start..start + 1) == Some("-");
         match self.peek() {
+            Some((_, ch)) if is_ident_continue(ch) && !negative => {
+                self.bump();
+                let (end, ident) = self.take_while(start, is_ident_continue);
+                Ok((start, Token::ident(ident), end))
+            }
             Some((_, '.')) => {
                 self.bump();
                 let (end, float) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
@@ -1135,7 +1171,7 @@ mod test {
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);
-        Box::new(std::iter::from_fn(move || Some(lexer.next()?)))
+        Box::new(std::iter::from_fn(move || lexer.next()))
     }
 
     // only exists to visually align assertions with inputs in tests
@@ -1160,6 +1196,27 @@ mod test {
         assert_eq!(count, length);
         assert!(count > 0);
         assert!(lexer.next().is_none());
+    }
+
+    #[test]
+    fn unterminated_literal_errors() {
+        let mut lexer = Lexer::new("a(m, r')");
+        assert_eq!(Some(Err(Error::Literal { start: 0 })), lexer.next());
+    }
+
+    #[test]
+    fn invalid_grok_pattern() {
+        // Grok pattern has an invalid escape char -> `\]`
+        let mut lexer = Lexer::new(
+            r#"parse_grok!("1.2.3.4 - - [23/Mar/2021:06:46:35 +0000]", "%{IPORHOST:remote_ip} %{USER:ident} %{USER:user_name} \[%{HTTPDATE:timestamp}\]""#,
+        );
+        assert_eq!(
+            Some(Err(Error::EscapeChar {
+                start: 55,
+                ch: Some('[')
+            })),
+            lexer.next()
+        );
     }
 
     #[test]
@@ -1715,6 +1772,26 @@ mod test {
                 (r#"                                     ~     "#, Dot),
                 (r#"                                      ~~~~~"#, Identifier("child")),
                 (r#"                                          ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn queries_digit_path() {
+        test(
+            data(r#".0foo foo.00_7bar.tar"#),
+            vec![
+                (r#"~                    "#, LQuery),
+                (r#"~                    "#, Dot),
+                (r#" ~~~~                "#, Identifier("0foo")),
+                (r#"    ~                "#, RQuery),
+                (r#"      ~              "#, LQuery),
+                (r#"      ~~~            "#, Identifier("foo")),
+                (r#"         ~           "#, Dot),
+                (r#"          ~~~~~~~    "#, Identifier("00_7bar")),
+                (r#"                 ~   "#, Dot),
+                (r#"                  ~~~"#, Identifier("tar")),
+                (r#"                    ~"#, RQuery),
             ],
         );
     }

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
@@ -8,6 +8,7 @@ use crate::{
 use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[derivative(Default)]
@@ -26,20 +27,19 @@ impl_generate_config_from_default!(InternalMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.scrape_interval_secs == 0 {
             warn!(
                 "Interval set to 0 secs, this could result in high CPU utilization. It is suggested to use interval >= 1 secs.",
             );
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
-        Ok(Box::pin(run(get_controller()?, interval, out, shutdown)))
+        Ok(Box::pin(run(
+            get_controller()?,
+            interval,
+            cx.out,
+            cx.shutdown,
+        )))
     }
 
     fn output_type(&self) -> DataType {
@@ -60,7 +60,7 @@ async fn run(
     let mut out =
         out.sink_map_err(|error| error!(message = "Error sending internal metrics.", %error));
 
-    let mut interval = time::interval(interval).take_until(shutdown);
+    let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
         let metrics = capture_metrics(controller);
         out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
@@ -71,7 +71,7 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
-    use crate::event::metric::{Metric, MetricValue, StatisticKind};
+    use crate::event::metric::{Metric, MetricValue};
     use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, histogram};
     use std::collections::BTreeMap;
@@ -94,8 +94,8 @@ mod tests {
         counter!("bar", 4);
         histogram!("baz", 5.0);
         histogram!("baz", 6.0);
-        histogram!("quux", 7.0, "host" => "foo");
         histogram!("quux", 8.0, "host" => "foo");
+        histogram!("quux", 8.1, "host" => "foo");
 
         let controller = get_controller().expect("no controller");
 
@@ -109,25 +109,43 @@ mod tests {
             })
             .collect::<BTreeMap<String, Metric>>();
 
-        assert_eq!(MetricValue::Gauge { value: 2.0 }, output["foo"].data.value);
-        assert_eq!(
-            MetricValue::Counter { value: 7.0 },
-            output["bar"].data.value
-        );
-        assert_eq!(
-            MetricValue::Distribution {
-                samples: crate::samples![5.0 => 1, 6.0 => 1],
-                statistic: StatisticKind::Histogram
-            },
-            output["baz"].data.value
-        );
-        assert_eq!(
-            MetricValue::Distribution {
-                samples: crate::samples![7.0 => 1, 8.0 => 1],
-                statistic: StatisticKind::Histogram
-            },
-            output["quux"].data.value
-        );
+        assert_eq!(&MetricValue::Gauge { value: 2.0 }, output["foo"].value());
+        assert_eq!(&MetricValue::Counter { value: 7.0 }, output["bar"].value());
+
+        match &output["baz"].value() {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                // This index is _only_ stable so long as the offsets in
+                // [`metrics::handle::Histogram::new`] are hard-coded. If this
+                // check fails you might look there and see if we've allowed
+                // users to set their own bucket widths.
+                assert_eq!(buckets[11].count, 2);
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 11.0);
+            }
+            _ => panic!("wrong type"),
+        }
+
+        match &output["quux"].value() {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                // This index is _only_ stable so long as the offsets in
+                // [`metrics::handle::Histogram::new`] are hard-coded. If this
+                // check fails you might look there and see if we've allowed
+                // users to set their own bucket widths.
+                assert_eq!(buckets[11].count, 1);
+                assert_eq!(buckets[12].count, 1);
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 16.1);
+            }
+            _ => panic!("wrong type"),
+        }
 
         let mut labels = BTreeMap::new();
         labels.insert(String::from("host"), String::from("foo"));

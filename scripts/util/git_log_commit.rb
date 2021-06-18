@@ -3,7 +3,7 @@ module Vector
     class << self
       def fetch_since!(last_version)
         range = "v#{last_version}..."
-        commit_log = `git log #{range} --no-merges --pretty=format:'%H\t%s\t%aN\t%ad'`.chomp
+        commit_log = `git log #{range} --cherry-pick --right-only --no-merges --pretty=format:'%H\t%s\t%aN\t%ad'`.chomp
         commit_lines = commit_log.split("\n").reverse
 
         commit_lines.collect do |commit_line|
@@ -96,9 +96,9 @@ module Vector
     def initialize(hash)
       @author = hash.fetch("author")
       @date = hash.fetch("date")
-      @deletions_count = hash.fetch("deletions_count")
-      @files_count = hash.fetch("files_count")
-      @insertions_count = hash.fetch("insertions_count")
+      @deletions_count = hash.fetch("deletions_count", 0)
+      @files_count = hash.fetch("files_count", 0)
+      @insertions_count = hash.fetch("insertions_count", 0)
       @message = hash.fetch("message")
       @sha = hash.fetch("sha")
     end

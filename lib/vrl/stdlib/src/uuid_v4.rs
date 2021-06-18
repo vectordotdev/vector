@@ -38,28 +38,30 @@ impl Expression for UuidV4Fn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
-//     use std::convert::TryFrom;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![static_def {
-//         expr: |_| UuidV4Fn,
-//         def: TypeDef {
-//             kind: value::Kind::Bytes,
-//             ..Default::default()
-//         },
-//     }];
+    test_type_def![default {
+        expr: |_| { UuidV4Fn },
+        want: TypeDef::new().infallible().bytes(),
+    }];
 
-//     #[test]
-//     fn uuid_v4() {
-//         let mut state = state::Program::default();
-//         let mut object: Value = map![].into();
-//         let value = UuidV4Fn.resolve(&mut ctx).unwrap();
+    #[test]
+    fn uuid_v4() {
+        let mut state = vrl::state::Runtime::default();
+        let mut object: Value = map![].into();
+        let mut ctx = Context::new(&mut object, &mut state);
+        let value = UuidV4Fn.resolve(&mut ctx).unwrap();
 
-//         assert!(matches!(&value, Value::Bytes(_)));
+        assert!(matches!(&value, Value::Bytes(_)));
 
-//         uuid::Uuid::parse_str(&String::try_from(value).unwrap()).expect("valid UUID V4");
-//     }
-// }
+        match value {
+            Value::Bytes(val) => {
+                let val = String::from_utf8_lossy(&val);
+                uuid::Uuid::parse_str(&val).expect("valid UUID V4");
+            }
+            _ => unreachable!(),
+        }
+    }
+}

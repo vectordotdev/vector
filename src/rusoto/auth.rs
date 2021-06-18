@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derivative(Default)]
 #[serde(untagged)]
 #[serde(deny_unknown_fields)]
-pub enum AWSAuthentication {
+pub enum AwsAuthentication {
     Static {
         access_key_id: String,
         secret_access_key: String,
@@ -23,7 +23,7 @@ pub enum AWSAuthentication {
     Default {},
 }
 
-impl AWSAuthentication {
+impl AwsAuthentication {
     pub fn build(
         &self,
         region: &Region,
@@ -66,7 +66,7 @@ mod tests {
     struct ComponentConfig {
         assume_role: Option<String>,
         #[serde(default)]
-        auth: AWSAuthentication,
+        auth: AwsAuthentication,
     }
 
     #[test]
@@ -77,7 +77,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AWSAuthentication::Default {}));
+        assert!(matches!(config.auth, AwsAuthentication::Default {}));
     }
 
     #[test]
@@ -89,7 +89,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AWSAuthentication::Default {}));
+        assert!(matches!(config.auth, AwsAuthentication::Default {}));
     }
 
     #[test]
@@ -101,7 +101,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AWSAuthentication::Role { .. }));
+        assert!(matches!(config.auth, AwsAuthentication::Role { .. }));
     }
 
     #[test]
@@ -115,7 +115,7 @@ mod tests {
         .unwrap();
 
         match config.auth {
-            AWSAuthentication::Role { assume_role } => assert_eq!(&assume_role, "auth.root"),
+            AwsAuthentication::Role { assume_role } => assert_eq!(&assume_role, "auth.root"),
             _ => panic!(),
         }
     }
@@ -130,6 +130,6 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AWSAuthentication::Static { .. }));
+        assert!(matches!(config.auth, AwsAuthentication::Static { .. }));
     }
 }

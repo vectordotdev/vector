@@ -1,6 +1,7 @@
 use crate::{
     buffers::Acker,
     config::SinkContext,
+    event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
         UnixSocketConnectionFailed, UnixSocketError,
@@ -10,11 +11,10 @@ use crate::{
         util::{
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
-            StreamSink,
+            EncodedEvent, StreamSink,
         },
         Healthcheck, VectorSink,
     },
-    Event,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -22,7 +22,7 @@ use futures::{stream::BoxStream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
-use tokio::{net::UnixStream, time::delay_for};
+use tokio::{net::UnixStream, time::sleep};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -44,7 +44,7 @@ impl UnixSinkConfig {
     pub fn build(
         &self,
         cx: SinkContext,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
         let sink = UnixSink::new(connector.clone(), cx.acker(), encode_event);
@@ -89,7 +89,7 @@ impl UnixConnector {
                         error,
                         path: &self.path
                     });
-                    delay_for(backoff.next().unwrap()).await;
+                    sleep(backoff.next().unwrap()).await;
                 }
             }
         }
@@ -103,14 +103,14 @@ impl UnixConnector {
 struct UnixSink {
     connector: UnixConnector,
     acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    encode_event: Arc<dyn Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync>,
 }
 
 impl UnixSink {
     pub fn new(
         connector: UnixConnector,
         acker: Acker,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
     ) -> Self {
         Self {
             connector,
@@ -136,14 +136,17 @@ impl StreamSink for UnixSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
-            .map(|event| encode_event(event).unwrap_or_else(Bytes::new))
+            .map(|event| encode_event(event).unwrap_or_else(|| EncodedEvent::new(Bytes::new())))
             .peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink.send_all_peekable(&mut input).await {
+            let result = match sink
+                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
+                .await
+            {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };
@@ -208,7 +211,7 @@ mod tests {
             .unwrap();
 
         // Send the test data
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, None);
         sink.run(events).await.unwrap();
 
         // Wait for output to connect

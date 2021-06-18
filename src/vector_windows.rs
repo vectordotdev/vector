@@ -392,7 +392,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 process_id: None,
             })?;
 
-            let mut rt = app.runtime;
+            let rt = app.runtime;
             let topology = app.config.topology;
 
             rt.block_on(async move {

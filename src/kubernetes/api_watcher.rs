@@ -64,11 +64,20 @@ where
         emit!(internal_events::RequestPrepared { request: &request });
 
         // Send request, get response.
-        let response = self
-            .client
-            .send(request)
-            .await
-            .context(invocation::Request)?;
+        let response = match self.client.send(request).await {
+            Ok(response) => response,
+            Err(source @ crate::http::HttpError::CallRequest { .. }) => {
+                return Err(watcher::invocation::Error::recoverable(
+                    invocation::Error::Request { source },
+                ))
+            }
+            Err(source) => {
+                return Err(watcher::invocation::Error::other(
+                    invocation::Error::Request { source },
+                ))
+            }
+        };
+
         emit!(internal_events::ResponseReceived {
             response: &response
         });
@@ -92,9 +101,9 @@ where
                 Err(watcher::stream::Error::desync(stream::Error::Desync))
             }
             Ok(val) => Ok(val),
-            Err(err) => Err(watcher::stream::Error::other(stream::Error::K8sStream {
-                source: err,
-            })),
+            Err(err) => Err(watcher::stream::Error::recoverable(
+                stream::Error::K8sStream { source: err },
+            )),
         }))
     }
 }
@@ -273,10 +282,14 @@ mod tests {
                 watcher::invocation::Error::Desync {
                     source: invocation::Error::BadStatus { status },
                 } => (Some(status), true),
+                watcher::invocation::Error::Desync { .. } => (None, true),
+                watcher::invocation::Error::Recoverable {
+                    source: invocation::Error::BadStatus { status },
+                } => (Some(status), false),
+                watcher::invocation::Error::Recoverable { .. } => (None, false),
                 watcher::invocation::Error::Other {
                     source: invocation::Error::BadStatus { status },
                 } => (Some(status), false),
-                watcher::invocation::Error::Desync { .. } => (None, true),
                 watcher::invocation::Error::Other { .. } => (None, false),
             };
 
@@ -545,7 +558,7 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    assert_matches!(error, watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Recoverable {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
@@ -564,7 +577,7 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    assert_matches!(error, watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Recoverable {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
@@ -594,7 +607,7 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    assert_matches!(error, watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Recoverable {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
@@ -624,7 +637,7 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    assert_matches!(error, watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Recoverable {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },

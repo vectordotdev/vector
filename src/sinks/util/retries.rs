@@ -7,7 +7,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::time::{delay_for, Delay};
+use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {
@@ -41,7 +41,7 @@ pub struct FixedRetryPolicy<L> {
 }
 
 pub struct RetryPolicyFuture<L: RetryLogic> {
-    delay: Delay,
+    delay: Pin<Box<Sleep>>,
     policy: FixedRetryPolicy<L>,
 }
 
@@ -79,7 +79,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
 
     fn build_retry(&self) -> RetryPolicyFuture<L> {
         let policy = self.advance();
-        let delay = delay_for(self.backoff());
+        let delay = Box::pin(sleep(self.backoff()));
 
         debug!(message = "Retrying request.", delay_ms = %self.backoff().as_millis());
         RetryPolicyFuture { delay, policy }

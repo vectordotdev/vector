@@ -23,28 +23,50 @@ impl Function for ParseRegex {
                 kind: kind::REGEX,
                 required: true,
             },
+            Parameter {
+                keyword: "numeric_groups",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
         ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
+        let numeric_groups = arguments
+            .optional("numeric_groups")
+            .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseRegexFn { value, pattern }))
+        Ok(Box::new(ParseRegexFn {
+            value,
+            pattern,
+            numeric_groups,
+        }))
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "simple match",
-            source: r#"parse_regex!("8.7.6.5 - zorp", r'^(?P<host>[\w\.]+) - (?P<user>[\w]+)')"#,
-            result: Ok(indoc! { r#"{
+        &[
+            Example {
+                title: "simple match",
+                source: r#"parse_regex!("8.7.6.5 - zorp", r'^(?P<host>[\w\.]+) - (?P<user>[\w]+)')"#,
+                result: Ok(indoc! { r#"{
+                "host": "8.7.6.5",
+                "user": "zorp"
+            }"# }),
+            },
+            Example {
+                title: "numeric groups",
+                source: r#"parse_regex!("8.7.6.5 - zorp", r'^(?P<host>[\w\.]+) - (?P<user>[\w]+)', numeric_groups: true)"#,
+                result: Ok(indoc! { r#"{
                 "0": "8.7.6.5 - zorp",
                 "1": "8.7.6.5",
                 "2": "zorp",
                 "host": "8.7.6.5",
                 "user": "zorp"
             }"# }),
-        }]
+            },
+        ]
     }
 }
 
@@ -52,17 +74,19 @@ impl Function for ParseRegex {
 pub(crate) struct ParseRegexFn {
     value: Box<dyn Expression>,
     pattern: Regex,
+    numeric_groups: Box<dyn Expression>,
 }
 
 impl Expression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
+        let numeric_groups = self.numeric_groups.resolve(ctx)?.try_boolean()?;
 
         let parsed = self
             .pattern
             .captures(&value)
-            .map(|capture| util::capture_regex_to_map(&self.pattern, capture))
+            .map(|capture| util::capture_regex_to_map(&self.pattern, capture, numeric_groups))
             .ok_or("could not find any pattern matches")?;
 
         Ok(parsed.into())
@@ -83,11 +107,12 @@ mod tests {
     test_function![
         find => ParseRegex;
 
-        matches {
+        numeric_groups {
             args: func_args! [
                 value: "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574",
                 pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
-                    .unwrap()
+                    .unwrap(),
+                numeric_groups: true,
             ],
             want: Ok(value!({"bytes_in": "5667",
                              "host": "5.86.210.12",
@@ -118,15 +143,15 @@ mod tests {
                     "path": Kind::Bytes,
                     "status": Kind::Bytes,
                     "bytes_out": Kind::Bytes,
-                    "0": Kind::Bytes,
-                    "1": Kind::Bytes,
-                    "2": Kind::Bytes,
-                    "3": Kind::Bytes,
-                    "4": Kind::Bytes,
-                    "5": Kind::Bytes,
-                    "6": Kind::Bytes,
-                    "7": Kind::Bytes,
-                    "8": Kind::Bytes,
+                    "0": Kind::Bytes | Kind::Null,
+                    "1": Kind::Bytes | Kind::Null,
+                    "2": Kind::Bytes | Kind::Null,
+                    "3": Kind::Bytes | Kind::Null,
+                    "4": Kind::Bytes | Kind::Null,
+                    "5": Kind::Bytes | Kind::Null,
+                    "6": Kind::Bytes | Kind::Null,
+                    "7": Kind::Bytes | Kind::Null,
+                    "8": Kind::Bytes | Kind::Null,
                 }),
         }
 
@@ -135,16 +160,13 @@ mod tests {
                 value: "first group and second group",
                 pattern: Regex::new(r#"(?P<number>.*?) group"#).unwrap()
             ],
-            want: Ok(value!({"number": "first",
-                             "0": "first group",
-                             "1": "first"
-            })),
+            want: Ok(value!({"number": "first"})),
             tdef: TypeDef::new()
                 .fallible()
                 .object::<&str, Kind>(map! {
                         "number": Kind::Bytes,
-                        "0": Kind::Bytes,
-                        "1": Kind::Bytes,
+                        "0": Kind::Bytes | Kind::Null,
+                        "1": Kind::Bytes | Kind::Null,
                 }),
         }
 
@@ -166,15 +188,15 @@ mod tests {
                     "path": Kind::Bytes,
                     "status": Kind::Bytes,
                     "bytes_out": Kind::Bytes,
-                    "0": Kind::Bytes,
-                    "1": Kind::Bytes,
-                    "2": Kind::Bytes,
-                    "3": Kind::Bytes,
-                    "4": Kind::Bytes,
-                    "5": Kind::Bytes,
-                    "6": Kind::Bytes,
-                    "7": Kind::Bytes,
-                    "8": Kind::Bytes,
+                    "0": Kind::Bytes | Kind::Null,
+                    "1": Kind::Bytes | Kind::Null,
+                    "2": Kind::Bytes | Kind::Null,
+                    "3": Kind::Bytes | Kind::Null,
+                    "4": Kind::Bytes | Kind::Null,
+                    "5": Kind::Bytes | Kind::Null,
+                    "6": Kind::Bytes | Kind::Null,
+                    "7": Kind::Bytes | Kind::Null,
+                    "8": Kind::Bytes | Kind::Null,
                 }),
         }
     ];

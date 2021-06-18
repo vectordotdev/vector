@@ -7,9 +7,9 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-bytes = "0.5"
-tokio-util = { version = "0.3.1", features = ["codec"] }
-tracing = "0.1.15"
+bytes = "1.0.0"
+tokio-util = { version = "0.6.7", features = ["codec"] }
+tracing = "0.1.26"
 
 [dev-dependencies]
-serde_json = "1.0.33"
+serde_json = "1.0.64"

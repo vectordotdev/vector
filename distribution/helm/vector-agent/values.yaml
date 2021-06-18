@@ -2,6 +2,10 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Additional labels to add to all resources
+# commonLabels:
+#   app.kubernetes.io/component: agent
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -13,6 +17,10 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
+
+# Command to use at the pods managed by DaemonSet
+command: []
 
 # Override the chart name used in templates.
 nameOverride: ""
@@ -51,6 +59,9 @@ podAnnotations: {}
 
 # Labels to add to the `Pod`s managed by `DaemonSet`.
 podLabels: {}
+
+# Priority class name to add to the `Pod`s managed by `DaemonSet`.
+podPriorityClassName: ""
 
 # PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.
 podSecurityContext: {}
@@ -95,6 +106,11 @@ extraVolumes: []
 # Additional volume mounts to pass to the `vector` container of the `Pod`s
 # managed by `DaemonSet`.
 extraVolumeMounts: []
+
+# Vector will store it's data here.
+dataVolume:
+  hostPath:
+    path: /var/lib/vector/
 
 rbac:
   # Whether to create rbac resources or not. Disable for non-rbac clusters.
@@ -185,7 +201,14 @@ hostMetricsSource:
   # The name to use for the "built-in" host metrics source.
   sourceId: host_metrics
   # Additional config to embed at the host metrics source.
-  config: {}
+  config:
+    filesystem:
+      devices:
+        excludes: [binfmt_misc]
+      filesystems:
+        excludes: [binfmt_misc]
+      mountpoints:
+        excludes: ["*/proc/sys/fs/binfmt_misc"]
     # option: "value"
   # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null
@@ -231,8 +254,12 @@ prometheusSink:
     # Whether to add the `PodMonitor` resource or not.
     # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
     enabled: false
+    # Additional labels for PodMonitor
+    additionalLabels: {}
     # Additional relabelings to include in the `PodMonitor`.
     extraRelabelings: []
+    # metricRelabelings to include in the `PodMonitor`.
+    metricRelabelings: []
 
 # Sources to add to the generated `vector` config (besides "built-in" kubernetes
 # logs source).

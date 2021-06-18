@@ -70,10 +70,10 @@ mod tests {
     };
 
     /// Test object.
-    type TO = WatchEvent<Pod>;
+    type TestObject = WatchEvent<Pod>;
 
     // A helper function to make a test object.
-    fn make_to(uid: &str) -> TO {
+    fn make_to(uid: &str) -> TestObject {
         WatchEvent::Added(Pod {
             metadata: ObjectMeta {
                 uid: Some(uid.to_owned()),
@@ -84,7 +84,7 @@ mod tests {
     }
 
     fn assert_test_object(
-        tested_test_object: Option<Result<TO, response::Error>>,
+        tested_test_object: Option<Result<TestObject, response::Error>>,
         expected_uid: &str,
     ) {
         let actual_to = tested_test_object
@@ -96,13 +96,13 @@ mod tests {
 
     #[test]
     fn test_empty() {
-        let dec = MultiResponseDecoder::<TO>::new();
+        let dec = MultiResponseDecoder::<TestObject>::new();
         assert!(dec.finish().is_ok());
     }
 
     #[test]
     fn test_incomplete() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(b"{");
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_rubbish() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(b"qwerty");
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_one() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_chunked() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_two() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_many_chunked_1() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_many_chunked_2() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_two_one_by_one() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_incomplete_after_valid_data() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_allows_unparsed_newlines_at_finish() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(b"\n");
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_memory_usage() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         let chunk = br#"{
             "type": "ADDED",
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_practical_error_case_1() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(&[

@@ -1,44 +1,23 @@
 ---
 title: "What is Vector?"
-description: "High-level description of the Vector observability data collector and router."
+description: "High-level overview of the Vector observability data pipeline"
 ---
 
 <SVG src="/optimized_svg/components_683_294.svg" />
 
-Vector is a lightweight, ultra-fast, [open-source][urls.vector_repo] tool for
-building observability pipelines. Compared to Logstash and friends, Vector
-[improves throughput by ~10X while significantly reducing CPU and memory
-usage][urls.vector_performance].
+Vector is a high-performance observability data pipeline that puts organizations
+in control of their observability data. [Collect][docs.sources],
+[transform][docs.transforms], and [route][docs.sinks] all your logs, metrics,
+and traces to any vendors you want today and any other vendors you may want
+tomorrow. Vector enables dramatic cost reduction, novel data enrichment, and
+data security where you need it, not where is most convenient for your vendors.
+Open source and up to 10x faster than every alternative.
 
-### Principles
-
-- **Reliability First.** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
-- **One Tool. All Data.** - One simple tool gets your [logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon) from A to B.
-- **Single Responsibility.** - Vector is a _data router_, it does not plan to become a distributed processing framework.
-
-### Who should use Vector?
-
-- You _SHOULD_ use Vector to replace Logstash, Fluent\*, Telegraf, Beats, or similar tools.
-- You _SHOULD_ use Vector as a [daemon][docs.strategies#daemon] or [sidecar][docs.strategies#sidecar].
-- You _SHOULD_ use Vector as a Kafka consumer/producer for observability data.
-- You _SHOULD_ use Vector in resource constrained environments (such as devices).
-- You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.
-- You _SHOULD NOT_ use Vector to replace Kafka. Vector is designed to work with Kafka!
-- You _SHOULD NOT_ use Vector for non-observability data such as analytics data.
-
-### Community
-
-- Vector is **downloaded over 100,000 times per day**.
-- Vector's largest user **processes over 10TB daily**.
-- Vector is **used by multiple fortune 500 companies** with stringent production requirements.
-- Vector has **over 15 active contributors** and growing.
+Vector is downloaded millions of times per month and relied on by companies
+like T-Mobile, Comcast, Zendesk, and Discord to own their observability data.
 
 <Jump to="/guides/getting-started/">Get started</Jump>
 
-[docs.data-model.log]: /docs/about/data-model/log/
-[docs.data-model.metric]: /docs/about/data-model/metric/
-[docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
-[docs.strategies#sidecar]: /docs/setup/deployment/strategies/#sidecar
-[urls.rust]: https://www.rust-lang.org/
-[urls.vector_performance]: https://vector.dev/#performance
-[urls.vector_repo]: https://github.com/timberio/vector
+[docs.sinks]: /docs/reference/configuration/sinks/
+[docs.sources]: /docs/reference/configuration/sources/
+[docs.transforms]: /docs/reference/configuration/transforms/

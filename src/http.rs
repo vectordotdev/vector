@@ -1,5 +1,4 @@
 use crate::{
-    dns::Resolver,
     internal_events::http_client,
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
@@ -37,7 +36,7 @@ pub enum HttpError {
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 
 pub struct HttpClient<B = Body> {
-    client: Client<HttpsConnector<HttpConnector<Resolver>>, B>,
+    client: Client<HttpsConnector<HttpConnector>, B>,
     span: Span,
     user_agent: HeaderValue,
 }
@@ -49,7 +48,7 @@ where
     B::Error: Into<crate::Error>,
 {
     pub fn new(tls_settings: impl Into<MaybeTlsSettings>) -> Result<HttpClient<B>, HttpError> {
-        let mut http = HttpConnector::new_with_resolver(Resolver);
+        let mut http = HttpConnector::new();
         http.enforce_http(false);
 
         let settings = tls_settings.into();
@@ -88,7 +87,7 @@ where
 
         default_request_headers(&mut request, &self.user_agent);
 
-        emit!(http_client::AboutToSendHTTPRequest { request: &request });
+        emit!(http_client::AboutToSendHttpRequest { request: &request });
 
         let response = self.client.request(request);
 
@@ -108,7 +107,7 @@ where
             let response = response_result
                 .map_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHTTPError {
+                    emit!(http_client::GotHttpError {
                         error: &error,
                         roundtrip
                     });
@@ -117,7 +116,7 @@ where
                 .context(CallRequest)?;
 
             // Emit the response into the internal events system.
-            emit!(http_client::GotHTTPResponse {
+            emit!(http_client::GotHttpResponse {
                 response: &response,
                 roundtrip
             });

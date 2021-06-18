@@ -102,7 +102,7 @@ down() {
     $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "vector"
   fi
 
-  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
+  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE" --force=true --grace-period=0 --wait=false
 }
 
 case "$COMMAND" in

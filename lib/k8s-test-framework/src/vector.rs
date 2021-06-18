@@ -3,7 +3,7 @@
 use crate::{helm_values_file::HelmValuesFile, resource_file::ResourceFile, up_down, Result};
 use std::process::{Command, Stdio};
 
-/// Parameters required to build a `kubectl` command to manage Vector in the
+/// Parameters required to build `kubectl` & `helm` commands to manage charts deployments in the
 /// Kubernetes cluster.
 #[derive(Debug)]
 pub struct CommandBuilder {
@@ -12,6 +12,7 @@ pub struct CommandBuilder {
     helm_chart: String,
     custom_helm_values_file: Option<HelmValuesFile>,
     custom_resource_file: Option<ResourceFile>,
+    custom_env: Option<Vec<(String, String)>>,
 }
 
 impl up_down::CommandBuilder for CommandBuilder {
@@ -33,7 +34,11 @@ impl up_down::CommandBuilder for CommandBuilder {
         if let Some(ref custom_resource_file) = self.custom_resource_file {
             command.env("CUSTOM_RESOURCE_CONFIGS_FILE", custom_resource_file.path());
         }
-
+        if let Some(env) = &self.custom_env {
+            for envvar in env {
+                command.env(envvar.0.clone(), envvar.1.clone());
+            }
+        }
         command
     }
 }
@@ -52,12 +57,13 @@ pub struct Config<'a> {
 
 /// Takes care of deploying Vector into the Kubernetes cluster.
 ///
-/// Manages the config file secret accordingly.
+/// Manages the config file secret accordingly, accept additional env var
 pub fn manager(
     interface_command: &str,
     namespace: &str,
     helm_chart: &str,
     config: Config<'_>,
+    custom_env: Option<Vec<(String, String)>>,
 ) -> Result<up_down::Manager<CommandBuilder>> {
     let Config {
         custom_helm_values,
@@ -79,5 +85,6 @@ pub fn manager(
         helm_chart: helm_chart.to_owned(),
         custom_helm_values_file,
         custom_resource_file,
+        custom_env,
     }))
 }

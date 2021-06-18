@@ -93,16 +93,30 @@ impl Expression for ParseJsonFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible()
-            .bytes()
-            .add_boolean()
-            .add_integer()
-            .add_float()
-            .add_null()
-            .add_array_mapped::<(), Kind>(map! { (): Kind::all() })
-            .add_object::<(), Kind>(map! { (): Kind::all() })
+        type_def()
     }
+}
+
+fn inner_kind() -> Kind {
+    Kind::Null
+        | Kind::Bytes
+        | Kind::Integer
+        | Kind::Float
+        | Kind::Boolean
+        | Kind::Array
+        | Kind::Object
+}
+
+fn type_def() -> TypeDef {
+    TypeDef::new()
+        .fallible()
+        .bytes()
+        .add_boolean()
+        .add_integer()
+        .add_float()
+        .add_null()
+        .add_array_mapped::<(), Kind>(map! { (): inner_kind() })
+        .add_object::<(), Kind>(map! { (): inner_kind() })
 }
 
 #[cfg(test)]
@@ -115,15 +129,13 @@ mod tests {
         parses {
             args: func_args![ value: r#"{"field": "value"}"# ],
             want: Ok(value!({ field: "value" })),
-            tdef: TypeDef::new()
-                .fallible()
-                .bytes()
-                .add_boolean()
-                .add_integer()
-                .add_float()
-                .add_null()
-                .add_array_mapped::<(), Kind>(map! { (): Kind::all() })
-                .add_object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: type_def(),
+        }
+
+        complex_json {
+            args: func_args![ value: r#"{"object": {"string":"value","number":42,"array":["hello","world"],"boolean":false}}"# ],
+            want: Ok(value!({ object: {string: "value", number: 42, array: ["hello", "world"], boolean: false} })),
+            tdef: type_def(),
         }
 
         invalid_json_errors {
@@ -136,8 +148,8 @@ mod tests {
                 .add_integer()
                 .add_float()
                 .add_null()
-                .add_array_mapped::<(), Kind>(map! { (): Kind::all() })
-                .add_object::<(), Kind>(map! { (): Kind::all() }),
+                .add_array_mapped::<(), Kind>(map! { (): inner_kind() })
+                .add_object::<(), Kind>(map! { (): inner_kind() }),
         }
     ];
 }

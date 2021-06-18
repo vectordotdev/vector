@@ -44,7 +44,7 @@ macro_rules! func_args {
 macro_rules! bench_function {
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))? $(,)* })+) => {
         fn $name(c: &mut criterion::Criterion) {
-            let mut group = c.benchmark_group(&format!("remap-functions/{}", stringify!($name)));
+            let mut group = c.benchmark_group(&format!("vrl_stdlib/functions/{}", stringify!($name)));
             group.throughput(criterion::Throughput::Elements(1));
             $(
                 group.bench_function(&format!("{}", stringify!($case)), |b| {

@@ -4,12 +4,13 @@ use crate::{
         metric::{Metric, MetricValue},
         Event,
     },
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
+        batch::{BatchConfig, BatchSettings},
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
-        BatchConfig, BatchSettings, Compression, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig,
+        Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -49,7 +50,7 @@ pub struct CloudWatchMetricsSinkConfig {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    pub auth: AWSAuthentication,
+    pub auth: AwsAuthentication,
 }
 
 lazy_static! {
@@ -149,15 +150,14 @@ impl CloudWatchMetricsSvc {
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
-                stream::iter(normalizer.apply(event).map(|mut event| {
-                    let namespace = event
-                        .as_mut_metric()
-                        .series
-                        .name
-                        .namespace
+                stream::iter(normalizer.apply(event).map(|mut metric| {
+                    let namespace = metric
+                        .take_namespace()
                         .take()
                         .unwrap_or_else(|| default_namespace.clone());
-                    Ok(PartitionInnerBuffer::new(event, namespace))
+                    Ok(EncodedEvent::new(PartitionInnerBuffer::new(
+                        metric, namespace,
+                    )))
                 }))
             });
 
@@ -169,13 +169,13 @@ impl CloudWatchMetricsSvc {
             .into_iter()
             .filter_map(|event| {
                 let metric_name = event.name().to_string();
-                let timestamp = event.data.timestamp.map(timestamp_to_string);
-                let dimensions = event.series.tags.clone().map(tags_to_dimensions);
+                let timestamp = event.timestamp().map(timestamp_to_string);
+                let dimensions = event.tags().map(tags_to_dimensions);
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
-                match event.data.value {
+                match event.value() {
                     MetricValue::Counter { value } => Some(MetricDatum {
                         metric_name,
-                        value: Some(value),
+                        value: Some(*value),
                         timestamp,
                         dimensions,
                         ..Default::default()
@@ -200,7 +200,7 @@ impl CloudWatchMetricsSvc {
                     }),
                     MetricValue::Gauge { value } => Some(MetricDatum {
                         metric_name,
-                        value: Some(value),
+                        value: Some(*value),
                         timestamp,
                         dimensions,
                         ..Default::default()
@@ -216,7 +216,7 @@ struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
+        match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
         }
@@ -240,8 +240,8 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
         }
 
         let input = PutMetricDataInput {
-            namespace,
             metric_data,
+            namespace,
         };
 
         debug!(message = "Sending data.", input = ?input);
@@ -269,7 +269,7 @@ fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
+fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
     tags.iter()
         .take(10)
@@ -389,7 +389,7 @@ mod tests {
             "latency",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![11.0 => 100, 12.0 => 50],
+                samples: vector_core::samples![11.0 => 100, 12.0 => 50],
                 statistic: StatisticKind::Histogram,
             },
         )];
@@ -430,7 +430,11 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{event::metric::StatisticKind, event::MetricKind, test_util::random_string, Event};
+    use crate::{
+        event::metric::StatisticKind,
+        event::{Event, MetricKind},
+        test_util::random_string,
+    };
     use chrono::offset::TimeZone;
     use rand::seq::SliceRandom;
 
@@ -495,7 +499,7 @@ mod integration_tests {
                     format!("distribution-{}", distribution_name),
                     MetricKind::Incremental,
                     MetricValue::Distribution {
-                        samples: crate::samples![i as f64 => 100],
+                        samples: vector_core::samples![i as f64 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )

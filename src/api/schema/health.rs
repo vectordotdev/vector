@@ -1,9 +1,7 @@
 use async_graphql::{validators::IntRange, Object, SimpleObject, Subscription};
 use chrono::{DateTime, Utc};
-use tokio::{
-    stream::{Stream, StreamExt},
-    time::Duration,
-};
+use tokio::time::Duration;
+use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
 
 #[derive(SimpleObject)]
 pub struct Heartbeat {
@@ -37,6 +35,9 @@ impl HealthSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Heartbeat> {
-        tokio::time::interval(Duration::from_millis(interval as u64)).map(|_| Heartbeat::new())
+        IntervalStream::new(tokio::time::interval(Duration::from_millis(
+            interval as u64,
+        )))
+        .map(|_| Heartbeat::new())
     }
 }

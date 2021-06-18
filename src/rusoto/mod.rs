@@ -30,7 +30,7 @@ use tower::{Service, ServiceExt};
 
 pub mod auth;
 pub mod region;
-pub use auth::AWSAuthentication;
+pub use auth::AwsAuthentication;
 pub use region::{region_from_endpoint, RegionOrEndpoint};
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
@@ -47,7 +47,7 @@ enum AwsRusotoError {
     DispatcherError,
 
     #[snafu(display("Invalid AWS credentials: {}", source))]
-    InvalidAWSCredentials { source: CredentialsError },
+    InvalidAwsCredentials { source: CredentialsError },
 }
 
 // A custom chain provider incorporating web identity support
@@ -136,7 +136,7 @@ impl AwsCredentialsProvider {
                 None,
             );
 
-            let creds = AutoRefreshingProvider::new(provider).context(InvalidAWSCredentials)?;
+            let creds = AutoRefreshingProvider::new(provider).context(InvalidAwsCredentials)?;
             Ok(Self::Role(creds))
         } else {
             debug!("Using default credentials provider for AWS.");
@@ -145,7 +145,7 @@ impl AwsCredentialsProvider {
             // is 10 seconds.
             chain.set_timeout(Duration::from_secs(8));
 
-            let creds = AutoRefreshingProvider::new(chain).context(InvalidAWSCredentials)?;
+            let creds = AutoRefreshingProvider::new(chain).context(InvalidAwsCredentials)?;
 
             Ok(Self::Default(creds))
         }

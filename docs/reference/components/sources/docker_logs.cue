@@ -390,6 +390,7 @@ components: sources: docker_logs: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:                       components.sources.internal_metrics.output.metrics.events_in_total
 		communication_errors_total:            components.sources.internal_metrics.output.metrics.communication_errors_total
 		container_metadata_fetch_errors_total: components.sources.internal_metrics.output.metrics.container_metadata_fetch_errors_total
 		container_processed_events_total:      components.sources.internal_metrics.output.metrics.container_processed_events_total

@@ -9,13 +9,16 @@ license = "MPL-2.0"
 
 [dependencies]
 futures = "0.3"
-k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_16"] }
+k8s-openapi = { version = "0.12.0", default-features = false, features = ["v1_16"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 regex = "1"
-reqwest = { version = "0.10", features = ["json"] }
+reqwest = { version = "0.11.3", features = ["json"] }
 serde_json = "1"
-tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
+tokio = { version = "1.6.1", features = ["full"] }
 indoc = "1.0.3"
+env_logger = "0.8"
+tracing = { version = "0.1", features = ["log"] }
+rand = "0.8"
 
 [features]
 e2e-tests = []
@@ -26,6 +29,10 @@ required-features = ["e2e-tests"]
 
 [[test]]
 name = "vector-aggregator"
+required-features = ["e2e-tests"]
+
+[[test]]
+name = "vector-dd-agent-aggregator"
 required-features = ["e2e-tests"]
 
 [[test]]

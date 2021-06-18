@@ -37,12 +37,7 @@ ignore = [
 
     # Type confusion if __private_get_type_id__ is overriden
     # https://github.com/timberio/vector/issues/5583
-    "RUSTSEC-2019-0036",
     "RUSTSEC-2020-0036",
-
-    # dirs is unmaintained, use dirs-next instead
-    # https://github.com/timberio/vector/issues/5584
-    "RUSTSEC-2020-0053",
 
     # stdweb is unmaintained
     # https://github.com/timberio/vector/issues/5585
@@ -56,7 +51,7 @@ ignore = [
     # https://github.com/timberio/vector/issues/6223
     "RUSTSEC-2021-0013",
 
-    # arr! macro erases lifetimes
-    # https://github.com/timberio/vector/issues/6584
-    "RUSTSEC-2020-0146",
+    # Memory access due to code generation flaw in Cranelift module
+    # https://github.com/timberio/vector/issues/7558
+    "RUSTSEC-2021-0067",
 ]

@@ -27,7 +27,7 @@ components: sinks: socket: {
 			}
 			send_buffer_bytes: {
 				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+				relevant_when: "mode = `tcp` or mode = `udp`"
 			}
 			keepalive: enabled: true
 			request: enabled:   false
@@ -94,7 +94,7 @@ components: sinks: socket: {
 		}
 		path: {
 			description:   "The unix socket path. This should be the absolute path."
-			relevant_when: "mode = `tcp` or `udp`"
+			relevant_when: "mode = `unix`"
 			required:      true
 			warnings: []
 			type: string: {

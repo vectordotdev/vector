@@ -1,8 +1,9 @@
+use crate::internal_events::KafkaStatisticsReceived;
 use crate::tls::TlsOptions;
-use rdkafka::ClientConfig;
+use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {
@@ -89,7 +90,19 @@ impl KafkaAuthConfig {
     }
 }
 
-fn pathbuf_to_string(path: &PathBuf) -> crate::Result<&str> {
+fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
     path.to_str()
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
+
+pub(crate) struct KafkaStatisticsContext;
+
+impl ClientContext for KafkaStatisticsContext {
+    fn stats(&self, statistics: Statistics) {
+        emit!(KafkaStatisticsReceived {
+            statistics: &statistics
+        });
+    }
+}
+
+impl ConsumerContext for KafkaStatisticsContext {}

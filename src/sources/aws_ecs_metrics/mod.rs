@@ -1,17 +1,19 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
     internal_events::{
         AwsEcsMetricsErrorResponse, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
         AwsEcsMetricsReceived, AwsEcsMetricsRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    Event, Pipeline,
+    Pipeline,
 };
 use futures::{stream, SinkExt, StreamExt};
 use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Instant};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 mod parser;
 
@@ -23,8 +25,8 @@ pub enum Version {
     V4,
 }
 
-#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 struct AwsEcsMetricsSourceConfig {
     #[serde(default = "default_endpoint")]
     endpoint: String,
@@ -91,21 +93,15 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ecs_metrics")]
 impl SourceConfig for AwsEcsMetricsSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         Ok(Box::pin(aws_ecs_metrics(
             self.stats_endpoint(),
             self.scrape_interval_secs,
             namespace,
-            out,
-            shutdown,
+            cx.out,
+            cx.shutdown,
         )))
     }
 
@@ -128,7 +124,7 @@ async fn aws_ecs_metrics(
     let mut out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
     let interval = time::Duration::from_secs(interval);
-    let mut interval = time::interval(interval).take_until(shutdown);
+    let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
         let client = Client::new();
 
@@ -199,7 +195,7 @@ mod test {
         service::{make_service_fn, service_fn},
         {Body, Response, Server},
     };
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
@@ -519,17 +515,12 @@ mod test {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
             .await
@@ -542,7 +533,7 @@ mod test {
             .find(|m| m.name() == "network_receive_bytes_total")
         {
             Some(m) => {
-                assert_eq!(m.data.value, MetricValue::Counter { value: 329932716.0 });
+                assert_eq!(m.value(), &MetricValue::Counter { value: 329932716.0 });
                 assert_eq!(m.namespace(), Some("awsecs"));
 
                 match m.tags() {
@@ -565,7 +556,7 @@ mod test {
 mod integration_tests {
     use super::*;
     use crate::test_util::collect_ready;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     async fn scrape_metrics(endpoint: String, version: Version) {
         let (tx, rx) = Pipeline::new_test();
@@ -576,17 +567,12 @@ mod integration_tests {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(5)).await;
 
         let metrics = collect_ready(rx).await;
 

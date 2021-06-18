@@ -3,15 +3,11 @@ use metrics::counter;
 
 #[derive(Debug)]
 pub(crate) struct DedupeEventDiscarded {
-    pub event: crate::Event,
+    pub event: crate::event::Event,
 }
 
 impl InternalEvent for DedupeEventDiscarded {
     fn emit_logs(&self) {
-        warn!(
-            message = "Encountered duplicate event; discarding.",
-            internal_log_rate_secs = 30
-        );
         trace!(message = "Encountered duplicate event; discarding.", event = ?self.event);
     }
 

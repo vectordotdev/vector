@@ -23,21 +23,43 @@ impl Function for ParseRegexAll {
                 kind: kind::ANY,
                 required: true,
             },
+            Parameter {
+                keyword: "numeric_groups",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
         ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
+        let numeric_groups = arguments
+            .optional("numeric_groups")
+            .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseRegexAllFn { value, pattern }))
+        Ok(Box::new(ParseRegexAllFn {
+            value,
+            pattern,
+            numeric_groups,
+        }))
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "Simple match",
-            source: r#"parse_regex_all!("apples and carrots, peaches and peas", r'(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)')"#,
-            result: Ok(indoc! { r#"[
+        &[
+            Example {
+                title: "Simple match",
+                source: r#"parse_regex_all!("apples and carrots, peaches and peas", r'(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)')"#,
+                result: Ok(indoc! { r#"[
+               {"fruit": "apples",
+                "veg": "carrots"},
+               {"fruit": "peaches",
+                "veg": "peas"}]"# }),
+            },
+            Example {
+                title: "Numeric groups",
+                source: r#"parse_regex_all!("apples and carrots, peaches and peas", r'(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)', numeric_groups: true)"#,
+                result: Ok(indoc! { r#"[
                {"fruit": "apples",
                 "veg": "carrots",
                 "0": "apples and carrots",
@@ -48,7 +70,8 @@ impl Function for ParseRegexAll {
                 "0": "peaches and peas",
                 "1": "peaches",
                 "2": "peas"}]"# }),
-        }]
+            },
+        ]
     }
 }
 
@@ -56,17 +79,21 @@ impl Function for ParseRegexAll {
 pub(crate) struct ParseRegexAllFn {
     value: Box<dyn Expression>,
     pattern: Regex,
+    numeric_groups: Box<dyn Expression>,
 }
 
 impl Expression for ParseRegexAllFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
+        let numeric_groups = self.numeric_groups.resolve(ctx)?.try_boolean()?;
 
         Ok(self
             .pattern
             .captures_iter(&value)
-            .map(|capture| util::capture_regex_to_map(&self.pattern, capture).into())
+            .map(|capture| {
+                util::capture_regex_to_map(&self.pattern, capture, numeric_groups).into()
+            })
             .collect::<Vec<Value>>()
             .into())
     }
@@ -88,12 +115,36 @@ mod tests {
     use super::*;
 
     test_function![
-        find_all => ParseRegexAll;
+        parse_regex_all => ParseRegexAll;
 
         matches {
             args: func_args![
                 value: "apples and carrots, peaches and peas",
-                pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
+                pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap(),
+            ],
+            want: Ok(value!([{"fruit": "apples",
+                              "veg": "carrots"},
+                             {"fruit": "peaches",
+                              "veg": "peas"}])),
+            tdef: TypeDef::new()
+                .fallible()
+                .array_mapped::<(), TypeDef>(map![(): TypeDef::new()
+                                                  .object::<&str, Kind>(map! {
+                                                      "fruit": Kind::Bytes,
+                                                      "veg": Kind::Bytes,
+                                                      "0": Kind::Bytes | Kind::Null,
+                                                      "1": Kind::Bytes | Kind::Null,
+                                                      "2": Kind::Bytes | Kind::Null,
+                                                  })
+                                                  .add_null()
+            ]),
+        }
+
+        numeric_groups {
+            args: func_args![
+                value: "apples and carrots, peaches and peas",
+                pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap(),
+                numeric_groups: true
             ],
             want: Ok(value!([{"fruit": "apples",
                               "veg": "carrots",
@@ -111,9 +162,9 @@ mod tests {
                                                   .object::<&str, Kind>(map! {
                                                       "fruit": Kind::Bytes,
                                                       "veg": Kind::Bytes,
-                                                      "0": Kind::Bytes,
-                                                      "1": Kind::Bytes,
-                                                      "2": Kind::Bytes,
+                                                      "0": Kind::Bytes | Kind::Null,
+                                                      "1": Kind::Bytes | Kind::Null,
+                                                      "2": Kind::Bytes | Kind::Null,
                                                   })
                                                   .add_null()
             ]),
@@ -131,9 +182,9 @@ mod tests {
                                                   .object::<&str, Kind>(map! {
                                                       "fruit": Kind::Bytes,
                                                       "veg": Kind::Bytes,
-                                                      "0": Kind::Bytes,
-                                                      "1": Kind::Bytes,
-                                                      "2": Kind::Bytes,
+                                                      "0": Kind::Bytes | Kind::Null,
+                                                      "1": Kind::Bytes | Kind::Null,
+                                                      "2": Kind::Bytes | Kind::Null,
                                                   })
                                                   .add_null()
                 ]),

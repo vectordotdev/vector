@@ -4,7 +4,8 @@ use crate::{
     http::HttpClient,
     sinks::util::{
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+        BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer,
+        TowerRequestConfig,
     },
 };
 use futures::{FutureExt, SinkExt};
@@ -89,7 +90,7 @@ impl HttpSink for HoneycombConfig {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let mut log = event.into_log();
 
         let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
@@ -99,10 +100,12 @@ impl HttpSink for HoneycombConfig {
             chrono::Utc::now()
         };
 
-        Some(json!({
+        let data = json!({
             "timestamp": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
             "data": log.all_fields(),
-        }))
+        });
+
+        Some(EncodedEvent::new(data).with_metadata(log))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

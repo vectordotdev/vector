@@ -68,8 +68,29 @@ impl Kind {
         self == self.scalar()
     }
 
-    pub(crate) fn quoted(self) -> String {
-        format!(r#""{}""#, self.as_str())
+    /// Returns a quoted variant of `as_str`
+    ///
+    /// This function is a close duplicate of `as_str`, returning the same
+    /// underlying str but with quotes. We avoid the obvious `format!("{}",
+    /// self.as_str())` here as that incurs an allocation cost and the `Display`
+    /// of `Kind` is sometimes in the hot path.
+    ///
+    /// See https://github.com/timberio/vector/pull/6878 for details.
+    pub(crate) fn quoted(self) -> &'static str {
+        match self {
+            Kind::Bytes => "\"string\"",
+            Kind::Integer => "\"integer\"",
+            Kind::Float => "\"float\"",
+            Kind::Boolean => "\"boolean\"",
+            Kind::Object => "\"object\"",
+            Kind::Array => "\"array\"",
+            Kind::Timestamp => "\"timestamp\"",
+            Kind::Regex => "\"regex\"",
+            Kind::Null => "\"null\"",
+            _ if self.is_all() => "\"unknown type\"",
+            _ if self.is_empty() => "\"none\"",
+            _ => "\"multiple\"",
+        }
     }
 
     pub fn as_str(self) -> &'static str {
@@ -137,7 +158,7 @@ macro_rules! impl_kind {
                     return write!(f, "{}", self.quoted())
                 }
 
-                let mut kinds = vec![];
+                let mut kinds = Vec::with_capacity(16);
                 $(paste::paste! {
                 if self.[<contains_ $name>]() {
                     kinds.push(Kind::$kind.quoted())
@@ -228,6 +249,14 @@ impl From<&Value> for Kind {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quoted() {
+        for i in 0..u16::MAX {
+            let kind = Kind::new(i);
+            assert_eq!(kind.quoted(), format!(r#""{}""#, kind.as_str()));
+        }
+    }
 
     #[test]
     fn kind_is_scalar() {

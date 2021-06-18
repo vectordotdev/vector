@@ -2,11 +2,11 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct ANSIStripperFieldMissing<'a> {
+pub struct AnsiStripperFieldMissing<'a> {
     pub field: &'a str,
 }
 
-impl InternalEvent for ANSIStripperFieldMissing<'_> {
+impl InternalEvent for AnsiStripperFieldMissing<'_> {
     fn emit_logs(&self) {
         debug!(
             message = "Field does not exist.",
@@ -21,11 +21,11 @@ impl InternalEvent for ANSIStripperFieldMissing<'_> {
 }
 
 #[derive(Debug)]
-pub struct ANSIStripperFieldInvalid<'a> {
+pub struct AnsiStripperFieldInvalid<'a> {
     pub field: &'a str,
 }
 
-impl InternalEvent for ANSIStripperFieldInvalid<'_> {
+impl InternalEvent for AnsiStripperFieldInvalid<'_> {
     fn emit_logs(&self) {
         debug!(
             message = "Field value must be a string.",
@@ -40,12 +40,12 @@ impl InternalEvent for ANSIStripperFieldInvalid<'_> {
 }
 
 #[derive(Debug)]
-pub struct ANSIStripperFailed<'a> {
+pub struct AnsiStripperFailed<'a> {
     pub field: &'a str,
     pub error: std::io::Error,
 }
 
-impl InternalEvent for ANSIStripperFailed<'_> {
+impl InternalEvent for AnsiStripperFailed<'_> {
     fn emit_logs(&self) {
         debug!(
             message = "Could not strip ANSI escape sequences.",

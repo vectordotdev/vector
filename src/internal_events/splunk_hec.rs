@@ -12,7 +12,6 @@ pub(crate) struct SplunkEventSent {
 
 impl InternalEvent for SplunkEventSent {
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -43,24 +42,24 @@ mod source {
     use metrics::counter;
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHECEventReceived;
+    pub(crate) struct SplunkHecEventReceived;
 
-    impl InternalEvent for SplunkHECEventReceived {
+    impl InternalEvent for SplunkHecEventReceived {
         fn emit_logs(&self) {
             trace!(message = "Received one event.");
         }
 
         fn emit_metrics(&self) {
-            counter!("processed_events_total", 1);
+            counter!("events_in_total", 1);
         }
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHECRequestReceived<'a> {
+    pub(crate) struct SplunkHecRequestReceived<'a> {
         pub path: &'a str,
     }
 
-    impl<'a> InternalEvent for SplunkHECRequestReceived<'a> {
+    impl<'a> InternalEvent for SplunkHecRequestReceived<'a> {
         fn emit_logs(&self) {
             debug!(
                 message = "Received one request.",
@@ -75,11 +74,11 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHECRequestBodyInvalid {
+    pub(crate) struct SplunkHecRequestBodyInvalid {
         pub error: std::io::Error,
     }
 
-    impl InternalEvent for SplunkHECRequestBodyInvalid {
+    impl InternalEvent for SplunkHecRequestBodyInvalid {
         fn emit_logs(&self) {
             error!(
                 message = "Invalid request body.",
@@ -92,11 +91,11 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHECRequestError {
+    pub(crate) struct SplunkHecRequestError {
         pub(crate) error: ApiError,
     }
 
-    impl InternalEvent for SplunkHECRequestError {
+    impl InternalEvent for SplunkHecRequestError {
         fn emit_logs(&self) {
             error!(
                 message = "Error processing request.",

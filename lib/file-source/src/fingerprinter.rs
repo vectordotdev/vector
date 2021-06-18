@@ -1,11 +1,15 @@
 use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
+use crc::Crc;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fs::{self, metadata, File},
     io::{self, Read, Seek, SeekFrom, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
+use tracing::trace_span;
+
+const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 
 #[derive(Clone)]
 pub struct Fingerprinter {
@@ -47,7 +51,7 @@ impl FileFingerprint {
                 let mut buf = Vec::with_capacity(std::mem::size_of_val(dev) * 2);
                 buf.write_all(&dev.to_be_bytes()).expect("writing to array");
                 buf.write_all(&ino.to_be_bytes()).expect("writing to array");
-                crc::crc64::checksum_ecma(&buf[..])
+                FINGERPRINT_CRC.checksum(&buf[..])
             }
             Unknown(c) => *c,
         }
@@ -63,7 +67,7 @@ impl From<u64> for FileFingerprint {
 impl Fingerprinter {
     pub fn get_fingerprint_of_file(
         &self,
-        path: &PathBuf,
+        path: &Path,
         buffer: &mut Vec<u8>,
     ) -> Result<FileFingerprint, io::Error> {
         use FileFingerprint::*;
@@ -86,7 +90,7 @@ impl Fingerprinter {
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
                 fingerprinter_read_until(fp, b'\n', buffer)?;
-                let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(FirstLineChecksum(fingerprint))
             }
         }
@@ -94,11 +98,12 @@ impl Fingerprinter {
 
     pub fn get_fingerprint_or_log_error(
         &self,
-        path: &PathBuf,
+        path: &Path,
         buffer: &mut Vec<u8>,
         known_small_files: &mut HashSet<PathBuf>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
+        let _span = trace_span!("fingerprinting", ?path).entered();
         metadata(path)
             .and_then(|metadata| {
                 if metadata.is_dir() {
@@ -111,7 +116,7 @@ impl Fingerprinter {
                 io::ErrorKind::UnexpectedEof => {
                     if !known_small_files.contains(path) {
                         emitter.emit_file_checksum_failed(path);
-                        known_small_files.insert(path.clone());
+                        known_small_files.insert(path.to_path_buf());
                     }
                 }
                 io::ErrorKind::NotFound => {
@@ -129,7 +134,7 @@ impl Fingerprinter {
 
     pub fn get_bytes_checksum(
         &self,
-        path: &PathBuf,
+        path: &Path,
         buffer: &mut Vec<u8>,
     ) -> Result<Option<FileFingerprint>, io::Error> {
         match self.strategy {
@@ -141,7 +146,7 @@ impl Fingerprinter {
                 let mut fp = fs::File::open(path)?;
                 fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
                 fp.read_exact(&mut buffer[..bytes])?;
-                let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
             }
             _ => Ok(None),

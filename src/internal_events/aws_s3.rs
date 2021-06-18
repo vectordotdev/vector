@@ -7,6 +7,18 @@ pub mod source {
     use rusoto_sqs::{DeleteMessageError, ReceiveMessageError};
 
     #[derive(Debug)]
+    pub(crate) struct SqsS3EventReceived {
+        pub byte_size: usize,
+    }
+
+    impl InternalEvent for SqsS3EventReceived {
+        fn emit_metrics(&self) {
+            counter!("events_in_total", 1);
+            counter!("processed_bytes_total", self.byte_size as u64);
+        }
+    }
+
+    #[derive(Debug)]
     pub(crate) struct SqsMessageReceiveFailed<'a> {
         pub error: &'a RusotoError<ReceiveMessageError>,
     }

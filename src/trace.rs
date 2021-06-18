@@ -1,15 +1,10 @@
-use crate::event::{Event, LogEvent, Value};
+use crate::event::Event;
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
-use std::{
-    convert::TryInto,
-    fmt::Debug,
-    sync::{Mutex, MutexGuard},
-};
+use std::sync::{Mutex, MutexGuard};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{
     dispatcher::{set_global_default, Dispatch},
-    field::{Field, Visit},
     span::Span,
     subscriber::Interest,
     Id, Metadata, Subscriber,
@@ -36,7 +31,26 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-pub fn init(color: bool, json: bool, levels: &str) {
+// This is a macro because `$subscriber` can be different, opaque types in different branches
+macro_rules! send_to_dd {
+    ($subscriber:ident) => {
+        let tracer = opentelemetry_datadog::new_pipeline()
+            .with_service_name("vector")
+            .with_version(opentelemetry_datadog::ApiVersion::Version05)
+            .with_trace_config(
+                opentelemetry::sdk::trace::config()
+                    .with_sampler(opentelemetry::sdk::trace::Sampler::AlwaysOn),
+            )
+            .install_batch(opentelemetry::runtime::Tokio)
+            .expect("building tracer");
+
+        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        let $subscriber = $subscriber.with(telemetry);
+    };
+}
+
+pub fn init(color: bool, json: bool, levels: &str, enable_datadog_tracing: bool) {
     let _ = BUFFER.set(Mutex::new(Some(Vec::new())));
 
     // An escape hatch to disable injecting a mertics layer into tracing.
@@ -52,25 +66,54 @@ pub fn init(color: bool, json: bool, levels: &str) {
     // bit of duplication as we started to create a generic struct to wrap the formatters that also
     // implemented `Layer`
     let dispatch = if json {
+        #[cfg(not(test))]
         let formatter = tracing_subscriber::fmt::Layer::default()
             .json()
             .flatten_event(true);
+
+        #[cfg(test)]
+        let formatter = tracing_subscriber::fmt::Layer::default()
+            .json()
+            .flatten_event(true)
+            .with_test_writer(); // ensures output is captured
 
         let subscriber = subscriber.with(RateLimitedLayer::new(formatter));
 
         if metrics_layer_enabled {
             let subscriber = subscriber.with(MetricsLayer::new());
+            if enable_datadog_tracing {
+                send_to_dd!(subscriber);
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            } else {
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            }
+        } else if enable_datadog_tracing {
+            send_to_dd!(subscriber);
             Dispatch::new(BroadcastSubscriber { subscriber })
         } else {
             Dispatch::new(BroadcastSubscriber { subscriber })
         }
     } else {
+        #[cfg(not(test))]
         let formatter = tracing_subscriber::fmt::Layer::default().with_ansi(color);
+
+        #[cfg(test)]
+        let formatter = tracing_subscriber::fmt::Layer::default()
+            .with_ansi(color)
+            .with_test_writer(); // ensures output is captured
 
         let subscriber = subscriber.with(RateLimitedLayer::new(formatter));
 
         if metrics_layer_enabled {
             let subscriber = subscriber.with(MetricsLayer::new());
+            if enable_datadog_tracing {
+                send_to_dd!(subscriber);
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            } else {
+                Dispatch::new(BroadcastSubscriber { subscriber })
+            }
+        } else if enable_datadog_tracing {
+            send_to_dd!(subscriber);
             Dispatch::new(BroadcastSubscriber { subscriber })
         } else {
             Dispatch::new(BroadcastSubscriber { subscriber })
@@ -190,68 +233,5 @@ impl<S: Subscriber + 'static> Subscriber for BroadcastSubscriber<S> {
     #[inline]
     unsafe fn downcast_raw(&self, id: std::any::TypeId) -> Option<*const ()> {
         self.subscriber.downcast_raw(id)
-    }
-}
-
-impl From<&tracing::Event<'_>> for Event {
-    fn from(event: &tracing::Event<'_>) -> Self {
-        let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent::default();
-        event.record(&mut maker);
-
-        let mut log = maker.0;
-        log.insert("timestamp", now);
-
-        let meta = event.metadata();
-        log.insert(
-            "metadata.kind",
-            if meta.is_event() {
-                Value::Bytes("event".to_string().into())
-            } else if meta.is_span() {
-                Value::Bytes("span".to_string().into())
-            } else {
-                Value::Null
-            },
-        );
-        log.insert("metadata.level", meta.level().to_string());
-        log.insert(
-            "metadata.module_path",
-            meta.module_path()
-                .map(|mp| Value::Bytes(mp.to_string().into()))
-                .unwrap_or(Value::Null),
-        );
-        log.insert("metadata.target", meta.target().to_string());
-
-        log.into()
-    }
-}
-
-#[derive(Debug, Default)]
-struct MakeLogEvent(LogEvent);
-
-impl Visit for MakeLogEvent {
-    fn record_str(&mut self, field: &Field, value: &str) {
-        self.0.insert(field.name(), value.to_string());
-    }
-
-    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.0.insert(field.name(), format!("{:?}", value));
-    }
-
-    fn record_i64(&mut self, field: &Field, value: i64) {
-        self.0.insert(field.name(), value);
-    }
-
-    fn record_u64(&mut self, field: &Field, value: u64) {
-        let field = field.name();
-        let converted: Result<i64, _> = value.try_into();
-        match converted {
-            Ok(value) => self.0.insert(field, value),
-            Err(_) => self.0.insert(field, value.to_string()),
-        };
-    }
-
-    fn record_bool(&mut self, field: &Field, value: bool) {
-        self.0.insert(field.name(), value);
     }
 }

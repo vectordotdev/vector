@@ -26,19 +26,21 @@ spec:
         {{- include "libvector.selectorLabels" . | nindent 8 }}
         vector.dev/exclude: "true"
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "libvector.imagePullSecrets" . | indent 6 }}
       serviceAccountName: {{ include "libvector.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.podPriorityClassName }}
+      priorityClassName: {{ .Values.podPriorityClassName }}
+      {{- end }}
       containers:
         - name: vector
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: {{ include "libvector.image" . | quote }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            {{- toYaml .Values.command | nindent 12 }}
           args:
             - --config
             - /etc/vector/*.toml
@@ -72,6 +74,10 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             # Host log directory mount.
             - name: var-log
@@ -126,8 +132,7 @@ spec:
             path: /var/lib/
         # Vector will store it's data here.
         - name: data-dir
-          hostPath:
-            path: /var/lib/vector/
+          {{- toYaml .Values.dataVolume | nindent 10 }}
         # Vector config dir.
         - name: config-dir
           projected:

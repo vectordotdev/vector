@@ -1,3 +1,4 @@
+use super::handlers::RecordDecodeError;
 use snafu::Snafu;
 use warp::http::StatusCode;
 
@@ -25,7 +26,7 @@ pub enum RequestError {
         source
     ))]
     ParseRecords {
-        source: std::io::Error,
+        source: RecordDecodeError,
         request_id: String,
     },
     #[snafu(display("Could not decode record for request {}: {}", request_id, source))]
@@ -80,11 +81,5 @@ impl RequestError {
             ShuttingDown { ref request_id, .. } => Some(request_id),
             UnsupportedProtocolVersion { .. } => None,
         }
-    }
-}
-
-impl From<RequestError> for warp::reject::Rejection {
-    fn from(error: RequestError) -> Self {
-        warp::reject::custom(error)
     }
 }

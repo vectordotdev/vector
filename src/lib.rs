@@ -15,21 +15,16 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
-#[macro_use]
-extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
-
-#[cfg(feature = "jemallocator")]
-#[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
-pub mod event;
+#[cfg(feature = "docker")]
+pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "wasm")]
@@ -44,14 +39,14 @@ pub mod buffers;
 pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
-#[cfg(feature = "rdkafka")]
+#[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
-pub mod mapping;
-pub mod metrics;
 pub(crate) mod pipeline;
+pub(crate) mod proto;
+pub mod providers;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;
@@ -63,6 +58,8 @@ pub mod sinks;
 pub mod sources;
 pub(crate) mod stats;
 pub mod stream;
+#[cfg(feature = "api-client")]
+mod tap;
 pub mod tcp;
 pub mod template;
 pub mod test_util;
@@ -74,7 +71,6 @@ pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;
-#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
 pub mod udp;
 pub mod unit_test;
 pub(crate) mod utilization;
@@ -82,12 +78,9 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use event::{Event, Value};
 pub use pipeline::Pipeline;
 
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T> = std::result::Result<T, Error>;
+pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
@@ -101,20 +94,26 @@ pub fn vector_version() -> impl std::fmt::Display {
 
 pub fn get_version() -> String {
     let pkg_version = vector_version();
-    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
-    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
-        .unwrap()
-        .format("%Y-%m-%d");
-    let built_string = if let Some(commit_hash) = commit_hash {
-        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
-    } else {
-        built_info::TARGET.into()
+    let build_desc = built_info::VECTOR_BUILD_DESC;
+    let build_string = match build_desc {
+        Some(desc) => format!("{} {}", built_info::TARGET, desc),
+        None => built_info::TARGET.into(),
     };
-    format!("{} ({})", pkg_version, built_string)
+
+    // We do not add 'debug' to the BUILD_DESC unless the caller has flagged on line
+    // or full debug symbols. See the Cargo Book profiling section for value meaning:
+    // https://doc.rust-lang.org/cargo/reference/profiles.html#debug
+    let build_string = match built_info::DEBUG {
+        "1" => format!("{} debug=line", build_string),
+        "2" | "true" => format!("{} debug=full", build_string),
+        _ => build_string,
+    };
+
+    format!("{} ({})", pkg_version, build_string)
 }
 
 #[allow(unused)]
-mod built_info {
+pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 

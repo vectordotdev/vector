@@ -1,11 +1,11 @@
 /// Exponentially Weighted Moving Average
 #[derive(Clone, Copy, Debug)]
-pub struct EWMA {
+pub struct Ewma {
     average: Option<f64>,
     alpha: f64,
 }
 
-impl EWMA {
+impl Ewma {
     pub fn new(alpha: f64) -> Self {
         let average = None;
         Self { average, alpha }
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn ewma_update_works() {
-        let mut mean = EWMA::new(0.5);
+        let mut mean = Ewma::new(0.5);
         assert_eq!(mean.average(), None);
         mean.update(2.0);
         assert_eq!(mean.average(), Some(2.0));

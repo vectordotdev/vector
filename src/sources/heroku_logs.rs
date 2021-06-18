@@ -1,16 +1,14 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
-    shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
-    Pipeline,
 };
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -57,7 +55,7 @@ struct LogplexSource {
 }
 
 impl HttpSource for LogplexSource {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
@@ -72,25 +70,11 @@ impl HttpSource for LogplexSource {
 #[async_trait::async_trait]
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
-    async fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
         };
-        source.run(
-            self.address,
-            "events",
-            true,
-            &self.tls,
-            &self.auth,
-            out,
-            shutdown,
-        )
+        source.run(self.address, "events", true, &self.tls, &self.auth, cx)
     }
 
     fn output_type(&self) -> DataType {
@@ -113,14 +97,8 @@ pub struct LogplexCompatConfig(LogplexConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
 impl SourceConfig for LogplexCompatConfig {
-    async fn build(
-        &self,
-        name: &str,
-        options: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        self.0.build(name, options, shutdown, out).await
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.0.build(cx).await
     }
 
     fn output_type(&self) -> DataType {
@@ -162,7 +140,7 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
         );
 
         if cfg!(test) {
-            panic!(error_msg);
+            panic!("{}", error_msg);
         }
         return Err(header_error_message("Logplex-Msg-Count", &error_msg));
     }
@@ -242,17 +220,16 @@ fn line_to_event(line: String) -> Event {
 #[cfg(test)]
 mod tests {
     use super::{HttpSourceAuthConfig, LogplexConfig};
-    use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
-        event::{Event, Value},
-        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
+        config::{log_schema, SourceConfig, SourceContext},
+        test_util::{next_addr, random_string, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
     use chrono::{DateTime, Utc};
+    use futures::Stream;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
+    use vector_core::event::{Event, EventStatus, Value};
 
     #[test]
     fn generate_config() {
@@ -262,9 +239,13 @@ mod tests {
     async fn source(
         auth: Option<HttpSourceAuthConfig>,
         query_parameters: Vec<String>,
-    ) -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+        status: EventStatus,
+        acknowledgements: bool,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
+        let mut context = SourceContext::new_test(sender);
+        context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
             LogplexConfig {
                 address,
@@ -272,12 +253,7 @@ mod tests {
                 tls: None,
                 auth,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(context)
             .await
             .unwrap()
             .await
@@ -309,29 +285,41 @@ mod tests {
             .as_u16()
     }
 
+    fn make_auth() -> HttpSourceAuthConfig {
+        HttpSourceAuthConfig {
+            username: random_string(16),
+            password: random_string(16),
+        }
+    }
+
+    const SAMPLE_BODY: &str = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
+
     #[tokio::test]
     async fn logplex_handles_router_log() {
         trace_init();
 
-        let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
-
-        let auth = HttpSourceAuthConfig {
-            username: "vector_user".to_owned(),
-            password: "vector_pass".to_owned(),
-        };
+        let auth = make_auth();
 
         let (rx, addr) = source(
             Some(auth.clone()),
             vec!["appname".to_string(), "absent".to_string()],
+            EventStatus::Delivered,
+            true,
         )
         .await;
 
-        assert_eq!(
-            200,
-            send(addr, body, Some(auth), "appname=lumberjack-store").await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                )
+            },
+            rx,
+            SAMPLE_BODY.lines().count(),
+        )
+        .await;
 
-        let mut events = collect_n(rx, body.lines().count()).await;
         let event = events.remove(0);
         let log = event.as_log();
 
@@ -350,6 +338,70 @@ mod tests {
         assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
         assert_eq!(log["appname"], "lumberjack-store".into());
         assert_eq!(log["absent"], Value::Null);
+    }
+
+    #[tokio::test]
+    async fn logplex_handles_failures() {
+        trace_init();
+
+        let auth = make_auth();
+
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, true).await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    400,
+                    send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                )
+            },
+            rx,
+            SAMPLE_BODY.lines().count(),
+        )
+        .await;
+
+        assert_eq!(events.len(), SAMPLE_BODY.lines().count());
+    }
+
+    #[tokio::test]
+    async fn logplex_ignores_disabled_acknowledgements() {
+        trace_init();
+
+        let auth = make_auth();
+
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, false).await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                )
+            },
+            rx,
+            SAMPLE_BODY.lines().count(),
+        )
+        .await;
+
+        assert_eq!(events.len(), SAMPLE_BODY.lines().count());
+    }
+
+    #[tokio::test]
+    async fn logplex_auth_failure() {
+        trace_init();
+
+        let (_rx, addr) = source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
+
+        assert_eq!(
+            401,
+            send(
+                addr,
+                SAMPLE_BODY,
+                Some(make_auth()),
+                "appname=lumberjack-store"
+            )
+            .await
+        );
     }
 
     #[test]
