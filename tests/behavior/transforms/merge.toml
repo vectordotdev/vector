@@ -17,7 +17,7 @@
   [[tests.outputs]]
     extract_from = "merge"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "hello world" &&
         !exists(."_partial")
@@ -43,7 +43,7 @@
   [[tests.outputs]]
     extract_from = "merge_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .nested.message == "hello world" &&
         !exists(."_partial")
@@ -70,7 +70,7 @@
   [[tests.outputs]]
     extract_from = "merge_nested_marker"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .nested.message == "hello world" &&
         !exists(.nested.is_partial)

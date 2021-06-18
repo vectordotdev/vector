@@ -11,7 +11,7 @@
   [[tests.outputs]]
     extract_from = "grok_parser_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .timestamp == "12/Dec/2015:18:32:56 +0100" &&
         .message == "hello"
@@ -30,7 +30,7 @@
   [[tests.outputs]]
     extract_from = "grok_parser_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .nested.timestamp == "12/Dec/2015:18:32:56 +0100" &&
         .doubly.nested.message == "hello"

@@ -142,7 +142,7 @@ impl FunctionTransform for Sample {
 mod tests {
     use super::*;
     use crate::{
-        conditions::{ConditionConfig, RemapConfig},
+        conditions::{ConditionConfig, VrlConfig},
         config::log_schema,
         event::Event,
         test_util::random_lines,
@@ -151,7 +151,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     fn condition_contains(key: &str, needle: &str) -> Box<dyn Condition> {
-        RemapConfig {
+        VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
         }
         .build()
