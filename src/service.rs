@@ -1,12 +1,6 @@
-use std::ffi::OsString;
 use std::path::PathBuf;
 
 use structopt::StructOpt;
-
-use crate::cli::handle_config_errors;
-use crate::config;
-
-const DEFAULT_SERVICE_NAME: &str = crate::built_info::PKG_NAME;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -59,37 +53,7 @@ struct InstallOpts {
 
 impl InstallOpts {
     fn service_info(&self) -> ServiceInfo {
-        let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
-        let display_name = self.display_name.as_deref().unwrap_or("Vector Service");
-        let description = crate::built_info::PKG_DESCRIPTION;
-
-        let current_exe = ::std::env::current_exe().unwrap();
-        let config_paths = self.config_paths_with_formats();
-        let arguments = create_service_arguments(&config_paths).unwrap();
-
-        ServiceInfo {
-            name: OsString::from(service_name),
-            display_name: OsString::from(display_name),
-            description: OsString::from(description),
-            executable_path: current_exe,
-            launch_arguments: arguments,
-        }
-    }
-
-    pub fn config_paths_with_formats(&self) -> Vec<config::ConfigPath> {
-        config::merge_path_lists(vec![
-            (&self.config_paths, None),
-            (&self.config_paths_toml, Some(config::Format::Toml)),
-            (&self.config_paths_json, Some(config::Format::Json)),
-            (&self.config_paths_yaml, Some(config::Format::Yaml)),
-        ])
-        .map(|(path, hint)| config::ConfigPath::File(path, hint))
-        .chain(
-            self.config_dirs
-                .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
-        )
-        .collect()
+        ServiceInfo {}
     }
 }
 
@@ -103,11 +67,7 @@ struct StandardOpts {
 
 impl StandardOpts {
     fn service_info(&self) -> ServiceInfo {
-        let mut default_service = ServiceInfo::default();
-        let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
-
-        default_service.name = OsString::from(service_name);
-        default_service
+        ServiceInfo::default()
     }
 }
 
@@ -126,26 +86,11 @@ enum SubCommand {
     Restart(StandardOpts),
 }
 
-struct ServiceInfo {
-    pub name: OsString,
-    pub display_name: OsString,
-    pub description: OsString,
-
-    pub executable_path: std::path::PathBuf,
-    pub launch_arguments: Vec<OsString>,
-}
+struct ServiceInfo {}
 
 impl Default for ServiceInfo {
     fn default() -> Self {
-        let current_exe = ::std::env::current_exe().unwrap();
-
-        ServiceInfo {
-            name: OsString::from(DEFAULT_SERVICE_NAME),
-            display_name: OsString::from("Vector Service"),
-            description: OsString::from(crate::built_info::PKG_DESCRIPTION),
-            executable_path: current_exe,
-            launch_arguments: vec![],
-        }
+        ServiceInfo {}
     }
 }
 
@@ -229,33 +174,4 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
 fn control_service(_service: &ServiceInfo, _action: ControlAction) -> exitcode::ExitCode {
     error!("Service commands are currently not supported on this platform.");
     exitcode::UNAVAILABLE
-}
-
-fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
-    let config_paths = config::process_paths(&config_paths)?;
-    match config::load_from_paths(&config_paths) {
-        Ok(_) => Some(
-            config_paths
-                .iter()
-                .flat_map(|config_path| match config_path {
-                    config::ConfigPath::File(path, format) => {
-                        let key = match format {
-                            None => "--config",
-                            Some(config::Format::Toml) => "--config-toml",
-                            Some(config::Format::Json) => "--config-json",
-                            Some(config::Format::Yaml) => "--config-yaml",
-                        };
-                        vec![OsString::from(key), path.as_os_str().into()]
-                    }
-                    config::ConfigPath::Dir(path) => {
-                        vec![OsString::from("--config-dir"), path.as_os_str().into()]
-                    }
-                })
-                .collect::<Vec<OsString>>(),
-        ),
-        Err(errs) => {
-            handle_config_errors(errs);
-            None
-        }
-    }
 }
