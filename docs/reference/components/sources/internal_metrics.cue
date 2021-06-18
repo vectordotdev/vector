@@ -109,6 +109,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		connection_send_ack_errors_total: {
+			description:       "The total number of protocol acknowledgement errors for this Vector instance for source protocols that support acknowledgements."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		connection_shutdown_total: {
 			description:       "The total number of times the connection has been shut down."
 			type:              "counter"

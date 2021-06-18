@@ -216,8 +216,9 @@ configuration: {
 		wildcards: {
 			title: "Wildcards in identifiers"
 			body: """
-				Vector supports wildcards (`*`) in component identifiers when building your topology, but only supports
-				them as the last character. For example:
+				Vector supports wildcard characters (`*`) in component identifiers when building your topology.
+
+				For example:
 
 				```toml
 				[sources.app1_logs]
@@ -238,7 +239,7 @@ configuration: {
 
 				[sinks.archive]
 				type = "aws_s3"
-				inputs = ["app*", "system_logs"]
+				inputs = ["*_logs"]
 				```
 				"""
 		}

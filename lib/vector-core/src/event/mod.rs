@@ -139,6 +139,14 @@ impl Event {
         }
     }
 
+    /// Destroy the event and return the metadata.
+    pub fn into_metadata(self) -> EventMetadata {
+        match self {
+            Self::Log(log) => log.into_parts().1,
+            Self::Metric(metric) => metric.into_parts().2,
+        }
+    }
+
     pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
         let finalizer = EventFinalizer::new(batch);
         match self {

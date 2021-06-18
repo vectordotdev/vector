@@ -94,3 +94,18 @@ impl InternalEvent for TcpSocketError {
         counter!("connection_errors_total", 1, "mode" => "tcp");
     }
 }
+
+#[derive(Debug)]
+pub struct TcpSendAckError {
+    pub error: std::io::Error,
+}
+
+impl InternalEvent for TcpSendAckError {
+    fn emit_logs(&self) {
+        warn!(message = "Error writing acknowledgement, dropping connection.", error = %self.error);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("connection_send_ack_errors_total", 1, "mode" => "tcp");
+    }
+}
