@@ -19,6 +19,7 @@ pub enum Encoding {
     Text,
     Ndjson,
     Json,
+    Binary,
 }
 
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
@@ -62,6 +63,7 @@ pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessag
                 .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
             json_parse_array_of_object(parsed_json)
         }
+        Encoding::Binary => Ok(vec![LogEvent::from(body).into()]),
     }
 }
 

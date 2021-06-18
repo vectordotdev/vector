@@ -9,7 +9,7 @@ pub mod remap;
 
 pub use check_fields::CheckFieldsConfig;
 
-use self::remap::RemapConfig;
+pub use self::remap::RemapConfig;
 
 pub trait Condition: Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;

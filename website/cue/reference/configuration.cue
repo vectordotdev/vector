@@ -146,4 +146,106 @@ configuration: {
 			}
 		}
 	}
+
+	how_it_works: {
+		environment_variables: {
+			title: "Environment variables"
+			body: """
+				Vector will interpolate environment variables within your configuration file
+				with the following syntax:
+
+				```toml title="vector.toml"
+				[transforms.add_host]
+				  type = "add_fields"
+
+				  [transforms.add_host.fields]
+				    host = "${HOSTNAME}"
+				    environment = "${ENV:-development}" # default value when not present
+				```
+				"""
+
+			sub_sections: [
+				{
+					title: "Default values"
+					body: """
+						Default values can be supplied via the `:-` syntax:
+
+						```toml
+						option = "${ENV_VAR:-default}"
+						```
+						"""
+				},
+				{
+					title: "Escaping"
+					body: """
+						You can escape environment variable by preceding them with a `$` character. For
+						example `$${HOSTNAME}` will be treated _literally_ in the above environment
+						variable example.
+						"""
+				},
+			]
+		}
+		formats: {
+			title: "Formats"
+			body:  """
+				Vector supports [TOML](\(urls.toml)), [YAML](\(urls.yaml)), and [JSON](\(urls.json)) to
+				ensure Vector fits into your workflow. A side benefit of supporting JSON is the
+				enablement of data templating languages like [Jsonnet](\(urls.jsonnet)) and
+				[Cue](\(urls.cue)).
+				"""
+		}
+		location: {
+			title: "Location"
+			body: """
+				The location of your Vector configuration file depends on your installation method. For most Linux
+				based systems, the file can be found at `/etc/vector/vector.toml`.
+				"""
+		}
+		multiple: {
+			title: "Multiple files"
+			body:  """
+				You can pass multiple configuration files when starting Vector:
+
+				```bash
+				vector --config vector1.toml --config vector2.toml
+				```
+
+				Or use a [globbing syntax](\(urls.globbing)):
+
+				```bash
+				vector --config /etc/vector/*.toml
+				```
+				"""
+		}
+		wildcards: {
+			title: "Wildcards in identifiers"
+			body: """
+				Vector supports wildcard characters (`*`) in component identifiers when building your topology.
+
+				For example:
+
+				```toml
+				[sources.app1_logs]
+				type = "file"
+				includes = ["/var/log/app1.log"]
+
+				[sources.app2_logs]
+				type = "file"
+				includes = ["/var/log/app.log"]
+
+				[sources.system_logs]
+				type = "file"
+				includes = ["/var/log/system.log"]
+
+				[sinks.app_logs]
+				type = "datadog_logs"
+				inputs = ["app*"]
+
+				[sinks.archive]
+				type = "aws_s3"
+				inputs = ["*_logs"]
+				```
+				"""
+		}
+	}
 }
