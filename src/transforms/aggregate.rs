@@ -116,17 +116,13 @@ impl Aggregate {
 
 impl TaskTransform for Aggregate {
     fn transform(
-        self: Box<Self>,
+        mut self: Box<Self>,
         mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
-        let mut me = self;
-
-        let interval = me.interval;
-
-        let mut flush_stream = tokio::time::interval(interval);
+        let mut flush_stream = tokio::time::interval(self.interval);
 
         Box::pin(
             stream! {
@@ -135,15 +131,15 @@ impl TaskTransform for Aggregate {
                 while !done {
                     tokio::select! {
                         _ = flush_stream.tick() => {
-                            me.flush_into(&mut output);
+                            self.flush_into(&mut output);
                         },
                         maybe_event = input_rx.next() => {
                             match maybe_event {
                                 None => {
-                                    me.flush_into(&mut output);
+                                    self.flush_into(&mut output);
                                     done = true;
                                 }
-                                Some(event) => me.record(event),
+                                Some(event) => self.record(event),
                             }
                         }
                     };
