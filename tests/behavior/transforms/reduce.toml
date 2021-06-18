@@ -281,43 +281,43 @@
 
 ##------------------------------------------------------------------------------
 
-[transforms.ends_when_remap]
+[transforms.ends_when_vrl]
   inputs = []
   type = "reduce"
   group_by = ["request_id"]
 
-  [transforms.ends_when_remap.ends_when]
+  [transforms.ends_when_vrl.ends_when]
     type = "vrl"
     source = """
         .test_end_message == true
     """
 
 [[tests]]
-  name = "reduce_ends_when_remap"
+  name = "reduce_ends_when_vrl"
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "1"
       counter = 1
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "1"
       counter = 3
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "2"
       counter = 5
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "1"
@@ -325,14 +325,14 @@
       test_end_message = true
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "1"
       counter = 7
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "2"
@@ -340,7 +340,7 @@
       test_end_message = true
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "3"
@@ -348,7 +348,7 @@
       test_end_message = true
 
   [[tests.outputs]]
-    extract_from = "ends_when_remap"
+    extract_from = "ends_when_vrl"
     [[tests.outputs.conditions]]
       type = "vrl"
       source = '''
@@ -377,7 +377,7 @@
     inputs = []
     type = "reduce"
     merge_strategies.message = "concat_newline"
-    starts_when.type = "remap"
+    starts_when.type = "vrl"
     starts_when.source = "match(string!(.message), r'^\\w.*')"
 
 [[tests]]
@@ -436,7 +436,7 @@
     inputs = []
     type = "reduce"
     merge_strategies.message = "concat"
-    ends_when.type = "remap"
+    ends_when.type = "vrl"
     ends_when.source = """!ends_with(strip_whitespace(string!(.message)), "\\\\")"""
 
 [[tests]]
@@ -490,7 +490,7 @@
   inputs = []
   type = "reduce"
   merge_strategies.message = "concat"
-  ends_when.type = "remap"
+  ends_when.type = "vrl"
   ends_when.source = """ends_with(strip_whitespace(string!(.message)), ";")"""
 
 [[tests]]
@@ -544,7 +544,7 @@
     inputs = []
     type = "reduce"
     merge_strategies.message = "concat"
-    starts_when.type = "remap"
+    starts_when.type = "vrl"
     starts_when.source = "match(string!(.message), r'^<\\d\\d> ')"
 
 [[tests]]
@@ -598,7 +598,7 @@
     inputs = []
     type = "reduce"
     merge_strategies.message = "concat_newline"
-    starts_when.type = "remap"
+    starts_when.type = "vrl"
     starts_when.source = "match(string!(.message), r'^\\d{4}-\\d{2}-\\d{2} .+')"
 
 [[tests]]
