@@ -40,7 +40,7 @@ inventory::collect!(ConditionDescription);
 
 /// A condition can either be a raw string such as
 /// `condition = '.message == "hooray"'`.
-/// In this case it is turned into a Vrl condition.
+/// In this case it is turned into a VRL condition.
 /// Otherwise it is a condition such as:
 ///
 /// condition.type = 'check_fields'
