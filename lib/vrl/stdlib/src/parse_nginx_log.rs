@@ -264,5 +264,20 @@ mod tests {
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
         }
+
+        error_line_starting {
+            args: func_args![
+                value: r#"2021/06/17 19:25:59 [notice] 133309#133309: signal process started"#,
+                format: "error"
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-17T19:25:59Z").unwrap().into()),
+                "severity" => "notice",
+                "pid" => 133309,
+                "tid" => 133309,
+                "message" => "signal process started",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+        }
     ];
 }

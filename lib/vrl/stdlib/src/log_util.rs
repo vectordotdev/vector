@@ -101,13 +101,13 @@ lazy_static! {
         (?P<timestamp>.+)\s+                            # Match any character until [
         \[(?P<severity>\w+)\]\s+                        # Match any word character
         (?P<pid>\d+)\#                                  # Match any number
-        (?P<tid>\d+):\s+                                # Match any number
-        \*(?P<cid>\d+)                                  # Match any number
-        \s+(?P<message>.*)                              # Match any character
-        (,\s+client:\s+(?P<client>.+))                  # Match any character after ', client: '
-        (,\s+server:\s+(?P<server>.+))                  # Match any character after ', server: '
-        (,\s+request:\s+"(?P<request>.+)")              # Match any character after ', request: '
-        (,\s+host:\s+"(?P<host>[^"]+)")                 # Match any character then ':' then any character after ', host: '
+        (?P<tid>\d+):                                   # Match any number
+        (\s+\*(?P<cid>\d+))?                            # Match any number
+        \s+(?P<message>[^,]*)                           # Match any character
+        (,\s+client:\s+(?P<client>[^,]+))?              # Match any character after ', client: '
+        (,\s+server:\s+(?P<server>[^,]+))?              # Match any character after ', server: '
+        (,\s+request:\s+"(?P<request>[^"]+)")?          # Match any character after ', request: '
+        (,\s+host:\s+"(?P<host>[^"]+)")?                # Match any character then ':' then any character after ', host: '
         (,\s+referrer:\s+"(?P<referrer>[^"]+)")?        # Match any character after ', referrer: '
         \s*$                                            # Match any number of whitespaces (to be discarded).
     "#)
