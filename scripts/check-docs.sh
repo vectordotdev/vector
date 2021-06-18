@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # SUMMARY
 #
-#   Checks that the contents of the /website/cue folder are valid. This includes:
+#   Checks that the contents of the /docs/cue folder are valid. This includes:
 #
 #     1. Ensuring that the .cue files can compile.
 #     2. In CI, ensuring that the .cue files are properly formatted.
@@ -42,7 +42,7 @@ read-all-docs() {
   echo "Validating cue files correctness..."
 
   if ERRORS="$("${CUE}" vet 2>&1)"; then
-    echo "Success! The contents of the \"docs/\" directory are valid"
+    echo "Success! The contents of the sources in the \"./docs/cue\" directory are valid"
   else
     printf "Failed!\n\n%s\n" "$ERRORS"
     exit 1

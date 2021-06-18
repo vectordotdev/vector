@@ -1,5 +1,5 @@
 [build]
-base = "website"
+base = "docs"
 publish = "public"
 command = "make ci-production-build"
 
