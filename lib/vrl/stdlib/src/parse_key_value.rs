@@ -72,9 +72,7 @@ impl Function for ParseKeyValue {
             Example {
                 title: "standalone key",
                 source: r#"parse_key_value!(s'foo=bar foobar', whitespace: "strict", accept_standalone_key: true)"#,
-                result: Ok(
-                    r#"{"foo": "bar", "foobar": true}"#,
-                ),
+                result: Ok(r#"{"foo": "bar", "foobar": true}"#),
             },
         ]
     }
