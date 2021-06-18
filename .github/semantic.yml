@@ -55,7 +55,6 @@ scopes:
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
-  - remap # Anything related to the Vector Remap Language
   - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector
@@ -68,6 +67,7 @@ scopes:
   - topology # Anything related to Vector's topology code
   - traces # Anything related to Vectors' trace events
   - transforms # Anything related to Vector's transform components
+  - vrl # Anything related to the Vector Remap Language
 
   # platforms
   - amazon-linux platform # Anything `amazon-linux` platform related
@@ -181,7 +181,6 @@ scopes:
   - blackhole sink # Anything `blackhole` sink related
   - clickhouse sink # Anything `clickhouse` sink related
   - console sink # Anything `console` sink related
-  - datadog_events sink # Anything `datadog_events` sink related
   - datadog_logs sink # Anything `datadog_logs` sink related
   - datadog_metrics sink # Anything `datadog_metrics` sink related
   - elasticsearch sink # Anything `elasticsearch` sink related
