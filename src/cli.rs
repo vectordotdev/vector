@@ -152,7 +152,7 @@ pub struct RootOpts {
 
     /// [experimental] Send internal tracing spans to a local APM-enabled Datadog agent with
     /// a granularity matching the current log level.
-    #[structopt(long, env = "VECTOR_ENABLE_DATADOG_TRACING")]
+    #[structopt(long, env = "VECTOR_ENABLE_DATADOG_TRACING", takes_value(false))]
     pub enable_datadog_tracing: bool,
 }
 
