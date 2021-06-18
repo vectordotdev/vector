@@ -9,7 +9,7 @@ remap: functions: parse_logfmt: {
 		* `"` characters can be escaped by `\`.
 		* As per this [logfmt specification](\#(urls.logfmt_specs)) standlone key are accepted and will be associated with the boolean value `true`.
 		"""#
-	notices: functions.encode_key_value.notices
+	notices:     functions.encode_key_value.notices
 
 	arguments: [
 		{
