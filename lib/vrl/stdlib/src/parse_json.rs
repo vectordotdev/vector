@@ -1,18 +1,18 @@
-use vrl::prelude::*;
+vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct ParseJson;
+ParseJson;
 
-impl Function for ParseJson {
-    fn identifier(&self) -> &'static str {
+Function for ParseJson {
+    identifier(&self) -> &'static str {
         "parse_json"
     }
 
-    fn summary(&self) -> &'static str {
+    summary(&self) -> &'static str {
         "parse a string to a JSON type"
     }
 
-    fn usage(&self) -> &'static str {
+    usage(&self) -> &'static str {
         indoc! {r#"
             Parses the provided `value` as JSON.
 
@@ -21,16 +21,16 @@ impl Function for ParseJson {
         "#}
     }
 
-    fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
+    parameters(&self) -> &'static [Parameter] {
+         {
             keyword: "value",
             kind: kind::BYTES,
             required: true,
         }]
     }
 
-    fn examples(&self) -> &'static [Example] {
-        &[
+    examples(&self) -> &'static [Example] {
+        
             Example {
                 title: "object",
                 source: r#"parse_json!(s'{ "field": "value" }')"#,
@@ -71,7 +71,7 @@ impl Function for ParseJson {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+     compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ParseJsonFn { value }))
@@ -79,12 +79,12 @@ impl Function for ParseJson {
 }
 
 #[derive(Debug, Clone)]
-struct ParseJsonFn {
+ ParseJsonFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseJsonFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+ Expression  ParseJsonFn {
+     resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let value = serde_json::from_slice::<'_, Value>(&bytes)
             .map_err(|e| format!("unable to parse json: {}", e))?;
@@ -92,12 +92,12 @@ impl Expression for ParseJsonFn {
         Ok(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+     type_def(&self, _: &state::Compiler) -> TypeDef {
         type_def()
     }
 }
 
-fn inner_kind() -> Kind {
+ inner_kind() -> Kind {
     Kind::Null
         | Kind::Bytes
         | Kind::Integer
@@ -107,7 +107,7 @@ fn inner_kind() -> Kind {
         | Kind::Object
 }
 
-fn type_def() -> TypeDef {
+ type_def() -> TypeDef {
     TypeDef::new()
         .fallible()
         .bytes()
@@ -120,8 +120,8 @@ fn type_def() -> TypeDef {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+ tests {
+     super::*;
 
     test_function![
         parse_json => ParseJson;
