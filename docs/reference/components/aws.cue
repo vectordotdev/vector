@@ -166,6 +166,8 @@ components: _aws: {
 
 				If credentials are not found the [healtcheck](#healthchecks) will fail and an
 				error will be [logged][docs.monitoring#logs].
+
+				Vector will again search for AWS credentials once they expire.
 				"""
 			sub_sections: [
 				{
@@ -184,12 +186,6 @@ components: _aws: {
 						Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
 						optional setting that is helpful for a variety of use cases, such as cross
 						account access.
-						"""
-				},
-				{
-					title: "Expiration"
-					body: """
-						Vector will again search for AWS credentials once they expire.
 						"""
 				},
 			]
