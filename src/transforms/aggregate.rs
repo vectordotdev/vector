@@ -24,7 +24,12 @@ use std::{
 #[serde(deny_unknown_fields, default)]
 pub struct AggregateConfig {
     /// The interval between flushes in milliseconds.
-    pub interval_ms: Option<u64>,
+    #[serde(default = "default_interval_ms")]
+    pub interval_ms: u64,
+}
+
+fn default_interval_ms() -> u64 {
+    10 * 1000
 }
 
 inventory::submit! {
@@ -64,7 +69,7 @@ pub struct Aggregate {
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         Ok(Self {
-            interval: Duration::from_millis(config.interval_ms.unwrap_or(10 * 1000)),
+            interval: Duration::from_millis(config.interval_ms),
             map: HashMap::new(),
         })
     }
@@ -190,7 +195,7 @@ mod tests {
 
     #[test]
     fn incremental() {
-        let mut agg = Aggregate::new(&AggregateConfig { interval_ms: Some(1000_u64) }).unwrap();
+        let mut agg = Aggregate::new(&AggregateConfig { interval_ms: 1000_u64 }).unwrap();
 
         let tags: BTreeMap<String, String> =
             vec![("tag1".into(), "val1".into())].into_iter().collect();
@@ -247,7 +252,7 @@ mod tests {
 
     #[test]
     fn absolute() {
-        let mut agg = Aggregate::new(&AggregateConfig { interval_ms: Some(1000_u64) }).unwrap();
+        let mut agg = Aggregate::new(&AggregateConfig { interval_ms: 1000_u64 }).unwrap();
 
         let tags: BTreeMap<String, String> =
             vec![("tag1".into(), "val1".into())].into_iter().collect();
@@ -353,7 +358,6 @@ interval_ms = 999999
     async fn transform_interval() {
         let agg = toml::from_str::<AggregateConfig>(
             r#"
-interval_ms = 10000
 "#,
         )
         .unwrap()
