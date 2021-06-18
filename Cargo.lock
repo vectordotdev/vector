@@ -8327,6 +8327,7 @@ dependencies = [
  "lookup",
  "md-5",
  "nom 6.1.2",
+ "percent-encoding",
  "regex",
  "rust_decimal",
  "serde_json",
