@@ -48,7 +48,7 @@ remap: functions: encode_percent: {
 			source: """
 				encode_percent("foo \tbar", ascii_set: "CONTROLS")
 				"""
-			return: "foo %14bar"
+			return: "foo %09bar"
 		},
 	]
 }
