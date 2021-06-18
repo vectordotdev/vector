@@ -300,7 +300,6 @@ impl Service<Request> for S3Sink {
         }
         let tagging = tagging.finish();
 
-        // <p>The base64-encoded 128-bit MD5 digest of the message (without the headers) according to RFC 1864. This header can be used as a message integrity check to verify that the data is the same data that was originally sent. Although it is optional, we recommend using the Content-MD5 mechanism as an end-to-end integrity check. For more information about REST request authentication, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html">REST Authentication</a>.</p>
         let client = self.client.clone();
         let request = PutObjectRequest {
             body: Some(request.body.into()),
@@ -575,7 +574,7 @@ mod tests {
     }
 }
 
-//#[cfg(feature = "aws-s3-integration-tests")]
+#[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;
