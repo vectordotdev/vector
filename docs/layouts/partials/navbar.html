@@ -1,5 +1,6 @@
 {{ $here := .RelPermalink }}
 {{ $menu := site.Menus.navbar }}
+{{ $modes := slice "Light" "Dark" }}
 <nav
   x-cloak
   x-data="{ open: false, flyout: false }"
@@ -11,13 +12,12 @@
       <div class="flex items-center px-2 lg:px-0">
         <div class="flex-shrink-0">
           <a href="{{ site.BaseURL }}">
-            <div x-show="$store.global.isDark()">
-              {{ partial "svg.html" (dict "src" "/img/logos/vector-logo-light.svg" "h" "auto" "w" 32) }}
+            {{ range $modes }}
+            {{ $src := printf "/img/logos/vector-logo-%s.svg" (. | lower) }}
+            <div x-show="$store.global.is{{ . }}()">
+              {{ partial "svg.html" (dict "src" $src "class" "h-auto w-32") }}
             </div>
-
-            <div x-show="$store.global.isLight()">
-              {{ partial "svg.html" (dict "src" "/img/logos/vector-logo-dark.svg" "h" "auto" "w" 32) }}
-            </div>
+            {{ end }}
           </a>
         </div>
         <div class="hidden lg:block lg:ml-6">
