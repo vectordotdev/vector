@@ -13,8 +13,15 @@
   <div x-data="{ config: '{{ $defaultConfig }}' }" class="mt-8 max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 items-start">
     <div class="md:pt-2 flex flex-col items-start md:items-end space-y-1 md:space-y-2">
       {{ range $configs }}
-      <button @click="config = '{{ .title }}'" :class="{ 'font-bold dark:text-primary': config === '{{ .title }}', 'text-gray-400 font-light hover:text-secondary dark:hover:text-primary': config != '{{ .title }}' }" class="md:text-lg font-semibold">
-        {{ .title }}
+      <button @click="config = '{{ .title }}'" :class="{ 'font-semibold dark:text-primary': config === '{{ .title }}', 'text-gray-400 font-light hover:text-secondary dark:hover:text-primary': config != '{{ .title }}' }" class="flex items-center space-x-2 md:text-lg">
+        <span>
+          {{ .title }}
+        </span>
+
+        {{/* Heroicon: outline/chevron-right */}}
+        <svg x-show="config === '{{ .title }}'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
       </button>
       {{ end }}
     </div>
@@ -23,14 +30,16 @@
       {{ range $configs }}
       {{ $code := highlight .config "toml" "" }}
       <div x-show="config === '{{ .title }}'">
-        <div class="bg-black p-6 rounded-lg shadow-lg">
-          {{ $code }}
-        </div>
+        <div class="bg-black rounded-lg shadow-lg p-6">
+          <div>
+            {{ $code }}
+          </div>
 
-        <div class="mt-2 ml-2 md:ml-4">
-          <span class="text-sm font-mono font-semibold text-gray-400">
-            {{ $configure.filename }}
-          </span>
+          <div class="mt-8 text-right">
+            <span class="text-gray-300 text-sm font-mono tracking-tight">
+              {{ $configure.filename }}
+            </span>
+          </div>
         </div>
       </div>
       {{ end }}

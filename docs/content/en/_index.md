@@ -3,11 +3,10 @@
 title: Vector
 
 # Tabs for the "A complete end-to-end platform" section
-platform_tabs: [
-  "Distributed",
-  "Centralized",
-  "Stream based"
-]
+platform_tabs:
+- Distributed
+- Centralized
+- Stream based
 
 # Configuration section
 configure:
@@ -16,15 +15,20 @@ configure:
   filename: "/etc/vector/vector.toml"
   below: "Configuration examples are in [TOML](https://toml.io) but Vector also supports [YAML](https://yaml.org) and [JSON](https://json.org)"
   example_configs:
-  - title: Do something
+  - title: Parse NGINX logs
     config: |
-      [sources.do_something]
-      type = "stdin"
+      [sources.nginx_error_log]
+      type = "file"
+      include = ["/var/log/nginx*.log"]
+      start_at_beginning = false
+      ignore_older = 86400
 
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
+      [transforms.nginx_error_parser]
+      inputs = ["nginx_error_log"]
+      type = "remap"
+      source = '''
+      # TODO
+      '''
   - title: Something else
     config: |
       [sources.do_something_else]
@@ -89,98 +93,51 @@ why: [
   }
 ]
 
-# Installation icons
-installation: [
-  {
-    logo: "kubernetes.svg",
+installation:
+  title: Installs everywhere
+  description: Packaged as a single binary. No dependencies, no runtime, and memory safe.
+  logos:
+  - logo: "kubernetes.svg"
     url: "/docs/setup/installation/platforms/kubernetes"
-  },
-  {
-    logo: "docker.svg",
+  - logo: "docker.svg"
     url: "/docs/setup/installation/platforms/docker"
-  },
-  {
-    logo: "linux.svg",
+  - logo: "linux.svg"
     url: "/docs/setup/installation/operating-systems"
-  },
-  {
-    logo: "raspbian.svg",
+  - logo: "raspbian.svg"
     url: "/docs/setup/installation/operating-systems/raspbian"
-  },
-  {
-    logo: "windows.svg",
+  - logo: "windows.svg"
     url: "/docs/setup/installation/operating-systems/windows"
-  },
-  {
-    logo: "apple.svg",
+  - logo: "apple.svg"
     url: "/docs/setup/installation/operating-systems/macos"
-  }
-]
-
-installation_features: [
-  {
-    title: "Single binary",
+  features:
+  - title: "Single binary"
     ionicon: "cube-outline"
-  },
-  {
-    title: "X86_64, ARM64/v7",
+  - title: "X86_64, ARM64/v7"
     ionicon: "hardware-chip-outline"
-  },
-  {
-    title: "No runtime",
+  - title: "No runtime"
     ionicon: "flash-outline"
-  },
-  {
-    title: "Memory safe",
+  - title: "Memory safe"
     ionicon: "shield-outline"
-  }
-]
-
-# Other methods
-methods: [
-  {
-    title: "Platforms",
+  methods:
+  - title: "Platforms"
     url: "/docs/setup/installation/platforms"
-  },
-  {
-    title: "Package managers",
+  - title: "Package managers"
     url: "/docs/setup/installation/package-managers"
-  },
-  {
-    title: "Operating systems",
-    url: "/docs/setup/installation/operating-systems",
-  },
-  {
-    title: "Manual",
+  - title: "Operating systems"
+    url: "/docs/setup/installation/operating-systems"
+  - title: "Manual"
     url: "/docs/setup/installation/manual"
-  }
-]
 
 # Community section
 community:
   title: Backed by a strong open source community
-  stats: [
-    {
-      title: "GitHub stars",
-      figure: "6k+"
-    },
-    {
-      title: "Contributors",
-      figure: "146"
-    },
-    {
-      title: "Downloads",
-      figure: "30m+"
-    },
-    {
-      title: "Countries",
-      figure: "40"
-    }
-  ]
-  buttons: [
-    {
-      title: "GitHub",
-      icon: "github"
-    }
-  ]
+  stats:
+  - title: "GitHub stars"
+    figure: "6k+"
+  - title: "Contributors"
+    figure: "146"
+  - title: "Downloads"
+    figure: "30m+"
+  - title: "Countries"
+    figure: "40"
 ---
