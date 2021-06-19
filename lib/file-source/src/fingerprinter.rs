@@ -23,9 +23,11 @@ pub enum FingerprintStrategy {
     Checksum {
         bytes: usize,
         ignored_header_bytes: usize,
+        lines: usize,
     },
-    FirstLineChecksum {
+    FirstLinesChecksum {
         ignored_header_bytes: usize,
+        lines: usize,
     },
     DevInode,
 }
@@ -35,7 +37,7 @@ pub enum FingerprintStrategy {
 pub enum FileFingerprint {
     #[serde(rename = "checksum")]
     BytesChecksum(u64),
-    FirstLineChecksum(u64),
+    FirstLinesChecksum(u64),
     DevInode(u64, u64),
     Unknown(u64),
 }
@@ -46,7 +48,7 @@ impl FileFingerprint {
 
         match self {
             BytesChecksum(c) => *c,
-            FirstLineChecksum(c) => *c,
+            FirstLinesChecksum(c) => *c,
             DevInode(dev, ino) => {
                 let mut buf = Vec::with_capacity(std::mem::size_of_val(dev) * 2);
                 buf.write_all(&dev.to_be_bytes()).expect("writing to array");
@@ -82,16 +84,18 @@ impl Fingerprinter {
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
                 bytes: _,
+                lines,
             }
-            | FingerprintStrategy::FirstLineChecksum {
+            | FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes,
+                lines,
             } => {
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                fingerprinter_read_until(fp, b'\n', buffer)?;
+                fingerprinter_read_until(fp, b'\n', lines, buffer)?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
-                Ok(FirstLineChecksum(fingerprint))
+                Ok(FirstLinesChecksum(fingerprint))
             }
         }
     }
@@ -141,6 +145,7 @@ impl Fingerprinter {
             FingerprintStrategy::Checksum {
                 bytes,
                 ignored_header_bytes,
+                lines: _,
             } => {
                 buffer.resize(bytes, 0u8);
                 let mut fp = fs::File::open(path)?;
@@ -154,7 +159,12 @@ impl Fingerprinter {
     }
 }
 
-fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> io::Result<()> {
+fn fingerprinter_read_until(
+    mut r: impl Read,
+    delim: u8,
+    mut count: usize,
+    mut buf: &mut [u8],
+) -> io::Result<()> {
     while !buf.is_empty() {
         let read = match r.read(buf) {
             Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
@@ -164,10 +174,14 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
         };
 
         if let Some(pos) = buf[..read].iter().position(|&c| c == delim) {
-            for el in &mut buf[(pos + 1)..] {
-                *el = 0;
+            if count <= 1 {
+                for el in &mut buf[(pos + 1)..] {
+                    *el = 0;
+                }
+                break;
+            } else {
+                count -= 1;
             }
-            break;
         }
 
         buf = &mut buf[read..];
@@ -187,6 +201,7 @@ mod test {
             strategy: FingerprintStrategy::Checksum {
                 bytes: 256,
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             max_line_length: 1024,
             ignore_not_found: false,
@@ -226,11 +241,12 @@ mod test {
     }
 
     #[test]
-    fn test_first_line_checksum_fingerprint() {
+    fn test_first_lines_checksum_fingerprint() {
         let max_line_length = 64;
         let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLineChecksum {
+            strategy: FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             max_line_length,
             ignore_not_found: false,
@@ -342,6 +358,7 @@ mod test {
             strategy: FingerprintStrategy::Checksum {
                 bytes: 256,
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             max_line_length: 1024,
             ignore_not_found: false,

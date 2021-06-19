@@ -197,7 +197,7 @@ impl Checkpointer {
 
         let path = match fng {
             BytesChecksum(c) => format!("g{:x}.{}", c, pos),
-            FirstLineChecksum(c) => format!("h{:x}.{}", c, pos),
+            FirstLinesChecksum(c) => format!("h{:x}.{}", c, pos),
             DevInode(dev, ino) => format!("i{:x}.{:x}.{}", dev, ino, pos),
             Unknown(x) => format!("{:x}.{}", x, pos),
         };
@@ -222,7 +222,7 @@ impl Checkpointer {
             }
             'h' => {
                 let (c, pos) = scan_fmt!(file_name, "h{x}.{}", [hex u64], FilePosition).unwrap();
-                (FirstLineChecksum(c), pos)
+                (FirstLinesChecksum(c), pos)
             }
             'i' => {
                 let (dev, ino, pos) =
@@ -390,7 +390,7 @@ mod test {
         let fingerprints = vec![
             FileFingerprint::DevInode(1, 2),
             FileFingerprint::BytesChecksum(3456),
-            FileFingerprint::FirstLineChecksum(78910),
+            FileFingerprint::FirstLinesChecksum(78910),
             FileFingerprint::Unknown(1337),
         ];
         for fingerprint in fingerprints {
@@ -417,7 +417,7 @@ mod test {
             Utc::now() - Duration::seconds(10),
         );
         let oldish = (
-            FileFingerprint::FirstLineChecksum(78910),
+            FileFingerprint::FirstLinesChecksum(78910),
             Utc::now() - Duration::seconds(15),
         );
         let older = (
@@ -461,7 +461,7 @@ mod test {
         let fingerprints = vec![
             FileFingerprint::DevInode(1, 2),
             FileFingerprint::BytesChecksum(3456),
-            FileFingerprint::FirstLineChecksum(78910),
+            FileFingerprint::FirstLinesChecksum(78910),
             FileFingerprint::Unknown(1337),
         ];
         for fingerprint in fingerprints {
@@ -595,6 +595,7 @@ mod test {
             strategy: crate::FingerprintStrategy::Checksum {
                 bytes: 16,
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             max_line_length: 1024,
             ignore_not_found: false,
@@ -616,7 +617,7 @@ mod test {
 
         // make sure each is of the expected type and that the inner values are not the same
         match (old, new) {
-            (FileFingerprint::BytesChecksum(old), FileFingerprint::FirstLineChecksum(new)) => {
+            (FileFingerprint::BytesChecksum(old), FileFingerprint::FirstLinesChecksum(new)) => {
                 assert_ne!(old, new)
             }
             _ => panic!("unexpected checksum types"),
