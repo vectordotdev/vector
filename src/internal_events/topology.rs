@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::Error;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -34,5 +35,20 @@ impl InternalEvent for EventOut {
             // jank.
             counter!("events_out_total", self.count as u64);
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct InternalReloadFailed {
+    pub error: Error,
+}
+
+impl InternalEvent for InternalReloadFailed {
+    fn emit_logs(&self) {
+        warn!(message = "Failed reloading component internal data.", error = %self.error);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("reload_errors_total", 1);
     }
 }

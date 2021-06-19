@@ -1,16 +1,31 @@
+use crate::internal_events::InternalReloadFailed;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Generation counter incremented for each reload.
-static RELOAD_GENERATION: AtomicUsize = AtomicUsize::new(0);
+static GENERATION: AtomicUsize = AtomicUsize::new(0);
 
 /// Increments generation causing all Ages to report that they
 /// are old.
 pub(super) fn inc_generation() {
-    RELOAD_GENERATION.fetch_add(1, Ordering::Relaxed);
+    GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
 /// Age to be paired with some relodable data.
-/// Age::new() -> is_old() -> set_age()
+///
+/// Usually used through more generic wrapper
+/// structures, but can be used in custom structs
+/// where this general procedure should be followed:
+/// 1. Age::new()
+/// 2. create data
+/// 3. if Age::is_old() continue from 6.
+/// 4. reload data
+/// 5. if Age::set_age() is old repeat from 4.
+/// 6. use data
+///
+/// Start from 1. when first creating data.
+/// Start from 3. when accesing data.
+///
+/// Or update method can be used.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Age {
     gen: usize,
@@ -20,7 +35,7 @@ impl Age {
     /// Creates new Age with current generation.
     pub fn new() -> Self {
         Age {
-            gen: RELOAD_GENERATION.load(Ordering::Relaxed),
+            gen: GENERATION.load(Ordering::Relaxed),
         }
     }
 
@@ -40,5 +55,52 @@ impl Age {
     pub fn set_age(&mut self, new: Age) -> Option<Age> {
         *self = new;
         self.is_old()
+    }
+
+    /// Returns updated data.
+    ///
+    /// Reloads data when it's old and on failure to do so
+    /// it reports warning and returns None.
+    pub fn update<T>(&mut self, update: impl Fn() -> crate::Result<T>) -> Option<T> {
+        let mut new = self.is_old();
+        let mut data = None;
+        while let Some(age) = new {
+            data = update()
+                .map_err(|error| emit!(InternalReloadFailed { error }))
+                .ok()
+                .or(data);
+            new = self.set_age(age);
+        }
+        data
+    }
+}
+
+/// Wrapper for relodable data.
+///
+/// Reloads data when it's old and on failure to do so
+/// it reports warning and reuses old data.
+pub struct Aged<T> {
+    create: Box<dyn Fn() -> crate::Result<T> + Send>,
+    data: T,
+    age: Age,
+}
+
+impl<T> Aged<T> {
+    pub fn new(create: impl Fn() -> crate::Result<T> + Send + 'static) -> crate::Result<Self> {
+        let age = Age::new();
+        let data = create()?;
+        Ok(Self {
+            create: Box::new(create) as Box<_>,
+            data,
+            age,
+        })
+    }
+
+    pub fn as_ref(&mut self) -> &T {
+        if let Some(data) = self.age.update(&self.create) {
+            self.data = data;
+        }
+
+        &self.data
     }
 }

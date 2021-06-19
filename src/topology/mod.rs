@@ -239,8 +239,8 @@ impl RunningTopology {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
 
-        /// Increment generation to trigger inner reloads in remaining
-        /// components and for the new pieces to have new age.
+        // Increment generation to trigger inner reloads in remaining
+        // components and for the new pieces to have new age.
         self::generation::inc_generation();
 
         // Now let's actually build the new pieces.

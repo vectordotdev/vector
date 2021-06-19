@@ -1,4 +1,4 @@
-use crate::{http::HttpError, tls::MaybeTlsSettings};
+use crate::{http::HttpError, tls::MaybeTlsSettings, topology::generation::Aged};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
@@ -26,6 +26,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use tokio::sync::Mutex;
 use tower::{Service, ServiceExt};
 
 pub mod auth;
@@ -94,8 +95,8 @@ impl ProvideAwsCredentials for CustomChainProvider {
 
 // A place-holder for the types of AWS credentials we support
 pub enum AwsCredentialsProvider {
-    Default(AutoRefreshingProvider<CustomChainProvider>),
-    Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
+    Default(Mutex<Aged<AutoRefreshingProvider<CustomChainProvider>>>),
+    Role(Mutex<Aged<AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>>>),
     Static(StaticProvider),
 }
 
@@ -116,36 +117,42 @@ impl fmt::Debug for AwsCredentialsProvider {
 impl AwsCredentialsProvider {
     pub fn new(region: &Region, assume_role: Option<String>) -> crate::Result<Self> {
         if let Some(role) = assume_role {
-            debug!("Using STS assume role credentials for AWS.");
+            let region = region.clone();
+            let creds = Mutex::new(Aged::new(move || {
+                debug!("Using STS assume role credentials for AWS.");
 
-            let dispatcher = rusoto_core::request::HttpClient::new()
-                .map_err(|_| AwsRusotoError::DispatcherError)?;
+                let dispatcher = rusoto_core::request::HttpClient::new()
+                    .map_err(|_| AwsRusotoError::DispatcherError)?;
 
-            let mut credentials = CustomChainProvider::new();
-            credentials.set_timeout(Duration::from_secs(8));
+                let mut credentials = CustomChainProvider::new();
+                credentials.set_timeout(Duration::from_secs(8));
 
-            let sts = StsClient::new_with(dispatcher, credentials, region.clone());
+                let sts = StsClient::new_with(dispatcher, credentials, region.clone());
 
-            let provider = StsAssumeRoleSessionCredentialsProvider::new(
-                sts,
-                role,
-                "default".to_owned(),
-                None,
-                None,
-                None,
-                None,
-            );
+                let provider = StsAssumeRoleSessionCredentialsProvider::new(
+                    sts,
+                    role.clone(),
+                    "default".to_owned(),
+                    None,
+                    None,
+                    None,
+                    None,
+                );
 
-            let creds = AutoRefreshingProvider::new(provider).context(InvalidAwsCredentials)?;
+                Ok(AutoRefreshingProvider::new(provider).context(InvalidAwsCredentials)?)
+            })?);
+
             Ok(Self::Role(creds))
         } else {
-            debug!("Using default credentials provider for AWS.");
-            let mut chain = CustomChainProvider::new();
-            // 8 seconds because our default healthcheck timeout
-            // is 10 seconds.
-            chain.set_timeout(Duration::from_secs(8));
+            let creds = Mutex::new(Aged::new(|| {
+                debug!("Using default credentials provider for AWS.");
+                let mut chain = CustomChainProvider::new();
+                // 8 seconds because our default healthcheck timeout
+                // is 10 seconds.
+                chain.set_timeout(Duration::from_secs(8));
 
-            let creds = AutoRefreshingProvider::new(chain).context(InvalidAwsCredentials)?;
+                Ok(AutoRefreshingProvider::new(chain).context(InvalidAwsCredentials)?)
+            })?);
 
             Ok(Self::Default(creds))
         }
@@ -162,12 +169,11 @@ impl AwsCredentialsProvider {
 #[async_trait]
 impl ProvideAwsCredentials for AwsCredentialsProvider {
     async fn credentials(&self) -> Result<AwsCredentials, CredentialsError> {
-        let fut = match self {
-            Self::Default(p) => p.credentials(),
-            Self::Role(p) => p.credentials(),
-            Self::Static(p) => p.credentials(),
-        };
-        fut.await
+        match self {
+            Self::Default(p) => p.lock().await.as_ref().credentials().await,
+            Self::Role(p) => p.lock().await.as_ref().credentials().await,
+            Self::Static(p) => p.credentials().await,
+        }
     }
 }
 
