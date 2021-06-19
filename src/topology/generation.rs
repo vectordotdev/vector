@@ -110,15 +110,19 @@ mod tests {
     use super::*;
     use std::cell::Cell;
 
-    #[test]
-    fn reload() {
+    fn counter() -> Aged<usize> {
         let cell = Cell::new(0);
-        let mut aged = Aged::new(move || {
+        Aged::new(move || {
             let new = cell.get() + 1;
             cell.set(new);
             Ok(new)
         })
-        .unwrap();
+        .unwrap()
+    }
+
+    #[test]
+    fn reload() {
+        let mut aged = counter();
 
         let start = *aged.as_ref();
         inc_generation();
@@ -129,22 +133,18 @@ mod tests {
 
     #[test]
     fn reuse() {
-        let cell = Cell::new(0);
-        let mut aged = Aged::new(move || {
-            let new = cell.get() + 1;
-            cell.set(new);
-            Ok(new)
-        })
-        .unwrap();
+        let mut aged = counter();
 
         let mut gen = aged.age.gen;
         loop {
             let first = *aged.as_ref();
             let second = *aged.as_ref();
+
             if aged.age.gen == gen {
                 assert_eq!(first, second);
                 break;
             }
+
             gen = aged.age.gen;
         }
     }
