@@ -58,12 +58,14 @@ impl TransformConfig for AggregateConfig {
     }
 }
 
+type MetricEntry = (metric::MetricData, EventMetadata);
+
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
-    map: HashMap<metric::MetricSeries, metric::MetricData>,
+    map: HashMap<metric::MetricSeries, MetricEntry>,
 }
 
 impl Aggregate {
@@ -75,20 +77,21 @@ impl Aggregate {
     }
 
     fn record(&mut self, event: Event) {
-        let (series, data, _metadata) = event.into_metric().into_parts();
+        let (series, data, metadata) = event.into_metric().into_parts();
 
         match data.kind {
             metric::MetricKind::Incremental => {
                 self.map.entry(series)
                     .and_modify(|existing| {
-                        if ! existing.update(&data) {
+                        if ! existing.0.update(&data) {
                             emit!(AggregateUpdateFailed);
                         }
-                    }).or_insert(data);
+                        existing.1.merge(metadata.clone());
+                    }).or_insert((data, metadata));
             },
             metric::MetricKind::Absolute => {
                 // Always replace/store
-                self.map.insert(series, data);
+                self.map.insert(series, (data, metadata));
             }
         };
 
@@ -97,12 +100,8 @@ impl Aggregate {
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         if self.map.len() > 0 {
-            // TODO: not clear how this should work with aggregation so just stuffing a default one
-            // in for now.
-            let metadata = EventMetadata::default();
-
-            for (series, metric) in self.map.drain() {
-                let metric = metric::Metric::from_parts(series, metric, metadata.clone());
+            for (series, entry) in self.map.drain() {
+                let metric = metric::Metric::from_parts(series, entry.0, entry.1);
                 output.push(Event::Metric(metric));
             }
         }
