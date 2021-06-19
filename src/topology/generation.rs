@@ -104,3 +104,48 @@ impl<T> Aged<T> {
         &self.data
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    #[test]
+    fn reload() {
+        let cell = Cell::new(0);
+        let mut aged = Aged::new(move || {
+            let new = cell.get() + 1;
+            cell.set(new);
+            Ok(new)
+        })
+        .unwrap();
+
+        let start = *aged.as_ref();
+        inc_generation();
+        let new = *aged.as_ref();
+
+        assert!(start < new);
+    }
+
+    #[test]
+    fn reuse() {
+        let cell = Cell::new(0);
+        let mut aged = Aged::new(move || {
+            let new = cell.get() + 1;
+            cell.set(new);
+            Ok(new)
+        })
+        .unwrap();
+
+        let mut gen = aged.age.gen;
+        loop {
+            let first = *aged.as_ref();
+            let second = *aged.as_ref();
+            if aged.age.gen == gen {
+                assert_eq!(first, second);
+                break;
+            }
+            gen = aged.age.gen;
+        }
+    }
+}
