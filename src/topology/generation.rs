@@ -33,7 +33,7 @@ pub struct Age {
 
 impl Age {
     /// Creates new Age with current generation.
-    pub fn new() -> Self {
+    pub fn current() -> Self {
         Age {
             gen: GENERATION.load(Ordering::Relaxed),
         }
@@ -42,7 +42,7 @@ impl Age {
     /// Returns new age to be seted after the data
     /// has been reloaded.
     pub fn is_old(&self) -> Option<Age> {
-        let current = Self::new();
+        let current = Self::current();
         if current != *self {
             Some(current)
         } else {
@@ -87,7 +87,7 @@ pub struct Aged<T> {
 
 impl<T> Aged<T> {
     pub fn new(create: impl Fn() -> crate::Result<T> + Send + 'static) -> crate::Result<Self> {
-        let age = Age::new();
+        let age = Age::current();
         let data = create()?;
         Ok(Self {
             create: Box::new(create) as Box<_>,
