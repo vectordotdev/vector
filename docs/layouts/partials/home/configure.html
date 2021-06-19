@@ -1,0 +1,45 @@
+{{ $configure := .Params.configure }}
+{{ $configs := $configure.example_configs }}
+{{ $defaultConfig := (index $configs 0).title }}
+<div class="relative py-12 md:py-16 lg:py-20 px-4 sm:px-6 mx-auto max-w-7xl">
+  <div class="text-center">
+    {{ partial "home/heading.html" (dict "title" $configure.title) }}
+
+    <p class="mt-4 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
+      {{ $configure.description }}
+    </p>
+  </div>
+
+  <div x-data="{ config: '{{ $defaultConfig }}' }" class="mt-8 max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 items-start">
+    <div class="md:pt-2 flex flex-col items-start md:items-end space-y-1 md:space-y-2">
+      {{ range $configs }}
+      <button @click="config = '{{ .title }}'" :class="{ 'font-bold dark:text-primary': config === '{{ .title }}', 'text-gray-400 font-light hover:text-secondary dark:hover:text-primary': config != '{{ .title }}' }" class="md:text-lg font-semibold">
+        {{ .title }}
+      </button>
+      {{ end }}
+    </div>
+
+    <div>
+      {{ range $configs }}
+      {{ $code := highlight .config "toml" "" }}
+      <div x-show="config === '{{ .title }}'">
+        <div class="bg-black p-6 rounded-lg shadow-lg">
+          {{ $code }}
+        </div>
+
+        <div class="mt-2 ml-2 md:ml-4">
+          <span class="text-sm font-mono font-semibold text-gray-400">
+            {{ $configure.filename }}
+          </span>
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+
+  <div class="mt-6 text-center">
+    <span class="prose prose-sm dark:prose-dark tracking-tight text-gray-500 dark:text-gray-400">
+      {{ $configure.below | markdownify }}
+    </span>
+  </div>
+</div>

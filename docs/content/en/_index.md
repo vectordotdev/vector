@@ -9,6 +9,51 @@ platform_tabs: [
   "Stream based"
 ]
 
+# Configuration section
+configure:
+  title: "Easy to configure"
+  description: "A simple, composable format enables you to build flexible pipelines"
+  filename: "/etc/vector/vector.toml"
+  below: "Configuration examples are in [TOML](https://toml.io) but Vector also supports [YAML](https://yaml.org) and [JSON](https://json.org)"
+  example_configs:
+  - title: Do something
+    config: |
+      [sources.do_something]
+      type = "stdin"
+
+      [sinks.out]
+      inputs = ["in"]
+      type = "console"
+      encoding.codec = "text"
+  - title: Something else
+    config: |
+      [sources.do_something_else]
+      type = "other"
+
+      [sinks.out]
+      inputs = ["in"]
+      type = "console"
+      encoding.codec = "text"
+  - title: Other thing entirely
+    config: |
+      [sources.do_other_thing_entirely]
+      type = "other"
+
+      [sinks.out]
+      inputs = ["in"]
+      type = "console"
+      encoding.codec = "text"
+  - title: And yet another
+    config: |
+      [sources.and_yet_another]
+      type = "other"
+
+      [sinks.out]
+      inputs = ["in"]
+      type = "console"
+      encoding.codec = "text"
+
+
 
 # Items listed in the "Why Vector?" section. Markdown is supported in the descriptions.
 why: [
