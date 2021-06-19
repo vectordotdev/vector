@@ -8,6 +8,7 @@
 
 pub mod builder;
 pub mod fanout;
+pub mod generation;
 mod task;
 
 use crate::{
@@ -237,6 +238,10 @@ impl RunningTopology {
             // This value is guess work.
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
+
+        /// Increment generation to trigger inner reloads in remaining
+        /// components and for the new pieces to have new age.
+        self::generation::inc_generation();
 
         // Now let's actually build the new pieces.
         if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
