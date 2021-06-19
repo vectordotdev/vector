@@ -9,6 +9,7 @@ platform_tabs: [
   "Stream based"
 ]
 
+
 # Items listed in the "Why Vector?" section. Markdown is supported in the descriptions.
 why: [
   {

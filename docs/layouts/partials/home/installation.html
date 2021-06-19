@@ -4,13 +4,7 @@
 {{ $defaultCommand := (index $commands 0).title }}
 <div class="py-12 md:py-16 lg:py-20 px-4 sm:px-6 mx-auto max-w-7xl">
   <div class="text-center">
-    <div class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary py-2">
-      <h1 class="text-3xl md:text-4xl lg:text-4.5xl font-extrabold leading-looser">
-        Installs everywhere
-      </h1>
-
-      <div class="mt-5 inline-flex bg-gradient-to-r from-primary to-purple-v h-1 w-20"></div>
-    </div>
+    {{ partial "home/heading.html" (dict "title" "Installs everywhere") }}
 
     <p class="mt-4 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
       Packaged as a single binary. No dependencies, no runtime, and memory safe.
@@ -40,26 +34,24 @@
   </div>
 
   <div class="mt-16">
-    <p class="text-xl md:text-2xl font-semibold text-gray-700 dark:text-gray-200">
+    <p class="text-lg md:text-xl lg:text-2xl font-semibold text-gray-700 dark:text-gray-200">
       Or choose your preferred method:
     </p>
 
-    <div class="mt-4 grid md:grid-cols-2 lg:grid-cols-4 md:gap-x-2 lg:gap-x-4 gap-y-2">
+    <div class="mt-4 grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 lg:gap-x-6 gap-y-1.5">
       {{ range $methods }}
-      <div class="flex-1 py-2 px-4 shadow rounded-full bg-dark hover:bg-gray-700 dark:bg-gray-50 dark:hover:bg-gray-200">
-        <a href="{{ .url }}">
-          <div class="flex justify-between items-center">
-            <span class="uppercase text-sm font-semibold text-white dark:text-dark">
-              {{ .title }}
-            </span>
+      <a href="{{ .url }}" class="flex-1 py-1.5 md:py-2 px-3 md:px-4 shadow rounded-full bg-gray-200 text-dark hover:bg-purple-v dark:bg-primary dark:text-dark dark:hover:bg-purple-v">
+        <div class="flex justify-between items-center">
+          <span class="uppercase text-xs md:text-sm font-semibold">
+            {{ .title }}
+          </span>
 
-            {{/* Heroicons: outline/chevron-right */}}
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary dark:text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
-        </a>
-      </div>
+          {{/* Heroicons: outline/chevron-right */}}
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </a>
       {{ end }}
     </div>
   </div>

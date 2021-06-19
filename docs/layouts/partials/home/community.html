@@ -2,13 +2,7 @@
 {{ $social := site.Menus.community }}
 <div class="py-12 md:py-16 lg:py-20 px-4 sm:px-6 mx-auto max-w-7xl">
   <div class="text-center">
-    <div class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary py-2">
-      <h1 class="text-3xl md:text-4xl lg:text-4.5xl font-extrabold leading-looser">
-        {{ $comm.title }}
-      </h1>
-
-      <div class="mt-5 inline-flex bg-gradient-to-r from-primary to-purple-v h-1 w-20"></div>
-    </div>
+    {{ partial "home/heading.html" (dict "title" $comm.title) }}
 
     {{/* Project stats */}}
     <div class="mt-4 md:mt-6 inline-flex divide-x dark:divide-gray-600">
@@ -34,11 +28,8 @@
     </div>
   </div>
 
-  <!-- Unhide this to show the rotating globe
-  <div>
-    <div id="globe"></div>
-  </div>
-  -->
+  {{/* Spinning globe (see assets/js/home.tsx) */}}
+  {{/* <div id="globe"></div> */}}
 </div>
 
 {{ define "community-button" }}

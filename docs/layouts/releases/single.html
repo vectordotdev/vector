@@ -31,7 +31,7 @@
       {{ end }}
 
       {{ with $release.whats_next }}
-      <div class="mt-8">
+      <div class="mt-8 prose dark:prose-dark">
         {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
 
         <div class="mt-6 flex flex-col space-y-6">
@@ -52,7 +52,9 @@
 
       {{ with $highlights }}
       <div class="mt-8">
-        {{ partial "heading.html" (dict "text" "Highlights" "level" 2) }}
+        <div class="prose dark:prose-dark">
+          {{ partial "heading.html" (dict "text" "Highlights" "level" 2) }}
+        </div>
 
         <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {{ range . }}
@@ -65,16 +67,20 @@
       {{ with $release.commits }}
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
-        {{ partial "heading.html" (dict "text" "Changelog" "level" 3) }}
+        <div class="prose dark:prose-dark">
+          {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
+        </div>
 
         <div class="mt-6 flex flex-col space-y-8">
           {{ range $k, $v := $groups }}
           {{ $commits := where $release.commits ".type" "eq" $k }}
           {{ if $commits }}
           {{ $numCommits := len $commits }}
-          {{ $heading := printf "%s %s" $numCommits $v }}
+          {{ $heading := printf "%d %s" $numCommits $v }}
           <div>
-            {{ partial "heading.html" (dict "text" $heading "level" 4) }}
+            <div class="prose dark:prose-dark">
+              {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+            </div>
 
             <div class="mt-4 flex flex-col space-y-2">
               {{ range $commits }}
