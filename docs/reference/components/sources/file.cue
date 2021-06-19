@@ -391,10 +391,10 @@ components: sources: file: {
 			title: "Fingerprint"
 			body: """
 				By default, Vector identifies files by creating a
-				[cyclic redundancy check](urls.crc) (CRC) on the first 256 bytes of
+				[cyclic redundancy check](urls.crc) (CRC) on the first N lines of
 				the file. This serves as a fingerprint to uniquely identify the file.
-				The amount of bytes read can be controlled via the `fingerprint_bytes`
-				and `ignored_header_bytes` options.
+				The amount of lines read can be controlled via the `fingerprint.lines`
+				and `fingerprint.ignored_header_bytes` options.
 
 				This strategy avoids the common pitfalls of using device and inode
 				names since inode names can be reused across files. This enables
