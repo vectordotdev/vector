@@ -7,6 +7,7 @@ use std::{
     io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
+use tracing::trace_span;
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 
@@ -102,6 +103,7 @@ impl Fingerprinter {
         known_small_files: &mut HashSet<PathBuf>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
+        let _span = trace_span!("fingerprinting", ?path).entered();
         metadata(path)
             .and_then(|metadata| {
                 if metadata.is_dir() {

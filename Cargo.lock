@@ -4534,6 +4534,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "492848ff47f11b7f9de0443b404e2c5775f695e1af6b7076ca25f999581d547a"
+dependencies = [
+ "async-trait",
+ "crossbeam-channel 0.5.1",
+ "futures 0.3.15",
+ "js-sys",
+ "lazy_static",
+ "percent-encoding",
+ "pin-project 1.0.7",
+ "rand 0.8.4",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "opentelemetry-datadog"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8794eb897decce87294f264182580c0615a6df1c8bfd1db03de6eda39903e87d"
+dependencies = [
+ "async-trait",
+ "http",
+ "indexmap",
+ "itertools 0.10.1",
+ "lazy_static",
+ "opentelemetry",
+ "opentelemetry-http",
+ "reqwest",
+ "rmp",
+ "thiserror",
+]
+
+[[package]]
+name = "opentelemetry-http"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b752610d59706ff7cae48003552b3d0bf19bcce532629c8a49095894f21c319"
+dependencies = [
+ "async-trait",
+ "bytes 1.0.1",
+ "futures-util",
+ "http",
+ "opentelemetry",
+ "reqwest",
+]
+
+[[package]]
 name = "ordered-float"
 version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7496,6 +7547,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-opentelemetry"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2f4cb277b92a8ba1170b3b911056428ce2ef9993351baf5965bb0359a2e5963"
+dependencies = [
+ "opentelemetry",
+ "tracing 0.1.26",
+ "tracing-core 0.1.18",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-serde"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7978,6 +8041,8 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "opentelemetry",
+ "opentelemetry-datadog",
  "percent-encoding",
  "pest",
  "pest_derive",
@@ -8046,6 +8111,7 @@ dependencies = [
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
+ "tracing-opentelemetry",
  "tracing-subscriber",
  "tracing-tower",
  "trust-dns-proto",
