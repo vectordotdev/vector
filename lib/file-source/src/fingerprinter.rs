@@ -165,7 +165,7 @@ fn fingerprinter_read_until(
     mut count: usize,
     mut buf: &mut [u8],
 ) -> io::Result<()> {
-    while !buf.is_empty() {
+    'main: while !buf.is_empty() {
         let read = match r.read(buf) {
             Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
             Ok(n) => n,
@@ -173,14 +173,16 @@ fn fingerprinter_read_until(
             Err(e) => return Err(e),
         };
 
-        if let Some(pos) = buf[..read].iter().position(|&c| c == delim) {
-            if count <= 1 {
-                for el in &mut buf[(pos + 1)..] {
-                    *el = 0;
+        for (pos, &c) in buf[..read].iter().enumerate() {
+            if c == delim {
+                if count <= 1 {
+                    for el in &mut buf[(pos + 1)..] {
+                        *el = 0;
+                    }
+                    break 'main;
+                } else {
+                    count -= 1;
                 }
-                break;
-            } else {
-                count -= 1;
             }
         }
 
@@ -241,7 +243,7 @@ mod test {
     }
 
     #[test]
-    fn test_first_lines_checksum_fingerprint() {
+    fn test_first_line_checksum_fingerprint() {
         let max_line_length = 64;
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::FirstLinesChecksum {
@@ -311,6 +313,60 @@ mod test {
         assert_eq!(
             run(&exactly_max_line_length).unwrap(),
             run(&exceeding_max_line_length).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_first_two_lines_checksum_fingerprint() {
+        let max_line_length = 64;
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 2,
+            },
+            max_line_length,
+            ignore_not_found: false,
+        };
+
+        let target_dir = tempdir().unwrap();
+        let prepare_test = |file: &str, contents: &[u8]| {
+            let path = target_dir.path().join(file);
+            fs::write(&path, contents).unwrap();
+            path
+        };
+
+        let incomlete_lines = prepare_test(
+            "incomlete_lines.log",
+            b"missing newline char\non second line",
+        );
+        let two_lines = prepare_test("two_lines.log", b"hello world\nfrom vector\n");
+        let two_lines_duplicate =
+            prepare_test("two_lines_duplicate.log", b"hello world\nfrom vector\n");
+        let two_lines_continued = prepare_test(
+            "two_lines_continued.log",
+            b"hello world\nfrom vector\nthe next line\n",
+        );
+        let different_three_lines = prepare_test(
+            "different_three_lines.log",
+            b"line one\nline two\nine three\n",
+        );
+
+        let mut buf = Vec::new();
+        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
+
+        assert!(run(&incomlete_lines).is_err());
+
+        assert!(run(&two_lines).is_ok());
+        assert!(run(&two_lines_duplicate).is_ok());
+        assert!(run(&two_lines_continued).is_ok());
+        assert!(run(&different_three_lines).is_ok());
+
+        assert_eq!(run(&two_lines).unwrap(), run(&two_lines_duplicate).unwrap());
+        assert_eq!(run(&two_lines).unwrap(), run(&two_lines_continued).unwrap());
+
+        assert_ne!(
+            run(&two_lines).unwrap(),
+            run(&different_three_lines).unwrap()
         );
     }
 
