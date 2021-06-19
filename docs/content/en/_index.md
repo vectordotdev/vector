@@ -72,6 +72,25 @@ installation: [
   }
 ]
 
+installation_features: [
+  {
+    title: "Single binary",
+    ionicon: "cube-outline"
+  },
+  {
+    title: "X86_64, ARM64/v7",
+    ionicon: "hardware-chip-outline"
+  },
+  {
+    title: "No runtime",
+    ionicon: "flash-outline"
+  },
+  {
+    title: "Memory safe",
+    ionicon: "shield-outline"
+  }
+]
+
 # Other methods
 methods: [
   {

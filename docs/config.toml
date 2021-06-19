@@ -69,17 +69,19 @@ discord = "https://chat.vector.dev"
 [[menu.doc_quick_links]]
 name = "Quickstart"
 url = "/docs/setup/quickstart"
-params = { emphasis = true }
+params = { emphasis = true, ionicon = "rocket-outline" }
 weight = 1
 
 [[menu.doc_quick_links]]
 name = "Vector Remap Language"
 url = "/docs/reference/vrl"
+params = { ionicon = "map-outline" }
 weight = 2
 
 [[menu.doc_quick_links]]
 name = "Components"
 url = "/components"
+params = { ionicon = "link-outline" }
 weight = 3
 
 # Navbar menu
