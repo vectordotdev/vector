@@ -17,38 +17,43 @@
         <span>
           {{ .title }}
         </span>
-
-        {{/* Heroicon: outline/chevron-right */}}
-        <svg x-show="config === '{{ .title }}'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-        </svg>
       </button>
       {{ end }}
     </div>
 
-    <div>
-      {{ range $configs }}
-      {{ $code := highlight .config "toml" "" }}
-      <div x-show="config === '{{ .title }}'">
-        <div class="bg-black rounded-lg shadow-lg p-6">
-          <div>
-            {{ $code }}
-          </div>
+    <div class="bg-black shadow-lg rounded-xl">
+      <div class="flex px-6 py-4 justify-between items-center border-b border-gray-700">
+        <div class="flex space-x-2">
+          {{ template "dot" "red-500" }}
+          {{ template "dot" "yellow-500" }}
+          {{ template "dot" "green-500" }}
+        </div>
 
-          <div class="mt-8 text-right">
-            <span class="text-gray-300 text-sm font-mono tracking-tight">
-              {{ $configure.filename }}
-            </span>
-          </div>
+        <div>
+          <span class="font-bold text-sm font-mono text-gray-100">
+            {{ $configure.filename }}
+          </span>
         </div>
       </div>
-      {{ end }}
+
+      <div class="p-6">
+        {{ range $configs }}
+        {{ $code := highlight .config "toml" "" }}
+        <div x-show="config === '{{ .title }}'">
+          {{ $code }}
+        </div>
+        {{ end }}
+      </div>
     </div>
   </div>
 
-  <div class="mt-6 text-center">
+  <div class="mt-8 text-center">
     <span class="prose prose-sm dark:prose-dark tracking-tight text-gray-500 dark:text-gray-400">
       {{ $configure.below | markdownify }}
     </span>
   </div>
 </div>
+
+{{ define "dot" }}
+<span class="h-3.5 w-3.5 bg-{{ . }} rounded-full"></span>
+{{ end }}

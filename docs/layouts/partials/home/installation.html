@@ -11,11 +11,10 @@
       {{ $install.description }}
     </p>
 
-    <div class="mt-6 lg:mt-8 inline-flex space-x-3 md:space-x-5 lg:space-x-8">
+    <div class="mt-8 lg:mt-10 inline-flex space-x-3 md:space-x-5 lg:space-x-8">
       {{ range $install.logos }}
       {{ $logo := printf "/img/logos/%s" .logo }}
-
-      <div class="fill-current w-16 md:w-20 lg:w-24 h-auto">
+      <div class="w-16 md:w-20 lg:w-24 h-auto">
         <a href="{{ .url }}">
           <div class="rounded-full hover:shadow-lg">
             {{ partial "svg.html" (dict "src" $logo "class" "install-icon") }}
@@ -26,7 +25,7 @@
     </div>
   </div>
 
-  <div class="mt-6 lg:mt-8">
+  <div class="mt-8 lg:mt-10">
     <div class="grid grid-cols-2 md:grid-cols-4 justify-items-center max-w-4xl mx-auto">
       {{ range $install.features }}
       <div class="flex items-center space-x-2">
