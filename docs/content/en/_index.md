@@ -8,6 +8,11 @@ platform_tabs:
 - Centralized
 - Stream based
 
+# Component cloud
+components:
+  title: Highly flexible processing topologies
+  description: A sea of sources, transforms, and sinks to choose from
+
 # Configuration section
 configure:
   title: "Easy to configure"
