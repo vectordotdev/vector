@@ -210,8 +210,7 @@ where
                         this.logic
                             .buffers
                             .drain()
-                            .map(|(src, (key, aggregate))| {
-                                timeouts.remove(&key);
+                            .map(|(src, (_, aggregate))| {
                                 let (line, context) = aggregate.merge();
                                 (src, line, context)
                             })
