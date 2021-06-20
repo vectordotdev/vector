@@ -22,7 +22,7 @@
         {{ $type | lower }}
       </span>
 
-      <div class="mt-6 grid grid-cols-2 gap-y-2.5 gap-x-2 lg:gap-x-3">
+      <div class="mt-6 grid grid-cols-2 gap-0.5">
         {{ range $components }}
         {{ $title := .Params.short | default .Title }}
         {{ template "component-chip" (dict "title" $title "href" .RelPermalink) }}
@@ -34,7 +34,7 @@
 </div>
 
 {{ define "component-chip" }}
-<a href="{{ .href }}" class="text-gray-500 dark:text-gray-300 hover:text-secondary dark:hover:text-primary tracking-tight leading-tight">
+<a href="{{ .href }}" class="rounded font-semibold text-gray-500 dark:text-gray-300 hover:text-secondary dark:hover:text-primary tracking-tight leading-tight border dark:border-gray-700 py-2.5 px-4 hover:border-secondary dark:hover:border-primary hover:shadow-md">
   {{ .title }}
 </a>
 {{ end }}
