@@ -203,7 +203,6 @@ where
                     }
                 }
                 Poll::Ready(None) => {
-                    let timeouts = &mut this.logic.timeouts;
                     // We got `None`, this means the `inner` stream has ended.
                     // Start flushing all existing data, stop polling `inner`.
                     *this.draining = Some(
