@@ -14,10 +14,10 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio_util::time::DelayQueue;
+use tokio_util::time::delay_queue::{DelayQueue, Key};
 
 /// The mode of operation of the line aggregator.
-#[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
@@ -118,7 +118,7 @@ pub struct Logic<K, C> {
 
     /// Line per key.
     /// Key is usually a filename or other line source identifier.
-    buffers: HashMap<K, Aggregate<C>>,
+    buffers: HashMap<K, (Key, Aggregate<C>)>,
 
     /// A queue of key timeouts.
     timeouts: DelayQueue<K>,
@@ -203,13 +203,15 @@ where
                     }
                 }
                 Poll::Ready(None) => {
+                    let timeouts = &mut this.logic.timeouts;
                     // We got `None`, this means the `inner` stream has ended.
                     // Start flushing all existing data, stop polling `inner`.
                     *this.draining = Some(
                         this.logic
                             .buffers
                             .drain()
-                            .map(|(src, aggregate)| {
+                            .map(|(src, (key, aggregate))| {
+                                timeouts.remove(&key);
                                 let (line, context) = aggregate.merge();
                                 (src, line, context)
                             })
@@ -220,7 +222,7 @@ where
                     // We didn't get any lines from `inner`, so we just give
                     // a line from the expired lines queue.
                     if let Some(key) = this.expired.pop_front() {
-                        if let Some(aggregate) = this.logic.buffers.remove(&key) {
+                        if let Some((_, aggregate)) = this.logic.buffers.remove(&key) {
                             let (line, context) = aggregate.merge();
                             return Poll::Ready(Some((key, line, context)));
                         }
@@ -278,6 +280,13 @@ pub enum Emit<T> {
     Two(T, T),
 }
 
+/// A helper enum
+enum Decision {
+    Continue,
+    EndInclude,
+    EndExclude,
+}
+
 impl<K, C> Logic<K, C>
 where
     K: Hash + Eq + Clone,
@@ -293,56 +302,42 @@ where
         match self.buffers.entry(src) {
             Entry::Occupied(mut entry) => {
                 let condition_matched = self.config.condition_pattern.is_match(line.as_ref());
-                match self.config.mode {
+                let decision = match (self.config.mode, condition_matched) {
                     // All consecutive lines matching this pattern are included in
                     // the group.
-                    Mode::ContinueThrough => {
-                        if condition_matched {
-                            let buffered = entry.get_mut();
-                            buffered.add_next_line(line);
-                            None
-                        } else {
-                            let (src, buffered) = entry.remove_entry();
-                            Some((src, Emit::Two(buffered.merge(), (line, context))))
-                        }
-                    }
+                    (Mode::ContinueThrough, true) => Decision::Continue,
+                    (Mode::ContinueThrough, false) => Decision::EndExclude,
                     // All consecutive lines matching this pattern, plus one
                     // additional line, are included in the group.
-                    Mode::ContinuePast => {
-                        if condition_matched {
-                            let buffered = entry.get_mut();
-                            buffered.add_next_line(line);
-                            None
-                        } else {
-                            let (src, mut buffered) = entry.remove_entry();
-                            buffered.add_next_line(line);
-                            Some((src, Emit::One(buffered.merge())))
-                        }
-                    }
+                    (Mode::ContinuePast, true) => Decision::Continue,
+                    (Mode::ContinuePast, false) => Decision::EndInclude,
                     // All consecutive lines not matching this pattern are included
                     // in the group.
-                    Mode::HaltBefore => {
-                        if condition_matched {
-                            let (src, buffered) = entry.remove_entry();
-                            Some((src, Emit::Two(buffered.merge(), (line, context))))
-                        } else {
-                            let buffered = entry.get_mut();
-                            buffered.add_next_line(line);
-                            None
-                        }
-                    }
+                    (Mode::HaltBefore, true) => Decision::EndExclude,
+                    (Mode::HaltBefore, false) => Decision::Continue,
                     // All consecutive lines, up to and including the first line
                     // matching this pattern, are included in the group.
-                    Mode::HaltWith => {
-                        if condition_matched {
-                            let (src, mut buffered) = entry.remove_entry();
-                            buffered.add_next_line(line);
-                            Some((src, Emit::One(buffered.merge())))
-                        } else {
-                            let buffered = entry.get_mut();
-                            buffered.add_next_line(line);
-                            None
-                        }
+                    (Mode::HaltWith, true) => Decision::EndInclude,
+                    (Mode::HaltWith, false) => Decision::Continue,
+                };
+
+                match decision {
+                    Decision::Continue => {
+                        let buffered = entry.get_mut();
+                        self.timeouts.reset(&buffered.0, self.config.timeout);
+                        buffered.1.add_next_line(line);
+                        None
+                    }
+                    Decision::EndInclude => {
+                        let (src, (key, mut buffered)) = entry.remove_entry();
+                        self.timeouts.remove(&key);
+                        buffered.add_next_line(line);
+                        Some((src, Emit::One(buffered.merge())))
+                    }
+                    Decision::EndExclude => {
+                        let (src, (key, buffered)) = entry.remove_entry();
+                        self.timeouts.remove(&key);
+                        Some((src, Emit::Two(buffered.merge(), (line, context))))
                     }
                 }
             }
@@ -351,9 +346,10 @@ where
                 if self.config.start_pattern.is_match(line.as_ref()) {
                     // It was indeed a new line we need to filter.
                     // Set the timeout and buffer this line.
-                    self.timeouts
+                    let key = self
+                        .timeouts
                         .insert(entry.key().clone(), self.config.timeout);
-                    entry.insert(Aggregate::new(line, context));
+                    entry.insert((key, Aggregate::new(line, context)));
                     None
                 } else {
                     // It's just a regular line we don't really care about.
