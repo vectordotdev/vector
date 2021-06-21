@@ -243,7 +243,7 @@ jobs:
           SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
           SCCACHE_IDLE_TIMEOUT: 0
         run: |
-          sccache --stop-server || true
+          Invoke-Expression 'sccache --stop-server; exit 0'
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
         shell: bash
