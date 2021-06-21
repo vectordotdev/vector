@@ -63,7 +63,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
@@ -95,15 +95,14 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.15.1",
+              "v1.21.0",
             ]
             const kubernetes_version = [
               { version: "v1.19.2", is_essential: true },
               { version: "v1.18.9" },
               { version: "v1.17.12" },
-              { version: "v1.16.15" }, // v1.16.13 is broken, see https://github.com/kubernetes/kubernetes/issues/93194
+              { version: "v1.16.15" },
               { version: "v1.15.12" },
-              { version: "v1.14.10" },
             ]
             const container_runtime = [
               "docker",
@@ -175,6 +174,6 @@ jobs:
     - name: Discord notification
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
+      uses: Ilshidur/action-discord@0.3.2
       with:
         args: "Master k8s e2e tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

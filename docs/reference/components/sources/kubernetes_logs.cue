@@ -153,6 +153,15 @@ components: sources: kubernetes_logs: {
 			required:    false
 			type: bool: default: true
 		}
+		ingestion_timestamp_field: {
+			common:      false
+			description: "The exact time the event was ingested into Vector."
+			required:    false
+			type: string: {
+				default: null
+				syntax:  "literal"
+			}
+		}
 		kube_config_file: {
 			common:      false
 			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
@@ -284,7 +293,7 @@ components: sources: kubernetes_logs: {
 				}
 			}
 			"kubernetes.pod_labels": {
-				description: "Pod labels name."
+				description: "Set of labels attached to the Pod."
 				required:    false
 				common:      true
 				type: object: {
@@ -356,7 +365,9 @@ components: sources: kubernetes_logs: {
 					syntax: "literal"
 				}
 			}
-			timestamp: fields._current_timestamp
+			timestamp: fields._current_timestamp & {
+				description: "The exact time the event was processed by Kubernetes."
+			}
 		}
 	}
 
@@ -540,7 +551,7 @@ components: sources: kubernetes_logs: {
 				Vector is tested extensively against Kubernetes. In addition to Kubernetes
 				being Vector's most popular installation method, Vector implements a
 				comprehensive end-to-end test suite for all minor Kubernetes versions starting
-				with `1.14.
+				with `1.15`.
 				"""
 		}
 

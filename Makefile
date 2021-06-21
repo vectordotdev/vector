@@ -215,6 +215,16 @@ cross-enable: cargo-install-cross
 CARGO_HANDLES_FRESHNESS:
 	${EMPTY}
 
+# GNU Make < 3.82 pattern matching priority depends on the definition order
+# so cross-image-% must be defined before cross-%
+.PHONY: cross-image-%
+cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
+cross-image-%:
+	$(CONTAINER_TOOL) build \
+		--tag vector-cross-env:${TRIPLE} \
+		--file scripts/cross/${TRIPLE}.dockerfile \
+		scripts/cross
+
 # This is basically a shorthand for folks.
 # `cross-anything-triple` will call `cross anything --target triple` with the right features.
 .PHONY: cross-%
@@ -268,14 +278,6 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 		./vector-${TRIPLE}
 	rm -rf target/scratch/
 
-.PHONY: cross-image-%
-cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
-cross-image-%:
-	$(CONTAINER_TOOL) build \
-		--tag vector-cross-env:${TRIPLE} \
-		--file scripts/cross/${TRIPLE}.dockerfile \
-		scripts/cross
-
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
 .PHONY: test
@@ -301,7 +303,7 @@ test-behavior: ## Runs behaviorial test
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
-test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
+test-integration: test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-splunk test-integration-dnstap
 
@@ -312,7 +314,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh aws start
 	sleep 10 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_ -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh aws stop
 endif
@@ -336,15 +338,14 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh clickhouse start
 	sleep 5 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh clickhouse stop
 endif
 
 .PHONY: test-integration-docker-logs
 test-integration-docker-logs: ## Runs Docker Logs integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs:: -- --nocapture
-
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs::
 
 .PHONY: test-integration-elasticsearch
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
@@ -353,14 +354,14 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh elasticsearch start
 	sleep 60 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh elasticsearch stop
 endif
 
 .PHONY: test-integration-fluent
 test-integration-fluent: ## Runs Fluent integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features fluent-integration-tests --lib ::fluent:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features fluent-integration-tests --lib ::fluent::
 
 .PHONY: test-integration-gcp
 test-integration-gcp: ## Runs GCP integration tests
@@ -370,7 +371,7 @@ ifeq ($(AUTOSPAWN), true)
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
-	 --lib ::gcp:: -- --nocapture
+	 --lib ::gcp::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh gcp stop
 endif
@@ -382,7 +383,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh humio start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib "::humio::.*::integration_tests::" -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib "::humio::.*::integration_tests::"
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh humio stop
 endif
@@ -393,7 +394,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh influxdb start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib integration_tests:: --  ::influxdb --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib integration_tests:: --  ::influxdb
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh influxdb stop
 endif
@@ -405,7 +406,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh kafka start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh kafka stop
 endif
@@ -417,10 +418,14 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh loki start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh loki stop
 endif
+
+.PHONY: test-integration-logstash
+test-integration-logstash: ## Runs Logstash integration tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features logstash-integration-tests --lib ::logstash:: -- --nocapture
 
 .PHONY: test-integration-mongodb_metrics
 test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
@@ -429,7 +434,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh mongodb_metrics start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh mongodb_metrics stop
 endif
@@ -441,7 +446,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh nats start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
@@ -452,7 +457,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh nginx stop
 	@scripts/setup_integration_env.sh nginx start
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx_metrics:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx_metrics::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nginx stop
 endif
@@ -464,7 +469,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh postgresql_metrics start
 	sleep 5 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh postgresql_metrics stop
 endif
@@ -478,7 +483,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh prometheus start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh influxdb stop
 	@scripts/setup_integration_env.sh prometheus stop
@@ -489,9 +494,9 @@ test-integration-pulsar: ## Runs Pulsar integration tests
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 	@scripts/setup_integration_env.sh pulsar start
-	sleep 10 # Many services are very slow... Give them a sec..
+	sleep 15 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features pulsar-integration-tests --lib ::pulsar::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 endif
@@ -503,7 +508,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh splunk start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh splunk stop
 endif
@@ -514,7 +519,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh dnstap stop
 	@scripts/setup_integration_env.sh dnstap start
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features dnstap-integration-tests --lib ::dnstap:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features dnstap-integration-tests --lib ::dnstap::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh dnstap stop
 endif
@@ -556,7 +561,7 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 test-wasm: export TEST_THREADS=1
 test-wasm: export TEST_LOG=vector=trace
 test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "transforms-field_filter transforms-wasm transforms-lua transforms-add_fields" -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "transforms-field_filter transforms-wasm transforms-lua transforms-add_fields"
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -583,6 +588,11 @@ bench-remap-functions: ## Run remap-functions benches
 .PHONY: bench-remap
 bench-remap: ## Run remap benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
+.PHONY: bench-transform
+bench-transform: ## Run transform benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "transform-benches" --bench transform ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-wasm

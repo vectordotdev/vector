@@ -2,25 +2,25 @@ use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
     event::{Event, VrlTarget},
-    internal_events::RemapConditionExecutionError,
+    internal_events::VrlConditionExecutionError,
 };
 use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Value};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
-pub struct RemapConfig {
+pub struct VrlConfig {
     pub source: String,
 }
 
 inventory::submit! {
-    ConditionDescription::new::<RemapConfig>("remap")
+    ConditionDescription::new::<VrlConfig>("vrl")
 }
 
-impl_generate_config_from_default!(RemapConfig);
+impl_generate_config_from_default!(VrlConfig);
 
-#[typetag::serde(name = "remap")]
-impl ConditionConfig for RemapConfig {
+#[typetag::serde(name = "vrl")]
+impl ConditionConfig for VrlConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
@@ -48,18 +48,18 @@ impl ConditionConfig for RemapConfig {
                 .to_string()
         })?;
 
-        Ok(Box::new(Remap { program }))
+        Ok(Box::new(Vrl { program }))
     }
 }
 
 //------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub struct Remap {
+pub struct Vrl {
     program: Program,
 }
 
-impl Remap {
+impl Vrl {
     fn run(&self, event: &Event) -> vrl::RuntimeResult {
         // TODO(jean): This clone exists until vrl-lang has an "immutable"
         // mode.
@@ -78,7 +78,7 @@ impl Remap {
     }
 }
 
-impl Condition for Remap {
+impl Condition for Vrl {
     fn check(&self, event: &Event) -> bool {
         self.run(&event)
             .map(|value| match value {
@@ -86,7 +86,7 @@ impl Condition for Remap {
                 _ => false,
             })
             .unwrap_or_else(|_| {
-                emit!(RemapConditionExecutionError);
+                emit!(VrlConditionExecutionError);
                 false
             })
     }
@@ -113,11 +113,11 @@ mod test {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<RemapConfig>();
+        crate::test_util::test_generate_config::<VrlConfig>();
     }
 
     #[test]
-    fn check_remap() {
+    fn check_vrl() {
         let checks = vec![
             (
                 log_event![],   // event
@@ -178,7 +178,7 @@ mod test {
 
         for (event, source, build, check) in checks {
             let source = source.to_owned();
-            let config = RemapConfig { source };
+            let config = VrlConfig { source };
 
             assert_eq!(config.build().map(|_| ()).map_err(|e| e.to_string()), build);
 

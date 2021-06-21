@@ -1,5 +1,8 @@
-#! /usr/bin/env bash
-set -e -o verbose
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o verbose
 
 # Set VECTOR_BUILD_DESC to add in pertinent build information.  We typically only
 # enable this when generating binaries that will be in the hands of users so that

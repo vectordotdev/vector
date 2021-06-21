@@ -29,6 +29,7 @@ mod blackhole;
 mod coercer;
 #[cfg(feature = "transforms-concat")]
 mod concat;
+mod conditions;
 #[cfg(feature = "sinks-console")]
 mod console;
 #[cfg(feature = "sinks-datadog")]
@@ -156,6 +157,7 @@ pub use self::blackhole::*;
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
+pub use self::conditions::*;
 #[cfg(feature = "sinks-console")]
 pub use self::console::*;
 #[cfg(feature = "sinks-datadog")]

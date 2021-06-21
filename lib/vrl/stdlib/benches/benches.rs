@@ -10,16 +10,19 @@ criterion_group!(
     // https://github.com/timberio/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
     targets = assert,
+              assert_eq,
               ceil,
               compact,
               contains,
               decode_base64,
+              decode_percent,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
               encode_base64,
               encode_json,
               encode_logfmt,
+              encode_percent,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -123,6 +126,15 @@ bench_function! {
 }
 
 bench_function! {
+    assert_eq=> vrl_stdlib::AssertEq;
+
+    literal {
+        args: func_args![left: value!(true), right: value!(true), message: "must be true"],
+        want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
     ceil => vrl_stdlib::Ceil;
 
     literal {
@@ -169,6 +181,15 @@ bench_function! {
     literal {
         args: func_args![value: "c29tZSs9c3RyaW5nL3ZhbHVl"],
         want: Ok("some+=string/value"),
+    }
+}
+
+bench_function! {
+    decode_percent => vrl_stdlib::DecodePercent;
+
+    literal {
+        args: func_args![value: "foo%20bar%3F"],
+        want: Ok("foo bar?"),
     }
 }
 
@@ -221,6 +242,20 @@ bench_function! {
             fields_ordering: value!(["lvl", "msg"])
         ],
         want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
+    }
+}
+
+bench_function! {
+    encode_percent => vrl_stdlib::EncodePercent;
+
+    non_alphanumeric {
+        args: func_args![value: r#"foo bar?"#],
+        want: Ok(r#"foo%20bar%3F"#),
+    }
+
+    controls {
+        args: func_args![value: r#"foo bar"#, ascii_set: "CONTROLS"],
+        want: Ok(r#"foo %14bar"#),
     }
 }
 
@@ -974,6 +1009,20 @@ bench_function! {
     logfmt {
         args: func_args! [
             value: r#"level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"#
+        ],
+        want: Ok(value!({
+            level: "info",
+            msg: "Stopping all fetchers",
+            tag: "stopping_fetchers",
+            id: "ConsumerFetcherManager-1382721708341",
+            module: "kafka.consumer.ConsumerFetcherManager"
+        }))
+    }
+
+    standalone_key_disabled {
+        args: func_args! [
+            value: r#"level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"#,
+            accept_standalone_key: false
         ],
         want: Ok(value!({
             level: "info",
