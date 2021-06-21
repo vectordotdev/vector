@@ -5,13 +5,16 @@ remap: functions: parse_logfmt: {
 	description: """
 		Parses the `value` in [logfmt](\(urls.logfmt)).
 
-		* Keys and values can be wrapped with `"`.
-		* `"` characters can be escaped by `\\`.
+		* Keys and values can be wrapped using the `\"` character.
+		* `\"` characters can be escaped by the `\\` character.
+		* As per this [logfmt specification](\(urls.logfmt_specs)), the `parse_logfmt` function
+		  accepts standalone keys and assigns them a Boolean value of `true`.
 		"""
 	notices: [
 		"""
-			All values are returned as strings, it is recommended to manually coerce values as you see fit.
-			""",
+		All values are returned as strings. We recommend coercing values to desired types as you see
+		fit.
+		""",
 	]
 
 	arguments: [
@@ -23,7 +26,7 @@ remap: functions: parse_logfmt: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a properly formatted key/value string",
+		"`value` isn't a properly formatted key/value string",
 	]
 	return: types: ["object"]
 

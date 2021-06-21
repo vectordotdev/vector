@@ -75,6 +75,7 @@ data:
       address = "vector-aggregator:9000"
       inputs = ["kubernetes_logs"]
       type = "vector"
+      version = "2"
     
     # Capture the metrics from the host.
     [sources.host_metrics]
@@ -134,6 +135,7 @@ data:
     [sources.vector]
       address = "0.0.0.0:9000"
       type = "vector"
+      version = "2"
     
     
     # Emit internal Vector metrics.
@@ -203,6 +205,7 @@ spec:
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: aggregator
 ---
 # Source: vector/charts/vector-aggregator/templates/service.yaml
 apiVersion: v1
@@ -226,6 +229,7 @@ spec:
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: aggregator
 ---
 # Source: vector/charts/vector-agent/templates/daemonset.yaml
 apiVersion: apps/v1
@@ -378,6 +382,7 @@ spec:
     matchLabels:
       app.kubernetes.io/name: vector-aggregator
       app.kubernetes.io/instance: vector
+      app.kubernetes.io/component: aggregator
   podManagementPolicy: "Parallel"
   replicas: 1
   template:
@@ -389,6 +394,7 @@ spec:
       labels:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
+        app.kubernetes.io/component: aggregator
         vector.dev/exclude: "true"
     spec:      
       serviceAccountName: vector-aggregator
