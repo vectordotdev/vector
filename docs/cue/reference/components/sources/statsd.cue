@@ -117,7 +117,7 @@ components: sources: statsd: {
 	how_it_works: {
 		timestamps: {
 			title: "Timestamps"
-			body: """
+			body:  """
 				The StatsD protocol doesn't provide support for sending metric timestamps. You may
 				notice that each parsed metric is assigned a `null` timestmap, which is a special
 				value indicating a realtime metric (i.e. not a historical metric). Normally, such

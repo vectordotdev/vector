@@ -12,9 +12,9 @@ remap: functions: parse_logfmt: {
 		"""
 	notices: [
 		"""
-		All values are returned as strings. We recommend coercing values to desired types as you see
-		fit.
-		""",
+			All values are returned as strings. We recommend coercing values to desired types as you see
+			fit.
+			""",
 	]
 
 	arguments: [

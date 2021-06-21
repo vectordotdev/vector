@@ -27,7 +27,7 @@ remap: features: compilation: {
 		}
 
 		type_safety_checks: {
-			title:       "Type safety checks"
+			title: "Type safety checks"
 			description: """
 				At compile time, Vector performs [type safety](#type-safety)) checks to catch runtime
 				errors stemming from type mismatches, for example passing an integer to the `parse_syslog` function,

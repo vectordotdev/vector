@@ -37,8 +37,8 @@ authors: [
 		name:   "Lee Benson"
 	},
 	{
-		handle: "spencergilbert",
-		name: "Spencer Gilbert"
+		handle: "spencergilbert"
+		name:   "Spencer Gilbert"
 	},
 	{
 		handle: "zsherman"

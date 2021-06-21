@@ -11,7 +11,7 @@ administration: {
 		title:       string
 		description: string
 		// Enables the topologies to be displayed in a specified order rather than alphabetically
-		order:       int
+		order: int
 
 		pros: [#Attribute, ...#Attribute]
 		cons: [#Attribute, ...#Attribute]

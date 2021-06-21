@@ -80,14 +80,14 @@ components: sinks: gcp_stackdriver_logs: {
 
 	configuration: {
 		billing_account_id: {
-			common:      false
+			common: false
 			description: """
 				The billing account ID to which to publish logs.
 
 				Exactly one of must be set: `billing_account_id`, `folder_id`, `organization_id`,
 				or `project_id`.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: string: {
 				default: null
@@ -96,7 +96,7 @@ components: sinks: gcp_stackdriver_logs: {
 			}
 		}
 		credentials_path: {
-			common:      true
+			common: true
 			description: """
 				The filename for a Google Cloud service account credentials JSON file used to authenticate access to the
 				Stackdriver Logging API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS`
@@ -106,7 +106,7 @@ components: sinks: gcp_stackdriver_logs: {
 				the program is running on. If Vector is not running on a GCE instance, you must define a credentials
 				file as above.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: string: {
 				default: null
@@ -141,14 +141,14 @@ components: sinks: gcp_stackdriver_logs: {
 			}
 		}
 		organization_id: {
-			common:      false
+			common: false
 			description: """
 				The organization ID to which to publish logs. This would be the identifier assigned to your organization
 				on Google Cloud Platform.
 
 				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: string: {
 				default: null
@@ -200,14 +200,14 @@ components: sinks: gcp_stackdriver_logs: {
 						}
 					}
 					"*": {
-						common:      false
+						common: false
 						description: """
 							Values for all of the labels listed in the associated monitored resource descriptor.
 
 							For example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and
 							`zone`.
 							"""
-						required:    false
+						required: false
 						warnings: []
 						type: string: {
 							default: null
@@ -249,7 +249,7 @@ components: sinks: gcp_stackdriver_logs: {
 	how_it_works: {
 		severity_level_mapping: {
 			title: "Severity Level Mapping"
-			body: """
+			body:  """
 				If a `severity_key` is configured, outgoing log records have their
 				`severity` header field set from the named field in the Vector
 				event. However, the [required values](\(urls.gcp_stackdriver_severity)) for

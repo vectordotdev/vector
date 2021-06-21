@@ -35,7 +35,7 @@ administration: topologies: stream_based: {
 				Vector is used solely as a routing layer and is not responsible for durability. Durability is delegated
 				to a purpose-built service that you can switch and evolve over time.
 				"""
-		}
+		},
 	]
 
 	cons: [
@@ -58,6 +58,6 @@ administration: topologies: stream_based: {
 				In addition the management cost, the added stream cluster will require more resources which will
 				increase operational cost.
 				"""
-		}
+		},
 	]
 }

@@ -382,7 +382,7 @@ components: sources: file: {
 
 		fingerprint: {
 			title: "fingerprint"
-			body: """
+			body:  """
 				By default, Vector identifies files by creating a
 				[cyclic redundancy check](\(urls.crc)) (CRC) on the first 256 bytes of
 				the file. This serves as a fingerprint to uniquely identify the file.

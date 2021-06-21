@@ -1,8 +1,8 @@
 package metadata
 
 administration: topologies: centralized: {
-	title: "Centralized"
-	order: 2
+	title:       "Centralized"
+	order:       2
 	description: """
 		A good balance of simplicity, stability, and control. For many use cases, a centralized deployment topology is
 		a good compromise between the [distributed](#distributed) and [stream-based](#stream-based) topologies, as it
@@ -13,7 +13,7 @@ administration: topologies: centralized: {
 
 	pros: [
 		{
-			title: "More efficient"
+			title:       "More efficient"
 			description: """
 				Centralized topologies are typically more efficient for client nodes and downstream services. Vector
 				[agents](\(urls.vector_agent_role)) do less work and thus use fewer resources. In addition, in this
@@ -35,19 +35,19 @@ administration: topologies: centralized: {
 				global metrics. This can be advantageous for large deployments in which metrics aggregated across many
 				hosts are more informative than isolated per-host metrics.
 				"""
-		}
+		},
 	]
 
 	cons: [
 		{
-			title: "More complex"
+			title:       "More complex"
 			description: """
 				A centralized topology has more moving parts, as you need to run Vector in both the
 				[agent](\(urls.vector_agent_role)) and [aggregator](\(urls.vector_aggregator_role)) roles.
 				"""
 		},
 		{
-			title: "Less durable"
+			title:       "Less durable"
 			description: """
 				[Agent](\(urls.vector_agent_role)) nodes are designed to get data off of the machine as quickly as
 				possible. While this is fine for some use cases, it does bear the possibility of data loss since the

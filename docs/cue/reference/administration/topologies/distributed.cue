@@ -10,13 +10,13 @@ administration: topologies: distributed: {
 
 	pros: [
 		{
-			title: "Simple"
+			title:       "Simple"
 			description: "Fewer moving parts"
 		},
 		{
-			title: "Elastic"
+			title:       "Elastic"
 			description: "Easily scales with your app. Resources grow as you scale."
-		}
+		},
 	]
 
 	cons: [
@@ -55,6 +55,6 @@ administration: topologies: distributed: {
 				reducing logs to global metrics. This is typically a concern for very large deployments where individual
 				host metrics are less useful.
 				"""
-		}
+		},
 	]
 }

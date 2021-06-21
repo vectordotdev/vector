@@ -7,7 +7,7 @@ remap: errors: "110": {
 		isn't a supported type.
 		"""
 	rationale:   remap._fail_safe_blurb
-	resolution: """
+	resolution:  """
 		You must guarantee the type of the variable by using the appropriate
 		[type](\(urls.vrl_functions)/#type-functions) or [coercion](\(urls.vrl_functions)/#coerce-functions) function.
 		"""

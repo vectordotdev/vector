@@ -1,5 +1,5 @@
 remap: features: type_safety: {
-	title:       "Type safety"
+	title: "Type safety"
 	description: """
 		VRL implements [_progressive_ type safety](#progressive-type-safety),
 		erroring at [compilation-time](#compilation) if a type mismatch is detected.
