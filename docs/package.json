@@ -14,6 +14,7 @@
     "alpinejs": "^2.8.2",
     "autoprefixer": "^10.2.5",
     "babel-preset-next": "^1.4.0",
+    "classnames": "^2.3.1",
     "core-js": "^3.14.0",
     "d3-geo": "^3.0.1",
     "minireset.css": "^0.0.7",

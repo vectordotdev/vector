@@ -2,16 +2,44 @@
 # The main page at https://vector.dev
 title: Vector
 
-# Tabs for the "A complete end-to-end platform" section
-platform_tabs:
-- Distributed
-- Centralized
-- Stream based
+# What is Vector (with animated diagram)
+what:
+  title: Take control of your observability data
+  description: Collect, transform, and route *all* your logs and metrics with *one* simple tool.
 
-# Component cloud
-components:
-  title: Highly flexible processing topologies
-  description: A sea of sources, transforms, and sinks to choose from
+# Items listed in the "Why Vector?" section. Markdown is supported in the descriptions.
+why:
+- title: "Ultra fast and reliable"
+  description: "Built in [Rust](https://rust-lang.org), Vector is blistering fast, memory efficient, and designed to handle the most demanding environments."
+  icon: "clock.svg"
+- title: "End to end"
+  description: "Vector strives to be the only tool you need to get observability data from A to B, [deploying](/docs/setup/deployment) as an [daemon](/docs/setup/deployment/roles/#daemon)), [sidecar](/docs/setup/deployment/roles/#sidecar), or [aggregator](/docs/setup/deployment/roles/#aggregator)."
+  icon: "chart.svg"
+-  title: "Unified"
+   description: "Vector supports [logs](/docs/about/under-the-hood/architecture/data-model/log) and [metrics](/docs/about/under-the-hood/architecture/data-model/metric), making it easy to collect and process all your observability data."
+   icon: "hex.svg"
+- title: "Vendor neutral"
+  description: "Vector doesn't favor any storage and fosters a fair, open ecosystem with your best interest in mind. Lock-in free and future proof."
+  icon: "lock.svg"
+- title: "Programmable transforms"
+  description: "[Programmable transforms](/docs/reference/configuration/transforms) give you the full power of programmable runtimes. Handle complex use cases without limitation."
+  icon: "code.svg"
+- title: "Clear guarantees"
+  description: "Guarantees matter, and Vector is [clear on its guarantees](/docs/about/under-the-hood/guarantees), helping you to make the appropriate trade offs for your use case."
+  icon: "laptop.svg"
+
+# Platform section
+platform:
+  title: A complete, end-to-end platform.
+  description: |
+    Deploy Vector in a variety of roles to suit your use case.
+    <br />
+    Get data from point A to point B without patching tools together.
+  # Selectable tabs with associated SVGs
+  tabs:
+  - Distributed
+  - Centralized
+  - Stream based
 
 # Configuration section
 configure:
@@ -62,42 +90,7 @@ configure:
       type = "console"
       encoding.codec = "text"
 
-
-
-# Items listed in the "Why Vector?" section. Markdown is supported in the descriptions.
-why: [
-  {
-    title: "Ultra fast and reliable",
-    description: "Built in [Rust](https://rust-lang.org), Vector is blistering fast, memory efficient, and designed to handle the most demanding environments.",
-    icon: "clock.svg"
-  },
-  {
-    title: "End to end",
-    description: "Vector strives to be the only tool you need to get observability data from A to B, [deploying](/docs/setup/deployment) as an [daemon](/docs/setup/deployment/roles/#daemon)), [sidecar](/docs/setup/deployment/roles/#sidecar), or [aggregator](/docs/setup/deployment/roles/#aggregator).",
-    icon: "chart.svg"
-  },
-  {
-    title: "Unified",
-    description: "Vector supports [logs](/docs/about/under-the-hood/architecture/data-model/log) and [metrics](/docs/about/under-the-hood/architecture/data-model/metric), making it easy to collect and process all your observability data.",
-    icon: "hex.svg"
-  },
-  {
-    title: "Vendor neutral",
-    description: "Vector doesn't favor any storage and fosters a fair, open ecosystem with your best interest in mind. Lock-in free and future proof.",
-    icon: "lock.svg"
-  },
-  {
-    title: "Programmable transforms",
-    description: "[Programmable transforms](/docs/reference/configuration/transforms) give you the full power of programmable runtimes. Handle complex use cases without limitation.",
-    icon: "code.svg"
-  },
-  {
-    title: "Clear guarantees",
-    description: "Guarantees matter, and Vector is [clear on its guarantees](/docs/about/under-the-hood/guarantees), helping you to make the appropriate trade offs for your use case.",
-    icon: "laptop.svg"
-  }
-]
-
+# Installation section
 installation:
   title: Installs everywhere
   description: Packaged as a single binary. No dependencies, no runtime, and memory safe.
@@ -132,6 +125,11 @@ installation:
     url: "/docs/setup/installation/operating-systems"
   - title: "Manual"
     url: "/docs/setup/installation/manual"
+
+# Component cloud
+components:
+  title: Highly flexible processing topologies
+  description: A wide range of sources, transforms, and sinks to choose from
 
 # Community section
 community:

@@ -1,20 +1,17 @@
 {{ define "main" }}
-<div class="bg-gradient-to-b from-white via-gray-100 to-gray-50 dark:from-dark dark:via-purple-800 dark:to-dark">
-  {{ partial "home/hero.html" . }}
-</div>
-
-<div class="bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-dark dark:via-gray-900 dark:to-dark">
-  {{ partial "home/why-vector.html" . }}
-  <hr class="border-gray-100 dark:border-gray-700" />
-  {{ partial "home/platform.html" . }}
-  <hr class="border-gray-100 dark:border-gray-700" />
-  {{ partial "home/configure.html" . }}
-  <hr class="border-gray-100 dark:border-gray-700" />
-  {{ partial "home/installation.html" . }}
-  <hr class="border-gray-100 dark:border-gray-700" />
-  {{ partial "home/components.html" . }}
-  <hr class="border-gray-100 dark:border-gray-700" />
-
-  {{ partial "home/community.html" . }}
-</div>
+{{ partial "home/hero.html" . }}
+<hr class="border-gray-100 dark:border-gray-700" />
+{{ partial "home/what.html" . }}
+<hr class="border-gray-100 dark:border-gray-700" />
+{{ partial "home/why-vector.html" . }}
+<hr class="border-gray-100 dark:border-gray-700" />
+{{ partial "home/platform.html" . }}
+<hr class="border-gray-100 dark:border-gray-700" />
+{{ partial "home/configure.html" . }}
+<hr class="border-gray-100 dark:border-gray-700" />
+{{ partial "home/installation.html" . }}
+<hr class="border-gray-100 dark:border-gray-700" />
+{{ partial "home/components.html" . }}
+<hr class="border-gray-100 dark:border-gray-700" />
+{{ partial "home/community.html" . }}
 {{ end }}

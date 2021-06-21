@@ -1,15 +1,15 @@
-{{ $tabs := .Params.platform_tabs }}
+{{ $platform := .Params.platform }}
 <div class="py-12 md:py-16 lg:py-20 px-4 sm:px-6 mx-auto max-w-7xl text-center">
-  {{ partial "home/heading.html" (dict "title" "A complete, end-to-end platform.") }}
+  {{ partial "home/heading.html" (dict "title" $platform.title) }}
 
   <p class="mt-4 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
-    Deploy Vector in a variety of roles to suit your use case.<br />Get data from point A to point B without patching tools together.
+    {{ $platform.description | safeHTML }}
   </p>
 
   <div class="mt-6 text-center">
     {{/* Selector */}}
     <div class="inline-flex space-x-5 bg-dark dark:bg-white py-1.5 px-2.5 rounded-full shadow-sm">
-      {{ range $tabs }}
+      {{ range $platform.tabs }}
       <button @click="$store.global.platformTab = '{{ . }}'" :class="{ 'rounded-full py-0.5 px-2.5 text-dark bg-primary dark:bg-dark dark:text-primary': $store.global.platformTab === '{{ . }}' }" class="uppercase text-sm font-semibold text-smtracking-tight text-white dark:text-dark">
         {{ . }}
       </button>
@@ -18,7 +18,7 @@
 
     {{/* Selectable images */}}
     <div class="mt-12 mx-auto flex flex-col items-center">
-      {{ range $tabs }}
+      {{ range $platform.tabs }}
       {{ $name := . | lower | urlize }}
       {{ $svg := printf "/img/topologies/%s.svg" (. | urlize) }}
       {{ $url := printf "/docs/setup/deployment/topologies/#%s" $name | relURL }}

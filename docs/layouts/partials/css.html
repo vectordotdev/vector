@@ -22,3 +22,8 @@
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
 <link rel="stylesheet" href="{{ $unpurgedCss.RelPermalink }}" integrity="{{ $unpurgedCss.Data.Integrity }}">
 {{ end }}
+
+{{ if site.Home }}
+{{ $diagramCss := resources.Get "css/diagram.css" | fingerprint }}
+<link rel="stylesheet" href="{{ $diagramCss.RelPermalink }}" integrity="{{ $diagramCss.Data.Integrity }}">
+{{ end }}
