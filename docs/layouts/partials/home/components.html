@@ -9,7 +9,7 @@
     </p>
   </div>
 
-  <div class="mt-8 grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-10">
+  <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
     {{ range $types }}
     {{ $type := . }}
     {{ $components := where site.RegularPages ".CurrentSection.Params.short" . }}
@@ -22,7 +22,7 @@
         {{ $type | lower }}
       </span>
 
-      <div class="mt-6 grid grid-cols-2 gap-0.5">
+      <div class="mt-4 grid grid-cols-3 md:grid-cols-2 gap-1.5">
         {{ range $components }}
         {{ $title := .Params.short | default .Title }}
         {{ template "component-chip" (dict "title" $title "href" .RelPermalink) }}
@@ -34,7 +34,7 @@
 </div>
 
 {{ define "component-chip" }}
-<a href="{{ .href }}" class="rounded font-semibold text-gray-500 dark:text-gray-300 hover:text-secondary dark:hover:text-primary tracking-tight leading-tight border dark:border-gray-700 py-2.5 px-4 hover:border-secondary dark:hover:border-primary hover:shadow-md">
+<a href="{{ .href }}" class="font-light text-gray-600 dark:text-gray-300 hover:text-secondary dark:hover:text-primary leading-tight">
   {{ .title }}
 </a>
 {{ end }}
