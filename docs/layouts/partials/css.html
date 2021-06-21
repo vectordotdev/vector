@@ -1,29 +1,33 @@
-{{ $serverMode   := site.IsServer }}
+{{ $server := site.IsServer }}
 {{ $includePaths := slice "node_modules" }}
-{{ $sass         := "sass/style.sass" }}
-{{ $cssOutput    := "css/style.css" }}
-{{ $devOpts      := dict "targetPath" $cssOutput "includePaths" $includePaths "enableSourceMap" true }}
-{{ $prodOpts     := dict "targetPath" $cssOutput "includePaths" $includePaths "outputStyle" "compressed" }}
-{{ $cssOpts      := cond $serverMode $devOpts $prodOpts }}
-{{ $postCssOpts  := dict "inlineImports" true }}
-{{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS $postCssOpts }}
+{{ $cssOpts := cond $server (dict "includePaths" $includePaths "enableSourceMap" true) (dict "includePaths" $includePaths "outputStyle" "compressed") }}
 
-{{/* Some Sass needs to be handled separately, as PurgeCSS will eliminate all of these
-     classes since they're created at page load time by JavaScript */}}
-{{ $unpurgedCss := resources.Get "sass/unpurged.sass" | toCSS (dict "targetPath" "css/unpurged.css" "outputStyle" "compressed") }}
-
-{{/* Run CSS post-processing for production and preview builds */}}
-{{ if $serverMode }}
+{{ define "sass-postcss" }}
+{{ $postCssOpts := dict "inlineImports" true }}
+{{ $css := resources.Get .input | resources.ExecuteAsTemplate .input .ctx | toCSS .css_opts | postCSS $postCssOpts }}
+{{ if .server }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}">
-<link rel="stylesheet" href="{{ $unpurgedCss.RelPermalink }}">
 {{ else }}
-{{ $css = $css | fingerprint | resources.PostProcess }}
-{{ $unpurgedCss = $unpurgedCss | fingerprint }}
+{{ $css = $css | fingerprint }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
-<link rel="stylesheet" href="{{ $unpurgedCss.RelPermalink }}" integrity="{{ $unpurgedCss.Data.Integrity }}">
+{{ end }}
 {{ end }}
 
-{{ if site.Home }}
-{{ $diagramCss := resources.Get "css/diagram.css" | fingerprint }}
-<link rel="stylesheet" href="{{ $diagramCss.RelPermalink }}" integrity="{{ $diagramCss.Data.Integrity }}">
+{{ define "sass" }}
+{{ $css := resources.Get .input | resources.ExecuteAsTemplate .input .ctx | toCSS .css_opts }}
+{{ if .server }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}">
+{{ else }}
+{{ $css = $css | fingerprint }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
 {{ end }}
+{{ end }}
+
+{{/* Main site CSS (Tailwind, etc.) */}}
+{{ template "sass-postcss" (dict "server" $server "input" "sass/style.sass" "ctx" . "css_opts" $cssOpts) }}
+
+{{/* Non-purged CSS (no PostCSS) */}}
+{{ template "sass" (dict "server" $server "input" "sass/unpurged.sass" "ctx" . "css_opts" $cssOpts) }}
+
+{{/* Main page animated Vector diagram */}}
+{{ template "sass" (dict "server" $server "input" "sass/diagram.sass" "ctx" . "css_opts" $cssOpts) }}
