@@ -223,6 +223,7 @@ listenfd = { version = "0.3.3", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.6.5", default-features = false, optional = true }
 maxminddb = { version = "0.18.0", default-features = false, optional = true }
+md-5 = { version = "0.9", optional = true }
 mongodb = { version = "2.0.0-beta.1", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.9.18", default-features = false, optional = true }
 nom = { version = "6.1.2", default-features = false, optional = true }
@@ -581,7 +582,7 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["bytesize", "rusoto", "rusoto_s3", "uuid"]
+sinks-aws_s3 = ["base64", "bytesize", "md-5", "rusoto", "rusoto_s3", "uuid"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
 sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []

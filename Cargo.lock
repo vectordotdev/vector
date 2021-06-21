@@ -8028,6 +8028,7 @@ dependencies = [
  "lucetc",
  "matches",
  "maxminddb",
+ "md-5",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
