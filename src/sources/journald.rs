@@ -109,9 +109,9 @@ impl SourceConfig for JournaldConfig {
             (false, _) => &self.include_units,
         };
 
-        let include_units: HashSet<String> = include_units.iter().map(|s| fixup_unit(&s)).collect();
+        let include_units: HashSet<String> = include_units.iter().map(|s| fixup_unit(s)).collect();
         let exclude_units: HashSet<String> =
-            self.exclude_units.iter().map(|s| fixup_unit(&s)).collect();
+            self.exclude_units.iter().map(|s| fixup_unit(s)).collect();
         if let Some(unit) = include_units
             .iter()
             .find(|unit| exclude_units.contains(&unit[..]))
@@ -391,7 +391,7 @@ fn create_event(record: Record) -> Event {
         .get(&*SOURCE_TIMESTAMP)
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
-        if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
+        if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
             let timestamp = chrono::Utc.timestamp(
                 (timestamp / 1_000_000) as i64,
                 (timestamp % 1_000_000) as u32 * 1_000,
@@ -776,20 +776,20 @@ mod tests {
         let includes: HashSet<String> = vec!["one", "two"].into_iter().map(Into::into).collect();
         let excludes: HashSet<String> = vec!["foo", "bar"].into_iter().map(Into::into).collect();
 
-        assert_eq!(filter_unit(None, &empty, &empty), false);
-        assert_eq!(filter_unit(None, &includes, &empty), true);
-        assert_eq!(filter_unit(None, &empty, &excludes), false);
-        assert_eq!(filter_unit(None, &includes, &excludes), true);
+        assert!(!filter_unit(None, &empty, &empty));
+        assert!(filter_unit(None, &includes, &empty));
+        assert!(!filter_unit(None, &empty, &excludes));
+        assert!(filter_unit(None, &includes, &excludes));
         let one = String::from("one");
-        assert_eq!(filter_unit(Some(&one), &empty, &empty), false);
-        assert_eq!(filter_unit(Some(&one), &includes, &empty), false);
-        assert_eq!(filter_unit(Some(&one), &empty, &excludes), false);
-        assert_eq!(filter_unit(Some(&one), &includes, &excludes), false);
+        assert!(!filter_unit(Some(&one), &empty, &empty));
+        assert!(!filter_unit(Some(&one), &includes, &empty));
+        assert!(!filter_unit(Some(&one), &empty, &excludes));
+        assert!(!filter_unit(Some(&one), &includes, &excludes));
         let two = String::from("bar");
-        assert_eq!(filter_unit(Some(&two), &empty, &empty), false);
-        assert_eq!(filter_unit(Some(&two), &includes, &empty), true);
-        assert_eq!(filter_unit(Some(&two), &empty, &excludes), true);
-        assert_eq!(filter_unit(Some(&two), &includes, &excludes), true);
+        assert!(!filter_unit(Some(&two), &empty, &empty));
+        assert!(filter_unit(Some(&two), &includes, &empty));
+        assert!(filter_unit(Some(&two), &empty, &excludes));
+        assert!(filter_unit(Some(&two), &includes, &excludes));
     }
 
     fn message(event: &Event) -> Value {

@@ -243,8 +243,7 @@ impl<'a> DnstapParser<'a> {
 
         let dnstap_message_type_id = dnstap_message.r#type;
         self.insert(
-            &self
-                .event_schema
+            self.event_schema
                 .dnstap_message_schema()
                 .dnstap_message_type_id(),
             dnstap_message_type_id as i64,
@@ -530,16 +529,14 @@ impl<'a> DnstapParser<'a> {
         );
 
         self.log_dns_message_record_section(
-            &self
-                .event_schema
+            self.event_schema
                 .dns_query_message_schema()
                 .additional_section(),
             &msg.additional_section,
         );
 
         self.log_edns(
-            &self
-                .event_schema
+            self.event_schema
                 .dns_query_message_schema()
                 .opt_pseudo_section(),
             &msg.opt_pserdo_section,
@@ -703,8 +700,7 @@ impl<'a> DnstapParser<'a> {
         );
 
         self.log_dns_message_record_section(
-            &self
-                .event_schema
+            self.event_schema
                 .dns_update_message_schema()
                 .prerequisite_section(),
             &msg.prerequisite_section,
@@ -718,8 +714,7 @@ impl<'a> DnstapParser<'a> {
         );
 
         self.log_dns_message_record_section(
-            &self
-                .event_schema
+            self.event_schema
                 .dns_update_message_schema()
                 .additional_section(),
             &msg.additional_section,

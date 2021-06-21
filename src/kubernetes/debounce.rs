@@ -227,16 +227,16 @@ mod tests {
         tokio::time::pause();
 
         let mut debounce = Debounce::new(TEST_DELAY);
-        assert_eq!(debounce.is_debouncing(), false);
+        assert!(!debounce.is_debouncing());
 
         debounce.signal();
-        assert_eq!(debounce.is_debouncing(), true);
+        assert!(debounce.is_debouncing());
 
         tokio::time::advance(TEST_DELAY * 2).await;
-        assert_eq!(debounce.is_debouncing(), true);
+        assert!(debounce.is_debouncing());
 
         debounce.debounced().await;
-        assert_eq!(debounce.is_debouncing(), false);
+        assert!(!debounce.is_debouncing(),);
 
         tokio::time::resume();
     }

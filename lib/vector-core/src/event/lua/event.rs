@@ -3,6 +3,7 @@ use crate::event::{Event, LogEvent, Metric};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for Event {
+    #![allow(clippy::wrong_self_convention)] // this trait is defined by rlua
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let table = ctx.create_table()?;
         match self {

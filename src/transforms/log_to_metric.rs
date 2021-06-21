@@ -230,14 +230,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             };
 
             let name = counter.name.as_ref().unwrap_or(&counter.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = counter.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&counter.tags, &event)?;
+            let tags = render_tags(&counter.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -258,14 +258,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })?;
 
             let name = hist.name.as_ref().unwrap_or(&hist.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = hist.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&hist.tags, &event)?;
+            let tags = render_tags(&hist.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -289,14 +289,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })?;
 
             let name = summary.name.as_ref().unwrap_or(&summary.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = summary.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&summary.tags, &event)?;
+            let tags = render_tags(&summary.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -320,14 +320,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })?;
 
             let name = gauge.name.as_ref().unwrap_or(&gauge.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = gauge.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&gauge.tags, &event)?;
+            let tags = render_tags(&gauge.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -343,14 +343,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let value = value.to_string_lossy();
 
             let name = set.name.as_ref().unwrap_or(&set.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = set.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&set.tags, &event)?;
+            let tags = render_tags(&set.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -370,7 +370,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         for config in self.config.metrics.iter() {
-            match to_metric(&config, &event) {
+            match to_metric(config, &event) {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }

@@ -1175,7 +1175,7 @@ mod tests {
             writeln!(&mut file, "short").unwrap();
             writeln!(&mut file, "this is too long").unwrap();
             writeln!(&mut file, "11 eleven11").unwrap();
-            let super_long = std::iter::repeat("This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
+            let super_long = "This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved".repeat(10000);
             writeln!(&mut file, "{}", super_long).unwrap();
             writeln!(&mut file, "exactly 10").unwrap();
             writeln!(&mut file, "it can end on a line that's too long").unwrap();
@@ -1604,7 +1604,7 @@ mod tests {
         let data_dir = config.data_dir.clone().unwrap();
         let acks = !matches!(acking_mode, NoAcks);
 
-        tokio::spawn(file::file_source(&config, data_dir, shutdown, tx, acks));
+        tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
 
         inner.await;
 

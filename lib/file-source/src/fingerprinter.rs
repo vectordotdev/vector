@@ -41,7 +41,7 @@ pub enum FileFingerprint {
 }
 
 impl FileFingerprint {
-    pub fn to_legacy(&self) -> u64 {
+    pub fn as_legacy(&self) -> u64 {
         use FileFingerprint::*;
 
         match self {

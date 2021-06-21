@@ -47,7 +47,7 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
     async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
-        RegexParser::build(&self, globals.timezone)
+        RegexParser::build(self, globals.timezone)
     }
 
     fn input_type(&self) -> DataType {
@@ -245,17 +245,15 @@ impl FunctionTransform for RegexParser {
         let value = log.get(&self.field).map(|s| s.as_bytes());
 
         if let Some(value) = &value {
-            let regex_id = self.regexset.matches(&value).into_iter().next();
+            let regex_id = self.regexset.matches(value).into_iter().next();
             let id = match regex_id {
                 Some(id) => id,
                 None => {
                     emit!(RegexParserFailedMatch { value });
-                    if self.drop_failed {
-                        return;
-                    } else {
+                    if !self.drop_failed {
                         output.push(event);
-                        return;
                     };
+                    return;
                 }
             };
 
@@ -266,7 +264,7 @@ impl FunctionTransform for RegexParser {
                 .get_mut(id)
                 .expect("Mismatch between capture patterns and regexset");
 
-            if let Some(captures) = pattern.captures(&value) {
+            if let Some(captures) = pattern.captures(value) {
                 // Handle optional overwriting of the target field
                 if let Some(target_field) = target_field {
                     if log.contains(target_field) {

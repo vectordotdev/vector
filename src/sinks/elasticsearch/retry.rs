@@ -83,7 +83,7 @@ impl RetryLogic for ElasticSearchRetryLogic {
 }
 
 fn get_error_reason(body: &str) -> String {
-    match serde_json::from_str::<EsResultResponse>(&body) {
+    match serde_json::from_str::<EsResultResponse>(body) {
         Err(json_error) => format!(
             "some messages failed, could not parse response, error: {}",
             json_error
@@ -117,14 +117,14 @@ mod tests {
     #[test]
     fn get_index_error_reason() {
         let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
-        let reason = get_error_reason(&json);
+        let reason = get_error_reason(json);
         assert_eq!(reason, "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]");
     }
 
     #[test]
     fn get_create_error_reason() {
         let json = "{\"took\":3,\"errors\":true,\"items\":[{\"create\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"_doc\",\"_id\":\"aBLq1HcBWD7eBWkW2nj4\",\"status\":400,\"error\":{\"type\":\"mapper_parsing_exception\",\"reason\":\"object mapping for [host] tried to parse field [host] as object, but found a concrete value\"}}}]}";
-        let reason = get_error_reason(&json);
+        let reason = get_error_reason(json);
         assert_eq!(reason, "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value");
     }
 }

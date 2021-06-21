@@ -128,7 +128,7 @@ impl SinkConfig for FileSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(&self, cx.acker());
+        let sink = FileSink::new(self, cx.acker());
         Ok((
             super::VectorSink::Stream(Box::new(sink)),
             future::ok(()).boxed(),

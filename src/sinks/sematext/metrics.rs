@@ -119,7 +119,7 @@ lazy_static! {
 
 fn write_uri(endpoint: &str) -> Result<Uri> {
     encode_uri(
-        &endpoint,
+        endpoint,
         "write",
         &[
             ("db", Some("metrics".into())),
