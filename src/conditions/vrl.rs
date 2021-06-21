@@ -56,7 +56,7 @@ impl ConditionConfig for VrlConfig {
 
 #[derive(Clone)]
 pub struct Vrl {
-    program: Program,
+    pub(super) program: Program,
 }
 
 impl Vrl {
