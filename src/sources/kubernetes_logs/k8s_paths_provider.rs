@@ -92,7 +92,7 @@ fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
         metadata.uid.as_ref()?
     };
 
-    Some(build_pod_logs_directory(&namespace, &name, &uid))
+    Some(build_pod_logs_directory(namespace, name, uid))
 }
 
 const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers";

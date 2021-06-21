@@ -25,7 +25,7 @@ impl InMemory {
                 when_full: *when_full,
             },
             #[cfg(feature = "disk-buffer")]
-            _ => unreachable!(),
+            Variant::Disk { .. } => unreachable!(),
         }
     }
 }

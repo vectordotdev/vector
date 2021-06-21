@@ -397,7 +397,7 @@ impl RequestSettings {
 fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, HeaderValue)> {
     Ok((
         HeaderName::from_bytes(name.as_bytes())?,
-        HeaderValue::from_str(&value)?,
+        HeaderValue::from_str(value)?,
     ))
 }
 

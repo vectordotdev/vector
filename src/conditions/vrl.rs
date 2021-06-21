@@ -80,7 +80,7 @@ impl Vrl {
 
 impl Condition for Vrl {
     fn check(&self, event: &Event) -> bool {
-        self.run(&event)
+        self.run(event)
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => false,

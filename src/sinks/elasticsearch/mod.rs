@@ -371,12 +371,12 @@ impl SinkConfig for ElasticSearchConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let common = ElasticSearchCommon::parse_config(&self)?;
+        let common = ElasticSearchCommon::parse_config(self)?;
         let client = HttpClient::new(common.tls_settings.clone())?;
 
         let healthcheck = common.healthcheck(client.clone()).boxed();
 
-        let common = ElasticSearchCommon::parse_config(&self)?;
+        let common = ElasticSearchCommon::parse_config(self)?;
         let compression = common.compression;
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -567,7 +567,7 @@ impl HttpSink for ElasticSearchCommon {
             request.set_payload(Some(events));
 
             // mut builder?
-            builder = finish_signer(&mut request, &credentials_provider, builder).await?;
+            builder = finish_signer(&mut request, credentials_provider, builder).await?;
 
             // The SignedRequest ends up owning the body, so we have
             // to play games here
@@ -701,7 +701,7 @@ impl ElasticSearchCommon {
             }
             Some(credentials_provider) => {
                 let mut signer = self.signed_request("GET", builder.uri_ref().unwrap(), false);
-                builder = finish_signer(&mut signer, &credentials_provider, builder).await?;
+                builder = finish_signer(&mut signer, credentials_provider, builder).await?;
             }
         }
         let request = builder.body(Body::empty())?;

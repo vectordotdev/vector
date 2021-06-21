@@ -158,7 +158,7 @@ impl CheckpointsView {
         for fng in fresh {
             if let Some((_, pos)) = self
                 .checkpoints
-                .remove(&FileFingerprint::Unknown(fng.to_legacy()))
+                .remove(&FileFingerprint::Unknown(fng.as_legacy()))
             {
                 self.update(fng, pos);
             }
@@ -485,7 +485,7 @@ mod test {
     #[test]
     fn test_checkpointer_fingerprint_upgrades() {
         let new_fingerprint = FileFingerprint::DevInode(1, 2);
-        let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.to_legacy());
+        let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.as_legacy());
         let position: FilePosition = 1234;
 
         let data_dir = tempdir().unwrap();
@@ -523,9 +523,9 @@ mod test {
         }
 
         // Ensure that the new files were not written but the old style of files were
-        assert_eq!(false, data_dir.path().join(TMP_FILE_NAME).exists());
-        assert_eq!(false, data_dir.path().join(STABLE_FILE_NAME).exists());
-        assert_eq!(true, data_dir.path().join("checkpoints").is_dir());
+        assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
+        assert!(!data_dir.path().join(STABLE_FILE_NAME).exists());
+        assert!(data_dir.path().join("checkpoints").is_dir());
 
         // Read from those old files, ensure the checkpoints were loaded properly, and then write
         // them normally (i.e. in the new format)
@@ -538,9 +538,9 @@ mod test {
 
         // Ensure that the stable file is present, the tmp file is not, and the legacy files have
         // been cleaned up
-        assert_eq!(false, data_dir.path().join(TMP_FILE_NAME).exists());
-        assert_eq!(true, data_dir.path().join(STABLE_FILE_NAME).exists());
-        assert_eq!(false, data_dir.path().join("checkpoints").is_dir());
+        assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
+        assert!(data_dir.path().join(STABLE_FILE_NAME).exists());
+        assert!(!data_dir.path().join("checkpoints").is_dir());
 
         // Ensure one last time that we can reread from the new files and get the same result
         {
@@ -627,11 +627,11 @@ mod test {
         // pretend that we had loaded this old style checksum from disk after an upgrade
         chkptr.update_checkpoint(old, 1234);
 
-        assert_eq!(true, chkptr.checkpoints.contains_bytes_checksums());
+        assert!(chkptr.checkpoints.contains_bytes_checksums());
 
         chkptr.checkpoints.update_key(old, new);
 
-        assert_eq!(false, chkptr.checkpoints.contains_bytes_checksums());
+        assert!(!chkptr.checkpoints.contains_bytes_checksums());
         assert_eq!(Some(1234), chkptr.get_checkpoint(new));
         assert_eq!(None, chkptr.get_checkpoint(old));
     }

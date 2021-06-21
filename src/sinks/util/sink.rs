@@ -281,7 +281,7 @@ where
                     || batch.was_full()
                     || matches!(
                         this.lingers
-                            .get_mut(&partition)
+                            .get_mut(partition)
                             .expect("linger should exists for poll_flush")
                             .poll_unpin(cx),
                         Poll::Ready(())
@@ -300,8 +300,8 @@ where
                 if service_ready {
                     trace!("Service ready; Sending batch.");
 
-                    let batch = self.partitions.remove(&partition).unwrap();
-                    self.lingers.remove(&partition);
+                    let batch = self.partitions.remove(partition).unwrap();
+                    self.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
                     let (batch, metadata) = batch.finish();

@@ -182,7 +182,7 @@ impl FunctionTransform for Geoip {
                 }
             } else {
                 emit!(GeoipIpAddressParseError {
-                    address: &ipaddress
+                    address: ipaddress
                 });
             }
         } else {

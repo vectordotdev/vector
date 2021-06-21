@@ -88,7 +88,7 @@ struct TimerConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
-        Lua::new(&self).map(Transform::task)
+        Lua::new(self).map(Transform::task)
     }
 
     pub fn input_type(&self) -> DataType {
@@ -254,7 +254,7 @@ impl RuntimeTransform for Lua {
                 ctx.scope(|scope| -> rlua::Result<()> {
                     let process =
                         ctx.named_registry_value::<_, rlua::Function<'_>>("hooks_process")?;
-                    process.call((event, wrap_emit_fn(&scope, emit_fn)?))
+                    process.call((event, wrap_emit_fn(scope, emit_fn)?))
                 })
             })
             .context(RuntimeErrorHooksProcess)
@@ -272,7 +272,7 @@ impl RuntimeTransform for Lua {
             .context(|ctx: rlua::Context<'_>| {
                 ctx.scope(|scope| -> rlua::Result<()> {
                     match ctx.named_registry_value::<_, Option<rlua::Function<'_>>>("hooks_init")? {
-                        Some(init) => init.call((wrap_emit_fn(&scope, emit_fn)?,)),
+                        Some(init) => init.call((wrap_emit_fn(scope, emit_fn)?,)),
                         None => Ok(()),
                     }
                 })
@@ -294,7 +294,7 @@ impl RuntimeTransform for Lua {
                     match ctx
                         .named_registry_value::<_, Option<rlua::Function<'_>>>("hooks_shutdown")?
                     {
-                        Some(shutdown) => shutdown.call((wrap_emit_fn(&scope, emit_fn)?,)),
+                        Some(shutdown) => shutdown.call((wrap_emit_fn(scope, emit_fn)?,)),
                         None => Ok(()),
                     }
                 })
@@ -317,7 +317,7 @@ impl RuntimeTransform for Lua {
                     let handler =
                         ctx.named_registry_value::<_, rlua::Function<'_>>(&handler_name)?;
 
-                    handler.call((wrap_emit_fn(&scope, emit_fn)?,))
+                    handler.call((wrap_emit_fn(scope, emit_fn)?,))
                 })
             })
             .context(RuntimeErrorTimerHandler)
@@ -334,7 +334,7 @@ impl RuntimeTransform for Lua {
 #[cfg(test)]
 fn format_error(error: &rlua::Error) -> String {
     match error {
-        rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
+        rlua::Error::CallbackError { traceback, cause } => format_error(cause) + "\n" + traceback,
         err => err.to_string(),
     }
 }
