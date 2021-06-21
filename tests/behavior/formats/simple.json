@@ -25,7 +25,7 @@
           "extract_from": "add_fields_nested_json",
           "conditions": [
             {
-              "type": "remap",
+              "type": "vrl",
               "source": ".a.b == 123 && .x.y == 456 && .x.z == 789"
             }
           ]
