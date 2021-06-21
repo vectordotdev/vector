@@ -94,12 +94,12 @@ impl Function for EncodePercent {
             Example {
                 title: "percent encode string",
                 source: r#"encode_percent("foo bar?")"#,
-                result: Ok(r#"s'"foo%20bar%3F'"#),
+                result: Ok(r#"s'foo%20bar%3F'"#),
             },
             Example {
                 title: "percent encode for query",
                 source: r#"encode_percent("foo@bar?")"#,
-                result: Ok(r#"s'"foo bar'"#),
+                result: Ok(r#"s'foo%40bar%3F'"#),
             },
         ]
     }
