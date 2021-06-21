@@ -1,5 +1,5 @@
 {{ $latest := index site.Data.docs.versions 0 }}
-{{ $defaultPlatformTab := index site.Home.Params.platform_tabs 0 }}
+{{ $defaultPlatformTab := index site.Home.Params.platform.tabs 0 }}
 {{ $siteGeneration := site.Params.site_generation }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
