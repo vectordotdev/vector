@@ -2,6 +2,10 @@
 $spacing-vertical: 0
 $transition-fast: 0
 
+// Main page globe icon
+$globe-ocean-color: #333
+$globe-land-color: #ddd
+
 @keyframes indexHeroInitial
   0%
     background-size: 100% 100%
@@ -70,17 +74,6 @@ $transition-fast: 0
     opacity: 0.01
   100%
     opacity: 1
-
-.diagram-container
-  //animation: indexHeroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), indexHeroPulsating 2.5s linear infinite
-  //animation-delay: 650ms, 1350ms
-  //animation-fill-mode: forwards
-  //background-image: radial-gradient(ellipse at center calc( 50% + 6em), rgba(40, 217, 242, 0.25), transparent 20%)
-  //background-position: center center
-  //font-size: 1.05em
-
-html.dark .diagram-container
-  //background-image: radial-gradient(ellipse at center calc( 50% + 125px), rgba(40, 217, 242, 0.2), transparent 30%)
 
 @media (max-width: 480px)
   html.dark .diagram-container,
@@ -182,3 +175,16 @@ html.dark .diagram-container
     #Structure, #Sample, #Aggregate
       polygon
         transition: all $transition-fast ease
+
+// Spinning globe in the main page community section
+#globe
+  .globe
+    .land
+      fill: $globe-land-color
+
+    fill: $globe-ocean-color
+    stroke: none
+
+    path
+      fill: $globe-ocean-color
+      stroke: none

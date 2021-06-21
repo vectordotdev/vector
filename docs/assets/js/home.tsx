@@ -58,6 +58,9 @@ export const Globe: React.FC<IGlobeProps> = animated(
     // find the center coordinates of the globe
     const center: [number, number] = [size / 2, size / 2];
 
+    const darkBlue = "#00a9bc";
+    const lightBlue = "#28d9f2";
+
     return (
       <div>
         <svg width={size} height={size} ref={svgRef} onClick={onClick}>
@@ -65,12 +68,11 @@ export const Globe: React.FC<IGlobeProps> = animated(
             cx={size / 2}
             cy={size / 2}
             r={size / 2}
-            style={{ cursor: "pointer" }}
             className="globe"
           />
-          <g style={{ pointerEvents: "none" }}>
+          <g>
             {countries.map((d, i) => (
-              <path key={`path-${i}`} d={pathgen(d) || ""} />
+              <path key={`path-${i}`} d={pathgen(d) || ""} className="land" />
             ))}
             {markers.map((m, i) => {
               const coordinates: [number, number] = [
@@ -95,8 +97,8 @@ export const Globe: React.FC<IGlobeProps> = animated(
                   cy={y}
                   r={7}
                   fillOpacity={0.4}
-                  fill={hideMarker ? "none" : "rgba(0,255,135,1)"}
-                  stroke={hideMarker ? "none" : "rgba(0,255,182,0.5)"}
+                  fill={hideMarker ? "none" : lightBlue}
+                  stroke={hideMarker ? "none" : darkBlue}
                   strokeWidth={1}
                 />
               );
@@ -312,5 +314,5 @@ function Diagram({className, height, width}) {
 };
 
 
-// ReactDOM.render(<RotatingGlobe size={900} />, document.getElementById("globe"));
+ReactDOM.render(<RotatingGlobe size={900} />, document.getElementById("globe"));
 ReactDOM.render(<Diagram className="mx-auto" width="100%" />, document.getElementById("diagram"));
