@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(buffer.num_items(), 0);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(false));
-        assert!(buffer.is_empty());
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 1);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(true));
