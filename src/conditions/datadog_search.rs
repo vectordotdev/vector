@@ -338,20 +338,20 @@ mod test {
             // Multiple wildcards.
             (
                 "*b*la*",
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => json!({"title": "foobla"})],
                 log_event![],
             ),
             // Multiple wildcards (negate).
             (
                 "NOT *b*la*",
                 log_event![],
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => json!({"title": "foobla"})],
             ),
             // Multiple wildcards (negate w/-).
             (
                 "-*b*la*",
                 log_event![],
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => json!({"title": "foobla"})],
             ),
             // Wildcard prefix - tag.
             (

@@ -183,9 +183,9 @@ pub fn recurse<I: ExactSizeIterator<Item = impl Into<ast::Expr>>>(exprs: I) -> a
 
 /// Coalesces an expression to <query> ?? false to avoid fallible states.
 pub fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
-    make_op(
+    make_container_group(make_op(
         make_node(expr.into()),
         Opcode::Err,
         make_node(ast::Expr::Literal(make_node(ast::Literal::Boolean(false)))),
-    )
+    ))
 }
