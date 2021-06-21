@@ -23,10 +23,10 @@ use rusoto_sqs::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
-use tracing::Instrument;
 use std::{cmp, future::ready, panic, sync::Arc};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
+use tracing::Instrument;
 
 lazy_static! {
     static ref SUPPORTED_S3S_EVENT_VERSION: semver::VersionReq =
