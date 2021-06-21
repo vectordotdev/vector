@@ -1,5 +1,7 @@
 use super::vrl::Vrl;
 use crate::conditions::{Condition, ConditionConfig, ConditionDescription};
+
+#[cfg(feature = "transforms-filter")]
 use datadog_search_syntax::{compile, parse, Builder};
 use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;
