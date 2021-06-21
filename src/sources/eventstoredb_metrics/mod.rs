@@ -74,7 +74,17 @@ fn eventstoredb(
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
     let client = HttpClient::new(tls_settings)?;
-    let url: Uri = format!("{}/stats", endpoint).parse()?;
+    let mut str = String::new();
+
+    str.push_str(endpoint);
+
+    if !endpoint.ends_with("/") {
+        str.push_str("/");
+    }
+
+    str.push_str("stats");
+
+    let url: Uri = str.parse()?;
 
     Ok(Box::pin(
         async move {
