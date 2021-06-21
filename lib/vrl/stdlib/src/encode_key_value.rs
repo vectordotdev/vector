@@ -227,6 +227,7 @@ pub fn encode<'a>(
 
     for field in fields.iter() {
         match (input.remove(field), flatten_boolean) {
+            (Some(Boolean(false)), true) => (),
             (Some(Boolean(true)), true) => {
                 encode_string(&mut output, field);
                 output.write_str(field_delimiter).unwrap();
@@ -241,10 +242,16 @@ pub fn encode<'a>(
 
     for (key, value) in input.iter() {
         match (value, flatten_boolean) {
-            (Boolean(true), true) => encode_string(&mut output, key),
-            (_, _) => encode_field(&mut output, key, value, key_value_delimiter),
+            (Boolean(false), true) => (),
+            (Boolean(true), true) => {
+                encode_string(&mut output, key);
+                output.write_str(field_delimiter).unwrap();
+            }
+            (_, _) => {
+                encode_field(&mut output, key, value, key_value_delimiter);
+                output.write_str(field_delimiter).unwrap();
+            }
         };
-        output.write_str(field_delimiter).unwrap();
     }
 
     if output.ends_with(field_delimiter) {
@@ -297,6 +304,7 @@ mod tests {
             args: func_args![value:
                 btreemap! {
                     "beta" => true,
+                    "prod" => false,
                     "lvl" => "info",
                     "msg" => "This is a log message",
                 },
@@ -306,6 +314,19 @@ mod tests {
             tdef: TypeDef::new().bytes().infallible(),
         }
 
+        dont_flatten_boolean {
+            args: func_args![value:
+                btreemap! {
+                    "beta" => true,
+                    "prod" => false,
+                    "lvl" => "info",
+                    "msg" => "This is a log message",
+                },
+                flatten_boolean: value!(false)
+            ],
+            want: Ok(r#"beta=true lvl=info msg="This is a log message" prod=false"#),
+            tdef: TypeDef::new().bytes().infallible(),
+        }
 
         flatten_boolean_with_custom_delimiters {
             args: func_args![value:
