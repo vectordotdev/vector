@@ -121,10 +121,9 @@ impl Expression for EncodeKeyValueFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        match &self.fields {
-            None => TypeDef::new().bytes().infallible(),
-            Some(_) => TypeDef::new().bytes().fallible(),
-        }
+        TypeDef::new()
+            .bytes()
+            .with_fallibility(self.fields.is_some())
     }
 }
 

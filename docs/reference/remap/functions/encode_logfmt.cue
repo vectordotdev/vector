@@ -5,11 +5,7 @@ remap: functions: encode_logfmt: {
 	description: #"""
 		Encodes the `value` to [logfmt](\#(urls.logfmt)).
 		"""#
-	notices: [
-		"""
-			
-			""",
-	]
+	notices:     functions.encode_key_value.notices
 
 	arguments: [
 		{
