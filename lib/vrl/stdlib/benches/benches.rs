@@ -15,12 +15,14 @@ criterion_group!(
               compact,
               contains,
               decode_base64,
+              decode_percent,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
               encode_base64,
               encode_json,
               encode_logfmt,
+              encode_percent,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -183,6 +185,15 @@ bench_function! {
 }
 
 bench_function! {
+    decode_percent => vrl_stdlib::DecodePercent;
+
+    literal {
+        args: func_args![value: "foo%20bar%3F"],
+        want: Ok("foo bar?"),
+    }
+}
+
+bench_function! {
     downcase => vrl_stdlib::Downcase;
 
     literal {
@@ -231,6 +242,20 @@ bench_function! {
             fields_ordering: value!(["lvl", "msg"])
         ],
         want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
+    }
+}
+
+bench_function! {
+    encode_percent => vrl_stdlib::EncodePercent;
+
+    non_alphanumeric {
+        args: func_args![value: r#"foo bar?"#],
+        want: Ok(r#"foo%20bar%3F"#),
+    }
+
+    controls {
+        args: func_args![value: r#"foo bar"#, ascii_set: "CONTROLS"],
+        want: Ok(r#"foo %14bar"#),
     }
 }
 
