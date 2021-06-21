@@ -21,6 +21,7 @@ hostname = { version = "0.3", optional = true }
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
 nom = { version = "6", optional = true }
+percent-encoding = { version = "2.1", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -49,11 +50,13 @@ default = [
     "compact",
     "contains",
     "decode_base64",
+    "decode_percent",
     "del",
     "downcase",
     "encode_base64",
     "encode_json",
     "encode_logfmt",
+    "encode_percent",
     "ends_with",
     "exists",
     "flatten",
@@ -151,11 +154,13 @@ ceil = []
 compact = []
 contains = []
 decode_base64 = ["base64"]
+decode_percent = ["percent-encoding"]
 del = []
 downcase = []
 encode_base64 = ["base64"]
 encode_json = ["serde_json"]
 encode_logfmt = []
+encode_percent= ["percent-encoding"]
 ends_with = []
 exists = []
 flatten = []
