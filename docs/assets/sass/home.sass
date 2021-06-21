@@ -85,7 +85,6 @@ $globe-land-color: #ddd
   .diagram
     margin: spacing-vertical 0 0 0
 
-
 .diagram
   margin: calc($spacing-vertical * 2 ) 0
   max-height: 21em
@@ -177,14 +176,8 @@ $globe-land-color: #ddd
         transition: all $transition-fast ease
 
 // Spinning globe in the main page community section
-#globe
-  .globe
-    .land
-      fill: $globe-land-color
+.globe
+  fill: $globe-ocean-color
 
-    fill: $globe-ocean-color
-    stroke: none
-
-    path
-      fill: $globe-ocean-color
-      stroke: none
+  .land
+    stroke: $globe-land-color

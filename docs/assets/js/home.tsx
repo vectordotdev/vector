@@ -58,12 +58,14 @@ export const Globe: React.FC<IGlobeProps> = animated(
     // find the center coordinates of the globe
     const center: [number, number] = [size / 2, size / 2];
 
-    const darkBlue = "#00a9bc";
-    const lightBlue = "#28d9f2";
+    const colors = {
+      darkBlue: "#00a9bc",
+      lightBlue: "#28d9f2"
+    };
 
     return (
       <div>
-        <svg width={size} height={size} ref={svgRef} onClick={onClick}>
+        <svg width={size} height={size} ref={svgRef} /* onClick={onClick} */>
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -97,8 +99,8 @@ export const Globe: React.FC<IGlobeProps> = animated(
                   cy={y}
                   r={7}
                   fillOpacity={0.4}
-                  fill={hideMarker ? "none" : lightBlue}
-                  stroke={hideMarker ? "none" : darkBlue}
+                  fill={hideMarker ? "none" : colors.lightBlue}
+                  stroke={hideMarker ? "none" : colors.darkBlue}
                   strokeWidth={1}
                 />
               );
@@ -132,7 +134,7 @@ export const RotatingGlobe: React.FC<{ size: number; duration?: number }> = ({
   });
 
   // globe click handler
-  const onClick = React.useCallback(() => {}, []);
+  // const onClick = React.useCallback(() => {}, []);
 
   // kick off the initial rotation
   React.useEffect(() => {
@@ -154,7 +156,7 @@ export const RotatingGlobe: React.FC<{ size: number; duration?: number }> = ({
       lat={lat}
       long={long}
       rotation={rotation}
-      onClick={onClick}
+      // onClick={onClick}
     />
   );
 };
@@ -313,6 +315,6 @@ function Diagram({className, height, width}) {
   );
 };
 
-
+// Place the components in the DOM
 ReactDOM.render(<RotatingGlobe size={900} />, document.getElementById("globe"));
 ReactDOM.render(<Diagram className="mx-auto" width="100%" />, document.getElementById("diagram"));
