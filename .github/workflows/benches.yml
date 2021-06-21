@@ -66,15 +66,17 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      # We always make sure to stop any previous sccache process before starting it fresh, that
+      # way we can be sure we're using the right credentials for storage, etc.
       - name: Start sccache
         env:
           SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
           SCCACHE_IDLE_TIMEOUT: 0
         run: |
+          sccache --stop-server || true
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make slim-builds
-
       # First, we run the benchmarks against master to establish our baseline numbers. Our benchmark
       # runners are configured to isolate CPU 0 from OS scheduling so that benchmarks aren't subject
       # to scheduling noise.  We make sure to utilize all CPUs for compiling the benchmark binaries,
