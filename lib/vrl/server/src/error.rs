@@ -41,7 +41,7 @@ impl Error {
 pub async fn handle_err(err: Rejection) -> Result<impl Reply, Infallible> {
     let result = if err.is_not_found() {
         status(Error::not_found(), StatusCode::NOT_FOUND)
-    } else if let Some(_) = err.find::<MethodNotAllowed>() {
+    } else if err.find::<MethodNotAllowed>().is_some() {
         status(Error::method_not_allowed(), StatusCode::METHOD_NOT_ALLOWED)
     } else if let Some(e) = err.find::<BodyDeserializeError>() {
         status(Error::body_deserialization(e), StatusCode::BAD_REQUEST)
