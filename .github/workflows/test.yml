@@ -246,7 +246,6 @@ jobs:
           Invoke-Expression 'sccache --stop-server; exit 0'
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-        shell: bash
       - run: make test
       - name: Stop sccache
         run: sccache --stop-server
