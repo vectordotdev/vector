@@ -174,6 +174,6 @@ jobs:
     - name: Discord notification
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
+      uses: Ilshidur/action-discord@0.3.2
       with:
         args: "Master k8s e2e tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
