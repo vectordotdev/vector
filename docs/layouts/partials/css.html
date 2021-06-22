@@ -7,7 +7,7 @@
 
 {{ range $cssInputs }}
 {{ $opts := merge $cssOpts (dict "targetPath" .output) }}
-{{ $css := resources.Get .input | resources.ExecuteAsTemplate .input . | toCSS $cssOpts }}
+{{ $css := resources.Get .input | resources.ExecuteAsTemplate .input . | toCSS $opts }}
 {{ if .postcss }}
 {{ $css = $css | postCSS $postCssOpts }}
 {{ end }}
