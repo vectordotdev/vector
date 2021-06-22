@@ -472,9 +472,9 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
 name = "atomig"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5802d4a527d4a66fc176d963f7587a9637dec22d3bf0e1ed2f6fb4707b7c383a"
+checksum = "413dc7da5dbea1ddd9aa01fdb743f54bf90af543744fad6d77e13c38004d194d"
 dependencies = [
  "atomig-macro",
  "serde",
@@ -4570,17 +4570,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "opentelemetry-datadog"
-version = "0.2.0"
+name = "opentelemetry"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8794eb897decce87294f264182580c0615a6df1c8bfd1db03de6eda39903e87d"
+checksum = "ff27b33e30432e7b9854936693ca103d8591b0501f7ae9f633de48cda3bf2a67"
+dependencies = [
+ "async-trait",
+ "crossbeam-channel 0.5.1",
+ "futures 0.3.15",
+ "js-sys",
+ "lazy_static",
+ "percent-encoding",
+ "pin-project 1.0.7",
+ "rand 0.8.4",
+ "thiserror",
+]
+
+[[package]]
+name = "opentelemetry-datadog"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adaa8ee3d931d080707ea2fe1ba539d76d8b4bcfada35c7cf141e970235084bb"
 dependencies = [
  "async-trait",
  "http",
  "indexmap",
  "itertools 0.10.1",
  "lazy_static",
- "opentelemetry",
+ "opentelemetry 0.15.0",
  "opentelemetry-http",
  "reqwest",
  "rmp",
@@ -4589,15 +4606,15 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-http"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b752610d59706ff7cae48003552b3d0bf19bcce532629c8a49095894f21c319"
+checksum = "1eeb0d4b230c69aa425f9c3aadf02ce7aa4b2bc9a4e9fbe59614108232078263"
 dependencies = [
  "async-trait",
  "bytes 1.0.1",
  "futures-util",
  "http",
- "opentelemetry",
+ "opentelemetry 0.15.0",
  "reqwest",
 ]
 
@@ -7569,7 +7586,7 @@ version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2f4cb277b92a8ba1170b3b911056428ce2ef9993351baf5965bb0359a2e5963"
 dependencies = [
- "opentelemetry",
+ "opentelemetry 0.14.0",
  "tracing 0.1.26",
  "tracing-core 0.1.18",
  "tracing-subscriber",
@@ -8060,7 +8077,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
- "opentelemetry",
+ "opentelemetry 0.14.0",
  "opentelemetry-datadog",
  "percent-encoding",
  "pest",
