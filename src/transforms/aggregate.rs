@@ -1,23 +1,16 @@
 use crate::{
-    internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
-    transforms::{
-        TaskTransform,
-        Transform,
-    },
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
-    event::{
-        metric,
-        Event,
-        EventMetadata,
-    },
+    event::{metric, Event, EventMetadata},
+    internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
+    transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{hash_map::Entry, HashMap},
     pin::Pin,
-    time::{Duration},
+    time::Duration,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -80,18 +73,16 @@ impl Aggregate {
         let (series, data, metadata) = event.into_metric().into_parts();
 
         match data.kind {
-            metric::MetricKind::Incremental => {
-                match self.map.entry(series) {
-                    Entry::Occupied(mut entry) => {
-                        let existing = entry.get_mut();
-                        if ! existing.0.update(&data) {
-                            emit!(AggregateUpdateFailed);
-                        }
-                        existing.1.merge(metadata);
+            metric::MetricKind::Incremental => match self.map.entry(series) {
+                Entry::Occupied(mut entry) => {
+                    let existing = entry.get_mut();
+                    if !existing.0.update(&data) {
+                        emit!(AggregateUpdateFailed);
                     }
-                    Entry::Vacant(entry) => {
-                        entry.insert((data, metadata));
-                    },
+                    existing.1.merge(metadata);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert((data, metadata));
                 }
             },
             metric::MetricKind::Absolute => {
@@ -123,31 +114,29 @@ impl TaskTransform for Aggregate {
     {
         let mut flush_stream = tokio::time::interval(self.interval);
 
-        Box::pin(
-            stream! {
-                let mut output = Vec::new();
-                let mut done = false;
-                while !done {
-                    tokio::select! {
-                        _ = flush_stream.tick() => {
-                            self.flush_into(&mut output);
-                        },
-                        maybe_event = input_rx.next() => {
-                            match maybe_event {
-                                None => {
-                                    self.flush_into(&mut output);
-                                    done = true;
-                                }
-                                Some(event) => self.record(event),
+        Box::pin(stream! {
+            let mut output = Vec::new();
+            let mut done = false;
+            while !done {
+                tokio::select! {
+                    _ = flush_stream.tick() => {
+                        self.flush_into(&mut output);
+                    },
+                    maybe_event = input_rx.next() => {
+                        match maybe_event {
+                            None => {
+                                self.flush_into(&mut output);
+                                done = true;
                             }
+                            Some(event) => self.record(event),
                         }
-                    };
-                    for event in output.drain(..) {
-                        yield event;
                     }
+                };
+                for event in output.drain(..) {
+                    yield event;
                 }
             }
-        )
+        })
     }
 }
 
@@ -155,7 +144,7 @@ impl TaskTransform for Aggregate {
 mod tests {
     use super::*;
     use crate::{event::metric, event::Event, event::Metric};
-    use futures::SinkExt;
+    use futures::{stream, SinkExt};
     use std::task::Poll;
 
     #[test]
@@ -168,25 +157,31 @@ mod tests {
         kind: metric::MetricKind,
         value: metric::MetricValue,
     ) -> Event {
-        Event::Metric(
-            Metric::new(
-                name,
-                kind,
-                value,
-            )
-        )
+        Event::Metric(Metric::new(name, kind, value))
     }
 
     #[test]
     fn incremental() {
-        let mut agg = Aggregate::new(&AggregateConfig { interval_ms: 1000_u64 }).unwrap();
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+        })
+        .unwrap();
 
-        let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 });
-        let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 });
-        let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 });
+        let counter_a_1 = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 42.0 },
+        );
+        let counter_a_2 = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 43.0 },
+        );
+        let counter_a_summed = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 85.0 },
+        );
 
         // Single item, just stored regardless of kind
         agg.record(counter_a_1.clone());
@@ -214,8 +209,11 @@ mod tests {
         assert_eq!(1, out.len());
         assert_eq!(&counter_a_summed, &out[0]);
 
-        let counter_b_1 = make_metric("counter_b", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 44.0 });
+        let counter_b_1 = make_metric(
+            "counter_b",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 44.0 },
+        );
         // Two increments with the different series, should get each back as-is
         agg.record(counter_a_1.clone());
         agg.record(counter_b_1.clone());
@@ -234,12 +232,21 @@ mod tests {
 
     #[test]
     fn absolute() {
-        let mut agg = Aggregate::new(&AggregateConfig { interval_ms: 1000_u64 }).unwrap();
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+        })
+        .unwrap();
 
-        let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 });
-        let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 });
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 42.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 43.0 },
+        );
 
         // Single item, just stored regardless of kind
         agg.record(gauge_a_1.clone());
@@ -267,8 +274,11 @@ mod tests {
         assert_eq!(1, out.len());
         assert_eq!(&gauge_a_2, &out[0]);
 
-        let gauge_b_1 = make_metric("gauge_b", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 44.0 });
+        let gauge_b_1 = make_metric(
+            "gauge_b",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 44.0 },
+        );
         // Two increments with the different series, should get each back as-is
         agg.record(gauge_a_1.clone());
         agg.record(gauge_b_1.clone());
@@ -299,16 +309,31 @@ interval_ms = 999999
 
         let agg = agg.into_task();
 
-        let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 });
-        let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 });
-        let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 });
-        let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 });
-        let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 });
+        let counter_a_1 = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 42.0 },
+        );
+        let counter_a_2 = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 43.0 },
+        );
+        let counter_a_summed = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 85.0 },
+        );
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 42.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 43.0 },
+        );
         let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
         // Queue up some events to be consummed & recorded
@@ -345,16 +370,31 @@ interval_ms = 999999
 
         let agg = agg.into_task();
 
-        let counter_a_1 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 });
-        let counter_a_2 = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 });
-        let counter_a_summed = make_metric("counter_a", metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 });
-        let gauge_a_1 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 });
-        let gauge_a_2 = make_metric("gauge_a", metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 });
+        let counter_a_1 = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 42.0 },
+        );
+        let counter_a_2 = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 43.0 },
+        );
+        let counter_a_summed = make_metric(
+            "counter_a",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 85.0 },
+        );
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 42.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 43.0 },
+        );
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
         let mut out_stream = agg.transform(Box::pin(rx));
