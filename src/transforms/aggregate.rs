@@ -15,7 +15,7 @@ use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     pin::Pin,
     time::{Duration},
 };
@@ -81,13 +81,18 @@ impl Aggregate {
 
         match data.kind {
             metric::MetricKind::Incremental => {
-                self.map.entry(series)
-                    .and_modify(|existing| {
+                match self.map.entry(series) {
+                    Entry::Occupied(mut entry) => {
+                        let existing = entry.get_mut();
                         if ! existing.0.update(&data) {
                             emit!(AggregateUpdateFailed);
                         }
-                        existing.1.merge(metadata.clone());
-                    }).or_insert((data, metadata));
+                        existing.1.merge(metadata);
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert((data, metadata));
+                    },
+                }
             },
             metric::MetricKind::Absolute => {
                 // Always replace/store
@@ -99,11 +104,9 @@ impl Aggregate {
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
-        if self.map.len() > 0 {
-            for (series, entry) in self.map.drain() {
-                let metric = metric::Metric::from_parts(series, entry.0, entry.1);
-                output.push(Event::Metric(metric));
-            }
+        for (series, entry) in self.map.drain() {
+            let metric = metric::Metric::from_parts(series, entry.0, entry.1);
+            output.push(Event::Metric(metric));
         }
 
         emit!(AggregateFlushed);
