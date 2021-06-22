@@ -50,7 +50,7 @@ impl sort::SortableByField<TransformsSortFieldName> for Transform {
 impl Transform {
     /// Transform name
     pub async fn name(&self) -> &str {
-        &self.get_name()
+        self.get_name()
     }
 
     /// Transform type
@@ -88,7 +88,7 @@ impl Transform {
 
     /// Transform metrics
     pub async fn metrics(&self) -> metrics::TransformMetrics {
-        metrics::by_component_name(&self.0.name).into_transform_metrics(&self.get_component_type())
+        metrics::by_component_name(&self.0.name).into_transform_metrics(self.get_component_type())
     }
 }
 

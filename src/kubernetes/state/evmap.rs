@@ -174,12 +174,12 @@ mod tests {
         let (state_reader, state_writer) = evmap::new();
         let mut state_writer = Writer::new(state_writer, None);
 
-        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());
 
         state_writer.add(make_pod("uid0")).await;
 
-        assert_eq!(state_reader.is_empty(), false);
+        assert!(!state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());
 
         drop(state_writer);
@@ -194,13 +194,13 @@ mod tests {
         let flush_debounce_timeout = Duration::from_millis(100);
         let mut state_writer = Writer::new(state_writer, Some(flush_debounce_timeout));
 
-        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());
 
         state_writer.add(make_pod("uid0")).await;
         state_writer.add(make_pod("uid1")).await;
 
-        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_some());
 
         let join = tokio::spawn(async move {
@@ -210,12 +210,12 @@ mod tests {
             state_writer
         });
 
-        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_reader.is_empty());
 
         tokio::time::sleep(flush_debounce_timeout * 2).await;
         let mut state_writer = join.await.unwrap();
 
-        assert_eq!(state_reader.is_empty(), false);
+        assert!(!state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());
 
         drop(state_writer);

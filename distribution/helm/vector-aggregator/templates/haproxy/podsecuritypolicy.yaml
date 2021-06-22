@@ -1,0 +1,39 @@
+{{- if and .Values.haproxy.enabled .Values.haproxy.podSecurityPolicy.create -}}
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ include "haproxy.fullname" . }}
+  labels:
+    {{- include "haproxy.labels" . | nindent 4 }}
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName:  'runtime/default'
+spec:
+  allowPrivilegeEscalation: true    # to be able to use privileged containers for initContainers
+  allowedCapabilities:
+    - NET_BIND_SERVICE
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - max: 65535
+        min: 1
+  hostIPC: false
+  hostPID: false
+  privileged: true
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: MustRunAs
+    ranges:
+      - max: 65535
+        min: 1
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+{{- end }}

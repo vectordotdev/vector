@@ -102,7 +102,7 @@ mod tests {
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        let output = capture_metrics(&controller)
+        let output = capture_metrics(controller)
             .map(|event| {
                 let m = event.into_metric();
                 (m.name().to_string(), m)

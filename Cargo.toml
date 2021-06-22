@@ -227,13 +227,14 @@ listenfd = { version = "0.3.3", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.6.5", default-features = false, optional = true }
 maxminddb = { version = "0.18.0", default-features = false, optional = true }
+md-5 = { version = "0.9", optional = true }
 mongodb = { version = "2.0.0-beta.1", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.9.18", default-features = false, optional = true }
 nom = { version = "6.1.2", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
 once_cell = { version = "1.3", default-features = false }
-openssl = { version = "0.10.34", default-features = false }
+openssl = { version = "0.10.35", default-features = false }
 openssl-probe = { version = "0.1.4", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 pest = { version = "2.1.3", default-features = false }
@@ -252,7 +253,7 @@ semver = { version = "1.0.3", default-features = false, features = ["serde", "st
 snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.0", default-features = false }
-stream-cancel = { version = "0.8.0", default-features = false }
+stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.0", default-features = false }
 structopt = { version = "0.3.21", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
@@ -585,7 +586,7 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["bytesize", "rusoto", "rusoto_s3", "uuid"]
+sinks-aws_s3 = ["base64", "bytesize", "md-5", "rusoto", "rusoto_s3", "uuid"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
 sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []

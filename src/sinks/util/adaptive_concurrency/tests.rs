@@ -402,7 +402,7 @@ async fn run_test(params: TestParams) -> TestResults {
         .into_inner()
         .expect("Failed to unwrap controller_stats Mutex");
 
-    let metrics = capture_metrics(&controller)
+    let metrics = capture_metrics(controller)
         .map(Event::into_metric)
         .map(|event| (event.name().to_string(), event))
         .collect::<HashMap<_, _>>();

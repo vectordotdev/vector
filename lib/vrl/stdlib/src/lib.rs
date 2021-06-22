@@ -18,6 +18,8 @@ mod compact;
 mod contains;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_percent")]
+mod decode_percent;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
@@ -28,6 +30,8 @@ mod encode_base64;
 mod encode_json;
 #[cfg(feature = "encode_logfmt")]
 mod encode_logfmt;
+#[cfg(feature = "encode_percent")]
+mod encode_percent;
 #[cfg(feature = "ends_with")]
 mod ends_with;
 #[cfg(feature = "exists")]
@@ -233,6 +237,8 @@ pub use compact::Compact;
 pub use contains::Contains;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_percent")]
+pub use decode_percent::DecodePercent;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
@@ -243,6 +249,8 @@ pub use encode_base64::EncodeBase64;
 pub use encode_json::EncodeJson;
 #[cfg(feature = "encode_logfmt")]
 pub use encode_logfmt::EncodeLogfmt;
+#[cfg(feature = "encode_percent")]
+pub use encode_percent::EncodePercent;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
@@ -434,6 +442,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Contains),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
+        #[cfg(feature = "decode_percent")]
+        Box::new(DecodePercent),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
@@ -444,6 +454,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeJson),
         #[cfg(feature = "encode_logfmt")]
         Box::new(EncodeLogfmt),
+        #[cfg(feature = "encode_percent")]
+        Box::new(EncodePercent),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
         #[cfg(feature = "exists")]

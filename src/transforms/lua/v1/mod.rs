@@ -253,7 +253,7 @@ impl rlua::UserData for LuaEvent {
 
 pub fn format_error(error: &rlua::Error) -> String {
     match error {
-        rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
+        rlua::Error::CallbackError { traceback, cause } => format_error(cause) + "\n" + traceback,
         err => err.to_string(),
     }
 }

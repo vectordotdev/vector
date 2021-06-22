@@ -71,7 +71,7 @@ impl Function for ParseKeyValue {
             },
             Example {
                 title: "standalone key",
-                source: r#"parse_key_value!(s'foo=bar foobar', whitespace: "strict", accept_standalone_key: true)"#,
+                source: r#"parse_key_value!(s'foo=bar foobar', whitespace: "strict")"#,
                 result: Ok(r#"{"foo": "bar", "foobar": true}"#),
             },
         ]
@@ -98,7 +98,7 @@ impl Function for ParseKeyValue {
 
         let standalone_key = arguments
             .optional("accept_standalone_key")
-            .unwrap_or_else(|| expr!(false));
+            .unwrap_or_else(|| expr!(true));
 
         Ok(Box::new(ParseKeyValueFn {
             value,
@@ -668,6 +668,7 @@ mod test {
                 value: r#"I am not a valid line."#,
                 key_value_delimiter: "--",
                 field_delimiter: "||",
+                accept_standalone_key: false,
             ],
             want: Err("0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n1: at line 1, in ManyMN:\nI am not a valid line.\n                      ^\n\n"),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {

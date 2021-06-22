@@ -264,26 +264,14 @@ mod tests {
 
     #[test]
     fn is_dynamic() {
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/%F").unwrap().is_dynamic()
-        );
-        assert_eq!(
-            false,
-            Template::try_from("/kube-demo/echo").unwrap().is_dynamic()
-        );
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/{{ foo }}")
-                .unwrap()
-                .is_dynamic()
-        );
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/{{ foo }}/%F")
-                .unwrap()
-                .is_dynamic()
-        );
+        assert!(Template::try_from("/kube-demo/%F").unwrap().is_dynamic());
+        assert!(!Template::try_from("/kube-demo/echo").unwrap().is_dynamic());
+        assert!(Template::try_from("/kube-demo/{{ foo }}")
+            .unwrap()
+            .is_dynamic());
+        assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
+            .unwrap()
+            .is_dynamic());
     }
 
     #[test]
