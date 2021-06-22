@@ -643,6 +643,84 @@ mod test {
                 log_event!["custom" => json!({"b": "10"})],
                 log_event!["custom" => json!({"b": "2"})],
             ),
+            // Range - alphanumeric, inclusive, facet (negate).
+            (
+                r#"NOT @b:["1" TO "100"]"#,
+                log_event!["custom" => json!({"b": "2"})],
+                log_event!["custom" => json!({"b": "10"})],
+            ),
+            // Range - alphanumeric, inclusive, facet (negate).
+            (
+                r#"-@b:["1" TO "100"]"#,
+                log_event!["custom" => json!({"b": "2"})],
+                log_event!["custom" => json!({"b": "10"})],
+            ),
+            // Range - tag, exclusive.
+            (
+                "f:{1 TO 100}",
+                log_event!["tags" => vec!["f:10"]],
+                log_event!["tags" => vec!["f:1"]],
+            ),
+            (
+                "f:{1 TO 100}",
+                log_event!["tags" => vec!["f:10"]],
+                log_event!["tags" => vec!["f:100"]],
+            ),
+            // Range - tag, exclusive (negate).
+            (
+                "NOT f:{1 TO 100}",
+                log_event!["tags" => vec!["f:1"]],
+                log_event!["tags" => vec!["f:10"]],
+            ),
+            (
+                "NOT f:{1 TO 100}",
+                log_event!["tags" => vec!["f:100"]],
+                log_event!["tags" => vec!["f:10"]],
+            ),
+            // Range - tag, exclusive (negate w/-).
+            (
+                "-f:{1 TO 100}",
+                log_event!["tags" => vec!["f:1"]],
+                log_event!["tags" => vec!["f:10"]],
+            ),
+            (
+                "-f:{1 TO 100}",
+                log_event!["tags" => vec!["f:100"]],
+                log_event!["tags" => vec!["f:10"]],
+            ),
+            // Range - facet, exclusive.
+            (
+                "@f:{1 TO 100}",
+                log_event!["custom" => json!({"f": 50})],
+                log_event!["custom" => json!({"f": 1})],
+            ),
+            (
+                "@f:{1 TO 100}",
+                log_event!["custom" => json!({"f": 50})],
+                log_event!["custom" => json!({"f": 100})],
+            ),
+            // Range - facet, exclusive (negate).
+            (
+                "NOT @f:{1 TO 100}",
+                log_event!["custom" => json!({"f": 1})],
+                log_event!["custom" => json!({"f": 50})],
+            ),
+            (
+                "NOT @f:{1 TO 100}",
+                log_event!["custom" => json!({"f": 100})],
+                log_event!["custom" => json!({"f": 50})],
+            ),
+            // Range - facet, exclusive (negate w/-).
+            (
+                "-@f:{1 TO 100}",
+                log_event!["custom" => json!({"f": 1})],
+                log_event!["custom" => json!({"f": 50})],
+            ),
+            (
+                "-@f:{1 TO 100}",
+                log_event!["custom" => json!({"f": 100})],
+                log_event!["custom" => json!({"f": 50})],
+            ),
         ];
 
         for (source, pass, fail) in checks {
