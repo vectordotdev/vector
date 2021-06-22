@@ -5195,9 +5195,9 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "2.0.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "646dfe12231d8635b7eed753a56f21a42de795e172ef2d8c44d6e972329888ab"
+checksum = "fbb9bcb03bed33d78771217614135f5a101785d337e93856e2f8d50825392054"
 dependencies = [
  "bit-vec 0.6.3",
  "bytes 1.0.1",
@@ -7261,13 +7261,13 @@ dependencies = [
 
 [[package]]
 name = "tokio-openssl"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac1bec5c0a4aa71e3459802c7a12e8912c2091ce2151004f9ce95cc5d1c6124e"
+checksum = "f24cddc8445a4dc8359cdd9e91c19d544fc95f672e32afe8945852b9381a09fe"
 dependencies = [
  "futures 0.3.15",
  "openssl",
- "pin-project 1.0.7",
+ "openssl-sys",
  "tokio",
 ]
 
