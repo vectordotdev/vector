@@ -141,7 +141,7 @@ components: transforms: logfmt_parser: {
 			title: "Quoting Values"
 			body: #"""
 				Values can be quoted to capture spaces, and quotes can be escaped with `\`.
-				For example
+				For example, this
 
 				```text
 				key1="value with spaces" key2="value with spaces and \""
@@ -164,7 +164,7 @@ components: transforms: logfmt_parser: {
 				[Logfmt](\(urls.logfmt)) is, unfortunately, a very loosely defined format. There
 				is no official specification for the format and Vector makes a best effort to
 				parse key/value pairs delimited with a `=`. It works by splitting the `field`'s
-				value on non-quoted white-space and then splitting each token by a non-quoted
+				value on non-quoted whitespace and then splitting each token by a non-quoted
 				`=` character. This makes the parsing process somewhat flexible in that the
 				string does not need to be strictly formatted.
 

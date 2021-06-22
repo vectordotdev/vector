@@ -2,9 +2,9 @@ package metadata
 
 remap: functions: encode_logfmt: {
 	category:    "Codec"
-	description: #"""
-		Encodes the `value` to [logfmt](\#(urls.logfmt)).
-		"""#
+	description: """
+		Encodes the `value` to [logfmt](\(urls.logfmt)).
+		"""
 	notices:     functions.encode_key_value.notices
 
 	arguments: [
