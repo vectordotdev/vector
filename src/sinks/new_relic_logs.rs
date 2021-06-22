@@ -275,7 +275,7 @@ mod tests {
         concurrency = 12
         rate_limit_num = 24
     "#;
-        let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
+        let nr_config: NewRelicLogsConfig = toml::from_str(config).unwrap();
 
         let http_config = nr_config.create_config().unwrap();
 
@@ -314,7 +314,7 @@ mod tests {
         concurrency = 12
         rate_limit_num = 24
     "#;
-        let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
+        let nr_config: NewRelicLogsConfig = toml::from_str(config).unwrap();
 
         nr_config.create_config().unwrap();
     }

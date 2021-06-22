@@ -311,7 +311,7 @@ mod tests {
         let config = indoc! {r#"
             default_api_key = "atoken"
         "#};
-        let (mut config, cx) = load_sink::<DatadogEventsConfig>(&config).unwrap();
+        let (mut config, cx) = load_sink::<DatadogEventsConfig>(config).unwrap();
 
         let addr = next_addr();
         // Swap out the endpoint so we can force send it

@@ -154,7 +154,7 @@ fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_st
         }
     }
 
-    for (ref key, ref val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
+    for (ref key, val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
         let inner: Vec<String> = val
             .iter()
             .filter_map(|v| v.ip.clone())

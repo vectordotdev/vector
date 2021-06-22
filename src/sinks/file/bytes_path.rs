@@ -29,7 +29,7 @@ impl AsRef<Path> for BytesPath {
     fn as_ref(&self) -> &Path {
         use std::os::unix::ffi::OsStrExt;
         let os_str = std::ffi::OsStr::from_bytes(&self.path);
-        &Path::new(os_str)
+        Path::new(os_str)
     }
     #[cfg(windows)]
     fn as_ref(&self) -> &Path {

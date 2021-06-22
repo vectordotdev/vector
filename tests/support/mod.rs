@@ -179,7 +179,7 @@ impl SourceConfig for MockSourceConfig {
     }
 
     fn output_type(&self) -> DataType {
-        self.data_type.clone().unwrap()
+        self.data_type.unwrap()
     }
 
     fn source_type(&self) -> &'static str {

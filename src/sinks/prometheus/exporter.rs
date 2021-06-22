@@ -180,7 +180,7 @@ fn handle(
             let mut s = collector::StringCollector::new();
 
             for (MetricEntry(metric), _) in metrics {
-                s.encode_metric(default_namespace, &buckets, quantiles, expired, metric);
+                s.encode_metric(default_namespace, buckets, quantiles, expired, metric);
             }
 
             *response.body_mut() = s.finish().into();

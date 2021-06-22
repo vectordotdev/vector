@@ -61,14 +61,11 @@ mod test {
     fn is_metric_basic() {
         let cond = IsMetricConfig {}.build().unwrap();
 
-        assert_eq!(cond.check(&Event::from("just a log")), false);
-        assert_eq!(
-            cond.check(&Event::from(Metric::new(
-                "test metric",
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 1.0 },
-            ))),
-            true
-        );
+        assert!(!cond.check(&Event::from("just a log")));
+        assert!(cond.check(&Event::from(Metric::new(
+            "test metric",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        ))),);
     }
 }

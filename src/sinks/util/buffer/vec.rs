@@ -96,19 +96,19 @@ mod tests {
         let mut buffer = VecBuffer::new(settings);
         let data = "dummy".to_string();
 
-        assert_eq!(buffer.is_empty(), true);
+        assert!(buffer.is_empty());
         assert_eq!(buffer.num_items(), 0);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(false));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 1);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(true));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 2);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Overflow(data));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 2);
 
         assert_eq!(buffer.finish().len(), 2);
@@ -120,26 +120,26 @@ mod tests {
         let mut buffer = VecBuffer::new(settings);
         let data = "some bytes".to_string();
 
-        assert_eq!(buffer.is_empty(), true);
+        assert!(buffer.is_empty());
         assert_eq!(buffer.num_items(), 0);
 
         assert_eq!(
             buffer.push("this record is just too long to be inserted".into()),
             PushResult::Ok(false)
         );
-        assert_eq!(buffer.is_empty(), true);
+        assert!(buffer.is_empty());
         assert_eq!(buffer.num_items(), 0);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(false));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 1);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(true));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 2);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Overflow(data));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 2);
 
         assert_eq!(buffer.finish().len(), 2);
