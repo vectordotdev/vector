@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: encode_key_value: {
-	category: "Codec"
+	category:    "Codec"
 	description: """
 		Encodes the `value` to in key/value format with customizable delimiters. Default delimiters match
 		the [logfmt](\(urls.logfmt)) format.
