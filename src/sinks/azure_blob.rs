@@ -162,7 +162,7 @@ impl AzureBlobSinkConfig {
             .service(blob);
 
         let encoding = self.encoding.clone();
-        let blob_prefix = self.blob_prefix.as_deref().unwrap_or("blob");
+        let blob_prefix = self.blob_prefix.as_deref().unwrap_or("blob/%F/");
         let blob_prefix = Template::try_from(blob_prefix)?;
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, compression));
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
