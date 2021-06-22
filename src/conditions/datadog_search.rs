@@ -631,6 +631,18 @@ mod test {
                 log_event!["custom" => json!({"b": 11})],
                 log_event!["custom" => json!({"b": 5})],
             ),
+            // Range - alpha, inclusive, facet.
+            (
+                "@b:[a TO z]",
+                log_event!["custom" => json!({"b": "c"})],
+                log_event!["custom" => json!({"b": 5})],
+            ),
+            // Range - alphanumeric, inclusive, facet.
+            (
+                r#"@b:["1" TO "100"]"#,
+                log_event!["custom" => json!({"b": "10"})],
+                log_event!["custom" => json!({"b": "2"})],
+            ),
         ];
 
         for (source, pass, fail) in checks {
