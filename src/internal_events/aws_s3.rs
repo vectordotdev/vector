@@ -90,13 +90,11 @@ pub mod source {
 
     impl InternalEvent for SqsMessageDeleteSucceeded {
         fn emit_logs(&self) {
-            let message_ids = self
-                .message_ids
-                .iter()
-                .map(|x| x.id.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            trace!(message = "Deleted SQS message(s).", %message_ids);
+            trace!(message = "Deleted SQS message(s).",
+                %message_ids = self.message_ids.iter()
+                    .map(|x| x.id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "));
         }
 
         fn emit_metrics(&self) {
@@ -142,22 +140,19 @@ pub mod source {
         fn emit_logs(&self) {
             match self.state {
                 MessageDeleteFailureState::Complete(ref entries, ref error) => {
-                    let message_ids = entries
-                        .iter()
-                        .map(|x| x.id.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                    warn!(message = "Deletion of SQS message(s) failed.", %message_ids, %error);
+                    warn!(message = "Deletion of SQS message(s) failed.",
+                        %error,
+                        %message_ids = entries.iter()
+                            .map(|x| x.id.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", "));
                 }
                 MessageDeleteFailureState::Partial(ref entries) => {
-                    let message_ids = entries
-                        .iter()
-                        .map(|x| format!("{}/{}", x.id, x.code))
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                    warn!(message = "Deletion of SQS message(s) failed.", %message_ids);
+                    warn!(message = "Deletion of SQS message(s) failed.",
+                        %message_ids entries.iter()
+                            .map(|x| format!("{}/{}", x.id, x.code))
+                            .collect::<Vec<_>>()
+                            .join(", "));
                 }
             }
         }
