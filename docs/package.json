@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "algolia-config": "algolia setsettings -a ${ALGOLIA_APP_ID} -k ${ALGOLIA_ADMIN_KEY} -n ${ALGOLIA_INDEX_NAME} -s ./algolia-config.js",
+    "algolia-config": "algolia setsettings -a $ALGOLIA_APP_ID -k $ALGOLIA_ADMIN_KEY -n $ALGOLIA_INDEX_NAME -s algolia.json",
     "algolia-index": "atomic-algolia"
   },
   "dependencies": {
