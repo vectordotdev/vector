@@ -395,6 +395,7 @@ impl<C> Aggregate<C> {
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use futures::SinkExt;
     use pretty_assertions::assert_eq;
 
     #[tokio::test]
@@ -674,6 +675,53 @@ mod tests {
         assert_results(results, &expected);
     }
 
+    #[tokio::test]
+    async fn timeout_resets_on_new_line() {
+        // Tests if multiline aggregation updates
+        // it's timeout every time it get's a new line.
+        // To test this we are emmiting a single large
+        // multiline but drip feeding it into the aggreagator
+        // with 1ms delay.
+
+        let n: usize = 1000;
+        let mut lines = vec![
+            "START msg 1".to_string(), // will be stashed
+        ];
+        for i in 0..n {
+            lines.push(format!("line {}", i));
+        }
+        let config = Config {
+            start_pattern: Regex::new("").unwrap(),
+            condition_pattern: Regex::new("^START ").unwrap(),
+            mode: Mode::HaltBefore,
+            timeout: Duration::from_millis(10),
+        };
+
+        let mut expected = "START msg 1".to_string();
+        for i in 0..n {
+            expected.push_str(&format!("\nline {}", i));
+        }
+
+        let (mut send, recv) = futures::channel::mpsc::unbounded();
+
+        let logic = Logic::new(config);
+        let line_agg = LineAgg::new(recv, logic);
+        let results = tokio::spawn(line_agg.collect());
+
+        for line in lines {
+            let data = (
+                "test.log".to_owned(),
+                Bytes::copy_from_slice(line.as_bytes()),
+                (),
+            );
+            send.send(data).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        drop(send);
+
+        assert_results(results.await.unwrap(), &[expected.as_str()]);
+    }
+
     // Test helpers.
 
     /// Private type alias to be more expressive in the internal implementation.
@@ -691,13 +739,13 @@ mod tests {
         }))
     }
 
-    fn assert_results(actual: Vec<(Filename, Bytes, ())>, expected: &[&'static str]) {
+    fn assert_results(actual: Vec<(Filename, Bytes, ())>, expected: &[&str]) {
         let expected_mapped: Vec<(Filename, Bytes, ())> = expected
             .iter()
             .map(|line| {
                 (
                     "test.log".to_owned(),
-                    Bytes::from_static(line.as_bytes()),
+                    Bytes::copy_from_slice(line.as_bytes()),
                     (),
                 )
             })
