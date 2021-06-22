@@ -1743,6 +1743,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "datadog-search-syntax"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.10.1",
+ "lazy_static",
+ "lookup",
+ "ordered-float",
+ "pest",
+ "pest_derive",
+ "regex",
+ "vrl",
+ "vrl-compiler",
+ "vrl-diagnostic",
+ "vrl-parser",
+ "vrl-stdlib",
+]
+
+[[package]]
 name = "db-key"
 version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3566,7 +3584,6 @@ checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
 name = "lookup"
 version = "0.1.0"
 dependencies = [
- "async-graphql",
  "inherent",
  "lalrpop",
  "lalrpop-util",
@@ -7987,6 +8004,7 @@ dependencies = [
  "crossterm 0.20.0",
  "dashmap",
  "data-encoding",
+ "datadog-search-syntax",
  "derivative 2.2.0",
  "dirs-next",
  "dnsmsg-parser",
@@ -8126,6 +8144,8 @@ dependencies = [
  "vector_core",
  "vrl",
  "vrl-cli",
+ "vrl-compiler",
+ "vrl-parser",
  "vrl-stdlib",
  "walkdir",
  "warp",
