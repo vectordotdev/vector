@@ -18,11 +18,18 @@ impl Function for ParseLogFmt {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "simple log",
-            source: r#"parse_logfmt!("zork=zook zonk=nork")"#,
-            result: Ok(r#"{"zork": "zook", "zonk": "nork"}"#),
-        }]
+        &[
+            Example {
+                title: "simple log",
+                source: r#"parse_logfmt!("zork=zook zonk=nork")"#,
+                result: Ok(r#"{"zork": "zook", "zonk": "nork"}"#),
+            },
+            Example {
+                title: "standalone key",
+                source: r#"parse_logfmt!("zork=zook plonk zonk=nork")"#,
+                result: Ok(r#"{"plonk": true, "zork": "zook", "zonk": "nork"}"#),
+            },
+        ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
@@ -33,12 +40,14 @@ impl Function for ParseLogFmt {
         let key_value_delimiter = expr!("=");
         let field_delimiter = expr!(" ");
         let whitespace = Whitespace::Lenient;
+        let standalone_key = expr!(true);
 
         Ok(Box::new(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
             whitespace,
+            standalone_key,
         }))
     }
 }

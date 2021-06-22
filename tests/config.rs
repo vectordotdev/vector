@@ -40,7 +40,9 @@ async fn happy_path() {
         inputs = ["in"]
         rate = 10
         key_field = "message"
-        exclude."message.contains" = "error"
+        exclude = """
+            contains!(.message, "error")
+        """
 
         [sinks.out]
         type = "socket"
@@ -60,7 +62,7 @@ async fn happy_path() {
         in = {type = "socket", mode = "tcp", address = "127.0.0.1:1235"}
 
         [transforms]
-        sample = {type = "sample", inputs = ["in"], rate = 10, key_field = "message", exclude."message.contains" = "error"}
+        sample = {type = "sample", inputs = ["in"], rate = 10, key_field = "message", exclude = """ contains!(.message, "error") """ }
 
         [sinks]
         out = {type = "socket", mode = "tcp", inputs = ["sample"], encoding = "text", address = "127.0.0.1:9999"}
@@ -189,7 +191,9 @@ async fn nonexistant_input() {
         inputs = ["qwerty"]
         rate = 10
         key_field = "message"
-        exclude."message.contains" = "error"
+        exclude = """
+            contains!(.message, "error")
+        """
 
         [sinks.out]
         type = "socket"
@@ -273,6 +277,7 @@ async fn bad_regex() {
         inputs = ["in"]
         rate = 10
         key_field = "message"
+        exclude.type = "check_fields"
         exclude."message.regex" = "(["
 
         [sinks.out]
@@ -479,14 +484,18 @@ async fn warnings() {
         inputs = ["in1"]
         rate = 10
         key_field = "message"
-        exclude."message.contains" = "error"
+        exclude = """
+            contains!(.message, "error")
+        """
 
         [transforms.sample2]
         type = "sample"
         inputs = ["in1"]
         rate = 10
         key_field = "message"
-        exclude."message.contains" = "error"
+        exclude = """
+            contains!(.message, "error")
+        """
 
         [sinks.out]
         type = "socket"

@@ -15,7 +15,7 @@
   [[tests.outputs]]
     extract_from = "concat_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.concatenated == "on wo re"'
 
 [transforms.concat_nested]
@@ -35,5 +35,5 @@
   [[tests.outputs]]
     extract_from = "concat_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.nested.concatenated.field == "ababab cdcdcd efe"'

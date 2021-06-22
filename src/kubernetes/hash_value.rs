@@ -107,14 +107,12 @@ mod tests {
                 Pod {
                     metadata: ObjectMeta {
                         uid: Some("uid".to_owned()),
-                        annotations: Some(
-                            vec![(
-                                "kubernetes.io/config.mirror".to_owned(),
-                                "config-hashsum".to_owned(),
-                            )]
-                            .into_iter()
-                            .collect(),
-                        ),
+                        annotations: vec![(
+                            "kubernetes.io/config.mirror".to_owned(),
+                            "config-hashsum".to_owned(),
+                        )]
+                        .into_iter()
+                        .collect(),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -125,14 +123,12 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: Some(
-                            vec![(
-                                "kubernetes.io/config.mirror".to_owned(),
-                                "config-hashsum".to_owned(),
-                            )]
-                            .into_iter()
-                            .collect(),
-                        ),
+                        annotations: vec![(
+                            "kubernetes.io/config.mirror".to_owned(),
+                            "config-hashsum".to_owned(),
+                        )]
+                        .into_iter()
+                        .collect(),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()

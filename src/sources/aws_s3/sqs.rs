@@ -26,6 +26,7 @@ use snafu::{ResultExt, Snafu};
 use std::{cmp, future::ready, panic, sync::Arc};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
+use tracing::Instrument;
 
 lazy_static! {
     static ref SUPPORTED_S3S_EVENT_VERSION: semver::VersionReq =
@@ -182,7 +183,8 @@ impl Ingestor {
         for _ in 0..self.state.client_concurrency {
             let process =
                 IngestorProcess::new(Arc::clone(&self.state), out.clone(), shutdown.clone());
-            let handle = tokio::spawn(async move { process.run().await });
+            let fut = async move { process.run().await };
+            let handle = tokio::spawn(fut.in_current_span());
             handles.push(handle);
         }
 

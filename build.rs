@@ -141,6 +141,9 @@ fn main() {
     let target_arch = tracker
         .get_env_var("CARGO_CFG_TARGET_ARCH")
         .expect("Cargo-provided environment variables should always exist!");
+    let debug = tracker
+        .get_env_var("DEBUG")
+        .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
     // Gather up the constants and write them out to our build constants file.
@@ -166,6 +169,7 @@ fn main() {
         "The target architecture being compiled for. (e.g. x86_64)",
         target_arch,
     );
+    constants.add_required_constant("DEBUG", "Level of debug info for Vector.", debug);
     constants.add_optional_constant(
         "VECTOR_BUILD_DESC",
         "Special build description, related to versioned releases.",

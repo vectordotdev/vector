@@ -52,7 +52,7 @@ pub struct Buffer<T> {
 fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
     let mut options = Options::new();
     options.create_if_missing = true;
-    let db: Database<Key> = Database::open(&path, options).with_context(|| Open {
+    let db: Database<Key> = Database::open(path, options).with_context(|| Open {
         data_dir: path.parent().expect("always a parent"),
     })?;
     Ok(db.value_iter(ReadOptions::new()).map(|v| v.len()).sum())
@@ -80,12 +80,12 @@ where
         let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
         let max_size = max_size - max_uncompacted_size;
 
-        let initial_size = db_initial_size(&path)?;
+        let initial_size = db_initial_size(path)?;
 
         let mut options = Options::new();
         options.create_if_missing = true;
 
-        let db: Database<Key> = Database::open(&path, options).with_context(|| Open {
+        let db: Database<Key> = Database::open(path, options).with_context(|| Open {
             data_dir: path.parent().expect("always a parent"),
         })?;
         let db = Arc::new(db);

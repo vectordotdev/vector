@@ -472,9 +472,9 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
 name = "atomig"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5802d4a527d4a66fc176d963f7587a9637dec22d3bf0e1ed2f6fb4707b7c383a"
+checksum = "413dc7da5dbea1ddd9aa01fdb743f54bf90af543744fad6d77e13c38004d194d"
 dependencies = [
  "atomig-macro",
  "serde",
@@ -1743,6 +1743,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "datadog-search-syntax"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.10.1",
+ "lazy_static",
+ "lookup",
+ "ordered-float",
+ "pest",
+ "pest_derive",
+ "regex",
+ "vrl",
+ "vrl-compiler",
+ "vrl-diagnostic",
+ "vrl-parser",
+ "vrl-stdlib",
+]
+
+[[package]]
 name = "db-key"
 version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2106,7 +2124,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "fakedata_generator",
- "rand 0.8.3",
+ "rand 0.8.4",
 ]
 
 [[package]]
@@ -3276,7 +3294,7 @@ dependencies = [
  "indoc",
  "k8s-openapi",
  "k8s-test-framework",
- "rand 0.8.3",
+ "rand 0.8.4",
  "regex",
  "reqwest",
  "serde_json",
@@ -3286,9 +3304,9 @@ dependencies = [
 
 [[package]]
 name = "k8s-openapi"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcc1f973542059e6d5a6d63de6a9539d0ec784f82b2327f3c1915d33200bc6a4"
+checksum = "fbff78f6da26dde0d74188966d23fc763431d730d0f766ecf7699209f8fc243c"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.0.1",
@@ -3428,9 +3446,9 @@ checksum = "db13adb97ab515a3691f56e4dbab09283d0b86cb45abd991d8634a9d6f501760"
 
 [[package]]
 name = "lexical-core"
-version = "0.7.5"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21f866863575d0e1d654fbeeabdc927292fdf862873dc3c96c6f753357e13374"
+checksum = "6607c62aa161d23d17a9072cc5da0be67cdfc89d3afb1e8d9c842bebc2525ffe"
 dependencies = [
  "arrayvec 0.5.2",
  "bitflags",
@@ -3566,7 +3584,6 @@ checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
 name = "lookup"
 version = "0.1.0"
 dependencies = [
- "async-graphql",
  "inherent",
  "lalrpop",
  "lalrpop-util",
@@ -4062,7 +4079,7 @@ dependencies = [
  "os_info",
  "pbkdf2 0.7.5",
  "percent-encoding",
- "rand 0.8.3",
+ "rand 0.8.4",
  "reqwest",
  "rustls 0.19.0",
  "serde",
@@ -4492,9 +4509,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.34"
+version = "0.10.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d7830286ad6a3973c0f1d9b73738f69c76b739301d0229c4b96501695cbe4c8"
+checksum = "549430950c79ae24e6d02e0b7404534ecf311d94cc9f861e9e4020187d13d885"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -4521,9 +4538,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.62"
+version = "0.9.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa52160d45fa2e7608d504b7c3a3355afed615e6d8b627a74458634ba21b69bd"
+checksum = "7a7907e3bfa08bb85105209cdfcb6c63d109f8f6c1ed6ca318fff5c1853fbc1d"
 dependencies = [
  "autocfg 1.0.1",
  "cc",
@@ -4531,6 +4548,57 @@ dependencies = [
  "openssl-src",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "opentelemetry"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "492848ff47f11b7f9de0443b404e2c5775f695e1af6b7076ca25f999581d547a"
+dependencies = [
+ "async-trait",
+ "crossbeam-channel 0.5.1",
+ "futures 0.3.15",
+ "js-sys",
+ "lazy_static",
+ "percent-encoding",
+ "pin-project 1.0.7",
+ "rand 0.8.4",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "opentelemetry-datadog"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8794eb897decce87294f264182580c0615a6df1c8bfd1db03de6eda39903e87d"
+dependencies = [
+ "async-trait",
+ "http",
+ "indexmap",
+ "itertools 0.10.1",
+ "lazy_static",
+ "opentelemetry",
+ "opentelemetry-http",
+ "reqwest",
+ "rmp",
+ "thiserror",
+]
+
+[[package]]
+name = "opentelemetry-http"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b752610d59706ff7cae48003552b3d0bf19bcce532629c8a49095894f21c319"
+dependencies = [
+ "async-trait",
+ "bytes 1.0.1",
+ "futures-util",
+ "http",
+ "opentelemetry",
+ "reqwest",
 ]
 
 [[package]]
@@ -4844,7 +4912,7 @@ dependencies = [
 name = "portpicker"
 version = "1.0.0"
 dependencies = [
- "rand 0.8.3",
+ "rand 0.8.4",
 ]
 
 [[package]]
@@ -4873,7 +4941,7 @@ dependencies = [
  "hmac",
  "md-5",
  "memchr",
- "rand 0.8.3",
+ "rand 0.8.4",
  "sha2",
  "stringprep",
 ]
@@ -5054,7 +5122,7 @@ dependencies = [
  "lazy_static",
  "num-traits",
  "quick-error 2.0.0",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_chacha 0.3.0",
  "rand_xorshift 0.3.0",
  "regex-syntax",
@@ -5127,9 +5195,9 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "2.0.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "646dfe12231d8635b7eed753a56f21a42de795e172ef2d8c44d6e972329888ab"
+checksum = "fbb9bcb03bed33d78771217614135f5a101785d337e93856e2f8d50825392054"
 dependencies = [
  "bit-vec 0.6.3",
  "bytes 1.0.1",
@@ -5145,7 +5213,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-derive",
- "rand 0.8.3",
+ "rand 0.8.4",
  "regex",
  "tokio",
  "tokio-native-tls",
@@ -5197,7 +5265,7 @@ checksum = "588f6378e4dd99458b60ec275b4477add41ce4fa9f64dcba6f15adccb19b50d6"
 dependencies = [
  "env_logger 0.8.4",
  "log",
- "rand 0.8.3",
+ "rand 0.8.4",
 ]
 
 [[package]]
@@ -5281,9 +5349,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ef9e7e66b4468674bfcb0c81af8b7fa0bb154fa9f28eb840da5c447baeb8d7e"
+checksum = "2e7573632e6454cf6b99d7aac4ccca54be06da05aca2ef7423d22d27d4d4bcd8"
 dependencies = [
  "libc",
  "rand_chacha 0.3.0",
@@ -5361,7 +5429,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "051b398806e42b9cd04ad9ec8f81e355d0a382c543ac6672c62f5a5b452ef142"
 dependencies = [
  "num-traits",
- "rand 0.8.3",
+ "rand 0.8.4",
 ]
 
 [[package]]
@@ -5635,9 +5703,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.3"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2296f2fac53979e8ccbc4a1136b25dcefd37be9ed7e4a1f6b05a6029c84ff124"
+checksum = "246e9f61b9bb77df069a947682be06e31ac43ea37862e244a69f177694ea6d22"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.0.1",
@@ -5955,9 +6023,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.14.2"
+version = "1.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9787e62372fc0c5a0f3af64c392652db72d3ec1cc0cff1becc175d2c11e6fbcc"
+checksum = "01127cb8617e5e21bcf2e19b5eb48317735ca677f1d0a94833c21c331c446582"
 dependencies = [
  "arrayvec 0.5.2",
  "num-traits",
@@ -6727,9 +6795,9 @@ checksum = "a66ae6a6cd930c97707cb3f1b62aadb8ddddd2fefa9df539564b3bfaa15dd31f"
 
 [[package]]
 name = "stream-cancel"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f36848ff9e3e8af125e00ab244aca7af0a8b270d4c6afcc9ccb4e523f7972c4c"
+checksum = "7b0a9eb2715209fb8cc0d942fcdff45674bfc9f0090a0d897e85a22955ad159b"
 dependencies = [
  "futures-core",
  "pin-project 1.0.7",
@@ -6968,7 +7036,7 @@ checksum = "dac1c663cfc93810f88aed9b8941d48cabf856a1b111c29a40439018d870eb22"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "rand 0.8.3",
+ "rand 0.8.4",
  "redox_syscall 0.2.6",
  "remove_dir_all",
  "winapi 0.3.9",
@@ -7193,13 +7261,13 @@ dependencies = [
 
 [[package]]
 name = "tokio-openssl"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac1bec5c0a4aa71e3459802c7a12e8912c2091ce2151004f9ce95cc5d1c6124e"
+checksum = "f24cddc8445a4dc8359cdd9e91c19d544fc95f672e32afe8945852b9381a09fe"
 dependencies = [
  "futures 0.3.15",
  "openssl",
- "pin-project 1.0.7",
+ "openssl-sys",
  "tokio",
 ]
 
@@ -7353,7 +7421,7 @@ dependencies = [
  "futures-util",
  "indexmap",
  "pin-project 1.0.7",
- "rand 0.8.3",
+ "rand 0.8.4",
  "slab",
  "tokio",
  "tokio-stream",
@@ -7496,6 +7564,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-opentelemetry"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2f4cb277b92a8ba1170b3b911056428ce2ef9993351baf5965bb0359a2e5963"
+dependencies = [
+ "opentelemetry",
+ "tracing 0.1.26",
+ "tracing-core 0.1.18",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-serde"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7546,9 +7626,9 @@ checksum = "a7f741b240f1a48843f9b8e0444fb55fb2a4ff67293b50a9179dfd5ea67f8d41"
 
 [[package]]
 name = "trust-dns-proto"
-version = "0.20.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98a0381b2864c2978db7f8e17c7b23cca5a3a5f99241076e13002261a8ecbabd"
+checksum = "ad0d7f5db438199a6e2609debe3f69f808d074e0a2888ee0bccb45fe234d03f4"
 dependencies = [
  "async-trait",
  "cfg-if 1.0.0",
@@ -7561,9 +7641,10 @@ dependencies = [
  "ipnet",
  "lazy_static",
  "log",
- "rand 0.8.3",
+ "rand 0.8.4",
  "smallvec",
  "thiserror",
+ "tinyvec",
  "tokio",
  "url",
 ]
@@ -7621,7 +7702,7 @@ dependencies = [
  "input_buffer",
  "log",
  "native-tls",
- "rand 0.8.3",
+ "rand 0.8.4",
  "sha-1 0.9.6",
  "url",
  "utf-8",
@@ -7924,6 +8005,7 @@ dependencies = [
  "crossterm 0.20.0",
  "dashmap",
  "data-encoding",
+ "datadog-search-syntax",
  "derivative 2.2.0",
  "dirs-next",
  "dnsmsg-parser",
@@ -7965,6 +8047,7 @@ dependencies = [
  "lucetc",
  "matches",
  "maxminddb",
+ "md-5",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
@@ -7978,6 +8061,8 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "opentelemetry",
+ "opentelemetry-datadog",
  "percent-encoding",
  "pest",
  "pest_derive",
@@ -7991,7 +8076,7 @@ dependencies = [
  "prost-types",
  "pulsar",
  "quickcheck",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_distr",
  "rdkafka",
  "regex",
@@ -8046,6 +8131,7 @@ dependencies = [
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
+ "tracing-opentelemetry",
  "tracing-subscriber",
  "tracing-tower",
  "trust-dns-proto",
@@ -8059,6 +8145,8 @@ dependencies = [
  "vector_core",
  "vrl",
  "vrl-cli",
+ "vrl-compiler",
+ "vrl-parser",
  "vrl-stdlib",
  "walkdir",
  "warp",
@@ -8261,6 +8349,7 @@ dependencies = [
  "lookup",
  "md-5",
  "nom 6.1.2",
+ "percent-encoding",
  "regex",
  "rust_decimal",
  "serde_json",

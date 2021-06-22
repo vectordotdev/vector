@@ -41,19 +41,19 @@ pub(super) trait MetricCollector {
 
         if metric.kind() == MetricKind::Absolute {
             let tags = metric.tags();
-            self.emit_metadata(metric.name(), &name, metric.value());
+            self.emit_metadata(metric.name(), name, metric.value());
 
             match metric.value() {
                 MetricValue::Counter { value } => {
-                    self.emit_value(timestamp, &name, "", *value, tags, None);
+                    self.emit_value(timestamp, name, "", *value, tags, None);
                 }
                 MetricValue::Gauge { value } => {
-                    self.emit_value(timestamp, &name, "", *value, tags, None);
+                    self.emit_value(timestamp, name, "", *value, tags, None);
                 }
                 MetricValue::Set { values } => {
                     // sets could expire
                     let value = if expired { 0 } else { values.len() };
-                    self.emit_value(timestamp, &name, "", value as f64, tags, None);
+                    self.emit_value(timestamp, name, "", value as f64, tags, None);
                 }
                 MetricValue::Distribution {
                     samples,
@@ -79,7 +79,7 @@ pub(super) trait MetricCollector {
                     for (b, c) in buckets.iter().zip(counts.iter()) {
                         self.emit_value(
                             timestamp,
-                            &name,
+                            name,
                             "_bucket",
                             *c as f64,
                             tags,
@@ -88,14 +88,14 @@ pub(super) trait MetricCollector {
                     }
                     self.emit_value(
                         timestamp,
-                        &name,
+                        name,
                         "_bucket",
                         count as f64,
                         tags,
                         Some(("le", "+Inf".to_string())),
                     );
-                    self.emit_value(timestamp, &name, "_sum", sum as f64, tags, None);
-                    self.emit_value(timestamp, &name, "_count", count as f64, tags, None);
+                    self.emit_value(timestamp, name, "_sum", sum as f64, tags, None);
+                    self.emit_value(timestamp, name, "_count", count as f64, tags, None);
                 }
                 MetricValue::Distribution {
                     samples,
@@ -106,28 +106,28 @@ pub(super) trait MetricCollector {
                         for (q, v) in statistic.quantiles.iter() {
                             self.emit_value(
                                 timestamp,
-                                &name,
+                                name,
                                 "",
                                 *v,
                                 tags,
                                 Some(("quantile", q.to_string())),
                             );
                         }
-                        self.emit_value(timestamp, &name, "_sum", statistic.sum, tags, None);
+                        self.emit_value(timestamp, name, "_sum", statistic.sum, tags, None);
                         self.emit_value(
                             timestamp,
-                            &name,
+                            name,
                             "_count",
                             statistic.count as f64,
                             tags,
                             None,
                         );
-                        self.emit_value(timestamp, &name, "_min", statistic.min, tags, None);
-                        self.emit_value(timestamp, &name, "_max", statistic.max, tags, None);
-                        self.emit_value(timestamp, &name, "_avg", statistic.avg, tags, None);
+                        self.emit_value(timestamp, name, "_min", statistic.min, tags, None);
+                        self.emit_value(timestamp, name, "_max", statistic.max, tags, None);
+                        self.emit_value(timestamp, name, "_avg", statistic.avg, tags, None);
                     } else {
-                        self.emit_value(timestamp, &name, "_sum", 0.0, tags, None);
-                        self.emit_value(timestamp, &name, "_count", 0.0, tags, None);
+                        self.emit_value(timestamp, name, "_sum", 0.0, tags, None);
+                        self.emit_value(timestamp, name, "_count", 0.0, tags, None);
                     }
                 }
                 MetricValue::AggregatedHistogram {
@@ -142,7 +142,7 @@ pub(super) trait MetricCollector {
                         value += bucket.count as f64;
                         self.emit_value(
                             timestamp,
-                            &name,
+                            name,
                             "_bucket",
                             value,
                             tags,
@@ -151,14 +151,14 @@ pub(super) trait MetricCollector {
                     }
                     self.emit_value(
                         timestamp,
-                        &name,
+                        name,
                         "_bucket",
                         *count as f64,
                         tags,
                         Some(("le", "+Inf".to_string())),
                     );
-                    self.emit_value(timestamp, &name, "_sum", *sum, tags, None);
-                    self.emit_value(timestamp, &name, "_count", *count as f64, tags, None);
+                    self.emit_value(timestamp, name, "_sum", *sum, tags, None);
+                    self.emit_value(timestamp, name, "_count", *count as f64, tags, None);
                 }
                 MetricValue::AggregatedSummary {
                     quantiles,
@@ -168,15 +168,15 @@ pub(super) trait MetricCollector {
                     for quantile in quantiles {
                         self.emit_value(
                             timestamp,
-                            &name,
+                            name,
                             "",
                             quantile.value,
                             tags,
                             Some(("quantile", quantile.upper_limit.to_string())),
                         );
                     }
-                    self.emit_value(timestamp, &name, "_sum", *sum, tags, None);
-                    self.emit_value(timestamp, &name, "_count", *count as f64, tags, None);
+                    self.emit_value(timestamp, name, "_sum", *sum, tags, None);
+                    self.emit_value(timestamp, name, "_count", *count as f64, tags, None);
                 }
             }
         }

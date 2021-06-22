@@ -83,7 +83,7 @@ impl SourceConfig for SocketConfig {
                 let tcp = tcp::RawTcpSource {
                     config: config.clone(),
                 };
-                let tls = MaybeTlsSettings::from_config(&config.tls(), true)?;
+                let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
                     config.address(),
                     config.keepalive(),
@@ -395,7 +395,7 @@ mod test {
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
         let shutdown_success = shutdown_complete.await;
-        assert_eq!(true, shutdown_success);
+        assert!(shutdown_success);
 
         // Ensure source actually shut down successfully.
         let _ = source_handle.await.unwrap();
@@ -454,7 +454,7 @@ mod test {
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
         let shutdown_success = shutdown_complete.await;
-        assert_eq!(true, shutdown_success);
+        assert!(shutdown_success);
 
         // Ensure that the source has actually shut down.
         let _ = source_handle.await.unwrap();
@@ -625,7 +625,7 @@ mod test {
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
         let shutdown_success = shutdown_complete.await;
-        assert_eq!(true, shutdown_success);
+        assert!(shutdown_success);
 
         // Ensure source actually shut down successfully.
         let _ = source_handle.await.unwrap();
@@ -660,7 +660,7 @@ mod test {
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
         let shutdown_success = shutdown_complete.await;
-        assert_eq!(true, shutdown_success);
+        assert!(shutdown_success);
 
         // Ensure that the source has actually shut down.
         let _ = source_handle.await.unwrap();

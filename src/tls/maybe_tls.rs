@@ -25,7 +25,7 @@ impl<R, T> MaybeTls<R, T> {
 
     pub fn raw(&self) -> Option<&R> {
         match self {
-            Self::Raw(raw) => Some(&raw),
+            Self::Raw(raw) => Some(raw),
             Self::Tls(_) => None,
         }
     }
@@ -33,7 +33,7 @@ impl<R, T> MaybeTls<R, T> {
     pub fn tls(&self) -> Option<&T> {
         match self {
             Self::Raw(_) => None,
-            Self::Tls(tls) => Some(&tls),
+            Self::Tls(tls) => Some(tls),
         }
     }
 }
