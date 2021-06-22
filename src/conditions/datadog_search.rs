@@ -618,17 +618,32 @@ mod test {
                 log_event!["custom" => json!({"b": 5})],
                 log_event!["custom" => json!({"b": 11})],
             ),
+            (
+                "@b:[1 TO 100]",
+                log_event!["custom" => json!({"b": "10"})],
+                log_event!["custom" => json!({"b": "2"})],
+            ),
             // Range - numeric, inclusive, facet (negate).
             (
                 "NOT @b:[1 TO 10]",
                 log_event!["custom" => json!({"b": 11})],
                 log_event!["custom" => json!({"b": 5})],
             ),
+            (
+                "NOT @b:[1 TO 100]",
+                log_event!["custom" => json!({"b": "2"})],
+                log_event!["custom" => json!({"b": "10"})],
+            ),
             // Range - numeric, inclusive, facet (negate w/-).
             (
                 "-@b:[1 TO 10]",
                 log_event!["custom" => json!({"b": 11})],
                 log_event!["custom" => json!({"b": 5})],
+            ),
+            (
+                "NOT @b:[1 TO 100]",
+                log_event!["custom" => json!({"b": "2"})],
+                log_event!["custom" => json!({"b": "10"})],
             ),
             // Range - alpha, inclusive, facet.
             (
