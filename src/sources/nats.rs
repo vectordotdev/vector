@@ -39,7 +39,6 @@ impl_generate_config_from_default!(NatsSourceConfig);
 #[typetag::serde(name = "nats")]
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        eprintln!("nats here");
         let (connection, subscription) = create_subscription(self).await?;
 
         Ok(Box::pin(nats_source(
@@ -90,9 +89,7 @@ async fn nats_source(
     shutdown: ShutdownSignal,
     mut out: Pipeline,
 ) -> Result<(), ()> {
-    eprintln!("starting nats source");
     while let Some(msg) = subscription.next().await {
-        eprintln!("received nats message");
         emit!(NatsEventReceived {
             byte_size: msg.data.len(),
         });
@@ -113,17 +110,14 @@ async fn nats_source(
             Ok(_) => (),
         }
     }
-    eprintln!("ending nats source");
     Ok(())
 }
 
 async fn create_subscription(
     config: &NatsSourceConfig,
 ) -> crate::Result<(async_nats::Connection, async_nats::Subscription)> {
-    eprintln!("creating nats connection");
     let nc = config.connect().await?;
 
-    eprintln!("creating nats subscription");
     let subscription = match &config.queue {
         None => nc.subscribe(&config.subject).await,
         Some(queue) => nc.queue_subscribe(&config.subject, &queue).await,
