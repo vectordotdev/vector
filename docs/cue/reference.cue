@@ -501,7 +501,7 @@ _values: {
 	unit: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
+#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds" | "lines"
 
 administration: _
 components:     _

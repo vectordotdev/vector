@@ -294,10 +294,11 @@ impl Source {
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
             fingerprinter: Fingerprinter {
-                strategy: FingerprintStrategy::FirstLineChecksum {
+                strategy: FingerprintStrategy::FirstLinesChecksum {
                     // Max line length to expect during fingerprinting, see the
                     // explanation above.
                     ignored_header_bytes: 0,
+                    lines: 1,
                 },
                 max_line_length: max_line_bytes,
                 ignore_not_found: true,

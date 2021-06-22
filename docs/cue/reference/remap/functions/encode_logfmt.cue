@@ -5,6 +5,7 @@ remap: functions: encode_logfmt: {
 	description: #"""
 		Encodes the `value` to [logfmt](\#(urls.logfmt)).
 		"""#
+	notices:     functions.encode_key_value.notices
 
 	arguments: [
 		{
@@ -29,7 +30,7 @@ remap: functions: encode_logfmt: {
 		{
 			title: "Encode to logfmt (no ordering)"
 			source: """
-				encode_logfmt!({"ts": "2021-06-05T17:20:00Z", "msg": "This is a message", "lvl": "info"})
+				encode_logfmt({"ts": "2021-06-05T17:20:00Z", "msg": "This is a message", "lvl": "info"})
 				"""
 			return: #"lvl=info msg="This is a message" ts=2021-06-05T17:20:00Z"#
 		},
@@ -43,7 +44,7 @@ remap: functions: encode_logfmt: {
 		{
 			title: "Encode to logfmt (nested fields)"
 			source: """
-				encode_logfmt!({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
+				encode_logfmt({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
 				"""
 			return: #"agent.name=vector event=log log.file.path=my.log"#
 		},
