@@ -6,7 +6,7 @@ authors: ["jszwedko"]
 pr_numbers: [6781]
 release: "0.14.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "announcement"
   domains: ["performance"]
 ---

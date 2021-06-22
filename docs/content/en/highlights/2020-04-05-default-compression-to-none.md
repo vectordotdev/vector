@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 hide_on_release_notes: false
 pr_numbers: [2219]
 release: "0.9.0"
-tags:
+badges:
   type: "breaking change"
   domains: ["sinks"]
   sinks: ["elasticsearch"]

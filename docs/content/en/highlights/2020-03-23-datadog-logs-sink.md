@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1832]
 release: "0.9.0"
 hide_on_release_notes: true
-tags:
+badges:
   type: "new feature"
   domains: ["sinks"]
   sinks: ["datadog_logs"]

@@ -1,6 +1,6 @@
 {{ $title := .Title | markdownify }}
 {{ $date := .Date | dateFormat "January 2, 2006" }}
-{{ $tags := .Params.tags }}
+{{ $badges := .Params.badges }}
 <div>
   <a href="{{ .RelPermalink }}">
     <div class="flex flex-col justify-between p-6 border rounded-md shadow dark:border-gray-700 hover:border-secondary dark:hover:border-primary">
@@ -38,23 +38,23 @@
       </div>
 
       <div class="block space-y-1.5">
-        {{ with $tags.type }}
+        {{ with $badges.type }}
         {{ partial "badge.html" (dict "prefix" "type" "word" . "color" "blue" "inline" true) }}
         {{ end }}
 
-        {{ range $tags.domains }}
+        {{ range $badges.domains }}
         {{ partial "badge.html" (dict "prefix" "domain" "word" . "color" "indigo" "inline" true) }}
         {{ end }}
 
-        {{ range $tags.sources }}
+        {{ range $badges.sources }}
         {{ partial "badge.html" (dict "prefix" "source" "word" . "color" "violet" "inline" true) }}
         {{ end }}
 
-        {{ range $tags.transforms }}
+        {{ range $badges.transforms }}
         {{ partial "badge.html" (dict "prefix" "transform" "word" . "color" "violet" "inline" true) }}
         {{ end }}
 
-        {{ range $tags.sinks }}
+        {{ range $badges.sinks }}
         {{ partial "badge.html" (dict "prefix" "sink" "word" . "color" "violet" "inline" true) }}
         {{ end }}
       </div>

@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1054, 1292]
 release: "0.6.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "new feature"
   domains: ["platforms"]
   platforms: ["arm64", "arm7"]

@@ -6,7 +6,7 @@ authors: ["jszwedko"]
 pr_numbers: [7373]
 release: "0.14.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: breaking change
   domains: ["metrics"]
 ---

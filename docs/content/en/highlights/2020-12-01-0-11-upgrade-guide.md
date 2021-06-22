@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [3557, 4580, 4557, 4647, 4918, 3297, 3427, 4103]
 release: "0.11.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "breaking change"
 ---
 

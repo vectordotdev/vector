@@ -6,7 +6,7 @@ authors: ["jamtur01"]
 pr_numbers: [3704, 4157, 4500, 4698, 5209]
 release: "0.11.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "new feature"
   domains: ["metrics", "sources"]
 ---

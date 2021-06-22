@@ -6,7 +6,7 @@ authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2953, 2637, 2679, 2682]
 release: "0.10.0"
-tags:
+badges:
   type: "new feature"
   sinks: ["aws_kinesis_firehose", "aws_kinesis_streams", "aws_s3", "humio_logs"]
 ---

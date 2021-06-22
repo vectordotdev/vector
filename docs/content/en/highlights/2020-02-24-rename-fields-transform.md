@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1800]
 release: "0.8.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "new feature"
   domains: ["transforms"]
   transforms: ["rename_fields"]

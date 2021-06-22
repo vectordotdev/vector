@@ -7,7 +7,7 @@ featured: true
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "new feature"
   domains: ["cli"]
   domains: ["observability"]

@@ -6,7 +6,7 @@ authors: ["spencergilbert"]
 pr_numbers: [7671]
 release: "0.14.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "deprecation"
   platforms: ["kubernetes"]
   domains: ["config"]

@@ -6,7 +6,7 @@ authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2969, 2518]
 release: "0.10.0"
-tags:
+badges:
   type: "performance"
   domains: ["operations"]
 ---

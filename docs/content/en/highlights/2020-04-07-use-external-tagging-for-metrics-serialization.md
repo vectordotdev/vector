@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 hide_on_release_notes: true
 pr_numbers: [2231]
 release: "0.9.0"
-tags:
+badges:
   type: "breaking change"
 ---
 

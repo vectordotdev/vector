@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1977, 1976]
 release: "0.8.1"
 hide_on_release_notes: true
-tags:
+badges:
   type: "announcement"
 ---
 

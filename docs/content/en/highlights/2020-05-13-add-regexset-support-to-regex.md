@@ -6,7 +6,7 @@ authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2493]
 release: "0.10.0"
-tags:
+badges:
   type: "enhancement"
   domains: ["transforms"]
   transforms: ["regex_parser"]

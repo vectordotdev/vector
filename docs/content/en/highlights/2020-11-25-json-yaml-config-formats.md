@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [4856, 5144]
 release: "0.11.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "new feature"
   domains: ["config"]
 ---

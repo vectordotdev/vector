@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1959]
 release: "0.9.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "new feature"
   domains: ["transforms"]
   transforms: ["tag_cardinality_limit"]

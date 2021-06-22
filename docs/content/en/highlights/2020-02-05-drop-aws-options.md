@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1703]
 release: "0.8.0"
 hide_on_release_notes: true
-tags:
+badges:
   type: "breaking change"
   providers: ["aws"]
   domains: ["sinks"]

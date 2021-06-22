@@ -6,7 +6,7 @@ authors: ["lucperkins"]
 pr_numbers: [3094]
 release: "0.11.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "new feature"
   domains: ["networking"]
   domains: ["performance", "reliability"]

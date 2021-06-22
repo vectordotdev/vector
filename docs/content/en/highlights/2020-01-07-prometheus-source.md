@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1264]
 release: "0.7.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "new feature"
   domains: ["sources"]
   sources: ["prometheus"]

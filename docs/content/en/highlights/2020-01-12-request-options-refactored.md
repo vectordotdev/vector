@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1006, 1493, 1494, 1495]
 release: "0.7.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "breaking change"
   domains: ["buffers", "config", "sinks"]
 ---

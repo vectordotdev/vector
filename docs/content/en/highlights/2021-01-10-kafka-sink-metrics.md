@@ -7,7 +7,7 @@ featured: false
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "enhancement"
   domains: ["metrics"]
   sinks: ["kafka"]

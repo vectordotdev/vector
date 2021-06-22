@@ -7,7 +7,7 @@ featured: true
 pr_numbers: [1314]
 release: "0.11.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: "featured"
   domains: ["platforms"]
   platforms: ["kubernetes"]

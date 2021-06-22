@@ -6,7 +6,7 @@ authors: ["jszwedko"]
 pr_numbers: []
 release: "0.13.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: breaking change
 ---
 

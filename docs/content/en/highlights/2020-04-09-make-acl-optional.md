@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 hide_on_release_notes: false
 pr_numbers: [2283]
 release: "0.9.0"
-tags:
+badges:
   type: "breaking change"
   domain: ["sinks"]
   sinks: ["gcp_cloud_storage"]

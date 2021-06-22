@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [2037]
 release: "0.9.0"
 hide_on_release_notes: true
-tags:
+badges:
   type: "breaking change"
   domains: ["sinks"]
   sinks: ["splunk_hec"]

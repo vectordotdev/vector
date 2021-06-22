@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1799]
 release: "0.8.0"
 hide_on_release_notes: true
-tags:
+badges:
   type: "enhancement"
   domains: ["transforms"]
   transforms: ["add_fields"]

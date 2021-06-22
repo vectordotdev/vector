@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [2126]
 release: "0.9.0"
 hide_on_release_notes: false
-tags:
+badges:
   type: enhancement
   domains: ["sources"]
   sources: ["vector"]

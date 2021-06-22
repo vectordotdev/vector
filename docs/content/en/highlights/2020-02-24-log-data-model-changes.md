@@ -6,7 +6,7 @@ authors: ["binarylogic"]
 pr_numbers: [1836, 1898]
 release: "0.8.0"
 hide_on_release_notes: true
-tags:
+badges:
   type: "breaking change"
   domains: ["buffers"]
   "event type": "log"

@@ -7,7 +7,7 @@ authors: ["binarylogic"]
 hide_on_release_notes: true
 pr_numbers: [2274]
 release: "0.9.0"
-tags:
+badges:
   type: "breaking change"
   domains: ["transforms"]
   transforms: ["lua"]
