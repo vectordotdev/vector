@@ -302,6 +302,14 @@ fn make_filter_call(
             make_function_call("parse_query_string", vec![value], false),
             make_null(),
         )),
+        "lowercase" => Ok(make_coalesce(
+            make_function_call("downcase", vec![value], false),
+            make_null(),
+        )),
+        "uppercase" => Ok(make_coalesce(
+            make_function_call("upcase", vec![value], false),
+            make_null(),
+        )),
         _ => Err(GrokError::UnsupportedFilter(filter.name.clone())),
     }
 }

@@ -356,8 +356,8 @@ mod tests {
         test_filter_function(vec![
             (r#"nullIf("-")"#, "-", Value::Null.into()),
             (r#"nullIf("-")"#, "abc", Value::Bytes("abc".into()).into()),
-            (r#"boolean"#, "tRue", Value::Boolean(true).into()),
-            (r#"boolean"#, "false", Value::Boolean(false).into()),
+            ("boolean", "tRue", Value::Boolean(true).into()),
+            ("boolean", "false", Value::Boolean(false).into()),
             (
                 r#"json"#,
                 r#"{"bool": true, "array": ["abc"]}"#,
@@ -365,7 +365,7 @@ mod tests {
                     btreemap! { "bool" => true, "array" => Value::Array(vec!["abc".into()])},
                 )),
             ),
-            (r#"json"#, r#"not a valid json"#, Value::Null.into()),
+            ("json", r#"not a valid json"#, Value::Null.into()),
             (
                 r#"rubyhash"#,
                 r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
@@ -373,9 +373,11 @@ mod tests {
                     btreemap! { "test" => "value", "testNum" => 0.2, "testObj" => Value::from(btreemap! {"testBool" => true})},
                 )),
             ),
-            (r#"querystring"#, "?productId=superproduct&promotionCode=superpromo", Some(Value::from(
+            ("querystring", "?productId=superproduct&promotionCode=superpromo", Some(Value::from(
                 btreemap! { "productId" => "superproduct", "promotionCode" => "superpromo"},
-            )))
+            ))),
+            ("lowercase", "aBC", Value::Bytes("abc".into()).into()),
+            ("uppercase", "Abc",  Value::Bytes("ABC".into()).into()),
         ])
         .await;
     }
