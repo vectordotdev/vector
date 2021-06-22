@@ -42,6 +42,20 @@ favicon = "favicon.ico"
 # invalidation that we control.
 site_generation = 1
 
+[[params.css]]
+input = "sass/style.sass"
+output = "css/style.css"
+postcss = true
+
+[[params.css]]
+input = "sass/unpurged.sass"
+output = "css/unpurged.css"
+
+[[params.css]]
+input = "sass/home.sass"
+output = "css/home.css"
+home_page_only = true
+
 # Aesthetics
 [[params.fonts]]
 name = "Segoe UI"
