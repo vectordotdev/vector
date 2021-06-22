@@ -203,7 +203,7 @@ mod tests {
 
         // Two increments with the same series, should sum into 1
         agg.record(counter_a_1.clone());
-        agg.record(counter_a_2.clone());
+        agg.record(counter_a_2);
         out.clear();
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
@@ -406,10 +406,10 @@ interval_ms = 999999
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         // Now send our events
-        tx.send(counter_a_1.into()).await.unwrap();
-        tx.send(counter_a_2.into()).await.unwrap();
-        tx.send(gauge_a_1.into()).await.unwrap();
-        tx.send(gauge_a_2.clone().into()).await.unwrap();
+        tx.send(counter_a_1).await.unwrap();
+        tx.send(counter_a_2).await.unwrap();
+        tx.send(gauge_a_1).await.unwrap();
+        tx.send(gauge_a_2.clone()).await.unwrap();
         // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
         // Now fast foward time enough that our flush should trigger.
