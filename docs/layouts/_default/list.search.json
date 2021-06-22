@@ -5,6 +5,7 @@
 {{- $sectionTitle := (.FirstSection.Params.short | default .FirstSection.Params.Title) | title -}}
 {{- $section := cond (eq .Layout "component") "Component" $sectionTitle -}}
 {{- $tags := .Params.tags | default slice -}}
-{{- $index = $index | append (dict "objectID" .File.UniqueID "title" $title "pageUrl" $url "itemUrl" $url "tags" $tags) -}}
+{{- $content := .Description | default .Plain -}}
+{{- $index = $index | append (dict "objectID" .File.UniqueID "title" $title "tags" $tags "content" $content) -}}
 {{- end -}}
 {{- $index | jsonify -}}
