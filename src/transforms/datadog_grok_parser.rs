@@ -358,6 +358,16 @@ mod tests {
         test_filter_function(vec![
             (r#"nullIf("-")"#, "-", Value::Null.into()),
             (r#"nullIf("-")"#, "abc", Value::Bytes("abc".into()).into()),
+            (r#"boolean"#, "tRue", Value::Boolean(true).into()),
+            (r#"boolean"#, "false", Value::Boolean(false).into()),
+            (
+                r#"json"#,
+                r#"{"bool": true, "array": ["abc"]}"#,
+                Some(Value::from(
+                    btreemap! { "bool" => true, "array" => Value::Array(vec!["abc".into()])},
+                )),
+            ),
+            (r#"json"#, r#"not a valid json"#, Value::Null.into()),
         ])
         .await;
     }

@@ -290,6 +290,10 @@ fn make_filter_call(
             }
             Err(GrokError::InvalidFunctionArguments(filter.name.clone()))
         }
+        "json" => Ok(make_coalesce(
+            make_function_call("parse_json", vec![value], false),
+            make_null(),
+        )),
         _ => Err(GrokError::UnsupportedFilter(filter.name.clone())),
     }
 }
