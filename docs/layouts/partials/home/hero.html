@@ -5,6 +5,7 @@
 {{ $link := printf "releases/%s" $latest | relURL }}
 {{ $links := site.Menus.doc_quick_links }}
 {{ $modes := slice "Light" "Dark" }}
+
 <div class="py-24 md:py-32 lg:py-48 mx-auto max-w-7xl relative" x-data="{ active: false }">
   <div class="px-4 sm:px-6 text-center">
     <a href="{{ $link }}" @mouseover="active = true" @mouseover.away="active = false" class="dark:bg-gray-800 bg-gradient-to-r uppercase from-primary to-purple-v inline-flex items-center text-white rounded-full py-1 px-1.5 sm:text-base lg:text-sm xl:text-base">
@@ -34,8 +35,7 @@
     </p>
 
     <div class="mt-6 md:mt-8 lg:mt-10 inline-flex space-x-2">
-      {{ $numLinks := len $links }}
-      {{ range $idx, $link := $links }}
+      {{ range $links }}
       <a href="{{ .URL }}" class="uppercase font-semibold text-xs md:text-sm tracking-tight shadow-sm py-1 px-3.5 rounded-full hover:shadow bg-gray-200 text-dark hover:bg-primary hover:text-dark dark:bg-primary dark:hover:bg-purple-v">
         <div class="flex items-center space-x-2">
           <ion-icon name="{{ .Params.ionicon }}"></ion-icon>
