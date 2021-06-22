@@ -17,7 +17,7 @@ pub enum Comparison {
 
 impl Comparison {
     /// Returns a string representing this comparison in Lucene query formatting.
-    pub fn to_lucene(&self) -> String {
+    pub fn as_lucene(&self) -> String {
         match self {
             Comparison::Gt => String::from(">"),
             Comparison::Lt => String::from("<"),
@@ -206,7 +206,7 @@ impl QueryNode {
                 value,
             } => {
                 Self::is_default_attr(attr)
-                    + &format!("{}{}", comparator.to_lucene(), value.to_lucene())
+                    + &format!("{}{}", comparator.as_lucene(), value.to_lucene())
             }
             QueryNode::AttributeTerm { attr, value } => {
                 Self::is_default_attr(attr) + &Self::lucene_escape(value)

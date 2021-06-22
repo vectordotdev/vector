@@ -171,10 +171,7 @@ impl QueryVisitor {
                     // As per the parser, value can only ever be one of:
                     // STAR, PHRASE, TERM, TERM_PREFIX, TERM_GLOB, range, comparison.
                     let value_contents = item.into_inner().next().unwrap();
-                    match (
-                        (field.clone().unwrap_or(default_field)),
-                        value_contents.as_rule(),
-                    ) {
+                    match ((field.unwrap_or(default_field)), value_contents.as_rule()) {
                         (EXISTS_FIELD, Rule::TERM) => {
                             return QueryNode::AttributeExists {
                                 attr: Self::visit_term(value_contents),
