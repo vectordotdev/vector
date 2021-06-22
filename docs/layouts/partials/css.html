@@ -2,6 +2,15 @@
 {{ $includePaths := slice "node_modules" }}
 {{ $cssOpts := cond $server (dict "includePaths" $includePaths "enableSourceMap" true) (dict "includePaths" $includePaths "outputStyle" "compressed") }}
 
+{{/* Main site CSS (Tailwind, etc.) */}}
+{{ template "sass-postcss" (dict "server" $server "input" "sass/style.sass" "ctx" . "css_opts" $cssOpts) }}
+
+{{/* Non-purged CSS (no PostCSS) */}}
+{{ template "sass" (dict "server" $server "input" "sass/unpurged.sass" "ctx" . "css_opts" $cssOpts) }}
+
+{{/* Main page animated Vector diagram */}}
+{{ template "sass" (dict "server" $server "input" "sass/home.sass" "ctx" . "css_opts" $cssOpts) }}
+
 {{ define "sass-postcss" }}
 {{ $postCssOpts := dict "inlineImports" true }}
 {{ $css := resources.Get .input | resources.ExecuteAsTemplate .input .ctx | toCSS .css_opts | postCSS $postCssOpts }}
@@ -22,12 +31,3 @@
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
 {{ end }}
 {{ end }}
-
-{{/* Main site CSS (Tailwind, etc.) */}}
-{{ template "sass-postcss" (dict "server" $server "input" "sass/style.sass" "ctx" . "css_opts" $cssOpts) }}
-
-{{/* Non-purged CSS (no PostCSS) */}}
-{{ template "sass" (dict "server" $server "input" "sass/unpurged.sass" "ctx" . "css_opts" $cssOpts) }}
-
-{{/* Main page animated Vector diagram */}}
-{{ template "sass" (dict "server" $server "input" "sass/home.sass" "ctx" . "css_opts" $cssOpts) }}
