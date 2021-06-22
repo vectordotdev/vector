@@ -378,6 +378,7 @@ mod tests {
             ))),
             ("lowercase", "aBC", Value::Bytes("abc".into()).into()),
             ("uppercase", "Abc",  Value::Bytes("ABC".into()).into()),
+            ("decodeuricomponent", "%2Fservice%2Ftest",  Value::Bytes("/service/test".into()).into()),
         ])
         .await;
     }

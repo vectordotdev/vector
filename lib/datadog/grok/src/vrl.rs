@@ -310,6 +310,10 @@ fn make_filter_call(
             make_function_call("upcase", vec![value], false),
             make_null(),
         )),
+        "decodeuricomponent" => Ok(make_coalesce(
+            make_function_call("decode_percent", vec![value], false),
+            make_null(),
+        )),
         _ => Err(GrokError::UnsupportedFilter(filter.name.clone())),
     }
 }
