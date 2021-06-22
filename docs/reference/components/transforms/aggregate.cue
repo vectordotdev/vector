@@ -185,11 +185,11 @@ components: transforms: aggregate: {
 		aggregation_behavior: {
 			title: "Aggregation Behavior"
 			body: """
-					Metrics are aggregated based their kind. During an interval `incremental` metrics
-					are "added" and `absolute` metrics use most recent value wins semantics. This results in a reduction
-					of volume, less granularity, while maintaining numerical correctness. As an example two
-					`incremental` `counter`s with values 10 and 13 processed by the transform during a period would be
-					aggregated into a single `incremental` `counter` with a value of 23. Two `absolute` `gauge`s with
+					Metrics are aggregated based on their kind. During an interval, `incremental` metrics
+					are "added" and newer `absolute` metrics replace older ones in the same series. This results in a reduction
+					of volume and less granularity, while maintaining numerical correctness. As an example, two
+					`incremental` `counter` metrics with values 10 and 13 processed by the transform during a period would be
+					aggregated into a single `incremental` `counter` with a value of 23. Two `absolute` `gauge` metrics with
 					values 93 and 95 would result in a single `absolute` `gauge` with the value of 95. More complex
 					types like `distribution`, `histogram`, `set`, and `summary` behave similarly with `incremental`
 					values being combined in a manner that makes sense based on their type.
