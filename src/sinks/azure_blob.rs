@@ -427,7 +427,7 @@ mod tests {
         let (bytes, _) = bytes.item.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
         assert_eq!(map[&log_schema().message_key().to_string()], message);
-        assert_eq!(map.contains_key("key"), false);
+        assert!(!map.contains_key("key"));
     }
 
     #[test]
