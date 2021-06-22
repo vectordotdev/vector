@@ -6,6 +6,6 @@
 {{- $section := cond (eq .Layout "component") "Component" $sectionTitle -}}
 {{- $tags := .Params.tags | default slice -}}
 {{- $content := .Description | default .Plain -}}
-{{- $index = $index | append (dict "objectID" .File.UniqueID "title" $title "tags" $tags "content" $content) -}}
+{{- $index = $index | append (dict "objectID" .File.UniqueID "title" $title "tags" $tags "content" $content "section" $section) -}}
 {{- end -}}
 {{- $index | jsonify -}}
