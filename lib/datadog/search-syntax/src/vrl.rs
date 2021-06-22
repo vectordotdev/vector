@@ -150,6 +150,55 @@ pub fn make_function_call<T: IntoIterator<Item = ast::Expr>>(tag: &str, argument
     }))
 }
 
+/// Makes a literal expression from something that converts to an `ast::Literal`.
+pub fn make_literal<T: Into<ast::Literal>>(literal: T) -> ast::Expr {
+    ast::Expr::Literal(make_node(literal.into()))
+}
+
+/// Makes a field expression that contains a runtime check on the field type where the field
+/// type is a facet or a non-`tags` reserved field.
+pub fn make_field_op<T: Into<ast::Literal> + std::fmt::Display + Clone>(
+    field: Field,
+    query: ast::Expr,
+    op: ast::Opcode,
+    value: T,
+) -> ast::Expr {
+    // Facets and non-`tags` reserved fields operate on numerals if the field type is float
+    // or integer. Otherwise, they're treated as strings.
+    match field {
+        Field::Facet(f) | Field::Reserved(f) if f != "tags" => {
+            // Check that the number is either an integer or a float.
+            let num_check = make_container_group(make_op(
+                make_node(make_function_call("is_integer", vec![query.clone()])),
+                ast::Opcode::Or,
+                make_node(make_function_call("is_float", vec![query.clone()])),
+            ));
+
+            // If we're dealing with a number, the range comparison should be numberic.
+            let num_eq = make_op(
+                make_node(query.clone()),
+                op,
+                make_node(make_literal(value.clone())),
+            );
+
+            // Final number expression, including int/float and range check.
+            let num_expr = make_container_group(make_op(
+                make_node(num_check),
+                ast::Opcode::And,
+                make_node(num_eq),
+            ));
+
+            // String comparison fallback.
+            let string_expr = make_string_comparison(query, op, value.to_string());
+
+            // Wire up the expressions, separated by `||`.
+            recurse_op(vec![num_expr, string_expr].into_iter(), ast::Opcode::Or)
+        }
+        // If the field type doesn't support numeric operations, just compare by string.
+        _ => make_string_comparison(query, op, value.to_string()),
+    }
+}
+
 /// Recursive, nested expressions, ultimately returning a single `ast::Expr`.
 pub fn recurse_op<I: ExactSizeIterator<Item = impl Into<ast::Expr>>, O: Into<ast::Opcode>>(
     mut exprs: I,

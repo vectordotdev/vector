@@ -12,6 +12,8 @@ lazy_static! {
     static ref FUNCTIONS: Vec<Box<dyn Function>> = vec![
         Box::new(f::EndsWith),
         Box::new(f::Exists),
+        Box::new(f::IsFloat),
+        Box::new(f::IsInteger),
         Box::new(f::Includes),
         Box::new(f::Join),
         Box::new(f::Match),

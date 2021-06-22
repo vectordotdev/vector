@@ -28,6 +28,8 @@ features = [
     "ends_with",
     "exists",
     "includes",
+    "is_float",
+    "is_integer",
     "join",
     "match",
     "parse_key_value",

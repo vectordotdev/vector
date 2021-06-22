@@ -24,6 +24,7 @@ static RESERVED_ATTRIBUTES: &[&str] = &[
 const DATADOG_TAGS_ROOT: &str = ".__datadog_tags";
 
 /// Describes a field to search on.
+#[derive(Clone)]
 pub enum Field {
     /// Default field (when tag/facet isn't provided)
     Default(String),
