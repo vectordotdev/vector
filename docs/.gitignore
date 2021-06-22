@@ -2,6 +2,7 @@
 public/
 resources/
 hugo_stats.json
+assets/jsconfig.json
 
 # JavaScript, Sass, CSS, etc.
 node_modules/
