@@ -135,14 +135,14 @@ impl Conversion {
             Self::TimestampFmt(format, tz) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = tz
-                    .datetime_from_str(&s, &format)
+                    .datetime_from_str(&s, format)
                     .context(TimestampParseError { s })?;
 
                 datetime_to_utc(dt).into()
             }
             Self::TimestampTzFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                let dt = DateTime::parse_from_str(&s, &format)
+                let dt = DateTime::parse_from_str(&s, format)
                     .with_context(|| TimestampParseError { s })?;
 
                 datetime_to_utc(dt).into()

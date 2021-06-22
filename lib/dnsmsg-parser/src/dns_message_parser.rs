@@ -737,9 +737,9 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                             final_issuer.push_str(&name.to_utf8());
                             for keyvalue in vec_keyvalue.iter() {
                                 final_issuer.push_str("; ");
-                                final_issuer.push_str(&keyvalue.key());
+                                final_issuer.push_str(keyvalue.key());
                                 final_issuer.push('=');
-                                final_issuer.push_str(&keyvalue.value());
+                                final_issuer.push_str(keyvalue.value());
                             }
                         }
                         final_issuer.trim_end().to_string()
@@ -843,8 +843,8 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                     u8::from(nsec3.hash_algorithm()),
                     nsec3.opt_out() as u8,
                     nsec3.iterations(),
-                    HEXUPPER.encode(&nsec3.salt()),
-                    BASE32HEX_NOPAD.encode(&nsec3.next_hashed_owner_name()),
+                    HEXUPPER.encode(nsec3.salt()),
+                    BASE32HEX_NOPAD.encode(nsec3.next_hashed_owner_name()),
                     nsec3
                         .type_bit_maps()
                         .iter()
@@ -860,7 +860,7 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                     u8::from(nsec3param.hash_algorithm()),
                     nsec3param.opt_out() as u8,
                     nsec3param.iterations(),
-                    HEXUPPER.encode(&nsec3param.salt()),
+                    HEXUPPER.encode(nsec3param.salt()),
                 );
                 Ok((Some(nsec3param_rdata), None))
             }
@@ -1004,7 +1004,7 @@ fn parse_edns_opt(opt_code: EdnsCode, opt_data: &[u8]) -> EdnsOptionEntry {
     EdnsOptionEntry {
         opt_code: Into::<u16>::into(opt_code),
         opt_name: format!("{:?}", opt_code),
-        opt_data: BASE64.encode(&opt_data),
+        opt_data: BASE64.encode(opt_data),
     }
 }
 

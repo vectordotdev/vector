@@ -397,7 +397,7 @@ fn encode_events(
                     statistic: StatisticKind::Histogram,
                 } => {
                     // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
-                    if let Some(s) = stats(&samples) {
+                    if let Some(s) = stats(samples) {
                         let mut result = vec![
                             DatadogMetric {
                                 metric: format!("{}.min", &fullname),

@@ -357,9 +357,9 @@ impl<R: Read> EventIterator<R> {
                         .or_else(|| remote.map(|addr| addr.to_string()))
                         .map(Value::from),
                 ),
-                DefaultExtractor::new("index", &INDEX),
-                DefaultExtractor::new("source", &SOURCE),
-                DefaultExtractor::new("sourcetype", &SOURCETYPE),
+                DefaultExtractor::new("index", INDEX),
+                DefaultExtractor::new("source", SOURCE),
+                DefaultExtractor::new("sourcetype", SOURCETYPE),
             ],
         }
     }
