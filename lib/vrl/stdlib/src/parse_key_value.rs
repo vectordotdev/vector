@@ -467,7 +467,13 @@ mod test {
                 ("bar".to_string(), "baz".into()),
                 ("barfoo".to_string(), value!(true)),
             ]),
-            parse("foo=bar foobar bar=baz barfoo","=", " ", Whitespace::Lenient, true)
+            parse(
+                "foo=bar foobar bar=baz barfoo",
+                "=",
+                " ",
+                Whitespace::Lenient,
+                true
+            )
         );
     }
 
@@ -481,7 +487,13 @@ mod test {
                 ("baz".to_string(), value!(true)),
                 ("barfoo".to_string(), value!(true)),
             ]),
-            parse("foo bar foobar baz barfoo","=", " ", Whitespace::Lenient, true)
+            parse(
+                "foo bar foobar baz barfoo",
+                "=",
+                " ",
+                Whitespace::Lenient,
+                true
+            )
         );
     }
 
