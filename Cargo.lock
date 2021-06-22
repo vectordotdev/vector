@@ -1743,6 +1743,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "datadog-grok"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "derivative 2.2.0",
+ "grok",
+ "indoc",
+ "inventory",
+ "lalrpop",
+ "lalrpop-util",
+ "lazy_static",
+ "lookup",
+ "regex",
+ "serde",
+ "serde_yaml",
+ "shared",
+ "thiserror",
+ "tokio",
+ "typetag",
+ "vector_core",
+ "vrl",
+ "vrl-compiler",
+ "vrl-parser",
+ "vrl-stdlib",
+]
+
+[[package]]
 name = "db-key"
 version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7987,6 +8015,7 @@ dependencies = [
  "crossterm 0.20.0",
  "dashmap",
  "data-encoding",
+ "datadog-grok",
  "derivative 2.2.0",
  "dirs-next",
  "dnsmsg-parser",

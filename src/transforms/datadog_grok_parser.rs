@@ -95,6 +95,7 @@ impl FunctionTransform for Grok {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transforms::test::transform_one;
     use indoc::{formatdoc, indoc};
     use serde_json::json;
     use shared::btreemap;
@@ -121,17 +122,14 @@ mod tests {
         field: Option<String>,
     ) -> LogEvent {
         let metadata = event.metadata().clone();
-        let mut parser = DataDogGrokConfig {
+        let mut parser = Grok::new(DataDogGrokConfig {
             field,
             helper_rules,
             parsing_rules,
-        }
-        .build(&GlobalOptions::default())
-        .await
+        })
         .unwrap();
-        let parser = parser.as_function();
 
-        let result = parser.transform_one(event).unwrap().into_log();
+        let result = transform_one(&mut parser, event).unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }
@@ -368,6 +366,16 @@ mod tests {
                 )),
             ),
             (r#"json"#, r#"not a valid json"#, Value::Null.into()),
+            (
+                r#"rubyhash"#,
+                r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
+                Some(Value::from(
+                    btreemap! { "test" => "value", "testNum" => 0.2, "testObj" => Value::from(btreemap! {"testBool" => true})},
+                )),
+            ),
+            (r#"querystring"#, "?productId=superproduct&promotionCode=superpromo", Some(Value::from(
+                btreemap! { "productId" => "superproduct", "promotionCode" => "superpromo"},
+            )))
         ])
         .await;
     }

@@ -294,6 +294,14 @@ fn make_filter_call(
             make_function_call("parse_json", vec![value], false),
             make_null(),
         )),
+        "rubyhash" => Ok(make_coalesce(
+            make_function_call("parse_ruby_hash", vec![value], false),
+            make_null(),
+        )),
+        "querystring" => Ok(make_coalesce(
+            make_function_call("parse_query_string", vec![value], false),
+            make_null(),
+        )),
         _ => Err(GrokError::UnsupportedFilter(filter.name.clone())),
     }
 }
