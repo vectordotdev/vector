@@ -25,10 +25,7 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
     match host {
-        None => {
-                Docker::connect_with_local_defaults().map_err(Into::into)
-            }
-        }
+        None => Docker::connect_with_local_defaults().map_err(Into::into),
         Some(host) => {
             let scheme = host
                 .parse::<Uri>()
