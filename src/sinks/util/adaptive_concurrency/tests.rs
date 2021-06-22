@@ -402,7 +402,7 @@ async fn run_test(params: TestParams) -> TestResults {
         .into_inner()
         .expect("Failed to unwrap controller_stats Mutex");
 
-    let metrics = capture_metrics(&controller)
+    let metrics = capture_metrics(controller)
         .map(Event::into_metric)
         .map(|event| (event.name().to_string(), event))
         .collect::<HashMap<_, _>>();
@@ -411,35 +411,28 @@ async fn run_test(params: TestParams) -> TestResults {
         metrics
             .get("adaptive_concurrency_observed_rtt")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
     assert!(matches!(
         metrics
             .get("adaptive_concurrency_averaged_rtt")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
     if params.concurrency == Concurrency::Adaptive {
         assert!(matches!(
-            metrics
-                .get("adaptive_concurrency_limit")
-                .unwrap()
-                .data
-                .value,
-            MetricValue::AggregatedHistogram { .. }
+            metrics.get("adaptive_concurrency_limit").unwrap().value(),
+            &MetricValue::AggregatedHistogram { .. }
         ));
     }
     assert!(matches!(
         metrics
             .get("adaptive_concurrency_in_flight")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
 
     TestResults { stats, cstats }

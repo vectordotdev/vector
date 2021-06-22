@@ -499,7 +499,7 @@ mod tests {
         token = "my-token"
         database = "my-database"
     "#;
-        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             format!("{}", settings.expect_err("expected error")),
@@ -511,7 +511,7 @@ mod tests {
     fn test_influxdb_settings_missing() {
         let config = r#"
     "#;
-        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             format!("{}", settings.expect_err("expected error")),
@@ -524,7 +524,7 @@ mod tests {
         let config = r#"
         database = "my-database"
     "#;
-        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
@@ -535,7 +535,7 @@ mod tests {
         org = "my-org"
         token = "my-token"
     "#;
-        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 

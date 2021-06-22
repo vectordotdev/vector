@@ -1,6 +1,10 @@
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 mod body_decoding;
 mod encoding_config;
+#[cfg(feature = "sources-file")]
+pub(crate) mod finalizer;
+#[cfg(all(unix, feature = "sources-dnstap"))]
+pub mod framestream;
 #[cfg(feature = "sources-utils-http")]
 mod http;
 pub mod multiline_config;
@@ -22,7 +26,7 @@ pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
-pub use tcp::{SocketListenAddr, TcpSource};
+pub use tcp::{IsErrorFatal as TcpIsErrorFatal, SocketListenAddr, TcpSource};
 #[cfg(all(unix, feature = "sources-socket",))]
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-unix",))]

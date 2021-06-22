@@ -89,14 +89,17 @@ pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> 
     Ok(value)
 }
 
+pub fn next_addr_for_ip(ip: IpAddr) -> SocketAddr {
+    let port = pick_unused_port(ip);
+    SocketAddr::new(ip, port)
+}
+
 pub fn next_addr() -> SocketAddr {
-    let port = pick_unused_port();
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+    next_addr_for_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    let port = pick_unused_port();
-    SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
+    next_addr_for_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)))
 }
 
 pub fn trace_init() {
@@ -109,7 +112,7 @@ pub fn trace_init() {
 
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels);
+    trace::init(color, false, &levels, false);
 }
 
 pub async fn send_lines(
@@ -253,6 +256,16 @@ where
     S: Stream + Unpin,
 {
     rx.take(n).collect().await
+}
+
+pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
+    let mut events = Vec::new();
+
+    while events.len() < n {
+        let e = stream.next().await.unwrap();
+        events.push(e);
+    }
+    events
 }
 
 pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>

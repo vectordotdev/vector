@@ -325,7 +325,7 @@ async fn handle_batch_status(
 ) -> Result<impl warp::Reply, Rejection> {
     match receiver {
         None => Ok(warp::reply()),
-        Some(receiver) => match receiver.await.unwrap_or(BatchStatus::Delivered) {
+        Some(receiver) => match receiver.await {
             BatchStatus::Delivered => Ok(warp::reply()),
             BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::INTERNAL_SERVER_ERROR,

@@ -18,12 +18,13 @@ Vector is a high-performance, end-to-end (agent & aggregator) observability data
 pipeline that puts you in control of your observability data.
 [Collect][docs.sources], [transform][docs.transforms], and [route][docs.sinks]
 all your logs, metrics, and traces to any vendors you want today and any other
-vendors you may want tomorrow. Vector enables dramatic cost reduction, novel data
-enrichment, and data security where you need it, not where is most convenient for
-your vendors. Open source and up to 10x faster than every alternative.
+vendors you may want tomorrow. Vector enables dramatic cost reduction, novel
+data enrichment, and data security where you need it, not where is most
+convenient for your vendors. Additionally, it is open source and up to 10x
+faster than every alternative in the space.
 
-To get started, follow our [**quickstart guide**][docs.quickstart]
-or [**install Vector**][docs.installation].
+To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
+Vector**][docs.installation].
 
 ### Principles
 

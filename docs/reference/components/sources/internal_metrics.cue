@@ -109,6 +109,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		connection_send_ack_errors_total: {
+			description:       "The total number of protocol acknowledgement errors for this Vector instance for source protocols that support acknowledgements."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		connection_shutdown_total: {
 			description:       "The total number of times the connection has been shut down."
 			type:              "counter"
@@ -155,13 +161,13 @@ components: sources: internal_metrics: {
 		// Metrics emitted by one or more components
 		// Reusable metric definitions
 		adaptive_concurrency_averaged_rtt: {
-			description:       "The average round-trip time (RTT) from the HTTP sink across the current window."
+			description:       "The average round-trip time (RTT) for the current window."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
 		adaptive_concurrency_in_flight: {
-			description:       "The number of outbound requests from the HTTP sink currently awaiting a response."
+			description:       "The number of outbound requests currently awaiting a response."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -173,7 +179,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		adaptive_concurrency_observed_rtt: {
-			description:       "The observed round-trip time (RTT) for requests from this HTTP sink."
+			description:       "The observed round-trip time (RTT) for requests."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -268,6 +274,12 @@ components: sources: internal_metrics: {
 		}
 		containers_watched_total: {
 			description:       "The total number of times Vector started watching for container logs."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		decode_errors_total: {
+			description:       "The total number of decode errors seen when decoding data in a source component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -412,8 +424,7 @@ components: sources: internal_metrics: {
 			description: """
 				The total number of events processed by this component.
 				This metric is deprecated in place of using
-				[`events_in_total`][docs.sources.internal_metrics.events_in_total] and
-				[`events_out_total`][docs.sources.internal_metrics.events_out_total] metrics.
+				`events_in_total` and `events_out_total` metrics.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
@@ -549,6 +560,28 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		http_client_response_rtt_seconds: {
+			description:       "The round-trip time (RTT) of HTTP requests, tagged with the response code."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				status: _status
+			}
+		}
+		http_client_responses_total: {
+			description:       "The total number of HTTP requests, tagged with the response code."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				status: _status
+			}
+		}
+		http_client_rtt_seconds: {
+			description:       "The round-trip time (RTT) of HTTP requests."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		http_error_response_total: {
 			description:       "The total number of HTTP error responses for this component."
 			type:              "counter"
@@ -678,6 +711,12 @@ components: sources: internal_metrics: {
 		}
 		request_read_errors_total: {
 			description:       "The total number of request read errors for this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		request_automatic_decode_errors_total: {
+			description:       "The total number of request errors for this component when it attempted to automatically discover and handle the content-encoding of incoming request data."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -949,6 +988,10 @@ components: sources: internal_metrics: {
 				tcp:  "Transmission Control Protocol"
 				unix: "Unix domain socket"
 			}
+		}
+		_status: {
+			description: "The HTTP status code of the request."
+			required:    false
 		}
 		_path: {
 			description: "The path that produced the error."

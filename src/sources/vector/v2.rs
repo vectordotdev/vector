@@ -1,47 +1,59 @@
 use crate::{
     config::SourceContext,
     config::{DataType, GenerateConfig, Resource},
-    event::Event,
     proto::vector as proto,
-    shutdown::{ShutdownSignal, ShutdownSignalToken},
+    shutdown::ShutdownSignalToken,
     sources::Source,
     Pipeline,
 };
 
-use futures::{FutureExt, SinkExt, TryFutureExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tonic::{
     transport::{Certificate, Identity, Server, ServerTlsConfig},
     Request, Response, Status,
 };
+use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
 
 #[derive(Debug, Clone)]
 pub struct Service {
     pipeline: Pipeline,
+    acknowledgements: bool,
 }
 
 #[tonic::async_trait]
 impl proto::Service for Service {
     async fn push_events(
         &self,
-        request: Request<proto::EventRequest>,
-    ) -> Result<Response<proto::EventResponse>, Status> {
-        let event = request
+        request: Request<proto::PushEventsRequest>,
+    ) -> Result<Response<proto::PushEventsResponse>, Status> {
+        let mut events: Vec<Event> = request
             .into_inner()
-            .message
+            .events
+            .into_iter()
             .map(Event::from)
-            .ok_or_else(|| Status::invalid_argument("missing event"))?;
+            .collect();
 
-        let response = Response::new(proto::EventResponse {});
+        let receiver = self.acknowledgements.then(|| {
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            for event in &mut events {
+                event.add_batch_notifier(Arc::clone(&batch));
+            }
+
+            receiver
+        });
 
         self.pipeline
             .clone()
-            .send(event)
-            .await
-            .map(|_| response)
+            .send_all(&mut futures::stream::iter(events).map(Ok))
             .map_err(|err| Status::unavailable(err.to_string()))
+            .and_then(|_| handle_batch_status(receiver))
+            .await?;
+
+        Ok(Response::new(proto::PushEventsResponse {}))
     }
 
     // TODO: figure out a way to determine if the current Vector instance is "healthy".
@@ -54,6 +66,19 @@ impl proto::Service for Service {
         };
 
         Ok(Response::new(message))
+    }
+}
+
+async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<(), Status> {
+    let status = match receiver {
+        Some(receiver) => receiver.await,
+        None => BatchStatus::Delivered,
+    };
+
+    match status {
+        BatchStatus::Errored => Err(Status::internal("Delivery error")),
+        BatchStatus::Failed => Err(Status::data_loss("Delivery failed")),
+        BatchStatus::Delivered => Ok(()),
     }
 }
 
@@ -92,9 +117,7 @@ impl GenerateConfig for VectorConfig {
 
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let SourceContext { shutdown, out, .. } = cx;
-
-        let source = run(self.address, self.tls.clone(), out, shutdown).map_err(|error| {
+        let source = run(self.address, self.tls.clone(), cx).map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
 
@@ -117,12 +140,14 @@ impl VectorConfig {
 async fn run(
     address: SocketAddr,
     tls: Option<GrpcTlsConfig>,
-    out: Pipeline,
-    shutdown: ShutdownSignal,
+    cx: SourceContext,
 ) -> crate::Result<()> {
     let _span = crate::trace::current_span();
 
-    let service = proto::Server::new(Service { pipeline: out });
+    let service = proto::Server::new(Service {
+        pipeline: cx.out,
+        acknowledgements: cx.acknowledgements,
+    });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
     let mut server = match tls {
@@ -141,7 +166,7 @@ async fn run(
 
     server
         .add_service(service)
-        .serve_with_shutdown(address, shutdown.map(|token| tx.send(token).unwrap()))
+        .serve_with_shutdown(address, cx.shutdown.map(|token| tx.send(token).unwrap()))
         .await?;
 
     drop(rx.await);

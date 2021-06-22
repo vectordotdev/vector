@@ -6,6 +6,8 @@ mod append;
 mod array;
 #[cfg(feature = "assert")]
 mod assert;
+#[cfg(feature = "assert_eq")]
+mod assert_eq;
 #[cfg(feature = "boolean")]
 mod boolean;
 #[cfg(feature = "ceil")]
@@ -16,6 +18,8 @@ mod compact;
 mod contains;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_percent")]
+mod decode_percent;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
@@ -24,8 +28,12 @@ mod downcase;
 mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
+#[cfg(feature = "encode_key_value")]
+mod encode_key_value;
 #[cfg(feature = "encode_logfmt")]
 mod encode_logfmt;
+#[cfg(feature = "encode_percent")]
+mod encode_percent;
 #[cfg(feature = "ends_with")]
 mod ends_with;
 #[cfg(feature = "exists")]
@@ -90,6 +98,10 @@ mod log;
 mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
+#[cfg(feature = "match_any")]
+mod match_any;
+#[cfg(feature = "match_array")]
+mod match_array;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -136,6 +148,8 @@ mod parse_query_string;
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
 mod parse_regex_all;
+#[cfg(feature = "parse_ruby_hash")]
+mod parse_ruby_hash;
 #[cfg(feature = "parse_syslog")]
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
@@ -213,6 +227,8 @@ pub use crate::sha1::Sha1;
 pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
+#[cfg(feature = "assert_eq")]
+pub use assert_eq::AssertEq;
 #[cfg(feature = "boolean")]
 pub use boolean::Boolean;
 #[cfg(feature = "ceil")]
@@ -223,6 +239,8 @@ pub use compact::Compact;
 pub use contains::Contains;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_percent")]
+pub use decode_percent::DecodePercent;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
@@ -231,8 +249,12 @@ pub use downcase::Downcase;
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
+#[cfg(feature = "encode_key_value")]
+pub use encode_key_value::EncodeKeyValue;
 #[cfg(feature = "encode_logfmt")]
 pub use encode_logfmt::EncodeLogfmt;
+#[cfg(feature = "encode_percent")]
+pub use encode_percent::EncodePercent;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
@@ -289,6 +311,10 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
+#[cfg(feature = "match_any")]
+pub use match_any::MatchAny;
+#[cfg(feature = "match_array")]
+pub use match_array::MatchArray;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -333,6 +359,8 @@ pub use parse_query_string::ParseQueryString;
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
 pub use parse_regex_all::ParseRegexAll;
+#[cfg(feature = "parse_ruby_hash")]
+pub use parse_ruby_hash::ParseRubyHash;
 #[cfg(feature = "parse_syslog")]
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
@@ -406,6 +434,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Append),
         #[cfg(feature = "assert")]
         Box::new(Assert),
+        #[cfg(feature = "assert_eq")]
+        Box::new(AssertEq),
         #[cfg(feature = "boolean")]
         Box::new(Boolean),
         #[cfg(feature = "ceil")]
@@ -416,6 +446,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Contains),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
+        #[cfg(feature = "decode_percent")]
+        Box::new(DecodePercent),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
@@ -424,8 +456,12 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
+        #[cfg(feature = "encode_key_value")]
+        Box::new(EncodeKeyValue),
         #[cfg(feature = "encode_logfmt")]
         Box::new(EncodeLogfmt),
+        #[cfg(feature = "encode_percent")]
+        Box::new(EncodePercent),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
@@ -484,6 +520,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Log),
         #[cfg(feature = "match")]
         Box::new(Match),
+        #[cfg(feature = "match_any")]
+        Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -532,6 +572,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseRegex),
         #[cfg(feature = "parse_regex_all")]
         Box::new(ParseRegexAll),
+        #[cfg(feature = "parse_ruby_hash")]
+        Box::new(ParseRubyHash),
         #[cfg(feature = "parse_syslog")]
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
@@ -544,6 +586,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Push),
         #[cfg(feature = "match")]
         Box::new(Match),
+        #[cfg(feature = "match_any")]
+        Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "replace")]

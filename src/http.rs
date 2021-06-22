@@ -218,10 +218,10 @@ impl Auth {
     pub fn apply_headers_map(&self, map: &mut HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
-                let auth = Authorization::basic(&user, &password);
+                let auth = Authorization::basic(user, password);
                 map.typed_insert(auth);
             }
-            Auth::Bearer { token } => match Authorization::bearer(&token) {
+            Auth::Bearer { token } => match Authorization::bearer(token) {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },

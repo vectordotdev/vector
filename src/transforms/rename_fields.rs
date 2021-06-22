@@ -87,7 +87,7 @@ impl FunctionTransform for RenameFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -111,7 +111,7 @@ mod tests {
         );
         let mut transform = RenameFields::new(fields, false).unwrap();
 
-        let new_event = transform.transform_one(log.into()).unwrap();
+        let new_event = transform_one(&mut transform, log.into()).unwrap();
 
         assert_eq!(new_event.into_log(), expected);
     }

@@ -40,7 +40,9 @@ async fn happy_path() {
         inputs = ["in"]
         rate = 10
         key_field = "message"
-        exclude."message.contains" = "error"
+        exclude = """
+            contains!(.message, "error")
+        """
 
         [sinks.out]
         type = "socket"
@@ -60,7 +62,7 @@ async fn happy_path() {
         in = {type = "socket", mode = "tcp", address = "127.0.0.1:1235"}
 
         [transforms]
-        sample = {type = "sample", inputs = ["in"], rate = 10, key_field = "message", exclude."message.contains" = "error"}
+        sample = {type = "sample", inputs = ["in"], rate = 10, key_field = "message", exclude = """ contains!(.message, "error") """ }
 
         [sinks]
         out = {type = "socket", mode = "tcp", inputs = ["sample"], encoding = "text", address = "127.0.0.1:9999"}
@@ -189,7 +191,9 @@ async fn nonexistant_input() {
         inputs = ["qwerty"]
         rate = 10
         key_field = "message"
-        exclude."message.contains" = "error"
+        exclude = """
+            contains!(.message, "error")
+        """
 
         [sinks.out]
         type = "socket"
@@ -206,8 +210,8 @@ async fn nonexistant_input() {
     assert_eq!(
         err,
         vec![
-            "Input \"asdf\" for sink \"out\" doesn't exist.",
-            "Input \"qwerty\" for transform \"sample\" doesn't exist.",
+            "Sink \"out\" has no inputs",
+            "Transform \"sample\" has no inputs"
         ]
     );
 }
@@ -273,6 +277,7 @@ async fn bad_regex() {
         inputs = ["in"]
         rate = 10
         key_field = "message"
+        exclude.type = "check_fields"
         exclude."message.regex" = "(["
 
         [sinks.out]
@@ -479,14 +484,18 @@ async fn warnings() {
         inputs = ["in1"]
         rate = 10
         key_field = "message"
-        exclude."message.contains" = "error"
+        exclude = """
+            contains!(.message, "error")
+        """
 
         [transforms.sample2]
         type = "sample"
         inputs = ["in1"]
         rate = 10
         key_field = "message"
-        exclude."message.contains" = "error"
+        exclude = """
+            contains!(.message, "error")
+        """
 
         [sinks.out]
         type = "socket"
@@ -760,11 +769,7 @@ async fn parses_sink_full_es_basic_auth() {
     .unwrap();
 }
 
-#[cfg(all(
-    feature = "docker",
-    feature = "sources-stdin",
-    feature = "sinks-elasticsearch"
-))]
+#[cfg(all(feature = "sources-stdin", feature = "sinks-elasticsearch"))]
 #[tokio::test]
 async fn parses_sink_full_es_aws() {
     load(
@@ -780,7 +785,7 @@ async fn parses_sink_full_es_aws() {
         [sinks.out.auth]
         strategy = "aws"
         "#,
-        Some(Format::TOML),
+        Some(Format::Toml),
     )
     .await
     .unwrap();

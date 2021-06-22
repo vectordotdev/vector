@@ -27,12 +27,17 @@ mod blackhole;
 mod coercer;
 #[cfg(feature = "transforms-concat")]
 mod concat;
+mod conditions;
 #[cfg(feature = "sinks-console")]
 mod console;
+#[cfg(feature = "sinks-datadog")]
+mod datadog_events;
 #[cfg(feature = "sinks-datadog")]
 mod datadog_logs;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
+#[cfg(feature = "sources-dnstap")]
+mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
@@ -41,6 +46,8 @@ mod encoding_transcode;
 mod exec;
 #[cfg(feature = "transforms-filter")]
 mod filter;
+#[cfg(feature = "sources-fluent")]
+mod fluent;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-geoip")]
@@ -148,12 +155,17 @@ pub use self::blackhole::*;
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
+pub use self::conditions::*;
 #[cfg(feature = "sinks-console")]
 pub use self::console::*;
+#[cfg(feature = "sinks-datadog")]
+pub use self::datadog_events::*;
 #[cfg(feature = "sinks-datadog")]
 pub use self::datadog_logs::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
+#[cfg(feature = "sources-dnstap")]
+pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
@@ -168,6 +180,8 @@ pub use self::exec::*;
 pub use self::file::*;
 #[cfg(feature = "transforms-filter")]
 pub use self::filter::*;
+#[cfg(feature = "sources-fluent")]
+pub use self::fluent::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
 #[cfg(feature = "transforms-geoip")]
@@ -295,6 +309,6 @@ mod test {
     #[test]
     fn truncate_utf8() {
         let message = "Hello 😁 this is test.";
-        assert_eq!("Hello [...]", super::truncate_string_at(&message, 13));
+        assert_eq!("Hello [...]", super::truncate_string_at(message, 13));
     }
 }

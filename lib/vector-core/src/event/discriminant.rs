@@ -6,7 +6,7 @@ use std::{
 
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
 // would be much easier. The issue is with `f64` type. We should consider using
-// a newtype for `f64` there that'd implement `Eq` and `Hash` is it's safe, for
+// a newtype for `f64` there that'd implement `Eq` and `Hash` if it's safe, for
 // example `NormalF64`, and guard the values with `val.is_normal() == true`
 // invariant.
 // See also: https://internals.rust-lang.org/t/f32-f64-should-implement-hash/5436/32

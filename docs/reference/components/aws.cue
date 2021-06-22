@@ -166,6 +166,8 @@ components: _aws: {
 
 				If credentials are not found the [healtcheck](#healthchecks) will fail and an
 				error will be [logged][docs.monitoring#logs].
+
+				Vector will search again for AWS credentials once they expire.
 				"""
 			sub_sections: [
 				{

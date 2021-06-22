@@ -1,4 +1,4 @@
-name: nightly
+name: Nightly
 
 on:
   workflow_dispatch:
@@ -11,14 +11,14 @@ env:
   VERBOSE: true
   CI: true
   DEBIAN_FRONTEND: noninteractive
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   build-x86_64-unknown-linux-musl-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -30,12 +30,34 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
 
+  build-x86_64-unknown-linux-gnu-debug-tarball:
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - env:
+          CARGO_PROFILE_RELEASE_DEBUG: 2 # https://doc.rust-lang.org/cargo/reference/profiles.html#debug
+        run: bash scripts/set-build-description.sh
+      - env:
+          PASS_FEATURES: "default"
+          CARGO_PROFILE_RELEASE_DEBUG: 2 # https://doc.rust-lang.org/cargo/reference/profiles.html#debug
+        run: make package-x86_64-unknown-linux-gnu
+      - name: rename gnu tarball to gnu-debug tarball
+        run: |
+          mv "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz" \
+             "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
+
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -59,8 +81,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -77,8 +98,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -103,8 +123,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -128,8 +147,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: bash scripts/set-build-description.sh
@@ -155,6 +173,9 @@ jobs:
       - name: "Set Vector build description"
         run: ./scripts/set-build-description.sh
         shell: bash
+      - name: "Set release flags"
+        run: ./scripts/environment/release-flags.sh
+        shell: bash
       - name: "Build archive"
         env:
           TARGET: "x86_64-apple-darwin"
@@ -169,6 +190,8 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     runs-on: windows-2019
+    env:
+      RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
     steps:
       - uses: actions/checkout@v2.3.4
       - name: "Add Vector version"
@@ -176,6 +199,9 @@ jobs:
         shell: bash
       - name: "Set Vector build description"
         run: ./scripts/set-build-description.sh
+        shell: bash
+      - name: "Set release flags"
+        run: ./scripts/environment/release-flags.sh
         shell: bash
       - name: "Download Perl"
         shell: bash
@@ -212,7 +238,6 @@ jobs:
         shell: bash
         run: |
           export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-          export RUSTFLAGS=-Ctarget-feature=+crt-static
           export FEATURES="default-msvc"
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"
@@ -374,6 +399,7 @@ jobs:
   release-s3:
     runs-on: ubuntu-18.04
     needs:
+      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
@@ -388,6 +414,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
@@ -587,6 +617,7 @@ jobs:
     name: nightly-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
+      - build-x86_64-unknown-linux-gnu-debug-tarball
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
@@ -607,6 +638,6 @@ jobs:
     - name: Discord notification
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
+      uses: Ilshidur/action-discord@0.3.2
       with:
         args: "Master nightly failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

@@ -133,7 +133,7 @@ impl Expression for Op {
             Or if lhs_kind.is_null() => rhs_def,
 
             // not null || ...
-            Or if !lhs_kind.contains(K::Null) => lhs_def,
+            Or if !(lhs_kind.contains(K::Null) || lhs_kind.contains(K::Boolean)) => lhs_def,
 
             // ... || ...
             Or if !lhs_kind.is_boolean() => {
@@ -161,6 +161,14 @@ impl Expression for Op {
             // ... == ...
             // ... != ...
             Eq | Ne => lhs_def.merge(rhs_def).boolean(),
+
+            // "b" >  "a"
+            // "a" >= "a"
+            // "a" <  "b"
+            // "b" <= "b"
+            Gt | Ge | Lt | Le if lhs_def.is_bytes() && rhs_def.is_bytes() => {
+                lhs_def.merge(rhs_def).boolean()
+            }
 
             // ... >  ...
             // ... >= ...
@@ -570,6 +578,11 @@ mod tests {
             want: TypeDef::new().infallible().boolean(),
         }
 
+        greater_bytes {
+            expr: |_| op(Gt, "c", "b"),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
         greater_other {
             expr: |_| op(Gt, 1, "foo"),
             want: TypeDef::new().fallible().boolean(),
@@ -587,6 +600,11 @@ mod tests {
 
         greater_or_equal_mixed {
             expr: |_| op(Ge, 1, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        greater_or_equal_bytes {
+            expr: |_| op(Ge, "foo", "foo"),
             want: TypeDef::new().infallible().boolean(),
         }
 
@@ -610,6 +628,11 @@ mod tests {
             want: TypeDef::new().infallible().boolean(),
         }
 
+        less_bytes {
+            expr: |_| op(Lt, "bar", "foo"),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
         less_other {
             expr: |_| op(Lt, 1, "foo"),
             want: TypeDef::new().fallible().boolean(),
@@ -627,6 +650,11 @@ mod tests {
 
         less_or_equal_mixed {
             expr: |_| op(Le, 1, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        less_or_equal_bytes {
+            expr: |_| op(Le, "bar", "bar"),
             want: TypeDef::new().infallible().boolean(),
         }
 

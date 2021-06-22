@@ -73,13 +73,13 @@ impl KafkaAuthConfig {
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
             if let Some(path) = &tls.options.ca_file {
-                client.set("ssl.ca.location", pathbuf_to_string(&path)?);
+                client.set("ssl.ca.location", pathbuf_to_string(path)?);
             }
             if let Some(path) = &tls.options.crt_file {
-                client.set("ssl.certificate.location", pathbuf_to_string(&path)?);
+                client.set("ssl.certificate.location", pathbuf_to_string(path)?);
             }
             if let Some(path) = &tls.options.key_file {
-                client.set("ssl.key.location", pathbuf_to_string(&path)?);
+                client.set("ssl.key.location", pathbuf_to_string(path)?);
             }
             if let Some(pass) = &tls.options.key_pass {
                 client.set("ssl.key.password", pass);

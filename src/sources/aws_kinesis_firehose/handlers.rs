@@ -1,13 +1,19 @@
 use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
+use super::Compression;
 use crate::{
-    config::log_schema, event::Event, internal_events::AwsKinesisFirehoseEventReceived, Pipeline,
+    config::log_schema,
+    event::Event,
+    internal_events::{
+        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventReceived,
+    },
+    Pipeline,
 };
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use futures::{SinkExt, StreamExt, TryFutureExt};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use std::io::Read;
 use warp::reject;
 
@@ -16,13 +22,19 @@ pub async fn firehose(
     request_id: String,
     source_arn: String,
     request: FirehoseRequest,
+    record_compression: Compression,
     mut out: Pipeline,
 ) -> Result<impl warp::Reply, reject::Rejection> {
-    let events = parse_records(request, request_id.as_str(), source_arn.as_str())
-        .with_context(|| ParseRecords {
-            request_id: request_id.clone(),
-        })
-        .map_err(reject::custom)?;
+    let events = parse_records(
+        record_compression,
+        request,
+        request_id.as_str(),
+        source_arn.as_str(),
+    )
+    .with_context(|| ParseRecords {
+        request_id: request_id.clone(),
+    })
+    .map_err(reject::custom)?;
     let mut stream = futures::stream::iter(events).map(Ok);
 
     let request_id = request_id.clone();
@@ -50,15 +62,16 @@ pub async fn firehose(
 
 /// Parses out events from the FirehoseRequest
 fn parse_records(
+    compression: Compression,
     request: FirehoseRequest,
     request_id: &str,
     source_arn: &str,
-) -> std::io::Result<Vec<Event>> {
+) -> Result<Vec<Event>, RecordDecodeError> {
     request
         .records
         .iter()
         .map(|record| {
-            decode_record(record).map(|record| {
+            decode_record(record, compression).map(|record| {
                 emit!(AwsKinesisFirehoseEventReceived {
                     byte_size: record.len()
                 });
@@ -77,14 +90,53 @@ fn parse_records(
         .collect()
 }
 
-/// Decodes a Firehose record from its base64 gzip format
-fn decode_record(record: &EncodedFirehoseRecord) -> std::io::Result<Bytes> {
-    let mut cursor = std::io::Cursor::new(record.data.as_bytes());
-    let base64decoder = base64::read::DecoderReader::new(&mut cursor, base64::STANDARD);
+#[derive(Debug, Snafu)]
+pub enum RecordDecodeError {
+    #[snafu(display("Could not base64 decode request data: {}", source))]
+    Base64 { source: base64::DecodeError },
+    #[snafu(display("Could not decompress request data as {}: {}", compression, source))]
+    Decompression {
+        source: std::io::Error,
+        compression: Compression,
+    },
+}
 
-    let mut gz = MultiGzDecoder::new(base64decoder);
-    let mut buffer = Vec::new();
-    gz.read_to_end(&mut buffer)?;
+/// Decodes a Firehose record.
+fn decode_record(
+    record: &EncodedFirehoseRecord,
+    compression: Compression,
+) -> Result<Bytes, RecordDecodeError> {
+    let buf = base64::decode(record.data.as_bytes()).context(Base64 {})?;
 
-    Ok(Bytes::from(buffer))
+    match compression {
+        Compression::None => Ok(Bytes::from(buf)),
+        Compression::Gzip => decode_gzip(&buf[..]).with_context(|| Decompression {
+            compression: compression.to_owned(),
+        }),
+        Compression::Auto => {
+            match infer::get(&buf) {
+                Some(filetype) => match filetype.mime_type() {
+                    "application/gzip" => decode_gzip(&buf[..]).or_else(|error| {
+                        emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
+                            compression: Compression::Gzip,
+                            error
+                        });
+                        Ok(Bytes::from(buf))
+                    }),
+                    // only support gzip for now
+                    _ => Ok(Bytes::from(buf)),
+                },
+                None => Ok(Bytes::from(buf)),
+            }
+        }
+    }
+}
+
+fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
+    let mut decoded = Vec::new();
+
+    let mut gz = MultiGzDecoder::new(data);
+    gz.read_to_end(&mut decoded)?;
+
+    Ok(Bytes::from(decoded))
 }

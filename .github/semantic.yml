@@ -15,6 +15,7 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
+  - docs                # A documentation change
 
 scopes:
   - new source
@@ -54,7 +55,6 @@ scopes:
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
-  - remap # Anything related to the Vector Remap Language
   - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector
@@ -67,6 +67,8 @@ scopes:
   - topology # Anything related to Vector's topology code
   - traces # Anything related to Vectors' trace events
   - transforms # Anything related to Vector's transform components
+  - unit tests # Anything related to Vector's unit testing feature
+  - vrl # Anything related to the Vector Remap Language
 
   # platforms
   - amazon-linux platform # Anything `amazon-linux` platform related

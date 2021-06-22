@@ -10,16 +10,20 @@ criterion_group!(
     // https://github.com/timberio/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
     targets = assert,
+              assert_eq,
               ceil,
               compact,
               contains,
               decode_base64,
+              decode_percent,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
               encode_base64,
+              encode_key_value,
               encode_json,
               encode_logfmt,
+              encode_percent,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -48,6 +52,8 @@ criterion_group!(
               length,
               log,
               r#match,
+              match_any,
+              match_array,
               md5,
               merge,
               // TODO: value is dynamic so we cannot assert equality
@@ -68,6 +74,7 @@ criterion_group!(
               parse_query_string,
               parse_regex,
               parse_regex_all,
+              parse_ruby_hash,
               parse_syslog,
               parse_timestamp,
               parse_tokens,
@@ -115,6 +122,15 @@ bench_function! {
 
     literal {
         args: func_args![condition: value!(true), message: "must be true"],
+        want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
+    assert_eq=> vrl_stdlib::AssertEq;
+
+    literal {
+        args: func_args![left: value!(true), right: value!(true), message: "must be true"],
         want: Ok(value!(true)),
     }
 }
@@ -170,6 +186,15 @@ bench_function! {
 }
 
 bench_function! {
+    decode_percent => vrl_stdlib::DecodePercent;
+
+    literal {
+        args: func_args![value: "foo%20bar%3F"],
+        want: Ok("foo bar?"),
+    }
+}
+
+bench_function! {
     downcase => vrl_stdlib::Downcase;
 
     literal {
@@ -184,6 +209,59 @@ bench_function! {
     literal {
         args: func_args![value: "some+=string/value"],
         want: Ok("c29tZSs9c3RyaW5nL3ZhbHVl"),
+    }
+}
+
+bench_function! {
+    encode_key_value => vrl_stdlib::EncodeKeyValue;
+
+    encode_complex_value {
+        args: func_args![value:
+            btreemap! {
+                "msg" => r#"result: {"authz": false, "length": 42}\n"#,
+                "severity" => "    panic"
+            },
+            key_value_delimiter: "==",
+            field_delimiter: "!!!"
+            ],
+        want: Ok(r#"msg=="result: {\"authz\": false, \"length\": 42}\\n"!!!severity=="    panic""#),
+    }
+
+    encode_key_value {
+        args: func_args![value:
+            btreemap! {
+                "mow" => "vvo",
+                "vvo" => "pkc",
+                "pkc" => "hrb",
+                "hrb" => "tsn",
+                "tsn" => "can",
+                "can" => "pnh",
+                "pnh" => "sin",
+                "sin" => "syd"
+            },
+            key_value_delimiter: ":",
+            field_delimiter: ","
+        ],
+        want: Ok(r#"can:pnh,hrb:tsn,mow:vvo,pkc:hrb,pnh:sin,sin:syd,tsn:can,vvo:pkc"#),
+    }
+
+    fields_ordering {
+        args: func_args![value:
+            btreemap! {
+                "mow" => "vvo",
+                "vvo" => "pkc",
+                "pkc" => "hrb",
+                "hrb" => "tsn",
+                "tsn" => "can",
+                "can" => "pnh",
+                "pnh" => "sin",
+                "sin" => "syd"
+            },
+            fields_ordering: value!(["mow", "vvo", "pkc", "hrb", "tsn", "can", "pnh", "sin"]),
+            key_value_delimiter: ":",
+            field_delimiter: ","
+        ],
+        want: Ok(r#"mow:vvo,vvo:pkc,pkc:hrb,hrb:tsn,tsn:can,can:pnh,pnh:sin,sin:syd"#),
     }
 }
 
@@ -218,6 +296,20 @@ bench_function! {
             fields_ordering: value!(["lvl", "msg"])
         ],
         want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
+    }
+}
+
+bench_function! {
+    encode_percent => vrl_stdlib::EncodePercent;
+
+    non_alphanumeric {
+        args: func_args![value: r#"foo bar?"#],
+        want: Ok(r#"foo%20bar%3F"#),
+    }
+
+    controls {
+        args: func_args![value: r#"foo bar"#, ascii_set: "CONTROLS"],
+        want: Ok(r#"foo %14bar"#),
     }
 }
 
@@ -590,6 +682,61 @@ bench_function! {
 }
 
 bench_function! {
+    match_any => vrl_stdlib::MatchAny;
+
+    simple {
+        args: func_args![value: "foo 2 bar", patterns: vec![Regex::new(r"foo \d bar").unwrap()]],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    match_array => vrl_stdlib::MatchArray;
+
+    single_match {
+        args: func_args![
+            value: value!(["foo 1 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(true),
+    }
+
+    no_match {
+        args: func_args![
+            value: value!(["foo x bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(false),
+    }
+
+    some_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+        ],
+        want: Ok(true),
+    }
+
+    all_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+            all: value!(true)
+        ],
+        want: Ok(true),
+    }
+
+    not_all_match {
+        args: func_args![
+            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo x bar"]),
+            pattern: Regex::new(r"foo \d bar").unwrap(),
+            all: value!(true)
+        ],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
     md5  => vrl_stdlib::Md5;
 
     literal {
@@ -925,6 +1072,20 @@ bench_function! {
             module: "kafka.consumer.ConsumerFetcherManager"
         }))
     }
+
+    standalone_key_disabled {
+        args: func_args! [
+            value: r#"level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"#,
+            accept_standalone_key: false
+        ],
+        want: Ok(value!({
+            level: "info",
+            msg: "Stopping all fetchers",
+            tag: "stopping_fetchers",
+            id: "ConsumerFetcherManager-1382721708341",
+            module: "kafka.consumer.ConsumerFetcherManager"
+        }))
+    }
 }
 
 bench_function! {
@@ -1064,6 +1225,23 @@ bench_function! {
                     "1": "peaches",
                     "2": "peas"
                 }]))
+    }
+}
+
+bench_function! {
+    parse_ruby_hash => vrl_stdlib::ParseRubyHash;
+
+    matches {
+        args: func_args![
+            value: r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
+        ],
+        want: Ok(value!({
+            test: "value",
+            testNum: 0.2,
+            testObj: {
+                testBool: true,
+            }
+        }))
     }
 }
 

@@ -2,7 +2,7 @@ use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
 use crate::config::log_schema;
 use lookup::LookupBuf;
 use snafu::Snafu;
-use std::{collections::BTreeMap, convert::TryFrom, iter::FromIterator};
+use std::{collections::BTreeMap, convert::TryFrom};
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
@@ -68,7 +68,7 @@ impl vrl_core::Target for VrlTarget {
                         ["tags"] => {
                             let value = value.try_object().map_err(|e| e.to_string())?;
                             for (field, value) in &value {
-                                metric.set_tag_value(
+                                metric.insert_tag(
                                     field.as_str().to_owned(),
                                     value
                                         .try_bytes_utf8_lossy()
@@ -80,7 +80,7 @@ impl vrl_core::Target for VrlTarget {
                         }
                         ["tags", field] => {
                             let value = value.try_bytes().map_err(|e| e.to_string())?;
-                            metric.set_tag_value(
+                            metric.insert_tag(
                                 (*field).to_owned(),
                                 String::from_utf8_lossy(&value).into_owned(),
                             );
@@ -167,11 +167,12 @@ impl vrl_core::Target for VrlTarget {
                             Some(timestamp) => return Ok(Some(timestamp.into())),
                             None => continue,
                         },
-                        ["kind"] => return Ok(Some(metric.data.kind.clone().into())),
+                        ["kind"] => return Ok(Some(metric.data.kind.into())),
                         ["tags"] => {
                             return Ok(metric.tags().map(|map| {
-                                let iter = map.iter().map(|(k, v)| (k.clone(), v.clone().into()));
-                                vrl_core::Value::from_iter(iter)
+                                map.iter()
+                                    .map(|(k, v)| (k.clone(), v.clone().into()))
+                                    .collect::<vrl_core::Value>()
                             }))
                         }
                         ["tags", field] => match metric.tag_value(field) {
@@ -227,11 +228,12 @@ impl vrl_core::Target for VrlTarget {
                         ["timestamp"] => return Ok(metric.data.timestamp.take().map(Into::into)),
                         ["tags"] => {
                             return Ok(metric.series.tags.take().map(|map| {
-                                let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                                vrl_core::Value::from_iter(iter)
+                                map.into_iter()
+                                    .map(|(k, v)| (k, v.into()))
+                                    .collect::<vrl_core::Value>()
                             }))
                         }
-                        ["tags", field] => return Ok(metric.delete_tag(field).map(Into::into)),
+                        ["tags", field] => return Ok(metric.remove_tag(field).map(Into::into)),
                         _ => {
                             return Err(MetricPathError::InvalidPath {
                                 path: &path.to_string(),

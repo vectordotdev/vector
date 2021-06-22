@@ -6,7 +6,7 @@ pub use finalization::{
 };
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
-pub use metadata::EventMetadata;
+pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
@@ -139,11 +139,26 @@ impl Event {
         }
     }
 
+    /// Destroy the event and return the metadata.
+    pub fn into_metadata(self) -> EventMetadata {
+        match self {
+            Self::Log(log) => log.into_parts().1,
+            Self::Metric(metric) => metric.into_parts().2,
+        }
+    }
+
     pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
         let finalizer = EventFinalizer::new(batch);
         match self {
             Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
+        }
+    }
+
+    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+        match self {
+            Self::Log(log) => log.with_batch_notifier(batch).into(),
+            Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
         }
     }
 }

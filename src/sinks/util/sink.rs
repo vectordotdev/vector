@@ -39,14 +39,10 @@ use super::{
 };
 use crate::{
     buffers::Acker,
-    event::{Event, EventMetadata, EventStatus},
+    event::{EventMetadata, EventStatus},
 };
-use async_trait::async_trait;
 use futures::{
-    future::BoxFuture,
-    ready,
-    stream::{BoxStream, FuturesUnordered},
-    FutureExt, Sink, Stream, TryFutureExt,
+    future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
 };
 use pin_project::pin_project;
 use std::{
@@ -66,10 +62,7 @@ use tracing_futures::Instrument;
 
 // === StreamSink ===
 
-#[async_trait]
-pub trait StreamSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
-}
+pub use vector_core::sink::StreamSink;
 
 // === BatchSink ===
 
@@ -288,7 +281,7 @@ where
                     || batch.was_full()
                     || matches!(
                         this.lingers
-                            .get_mut(&partition)
+                            .get_mut(partition)
                             .expect("linger should exists for poll_flush")
                             .poll_unpin(cx),
                         Poll::Ready(())
@@ -307,8 +300,8 @@ where
                 if service_ready {
                     trace!("Service ready; Sending batch.");
 
-                    let batch = self.partitions.remove(&partition).unwrap();
-                    self.lingers.remove(&partition);
+                    let batch = self.partitions.remove(partition).unwrap();
+                    self.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
                     let (batch, metadata) = batch.finish();

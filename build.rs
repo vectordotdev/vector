@@ -97,16 +97,26 @@ fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
 
-    #[cfg(any(feature = "sources-vector", feature = "sinks-vector"))]
+    #[cfg(any(
+        feature = "sources-vector",
+        feature = "sources-dnstap",
+        feature = "sinks-vector"
+    ))]
     {
         println!("cargo:rerun-if-changed=proto/vector.proto");
+        println!("cargo:rerun-if-changed=proto/dnstap.proto");
+
         let mut prost_build = prost_build::Config::new();
         prost_build.btree_map(&["."]);
 
         tonic_build::configure()
             .compile_with_config(
                 prost_build,
-                &["lib/vector-core/proto/event.proto", "proto/vector.proto"],
+                &[
+                    "lib/vector-core/proto/event.proto",
+                    "proto/vector.proto",
+                    "proto/dnstap.proto",
+                ],
                 &["proto/", "lib/vector-core/proto/"],
             )
             .unwrap();
@@ -130,6 +140,9 @@ fn main() {
         .expect("Cargo-provided environment variables should always exist!");
     let target_arch = tracker
         .get_env_var("CARGO_CFG_TARGET_ARCH")
+        .expect("Cargo-provided environment variables should always exist!");
+    let debug = tracker
+        .get_env_var("DEBUG")
         .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
@@ -156,6 +169,7 @@ fn main() {
         "The target architecture being compiled for. (e.g. x86_64)",
         target_arch,
     );
+    constants.add_required_constant("DEBUG", "Level of debug info for Vector.", debug);
     constants.add_optional_constant(
         "VECTOR_BUILD_DESC",
         "Special build description, related to versioned releases.",
