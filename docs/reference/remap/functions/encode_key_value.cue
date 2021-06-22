@@ -39,6 +39,13 @@ remap: functions: encode_key_value: {
 			default:     " "
 			type: ["string"]
 		},
+		{
+			name:        "flatten_boolean"
+			description: "Whether to encode key/value with a boolean value as a standalone key if `true` and nothing if `false`."
+			required:    false
+			type: ["boolean"]
+			default: false
+		},
 	]
 	internal_failure_reasons: [
 		"`fields_ordering` contains a non-string element",
@@ -84,6 +91,18 @@ remap: functions: encode_key_value: {
 				)
 				"""
 			return: #"lvl:info,msg:"This is a message",ts:2021-06-05T17:20:00Z"#
+		},
+		{
+			title: "Encode with custom delimiters and flatten boolean"
+			source: """
+				encode_key_value(
+					{"ts": "2021-06-05T17:20:00Z", "msg": "This is a message", "lvl": "info", "beta": true, "dropped": false},
+					field_delimiter: ",",
+					key_value_delimiter: ":",
+					flatten_boolean: true
+				)
+				"""
+			return: #"beta,lvl:info,msg:"This is a message",ts:2021-06-05T17:20:00Z"#
 		},
 	]
 }

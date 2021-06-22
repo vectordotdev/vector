@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::result::Result;
 use vrl::prelude::*;
-use Value::{Array, Object};
+use Value::{Array, Boolean, Object};
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeKeyValue;
@@ -34,6 +34,11 @@ impl Function for EncodeKeyValue {
                 kind: kind::BYTES,
                 required: false,
             },
+            Parameter {
+                keyword: "flatten_boolean",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
         ]
     }
 
@@ -49,11 +54,16 @@ impl Function for EncodeKeyValue {
             .optional("field_delimiter")
             .unwrap_or_else(|| expr!(" "));
 
+        let flatten_boolean = arguments
+            .optional("flatten_boolean")
+            .unwrap_or_else(|| expr!(false));
+
         Ok(Box::new(EncodeKeyValueFn {
             value,
             fields,
             key_value_delimiter,
             field_delimiter,
+            flatten_boolean,
         }))
     }
 
@@ -84,6 +94,7 @@ pub(crate) struct EncodeKeyValueFn {
     pub(crate) fields: Option<Box<dyn Expression>>,
     pub(crate) key_value_delimiter: Box<dyn Expression>,
     pub(crate) field_delimiter: Box<dyn Expression>,
+    pub(crate) flatten_boolean: Box<dyn Expression>,
 }
 
 fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
@@ -116,8 +127,16 @@ impl Expression for EncodeKeyValueFn {
 
         let value = self.field_delimiter.resolve(ctx)?;
         let field_delimiter = value.try_bytes_utf8_lossy()?;
+        let flatten_boolean = self.flatten_boolean.resolve(ctx)?.try_boolean()?;
 
-        Ok(encode(object, &fields[..], &key_value_delimiter, &field_delimiter).into())
+        Ok(encode(
+            object,
+            &fields[..],
+            &key_value_delimiter,
+            &field_delimiter,
+            flatten_boolean,
+        )
+        .into())
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
@@ -200,21 +219,39 @@ pub fn encode<'a>(
     fields: &[String],
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
+    flatten_boolean: bool,
 ) -> String {
     let mut output = String::new();
 
     let mut input: BTreeMap<_, _> = flatten(input, String::from(""), '.', 0).collect();
 
     for field in fields.iter() {
-        if let Some(val) = input.remove(field) {
-            encode_field(&mut output, field, &val, key_value_delimiter);
-            output.write_str(field_delimiter).unwrap();
-        }
+        match (input.remove(field), flatten_boolean) {
+            (Some(Boolean(false)), true) => (),
+            (Some(Boolean(true)), true) => {
+                encode_string(&mut output, field);
+                output.write_str(field_delimiter).unwrap();
+            }
+            (Some(val), _) => {
+                encode_field(&mut output, field, &val, key_value_delimiter);
+                output.write_str(field_delimiter).unwrap();
+            }
+            (None, _) => (),
+        };
     }
 
     for (key, value) in input.iter() {
-        encode_field(&mut output, key, value, key_value_delimiter);
-        output.write_str(field_delimiter).unwrap();
+        match (value, flatten_boolean) {
+            (Boolean(false), true) => (),
+            (Boolean(true), true) => {
+                encode_string(&mut output, key);
+                output.write_str(field_delimiter).unwrap();
+            }
+            (_, _) => {
+                encode_field(&mut output, key, value, key_value_delimiter);
+                output.write_str(field_delimiter).unwrap();
+            }
+        };
     }
 
     if output.ends_with(field_delimiter) {
@@ -263,6 +300,48 @@ mod tests {
             tdef: TypeDef::new().bytes().infallible(),
         }
 
+        flatten_boolean {
+            args: func_args![value:
+                btreemap! {
+                    "beta" => true,
+                    "prod" => false,
+                    "lvl" => "info",
+                    "msg" => "This is a log message",
+                },
+                flatten_boolean: value!(true)
+            ],
+            want: Ok(r#"beta lvl=info msg="This is a log message""#),
+            tdef: TypeDef::new().bytes().infallible(),
+        }
+
+        dont_flatten_boolean {
+            args: func_args![value:
+                btreemap! {
+                    "beta" => true,
+                    "prod" => false,
+                    "lvl" => "info",
+                    "msg" => "This is a log message",
+                },
+                flatten_boolean: value!(false)
+            ],
+            want: Ok(r#"beta=true lvl=info msg="This is a log message" prod=false"#),
+            tdef: TypeDef::new().bytes().infallible(),
+        }
+
+        flatten_boolean_with_custom_delimiters {
+            args: func_args![value:
+                btreemap! {
+                    "tag_a" => "val_a",
+                    "tag_b" => "val_b",
+                    "tag_c" => true,
+                },
+                key_value_delimiter: value!(":"),
+                field_delimiter: value!(","),
+                flatten_boolean: value!(true)
+            ],
+            want: Ok(r#"tag_a:val_a,tag_b:val_b,tag_c"#),
+            tdef: TypeDef::new().bytes().infallible(),
+        }
         string_with_characters_to_escape {
             args: func_args![value:
                 btreemap! {
