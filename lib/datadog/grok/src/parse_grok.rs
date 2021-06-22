@@ -166,7 +166,10 @@ fn purify_grok_pattern(
             });
         }
         Ok(res)
-    } else if rule.match_fn.name == "regex" || rule.match_fn.name == "date" {
+    } else if rule.match_fn.name == "regex"
+        || rule.match_fn.name == "date"
+        || rule.match_fn.name == "boolean"
+    {
         // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
         res.push_str("(?");
         res.push_str("<");
@@ -201,42 +204,88 @@ fn process_match_function(
     let match_fn = &pattern.match_fn;
     let result = match match_fn.name.as_ref() {
         "regex" => {
-            let args = match_fn.args.as_ref().unwrap();
-            if let ast::FunctionArgument::ARG(Value::Bytes(b)) = &args[0] {
-                Ok(String::from_utf8_lossy(&b).to_string())
-            } else {
-                Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
+            if match_fn.args.is_some() {
+                if let ast::FunctionArgument::ARG(Value::Bytes(b)) =
+                    &match_fn.args.as_ref().unwrap()[0]
+                {
+                    return Ok(String::from_utf8_lossy(&b).to_string());
+                }
             }
+            Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
         }
         "date" => Ok("13\\/Jul\\/2016:10:55:36 \\+0000".to_string()), // TODO in a follow-up PR
-        "integer" => {
-            // replace with DD grok pattern and add a filter
-            if let Some(destination) = &pattern.destination {
-                filters.insert(
-                    destination.path.clone(),
-                    vec![Function {
-                        name: "integer".to_string(),
-                        args: None,
-                    }],
-                );
+        "integer" => replace_with_pattern_and_add_as_filter(
+            "integerStr",
+            Function::new("integer"),
+            filters,
+            pattern,
+        ),
+        "integerExt" => replace_with_pattern_and_add_as_filter(
+            "integerExtStr",
+            Function::new("integerExt"),
+            filters,
+            pattern,
+        ),
+        "number" => replace_with_pattern_and_add_as_filter(
+            "numberStr",
+            Function::new("number"),
+            filters,
+            pattern,
+        ),
+        "numberExt" => replace_with_pattern_and_add_as_filter(
+            "numberExtStr",
+            Function::new("numberExt"),
+            filters,
+            pattern,
+        ),
+        "boolean" => {
+            if match_fn.args.is_some() {
+                let args = match_fn.args.as_ref().unwrap();
+                if args.len() == 2 {
+                    if let ast::FunctionArgument::ARG(true_pattern) = &args[0] {
+                        if let ast::FunctionArgument::ARG(false_pattern) = &args[1] {
+                            return replace_with_pattern_and_add_as_filter(
+                                format!(
+                                    "{}|{}",
+                                    true_pattern.try_bytes_utf8_lossy().map_err(|_| {
+                                        Error::InvalidFunctionArguments(match_fn.name.clone())
+                                    })?,
+                                    false_pattern.try_bytes_utf8_lossy().map_err(|_| {
+                                        Error::InvalidFunctionArguments(match_fn.name.clone())
+                                    })?
+                                )
+                                .as_str(),
+                                match_fn.clone(),
+                                filters,
+                                pattern,
+                            );
+                        }
+                    }
+                }
+                Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
+            } else {
+                replace_with_pattern_and_add_as_filter(
+                    "[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]",
+                    match_fn.clone(),
+                    filters,
+                    pattern,
+                )
             }
-            Ok("integerStr".to_string())
-        }
-        "number" => {
-            // replace with DD grok pattern and add a filter
-            if let Some(destination) = &pattern.destination {
-                filters.insert(
-                    destination.path.clone(),
-                    vec![Function {
-                        name: "number".to_string(),
-                        args: None,
-                    }],
-                );
-            }
-            Ok("numberStr".to_string())
         }
         // otherwise just add it as is, it should be a known grok pattern
         grok_pattern_name => Ok(grok_pattern_name.to_string()),
     };
     result
+}
+
+fn replace_with_pattern_and_add_as_filter(
+    new_pattern: &str,
+    filter: Function,
+    filters: &mut HashMap<LookupBuf, Vec<Function>>,
+    pattern: &ast::GrokPattern,
+) -> Result<String, Error> {
+    if let Some(destination) = &pattern.destination {
+        filters.insert(destination.path.clone(), vec![filter]);
+    }
+    Ok(new_pattern.to_string())
 }

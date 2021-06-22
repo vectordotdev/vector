@@ -19,6 +19,22 @@ pub struct Function {
     pub args: Option<Vec<FunctionArgument>>,
 }
 
+impl Function {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            args: None,
+        }
+    }
+
+    pub fn new_with_args(name: &str, args: Option<Vec<FunctionArgument>>) -> Self {
+        Self {
+            name: name.to_string(),
+            args,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum FunctionArgument {
     FUNCTION(Function),

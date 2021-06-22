@@ -156,12 +156,12 @@ fn grok_rule_to_expr(
         .collect::<std::result::Result<Vec<vrl_ast::Expr>, GrokError>>()?;
 
     let parsed_eq_null = make_op(
-        make_node(make_query(target_var_name)),
+        make_node(make_variable(target_var_name)),
         Opcode::Eq,
         make_node(make_null()),
     );
     let er_eq_null = make_op(
-        make_node(make_query(err_var_name)),
+        make_node(make_variable(err_var_name)),
         Opcode::Eq,
         make_node(make_null()),
     );
@@ -183,10 +183,60 @@ fn make_filter_call(
             make_function_call("to_int", vec![value], false),
             make_null(),
         )),
+        "integerExt" => Ok(
+            /// scientific notation is supported by float conversion,
+            /// so first convert it to float and then to int
+            make_coalesce(
+                make_function_call(
+                    "to_int",
+                    vec![make_coalesce(
+                        make_function_call("to_float", vec![value], false),
+                        vrl_ast::Expr::Literal(make_node(
+                            vrl_ast::Literal::String("not a valid integer".into()).into(),
+                        )),
+                    )],
+                    false,
+                ),
+                make_null(),
+            ),
+        ),
         "number" => Ok(make_coalesce(
             make_function_call("to_float", vec![value], false),
             make_null(),
         )),
+        "numberExt" => Ok(make_coalesce(
+            make_function_call("to_float", vec![value], false),
+            make_null(),
+        )),
+        "boolean" => {
+            if filter.args.is_some() && !filter.args.as_ref().unwrap().is_empty() {
+                if let FunctionArgument::ARG(ref true_pattern) = filter.args.as_ref().unwrap()[0] {
+                    return Ok(make_if_else(
+                        make_function_call(
+                            "match",
+                            vec![
+                                value,
+                                vrl_ast::Expr::Literal(make_node(vrl_ast::Literal::Regex(
+                                    format!(
+                                        "^{}$",
+                                        true_pattern.try_bytes_utf8_lossy().map_err(|_| {
+                                            GrokError::InvalidFunctionArguments(filter.name.clone())
+                                        })?
+                                    ),
+                                ))),
+                            ],
+                            false,
+                        ),
+                        vrl_ast::Expr::Literal(make_node(vrl_ast::Literal::Boolean(true))),
+                        vrl_ast::Expr::Literal(make_node(vrl_ast::Literal::Boolean(false))),
+                    ));
+                }
+            }
+            Ok(make_coalesce(
+                make_function_call("to_bool", vec![value], false),
+                make_null(),
+            ))
+        }
         "nullIf" => Ok(value), //TODO in a follow-up PR
         "scale" => {
             if filter.args.is_some() && !filter.args.as_ref().unwrap().is_empty() {

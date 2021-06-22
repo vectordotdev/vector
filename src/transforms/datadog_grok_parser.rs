@@ -309,4 +309,46 @@ mod tests {
 
         assert_eq!(event["custom.field"], "other".into());
     }
+
+    #[tokio::test]
+    async fn parses_all_match_functions() {
+        test_match_function(vec![
+            ("numberStr", "-1.2", Value::Bytes("-1.2".into()).into()),
+            ("number", "-1.2", Value::Float(-1.2_f64).into()),
+            ("number", "-1", Value::Float(-1_f64).into()),
+            ("numberExt", "-1234e+3", Value::Float(-1234e+3_f64).into()),
+            ("numberExt", ".1e+3", Value::Float(0.1e+3_f64).into()),
+            ("integer", "-2", Value::Integer(-2).into()),
+            ("integerExt", "+2", Value::Integer(2).into()),
+            ("integerExt", "-2", Value::Integer(-2).into()),
+            ("integerExt", "-1e+2", Value::Integer(-100).into()),
+            ("integerExt", "1234.1e+5", None),
+            ("boolean", "tRue", Value::Boolean(true).into()), // true/false are default values(case-insensitive)
+            ("boolean", "False", Value::Boolean(false).into()),
+            (r#"boolean("ok", "no")"#, "ok", Value::Boolean(true).into()),
+            (r#"boolean("ok", "no")"#, "no", Value::Boolean(false).into()),
+            // (r#"date("HH:mm:ss")"#, "14:20:15", 51615000.into()), //TODO
+            (r#"boolean("ok", "no")"#, "No", None),
+            (
+                r#"doubleQuotedString"#,
+                r#""test  ""#,
+                Value::Bytes(r#""test  ""#.into()).into(),
+            ),
+        ])
+        .await;
+    }
+
+    async fn test_match_function(tests: Vec<(&str, &str, Option<Value>)>) {
+        for (match_fn, k, v) in tests {
+            let event = parse_log(
+                Event::from(k),
+                vec![],
+                vec![format!(r#"test %{{{}:field}}"#, match_fn)],
+                None,
+            )
+            .await;
+
+            assert_eq!(event.get("custom.field"), v.as_ref());
+        }
+    }
 }
