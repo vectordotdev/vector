@@ -26,14 +26,6 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
 
     match host {
         None => {
-            // TODO: Use `connect_with_local_defaults` on all platforms.
-            //
-            // Using `connect_with_local_defaults` defers to `connect_with_named_pipe_defaults` on Windows. However,
-            // named pipes are currently disabled in Tokio. Tracking issue:
-            // https://github.com/fussybeaver/bollard/pull/138
-            if cfg!(windows) {
-                Docker::connect_with_http_defaults().map_err(Into::into)
-            } else {
                 Docker::connect_with_local_defaults().map_err(Into::into)
             }
         }
