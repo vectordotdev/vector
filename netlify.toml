@@ -6,9 +6,13 @@ command = "make ci-production-build"
 [build.environment]
 HUGO_VERSION = "0.84.0"
 HUGO_ENVIRONMENT = "production"
+ALGOLIA_INDEX_FILE="public/search.json"
+ALGOLIA_INDEX_NAME="vector_docs_prod"
 
 [context.deploy-preview]
 command = "make ci-preview-build"
+ALGOLIA_INDEX_NAME="vector_docs_staging"
 
 [context.branch-deploy]
 command = "make ci-preview-build"
+ALGOLIA_INDEX_NAME="vector_docs_staging"

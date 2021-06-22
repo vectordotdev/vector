@@ -17,7 +17,7 @@ production-build:
 	hugo \
 	--minify
 
-ci-production-build: setup build-cue production-build run-link-checker
+ci-production-build: setup build-cue production-build run-link-checker algolia-upload
 
 # Preview site
 preview-build:
@@ -26,10 +26,14 @@ preview-build:
 	--buildFuture \
 	--minify
 
-ci-preview-build: setup build-cue preview-build
+ci-preview-build: setup build-cue preview-build algolia-upload
 
 run-link-checker:
 	htmltest
 
 # Check links without rebuilding the CUE sources. Optimal for fixing links locally.
 check-links: production-build run-link-checker
+
+# Search
+algolia-upload:
+	yarn run algolia
