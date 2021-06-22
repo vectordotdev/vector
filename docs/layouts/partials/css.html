@@ -9,14 +9,14 @@
 {{ $opts := merge $cssOpts (dict "targetPath" .output) }}
 {{ $css := resources.Get .input | resources.ExecuteAsTemplate .input . | toCSS $opts }}
 {{ if .postcss }}
-{{ $css = $css | postCSS $postCssOpts }}
+{{ $css := $css | postCSS $postCssOpts }}
 {{ end }}
 
 {{ if not (and .home_page_only (not $isHome)) }}
 {{ if $server }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}">
 {{ else }}
-{{ $css = $css | fingerprint }}
+{{ $css := $css | fingerprint }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
 {{ end }}
 {{ end }}
