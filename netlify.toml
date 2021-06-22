@@ -4,7 +4,7 @@ publish = "public"
 command = "make ci-production-build"
 
 [build.environment]
-HUGO_VERSION = "0.82.0"
+HUGO_VERSION = "0.84.0"
 HUGO_ENVIRONMENT = "production"
 
 [context.deploy-preview]

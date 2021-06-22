@@ -3,7 +3,7 @@ frontend:
   phases:
     preBuild:
       commands:
-        - HUGO_VERSION=0.83.1
+        - HUGO_VERSION=0.84.0
         - CUE_VERSION=0.4.0-beta.1
         - cd website
         # install golang for hugo ext
