@@ -17,7 +17,7 @@ production-build:
 	hugo \
 	--minify
 
-ci-production-build: setup build-cue production-build run-link-checker algolia-upload
+ci-production-build: setup build-cue production-build run-link-checker algolia
 
 # Preview site
 preview-build:
@@ -26,7 +26,7 @@ preview-build:
 	--buildFuture \
 	--minify
 
-ci-preview-build: setup build-cue preview-build algolia-upload
+ci-preview-build: setup build-cue preview-build algolia
 
 run-link-checker:
 	htmltest
@@ -35,5 +35,6 @@ run-link-checker:
 check-links: production-build run-link-checker
 
 # Search
-algolia-upload:
-	yarn run algolia
+algolia:
+	yarn run algolia-config
+	yarn run algolia-index

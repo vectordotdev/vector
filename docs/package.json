@@ -1,9 +1,11 @@
 {
   "private": true,
   "scripts": {
-    "algolia": "atomic-algolia"
+    "algolia-config": "algolia setsettings -a ${ALGOLIA_APP_ID} -k ${ALGOLIA_ADMIN_KEY} -n ${ALGOLIA_INDEX_NAME} -s ./algolia-config.js",
+    "algolia-index": "atomic-algolia"
   },
   "dependencies": {
+    "@algolia/cli": "^4.0.8",
     "@babel/cli": "^7.14.5",
     "@babel/core": "^7.14.6",
     "@babel/preset-env": "^7.14.5",
