@@ -6,7 +6,7 @@ use vrl_parser::ast;
 use vrl_stdlib as f;
 
 /// Static express to parse Datadog tags to a VRL object.
-static TAGS_QUERY: &str = r#".__datadog_tags = parse_key_value(join!(.tags, ","), field_delimiter: ",", key_value_delimiter: ":", accept_standalone_key: true) ?? {}"#;
+static TAGS_QUERY: &str = r#".__datadog_tags = parse_key_value(join!(.tags, ","), field_delimiter: ",", key_value_delimiter: ":"    ) ?? {}"#;
 
 lazy_static! {
     static ref FUNCTIONS: Vec<Box<dyn Function>> = vec![
