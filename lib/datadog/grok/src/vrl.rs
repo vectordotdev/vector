@@ -237,7 +237,29 @@ fn make_filter_call(
                 make_null(),
             ))
         }
-        "nullIf" => Ok(value), //TODO in a follow-up PR
+        "nullIf" => {
+            if filter.args.is_some() && !filter.args.as_ref().unwrap().is_empty() {
+                if let FunctionArgument::ARG(ref null_value) = filter.args.as_ref().unwrap()[0] {
+                    return Ok(make_if_else(
+                        make_op(
+                            make_node(value.clone()),
+                            Opcode::Eq,
+                            make_node(vrl_ast::Expr::Literal(make_node(vrl_ast::Literal::String(
+                                format!(
+                                    "{}",
+                                    null_value.try_bytes_utf8_lossy().map_err(|_| {
+                                        GrokError::InvalidFunctionArguments(filter.name.clone())
+                                    })?
+                                ),
+                            )))),
+                        ),
+                        make_null(),
+                        value,
+                    ));
+                }
+            }
+            Err(GrokError::InvalidFunctionArguments(filter.name.clone()))
+        }
         "scale" => {
             if filter.args.is_some() && !filter.args.as_ref().unwrap().is_empty() {
                 if let FunctionArgument::ARG(Value::Integer(scale_factor)) =

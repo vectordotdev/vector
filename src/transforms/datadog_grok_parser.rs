@@ -208,6 +208,7 @@ mod tests {
         assert_eq!(event["custom.http.version"], "1.0".into());
         assert_eq!(event["custom.http.referer"], "http://www.perdu.com/".into());
         assert_eq!(event["custom.http.useragent"], "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36".into());
+        assert_eq!(event["custom.http._x_forwarded_for"], Value::Null);
         assert_eq!(event["custom.network.bytes_written"], 2326.into());
         assert_eq!(event["custom.network.client.ip"], "127.0.0.1".into());
     }
@@ -311,7 +312,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn parses_all_match_functions() {
+    async fn parses_match_functions() {
         test_match_function(vec![
             ("numberStr", "-1.2", Value::Bytes("-1.2".into()).into()),
             ("number", "-1.2", Value::Float(-1.2_f64).into()),
@@ -344,6 +345,29 @@ mod tests {
                 Event::from(k),
                 vec![],
                 vec![format!(r#"test %{{{}:field}}"#, match_fn)],
+                None,
+            )
+            .await;
+
+            assert_eq!(event.get("custom.field"), v.as_ref());
+        }
+    }
+
+    #[tokio::test]
+    async fn parses_filter_functions() {
+        test_filter_function(vec![
+            (r#"nullIf("-")"#, "-", Value::Null.into()),
+            (r#"nullIf("-")"#, "abc", Value::Bytes("abc".into()).into()),
+        ])
+        .await;
+    }
+
+    async fn test_filter_function(tests: Vec<(&str, &str, Option<Value>)>) {
+        for (filter, k, v) in tests {
+            let event = parse_log(
+                Event::from(k),
+                vec![],
+                vec![format!(r#"test %{{data:field:{}}}"#, filter)],
                 None,
             )
             .await;
