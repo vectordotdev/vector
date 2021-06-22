@@ -80,168 +80,168 @@ discord = "https://chat.vector.dev"
 ## Menus
 
 # Main page doc links
-[[menu.doc_quick_links]]
+[[menus.doc_quick_links]]
 name = "Quickstart"
 url = "/docs/setup/quickstart"
 params = { emphasis = true, ionicon = "rocket-outline" }
 weight = 1
 
-[[menu.doc_quick_links]]
+[[menus.doc_quick_links]]
 name = "Vector Remap Language"
 url = "/docs/reference/vrl"
 params = { ionicon = "map-outline" }
 weight = 2
 
-[[menu.doc_quick_links]]
+[[menus.doc_quick_links]]
 name = "Components"
 url = "/components"
 params = { ionicon = "link-outline" }
 weight = 3
 
 # Navbar menu
-[[menu.navbar]]
+[[menus.navbar]]
 name = "Docs"
 url = "/docs"
 params = { flyout = true }
 weight = 1
 
-[[menu.navbar]]
+[[menus.navbar]]
 name = "Guides"
 url = "/guides"
 weight = 2
 
-[[menu.navbar]]
+[[menus.navbar]]
 name = "Components"
 url = "/components"
 weight = 3
 
-[[menu.navbar]]
+[[menus.navbar]]
 name = "Download"
 url = "/download"
 weight = 4
 
-[[menu.navbar]]
+[[menus.navbar]]
 name = "Blog"
 url = "/blog"
 weight = 5
 
 # Footer menu
-[[menu.footer]]
+[[menus.footer]]
 name = "About"
 identifier = "about"
 weight = 1
 
-[[menu.footer]]
+[[menus.footer]]
 name = "What is Vector?"
 url = "/docs/about"
 parent = "about"
 weight = 1
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Contact us"
 url = "/community"
 parent = "about"
 weight = 2
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Components"
 identifier = "components"
 weight = 2
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Sources"
 url = "/docs/reference/configuration/sources"
 parent = "components"
 weight = 1
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Transforms"
 url = "/docs/reference/configuration/transforms"
 parent = "components"
 weight = 2
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Sinks"
 url = "/docs/reference/configuration/sinks"
 parent = "components"
 weight = 3
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Setup"
 identifier = "setup"
 weight = 3
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Installation"
 url = "/docs/setup/installation"
 parent = "setup"
 weight = 1
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Deployment"
 url = "/docs/setup/deployment"
 parent = "setup"
 weight = 2
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Configuration"
 url = "/docs/reference/configuration"
 parent = "setup"
 weight = 3
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Administration"
 url = "/docs/administration"
 parent = "setup"
 weight = 4
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Community"
 identifier = "community"
 weight = 4
 
-[[menu.footer]]
+[[menus.footer]]
 name = "GitHub"
 url = "https://github.com/timberio/vector"
 parent = "community"
 weight = 1
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Twitter"
 url = "https://twitter.com/vectordotdev"
 parent = "community"
 weight = 2
 
-[[menu.footer]]
+[[menus.footer]]
 name = "Chat"
 url = "https://chat.vector.dev"
 parent = "community"
 weight = 3
 
 # Extra links under the "Meta" section in the docs
-[[menu.meta]]
+[[menus.meta]]
 name = "Privacy"
 url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
 weight = 1
 
-[[menu.meta]]
+[[menus.meta]]
 name = "Release"
 url = "https://github.com/timberio/vector/blob/master/RELEASING.md"
 weight = 2
 
-[[menu.meta]]
+[[menus.meta]]
 name = "Security"
 url = "https://github.com/timberio/vector/security/policy"
 weight = 3
 
 # Buttons in "community" section on main page
-[[menu.community]]
+[[menus.community]]
 name = "View GitHub repo"
 params = { color = "black", dark = "white", icon = "github" }
 url = "https://github.com/timberio/vector"
 weight = 1
 
-[[menu.community]]
+[[menus.community]]
 name = "Chat with us on Discord"
 params = { color = "discord-purple", icon = "discord" }
 url = "https://chat.vector.dev"
@@ -249,125 +249,125 @@ weight = 2
 
 
 # Mini icons in navbar and footer
-[[menu.comms]]
+[[menus.comms]]
 name = "Twitter"
 params = { color = "twitter-blue", icon = "twitter" }
 url = "https://twitter.com/vectordotdev"
 weight = 1
 
-[[menu.comms]]
+[[menus.comms]]
 name = "GitHub"
 params = { color = "black", dark = "white", icon = "github" }
 url = "https://github.com/timberio/vector"
 weight = 2
 
-[[menu.comms]]
+[[menus.comms]]
 name = "Chat"
 params = { color = "discord-purple", icon = "discord" }
 url = "https://chat.vector.dev"
 weight = 3
 
-[[menu.comms]]
+[[menus.comms]]
 name = "RSS"
 params = { color = "rss-orange", icon = "rss" }
 url = "/blog/index.xml"
 weight = 4
 
 # Links in subfooter
-[[menu.subfooter]]
+[[menus.subfooter]]
 name = "Security policy"
 url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
 weight = 1
 
-[[menu.subfooter]]
+[[menus.subfooter]]
 name = "Privacy policy"
 url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
 weight = 2
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Documentation"
 identifier = "docs"
 url = "/docs"
 weight = 1
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Quickstart"
 parent = "docs"
 url = "/docs/setup/quickstart"
 weight = 1
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Components"
 identifier = "components"
 url = "/components"
 weight = 2
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Sources"
 parent = "components"
 url = "/docs/reference/configuration/sources"
 weight = 1
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Transforms"
 parent = "components"
 url = "/docs/reference/configuration/transforms"
 weight = 2
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Sinks"
 parent = "components"
 url = "/docs/reference/configuration/sinks"
 weight = 3
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Vector Remap Language"
 identifier = "vrl"
 url = "/docs/reference/vrl"
 weight = 3
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Expressions"
 parent = "vrl"
 url = "/docs/reference/vrl/expressions"
 weight = 1
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Functions"
 parent = "vrl"
 url = "/docs/reference/vrl/functions"
 weight = 2
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Errors"
 parent = "vrl"
 url = "/docs/reference/vrl/errors"
 weight = 3
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Examples"
 parent = "vrl"
 url = "/docs/reference/vrl/examples"
 weight = 4
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Pages"
 identifier = "pages"
 weight = 4
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Download"
 parent = "pages"
 url = "/download"
 weight = 1
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Releases"
 parent = "pages"
 url = "/releases"
 weight = 2
 
-[[menu.flyout]]
+[[menus.flyout]]
 name = "Highlights"
 parent = "pages"
 url = "/highlights"
