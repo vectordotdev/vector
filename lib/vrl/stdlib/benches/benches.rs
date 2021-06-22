@@ -20,6 +20,7 @@ criterion_group!(
               //del,
               downcase,
               encode_base64,
+              encode_key_value,
               encode_json,
               encode_logfmt,
               encode_percent,
@@ -208,6 +209,59 @@ bench_function! {
     literal {
         args: func_args![value: "some+=string/value"],
         want: Ok("c29tZSs9c3RyaW5nL3ZhbHVl"),
+    }
+}
+
+bench_function! {
+    encode_key_value => vrl_stdlib::EncodeKeyValue;
+
+    encode_complex_value {
+        args: func_args![value:
+            btreemap! {
+                "msg" => r#"result: {"authz": false, "length": 42}\n"#,
+                "severity" => "    panic"
+            },
+            key_value_delimiter: "==",
+            field_delimiter: "!!!"
+            ],
+        want: Ok(r#"msg=="result: {\"authz\": false, \"length\": 42}\\n"!!!severity=="    panic""#),
+    }
+
+    encode_key_value {
+        args: func_args![value:
+            btreemap! {
+                "mow" => "vvo",
+                "vvo" => "pkc",
+                "pkc" => "hrb",
+                "hrb" => "tsn",
+                "tsn" => "can",
+                "can" => "pnh",
+                "pnh" => "sin",
+                "sin" => "syd"
+            },
+            key_value_delimiter: ":",
+            field_delimiter: ","
+        ],
+        want: Ok(r#"can:pnh,hrb:tsn,mow:vvo,pkc:hrb,pnh:sin,sin:syd,tsn:can,vvo:pkc"#),
+    }
+
+    fields_ordering {
+        args: func_args![value:
+            btreemap! {
+                "mow" => "vvo",
+                "vvo" => "pkc",
+                "pkc" => "hrb",
+                "hrb" => "tsn",
+                "tsn" => "can",
+                "can" => "pnh",
+                "pnh" => "sin",
+                "sin" => "syd"
+            },
+            fields_ordering: value!(["mow", "vvo", "pkc", "hrb", "tsn", "can", "pnh", "sin"]),
+            key_value_delimiter: ":",
+            field_delimiter: ","
+        ],
+        want: Ok(r#"mow:vvo,vvo:pkc,pkc:hrb,hrb:tsn,tsn:can,can:pnh,pnh:sin,sin:syd"#),
     }
 }
 
