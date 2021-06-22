@@ -99,6 +99,8 @@ pub enum FingerprintConfig {
         #[serde(alias = "fingerprint_bytes")]
         bytes: Option<usize>,
         ignored_header_bytes: usize,
+        #[serde(default = "default_lines")]
+        lines: usize,
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
@@ -126,6 +128,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             FingerprintConfig::Checksum {
                 bytes,
                 ignored_header_bytes,
+                lines,
             } => {
                 let bytes = match bytes {
                     Some(bytes) => {
@@ -137,6 +140,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
                 FingerprintStrategy::Checksum {
                     bytes,
                     ignored_header_bytes,
+                    lines,
                 }
             }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
@@ -146,6 +150,10 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 
 fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
+}
+
+fn default_lines() -> usize {
+    1
 }
 
 #[derive(Debug)]
@@ -168,6 +176,7 @@ impl Default for FileConfig {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: None,
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             ignore_not_found: false,
             host_key: None,
@@ -488,6 +497,7 @@ mod tests {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: Some(8),
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             data_dir: Some(dir.path().to_path_buf()),
             glob_minimum_cooldown_ms: 100, // millis
@@ -524,6 +534,7 @@ mod tests {
             FingerprintConfig::Checksum {
                 bytes: None,
                 ignored_header_bytes: 0,
+                lines: 1
             }
         );
 
@@ -550,6 +561,7 @@ mod tests {
             FingerprintConfig::Checksum {
                 bytes: Some(128),
                 ignored_header_bytes: 512,
+                lines: 1
             }
         );
 
