@@ -111,7 +111,11 @@ components: sources: file: {
 				}
 				lines: {
 					common:        false
-					description:   "The number of lines to read when generating a unique fingerprint. This is helpful when some files share common first lines."
+					description:   """
+							   The number of lines to read when generating a unique fingerprint.
+							   This is helpful when some files share common first lines.
+							   If the file has less than this amount of lines then it won't be read at all.
+							   """
 					relevant_when: "strategy = \"checksum\""
 					required:      false
 					type: uint: {
