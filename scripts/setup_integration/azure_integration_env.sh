@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -o pipefail
 
-# aws_integration_env.sh
+# azure_integration_env.sh
 #
 # SUMMARY
 #
-#   Builds and pulls down the Vector AWS Integration test environment
+#   Builds and pulls down the Vector Azure Integration test environment
 
 set -x
 
@@ -43,6 +43,6 @@ stop_docker() {
   docker network rm vector-test-integration-azure 2>/dev/null; true
 }
 
-echo "Running $ACTION action for AWS integration tests environment"
+echo "Running $ACTION action for Azure integration tests environment"
 
 "${ACTION}"_"${CONTAINER_TOOL}"

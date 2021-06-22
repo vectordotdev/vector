@@ -255,7 +255,7 @@ impl Compression {
     pub fn content_type(&self) -> Option<&'static str> {
         match self {
             Self::None => Some("text/plain"),
-            Self::Gzip(_) => Some("application/octet-stream"),
+            Self::Gzip(_) => Some("application/gzip"),
         }
     }
 }
@@ -471,7 +471,7 @@ mod tests {
         assert_eq!(request.container_name, "logs".to_string());
         assert_eq!(request.blob_name, "blob.log.gz".to_string());
         assert_eq!(request.content_encoding, Some("gzip"));
-        assert_eq!(request.content_type.unwrap(), "application/octet-stream");
+        assert_eq!(request.content_type.unwrap(), "application/gzip");
     }
 
     #[test]
@@ -633,7 +633,7 @@ mod integration_tests {
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
         assert_eq!(
             blob.properties.content_type,
-            String::from("application/octet-stream")
+            String::from("application/gzip")
         );
         assert_eq!(lines, blob_lines);
     }
@@ -662,7 +662,7 @@ mod integration_tests {
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
         assert_eq!(
             blob.properties.content_type,
-            String::from("application/octet-stream")
+            String::from("application/gzip")
         );
         let expected = events
             .iter()
