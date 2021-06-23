@@ -3,7 +3,7 @@
 {{- $index := slice -}}
 {{- range site.AllPages -}}
 {{- $url := .RelPermalink -}}
-{{- $title := .Params.short | default .Title -}}
+{{- $title := .Params.short | default .Title | markdownify | plainify -}}
 {{- $sectionTitle := (.FirstSection.Params.short | default .FirstSection.Params.Title) | title -}}
 {{- $section := cond (eq .Layout "component") "Component" $sectionTitle -}}
 {{- $tags := .Params.tags | default slice -}}

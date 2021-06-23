@@ -1,7 +1,7 @@
 {
   "minWordSizefor1Typo": 4,
   "minWordSizefor2Typos": 8,
-  "hitsPerPage": 20,
+  "hitsPerPage": 10,
   "maxValuesPerFacet": 100,
   "searchableAttributes": [
     "title",

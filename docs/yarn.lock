@@ -3317,11 +3317,6 @@ minimist@^1.1.1, minimist@^1.2.5:
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.5.tgz#67d66014b66a6a8aaa0c083c5fd58df4e4e97602"
   integrity sha512-FM9nNUYrRBAELZQT3xeZQ7fmMOBg6nWNmJKTcgsJeaLstP/UODVpGsr5OhXhhXg6f+qtJ8uiZ+PUxkDWcgIXLw==
 
-minireset.css@^0.0.7:
-  version "0.0.7"
-  resolved "https://registry.yarnpkg.com/minireset.css/-/minireset.css-0.0.7.tgz#7f0750051b14628a4e4df2227547fc9a13a7ea12"
-  integrity sha512-raWKK2aHP/MI4Yu72dU6hade1YFuoyDQtSUi/FiIZfeRHjgL81uN/nFvG2aoAr+mseRc3jpg47jQqx1/+6w+kQ==
-
 mixin-deep@^1.2.0:
   version "1.3.2"
   resolved "https://registry.yarnpkg.com/mixin-deep/-/mixin-deep-1.3.2.tgz#1120b43dc359a785dce65b55b82e257ccf479566"
