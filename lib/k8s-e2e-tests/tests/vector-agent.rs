@@ -1903,7 +1903,7 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
 
     // Sleep to ensure checkpoints are written
     // https://github.com/timberio/vector/issues/7898
-    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(61)).await;
 
     framework
         .restart_rollout("test-vector", "daemonset/vector-agent", vec![])
