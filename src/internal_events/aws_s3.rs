@@ -91,7 +91,7 @@ pub mod source {
     impl InternalEvent for SqsMessageDeleteSucceeded {
         fn emit_logs(&self) {
             trace!(message = "Deleted SQS message(s).",
-                %message_ids = self.message_ids.iter()
+                message_ids = %self.message_ids.iter()
                     .map(|x| x.id.to_string())
                     .collect::<Vec<_>>()
                     .join(", "));
@@ -142,14 +142,14 @@ pub mod source {
                 MessageDeleteFailureState::Complete(ref entries, ref error) => {
                     warn!(message = "Deletion of SQS message(s) failed.",
                         %error,
-                        %message_ids = entries.iter()
+                        message_ids = %entries.iter()
                             .map(|x| x.id.to_string())
                             .collect::<Vec<_>>()
                             .join(", "));
                 }
                 MessageDeleteFailureState::Partial(ref entries) => {
                     warn!(message = "Deletion of SQS message(s) failed.",
-                        %message_ids entries.iter()
+                        message_ids = %entries.iter()
                             .map(|x| format!("{}/{}", x.id, x.code))
                             .collect::<Vec<_>>()
                             .join(", "));
