@@ -160,14 +160,19 @@ fn grok_rule_to_expr(
         Opcode::Eq,
         make_node(make_null()),
     );
-    let er_eq_null = make_op(
+    let err_eq_null = make_op(
         make_node(make_variable(err_var_name)),
         Opcode::Eq,
         make_node(make_null()),
     );
-    let apply_filters_if_parsed = make_if(er_eq_null, make_block(filters));
+    let apply_filters_if_parsed = make_if(err_eq_null.clone(), make_block(filters));
+    // TODO why parsed == null doesn't work - only parsed == null || err != null works
     let parse_if_not_parsed = make_if(
-        parsed_eq_null,
+        make_op(
+            make_node(parsed_eq_null),
+            Opcode::Or,
+            make_node(make_not(err_eq_null)),
+        ),
         make_block(vec![parse_grok, apply_filters_if_parsed]),
     );
 
