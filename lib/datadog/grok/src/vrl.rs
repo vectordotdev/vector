@@ -96,7 +96,7 @@ pub fn compile_to_vrl(
     Converts a grok rule to a corresponding VRL expr:
     if parsed == null {
         parsed, err = parse_datadog_grok(value, pattern1)
-        if err == nil { { // it matched - apply filters
+        if err == null { { // it matched - apply filters
             target_var.http.status_code = to_int(target_var.http.status_code)
             target_var.http.url_details = parse_url(target_var.http.url)
         }
