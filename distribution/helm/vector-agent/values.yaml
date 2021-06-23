@@ -41,13 +41,6 @@ service:
   #   - "topology.kubernetes.io/region"
   #   - "*"
 
-  # Service monitoring
-  metrics:
-    enabled: false
-    # port: 9598
-    serviceMonitor:
-      enabled: false
-
 serviceAccount:
   # Specifies whether a service account should be created.
   create: true
