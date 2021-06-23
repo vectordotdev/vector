@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use atomig::{Atom, AtomInteger, Atomic, Ordering};
+use atomig::{Atom, Atomic, Ordering};
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -263,10 +263,6 @@ impl BatchStatus {
     }
 }
 
-// Can be dropped when this issue is closed:
-// https://github.com/LukasKalbertodt/atomig/issues/3
-impl AtomInteger for BatchStatus {}
-
 /// The status of an individual event.
 #[derive(Atom, Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
 #[derivative(Default)]
@@ -284,10 +280,6 @@ pub enum EventStatus {
     /// This status has been recorded and should not be updated.
     Recorded,
 }
-
-// Can be dropped when this issue is closed:
-// https://github.com/LukasKalbertodt/atomig/issues/3
-impl AtomInteger for EventStatus {}
 
 impl EventStatus {
     /// Update this status with another event's finalization status and return the result.

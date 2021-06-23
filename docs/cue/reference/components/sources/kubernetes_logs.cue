@@ -234,7 +234,7 @@ components: sources: kubernetes_logs: {
 			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files within a single pod."
 			required:    false
 			type: uint: {
-				default: 1_000
+				default: 60_000
 				unit:    "milliseconds"
 			}
 		}

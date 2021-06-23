@@ -19,14 +19,14 @@ anyhow = "1.0.41"
 async-stream = "0.3.2"
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.6.1", features = ["full"] }
+tokio = { version = "1.7.1", features = ["full"] }
 tokio-stream = { version = "0.1.6", features = ["sync"] }
 
 # GraphQL
 graphql_client = "0.9.0"
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.3", features = ["json"] }
+reqwest = { version = "0.11.4", features = ["json"] }
 tokio-tungstenite = { version = "0.13.0", features = ["tls"] }
 
 # External libs
