@@ -2,9 +2,9 @@ use crate::{
     config::log_schema,
     event::Event,
     internal_events::aws_s3::source::{
-        SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
-        SqsMessageProcessingSucceeded, SqsMessageReceiveFailed, SqsMessageReceiveSucceeded,
-        SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
+        SqsMessageDeleteBatchFailed, SqsMessageDeletePartialFailure, SqsMessageDeleteSucceeded,
+        SqsMessageProcessingFailed, SqsMessageProcessingSucceeded, SqsMessageReceiveFailed,
+        SqsMessageReceiveSucceeded, SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -297,11 +297,16 @@ impl IngestorProcess {
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(SqsMessageDeleteFailed::partial(result.failed));
+                        emit!(SqsMessageDeletePartialFailure {
+                            entries: result.failed
+                        });
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageDeleteFailed::complete(cloned_entries, err));
+                    emit!(SqsMessageDeleteBatchFailed {
+                        entries: cloned_entries,
+                        error: err,
+                    });
                 }
             }
         }

@@ -106,66 +106,43 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    enum MessageDeleteFailureState {
-        Complete(
-            Vec<DeleteMessageBatchRequestEntry>,
-            RusotoError<DeleteMessageBatchError>,
-        ),
-        Partial(Vec<BatchResultErrorEntry>),
+    pub(crate) struct SqsMessageDeletePartialFailure {
+        pub entries: Vec<BatchResultErrorEntry>,
     }
 
-    #[derive(Debug)]
-    pub(crate) struct SqsMessageDeleteFailed {
-        state: MessageDeleteFailureState,
-    }
-
-    impl SqsMessageDeleteFailed {
-        pub(crate) fn complete(
-            entries: Vec<DeleteMessageBatchRequestEntry>,
-            error: RusotoError<DeleteMessageBatchError>,
-        ) -> Self {
-            SqsMessageDeleteFailed {
-                state: MessageDeleteFailureState::Complete(entries, error),
-            }
-        }
-
-        pub(crate) fn partial(entries: Vec<BatchResultErrorEntry>) -> Self {
-            SqsMessageDeleteFailed {
-                state: MessageDeleteFailureState::Partial(entries),
-            }
-        }
-    }
-
-    impl InternalEvent for SqsMessageDeleteFailed {
+    impl InternalEvent for SqsMessageDeletePartialFailure {
         fn emit_logs(&self) {
-            match self.state {
-                MessageDeleteFailureState::Complete(ref entries, ref error) => {
-                    warn!(message = "Deletion of SQS message(s) failed.",
-                        %error,
-                        message_ids = %entries.iter()
-                            .map(|x| x.id.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", "));
-                }
-                MessageDeleteFailureState::Partial(ref entries) => {
-                    warn!(message = "Deletion of SQS message(s) failed.",
-                        message_ids = %entries.iter()
-                            .map(|x| format!("{}/{}", x.id, x.code))
-                            .collect::<Vec<_>>()
-                            .join(", "));
-                }
-            }
+            warn!(message = "Deletion of SQS message(s) failed.",
+                message_ids = %self.entries.iter()
+                    .map(|x| format!("{}/{}", x.id, x.code))
+                    .collect::<Vec<_>>()
+                    .join(", "));
         }
 
         fn emit_metrics(&self) {
-            match self.state {
-                MessageDeleteFailureState::Complete(ref entries, _) => {
-                    counter!("sqs_message_delete_failed_total", entries.len() as u64);
-                }
-                MessageDeleteFailureState::Partial(ref entries) => {
-                    counter!("sqs_message_delete_failed_total", entries.len() as u64);
-                }
-            }
+            counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
+        }
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct SqsMessageDeleteBatchFailed {
+        pub entries: Vec<DeleteMessageBatchRequestEntry>,
+        pub error: RusotoError<DeleteMessageBatchError>,
+    }
+
+    impl InternalEvent for SqsMessageDeleteBatchFailed {
+        fn emit_logs(&self) {
+            warn!(message = "Deletion of SQS message(s) failed.",
+                error = %self.error,
+                message_ids = %self.entries.iter()
+                    .map(|x| x.id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "));
+        }
+
+        fn emit_metrics(&self) {
+            counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
+            counter!("sqs_message_delete_batch_failed_total", 1);
         }
     }
 
