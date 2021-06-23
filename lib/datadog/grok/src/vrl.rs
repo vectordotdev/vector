@@ -24,7 +24,7 @@ use crate::vrl_helpers::*;
 
     // check the first pattern
     if parsed == null {
-        parsed = parse_datadog_grok(.message, pattern1)
+        parsed, err = parse_datadog_grok(.message, pattern1)
         if err == null { // it matched - apply filters
             parsed.http.status_code = to_int(parsed.http.status_code)
             parsed.http.url_details = parse_url(parsed.http.url)
@@ -32,7 +32,7 @@ use crate::vrl_helpers::*;
     }
     // check the second, third pattern and so on
     if parsed == null {
-        parsed = parse_datadog_grok(.message, pattern2)
+        parsed, err = parse_datadog_grok(.message, pattern2)
         if err == null { // it matched - apply filters
             ...
         }
