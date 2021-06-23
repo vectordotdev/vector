@@ -68,10 +68,7 @@ where
         let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
             .expect("Invalid header value for version!");
 
-        Ok(HttpClient {
-            client,
-            user_agent,
-        })
+        Ok(HttpClient { client, user_agent })
     }
 
     pub fn send(
