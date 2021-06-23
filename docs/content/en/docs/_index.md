@@ -1,8 +1,7 @@
 ---
 title: The Vector documentation
 description: Your gateway to the world of Vector
-breadcrumb: Docs
-short: Docs home
+short: Docs
 ---
 
 Welcome to the documentation for **Vector**! Vector is a lightweight and ultra-fast tool for building observability pipelines.
