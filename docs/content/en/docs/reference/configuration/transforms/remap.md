@@ -1,7 +1,7 @@
 ---
-title: Remap
+title: Remap with VRL
 description: >
-  Modify your observability data as it passes through your topology using [VRL](/docs/reference/vrl)
+  Modify your observability data as it passes through your topology using [Vector Remap Language](/docs/reference/vrl) (VRL)
 kind: transform
 featured: true
 layout: component

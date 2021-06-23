@@ -136,9 +136,9 @@ community:
   title: Backed by a strong open source community
   stats:
   - title: "GitHub stars"
-    figure: "6k+"
+    figure: "7.4k+"
   - title: "Contributors"
-    figure: "146"
+    figure: "150"
   - title: "Downloads"
     figure: "30m+"
   - title: "Countries"

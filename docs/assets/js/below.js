@@ -28,6 +28,19 @@ const search = instantsearch({
   searchClient
 });
 
+const searchBox = instantsearch.widgets.searchBox({
+  container: '#algolia-search-box'
+});
+
+const searchHits = instantsearch.widgets.hits({
+  container: '#algolia-search-hits'
+})
+
+search.addWidgets([
+  searchBox,
+  searchHits
+]);
+
 document.addEventListener('DOMContentLoaded', () => {
   search.start();
 
