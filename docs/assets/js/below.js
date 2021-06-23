@@ -5,7 +5,30 @@
 
 import algoliasearch from 'algoliasearch/lite';
 import instantsearch from 'instantsearch.js';
+import { searchBox, hits } from 'instantsearch.js/es/widgets';
+
 import 'tocbot/dist/tocbot';
+
+// Algolia search
+const searchClient = algoliasearch('{{ $algoliaAppId }}', '{{ $algoliaApiKey }}');
+
+const search = instantsearch({
+  indexName: '{{ $algoliaIndex }}',
+  searchClient
+});
+
+const searchInput = searchBox({
+  container: '#algolia-search-box'
+});
+
+const searchResults = hits({
+  container: '#algolia-search-results'
+})
+
+search.addWidgets([
+  searchInput,
+  searchResults
+]);
 
 // Table of contents for documentation pages
 const tableOfContents = () => {
@@ -19,27 +42,6 @@ const tableOfContents = () => {
     });
   }
 }
-
-// Algolia search
-const searchClient = algoliasearch('{{ $algoliaAppId }}', '{{ $algoliaApiKey }}');
-
-const search = instantsearch({
-  indexName: '{{ $algoliaIndex }}',
-  searchClient
-});
-
-const searchBox = instantsearch.widgets.searchBox({
-  container: '#algolia-search-box'
-});
-
-const searchHits = instantsearch.widgets.hits({
-  container: '#algolia-search-hits'
-})
-
-search.addWidgets([
-  searchBox,
-  searchHits
-]);
 
 document.addEventListener('DOMContentLoaded', () => {
   search.start();
