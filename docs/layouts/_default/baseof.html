@@ -59,6 +59,8 @@
     {{ partial "javascript/below.html" . }}
 
     {{/* JS that's solely for the front page React.js shenanigans */}}
+    {{ if .IsHome }}
     {{ partial "javascript/home.html" . }}
+    {{ end }}
   </body>
 </html>
