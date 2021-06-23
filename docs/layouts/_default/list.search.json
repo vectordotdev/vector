@@ -1,3 +1,4 @@
+{{/* Algolia search index, See the "searchableAttributes" field algolia.js for the list of fields that we send over to Algolia. */}}
 {{- $pages := where site.AllPages "Draft" false -}}
 {{- $index := slice -}}
 {{- range site.AllPages -}}
