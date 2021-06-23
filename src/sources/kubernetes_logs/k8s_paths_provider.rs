@@ -146,7 +146,7 @@ where
                 // architecture.
                 // In some setups, there will also be paths like
                 // `<pod_logs_dir>/<hash>.log` - those we want to skip.
-                &[dir, "*/*.log"].join("/"),
+                &[dir, "*/*.log*"].join("/"),
             );
 
             // Extract the containers to exclude, then build patters from them
@@ -438,9 +438,19 @@ mod tests {
         let cases = vec![
             // No exclusion pattern allows everything.
             (
-                vec!["/var/log/pods/a.log", "/var/log/pods/b.log"],
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                ],
                 vec![],
-                vec!["/var/log/pods/a.log", "/var/log/pods/b.log"],
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                ],
             ),
             // Test a filter that doesn't apply to anything.
             (

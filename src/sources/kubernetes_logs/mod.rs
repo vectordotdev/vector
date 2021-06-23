@@ -80,6 +80,7 @@ pub struct Config {
     annotation_fields: pod_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to exclude from reading the files.
+    #[serde(default = "default_path_exclusion")]
     exclude_paths_glob_patterns: Vec<PathBuf>,
 
     /// Max amount of bytes to read from a single file before switching over
@@ -432,6 +433,10 @@ fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
     format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
+}
+
+fn default_path_exclusion() -> Vec<PathBuf> {
+    vec![PathBuf::from("**/*.tmp"), PathBuf::from("**/*.gz")]
 }
 
 fn default_max_read_bytes() -> usize {
