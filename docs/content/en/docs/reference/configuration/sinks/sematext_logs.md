@@ -3,6 +3,7 @@ title: Sematext logs
 description: Publish log events to [Sematext](https://sematext.com)
 kind: sink
 layout: component
+tags: ["sematext", "component", "sink", "logs"]
 ---
 
 {{/* This doc is generated using:

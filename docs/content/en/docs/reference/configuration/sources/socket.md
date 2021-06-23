@@ -3,6 +3,7 @@ title: Socket
 description: Collect logs using the [socket](https://en.wikipedia.org/wiki/Network_socket) client
 kind: source
 layout: component
+tags: ["socket", "component", "source", "logs"]
 ---
 
 {{/* This doc is generated using:

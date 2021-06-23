@@ -1,6 +1,7 @@
 ---
 title: Validating
 weight: 5
+tags: ["validate", "configuration"]
 ---
 
 Vector provides a subcommand, `validate`, that checks the validity of any number of configuration files and then exits.

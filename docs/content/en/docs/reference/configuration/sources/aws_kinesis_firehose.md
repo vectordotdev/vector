@@ -3,6 +3,7 @@ title: AWS Kinesis Firehose
 description: Collect logs from [AWS Kinesis Firehose](https://aws.amazon.com/kinesis/data-firehose)
 kind: source
 layout: component
+tags: ["aws", "kinesis", "firehose", "component", "source", "logs"]
 ---
 
 {{/* This doc is generated using:

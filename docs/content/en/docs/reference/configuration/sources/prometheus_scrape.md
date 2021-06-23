@@ -3,6 +3,7 @@ title: Prometheus scrape
 description: Collect metrics via the [Prometheus](https://prometheus.io) client
 kind: source
 layout: component
+tags: ["prometheus", "scrape", "component", "source", "metrics"]
 ---
 
 {{/* This doc is generated using:

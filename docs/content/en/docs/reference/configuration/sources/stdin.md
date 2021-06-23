@@ -3,6 +3,7 @@ title: stdin
 description: Collect logs sent via [stdin](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin))
 kind: source
 layout: component
+tags: ["stdin", "component", "source", "logs"]
 ---
 
 {{/* This doc is generated using:

@@ -3,6 +3,7 @@ title: Log to metric
 description: Convert log events to metric events
 kind: transform
 layout: component
+tags: ["log to metric", "convert", "component", "transform"]
 ---
 
 {{/* This doc is generated using:

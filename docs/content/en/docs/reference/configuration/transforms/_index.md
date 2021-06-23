@@ -5,6 +5,7 @@ description: "**Shape** your data as it moves through your Vector topology"
 component_type: transforms
 layout: components
 weight: 2
+tags: ["components", "transforms"]
 ---
 
 ## Available transforms

@@ -3,6 +3,7 @@ title: Generator
 description: Generate fake events, which can be useful for testing, benchmarking, and demos
 kind: source
 layout: component
+tags: ["generator", "random", "fake", "component", "source"]
 ---
 
 {{/* This doc is generated using:

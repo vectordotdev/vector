@@ -3,6 +3,7 @@ title: Prometheus remote write
 description: Collect metrics from [Prometheus](https://prometheus.io)
 kind: source
 layout: component
+tags: ["prometheus", "remote write", "component", "source", "metrics"]
 ---
 
 {{/* This doc is generated using:

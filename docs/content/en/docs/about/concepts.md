@@ -1,6 +1,7 @@
 ---
 title: Concepts
 weight: 2
+tags: ["concepts", "meta", "events", "logs", "metrics", "components", "sources", "transforms", "sinks", "pipeline", "roles", "agent", "aggregator", "topology"]
 ---
 
 In order to understand Vector, you must first understand the fundamental concepts. The following concepts are ordered progressively, starting with the individual unit of data ([events]) and broadening all the way to Vector's deployment models ([pipelines]).

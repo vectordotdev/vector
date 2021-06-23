@@ -2,6 +2,7 @@
 title: Monitoring and observing
 short: Monitoring
 weight: 2
+tags: ["admin", "logs", "metrics"]
 ---
 
 Vector strives to be a good example of observability and therefore includes various facilities to observe and monitor Vector itself. It is intentionally designed to be composable and fit into your existing workflows.

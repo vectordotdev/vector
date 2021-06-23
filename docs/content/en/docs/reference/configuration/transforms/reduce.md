@@ -3,6 +3,7 @@ title: Reduce
 description: Collapse multiple log events into a single event based on a set of conditions and merge strategies
 kind: transform
 layout: component
+tags: ["filter", "multiline", "component", "transform", "logs"]
 ---
 
 {{/* This doc is generated using:

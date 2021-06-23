@@ -1,6 +1,7 @@
 ---
 title: Pipeline model
 weight: 1
+tags: ["pipeline", "dag", "graph", "configuration"]
 ---
 
 {{< svg "img/pipeline-model.svg" >}}

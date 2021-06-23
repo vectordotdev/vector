@@ -3,6 +3,7 @@ title: Humio logs
 description: Deliver log event data to [Humio](https://humio.com)
 kind: sink
 layout: component
+tags: ["humio", "component", "sink", "logs"]
 ---
 
 {{/* This doc is generated using:

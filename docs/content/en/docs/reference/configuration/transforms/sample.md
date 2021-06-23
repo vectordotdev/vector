@@ -3,6 +3,7 @@ title: Sample
 description: Sample events from an event stream based on supplied criteria and at a configurable rate
 kind: transform
 layout: component
+tags: ["sample", "component", "transform"]
 ---
 
 {{/* This doc is generated using:

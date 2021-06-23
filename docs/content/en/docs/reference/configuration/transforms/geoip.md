@@ -3,6 +3,7 @@ title: GeoIP
 description: Enrich events with GeoIP metadata
 kind: transform
 layout: component
+tags: ["geo", "geoip", "enrich", "component", "transform"]
 ---
 
 {{/* This doc is generated using:

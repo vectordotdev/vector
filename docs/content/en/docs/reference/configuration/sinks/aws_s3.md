@@ -3,6 +3,7 @@ title: AWS S3
 description: Store observability events in the [AWS S3](https://aws.amazon.com/s3/) object storage system
 kind: sink
 layout: component
+tags: ["aws", "s3", "component", "sink", "storage"]
 ---
 
 {{/* This doc is generated using:

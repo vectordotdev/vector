@@ -2,6 +2,7 @@
 title: Data model
 description: How Vector understands data
 weight: 1
+tags: ["data model", "logs", "metrics", "events"]
 ---
 
 {{< svg "img/data-model-event.svg" >}}

@@ -3,6 +3,7 @@ title: Blackhole
 description: Send observability events nowhere, which can be useful for debugging purposes
 kind: sink
 layout: component
+tags: ["blackhole", "component", "sink"]
 ---
 
 {{/* This doc is generated using:

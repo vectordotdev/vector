@@ -3,6 +3,7 @@ title: Route
 description: Split a stream of events into multiple sub-streams based on user-supplied conditions
 kind: transforms
 layout: component
+tags: ["route", "swimlanes", "split", "component", "transform"]
 ---
 
 {{/* This doc is generated using:

@@ -3,6 +3,7 @@ title: Elasticsearch
 description: Index observability events in [Elasticsearch](https://www.elastic.co/elasticsearch)
 kind: sink
 layout: component
+tags: ["elasticsearch", "component", "sink", "search", "storage"]
 ---
 
 {{/* This doc is generated using:

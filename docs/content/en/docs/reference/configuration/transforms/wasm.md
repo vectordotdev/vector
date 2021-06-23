@@ -4,6 +4,7 @@ description: Modify events using an embedded [WebAssembly](https://webassembly.o
 short: Wasm
 kind: transform
 layout: component
+tags: ["wasm", "webassembly", "runtime", "component", "transform"]
 ---
 
 {{/* This doc is generated using:

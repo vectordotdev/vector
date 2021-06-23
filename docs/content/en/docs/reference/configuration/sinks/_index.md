@@ -4,6 +4,7 @@ short: Sinks
 description: "**Deliver** your observability data to a variety of destinations"
 component_type: sinks
 weight: 3
+tags: ["components", "sinks"]
 ---
 
 ## Available sinks

@@ -6,6 +6,7 @@ kind: transform
 featured: true
 layout: component
 weight: 1
+tags: ["remap", "vrl", "vector remap language", "modify", "component", "transform"]
 ---
 
 {{/* This doc is generated using:

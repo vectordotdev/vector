@@ -4,6 +4,7 @@ description: Receive logs from [Splunk](https://splunk.com)
 short: Splunk HEC
 kind: source
 layout: component
+tags: ["splunk", "hec", "http event collector", "component", "source", "logs"]
 ---
 
 {{/* This doc is generated using:

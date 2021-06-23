@@ -3,6 +3,7 @@ title: File
 description: Output observability events into files
 kind: sink
 layout: component
+tags: ["file", "component", "sink"]
 ---
 
 {{/* This doc is generated using:

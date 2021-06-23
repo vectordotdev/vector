@@ -3,6 +3,7 @@ title: Kafka
 description: Collect logs from [Kafka](https://kafka.apache.org)
 kind: source
 layout: component
+tags: ["kafka", "apache", "component", "source", "logs"]
 ---
 
 {{/* This doc is generated using:

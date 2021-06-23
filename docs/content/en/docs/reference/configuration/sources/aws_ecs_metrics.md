@@ -5,6 +5,7 @@ description: >
   [AWS Fargate](https://aws.amazon.com/fargate)
 kind: source
 layout: component
+tags: ["aws", "ecs", "docker", "fargate", "container", "component", "source", "metrics"]
 ---
 
 {{/* This doc is generated using:

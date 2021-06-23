@@ -3,6 +3,7 @@ title: InfluxDB metrics
 description: Deliver metric event data to [InfluxDB](https://influxdata.com)
 kind: sink
 layout: component
+tags: ["influxdb", "influx", "component", "sink", "metrics"]
 ---
 
 {{/* This doc is generated using:

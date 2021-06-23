@@ -1,3 +1,4 @@
+{{- $pages := where site.AllPages "Draft" false -}}
 {{- $index := slice -}}
 {{- range site.AllPages -}}
 {{- $url := .RelPermalink -}}

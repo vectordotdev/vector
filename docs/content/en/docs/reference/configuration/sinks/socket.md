@@ -3,6 +3,7 @@ title: Socket
 description: Deliver logs to a remote socket endpoint
 kind: sink
 layout: component
+tags: ["socket", "remote", "component", "sink", "logs"]
 ---
 
 {{/* This doc is generated using:

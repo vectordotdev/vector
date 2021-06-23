@@ -4,6 +4,7 @@ description: Deliver logs to GCP's [Cloud Operations](https://cloud.google.com/p
 short: GCP Stackdriver
 kind: sink
 layout: component
+tags: ["gcp", "stackdriver", "operations", "component", "sink", "logs"]
 ---
 
 {{/* This doc is generated using:

@@ -4,6 +4,7 @@ description: Collect metrics from Apache's [HTTPD](https://httpd.apache.org) ser
 short: Apache Metrics
 kind: source
 layout: component
+tags: ["apache", "http", "component", "source", "metrics"]
 ---
 
 {{/* This doc is generated using:

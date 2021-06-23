@@ -1,6 +1,7 @@
 ---
 title: Concurrency model
 weight: 2
+tags: ["concurrency", "pipeline", "state"]
 ---
 
 {{< svg "img/concurrency-model.svg" >}}

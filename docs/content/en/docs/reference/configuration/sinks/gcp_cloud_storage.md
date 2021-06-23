@@ -4,6 +4,7 @@ description: Store observability events in GCP [Cloud Storage](https://cloud.goo
 short: GCP Cloud Storage
 kind: sink
 layout: component
+tags: ["gcp", "gcs", "cloud storage", "component", "sink"]
 ---
 
 {{/* This doc is generated using:

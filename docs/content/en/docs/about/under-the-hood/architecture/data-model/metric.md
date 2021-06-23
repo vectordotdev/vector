@@ -1,6 +1,7 @@
 ---
 title: Metric events
 weight: 2
+tags: ["metrics", "events", "schema"]
 ---
 
 {{< svg "img/data-model-metric.svg" >}}

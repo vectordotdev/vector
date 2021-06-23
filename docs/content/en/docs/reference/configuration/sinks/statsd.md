@@ -3,6 +3,7 @@ title: Statsd
 description: Deliver log data to a [StatsD](https://github.com/statsd/statsd) aggregator
 kind: sink
 layout: component
+tags: ["statsd", "component", "sink", "logs"]
 ---
 
 {{/* This doc is generated using:

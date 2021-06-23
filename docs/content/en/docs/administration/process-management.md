@@ -3,6 +3,7 @@ title: Process management
 description: Something
 short: Management
 weight: 1
+tags: ["process", "admin", "reload", "start", "stop", "restart"]
 ---
 
 This document shows you how to manage the Vector process on various platforms. *How* you manage the Vector process is largely dependent on how you installed it.

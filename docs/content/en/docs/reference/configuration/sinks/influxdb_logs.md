@@ -3,6 +3,7 @@ title: InfluxDB logs
 description: Deliver log event data to [InfluxDB](https://influxdata.com)
 kind: sink
 layout: component
+tags: ["influxdb", "influx", "component", "sink", "logs"]
 ---
 
 {{/* This doc is generated using:

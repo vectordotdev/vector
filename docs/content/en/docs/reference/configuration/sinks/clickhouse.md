@@ -3,6 +3,7 @@ title: Clickhouse
 description: Deliver log data to the [Clickhouse](https://clickhouse.tech) database
 kind: sink
 layout: component
+tags: ["clickhole", "component", "sink", "storage", "logs"]
 ---
 
 {{/* This doc is generated using:

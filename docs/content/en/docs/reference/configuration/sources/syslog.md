@@ -3,6 +3,7 @@ title: Syslog
 description: Collect logs sent via [Syslog](https://en.wikipedia.org/wiki/Syslog)
 kind: source
 layout: component
+tags: ["syslog", "component", "source", "logs"]
 ---
 
 {{/* This doc is generated using:

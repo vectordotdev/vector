@@ -4,6 +4,7 @@ description: Parse logs from [AWS Cloudwatch Logs](https://docs.aws.amazon.com/A
 kind: transform
 deprecated: true
 layout: component
+tags: []
 ---
 
 {{/* This doc is generated using:

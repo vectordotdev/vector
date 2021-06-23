@@ -3,6 +3,7 @@ title: Filter
 description: Filter events based on a set of conditions
 kind: transform
 layout: component
+tags: ["filter", "component", "transform"]
 ---
 
 {{/* This doc is generated using:

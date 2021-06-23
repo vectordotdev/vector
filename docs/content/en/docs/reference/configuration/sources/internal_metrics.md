@@ -3,6 +3,7 @@ title: Internal metrics
 description: Access to the metrics produced by Vector itself and process them in your Vector pipeline
 kind: source
 layout: component
+tags: ["vector", "instance", "local", "internal", "component", "source", "metrics"]
 ---
 
 {{/* This doc is generated using:

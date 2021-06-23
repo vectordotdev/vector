@@ -4,6 +4,7 @@ description: Deduplicate events passing through a topology, i.e. eliminate any e
 short: Dedupe
 kind: transform
 layout: component
+tags: ["dedupe", "deduplicate", "component", "transform"]
 ---
 
 {{/* This doc is generated using:

@@ -5,6 +5,7 @@ description: "**Ingest** observability data from a wide variety of targets"
 component_type: sources
 layout: components
 weight: 1
+tags: ["components", "sources"]
 ---
 
 Vector enables you to take in observability data from a wide variety of **sources**.

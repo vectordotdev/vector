@@ -1,6 +1,7 @@
 ---
 title: Architecture
 weight: 1
+tags: ["architecture", "concepts"]
 ---
 
 {{< svg "img/architecture.svg" >}}

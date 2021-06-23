@@ -3,6 +3,7 @@ title: Honeycomb
 description: Deliver log events to [Honeycomb](https://www.honeycomb.io)
 kind: sink
 layout: component
+tags: ["honeycomb", "component", "sink", "logs"]
 ---
 
 {{/* This doc is generated using:

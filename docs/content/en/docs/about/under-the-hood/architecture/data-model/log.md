@@ -1,6 +1,7 @@
 ---
 title: Log events
 weight: 1
+tags: ["logs", "events", "schema"]
 ---
 
 {{< svg "img/data-model-log.svg" >}}
