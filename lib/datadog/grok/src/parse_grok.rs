@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt;
 
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -55,9 +54,8 @@ pub fn parse_grok_rules(
     support_rules
         .iter()
         .filter(|&r| !r.is_empty())
-        .for_each(|r| {
-            parse_grok_rule(r, &mut prev_rule_definitions, &mut prev_rule_destinations);
-        });
+        .map(|r| parse_grok_rule(r, &mut prev_rule_definitions, &mut prev_rule_destinations))
+        .collect::<Result<Vec<GrokRule>, Error>>()?;
 
     // parse match rules and return them
     let match_rules = match_rules

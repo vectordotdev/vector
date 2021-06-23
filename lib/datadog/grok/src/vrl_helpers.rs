@@ -105,7 +105,7 @@ pub fn make_if(predicate: ast::Expr, consequent: ast::Expr) -> ast::Expr {
     ast::Expr::IfStatement(make_node(ast::IfStatement {
         predicate: make_node(ast::Predicate::One(Box::new(make_node(predicate)))),
         consequent: make_node(ast::Block(vec![make_node(consequent)])),
-        alternative: None, //TODO
+        alternative: None,
     }))
 }
 

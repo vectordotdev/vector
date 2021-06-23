@@ -1,19 +1,16 @@
-use crate::config::{DataType, GlobalOptions, TransformConfig, TransformDescription};
-use crate::transforms::{FunctionTransform, Transform};
-use datadog_grok::vrl::compile_to_vrl;
 use derivative::Derivative;
-use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
+
+use datadog_grok::vrl::compile_to_vrl;
 use vector_core::{
     event::{Event, VrlTarget},
     Result,
 };
 use vrl::diagnostic::Formatter;
-use vrl::{Program, Runtime, Terminate, Value};
+use vrl::{Program, Runtime};
+
+use crate::config::{DataType, GlobalOptions, TransformConfig, TransformDescription};
+use crate::transforms::{FunctionTransform, Transform};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -94,25 +91,16 @@ impl FunctionTransform for Grok {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::transforms::test::transform_one;
-    use indoc::{formatdoc, indoc};
-    use serde_json::json;
     use shared::btreemap;
-    use std::collections::BTreeMap;
-    use vector_core::event::{
-        metric::{MetricKind, MetricValue},
-        LogEvent, Metric, Value,
-    };
-    use vrl::prelude::*;
+    use vector_core::event::{LogEvent, Value};
+
+    use crate::transforms::test::transform_one;
+
+    use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DataDogGrokConfig>();
-    }
-
-    fn get_field_string(event: &Event, field: &str) -> String {
-        event.as_log().get(field).unwrap().to_string_lossy()
     }
 
     async fn parse_log(
@@ -310,26 +298,46 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn parses_match_functions() {
-        test_match_function(vec![
-            ("numberStr", "-1.2", Value::Bytes("-1.2".into()).into()),
-            ("number", "-1.2", Value::Float(-1.2_f64).into()),
-            ("number", "-1", Value::Float(-1_f64).into()),
-            ("numberExt", "-1234e+3", Value::Float(-1234e+3_f64).into()),
-            ("numberExt", ".1e+3", Value::Float(0.1e+3_f64).into()),
-            ("integer", "-2", Value::Integer(-2).into()),
-            ("integerExt", "+2", Value::Integer(2).into()),
-            ("integerExt", "-2", Value::Integer(-2).into()),
-            ("integerExt", "-1e+2", Value::Integer(-100).into()),
-            ("integerExt", "1234.1e+5", None),
-            ("boolean", "tRue", Value::Boolean(true).into()), // true/false are default values(case-insensitive)
-            ("boolean", "False", Value::Boolean(false).into()),
-            (r#"boolean("ok", "no")"#, "ok", Value::Boolean(true).into()),
-            (r#"boolean("ok", "no")"#, "no", Value::Boolean(false).into()),
-            // (r#"date("HH:mm:ss")"#, "14:20:15", 51615000.into()), //TODO
-            (r#"boolean("ok", "no")"#, "No", None),
+    async fn supports_matchers() {
+        test_grok_pattern(vec![
             (
-                r#"doubleQuotedString"#,
+                "%{numberStr:field}",
+                "-1.2",
+                Value::Bytes("-1.2".into()).into(),
+            ),
+            ("%{number:field}", "-1.2", Value::Float(-1.2_f64).into()),
+            ("%{number:field}", "-1", Value::Float(-1_f64).into()),
+            (
+                "%{numberExt:field}",
+                "-1234e+3",
+                Value::Float(-1234e+3_f64).into(),
+            ),
+            (
+                "%{numberExt:field}",
+                ".1e+3",
+                Value::Float(0.1e+3_f64).into(),
+            ),
+            ("%{integer:field}", "-2", Value::Integer(-2).into()),
+            ("%{integerExt:field}", "+2", Value::Integer(2).into()),
+            ("%{integerExt:field}", "-2", Value::Integer(-2).into()),
+            ("%{integerExt:field}", "-1e+2", Value::Integer(-100).into()),
+            ("%{integerExt:field}", "1234.1e+5", None),
+            ("%{boolean:field}", "tRue", Value::Boolean(true).into()), // true/false are default values(case-insensitive)
+            ("%{boolean:field}", "False", Value::Boolean(false).into()),
+            (
+                r#"%{boolean("ok", "no"):field}"#,
+                "ok",
+                Value::Boolean(true).into(),
+            ),
+            (
+                r#"%{boolean("ok", "no"):field}"#,
+                "no",
+                Value::Boolean(false).into(),
+            ),
+            // (r#"date("HH:mm:ss")"#, "14:20:15", 51615000.into()), //TODO
+            (r#"%{boolean("ok", "no"):field}"#, "No", None),
+            (
+                "%{doubleQuotedString:field}",
                 r#""test  ""#,
                 Value::Bytes(r#""test  ""#.into()).into(),
             ),
@@ -337,58 +345,47 @@ mod tests {
         .await;
     }
 
-    async fn test_match_function(tests: Vec<(&str, &str, Option<Value>)>) {
-        for (match_fn, k, v) in tests {
-            let event = parse_log(
-                Event::from(k),
-                vec![],
-                vec![format!(r#"test %{{{}:field}}"#, match_fn)],
-                None,
-            )
-            .await;
-
-            assert_eq!(event.get("custom.field"), v.as_ref());
-        }
-    }
-
     #[tokio::test]
-    async fn parses_filter_functions() {
-        test_filter_function(vec![
-            (r#"nullIf("-")"#, "-", Value::Null.into()),
-            (r#"nullIf("-")"#, "abc", Value::Bytes("abc".into()).into()),
-            ("boolean", "tRue", Value::Boolean(true).into()),
-            ("boolean", "false", Value::Boolean(false).into()),
+    async fn supports_filters() {
+        test_grok_pattern(vec![
+            ("%{data:field:number}", "1.0", Value::Float(1.0_f64).into()),
+            ("%{data:field:integer}", "1", Value::Integer(1).into()),
+            (r#"%{data:field:nullIf("-")}"#, "-", Value::Null.into()),
+            (r#"%{data:field:nullIf("-")}"#, "abc", Value::Bytes("abc".into()).into()),
+            ("%{data:field:boolean}", "tRue", Value::Boolean(true).into()),
+            ("%{data:field:boolean}", "false", Value::Boolean(false).into()),
             (
-                r#"json"#,
+                "%{data:field:json}",
                 r#"{"bool": true, "array": ["abc"]}"#,
                 Some(Value::from(
                     btreemap! { "bool" => true, "array" => Value::Array(vec!["abc".into()])},
                 )),
             ),
-            ("json", r#"not a valid json"#, Value::Null.into()),
+            ("%{data:field:json}", r#"not a valid json"#, Value::Null.into()),
             (
-                r#"rubyhash"#,
+                "%{data:field:rubyhash}",
                 r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
                 Some(Value::from(
                     btreemap! { "test" => "value", "testNum" => 0.2, "testObj" => Value::from(btreemap! {"testBool" => true})},
                 )),
             ),
-            ("querystring", "?productId=superproduct&promotionCode=superpromo", Some(Value::from(
+            ("%{data:field:querystring}", "?productId=superproduct&promotionCode=superpromo", Some(Value::from(
                 btreemap! { "productId" => "superproduct", "promotionCode" => "superpromo"},
             ))),
-            ("lowercase", "aBC", Value::Bytes("abc".into()).into()),
-            ("uppercase", "Abc",  Value::Bytes("ABC".into()).into()),
-            ("decodeuricomponent", "%2Fservice%2Ftest",  Value::Bytes("/service/test".into()).into()),
+            ("%{data:field:lowercase}", "aBC", Value::Bytes("abc".into()).into()),
+            ("%{data:field:uppercase}", "Abc",  Value::Bytes("ABC".into()).into()),
+            ("%{data:field:decodeuricomponent}", "%2Fservice%2Ftest",  Value::Bytes("/service/test".into()).into()),
+            ("%{integer:field:scale(10)}", "1",  Value::Integer(10).into()),
         ])
         .await;
     }
 
-    async fn test_filter_function(tests: Vec<(&str, &str, Option<Value>)>) {
+    async fn test_grok_pattern(tests: Vec<(&str, &str, Option<Value>)>) {
         for (filter, k, v) in tests {
             let event = parse_log(
                 Event::from(k),
                 vec![],
-                vec![format!(r#"test %{{data:field:{}}}"#, filter)],
+                vec![format!(r#"test {}"#, filter)],
                 None,
             )
             .await;

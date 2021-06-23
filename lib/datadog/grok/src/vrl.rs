@@ -9,7 +9,7 @@ use ::vrl::{
 };
 use lookup::LookupBuf;
 use shared::btreemap;
-use vrl_compiler::{compile, Program};
+use vrl_compiler::compile;
 use vrl_parser::ast as vrl_ast;
 use vrl_parser::ast::{AssignmentTarget, Opcode, RootExpr};
 
@@ -62,7 +62,7 @@ pub fn compile_to_vrl(
 
     let mut exprs = vec![];
     exprs.extend(grok_rule_exprs);
-    // . = merge(., target_var_name)
+    // vrl: .custom = merge(., parsed)
     let merge = vrl_ast::Expr::Assignment(make_node(vrl_ast::Assignment::Single {
         target: make_node(AssignmentTarget::External(Some(".custom".parse().unwrap()))),
         op: vrl_ast::AssignmentOp::Assign,
@@ -184,8 +184,8 @@ fn make_filter_call(
             make_null(),
         )),
         "integerExt" => Ok(
-            /// scientific notation is supported by float conversion,
-            /// so first convert it to float and then to int
+            // scientific notation is supported by float conversion,
+            // so first convert it to float and then to int
             make_coalesce(
                 make_function_call(
                     "to_int",
