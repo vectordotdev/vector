@@ -1217,10 +1217,10 @@ components: sources: dnstap: {
 				add option "socket_file_mode" in dnstap source configuration like below:
 
 				```toml
-						[sources.my_dnstap_source]
-							type = "dnstap"
-							# ...
-							socket_file_mode: 0o774
+				[sources.my_dnstap_source]
+				type = "dnstap"
+				# ...
+				socket_file_mode: 0o774
 				```
 				"""#
 			sub_sections: [
@@ -1251,11 +1251,11 @@ components: sources: dnstap: {
 				configuration accordingly, like below:
 
 				```toml
-						[sources.my_dnstap_source]
-							type = "dnstap"
-							# ...
-							socket_receive_buffer_size = 10_485_760
-							socket_send_buffer_size = 10_485_760
+				[sources.my_dnstap_source]
+				type = "dnstap"
+				# ...
+				socket_receive_buffer_size = 10_485_760
+				socket_send_buffer_size = 10_485_760
 				```
 
 				And certainly, for the buffer size settings to actually take effects,
