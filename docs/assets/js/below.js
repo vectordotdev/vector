@@ -33,7 +33,6 @@ const renderSearchBox = (renderOptions, isFirstRender) => {
   }
 
   container.querySelector('#algolia-search-input').value = query;
-  console.log(query);
 }
 
 const renderHits = (renderOptions, _isFirstRender) => {

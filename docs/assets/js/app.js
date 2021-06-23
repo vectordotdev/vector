@@ -14,7 +14,6 @@ const clearLocalStorageOnNewGeneration = () => {
 
   if ((storedGeneration != null) && (storedGeneration < currentGeneration)) {
     ['__spruce:ui', '__spruce:global'].forEach((item) => localStorage.removeItem(item));
-    console.log('Removing current localStorage');
   }
 
   localStorage.setItem('generation', currentGeneration);
