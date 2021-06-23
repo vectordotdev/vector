@@ -1,0 +1,6 @@
+- from: "/guides/integrate/platforms/*"
+  to: "/docs/setup/installation/platforms/:splat"
+- from: "/guides/integration/sinks/*"
+  to: "/docs/reference/configuration/sinks/:splat"
+- from: "/guides/integration/sources/*"
+  to: "/docs/reference/configuration/sources/:splat"

@@ -1,0 +1,4 @@
+{{- $integrationGuides := site.Data.redirects -}}
+{{- range $integrationGuides }}
+{{ .from }}     {{ .to }}     301!
+{{- end -}}

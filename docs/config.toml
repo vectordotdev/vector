@@ -43,14 +43,25 @@ favicon = "favicon.ico"
 site_generation = 1
 
 # Search
-[outputFormats.Search]
+[outputFormats.SEARCH]
 baseName = "search"
 isPlainText = true
 mediaType = "application/json"
 notAlternative = true
 
+# Redirects
+[mediaTypes."text/netlify"]
+delimiter = ""
+
+[outputFormats.REDIRECTS]
+baseName = "_redirects"
+mediaType = "text/netlify"
+isPlainText = true
+notAlternative = true
+
+# Outputs (including search.json and _redirects files)
 [outputs]
-home = ["HTML", "RSS", "Search"]
+home = ["HTML", "RSS", "SEARCH", "REDIRECTS"]
 
 # CSS generation
 [[params.css]]
