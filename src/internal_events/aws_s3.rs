@@ -28,7 +28,7 @@ pub mod source {
 
     impl<'a> InternalEvent for SqsMessageReceiveFailed<'a> {
         fn emit_logs(&self) {
-            warn!(message = "Failed to fetch SQS events.", %self.error);
+            warn!(message = "Failed to fetch SQS events.", error = %self.error);
         }
 
         fn emit_metrics(&self) {
@@ -43,7 +43,7 @@ pub mod source {
 
     impl InternalEvent for SqsMessageReceiveSucceeded {
         fn emit_logs(&self) {
-            trace!(message = "Received SQS messages.", %self.count);
+            trace!(message = "Received SQS messages.", count = %self.count);
         }
 
         fn emit_metrics(&self) {
@@ -59,7 +59,7 @@ pub mod source {
 
     impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
         fn emit_logs(&self) {
-            trace!(message = "Processed SQS message succeededly.", %self.message_id);
+            trace!(message = "Processed SQS message succeededly.", message_id = %self.message_id);
         }
 
         fn emit_metrics(&self) {
@@ -75,7 +75,7 @@ pub mod source {
 
     impl<'a> InternalEvent for SqsMessageProcessingFailed<'a> {
         fn emit_logs(&self) {
-            warn!(message = "Failed to process SQS message.", %self.message_id, %self.error);
+            warn!(message = "Failed to process SQS message.", message_id = %self.message_id, error = %self.error);
         }
 
         fn emit_metrics(&self) {
@@ -179,7 +179,8 @@ pub mod source {
 
     impl<'a> InternalEvent for SqsS3EventRecordInvalidEventIgnored<'a> {
         fn emit_logs(&self) {
-            warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.", %self.bucket, %self.key, %self.kind, %self.name);
+            warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.",
+                bucket = %self.bucket, key = %self.key, kind = %self.kind, name = %self.name);
         }
 
         fn emit_metrics(&self) {
