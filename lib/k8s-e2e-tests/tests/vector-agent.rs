@@ -10,7 +10,13 @@ use tracing::{debug, info};
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
+// Lower cooldown to avoid breaking simple_checkpoint test
+// This is added as rawConfig due to the following bug:
+// https://github.com/timberio/vector/issues/7453
 const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
+    kubernetesLogsSource:
+      rawConfig: |
+        glob_minimum_cooldown_ms = 5000
     sinks:
       stdout:
         type: "console"
