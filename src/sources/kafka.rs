@@ -1,9 +1,14 @@
-use super::util::finalizer::OrderedFinalizer;
+use super::util::{
+    decoding::{DecodingConfig, NoopDecoder},
+    finalizer::OrderedFinalizer,
+};
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    event::{BatchNotifier, LogEvent, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
+    sources::util::decoding::Decoder,
     Pipeline,
 };
 use bytes::Bytes;
@@ -19,7 +24,6 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use vector_core::event::{BatchNotifier, LogEvent, Value};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -58,6 +62,7 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+    decoding: Option<DecodingConfig>,
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -111,6 +116,10 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
+        let decode = match &self.decoding {
+            Some(decoding) => decoding.build(),
+            None => NoopDecoder.build(),
+        }?;
 
         Ok(Box::pin(kafka_source(
             consumer,
@@ -122,6 +131,7 @@ impl SourceConfig for KafkaSourceConfig {
             cx.shutdown,
             cx.out,
             cx.acknowledgements,
+            decode,
         )))
     }
 
@@ -144,6 +154,7 @@ async fn kafka_source(
     shutdown: ShutdownSignal,
     mut out: Pipeline,
     acknowledgements: bool,
+    decode: impl Fn(Bytes) -> crate::Result<Value> + Send,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let shutdown = shutdown.shared();
@@ -167,10 +178,15 @@ async fn kafka_source(
                 };
                 let mut log = LogEvent::default();
 
-                log.insert(
-                    log_schema().message_key(),
-                    Value::from(Bytes::from(payload.to_owned())),
-                );
+                let message = match decode(Bytes::from(payload.to_owned())) {
+                    Ok(message) => message,
+                    Err(error) => {
+                        error!(message = "Error decoding event.", %error);
+                        continue;
+                    }
+                };
+
+                log.insert(log_schema().message_key(), message);
 
                 // Extract timestamp from kafka message
                 let timestamp = msg
@@ -447,6 +463,7 @@ mod integration_test {
             shutdown,
             tx,
             acknowledgements,
+            NoopDecoder.build().unwrap(),
         ));
         let events = collect_n(rx, 10).await;
         drop(trigger_shutdown);
