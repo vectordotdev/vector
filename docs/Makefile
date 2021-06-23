@@ -17,6 +17,8 @@ production-build:
 	hugo \
 	--minify
 
+local-production-build: setup build-cue production-build run-link-checker
+
 ci-production-build: setup build-cue production-build run-link-checker algolia
 
 # Preview site
