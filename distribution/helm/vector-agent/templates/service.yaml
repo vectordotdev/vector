@@ -1,0 +1,22 @@
+
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "libvector.fullname" . }}
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - name: api
+    targetPort: api
+    port: {{ .Values.service.port }}
+    protocol: TCP
+  selector:
+    {{- include "libvector.selectorLabels" . | nindent 4 }}
+  {{- with .Values.service.topologyKeys }}
+  topologyKeys:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
