@@ -7,7 +7,7 @@
 {{ $modes := slice "Light" "Dark" }}
 
 <div class="py-24 md:py-32 lg:py-48 mx-auto max-w-7xl relative" x-data="{ active: false }">
-  <div class="px-4 sm:px-6 text-center">
+  <div class="text-center">
     <a href="{{ $link }}" @mouseover="active = true" @mouseover.away="active = false" class="dark:bg-gray-800 bg-gradient-to-r uppercase from-primary to-purple-v inline-flex items-center text-white rounded-full py-1 px-1.5 sm:text-base lg:text-sm xl:text-base">
       <span class="bg-black text-white font-semibold px-2.5 py-0 lg:py-0.5 text-xs leading-5 tracking-tight rounded-full">
         New

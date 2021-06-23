@@ -1,7 +1,7 @@
 {{ $comm := .Params.community }}
 {{ $social := site.Menus.community }}
-<div class="py-12 md:py-16 lg:py-20 mx-auto max-w-7xl">
-  <div class="text-center px-4 sm:px-6">
+<div class="py-12 md:py-16 lg:py-20 mx-auto max-w-7xl px-8 md:px-4 lg:px-0">
+  <div class="text-center">
     {{ partial "home/heading.html" (dict "title" $comm.title) }}
 
     {{/* Project stats */}}
