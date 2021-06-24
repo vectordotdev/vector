@@ -7,26 +7,9 @@ const autoprefixer = require('autoprefixer')({
 // These are classes for things that are applied by JS, and thus missed by Hugo.
 // See assets/js/*.js for places where this happens.
 const safeClasses = [
-  'bg-dark',
-  'dark:bg-black',
-  'dark:hover:text-primary',
-  'dark:text-gray-200',
-  'focus:bg-white',
-  'focus:border-none',
-  'focus:outline-none',
-  'focus:ring-none',
-  'focus:text-gray-900',
-  'font-mono',
-  'font-semibold',
-  'hover:text-secondary',
-  'px-2',
-  'py-1.5',
-  'py-2',
-  'rounded',
-  'text-dark',
-  'text-gray-50',
-  'text-sm',
-  'tracking-wide',
+  "search-input",
+  "search-results-list",
+  "search-result"
 ];
 
 const purgecss = require('@fullhuman/postcss-purgecss')({

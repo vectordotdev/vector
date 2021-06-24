@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .search-input {
+    @apply bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md sm:text-sm text-gray-800 dark:text-gray-400 placeholder-gray-400 leading-5 block w-full pl-10 pr-3 focus:outline-none focus:bg-white focus:text-gray-900;
+  }
+
+  .search-results-list {
+    @apply flex flex-col divide-y dark:divide-gray-700;
+  }
+
+  .search-results-list .search-result {
+    @apply text-dark dark:text-gray-200 py-2 hover:text-secondary dark:hover:text-primary;
+  }
+}
+
 [x-cloak] {
   display: none !important;
 }

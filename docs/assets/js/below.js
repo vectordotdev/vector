@@ -22,12 +22,10 @@ const renderSearchBox = (renderOptions, isFirstRender) => {
 
   const container = widgetParams.container;
 
-  const focus = 'focus:outline-none focus:bg-white focus:text-gray-900 focus:ring-none focus:border-none';
-
   // Make sure you add any Tailwind classes you apply here to the safeClasses list in postcss.config.js
   if (isFirstRender) {
     container.innerHTML = `
-    <input x-model="query" x-ref="q" id="algolia-search-input" autocomplete="on" aria-label="Search" aria-autocomplete="list" aria-owns="algolia-search-results" spellcheck="false" dir="auto" name="search" type="search" class="dark:bg-gray-700 dark:text-gray-400 bg-gray-200 text-gray-800 block w-full pl-10 pr-3 border border-transparent rounded-md leading-5 placeholder-gray-400 sm:text-sm ${focus}" placeholder="Search">
+    <input x-model="query" x-ref="q" id="algolia-search-input" autocomplete="on" aria-label="Search" aria-autocomplete="list" aria-owns="algolia-search-results" spellcheck="false" dir="auto" name="search" type="search" class="search-input" placeholder="Search">
     `;
 
     container.querySelector('#algolia-search-input').addEventListener('input', event => {
@@ -43,11 +41,11 @@ const renderHits = (renderOptions, _isFirstRender) => {
 
   // Make sure you add any Tailwind classes you apply here to the safeClasses list in postcss.config.js
   widgetParams.container.innerHTML = `
-    <ul class="flex flex-col divide-y dark:divide-gray-700">
+    <ul class="search-results-list">
       ${hits
         .map(
           item =>
-            `<li class="text-dark dark:text-gray-200 py-2 hover:text-secondary dark:hover:text-primary">
+            `<li class="search-result">
               <a href="${item.url}">
               ${instantsearch.highlight({ attribute: 'title', hit: item, highlightedTagName: "strong" })}
               </a>
