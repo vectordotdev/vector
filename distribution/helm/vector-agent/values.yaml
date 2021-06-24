@@ -30,10 +30,10 @@ fullnameOverride: ""
 
 updateStrategy: RollingUpdate
 
-# Deploy a service to use Topology-aware traffic routing with topology keys.
+# Deploy a service resource to use Topology-aware traffic routing with topology keys.
 service:
   # Whether to create service resource or not.
-  enabled: true
+  enabled: false
   type: ClusterIP
   topologyKeys:
     - "kubernetes.io/hostname"
