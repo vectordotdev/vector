@@ -2,8 +2,10 @@
 {{- $pages := where site.AllPages "Draft" false -}}
 {{- $index := slice -}}
 {{- range site.AllPages -}}
+{{- $isComponent := eq .Layout "component" -}}
 {{- $url := .RelPermalink -}}
-{{- $title := .Params.short | default .Title | markdownify | plainify -}}
+{{- $title := .Params.search_title | default .Params.short | default .Title | markdownify | plainify -}}
+{{- $title := cond $isComponent (printf "%s %s" .Title .Params.kind) $title -}}
 {{- $sectionTitle := (.FirstSection.Params.short | default .FirstSection.Params.Title) | title -}}
 {{- $section := cond (eq .Layout "component") "Component" $sectionTitle -}}
 {{- $tags := .Params.tags | default slice -}}

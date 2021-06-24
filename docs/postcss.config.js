@@ -6,11 +6,14 @@ const autoprefixer = require('autoprefixer')({
 
 // These are classes for things that are applied by JS, and thus missed by Hugo.
 // See assets/js/*.js for places where this happens.
-const safeClasses = [
-  "search-input",
-  "search-results-list",
-  "search-result"
-];
+const safeClasses = {
+  standard: [
+    "search-input",
+    "search-results-list",
+    "search-result",
+    /^ais-/ // All Algolia-specific classes
+  ]
+};
 
 const purgecss = require('@fullhuman/postcss-purgecss')({
   content: ['./hugo_stats.json'],
