@@ -186,16 +186,7 @@ impl Source {
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), name)?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
-        let exclude_paths = config
-            .exclude_paths_glob_patterns
-            .iter()
-            .map(|pattern| {
-                let pattern = pattern
-                    .to_str()
-                    .ok_or("glob pattern is not a valid UTF-8 string")?;
-                Ok(glob::Pattern::new(pattern)?)
-            })
-            .collect::<crate::Result<Vec<_>>>()?;
+        let exclude_paths = prepare_exclude_paths(config)?;
 
         let glob_minimum_cooldown =
             Duration::from_millis(config.glob_minimum_cooldown_ms.try_into().expect(
@@ -458,6 +449,26 @@ fn default_max_line_bytes() -> usize {
 
 fn default_glob_minimum_cooldown_ms() -> usize {
     60000
+}
+
+fn prepare_exclude_paths(config: &Config) -> crate::Result<Vec<glob::Pattern>> {
+    let exclude_paths = config
+        .exclude_paths_glob_patterns
+        .iter()
+        .map(|pattern| {
+            let pattern = pattern
+                .to_str()
+                .ok_or("glob pattern is not a valid UTF-8 string")?;
+            Ok(glob::Pattern::new(pattern)?)
+        })
+        .collect::<crate::Result<Vec<_>>>()?;
+
+    info!(
+        message = "Excluding matching files.",
+        exclude_paths = format!("[{}]", exclude_paths.iter().join(","))
+    );
+
+    Ok(exclude_paths)
 }
 
 /// This function constructs the effective field selector to use, based on
