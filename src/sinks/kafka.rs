@@ -313,8 +313,13 @@ impl Sink<Event> for KafkaSink {
         self.seq_head += 1;
 
         let producer = Arc::clone(&self.producer);
+        let kf = self.key_field.is_some();
         self.delivery_fut.push(Box::pin(async move {
-            let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
+            let mut record = if kf {
+                FutureRecord::to(&topic).key(&key).payload(&body[..])
+            } else {
+                FutureRecord::to(&topic).payload(&body[..])
+            };
             if let Some(timestamp) = timestamp_ms {
                 record = record.timestamp(timestamp);
             }
