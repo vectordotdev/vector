@@ -3,6 +3,7 @@ use crate::event::{
     Event,
 };
 use chrono::{DateTime, TimeZone, Utc};
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 pub use prometheus_parser::*;
@@ -71,6 +72,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
                     let mut buckets = metric.buckets;
+                    buckets.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap_or(Ordering::Equal));
                     for i in (1..buckets.len()).rev() {
                         buckets[i].count -= buckets[i - 1].count;
                     }
@@ -696,6 +698,32 @@ mod test {
                     buckets: vector_core::buckets![
                         0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
                     ],
+                    count: 144320,
+                    sum: 53423.0,
+                },
+            )
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    #[test]
+    fn test_histogram_out_of_order() {
+        let exp = r##"
+            # HELP duration A histogram of the request duration.
+            # TYPE duration histogram
+            duration_bucket{le="+Inf"} 144320 1612411506789
+            duration_bucket{le="1"} 133988 1612411506789
+            duration_sum 53423 1612411506789
+            duration_count 144320 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "duration",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vector_core::buckets![1.0 => 133988],
                     count: 144320,
                     sum: 53423.0,
                 },
