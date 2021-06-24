@@ -18,8 +18,14 @@
     }
   }"
   @keydown.window.slash="searchFocus()"
+  @keydown="if (showSearchResults()) {
+    if ($event.key === 'ArrowDown') {
+      this.$refs.results.focus();
+    }
+  }"
   x-on:open-flyout="flyout = !flyout"
-  class="z-50 dark:bg-dark dark:border-gray-700 border-b">
+  class="z-50 dark:bg-dark dark:border-gray-700 border-b"
+  tabindex="0">
 
   <div class="max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-1 md:py-1.5 lg:py-2">
     <div class="relative flex items-center justify-between h-16">

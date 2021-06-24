@@ -9,6 +9,7 @@
 {{- $tags := .Params.tags | default slice -}}
 {{- $content := .Plain -}}
 {{- $summary := .Summary -}}
-{{- $index = $index | append (dict "objectID" .File.UniqueID "title" $title "tags" $tags "content" $content "section" $section "summary" $summary "url" $url) -}}
+{{- $description := .Description | markdownify | plainify -}}
+{{- $index = $index | append (dict "objectID" .File.UniqueID "title" $title "tags" $tags "content" $content "section" $section "summary" $summary "description" $description "url" $url) -}}
 {{- end -}}
 {{- $index | jsonify -}}
