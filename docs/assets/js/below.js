@@ -22,9 +22,11 @@ const renderSearchBox = (renderOptions, isFirstRender) => {
 
   const container = widgetParams.container;
 
+  const focus = 'focus:outline-none focus:bg-white focus:text-gray-900 focus:ring-none focus:border-none';
+
   if (isFirstRender) {
     container.innerHTML = `
-    <input x-model="query" id="algolia-search-input" name="search" type="search" class="dark:bg-gray-700 dark:text-gray-400 bg-gray-200 text-gray-800 block w-full pl-10 pr-3 border border-transparent rounded-md leading-5 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-white focus:ring-white focus:text-gray-900 sm:text-sm" placeholder="Search">
+    <input x-model="query" id="algolia-search-input" name="search" type="search" class="dark:bg-gray-700 dark:text-gray-400 bg-gray-200 text-gray-800 block w-full pl-10 pr-3 border border-transparent rounded-md leading-5 placeholder-gray-400 sm:text-sm ${focus}" placeholder="Search">
     `;
 
     container.querySelector('#algolia-search-input').addEventListener('input', event => {
