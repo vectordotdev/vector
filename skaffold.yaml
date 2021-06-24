@@ -8,8 +8,8 @@ build:
     push: false
   artifacts:
     - image: timberio/vector
-      context: target/debug
+      context: target/x86_64-unknown-linux-gnu/debug
       docker:
-        dockerfile: ../../skaffold/docker/Dockerfile
+        dockerfile: ../../../skaffold/docker/Dockerfile
 deploy:
   kustomize: {}
