@@ -30,16 +30,26 @@ fullnameOverride: ""
 
 updateStrategy: RollingUpdate
 
-# Deploy service to use Topology-aware traffic routing with topology keys.
+# Deploy a service to use Topology-aware traffic routing with topology keys.
 service:
-  enabled: false
-  # type: ClusterIP
-  # port: 80
-  # topologyKeys:
-  #   - "kubernetes.io/hostname"
-  #   - "topology.kubernetes.io/zone"
-  #   - "topology.kubernetes.io/region"
-  #   - "*"
+  # Whether to create service resource or not.
+  enabled: true
+  type: ClusterIP
+  topologyKeys:
+    - "kubernetes.io/hostname"
+    - "topology.kubernetes.io/zone"
+    - "topology.kubernetes.io/region"
+    - "*"
+  ports:
+    - name: api
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    # Additional ports (Vector sources, etc.)
+    # - name: another_port
+    #   port: 8081
+    #   protocol: TCP
+    #   targetPort: 8081
 
 serviceAccount:
   # Specifies whether a service account should be created.
