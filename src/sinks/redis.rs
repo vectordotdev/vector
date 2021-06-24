@@ -263,7 +263,7 @@ impl RetryLogic for RedisRetryLogic {
         if response.is_successful() {
             return RetryAction::Successful;
         }
-        RetryAction::Retry("Sent data to redis failed.".into())
+        RetryAction::Retry("Sending data to redis failed.".into())
     }
 }
 
@@ -320,20 +320,19 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
 
         Box::pin(async move {
             let result: RedisPipeResult = pipe.query_async(&mut conn).await;
-            match result {
+            match &result {
                 Ok(res) => {
                     if res.is_successful() {
                         emit!(RedisEventSent { count, byte_size });
+                    } else {
+                        warn!("Batch sending was not all successful and will be retried.")
                     }
-                    Ok(res)
                 }
-                Err(error) => {
-                    emit!(RedisSendEventFailed {
-                        error: error.to_string()
-                    });
-                    Err(error)
-                }
-            }
+                Err(error) => emit!(RedisSendEventFailed {
+                    error: error.to_string()
+                }),
+            };
+            result
         })
     }
 }
