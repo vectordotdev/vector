@@ -71,7 +71,7 @@ up() {
     --set "global.vector.commonEnvKV.LOG=info"
   )
 
-  for file in "$CUSTOM_HELM_VALUES_FILES" ; do
+  for file in $CUSTOM_HELM_VALUES_FILES ; do
     HELM_VALUES+=(
       --values "$file"
     )
