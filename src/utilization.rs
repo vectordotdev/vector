@@ -1,5 +1,6 @@
 use crate::{buffers::EventStream, event::Event, stats};
 use futures::{Stream, StreamExt};
+use metrics::gauge;
 use pin_project::pin_project;
 use std::{pin::Pin, task::Context};
 use std::{
@@ -124,7 +125,9 @@ impl Timer {
         let utilization = 1.0 - wait_ratio;
 
         self.ewma.update(utilization);
-        debug!(utilization = %self.ewma.average().unwrap_or(f64::NAN));
+        let avg = self.ewma.average().unwrap_or(f64::NAN);
+        debug!(utilization = %avg);
+        gauge!("utilization", avg);
 
         // Reset overall statistics for the next reporting period.
         self.overall_start = self.span_start;
