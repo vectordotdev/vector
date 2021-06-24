@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[x-cloak] {
+  display: none !important;
+}
+
+// Some rules that Tailwind can't really cover
+.jump + .jump, .admonition + .admonition {
+  margin-top: 0.5rem;
+}
+
+.svg svg {
+  max-width: 100%;
+  height: auto;
+}

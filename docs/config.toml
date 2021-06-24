@@ -73,7 +73,7 @@ home = ["HTML", "RSS", "SEARCH", "REDIRECTS"]
 
 # CSS generation
 [[params.css]]
-input = "sass/style.sass"
+input = "css/style.css"
 output = "css/style.css"
 postcss = true
 post_process = true
