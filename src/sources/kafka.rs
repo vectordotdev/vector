@@ -1,5 +1,5 @@
 use super::util::{
-    decoding::{DecodingConfig, NoopDecoder},
+    decoding::{DecodingBuilder, DecodingConfig},
     finalizer::OrderedFinalizer,
 };
 use crate::{
@@ -8,7 +8,6 @@ use crate::{
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
-    sources::util::decoding::Decoder,
     Pipeline,
 };
 use bytes::Bytes;
@@ -116,10 +115,7 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
-        let decode = match &self.decoding {
-            Some(decoding) => decoding.build(),
-            None => NoopDecoder.build(),
-        }?;
+        let decode = self.decoding.build()?;
 
         Ok(Box::pin(kafka_source(
             consumer,
@@ -463,7 +459,7 @@ mod integration_test {
             shutdown,
             tx,
             acknowledgements,
-            NoopDecoder.build().unwrap(),
+            None.build().unwrap(),
         ));
         let events = collect_n(rx, 10).await;
         drop(trigger_shutdown);

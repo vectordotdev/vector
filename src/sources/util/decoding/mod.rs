@@ -7,7 +7,7 @@ mod noop;
 
 use crate::event::Value;
 use bytes::Bytes;
-pub use config::DecodingConfig;
+pub use config::{DecodingBuilder, DecodingConfig};
 pub use noop::NoopDecoder;
 
 /// The common `Decoder` trait which provides a method to build a transform that

@@ -3,6 +3,7 @@
 
 #![deny(missing_docs)]
 
+use super::{Decoder, NoopDecoder};
 use crate::event::Value;
 use bytes::Bytes;
 use lazy_static::lazy_static;
@@ -52,15 +53,30 @@ impl DecodingConfig {
             Self::Decoder(decoder) => decoder.name().to_owned(),
         }
     }
+}
 
+pub trait DecodingBuilder {
     /// Builds the transform that converts from byte frame to event value.
-    pub fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>> {
+    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>>;
+}
+
+impl DecodingBuilder for DecodingConfig {
+    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>> {
         match &self {
             Self::Name(name) => match DECODERS.get(name.as_str()) {
                 Some(decoder) => decoder.build(),
                 _ => Err(format!(r#"Unknown codec "{}""#, name).into()),
             },
             Self::Decoder(decoder) => decoder.build(),
+        }
+    }
+}
+
+impl DecodingBuilder for Option<DecodingConfig> {
+    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>> {
+        match self {
+            Some(decoder) => decoder.build(),
+            None => NoopDecoder.build(),
         }
     }
 }
