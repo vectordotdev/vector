@@ -1044,7 +1044,7 @@ impl fmt::Debug for Unary {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
-pub struct Not(pub(crate) Node<()>, pub(crate) Box<Node<Expr>>);
+pub struct Not(pub Node<()>, pub Box<Node<Expr>>);
 
 impl Not {
     pub fn take(self) -> (Node<()>, Box<Node<Expr>>) {

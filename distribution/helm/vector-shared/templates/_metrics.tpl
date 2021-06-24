@@ -82,6 +82,9 @@ metadata:
   name: {{ include "libvector.fullname" . }}
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
+    {{- with .Values.prometheusSink.podMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   jobLabel: app.kubernetes.io/name
 
@@ -104,6 +107,10 @@ spec:
         - action: labelmap
           regex: __meta_kubernetes_pod_label_(.+)
         {{- with .Values.prometheusSink.podMonitor.extraRelabelings }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      metricRelabelings:
+        {{- with .Values.prometheusSink.podMonitor.metricRelabelings }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
 {{- end }}

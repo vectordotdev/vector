@@ -11,7 +11,7 @@ pub mod fanout;
 mod task;
 
 use crate::{
-    buffers,
+    buffers::{self, EventStream},
     config::{Config, ConfigDiff, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
@@ -21,7 +21,7 @@ use crate::{
     },
     trigger::DisabledTrigger,
 };
-use futures::{future, Future, FutureExt, SinkExt, Stream};
+use futures::{future, Future, FutureExt, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
@@ -37,8 +37,8 @@ use tracing_futures::Instrument;
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
-    buffers::BufferInputCloner,
-    Arc<Mutex<Option<Pin<Box<dyn Stream<Item = Event> + Send>>>>>,
+    buffers::BufferInputCloner<Event>,
+    Arc<Mutex<Option<Pin<EventStream>>>>,
     buffers::Acker,
 );
 
@@ -52,7 +52,7 @@ pub type WatchRx = watch::Receiver<Outputs>;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<String, buffers::BufferInputCloner>,
+    inputs: HashMap<String, buffers::BufferInputCloner<Event>>,
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, TaskHandle>,
     tasks: HashMap<String, TaskHandle>,
@@ -370,8 +370,8 @@ impl RunningTopology {
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
 
-            self.remove_inputs(&name).await;
-            self.remove_outputs(&name);
+            self.remove_inputs(name).await;
+            self.remove_outputs(name);
         }
 
         // Sinks
@@ -388,7 +388,7 @@ impl RunningTopology {
         let add_source = diff
             .sources
             .changed_and_added()
-            .map(|name| (name, new_config.sources[name].resources()));
+            .map(|name| (name, new_config.sources[name].inner.resources()));
         let add_sink = diff
             .sinks
             .changed_and_added()
@@ -428,7 +428,7 @@ impl RunningTopology {
         // Detach removed sinks
         for name in &diff.sinks.to_remove {
             info!(message = "Removing sink.", name = ?name);
-            self.remove_inputs(&name).await;
+            self.remove_inputs(name).await;
         }
 
         // Detach changed sinks
@@ -484,31 +484,31 @@ impl RunningTopology {
     async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         // Sources
         for name in diff.sources.changed_and_added() {
-            self.setup_outputs(&name, new_pieces).await;
+            self.setup_outputs(name, new_pieces).await;
         }
 
         // Transforms
         // Make sure all transform outputs are set up before another transform might try use
         // it as an input
         for name in diff.transforms.changed_and_added() {
-            self.setup_outputs(&name, new_pieces).await;
+            self.setup_outputs(name, new_pieces).await;
         }
 
         for name in &diff.transforms.to_change {
-            self.replace_inputs(&name, new_pieces).await;
+            self.replace_inputs(name, new_pieces).await;
         }
 
         for name in &diff.transforms.to_add {
-            self.setup_inputs(&name, new_pieces).await;
+            self.setup_inputs(name, new_pieces).await;
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
-            self.replace_inputs(&name, new_pieces).await;
+            self.replace_inputs(name, new_pieces).await;
         }
 
         for name in &diff.sinks.to_add {
-            self.setup_inputs(&name, new_pieces).await;
+            self.setup_inputs(name, new_pieces).await;
         }
 
         // Broadcast changes to subscribers.
@@ -530,29 +530,29 @@ impl RunningTopology {
 
         for name in &diff.sources.to_add {
             info!(message = "Starting source.", name = ?name);
-            self.spawn_source(&name, &mut new_pieces);
+            self.spawn_source(name, &mut new_pieces);
         }
 
         // Transforms
         for name in &diff.transforms.to_change {
             info!(message = "Rebuilding transform.", name = ?name);
-            self.spawn_transform(&name, &mut new_pieces);
+            self.spawn_transform(name, &mut new_pieces);
         }
 
         for name in &diff.transforms.to_add {
             info!(message = "Starting transform.", name = ?name);
-            self.spawn_transform(&name, &mut new_pieces);
+            self.spawn_transform(name, &mut new_pieces);
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
             info!(message = "Rebuilding sink.", name = ?name);
-            self.spawn_sink(&name, &mut new_pieces);
+            self.spawn_sink(name, &mut new_pieces);
         }
 
         for name in &diff.sinks.to_add {
             info!(message = "Starting sink.", name = ?name);
-            self.spawn_sink(&name, &mut new_pieces);
+            self.spawn_sink(name, &mut new_pieces);
         }
     }
 
@@ -815,7 +815,7 @@ mod tests {
         old_config.add_source("in", SocketConfig::make_basic_tcp_config(next_addr()));
         old_config.add_sink(
             "out",
-            &[&"in"],
+            &["in"],
             ConsoleSinkConfig {
                 target: Target::Stdout,
                 encoding: Encoding::Text.into(),
@@ -1165,7 +1165,7 @@ mod source_finished_tests {
         old_config.add_source("in", generator);
         old_config.add_sink(
             "out",
-            &[&"in"],
+            &["in"],
             ConsoleSinkConfig {
                 target: Target::Stdout,
                 encoding: Encoding::Text.into(),

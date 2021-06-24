@@ -7,7 +7,7 @@ installation: platforms: kubernetes: {
 		open-source container-orchestration system for automating
 		application deployment, scaling, and management.
 		"""
-	minimum_supported_version: "1.14"
+	minimum_supported_version: "1.15"
 
 	how_it_works: {
 		components.sources.kubernetes_logs.how_it_works

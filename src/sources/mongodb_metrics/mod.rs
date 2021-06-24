@@ -337,7 +337,7 @@ impl MongoDbMetrics {
         // instance_*
         metrics.push(self.create_metric(
             "instance_local_time",
-            gauge!(status.instance.local_time.timestamp()),
+            gauge!(status.instance.local_time.timestamp_millis() / 1000),
             tags!(self.tags),
         ));
         metrics.push(self.create_metric(
@@ -1077,7 +1077,7 @@ mod integration_tests {
             // validate namespace
             assert!(metric.namespace() == Some(namespace));
             // validate timestamp
-            let timestamp = metric.data.timestamp.expect("existed timestamp");
+            let timestamp = metric.timestamp().expect("existed timestamp");
             assert!((timestamp - Utc::now()).num_seconds() < 1);
             // validate basic tags
             let tags = metric.tags().expect("existed tags");

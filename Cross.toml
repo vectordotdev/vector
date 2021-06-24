@@ -1,7 +1,9 @@
 [build.env]
 passthrough = [
+    "BUILD_DIR",
     "RUST_BACKTRACE",
     "RUST_LOG",
+    "VECTOR_BUILD_DESC",
 ]
 
 [target.x86_64-unknown-linux-gnu]

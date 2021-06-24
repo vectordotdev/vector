@@ -327,7 +327,7 @@ mod test {
         drop(shutdown_signal);
 
         let success = shutdown_complete.await;
-        assert_eq!(true, success);
+        assert!(success);
     }
 
     #[tokio::test]
@@ -343,7 +343,7 @@ mod test {
         // Since we never drop the ShutdownSignal the ShutdownCoordinator assumes the Source is
         // still running and must force shutdown.
         let success = shutdown_complete.await;
-        assert_eq!(false, success);
+        assert!(!success);
 
         let finished = futures::poll!(force_shutdown_tripwire.boxed());
         assert_eq!(finished, Poll::Ready(()));

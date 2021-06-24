@@ -66,6 +66,10 @@ impl Expression for Literal {
         Ok(self.to_value())
     }
 
+    fn as_value(&self) -> Option<Value> {
+        Some(self.to_value())
+    }
+
     fn type_def(&self, _: &State) -> TypeDef {
         use Literal::*;
 

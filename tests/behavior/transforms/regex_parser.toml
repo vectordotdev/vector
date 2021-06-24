@@ -11,7 +11,7 @@
   [[tests.outputs]]
     extract_from = "regex_parser_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .timestamp == "2020-01-01T12:34:56Z" &&
         .level == "INFO" &&
@@ -32,7 +32,7 @@
   [[tests.outputs]]
     extract_from = "regex_parser_target"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .something.timestamp == "2020-01-01T12:34:56Z" &&
         .something.level == "INFO" &&

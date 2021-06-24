@@ -23,7 +23,7 @@
   [[tests.outputs]]
     extract_from = "coercer_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .integer_field == 123 &&
         .boolean_field == true &&
@@ -48,5 +48,5 @@
   [[tests.outputs]]
     extract_from = "coercer_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = ".nested.field == 1234"

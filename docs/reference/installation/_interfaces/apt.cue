@@ -23,12 +23,18 @@ installation: _interfaces: apt: {
 
 	role_implementations: [string]: {
 		commands: role_implementations._systemd_commands & {
-			_config_path: paths.config
 			add_repo:
 				#"""
+					# One of the following:
+
+					# Use repository installation script
 					curl -1sLf \
 					  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
 					  | sudo -E bash
+
+					# Use extrepo
+					sudo apt install extrepo
+					sudo extrepo enable vector
 					"""#
 			install:   "sudo apt-get install vector"
 			uninstall: "sudo apt remove vector"

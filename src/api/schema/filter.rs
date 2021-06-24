@@ -104,7 +104,7 @@ mod test {
             ..Default::default()
         };
 
-        assert!(sf.filter_value(&value));
+        assert!(sf.filter_value(value));
         assert!(!sf.filter_value("not found"));
     }
 
@@ -118,7 +118,7 @@ mod test {
             ..Default::default()
         };
 
-        assert!(sf.filter_value(&value));
+        assert!(sf.filter_value(value));
         assert!(!sf.filter_value(diff_value));
     }
 

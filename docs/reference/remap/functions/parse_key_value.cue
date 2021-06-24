@@ -46,6 +46,13 @@ remap: functions: parse_key_value: {
 			default: "lenient"
 			type: ["string"]
 		},
+		{
+			name:        "accept_standalone_key"
+			description: "Whether a standalone key should be accepted, the resulting object will associate such keys with boolean value `true`"
+			required:    false
+			type: ["boolean"]
+			default: true
+		},
 	]
 	internal_failure_reasons: [
 		"`value` isn't a properly formatted key/value string",
@@ -88,6 +95,22 @@ remap: functions: parse_key_value: {
 				status:   "304"
 				bytes:    "632"
 				protocol: "https"
+			}
+		},
+		{
+			title: "Parse comma delimited log with standalone keys"
+			source: #"""
+				parse_key_value!(
+					"env:prod,service:backend,region:eu-east1,beta",
+					field_delimiter: ",",
+					key_value_delimiter: ":",
+				)
+				"""#
+			return: {
+				env:     "prod"
+				service: "backend"
+				region:  "eu-east1"
+				beta:    true
 			}
 		},
 	]

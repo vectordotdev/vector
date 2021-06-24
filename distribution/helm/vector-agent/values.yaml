@@ -2,6 +2,10 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Additional labels to add to all resources
+# commonLabels:
+#   app.kubernetes.io/component: agent
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -13,6 +17,7 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
 
 # Command to use at the pods managed by DaemonSet
 command: []
@@ -24,6 +29,17 @@ nameOverride: ""
 fullnameOverride: ""
 
 updateStrategy: RollingUpdate
+
+# Deploy service to use Topology-aware traffic routing with topology keys.
+service:
+  enabled: false
+  # type: ClusterIP
+  # port: 80
+  # topologyKeys:
+  #   - "kubernetes.io/hostname"
+  #   - "topology.kubernetes.io/zone"
+  #   - "topology.kubernetes.io/region"
+  #   - "*"
 
 serviceAccount:
   # Specifies whether a service account should be created.
@@ -198,8 +214,12 @@ hostMetricsSource:
   # Additional config to embed at the host metrics source.
   config:
     filesystem:
+      devices:
+        excludes: [binfmt_misc]
       filesystems:
         excludes: [binfmt_misc]
+      mountpoints:
+        excludes: ["*/proc/sys/fs/binfmt_misc"]
     # option: "value"
   # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null
@@ -245,8 +265,12 @@ prometheusSink:
     # Whether to add the `PodMonitor` resource or not.
     # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
     enabled: false
+    # Additional labels for PodMonitor
+    additionalLabels: {}
     # Additional relabelings to include in the `PodMonitor`.
     extraRelabelings: []
+    # metricRelabelings to include in the `PodMonitor`.
+    metricRelabelings: []
 
 # Sources to add to the generated `vector` config (besides "built-in" kubernetes
 # logs source).
@@ -274,3 +298,4 @@ sinks: {}
   #   option: "value"
   #   rawConfig: |
   #     option = "value"
+

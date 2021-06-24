@@ -162,9 +162,9 @@ remap: #Remap & {
 				}
 			}
 			source: #"""
-				.environment = get_env_var!("ENV") # add
-				.hostname = del(.host) # rename
-				del(.email)
+				.tags.environment = get_env_var!("ENV") # add
+				.tags.hostname = del(.tags.host) # rename
+				del(.tags.email)
 				"""#
 			output: metric: {
 				kind: "incremental"
@@ -270,9 +270,9 @@ remap: #Remap & {
 			title: "Event Data Model"
 			body:  """
 				You can use the `remap` transform with both log and metric events. Log events in the `remap` transform
-				correspond directly to Vector's [log schem](\(urls.vector_log)), which means that the transform has
-				access to the whole event. With metric events, however, the remap transform only has access to the
-				event's tags.
+				correspond directly to Vector's [log schema](\(urls.vector_log)), which means that the transform has
+				access to the whole event. With metric events the remap transform has read access to the event's`.type`,
+				and read/write access to the `.name`, `.namespace`, `.timestamp`, `.kind`, and `.tags`.
 				"""
 		}
 	}

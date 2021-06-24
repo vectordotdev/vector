@@ -69,7 +69,13 @@ impl<'a> FieldsIter<'a> {
         loop {
             match path_iter.next() {
                 None => return res,
-                Some(PathComponent::Key(key)) => res.push_str(&key),
+                Some(PathComponent::Key(key)) => {
+                    if key.contains('.') {
+                        res.push_str(&key.replace(".", "\\."))
+                    } else {
+                        res.push_str(&key)
+                    }
+                }
                 Some(PathComponent::Index(index)) => res.push_str(&format!("[{}]", index)),
             }
             if let Some(PathComponent::Key(_)) = path_iter.peek() {
@@ -156,7 +162,8 @@ mod test {
                 "array": [null, 3, {
                     "x": 1
                 }, [2]]
-            }
+            },
+            "a.b.c": 6,
         }));
         let expected: Vec<_> = vec![
             ("a.a", &Value::Integer(4)),
@@ -165,6 +172,7 @@ mod test {
             ("a.array[2].x", &Value::Integer(1)),
             ("a.array[3][0]", &Value::Integer(2)),
             ("a.b.c", &Value::Integer(5)),
+            ("a\\.b\\.c", &Value::Integer(6)),
         ]
         .into_iter()
         .map(|(k, v)| (k.into(), v))

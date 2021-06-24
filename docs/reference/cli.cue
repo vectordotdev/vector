@@ -103,6 +103,13 @@ cli: {
 			description: "Watch for changes in the configuration file, and reload accordingly"
 			env_var:     "VECTOR_WATCH_CONFIG"
 		}
+		"enable-datadog-tracing": {
+			description: """
+				  [experimental] Send internal tracing spans to a local APM-enabled
+				  Datadog agent with a granularity matching the current log level.
+				"""
+			env_var: "VECTOR_ENABLE_DATADOG_TRACING"
+		}
 	}
 
 	options: {

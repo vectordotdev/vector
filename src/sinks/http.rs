@@ -377,7 +377,7 @@ mod tests {
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
         "#;
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         assert!(super::validate_headers(&config.request.headers, &None).is_ok());
     }
@@ -390,7 +390,7 @@ mod tests {
         [request.headers]
         "\u0001" = "bad"
         "#;
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         assert_downcast_matches!(
             super::validate_headers(&config.request.headers, &None).unwrap_err(),

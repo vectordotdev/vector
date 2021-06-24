@@ -22,7 +22,7 @@ use std::{
     time::{self, Duration},
 };
 use tokio::time::sleep;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, trace_span, Instrument};
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -75,10 +75,11 @@ where
         self,
         mut chans: C,
         shutdown: S,
-    ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
+        mut checkpointer: Checkpointer,
+    ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
     where
-        C: Sink<Vec<(Bytes, String)>> + Unpin,
-        <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
+        C: Sink<Vec<Line>> + Unpin,
+        <C as Sink<Vec<Line>>>::Error: std::error::Error,
         S: Future + Unpin + Send + 'static,
         <S as Future>::Output: Clone + Send + Sync,
     {
@@ -89,7 +90,6 @@ where
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
 
-        let mut checkpointer = Checkpointer::new(&self.data_dir);
         checkpointer.read_checkpoints(self.ignore_before);
 
         let mut known_small_files = HashSet::new();
@@ -163,6 +163,7 @@ where
                         Err(error) => emitter.emit_file_checkpoint_write_failed(error),
                     }
                 })
+                .instrument(trace_span!("writing checkpoints file"))
                 .await
                 .ok();
 
@@ -183,9 +184,13 @@ where
         // or write new checkpoints, on every iteration.
         let mut next_glob_time = time::Instant::now();
         loop {
+            let _loop_span = trace_span!("file_server_iteration").entered();
+
             // Glob find files to follow, but not too often.
             let now_time = time::Instant::now();
             if next_glob_time <= now_time {
+                let _discovery_span = trace_span!("file_discovery").entered();
+
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
 
@@ -202,7 +207,10 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
-                for path in self.paths_provider.paths().into_iter() {
+
+                let paths = trace_span!("paths_provider").in_scope(|| self.paths_provider.paths());
+
+                for path in paths.into_iter() {
                     if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                         &path,
                         &mut fingerprint_buffer,
@@ -260,9 +268,12 @@ where
             }
 
             // Collect lines by polling files.
+            let reading_span = trace_span!("reading").entered();
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
+                let _span = trace_span!("reading", path = ?watcher.path).entered();
+
                 if !watcher.should_read() {
                     continue;
                 }
@@ -284,10 +295,12 @@ where
 
                     bytes_read += sz;
 
-                    lines.push((
-                        line,
-                        watcher.path.to_str().expect("not a valid path").to_owned(),
-                    ));
+                    lines.push(Line {
+                        text: line,
+                        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                        file_id,
+                        offset: watcher.get_file_position(),
+                    });
 
                     if bytes_read > self.max_read_bytes {
                         maxed_out_reading_single_file = true;
@@ -298,7 +311,6 @@ where
 
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                    checkpoints.update(file_id, watcher.get_file_position());
                 } else {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after {
@@ -323,6 +335,7 @@ where
                     break;
                 }
             }
+            drop(reading_span);
 
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
@@ -340,7 +353,11 @@ where
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
             let mut stream = stream::once(futures::future::ok(to_send));
-            let result = block_on(chans.send_all(&mut stream));
+            let result = block_on(
+                chans
+                    .send_all(&mut stream)
+                    .instrument(trace_span!("sending")),
+            );
             match result {
                 Ok(()) => {}
                 Err(error) => {
@@ -355,11 +372,11 @@ where
             // limited by the hard-coded cap. Else, we set the backup_cap to its
             // minimum on the assumption that next time through there will be
             // more lines to read promptly.
-            if global_bytes_read == 0 {
-                backoff_cap = cmp::min(2_048, backoff_cap.saturating_mul(2));
+            backoff_cap = if global_bytes_read == 0 {
+                cmp::min(2_048, backoff_cap.saturating_mul(2))
             } else {
-                backoff_cap = 1;
-            }
+                1
+            };
             let backoff = backoff_cap.saturating_sub(global_bytes_read);
 
             // This works only if run inside tokio context since we are using
@@ -504,4 +521,12 @@ impl Default for TimingStats {
             bytes: Default::default(),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct Line {
+    pub text: Bytes,
+    pub filename: String,
+    pub file_id: FileFingerprint,
+    pub offset: u64,
 }

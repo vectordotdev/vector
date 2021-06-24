@@ -9,6 +9,7 @@ spec:
   selector:
     matchLabels:
       {{- include "libvector.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: aggregator
   podManagementPolicy: "{{ .Values.podManagementPolicy }}"
   replicas: {{ .Values.replicas }}
   template:
@@ -24,12 +25,10 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- include "libvector.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: aggregator
         vector.dev/exclude: "true"
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "libvector.imagePullSecrets" . | indent 6 }}
       serviceAccountName: {{ include "libvector.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}

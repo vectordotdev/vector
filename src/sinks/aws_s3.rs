@@ -19,6 +19,7 @@ use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use http::StatusCode;
 use lazy_static::lazy_static;
+use md5::Digest;
 use rusoto_core::RusotoError;
 use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
@@ -289,6 +290,8 @@ impl Service<Request> for S3Sink {
             .content_type
             .or_else(|| Some("text/x-log".to_owned()));
 
+        let content_md5 = base64::encode(md5::Md5::digest(&request.body));
+
         let mut tagging = url::form_urlencoded::Serializer::new(String::new());
         if let Some(tags) = options.tags {
             for (p, v) in tags {
@@ -313,6 +316,7 @@ impl Service<Request> for S3Sink {
             ssekms_key_id: options.ssekms_key_id,
             storage_class: options.storage_class.map(to_string),
             tagging: Some(tagging),
+            content_md5: Some(content_md5),
             ..Default::default()
         };
 
@@ -427,10 +431,11 @@ fn encode_event(
         }
     };
 
-    Some(EncodedEvent::new(PartitionInnerBuffer::new(
-        bytes,
-        key.into(),
-    )))
+    let (_fields, metadata) = log.into_parts();
+    Some(EncodedEvent {
+        item: PartitionInnerBuffer::new(bytes, key.into()),
+        metadata: Some(metadata),
+    })
 }
 
 #[cfg(test)]
@@ -579,31 +584,36 @@ mod integration_tests {
     };
     use bytes::{Buf, BytesMut};
     use flate2::read::MultiGzDecoder;
+    use futures::Stream;
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use std::io::{BufRead, BufReader};
-
-    const BUCKET: &str = "router-tests";
+    use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent};
 
     #[tokio::test]
     async fn s3_insert_message_into() {
         let cx = SinkContext::new_test();
 
-        let config = config(1000000).await;
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
+        let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 10, None);
+        let (lines, events, mut receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let keys = get_keys(prefix.unwrap()).await;
+        let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
         assert!(key.ends_with(".log"));
 
-        let obj = get_object(key).await;
+        let obj = get_object(&bucket, key).await;
         assert_eq!(obj.content_encoding, Some("identity".to_string()));
 
         let response_lines = get_lines(obj).await;
@@ -614,11 +624,15 @@ mod integration_tests {
     async fn s3_rotate_files_after_the_buffer_size_is_reached() {
         let cx = SinkContext::new_test();
 
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
         let config = S3SinkConfig {
             key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
             filename_time_format: Some("waitsforfullbatch".into()),
             filename_append_uuid: Some(false),
-            ..config(1010).await
+            ..config(&bucket, 1010)
         };
         let prefix = config.key_prefix.clone();
         let client = config.create_client().unwrap();
@@ -627,7 +641,7 @@ mod integration_tests {
         let (lines, _events) = random_lines_with_stream(100, 30, None);
 
         let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
-            let mut e = Event::from(line);
+            let mut e = LogEvent::from(line);
             let i = if i < 10 {
                 1
             } else if i < 20 {
@@ -635,17 +649,18 @@ mod integration_tests {
             } else {
                 3
             };
-            e.as_mut_log().insert("i", format!("{}", i));
-            e
+            e.insert("i", format!("{}", i));
+            Event::from(e)
         });
+
         sink.run(stream::iter(events)).await.unwrap();
 
-        let keys = get_keys(prefix.unwrap()).await;
+        let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 3);
 
         let response_lines = stream::iter(keys)
             .fold(Vec::new(), |mut acc, key| async {
-                acc.push(get_lines(get_object(key).await).await);
+                acc.push(get_lines(get_object(&bucket, key).await).await);
                 acc
             })
             .await;
@@ -659,26 +674,31 @@ mod integration_tests {
     async fn s3_gzip() {
         let cx = SinkContext::new_test();
 
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
         let config = S3SinkConfig {
             compression: Compression::gzip_default(),
             filename_time_format: Some("%s%f".into()),
-            ..config(10000).await
+            ..config(&bucket, 10000)
         };
 
         let prefix = config.key_prefix.clone();
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 500, None);
+        let (lines, events, mut receiver) = make_events_batch(100, 500);
         sink.run(events).await.unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let keys = get_keys(prefix.unwrap()).await;
+        let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 6);
 
         let response_lines = stream::iter(keys).fold(Vec::new(), |mut acc, key| async {
             assert!(key.ends_with(".log.gz"));
 
-            let obj = get_object(key).await;
+            let obj = get_object(&bucket, key).await;
             assert_eq!(obj.content_encoding, Some("gzip".to_string()));
 
             acc.append(&mut get_gzipped_lines(obj).await);
@@ -688,19 +708,95 @@ mod integration_tests {
         assert_eq!(lines, response_lines.await);
     }
 
+    // NOTE: this test doesn't actually validate anything because localstack doesn't enforce the
+    // required Content-MD5 header on the request for buckets with object lock enabled
+    // https://github.com/localstack/localstack/issues/4166
+    #[tokio::test]
+    async fn s3_insert_message_into_object_lock() {
+        let cx = SinkContext::new_test();
+
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, true).await;
+
+        client()
+            .put_object_lock_configuration(rusoto_s3::PutObjectLockConfigurationRequest {
+                bucket: bucket.to_string(),
+                object_lock_configuration: Some(rusoto_s3::ObjectLockConfiguration {
+                    object_lock_enabled: Some(String::from("Enabled")),
+                    rule: Some(rusoto_s3::ObjectLockRule {
+                        default_retention: Some(rusoto_s3::DefaultRetention {
+                            days: Some(1),
+                            mode: Some(String::from("GOVERNANCE")),
+                            years: None,
+                        }),
+                    }),
+                }),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        let config = config(&bucket, 1000000);
+        let prefix = config.key_prefix.clone();
+        let client = config.create_client().unwrap();
+        let sink = config.new(client, cx).unwrap();
+
+        let (lines, events, mut receiver) = make_events_batch(100, 10);
+        sink.run(events).await.unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let keys = get_keys(&bucket, prefix.unwrap()).await;
+        assert_eq!(keys.len(), 1);
+
+        let key = keys[0].clone();
+        assert!(key.ends_with(".log"));
+
+        let obj = get_object(&bucket, key).await;
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
+
+        let response_lines = get_lines(obj).await;
+        assert_eq!(lines, response_lines);
+    }
+
+    #[tokio::test]
+    async fn acknowledges_failures() {
+        let cx = SinkContext::new_test();
+
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
+        let mut config = config(&bucket, 1);
+        // Break the bucket name
+        config.bucket = format!("BREAK{}IT", config.bucket);
+        let prefix = config.key_prefix.clone();
+        let client = config.create_client().unwrap();
+        let sink = config.new(client, cx).unwrap();
+
+        let (_lines, events, mut receiver) = make_events_batch(1, 1);
+        sink.run(events).await.unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+
+        let objects = list_objects(&bucket, prefix.unwrap()).await;
+        assert_eq!(objects, None);
+    }
+
     #[tokio::test]
     async fn s3_healthchecks() {
-        let config = config(1).await;
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
+        let config = config(&bucket, 1);
         let client = config.create_client().unwrap();
         config.healthcheck(client).await.unwrap();
     }
 
     #[tokio::test]
     async fn s3_healthchecks_invalid_bucket() {
-        let config = S3SinkConfig {
-            bucket: "asdflkjadskdaadsfadf".to_string(),
-            ..config(1).await
-        };
+        let config = config("s3_healthchecks_invalid_bucket", 1);
+
         let client = config.create_client().unwrap();
         assert_downcast_matches!(
             config.healthcheck(client).await.unwrap_err(),
@@ -724,11 +820,9 @@ mod integration_tests {
         S3Client::new_with(d, p, region)
     }
 
-    async fn config(batch_size: usize) -> S3SinkConfig {
-        ensure_bucket(&client()).await;
-
+    fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         S3SinkConfig {
-            bucket: BUCKET.to_string(),
+            bucket: bucket.to_string(),
             key_prefix: Some(random_string(10) + "/date=%F/"),
             filename_time_format: None,
             filename_append_uuid: None,
@@ -748,15 +842,28 @@ mod integration_tests {
         }
     }
 
-    async fn ensure_bucket(client: &S3Client) {
+    fn make_events_batch(
+        len: usize,
+        count: usize,
+    ) -> (Vec<String>, impl Stream<Item = Event>, BatchStatusReceiver) {
+        let (lines, events) = random_lines_with_stream(len, count, None);
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let events = events.map(move |event| event.into_log().with_batch_notifier(&batch).into());
+
+        (lines, events, receiver)
+    }
+
+    async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
         use rusoto_s3::{CreateBucketError, CreateBucketRequest};
 
         let req = CreateBucketRequest {
-            bucket: BUCKET.to_string(),
+            bucket: bucket.to_string(),
+            object_lock_enabled_for_bucket: Some(object_lock_enabled),
             ..Default::default()
         };
 
-        match client.create_bucket(req).await {
+        match client().create_bucket(req).await {
             Ok(_) | Err(RusotoError::Service(CreateBucketError::BucketAlreadyOwnedByYou(_))) => {}
             Err(e) => match e {
                 RusotoError::Unknown(resp) => {
@@ -768,30 +875,33 @@ mod integration_tests {
         }
     }
 
-    async fn get_keys(prefix: String) -> Vec<String> {
+    async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<rusoto_s3::Object>> {
         let prefix = prefix.split('/').next().unwrap().to_string();
 
-        let list_res = client()
+        client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {
-                bucket: BUCKET.to_string(),
+                bucket: bucket.to_string(),
                 prefix: Some(prefix),
                 ..Default::default()
             })
             .await
-            .unwrap();
-
-        list_res
+            .unwrap()
             .contents
+    }
+
+    async fn get_keys(bucket: &str, prefix: String) -> Vec<String> {
+        list_objects(bucket, prefix)
+            .await
             .unwrap()
             .into_iter()
             .map(|obj| obj.key.unwrap())
             .collect()
     }
 
-    async fn get_object(key: String) -> rusoto_s3::GetObjectOutput {
+    async fn get_object(bucket: &str, key: String) -> rusoto_s3::GetObjectOutput {
         client()
             .get_object(rusoto_s3::GetObjectRequest {
-                bucket: BUCKET.to_string(),
+                bucket: bucket.to_string(),
                 key,
                 ..Default::default()
             })

@@ -19,15 +19,14 @@ installation: _interfaces: homebrew: {
 
 	role_implementations: [Name=string]: {
 		commands: {
-			_config_path: paths.config
-			install:      "brew tap timberio/brew && brew install vector"
-			logs:         "tail -f /usr/local/var/log/vector.log"
-			reload:       "killall -s SIGHUP vector"
-			restart:      "brew services restart vector"
-			start:        "brew services start vector"
-			stop:         "brew services stop vector"
-			uninstall:    "brew remove vector"
-			upgrade:      "brew update && brew upgrade vector"
+			install:   "brew tap timberio/brew && brew install vector"
+			logs:      "tail -f /usr/local/var/log/vector.log"
+			reload:    "killall -s SIGHUP vector"
+			restart:   "brew services restart vector"
+			start:     "brew services start vector"
+			stop:      "brew services stop vector"
+			uninstall: "brew remove vector"
+			upgrade:   "brew update && brew upgrade vector"
 		}
 		tutorials: {
 			installation: [

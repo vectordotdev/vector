@@ -173,16 +173,16 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Encoded
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
-    match &metric.data.value {
+    match metric.value() {
         MetricValue::Counter { value } => {
-            push_event(&mut buf, &metric, value, "c", None);
+            push_event(&mut buf, metric, value, "c", None);
         }
         MetricValue::Gauge { value } => {
-            match metric.data.kind {
+            match metric.kind() {
                 MetricKind::Incremental => {
-                    push_event(&mut buf, &metric, format!("{:+}", value), "g", None)
+                    push_event(&mut buf, metric, format!("{:+}", value), "g", None)
                 }
-                MetricKind::Absolute => push_event(&mut buf, &metric, value, "g", None),
+                MetricKind::Absolute => push_event(&mut buf, metric, value, "g", None),
             };
         }
         MetricValue::Distribution { samples, statistic } => {
@@ -193,7 +193,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Encoded
             for sample in samples {
                 push_event(
                     &mut buf,
-                    &metric,
+                    metric,
                     sample.value,
                     metric_type,
                     Some(sample.rate),
@@ -202,13 +202,13 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Encoded
         }
         MetricValue::Set { values } => {
             for val in values {
-                push_event(&mut buf, &metric, val, "s", None);
+                push_event(&mut buf, metric, val, "s", None);
             }
         }
         _ => {
             emit!(StatsdInvalidMetricReceived {
-                value: &metric.data.value,
-                kind: &metric.data.kind,
+                value: metric.value(),
+                kind: &metric.kind(),
             });
 
             return None;
