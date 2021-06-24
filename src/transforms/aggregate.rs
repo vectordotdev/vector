@@ -343,11 +343,11 @@ mod tests {
         // Start out with an set
         agg.record(set.clone());
         // Union with itself, a noop
-        agg.record(set.clone());
+        agg.record(set);
         // Send an counter with the same name, will replace due to a failed update
         agg.record(counter.clone());
         // Send another counter will "add"
-        agg.record(counter.clone());
+        agg.record(counter);
         let mut out = vec![];
         // We should flush 1 item counter
         agg.flush_into(&mut out);
@@ -397,11 +397,11 @@ mod tests {
         // Start out with an absolute
         agg.record(absolute.clone());
         // Replace it normally
-        agg.record(absolute.clone());
+        agg.record(absolute);
         // Send an incremental with the same name, will replace due to a failed update
         agg.record(incremental.clone());
         // Send another incremental will "add"
-        agg.record(incremental.clone());
+        agg.record(incremental);
         let mut out = vec![];
         // We should flush 1 item incremental
         agg.flush_into(&mut out);
