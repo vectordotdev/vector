@@ -118,7 +118,7 @@ const manageState = () => {
 }
 
 const showCodeFilename = () => {
-  const classes = "code-title font-semibold font-mono tracking-wide text-gray-50 dark:text-gray-200 bg-dark dark:bg-black py-1.5 px-2 rounded text-sm";
+  const classes = "font-semibold font-mono tracking-wide text-gray-50 dark:text-gray-200 bg-dark dark:bg-black py-1.5 px-2 rounded text-sm";
   var els = document.getElementsByClassName("highlight");
   for (var i = 0; i < els.length; i++) {
     if (els[i].title.length) {
