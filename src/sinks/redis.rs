@@ -461,7 +461,7 @@ mod integration_tests {
 
         let key_exists: bool = conn.exists(key.clone()).await.unwrap();
         debug!("Test key: {} exists: {}.", key, key_exists);
-        assert_eq!(key_exists, true);
+        assert!(key_exists);
         let llen: usize = conn.llen(key.clone()).await.unwrap();
         debug!("Test key: {} len: {}.", key, llen);
         assert_eq!(llen, num_events);
@@ -519,7 +519,7 @@ mod integration_tests {
 
         let key_exists: bool = conn.exists(key.clone()).await.unwrap();
         debug!("Test key: {} exists: {}.", key, key_exists);
-        assert_eq!(key_exists, true);
+        assert!(key_exists);
         let llen: usize = conn.llen(key.clone()).await.unwrap();
         debug!("Test key: {} len: {}.", key, llen);
         assert_eq!(llen, num_events);
