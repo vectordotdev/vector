@@ -19,8 +19,9 @@ const purgecss = require('@fullhuman/postcss-purgecss')({
   content: ['./hugo_stats.json'],
   safelist: safeClasses,
   defaultExtractor: (content) => {
-      let els = JSON.parse(content).htmlElements;
-      return els.tags.concat(els.classes, els.ids);
+    const broadMatches = content.match(/[^<>"'`\s]*[^<>"'`\s:]/g) || [];
+    const innerMatches = content.match(/[^<>"'`\s.()]*[^<>"'`\s.():]/g) || [];
+    return broadMatches.concat(innerMatches);
   }
 })
 
