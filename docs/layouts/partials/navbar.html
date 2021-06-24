@@ -66,11 +66,11 @@
       </div>
       <div class="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end">
         {{/* Dark mode toggler */}}
-        {{ partial "toggler.html" . }}
+        {{ partial "navbar/toggler.html" . }}
 
 
         {{/* Search bar */}}
-        {{ partial "search-bar.html" . }}
+        {{ partial "navbar/search-bar.html" . }}
       </div>
 
       {{/* Social icons */}}
@@ -116,8 +116,8 @@
   </div>
 
   {{/* Docs flyout menu */}}
-  {{ partial "flyout-menu.html" . }}
+  {{ partial "navbar/flyout-menu.html" . }}
 
   {{/* Search results */}}
-  {{ partial "search-results.html" . }}
+  {{ partial "navbar/search-results.html" . }}
 </nav>
