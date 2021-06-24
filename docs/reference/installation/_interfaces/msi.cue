@@ -62,7 +62,7 @@ installation: _interfaces: msi: {
 	}
 
 	role_implementations: {
-		agent:      role_implementations._file_agent & {
+		agent: role_implementations._file_agent & {
 			variables: config: sources: logs: {
 				include: [#"C:\\Server\\example.com\logs\\*.log"#]
 			}
