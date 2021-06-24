@@ -1248,6 +1248,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         kubernetesLogsSource:
           rawConfig: |
             exclude_paths_glob_patterns = ["/var/log/pods/{}_test-pod_*/excluded/**"]
+            glob_minimum_cooldown_ms = 5000
     "#},
         pod_namespace
     );
@@ -1261,7 +1262,6 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
                     &config_override_name(&override_name, true),
                     config,
                     HELM_VALUES_STDOUT_SINK,
-                    HELM_VALUES_LOWER_GLOB,
                 ],
                 ..Default::default()
             },
