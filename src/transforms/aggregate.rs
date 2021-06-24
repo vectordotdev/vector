@@ -316,7 +316,7 @@ mod tests {
         let set = make_metric(
             "the-thing",
             metric::MetricKind::Incremental,
-            metric::MetricValue::Set { values: values },
+            metric::MetricValue::Set { values },
         );
         let summed = make_metric(
             "the-thing",
