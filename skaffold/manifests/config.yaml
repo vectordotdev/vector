@@ -4,9 +4,6 @@ metadata:
   name: vector-agent-config
 data:
   vector.toml: |
-    [sources.internal_metrics]
-        type = "internal_metrics"
-
     [sinks.stdout]
         type = "console"
         inputs = ["kubernetes_logs", "internal_metrics"]
