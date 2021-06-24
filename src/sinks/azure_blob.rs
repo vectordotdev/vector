@@ -72,7 +72,7 @@ struct AzureBlobSinkRequest {
     blob_name: String,
     blob_data: Vec<u8>,
     content_encoding: Option<&'static str>,
-    content_type: Option<&'static str>,
+    content_type: &'static str,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -222,7 +222,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
             let byte_size = request.blob_data.len();
             let blob = client
                 .put_block_blob(Bytes::from(request.blob_data))
-                .content_type(request.content_type.unwrap());
+                .content_type(request.content_type);
             let blob = match request.content_encoding {
                 Some(encoding) => blob.content_encoding(encoding),
                 None => blob,
@@ -252,10 +252,10 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
 }
 
 impl Compression {
-    pub fn content_type(&self) -> Option<&'static str> {
+    pub fn content_type(&self) -> &'static str {
         match self {
-            Self::None => Some("text/plain"),
-            Self::Gzip(_) => Some("application/gzip"),
+            Self::None => "text/plain",
+            Self::Gzip(_) => "application/gzip",
         }
     }
 }
@@ -449,7 +449,7 @@ mod tests {
         assert_eq!(request.container_name, "logs".to_string());
         assert_eq!(request.blob_name, "blob.log".to_string());
         assert_eq!(request.content_encoding, None);
-        assert_eq!(request.content_type.unwrap(), "text/plain");
+        assert_eq!(request.content_type, "text/plain");
     }
 
     #[test]
@@ -471,7 +471,7 @@ mod tests {
         assert_eq!(request.container_name, "logs".to_string());
         assert_eq!(request.blob_name, "blob.log.gz".to_string());
         assert_eq!(request.content_encoding, Some("gzip"));
-        assert_eq!(request.content_type.unwrap(), "application/gzip");
+        assert_eq!(request.content_type, "application/gzip");
     }
 
     #[test]
@@ -496,7 +496,7 @@ mod tests {
             format!("blob{}.log", Utc::now().format("%F"))
         );
         assert_eq!(request.content_encoding, None);
-        assert_eq!(request.content_type.unwrap(), "text/plain");
+        assert_eq!(request.content_type, "text/plain");
     }
 
     #[test]
@@ -518,7 +518,7 @@ mod tests {
         assert_eq!(request.container_name, "logs".to_string());
         assert_ne!(request.blob_name, "blob.log".to_string());
         assert_eq!(request.content_encoding, None);
-        assert_eq!(request.content_type.unwrap(), "text/plain");
+        assert_eq!(request.content_type, "text/plain");
     }
 }
 

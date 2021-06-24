@@ -42,8 +42,8 @@ components: sinks: azure_blob: {
 				rate_limit_duration_secs:   1
 				rate_limit_num:             250
 				retry_initial_backoff_secs: 1
-				retry_max_duration_secs:    10
-				timeout_secs:               30
+				retry_max_duration_secs:    3600
+				timeout_secs:               60
 				headers:                    false
 			}
 			tls: enabled: false
