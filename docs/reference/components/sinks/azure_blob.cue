@@ -192,10 +192,10 @@ components: sinks: azure_blob: {
 	}
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		events_discarded_total:    components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total:   components.sources.internal_metrics.output.metrics.processing_errors_total
 		http_error_response_total: components.sources.internal_metrics.output.metrics.http_error_response_total
 		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		processed_bytes_total: components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
 	}
 }
