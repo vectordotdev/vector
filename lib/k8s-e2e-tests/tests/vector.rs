@@ -17,6 +17,9 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
 
     vector-agent:
       fullnameOverride: "{}"
+      kubernetesLogsSource:
+        rawConfig: |
+          glob_minimum_cooldown_ms = 5000
       vectorSink:
         host: "{}"
       dataVolume:
@@ -64,6 +67,9 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
 
     vector-agent:
       fullnameOverride: "{}"
+      kubernetesLogsSource:
+        rawConfig: |
+          glob_minimum_cooldown_ms = 5000
       vectorSink:
         host: "{}"
 
@@ -97,6 +103,9 @@ fn helm_values_haproxy(aggregator_override_name: &str, agent_override_name: &str
 
     vector-agent:
       fullnameOverride: "{}"
+      kubernetesLogsSource:
+        rawConfig: |
+          glob_minimum_cooldown_ms = 5000
       vectorSink:
         host: "{}-haproxy"
       dataVolume:
@@ -176,10 +185,10 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR,
             VectorConfig {
-                custom_helm_values: &helm_values_stdout_sink(
+                custom_helm_values: vec![&helm_values_stdout_sink(
                     &aggregator_override_name,
                     &agent_override_name,
-                ),
+                )],
                 ..Default::default()
             },
         )
@@ -280,10 +289,10 @@ async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR,
             VectorConfig {
-                custom_helm_values: &helm_values_haproxy(
+                custom_helm_values: vec![&helm_values_haproxy(
                     &aggregator_override_name,
                     &agent_override_name,
-                ),
+                )],
                 ..Default::default()
             },
         )
