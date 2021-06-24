@@ -1827,6 +1827,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[tokio::test]
+#[ignore] // https://github.com/timberio/vector/issues/8014
 async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
