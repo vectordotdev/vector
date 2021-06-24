@@ -3,8 +3,8 @@ $spacing-vertical: 0
 $transition-fast: 0
 
 // Main page globe icon
-$globe-ocean-color: #333
-$globe-land-color: #ddd
+$globe-ocean-color: rgb(0, 0, 0)
+$globe-land-color: rgb(88,88,88)
 
 @keyframes indexHeroInitial
   0%
@@ -176,8 +176,10 @@ $globe-land-color: #ddd
         transition: all $transition-fast ease
 
 // Spinning globe in the main page community section
-.globe
-  fill: $globe-ocean-color
+#globe-wrapper
+  #globe
+    svg
+      fill: $globe-ocean-color
 
-  .land
-    stroke: $globe-land-color
+      .land
+        fill: $globe-land-color

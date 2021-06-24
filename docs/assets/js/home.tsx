@@ -316,5 +316,5 @@ function Diagram({className, height, width}) {
 };
 
 // Place the components in the DOM
-ReactDOM.render(<RotatingGlobe size={900} />, document.getElementById("globe"));
+ReactDOM.render(<RotatingGlobe size={750} />, document.getElementById("globe"));
 ReactDOM.render(<Diagram className="mx-auto" width="100%" />, document.getElementById("diagram"));
