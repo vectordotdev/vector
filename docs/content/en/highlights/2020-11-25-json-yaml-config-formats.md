@@ -1,6 +1,6 @@
 ---
 date: "2020-11-25"
-title: "JSON & YAML config formats are now supported"
+title: "JSON and YAML config formats are now supported"
 description: "We've added support for JSON and YAML config formats."
 authors: ["binarylogic"]
 pr_numbers: [4856, 5144]

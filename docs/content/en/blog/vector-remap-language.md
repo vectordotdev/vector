@@ -418,7 +418,7 @@ three things:
     handling this error is a *very* common mistake that would otherwise result
     in data loss and downtime.
 
-2.  **Raise the error & abort**
+2.  **Raise the error and abort**
 
     ```ruby
     . = parse_common_log!(.log)

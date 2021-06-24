@@ -1,6 +1,6 @@
 ---
 date: "2020-04-13"
-title: "The Vector Source & Sink Support TLS"
+title: "The Vector Source and Sink Support TLS"
 description: "Securely forward data between Vector instances"
 authors: ["binarylogic"]
 pr_numbers: [2025]

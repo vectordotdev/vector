@@ -1,6 +1,6 @@
 ---
 date: "2020-04-13"
-title: "Whitelist & Blacklist Fields When Encoding"
+title: "Whitelist and Blacklist Fields When Encoding"
 description: "More control over which fields are included when encoding"
 authors: ["binarylogic"]
 pr_numbers: [1915]

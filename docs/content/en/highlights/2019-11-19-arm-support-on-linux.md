@@ -1,7 +1,7 @@
 ---
 date: "2020-03-31"
-title: "ARMv7 & ARM64 Support on Linux"
-description: "These architectures are widely used in embeded devices & servers"
+title: "ARMv7 and ARM64 Support on Linux"
+description: "These architectures are widely used in embeded devices and servers"
 authors: ["binarylogic"]
 pr_numbers: [1054, 1292]
 release: "0.6.0"
@@ -32,7 +32,7 @@ This makes installation as simple as copying the Vector binary onto
 your machine. There are no dependencies to install or environment changes
 required.
 
-## DPKG, RPM, & Docker support
+## DPKG, RPM, and Docker support
 
 In addition to providing archives for these architectures, we went the extra
 mile to ensure [DPKG][docs.package-managers.dpkg],
@@ -51,7 +51,7 @@ instances][urls.aws_arm_g2_announcement]. These instances are based on Amazon's
 ARM-based Graviton2 processors. Amazon claims they "deliver up to 40% improved
 price/performance over current generation `M5`, `C5`, and `R5` instances".
 
-### Raspbian, IoT, & embedded devices
+### Raspbian, IoT, and embedded devices
 
 ARM architectures are widely used on IoT devices. Vector is the perfect
 candidate for resource constrainted environments like this, especially given

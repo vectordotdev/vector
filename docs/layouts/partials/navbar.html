@@ -3,7 +3,21 @@
 {{ $modes := slice "Light" "Dark" }}
 <nav
   x-cloak
-  x-data="{ open: false, flyout: false, query: '', showResults() { return this.query.length > 0 } }"
+  x-data="{
+    open: false,
+    flyout: false,
+    query: '',
+    searchFocus() {
+      this.$refs.q.focus();
+    },
+    showSearchResults() {
+      return this.query != '';
+    },
+    hideSearchResults() {
+      this.query = '';
+    }
+  }"
+  @keydown.window.slash="searchFocus()"
   x-on:open-flyout="flyout = !flyout"
   class="z-50 dark:bg-dark dark:border-gray-700 border-b">
 

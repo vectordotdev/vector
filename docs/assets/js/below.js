@@ -26,7 +26,7 @@ const renderSearchBox = (renderOptions, isFirstRender) => {
 
   if (isFirstRender) {
     container.innerHTML = `
-    <input x-model="query" id="algolia-search-input" name="search" type="search" class="dark:bg-gray-700 dark:text-gray-400 bg-gray-200 text-gray-800 block w-full pl-10 pr-3 border border-transparent rounded-md leading-5 placeholder-gray-400 sm:text-sm ${focus}" placeholder="Search">
+    <input x-model="query" x-ref="q" id="algolia-search-input" name="search" type="search" class="dark:bg-gray-700 dark:text-gray-400 bg-gray-200 text-gray-800 block w-full pl-10 pr-3 border border-transparent rounded-md leading-5 placeholder-gray-400 sm:text-sm ${focus}" placeholder="Search">
     `;
 
     container.querySelector('#algolia-search-input').addEventListener('input', event => {

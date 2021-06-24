@@ -38,7 +38,7 @@ We had a few reasons to add plugin support!
   able to handle it. What a nightmare scenario 😔. *Fear not. Plugins can help us.* They allow us to decompose Vector
   components into small units that don't need to be part of the main linkage.
 
-* **Language capabilities & limitations is up next.** Vector is built on Rust. It's a static, systems language which
+* **Language capabilities and limitations is up next.** Vector is built on Rust. It's a static, systems language which
   relies on ahead-of-time compilation. Normally, this is a most excellent decision, but in some niche cases it creates
   big problems! *Protobufs* are a good example of this problem. See, most fast protobuf libraries are *generated* by a
   tool called `protoc` or something like `prost`, a protobuf crate that generates code at build time.
@@ -91,7 +91,7 @@ While all that sounds great, it doesn't mean anything if Vector components runs 
 that the cost of a WASM call is typically under 10ns, so unless you're truly pushing Vector to its limits already, you
 shouldn't notice a dip in performance.
 
-## Cook your environment & kick the wheels
+## Cook your environment and kick the wheels
 
 In order to develop and test a WASM plugin for Vector, you'll need to do two things:
 

@@ -1,16 +1,17 @@
 <div
-  x-show="showResults()"
+  x-ref="results"
+  x-show="showSearchResults()"
   x-transition:enter="transition ease-out duration-200"
   x-transition:enter-start="opacity-0 -translate-y-1"
   x-transition:enter-end="opacity-100 translate-y-0"
   x-transition:leave="transition ease-in duration-150"
   x-transition:leave-start="opacity-100 translate-y-0"
   x-transition:leave-end="opacity-0 -translate-y-1"
-  @mouseleave="flyout = false"
+  @click.away="hideSearchResults()"
   class="z-10 relative">
 
   <div class="absolute z-10 inset-x-0 bg-white dark:bg-dark shadow-sm">
-    <div class="max-w-7xl mx-auto py-2">
+    <div class="max-w-7xl mx-auto py-2 px-8">
       <div id="algolia-search-results"></div>
     </div>
   </div>

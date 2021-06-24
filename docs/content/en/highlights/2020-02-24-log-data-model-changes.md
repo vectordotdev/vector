@@ -1,6 +1,6 @@
 ---
 date: "2020-04-13"
-title: "Log Data Model Changes & Disk Buffers"
+title: "Log Data Model Changes and Disk Buffers"
 description: "We're bringing our log data model closer to JSON"
 authors: ["binarylogic"]
 pr_numbers: [1836, 1898]
