@@ -78,8 +78,8 @@ fn eventstoredb(
 
     str.push_str(endpoint);
 
-    if !endpoint.ends_with("/") {
-        str.push_str("/");
+    if !endpoint.ends_with('/') {
+        str.push('/');
     }
 
     str.push_str("stats");
