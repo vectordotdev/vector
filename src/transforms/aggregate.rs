@@ -76,10 +76,13 @@ impl Aggregate {
             metric::MetricKind::Incremental => match self.map.entry(series) {
                 Entry::Occupied(mut entry) => {
                     let existing = entry.get_mut();
-                    if !existing.0.update(&data) {
+                    // In order to update (add) the new and old kind's must match
+                    if existing.0.kind == data.kind && existing.0.update(&data) {
+                        existing.1.merge(metadata);
+                    } else {
                         emit!(AggregateUpdateFailed);
+                        *existing = (data, metadata);
                     }
-                    existing.1.merge(metadata);
                 }
                 Entry::Vacant(entry) => {
                     entry.insert((data, metadata));
@@ -145,7 +148,7 @@ mod tests {
     use super::*;
     use crate::{event::metric, event::Event, event::Metric};
     use futures::{stream, SinkExt};
-    use std::task::Poll;
+    use std::{collections::BTreeSet, task::Poll};
 
     #[test]
     fn generate_config() {
@@ -293,6 +296,117 @@ mod tests {
                 _ => panic!("Unexpected metric name in aggregate output"),
             }
         }
+    }
+
+    #[test]
+    fn conflicting_value_type() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+        })
+        .unwrap();
+
+        let counter = make_metric(
+            "the-thing",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 42.0 },
+        );
+        let mut values = BTreeSet::<String>::new();
+        values.insert("a".into());
+        values.insert("b".into());
+        let set = make_metric(
+            "the-thing",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Set { values: values },
+        );
+        let summed = make_metric(
+            "the-thing",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 84.0 },
+        );
+
+        // when types conflict the new values replaces whatever is there
+
+        // Start with an counter
+        agg.record(counter.clone());
+        // Another will "add" to it
+        agg.record(counter.clone());
+        // Then an set will replace it due to a failed update
+        agg.record(set.clone());
+        // Then a set union would be a noop
+        agg.record(set.clone());
+        let mut out = vec![];
+        // We should flush 1 item counter
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&set, &out[0]);
+
+        // Start out with an set
+        agg.record(set.clone());
+        // Union with itself, a noop
+        agg.record(set.clone());
+        // Send an counter with the same name, will replace due to a failed update
+        agg.record(counter.clone());
+        // Send another counter will "add"
+        agg.record(counter.clone());
+        let mut out = vec![];
+        // We should flush 1 item counter
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&summed, &out[0]);
+    }
+
+    #[test]
+    fn conflicting_kinds() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+        })
+        .unwrap();
+
+        let incremental = make_metric(
+            "the-thing",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 42.0 },
+        );
+        let absolute = make_metric(
+            "the-thing",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Counter { value: 43.0 },
+        );
+        let summed = make_metric(
+            "the-thing",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 84.0 },
+        );
+
+        // when types conflict the new values replaces whatever is there
+
+        // Start with an incremental
+        agg.record(incremental.clone());
+        // Another will "add" to it
+        agg.record(incremental.clone());
+        // Then an absolute will replace it with a failed update
+        agg.record(absolute.clone());
+        // Then another absolute will replace it normally
+        agg.record(absolute.clone());
+        let mut out = vec![];
+        // We should flush 1 item incremental
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&absolute, &out[0]);
+
+        // Start out with an absolute
+        agg.record(absolute.clone());
+        // Replace it normally
+        agg.record(absolute.clone());
+        // Send an incremental with the same name, will replace due to a failed update
+        agg.record(incremental.clone());
+        // Send another incremental will "add"
+        agg.record(incremental.clone());
+        let mut out = vec![];
+        // We should flush 1 item incremental
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&summed, &out[0]);
     }
 
     #[tokio::test]
