@@ -886,6 +886,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     const CONFIG: &str = indoc! {r#"
         kubernetesLogsSource:
           rawConfig: |
+            glob_minimum_cooldown_ms = 5000
             extra_label_selector = "my_custom_negative_label_selector!=my_val"
             extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
     "#};
@@ -899,7 +900,6 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
                     &config_override_name(&override_name, true),
                     CONFIG,
                     HELM_VALUES_STDOUT_SINK,
-                    HELM_VALUES_LOWER_GLOB,
                 ],
                 ..Default::default()
             },
