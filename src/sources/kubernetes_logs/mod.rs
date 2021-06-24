@@ -460,7 +460,7 @@ fn default_glob_minimum_cooldown_ms() -> usize {
     60000
 }
 
-/// This function construct the effective field selector to use, based on
+/// This function constructs the effective field selector to use, based on
 /// the specified configuration.
 fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     let self_node_name = if config.self_node_name.is_empty()
@@ -492,7 +492,7 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     ))
 }
 
-/// This function construct the effective label selector to use, based on
+/// This function constructs the effective label selector to use, based on
 /// the specified configuration.
 fn prepare_label_selector(config: &Config) -> String {
     const BUILT_IN: &str = "vector.dev/exclude!=true";

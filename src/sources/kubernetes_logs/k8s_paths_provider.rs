@@ -149,7 +149,7 @@ where
                 &[dir, "*/*.log*"].join("/"),
             );
 
-            // Extract the containers to exclude, then build patters from them
+            // Extract the containers to exclude, then build patterns from them
             // and cache the results into a Vec.
             let excluded_containers = extract_excluded_containers_for_pod(pod);
             let exclusion_patterns: Vec<_> =
@@ -377,7 +377,7 @@ mod tests {
                 // Calls to the glob mock.
                 vec![(
                     // The pattern to expect at the mock.
-                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log*",
                     // The paths to return from the mock.
                     vec![
                         "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container1/qwe.log",
@@ -408,7 +408,7 @@ mod tests {
                     ..Pod::default()
                 },
                 vec![(
-                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log*",
                     vec![],
                 )],
                 vec![],
