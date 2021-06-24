@@ -15,7 +15,7 @@ impl Decoder for NoopDecoder {
         "noop"
     }
 
-    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>> {
+    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send + Sync>> {
         Ok(Box::new(|bytes| Ok(bytes.into())))
     }
 }

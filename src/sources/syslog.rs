@@ -172,14 +172,19 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
+    type Context = ();
     type Error = LinesCodecError;
     type Decoder = SyslogDecoder;
+
+    fn build_context(&self) -> crate::Result<Self::Context> {
+        Ok(())
+    }
 
     fn decoder(&self) -> Self::Decoder {
         SyslogDecoder::new(self.max_length)
     }
 
-    fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
+    fn build_event(&self, _context: &Self::Context, frame: String, host: Bytes) -> Option<Event> {
         Some(event_from_str(&self.host_key, Some(host), &frame))
     }
 }

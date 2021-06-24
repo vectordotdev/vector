@@ -21,7 +21,7 @@ pub trait Decoder: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn name(&self) -> &'static str;
 
     /// Builds the decoder transformation.
-    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>>;
+    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send + Sync>>;
 }
 
 dyn_clone::clone_trait_object!(Decoder);

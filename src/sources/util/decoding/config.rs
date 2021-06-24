@@ -57,11 +57,11 @@ impl DecodingConfig {
 
 pub trait DecodingBuilder {
     /// Builds the transform that converts from byte frame to event value.
-    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>>;
+    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send + Sync>>;
 }
 
 impl DecodingBuilder for DecodingConfig {
-    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>> {
+    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send + Sync>> {
         match &self {
             Self::Name(name) => match DECODERS.get(name.as_str()) {
                 Some(decoder) => decoder.build(),
@@ -73,7 +73,7 @@ impl DecodingBuilder for DecodingConfig {
 }
 
 impl DecodingBuilder for Option<DecodingConfig> {
-    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send>> {
+    fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send + Sync>> {
         match self {
             Some(decoder) => decoder.build(),
             None => NoopDecoder.build(),
