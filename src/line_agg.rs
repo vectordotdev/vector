@@ -7,7 +7,7 @@ use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::Entry, HashMap, VecDeque};
+use std::collections::{hash_map::Entry, HashMap};
 use std::hash::Hash;
 use std::time::Duration;
 use std::{
@@ -103,9 +103,6 @@ pub struct LineAgg<T, K, C> {
     /// the inner stream. In this mode we stop polling `inner` for new lines
     /// and just flush all the buffered data.
     draining: Option<Vec<(K, Bytes, C)>>,
-
-    /// A queue of keys with expired timeouts.
-    expired: VecDeque<K>,
 }
 
 /// Core line aggregation logic.
@@ -148,7 +145,6 @@ where
             logic,
             draining: None,
             stashed: None,
-            expired: VecDeque::new(),
         }
     }
 }
@@ -187,11 +183,6 @@ where
                 }
             }
 
-            // Check for keys that have hit their timeout.
-            while let Poll::Ready(Some(Ok(expired_key))) = this.logic.timeouts.poll_expired(cx) {
-                this.expired.push_back(expired_key.into_inner());
-            }
-
             match this.inner.poll_next_unpin(cx) {
                 Poll::Ready(Some((src, line, context))) => {
                     // Handle the incoming line we got from `inner`. If the
@@ -218,8 +209,11 @@ where
                 }
                 Poll::Pending => {
                     // We didn't get any lines from `inner`, so we just give
-                    // a line from the expired lines queue.
-                    if let Some(key) = this.expired.pop_front() {
+                    // a line from keys that have hit their timeout.
+                    while let Poll::Ready(Some(Ok(expired_key))) =
+                        this.logic.timeouts.poll_expired(cx)
+                    {
+                        let key = expired_key.into_inner();
                         if let Some((_, aggregate)) = this.logic.buffers.remove(&key) {
                             let (line, context) = aggregate.merge();
                             return Poll::Ready(Some((key, line, context)));
