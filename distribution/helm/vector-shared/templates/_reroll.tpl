@@ -16,15 +16,6 @@ rollme: {{ randAlphaNum 5 | quote }}
 {{- end }}
 
 {{/*
-`ConfigMap` template checksum annotation.
-*/}}
-{{- define "libvector.configTemplateChecksumAnnotation" -}}
-{{- if not .Values.externalConfigMap }}
-checksum/config: {{ tpl (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-{{- end }}
-{{- end }}
-
-{{/*
 Values checksum annotation.
 */}}
 {{- define "libvector.valuesChecksumAnnotation" -}}
@@ -43,7 +34,6 @@ checksum/values: {{ toJson .Values | sha256sum }}
 All reroll annotations.
 */}}
 {{- define "libvector.rerollAnnotations" -}}
-{{- include "libvector.configTemplateChecksumAnnotation" . }}
 {{- include "libvector.valuesChecksumAnnotation" . }}
 {{- include "libvector.rollmeAnnotation" . }}
 {{- end }}
