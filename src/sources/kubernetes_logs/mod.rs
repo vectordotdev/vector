@@ -52,7 +52,7 @@ const FILE_KEY: &str = "file";
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
     /// Specifies the label selector to filter `Pod`s with, to be used in
@@ -62,7 +62,6 @@ pub struct Config {
     /// The `name` of the Kubernetes `Node` that Vector runs at.
     /// Required to filter the `Pod`s to only include the ones with the log
     /// files accessible locally.
-    #[serde(default = "default_self_node_name_env_template")]
     self_node_name: String,
 
     /// Specifies the field selector to filter `Pod`s with, to be used in
@@ -70,7 +69,6 @@ pub struct Config {
     extra_field_selector: String,
 
     /// Automatically merge partial events.
-    #[serde(default = "crate::serde::default_true")]
     auto_partial_merge: bool,
 
     /// Override global data_dir
@@ -80,19 +78,16 @@ pub struct Config {
     annotation_fields: pod_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to exclude from reading the files.
-    #[serde(default = "default_path_exclusion")]
     exclude_paths_glob_patterns: Vec<PathBuf>,
 
     /// Max amount of bytes to read from a single file before switching over
     /// to the next file.
     /// This allows distributing the reads more or less evenly accross
     /// the files.
-    #[serde(default = "default_max_read_bytes")]
     max_read_bytes: usize,
 
     /// The maximum number of a bytes a line can contain before being discarded. This protects
     /// against malformed lines or tailing incorrect files.
-    #[serde(default = "default_max_line_bytes")]
     max_line_bytes: usize,
 
     /// This value specifies not exactly the globbing, but interval
@@ -101,7 +96,6 @@ pub struct Config {
     /// file system; in addition, it is currently coupled with chechsum dumping
     /// in the underlying file server, so setting it too low may introduce
     /// a significant overhead.
-    #[serde(default = "default_glob_minimum_cooldown_ms")]
     glob_minimum_cooldown_ms: usize,
 
     /// A field to use to set the timestamp when Vector ingested the event.
@@ -130,6 +124,26 @@ impl GenerateConfig for Config {
             ..Default::default()
         })
         .unwrap()
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            extra_label_selector: "".to_string(),
+            self_node_name: default_self_node_name_env_template(),
+            extra_field_selector: "".to_string(),
+            auto_partial_merge: true,
+            data_dir: None,
+            annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
+            exclude_paths_glob_patterns: default_path_exclusion(),
+            max_read_bytes: default_max_read_bytes(),
+            max_line_bytes: default_max_line_bytes(),
+            glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
+            ingestion_timestamp_field: None,
+            timezone: None,
+            kube_config_file: None,
+        }
     }
 }
 
@@ -427,7 +441,7 @@ fn default_self_node_name_env_template() -> String {
 }
 
 fn default_path_exclusion() -> Vec<PathBuf> {
-    vec![PathBuf::from("**/*.tmp"), PathBuf::from("**/*.gz")]
+    vec![PathBuf::from("**/*.gz"), PathBuf::from("**/*.tmp")]
 }
 
 fn default_max_read_bytes() -> usize {
@@ -527,6 +541,50 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn prepare_exclude_paths() {
+        let cases = vec![
+            (
+                Config::default(),
+                vec![
+                    glob::Pattern::new("**/*.gz").unwrap(),
+                    glob::Pattern::new("**/*.tmp").unwrap(),
+                ],
+            ),
+            (
+                Config {
+                    exclude_paths_glob_patterns: vec![std::path::PathBuf::from("**/*.tmp")],
+                    ..Default::default()
+                },
+                vec![glob::Pattern::new("**/*.tmp").unwrap()],
+            ),
+            (
+                Config {
+                    exclude_paths_glob_patterns: vec![
+                        std::path::PathBuf::from("**/kube-system_*/**"),
+                        std::path::PathBuf::from("**/*.gz"),
+                        std::path::PathBuf::from("**/*.tmp"),
+                    ],
+                    ..Default::default()
+                },
+                vec![
+                    glob::Pattern::new("**/kube-system_*/**").unwrap(),
+                    glob::Pattern::new("**/*.gz").unwrap(),
+                    glob::Pattern::new("**/*.tmp").unwrap(),
+                ],
+            ),
+        ];
+
+        for (input, mut expected) in cases {
+            let mut output = super::prepare_exclude_paths(&input).unwrap();
+            assert_eq!(
+                expected.sort(),
+                output.sort(),
+                "expected left, actual right"
+            );
+        }
     }
 
     #[test]

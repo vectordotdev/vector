@@ -187,7 +187,7 @@ components: sources: kubernetes_logs: {
 				"""
 			required: false
 			type: array: {
-				default: []
+				default: ["**/*.gz", "**/*.tmp"]
 				items: type: string: {
 					examples: ["**/exclude/**"]
 					syntax: "literal"
