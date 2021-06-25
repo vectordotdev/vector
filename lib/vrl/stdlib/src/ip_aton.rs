@@ -47,9 +47,9 @@ impl Expression for IpAtonFn {
             .parse()
             .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;
 
-        let mut octets = ip.octets();
-        octets.reverse();
-        Ok(u32::from_be_bytes(octets).into())
+        let i = u32::from(ip); // host-order
+
+        Ok(i.to_be().into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

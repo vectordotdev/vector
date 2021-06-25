@@ -47,9 +47,7 @@ impl Expression for IpNtoaFn {
             .try_into()
             .map_err(|_| format!("cannot convert to bytes: integer does not fit in u32"))?;
 
-        let mut bytes = i.to_be_bytes();
-        bytes.reverse();
-        let ip = Ipv4Addr::from(bytes);
+        let ip = Ipv4Addr::from(i.to_ne_bytes());
 
         Ok(ip.to_string().into())
     }
