@@ -451,6 +451,8 @@ fn default_glob_minimum_cooldown_ms() -> usize {
     60000
 }
 
+// This function constructs the patterns we exclude from file watching, created
+// from the defaults or user provided configuration.
 fn prepare_exclude_paths(config: &Config) -> crate::Result<Vec<glob::Pattern>> {
     let exclude_paths = config
         .exclude_paths_glob_patterns
@@ -465,14 +467,17 @@ fn prepare_exclude_paths(config: &Config) -> crate::Result<Vec<glob::Pattern>> {
 
     info!(
         message = "Excluding matching files.",
-        exclude_paths = format!("[{}]", exclude_paths.iter().join(","))
+        exclude_paths = ?exclude_paths
+            .iter()
+            .map(glob::Pattern::as_str)
+            .collect::<Vec<_>>()
     );
 
     Ok(exclude_paths)
 }
 
-/// This function constructs the effective field selector to use, based on
-/// the specified configuration.
+// This function constructs the effective field selector to use, based on
+// the specified configuration.
 fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     let self_node_name = if config.self_node_name.is_empty()
         || config.self_node_name == default_self_node_name_env_template()
@@ -503,8 +508,8 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     ))
 }
 
-/// This function constructs the effective label selector to use, based on
-/// the specified configuration.
+// This function constructs the effective label selector to use, based on
+// the specified configuration.
 fn prepare_label_selector(config: &Config) -> String {
     const BUILT_IN: &str = "vector.dev/exclude!=true";
 
