@@ -20,10 +20,7 @@ remap: functions: ip_aton: {
 	internal_failure_reasons: [
 		"`value` isn't a valid IPv4 address",
 	]
-	return: {
-		types: ["integer"]
-		rules: []
-	}
+	return: types: ["integer"]
 
 	examples: [
 		{

@@ -234,7 +234,7 @@ urls: {
 	influxdb_line_protocol:                                   "https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/"
 	inode:                                                    "\(wikipedia)/wiki/Inode"
 	ip_aton:                                                  "https://linux.die.net/man/3/inet_aton"
-	ip_nota:                                                  "https://linux.die.net/man/3/inet_ntoa"
+	ip_ntoa:                                                  "https://linux.die.net/man/3/inet_ntoa"
 	iso_8601:                                                 "\(wikipedia)/wiki/ISO_8601"
 	iso3166_2:                                                "\(wikipedia)/wiki/ISO_3166-2"
 	issue_1694:                                               "\(vector_repo)/issues/1694"

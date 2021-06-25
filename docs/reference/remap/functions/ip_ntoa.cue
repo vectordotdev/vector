@@ -20,10 +20,7 @@ remap: functions: ip_ntoa: {
 	internal_failure_reasons: [
 		"`value` cannot fit in u32",
 	]
-	return: {
-		types: ["string"]
-		rules: []
-	}
+	return: types: ["string"]
 
 	examples: [
 		{
