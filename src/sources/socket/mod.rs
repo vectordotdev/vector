@@ -99,14 +99,15 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                Ok(udp::udp(
+                udp::udp(
                     config.address(),
                     config.max_length(),
                     host_key,
                     config.receive_buffer_bytes(),
+                    config.decoding().clone(),
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
