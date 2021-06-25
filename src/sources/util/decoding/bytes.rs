@@ -5,14 +5,14 @@ use crate::event::Value;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-/// A decoder which returns its input as-is.
+/// A decoder which wraps the byte frame as-is.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NoopDecoder;
+pub struct BytesDecoder;
 
-#[typetag::serde(name = "noop")]
-impl Decoder for NoopDecoder {
+#[typetag::serde(name = "bytes")]
+impl Decoder for BytesDecoder {
     fn name(&self) -> &'static str {
-        "noop"
+        "bytes"
     }
 
     fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send + Sync>> {
@@ -21,5 +21,5 @@ impl Decoder for NoopDecoder {
 }
 
 inventory::submit! {
-    Box::new(NoopDecoder) as Box<dyn Decoder>
+    Box::new(BytesDecoder) as Box<dyn Decoder>
 }

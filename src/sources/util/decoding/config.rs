@@ -3,7 +3,7 @@
 
 #![deny(missing_docs)]
 
-use super::{Decoder, NoopDecoder};
+use super::{BytesDecoder, Decoder};
 use crate::event::Value;
 use bytes::Bytes;
 use lazy_static::lazy_static;
@@ -76,7 +76,7 @@ impl DecodingBuilder for Option<DecodingConfig> {
     fn build(&self) -> crate::Result<Box<dyn Fn(Bytes) -> crate::Result<Value> + Send + Sync>> {
         match self {
             Some(decoder) => decoder.build(),
-            None => NoopDecoder.build(),
+            None => BytesDecoder.build(),
         }
     }
 }
@@ -97,30 +97,30 @@ mod tests {
     #[test]
     fn config_codec() {
         let config: Config = toml::from_str(indoc! {r#"
-            decoding = "noop"
+            decoding = "bytes"
         "#})
         .unwrap();
         let decoding = config.decoding;
 
-        assert_eq!(decoding.name(), "noop");
+        assert_eq!(decoding.name(), "bytes");
     }
 
     #[test]
     fn config_codec_with_options() {
         let config: Config = toml::from_str(indoc! {r#"
             [decoding]
-            codec = "noop"
+            codec = "bytes"
         "#})
         .unwrap();
         let decoding = config.decoding;
 
-        assert_eq!(decoding.name(), "noop");
+        assert_eq!(decoding.name(), "bytes");
     }
 
     #[test]
     fn build_codec() {
         let config: Config = toml::from_str(indoc! {r#"
-            decoding = "noop"
+            decoding = "bytes"
         "#})
         .unwrap();
         let decoding = config.decoding;

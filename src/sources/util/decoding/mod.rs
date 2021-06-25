@@ -2,13 +2,13 @@
 
 #![deny(missing_docs)]
 
+mod bytes;
 mod config;
-mod noop;
 
+pub use self::bytes::BytesDecoder;
 use crate::event::Value;
-use bytes::Bytes;
+use ::bytes::Bytes;
 pub use config::{DecodingBuilder, DecodingConfig};
-pub use noop::NoopDecoder;
 
 /// The common `Decoder` trait which provides a method to build a transform that
 /// converts from byte frame to event value.
