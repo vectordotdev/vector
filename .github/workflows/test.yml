@@ -201,7 +201,7 @@ jobs:
   cross-linux-success:
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    name: Cross
+    name: Cross Linux
     needs: cross-linux
     steps:
       - name: Check cross matrix status
