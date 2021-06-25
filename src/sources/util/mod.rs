@@ -1,10 +1,6 @@
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 mod body_decoding;
-#[cfg(any(
-    feature = "sources-socket",
-    feature = "sources-kafka",
-    all(unix, feature = "sources-utils-unix")
-))]
+#[cfg(feature = "sources-utils-decoding")]
 pub mod decoding;
 mod encoding_config;
 #[cfg(any(feature = "sources-file", feature = "sources-kafka"))]
