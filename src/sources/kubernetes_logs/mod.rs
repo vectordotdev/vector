@@ -579,11 +579,9 @@ mod tests {
 
         for (input, mut expected) in cases {
             let mut output = super::prepare_exclude_paths(&input).unwrap();
-            assert_eq!(
-                expected.sort(),
-                output.sort(),
-                "expected left, actual right"
-            );
+            expected.sort();
+            output.sort();
+            assert_eq!(expected, output, "expected left, actual right");
         }
     }
 
