@@ -158,6 +158,8 @@ mod parse_timestamp;
 mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
+#[cfg(feature = "parse_xml")]
+mod parse_xml;
 #[cfg(feature = "push")]
 mod push;
 #[cfg(feature = "redact")]
@@ -369,6 +371,8 @@ pub use parse_timestamp::ParseTimestamp;
 pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
+#[cfg(feature = "parse_xml")]
+pub use parse_xml::ParseXml;
 #[cfg(feature = "push")]
 pub use push::Push;
 #[cfg(feature = "match")]
@@ -582,6 +586,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
+        #[cfg(feature = "parse_xml")]
+        Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
         #[cfg(feature = "match")]
