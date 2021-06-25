@@ -35,16 +35,17 @@ service:
   # Whether to create service resource or not.
   enabled: false
   type: ClusterIP
-  topologyKeys:
-    - "kubernetes.io/hostname"
-    - "topology.kubernetes.io/zone"
-    - "topology.kubernetes.io/region"
-    - "*"
+  topologyKeys: {}
+  # List of valid topologyKeys values.
+  #   - "kubernetes.io/hostname"
+  #   - "topology.kubernetes.io/zone"
+  #   - "topology.kubernetes.io/region"
+  #   - "*"
   ports:
     - name: api
-      port: 80
+      port: 8686
       protocol: TCP
-      targetPort: 80
+      targetPort: 8686
     # Additional ports (Vector sources, etc.)
     # - name: another_port
     #   port: 8081
