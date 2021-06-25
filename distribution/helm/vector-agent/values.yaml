@@ -29,6 +29,8 @@ nameOverride: ""
 fullnameOverride: ""
 
 updateStrategy: RollingUpdate
+# Only used when updateStrategy is set to "RollingUpdate".
+maxUnavailable: 1
 
 # Deploy a service resource to use Topology-aware traffic routing with topology keys.
 service:
@@ -309,4 +311,3 @@ sinks: {}
   #   option: "value"
   #   rawConfig: |
   #     option = "value"
-

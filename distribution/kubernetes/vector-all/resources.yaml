@@ -251,6 +251,8 @@ spec:
   minReadySeconds: 1
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   template:
     metadata:
       annotations:
