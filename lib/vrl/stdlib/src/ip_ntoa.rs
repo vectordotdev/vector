@@ -13,7 +13,7 @@ impl Function for IpNtoa {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::BYTES,
+            kind: kind::INTEGER,
             required: true,
         }]
     }

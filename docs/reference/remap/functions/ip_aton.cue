@@ -26,7 +26,7 @@ remap: functions: ip_aton: {
 		{
 			title: "IPv4 to integer"
 			source: #"""
-				ip_ntoa!("1.2.3.4")
+				ip_aton!("1.2.3.4")
 				"""#
 			return: 67305985
 		},
