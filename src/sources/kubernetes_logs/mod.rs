@@ -294,10 +294,11 @@ impl Source {
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
             fingerprinter: Fingerprinter {
-                strategy: FingerprintStrategy::FirstLineChecksum {
+                strategy: FingerprintStrategy::FirstLinesChecksum {
                     // Max line length to expect during fingerprinting, see the
                     // explanation above.
                     ignored_header_bytes: 0,
+                    lines: 1,
                 },
                 max_line_length: max_line_bytes,
                 ignore_not_found: true,
@@ -451,7 +452,7 @@ fn default_max_line_bytes() -> usize {
 }
 
 fn default_glob_minimum_cooldown_ms() -> usize {
-    5000
+    60000
 }
 
 /// This function construct the effective field selector to use, based on

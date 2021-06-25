@@ -356,13 +356,13 @@ components: {
 			enabled: bool
 
 			if enabled {
-				adaptive_concurrency:       bool | *true
-				concurrency:                uint8 | *5
-				rate_limit_duration_secs:   uint8
-				rate_limit_num:             uint16
-				retry_initial_backoff_secs: uint8
-				retry_max_duration_secs:    uint8
-				timeout_secs:               uint8
+				adaptive_concurrency:       bool | *false
+				concurrency:                uint64
+				rate_limit_duration_secs:   uint64 | *1
+				rate_limit_num:             uint64 | *5
+				retry_initial_backoff_secs: uint64 | *1
+				retry_max_duration_secs:    uint64 | *3600
+				timeout_secs:               uint64 | *60
 				headers:                    bool
 			}
 		}

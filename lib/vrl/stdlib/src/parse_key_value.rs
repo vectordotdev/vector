@@ -293,9 +293,9 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                     many_m_n(
                         !standalone_key as usize,
                         1,
-                        preceded(space0, tag(key_value_delimiter)),
+                        delimited(space0, tag(key_value_delimiter), space0),
                     ),
-                    preceded(space0, parse_value(field_delimiter)),
+                    parse_value(field_delimiter),
                 ))(input),
             },
             |(field, sep, value): (&str, Vec<&str>, Value)| {
@@ -455,6 +455,45 @@ mod test {
                 ("foobar".to_string(), value!(true))
             ]),
             parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Lenient, true)
+        );
+    }
+
+    #[test]
+    fn test_multiple_standalone_key() {
+        assert_eq!(
+            Ok(vec![
+                ("foo".to_string(), "bar".into()),
+                ("foobar".to_string(), value!(true)),
+                ("bar".to_string(), "baz".into()),
+                ("barfoo".to_string(), value!(true)),
+            ]),
+            parse(
+                "foo=bar foobar bar=baz barfoo",
+                "=",
+                " ",
+                Whitespace::Lenient,
+                true
+            )
+        );
+    }
+
+    #[test]
+    fn test_only_standalone_key() {
+        assert_eq!(
+            Ok(vec![
+                ("foo".to_string(), value!(true)),
+                ("bar".to_string(), value!(true)),
+                ("foobar".to_string(), value!(true)),
+                ("baz".to_string(), value!(true)),
+                ("barfoo".to_string(), value!(true)),
+            ]),
+            parse(
+                "foo bar foobar baz barfoo",
+                "=",
+                " ",
+                Whitespace::Lenient,
+                true
+            )
         );
     }
 

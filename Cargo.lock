@@ -478,9 +478,9 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
 name = "atomig"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5802d4a527d4a66fc176d963f7587a9637dec22d3bf0e1ed2f6fb4707b7c383a"
+checksum = "413dc7da5dbea1ddd9aa01fdb743f54bf90af543744fad6d77e13c38004d194d"
 dependencies = [
  "atomig-macro",
  "serde",
@@ -846,9 +846,9 @@ dependencies = [
 
 [[package]]
 name = "bollard"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "699194c00f3a2effd3358d47f880646818e3d483190b17ebcdf598c654fb77e9"
+checksum = "a4a3f238d4b66f33d9162893ade03cd8a485320f591b244ea5b7f236d3494e98"
 dependencies = [
  "base64 0.13.0",
  "bollard-stubs",
@@ -862,7 +862,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-rustls",
- "hyper-unix-connector",
+ "hyperlocal",
  "log",
  "pin-project 1.0.7",
  "rustls 0.19.0",
@@ -1796,6 +1796,24 @@ name = "data-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
+
+[[package]]
+name = "datadog-search-syntax"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.10.1",
+ "lazy_static",
+ "lookup",
+ "ordered-float",
+ "pest",
+ "pest_derive",
+ "regex",
+ "vrl",
+ "vrl-compiler",
+ "vrl-diagnostic",
+ "vrl-parser",
+ "vrl-stdlib",
+]
 
 [[package]]
 name = "db-key"
@@ -3076,12 +3094,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyper-unix-connector"
-version = "0.2.2"
+name = "hyperlocal"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24ef1fd95d34b4ff007d3f0590727b5cf33572cace09b42032fc817dc8b16557"
+checksum = "0fafdf7b2b2de7c9784f76e02c0935e65a8117ec3b768644379983ab333ac98c"
 dependencies = [
- "anyhow",
+ "futures-util",
  "hex",
  "hyper",
  "pin-project 1.0.7",
@@ -3615,7 +3633,6 @@ checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
 name = "lookup"
 version = "0.1.0"
 dependencies = [
- "async-graphql",
  "inherent",
  "lalrpop",
  "lalrpop-util",
@@ -5234,9 +5251,9 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "2.0.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "646dfe12231d8635b7eed753a56f21a42de795e172ef2d8c44d6e972329888ab"
+checksum = "fbb9bcb03bed33d78771217614135f5a101785d337e93856e2f8d50825392054"
 dependencies = [
  "bit-vec 0.6.3",
  "bytes 1.0.1",
@@ -5742,9 +5759,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.3"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2296f2fac53979e8ccbc4a1136b25dcefd37be9ed7e4a1f6b05a6029c84ff124"
+checksum = "246e9f61b9bb77df069a947682be06e31ac43ea37862e244a69f177694ea6d22"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.0.1",
@@ -7296,9 +7313,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.6.1"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a38d31d7831c6ed7aad00aa4c12d9375fd225a6dd77da1d25b707346319a975"
+checksum = "5fb2ed024293bb19f7a5dc54fe83bf86532a44c12a2bb8ba40d64a4509395ca2"
 dependencies = [
  "autocfg 1.0.1",
  "bytes 1.0.1",
@@ -7348,13 +7365,13 @@ dependencies = [
 
 [[package]]
 name = "tokio-openssl"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac1bec5c0a4aa71e3459802c7a12e8912c2091ce2151004f9ce95cc5d1c6124e"
+checksum = "f24cddc8445a4dc8359cdd9e91c19d544fc95f672e32afe8945852b9381a09fe"
 dependencies = [
  "futures 0.3.15",
  "openssl",
- "pin-project 1.0.7",
+ "openssl-sys",
  "tokio",
 ]
 
@@ -7713,9 +7730,9 @@ checksum = "a7f741b240f1a48843f9b8e0444fb55fb2a4ff67293b50a9179dfd5ea67f8d41"
 
 [[package]]
 name = "trust-dns-proto"
-version = "0.20.0"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98a0381b2864c2978db7f8e17c7b23cca5a3a5f99241076e13002261a8ecbabd"
+checksum = "ad0d7f5db438199a6e2609debe3f69f808d074e0a2888ee0bccb45fe234d03f4"
 dependencies = [
  "async-trait",
  "cfg-if 1.0.0",
@@ -7731,6 +7748,7 @@ dependencies = [
  "rand 0.8.4",
  "smallvec",
  "thiserror",
+ "tinyvec",
  "tokio",
  "url",
 ]
@@ -8093,6 +8111,7 @@ dependencies = [
  "crossterm 0.20.0",
  "dashmap",
  "data-encoding",
+ "datadog-search-syntax",
  "derivative 2.2.0",
  "dirs-next",
  "dnsmsg-parser",
@@ -8232,6 +8251,8 @@ dependencies = [
  "vector_core",
  "vrl",
  "vrl-cli",
+ "vrl-compiler",
+ "vrl-parser",
  "vrl-stdlib",
  "walkdir",
  "warp",

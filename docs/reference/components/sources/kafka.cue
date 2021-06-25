@@ -34,6 +34,7 @@ components: sources: kafka: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		auto_offset_reset: {
 			common:      false
 			description: "If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation][urls.librdkafka_config] for `auto.offset.reset` option for explanation."

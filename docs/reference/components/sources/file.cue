@@ -93,7 +93,7 @@ components: sources: file: {
 					type: string: {
 						default: "checksum"
 						enum: {
-							checksum:         "Read the first line of the file, skipping the first `ignored_header_bytes` bytes, to uniquely identify files via a checksum."
+							checksum:         "Read first N lines of the file, skipping the first `ignored_header_bytes` bytes, to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
 						syntax: "literal"
@@ -107,6 +107,20 @@ components: sources: file: {
 					type: uint: {
 						default: 0
 						unit:    "bytes"
+					}
+				}
+				lines: {
+					common: false
+					description: """
+						The number of lines to read when generating a unique fingerprint.
+						This is helpful when some files share common first lines.
+						If the file has less than this amount of lines then it won't be read at all.
+						"""
+					relevant_when: "strategy = \"checksum\""
+					required:      false
+					type: uint: {
+						default: 1
+						unit:    "lines"
 					}
 				}
 			}
@@ -378,13 +392,13 @@ components: sources: file: {
 		}
 
 		fingerprint: {
-			title: "fingerprint"
+			title: "Fingerprint"
 			body: """
 				By default, Vector identifies files by creating a
-				[cyclic redundancy check](urls.crc) (CRC) on the first 256 bytes of
+				[cyclic redundancy check](urls.crc) (CRC) on the first N lines of
 				the file. This serves as a fingerprint to uniquely identify the file.
-				The amount of bytes read can be controlled via the `fingerprint_bytes`
-				and `ignored_header_bytes` options.
+				The amount of lines read can be controlled via the `fingerprint.lines`
+				and `fingerprint.ignored_header_bytes` options.
 
 				This strategy avoids the common pitfalls of using device and inode
 				names since inode names can be reused across files. This enables

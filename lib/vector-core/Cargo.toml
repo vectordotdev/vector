@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 async-trait = { version = "0.1", default-features = false }
 async-graphql = { version = "=2.6.4", default-features = false, optional = true }
-atomig = { version = "0.2.0", features = ["derive", "serde"] }
+atomig = { version = "0.3.1", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
 bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
@@ -35,7 +35,7 @@ serde = { version = "1.0.126", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.64", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
-tokio = { version = "1.6.1", default-features = false }
+tokio = { version = "1.7.1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
 toml = { version = "0.5.8", default-features = false }
 tracing = { version = "0.1.26", default-features = false }
