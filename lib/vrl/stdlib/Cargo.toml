@@ -69,8 +69,10 @@ default = [
     "get_hostname",
     "includes",
     "integer",
+    "ip_aton",
     "ip_cidr_contains",
     "ip_subnet",
+    "ip_ntoa",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_array",
@@ -174,7 +176,9 @@ get_env_var = []
 get_hostname = ["hostname"]
 includes = []
 integer = []
+ip_aton = []
 ip_cidr_contains = ["cidr-utils"]
+ip_ntoa = []
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
