@@ -1,15 +1,18 @@
 use crate::{
     async_read::VecAsyncReadExt,
     emit,
-    event::Event,
+    event::{Event, Value},
     internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteFailed},
     shutdown::ShutdownSignal,
-    sources::Source,
+    sources::{
+        util::decoding::{DecodingBuilder, DecodingConfig},
+        Source,
+    },
     Pipeline,
 };
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
-use std::{fs::remove_file, future::ready, path::PathBuf, time::Duration};
+use std::{fs::remove_file, path::PathBuf, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
@@ -28,17 +31,28 @@ pub fn build_unix_stream_source<D>(
     listen_path: PathBuf,
     decoder: D,
     host_key: String,
+    decoding: Option<DecodingConfig>,
     shutdown: ShutdownSignal,
     out: Pipeline,
-    build_event: impl Fn(&str, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
-) -> Source
+    build_event: impl Fn(
+            &str,
+            Option<Bytes>,
+            Bytes,
+            &(dyn Fn(Bytes) -> crate::Result<Value> + Send + Sync),
+        ) -> Option<Event>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+) -> crate::Result<Source>
 where
     D: Decoder<Item = String> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
-    let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
+    let decode = decoding.build()?;
+    let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
-    Box::pin(async move {
+    Ok(Box::pin(async move {
         let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
@@ -74,34 +88,41 @@ where
                 path.map(|p| p.to_string_lossy().into_owned().into());
 
             let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
-            let mut stream = FramedRead::new(stream, decoder.clone()).filter_map(move |line| {
-                ready(match line {
-                    Ok(line) => build_event(&host_key, received_from.clone(), &line).map(Ok),
-                    Err(error) => {
-                        emit!(UnixSocketError {
-                            error,
-                            path: &listen_path
-                        });
-                        None
-                    }
-                })
-            });
+            let mut stream = FramedRead::new(stream, decoder.clone());
 
             let connection_open = connection_open.clone();
-            let mut out = out.clone();
-            tokio::spawn(
-                async move {
-                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
-                    let _ = out.send_all(&mut stream).await;
-                    info!("Finished sending.");
 
-                    let socket: &mut UnixStream = stream.get_mut().get_mut().get_mut();
-                    if let Err(error) = socket.shutdown().await {
-                        error!(message = "Failed shutting down socket.", %error);
+            async {
+                let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
+
+                while let Some(line) = stream.next().await {
+                    match line {
+                        Ok(line) => {
+                            let frame = Bytes::from(line);
+
+                            if let Some(event) =
+                                build_event(&host_key, received_from.clone(), frame, &decode)
+                            {
+                                let _ = out.send(event).await;
+                            }
+                        }
+                        Err(error) => {
+                            emit!(UnixSocketError {
+                                error,
+                                path: &listen_path
+                            });
+                        }
                     }
                 }
-                .instrument(span),
-            );
+
+                info!("Finished sending.");
+
+                let socket: &mut UnixStream = stream.get_mut().get_mut();
+                if let Err(error) = socket.shutdown().await {
+                    error!(message = "Failed shutting down socket.", %error);
+                }
+            }
+            .instrument(span);
         }
 
         // Cleanup
@@ -121,5 +142,5 @@ where
         }
 
         Ok(())
-    })
+    }))
 }

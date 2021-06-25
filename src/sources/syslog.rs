@@ -136,14 +136,21 @@ impl SourceConfig for SyslogConfig {
                 cx.out,
             )),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(build_unix_stream_source(
+            Mode::Unix { path } => build_unix_stream_source(
                 path,
                 SyslogDecoder::new(self.max_length),
                 host_key,
+                None,
                 cx.shutdown,
                 cx.out,
-                |host_key, default_host, line| Some(event_from_str(host_key, default_host, line)),
-            )),
+                |host_key, default_host, frame, _| match std::str::from_utf8(&frame) {
+                    Ok(line) => Some(event_from_str(host_key, default_host, line)),
+                    Err(error) => {
+                        error!(message = "Received frame containing invalid UTF-8.", %error);
+                        None
+                    }
+                },
+            ),
         }
     }
 

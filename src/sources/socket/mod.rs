@@ -114,26 +114,28 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                Ok(unix::unix_datagram(
+                unix::unix_datagram(
                     config.path,
                     config.max_length,
                     host_key,
+                    config.decoding,
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                Ok(unix::unix_stream(
+                unix::unix_stream(
                     config.path,
                     config.max_length,
                     host_key,
+                    config.decoding,
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
         }
     }
