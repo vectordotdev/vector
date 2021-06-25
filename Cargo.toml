@@ -502,6 +502,7 @@ transforms-logs = [
 ]
 transforms-metrics = [
   "transforms-add_tags",
+  "transforms-aggregate",
   "transforms-filter",
   "transforms-log_to_metric",
   "transforms-lua",
@@ -513,6 +514,7 @@ transforms-metrics = [
 
 transforms-add_fields = []
 transforms-add_tags = []
+transforms-aggregate = []
 transforms-ansi_stripper = []
 transforms-aws_cloudwatch_logs_subscription_parser= []
 transforms-aws_ec2_metadata = ["evmap"]
