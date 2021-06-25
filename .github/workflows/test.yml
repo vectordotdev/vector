@@ -198,8 +198,8 @@ jobs:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
 
-  cross-linux-success:
-    if: ${{ always() }}
+  cross-linux-check:
+    if: ${{ needs.changes.outputs.dependencies == 'true' }}
     runs-on: ubuntu-latest
     name: Cross - Linux
     needs: cross-linux
