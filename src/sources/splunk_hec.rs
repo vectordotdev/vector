@@ -255,12 +255,10 @@ impl SplunkSource {
                     if valid_credentials.is_empty() {
                         return Ok(());
                     }
-                    if let Some(token) = token {
-                        if valid_credentials.contains(&token) {
-                            return Ok(());
-                        }
+                    match token {
+                        Some(token) if valid_credentials.contains(&token) => Ok(()),
+                        _ => Err(Rejection::from(ApiError::BadRequest)),
                     }
-                    return Err(Rejection::from(ApiError::BadRequest));
                 }
             });
 
