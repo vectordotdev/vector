@@ -15,12 +15,12 @@ struct ParseXmlConfig<'a> {
     attr_prefix: Cow<'a, str>,
     /// Key to use for text nodes. Default: "text".
     text_prop_name: Cow<'a, str>,
-    /// Ignore and exclude null values from the resulting JSON. Default: false.
-    ignore_null_value: bool,
-    /// Serialize null values as an empty object. Default: false.
-    null_value_as_object: bool,
-    /// Convert numbers to strings. Default: false
-    numbers_as_strings: bool,
+    /// Parse "true" or "false" as booleans. Default: true.
+    parse_bools: bool,
+    /// Parse "null" as null. Default: true.
+    parse_nulls: bool,
+    /// Parse numeric values as integers/floats. Default: true.
+    parse_numbers: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -37,7 +37,7 @@ impl Function for ParseXml {
             source: indoc! {r#"
                 value = s'<book category="CHILDREN"><title lang="en">Harry Potter</title><author>J K. Rowling</author><year>2005</year></book>';
 
-                parse_xml_to_json!(value, numbers_as_strings: true)
+                parse_xml_to_json!(value, string_numbers: true)
             "#},
             result: Ok(
                 r#"{"book": { "year": "2005", "author": "J K. Rowling", "category": "CHILDREN", "title": { "lang": "en", "value": "Harry Potter" } } }"#,
@@ -52,9 +52,9 @@ impl Function for ParseXml {
         let include_attr = arguments.optional("include_attr");
         let attr_prefix = arguments.optional("attr_prefix");
         let text_prop_name = arguments.optional("text_prop_name");
-        let ignore_null_value = arguments.optional("ignore_null_value");
-        let null_value_as_object = arguments.optional("null_value_as_object");
-        let numbers_as_strings = arguments.optional("numbers_as_strings");
+        let parse_bools = arguments.optional("parse_bools");
+        let parse_nulls = arguments.optional("parse_nulls");
+        let parse_numbers = arguments.optional("parse_numbers");
 
         Ok(Box::new(ParseXmlFn {
             trim,
@@ -62,9 +62,9 @@ impl Function for ParseXml {
             include_attr,
             attr_prefix,
             text_prop_name,
-            ignore_null_value,
-            null_value_as_object,
-            numbers_as_strings,
+            parse_bools,
+            parse_nulls,
+            parse_numbers,
         }))
     }
 
@@ -96,17 +96,17 @@ impl Function for ParseXml {
                 required: false,
             },
             Parameter {
-                keyword: "ignore_null_value",
+                keyword: "parse_bools",
                 kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
-                keyword: "null_value_as_object",
+                keyword: "parse_nulls",
                 kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
-                keyword: "numbers_as_strings",
+                keyword: "parse_numbers",
                 kind: kind::BOOLEAN,
                 required: false,
             },
@@ -122,9 +122,9 @@ struct ParseXmlFn {
     include_attr: Option<Box<dyn Expression>>,
     attr_prefix: Option<Box<dyn Expression>>,
     text_prop_name: Option<Box<dyn Expression>>,
-    ignore_null_value: Option<Box<dyn Expression>>,
-    null_value_as_object: Option<Box<dyn Expression>>,
-    numbers_as_strings: Option<Box<dyn Expression>>,
+    parse_bools: Option<Box<dyn Expression>>,
+    parse_nulls: Option<Box<dyn Expression>>,
+    parse_numbers: Option<Box<dyn Expression>>,
 }
 
 impl Expression for ParseXmlFn {
@@ -152,28 +152,28 @@ impl Expression for ParseXmlFn {
             None => Cow::from("text"),
         };
 
-        let ignore_null_value = match &self.ignore_null_value {
+        let parse_bools = match &self.parse_bools {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
+            None => true,
         };
 
-        let null_value_as_object = match &self.null_value_as_object {
+        let parse_nulls = match &self.parse_nulls {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
+            None => true,
         };
 
-        let numbers_as_strings = match &self.numbers_as_strings {
+        let parse_numbers = match &self.parse_numbers {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
+            None => true,
         };
 
         let config = ParseXmlConfig {
             include_attr,
             attr_prefix,
             text_prop_name,
-            ignore_null_value,
-            null_value_as_object,
-            numbers_as_strings,
+            parse_bools,
+            parse_nulls,
+            parse_numbers,
         };
 
         // Trim whitespace around XML elements, if applicable.
@@ -199,6 +199,34 @@ fn type_def() -> TypeDef {
         .fallible()
         .bytes()
         .add_object::<(), Kind>(map! { (): inner_kind() })
+}
+
+/// Process a text node, and return the correct `Value` type based on config.
+fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
+    match text {
+        // Parse nulls.
+        "" | "null" if config.parse_nulls => Value::Null,
+        // Parse bools.
+        "true" if config.parse_bools => true.into(),
+        "false" if config.parse_bools => false.into(),
+        // String numbers.
+        _ if !config.parse_numbers => text.into(),
+        // Parse numbers, falling back to string.
+        _ => {
+            // Attempt an integer first (effectively a subset of float).
+            if let Ok(v) = text.parse::<i64>() {
+                return v.into();
+            }
+
+            // Then a float.
+            if let Ok(v) = text.parse::<f64>() {
+                return v.into();
+            }
+
+            // Fall back to string.
+            text.into()
+        }
+    }
 }
 
 /// Process an XML node, and return a VRL `Value`.
@@ -270,9 +298,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             // Continue recursing into children.
             _ => Value::Object(recurse(node)),
         },
-        NodeType::Text => Value::Bytes(Bytes::from(
-            node.text().expect("expected XML text node").to_string(),
-        )),
+        NodeType::Text => process_text(node.text().expect("expected XML text node"), config),
         // Ignore comments and processing instructions
         _ => Value::Null,
     }
@@ -283,7 +309,7 @@ fn trim_xml<'a>(xml: &'a Cow<str>) -> Cow<'a, str> {
         static ref RE: Regex = RegexBuilder::new(r">\s+?<")
             .multi_line(true)
             .build()
-            .expect("trimming regex failed");
+            .expect("trim regex failed");
     }
 
     RE.replace_all(xml, "><")
@@ -352,7 +378,54 @@ mod tests {
                 
                 <!-- Could literally be placed anywhere -->
             "#}],
-            want: Ok(value!({ "note": { "to": "Tove", "from": "Jani", "heading": "Reminder", "body": "Don't forget me this weekend!" } })),
+            want: Ok(value!(
+                {
+                    "note": {
+                        "to": "Tove",
+                        "from": "Jani",
+                        "heading": "Reminder",
+                        "body": "Don't forget me this weekend!"
+                    }
+                }
+            )),
+            tdef: type_def(),
+        }
+
+        mixed_types {
+            args: func_args![ value: indoc!{r#"
+                <?xml version="1.0" encoding="ISO-8859-1"?>
+                <!-- Mixed types -->
+                <data>
+                    <!-- Booleans -->
+                    <item>true</item>
+                    <item>false</item>
+                    <!-- String -->
+                    <item>string!</item>
+                    <!-- Empty object -->
+                    <item />
+                    <!-- Literal value "null" -->
+                    <item>null</item>
+                    <!-- Integer -->
+                    <item>1</item>
+                    <!-- Float -->
+                    <item>1.0</item>
+                </data>
+            "#}],
+            want: Ok(value!(
+                {
+                    "data": {
+                        "item": [
+                            true,
+                            false,
+                            "string!",
+                            {},
+                            null,
+                            1,
+                            1.0
+                        ]
+                    }
+                }
+            )),
             tdef: type_def(),
         }
     ];
