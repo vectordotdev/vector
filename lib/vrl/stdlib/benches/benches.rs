@@ -79,6 +79,7 @@ criterion_group!(
               parse_timestamp,
               parse_tokens,
               parse_url,
+              parse_xml,
               push,
               redact,
               replace,

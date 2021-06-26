@@ -9,18 +9,20 @@ use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 
 struct ParseXmlConfig<'a> {
-    /// Include XML attributes.
+    /// Include XML attributes. Default: true,
     include_attr: bool,
     /// XML attribute prefix, e.g. `<a href="test">` -> `{a: { "@href": "test }}`. Default: "@".
     attr_prefix: Cow<'a, str>,
-    /// Key to use for text nodes. Default: "text".
-    text_prop_name: Cow<'a, str>,
+    /// Key to use for text nodes when attributes are included. Default: "text".
+    text_key: Cow<'a, str>,
+    /// Always use text default (instead of flattening). Default: false.
+    always_use_text_key: bool,
     /// Parse "true" or "false" as booleans. Default: true.
-    parse_bools: bool,
+    parse_bool: bool,
     /// Parse "null" as null. Default: true.
-    parse_nulls: bool,
+    parse_null: bool,
     /// Parse numeric values as integers/floats. Default: true.
-    parse_numbers: bool,
+    parse_number: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -51,20 +53,22 @@ impl Function for ParseXml {
         let trim = arguments.optional("trim");
         let include_attr = arguments.optional("include_attr");
         let attr_prefix = arguments.optional("attr_prefix");
-        let text_prop_name = arguments.optional("text_prop_name");
-        let parse_bools = arguments.optional("parse_bools");
-        let parse_nulls = arguments.optional("parse_nulls");
-        let parse_numbers = arguments.optional("parse_numbers");
+        let text_key = arguments.optional("text_key");
+        let always_use_text_key = arguments.optional("always_use_text_key");
+        let parse_bool = arguments.optional("parse_bool");
+        let parse_null = arguments.optional("parse_null");
+        let parse_number = arguments.optional("parse_number");
 
         Ok(Box::new(ParseXmlFn {
-            trim,
             value,
+            trim,
             include_attr,
             attr_prefix,
-            text_prop_name,
-            parse_bools,
-            parse_nulls,
-            parse_numbers,
+            text_key,
+            always_use_text_key,
+            parse_bool,
+            parse_null,
+            parse_number,
         }))
     }
 
@@ -91,22 +95,27 @@ impl Function for ParseXml {
                 required: false,
             },
             Parameter {
-                keyword: "text_prop_name",
+                keyword: "text_key",
                 kind: kind::BYTES,
                 required: false,
             },
             Parameter {
-                keyword: "parse_bools",
+                keyword: "always_use_text_key",
                 kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
-                keyword: "parse_nulls",
+                keyword: "parse_bool",
                 kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
-                keyword: "parse_numbers",
+                keyword: "parse_null",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
+            Parameter {
+                keyword: "parse_number",
                 kind: kind::BOOLEAN,
                 required: false,
             },
@@ -121,10 +130,11 @@ struct ParseXmlFn {
     trim: Option<Box<dyn Expression>>,
     include_attr: Option<Box<dyn Expression>>,
     attr_prefix: Option<Box<dyn Expression>>,
-    text_prop_name: Option<Box<dyn Expression>>,
-    parse_bools: Option<Box<dyn Expression>>,
-    parse_nulls: Option<Box<dyn Expression>>,
-    parse_numbers: Option<Box<dyn Expression>>,
+    text_key: Option<Box<dyn Expression>>,
+    always_use_text_key: Option<Box<dyn Expression>>,
+    parse_bool: Option<Box<dyn Expression>>,
+    parse_null: Option<Box<dyn Expression>>,
+    parse_number: Option<Box<dyn Expression>>,
 }
 
 impl Expression for ParseXmlFn {
@@ -139,7 +149,7 @@ impl Expression for ParseXmlFn {
 
         let include_attr = match &self.include_attr {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
+            None => true,
         };
 
         let attr_prefix = match &self.attr_prefix {
@@ -147,22 +157,27 @@ impl Expression for ParseXmlFn {
             None => Cow::from("@"),
         };
 
-        let text_prop_name = match &self.text_prop_name {
+        let text_key = match &self.text_key {
             Some(expr) => Cow::from(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned()),
             None => Cow::from("text"),
         };
 
-        let parse_bools = match &self.parse_bools {
+        let always_use_text_key = match &self.always_use_text_key {
+            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
+            None => false,
+        };
+
+        let parse_bool = match &self.parse_bool {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
             None => true,
         };
 
-        let parse_nulls = match &self.parse_nulls {
+        let parse_null = match &self.parse_null {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
             None => true,
         };
 
-        let parse_numbers = match &self.parse_numbers {
+        let parse_number = match &self.parse_number {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
             None => true,
         };
@@ -170,10 +185,11 @@ impl Expression for ParseXmlFn {
         let config = ParseXmlConfig {
             include_attr,
             attr_prefix,
-            text_prop_name,
-            parse_bools,
-            parse_nulls,
-            parse_numbers,
+            text_key,
+            always_use_text_key,
+            parse_bool,
+            parse_null,
+            parse_number,
         };
 
         // Trim whitespace around XML elements, if applicable.
@@ -210,7 +226,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
         for n in node.children().into_iter().filter(|n| !n.is_comment()) {
             // Use the default tag name if blank.
             let name = if n.tag_name().name() == "" {
-                config.text_prop_name.to_string()
+                config.text_key.to_string()
             } else {
                 n.tag_name().name().to_string()
             };
@@ -245,31 +261,43 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
 
     match node.node_type() {
         NodeType::Root => Value::Object(recurse(node)),
-        NodeType::Element => match node.children().count() {
-            // If there's only one element, and attributes are ignored, 'flatten' the object.
-            1 if !config.include_attr => process_node(
-                node.children()
-                    .into_iter()
-                    .next()
-                    .expect("expected 1 XML node"),
-                config,
-            ),
-            // If attributes are included, irrespective of children, expand into keys.
-            _ if config.include_attr => {
-                let mut map = recurse(node);
 
+        NodeType::Element => {
+            let mut map = BTreeMap::new();
+
+            // Expand attributes, if required.
+            if config.include_attr {
                 for attr in node.attributes() {
                     map.insert(
                         format!("{}{}", config.attr_prefix, attr.name()),
                         Value::Bytes(Bytes::from(attr.value().to_string())),
                     );
                 }
-
-                Value::Object(map)
             }
-            // Continue recursing into children.
-            _ => Value::Object(recurse(node)),
-        },
+
+            match (config.always_use_text_key, map.is_empty()) {
+                // If the map isn't empty, *always* recurse to expand default keys.
+                (_, false) => {
+                    map.extend(recurse(node));
+                    Value::Object(map)
+                }
+                // If a text key should be used, always recurse.
+                (true, true) => Value::Object(recurse(node)),
+                // Otherwise, check the node count to determine what to do.
+                _ => match node.children().count() {
+                    // For a single node, 'flatten' the object.
+                    1 => process_node(
+                        node.children()
+                            .into_iter()
+                            .next()
+                            .expect("expected 1 XML node"),
+                        config,
+                    ),
+                    // For 2+ nodes, expand.
+                    _ => Value::Object(recurse(node)),
+                },
+            }
+        }
         NodeType::Text => process_text(node.text().expect("expected XML text node"), config),
         _ => unreachable!("shouldn't be other XML nodes"),
     }
@@ -279,12 +307,12 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
 fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
     match text {
         // Parse nulls.
-        "" | "null" if config.parse_nulls => Value::Null,
+        "" | "null" if config.parse_null => Value::Null,
         // Parse bools.
-        "true" if config.parse_bools => true.into(),
-        "false" if config.parse_bools => false.into(),
+        "true" if config.parse_bool => true.into(),
+        "false" if config.parse_bool => false.into(),
         // String numbers.
-        _ if !config.parse_numbers => text.into(),
+        _ if !config.parse_number => text.into(),
         // Parse numbers, falling back to string.
         _ => {
             // Attempt an integer first (effectively a subset of float).
@@ -303,7 +331,7 @@ fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
     }
 }
 
-fn trim_xml<'a>(xml: &'a Cow<str>) -> Cow<'a, str> {
+fn trim_xml(xml: &str) -> Cow<str> {
     lazy_static::lazy_static! {
         static ref RE: Regex = RegexBuilder::new(r">\s+?<")
             .multi_line(true)
@@ -327,26 +355,20 @@ mod tests {
             tdef: type_def(),
         }
 
-        ignore_attr_by_default {
-            args: func_args![ value: r#"<a href="https://vector.dev">test</a>"# ],
-            want: Ok(value!({ "a": "test" })),
-            tdef: type_def(),
-        }
-
         include_attr {
-            args: func_args![ value: r#"<a href="https://vector.dev">test</a>"#, include_attr: true ],
+            args: func_args![ value: r#"<a href="https://vector.dev">test</a>"# ],
             want: Ok(value!({ "a": { "@href": "https://vector.dev", "text": "test" } })),
             tdef: type_def(),
         }
 
-        include_attr_no_attributes {
-            args: func_args![ value: r#"<a>test</a>"#, include_attr: true ],
-            want: Ok(value!({ "a": { "text": "test" } })),
+        exclude_attr {
+            args: func_args![ value: r#"<a href="https://vector.dev">test</a>"#, include_attr: false ],
+            want: Ok(value!({ "a": "test" })),
             tdef: type_def(),
         }
 
-        custom_text_prop_name {
-            args: func_args![ value: r#"<b>test</b>"#, include_attr: true, text_prop_name: "node" ],
+        custom_text_key {
+            args: func_args![ value: r#"<b>test</b>"#, text_key: "node", always_use_text_key: true ],
             want: Ok(value!({ "b": { "node": "test" } })),
             tdef: type_def(),
         }
@@ -442,7 +464,7 @@ mod tests {
                     <item>1</item>
                     <item>1.0</item>
                 </data>
-            "#}, parse_nulls: false, parse_bools: false, parse_numbers: false],
+            "#}, parse_null: false, parse_bool: false, parse_number: false],
             want: Ok(value!(
                 {
                     "data": {
@@ -458,6 +480,25 @@ mod tests {
                     }
                 }
             )),
+            tdef: type_def(),
+        }
+
+        untrimmed {
+            args: func_args![ value: "<root>  <a>test</a>  </root>", trim: false ],
+            want: Ok(value!(
+                {
+                    "root": {
+                        "a": "test",
+                        "text": ["  ", "  "],
+                    }
+                }
+            )),
+            tdef: type_def(),
+        }
+
+        invalid_token {
+            args: func_args![ value: "true" ],
+            want: Err("unable to parse xml: unknown token at 1:1"),
             tdef: type_def(),
         }
     ];
