@@ -38,8 +38,9 @@ pub struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
     address: SocketAddr,
-    /// Splunk HEC token
+    /// Splunk HEC token. Deprecated - use `valid_tokens` instead
     token: Option<String>,
+    /// A list of tokens to accept. Omit this to accept any token
     valid_tokens: Option<Vec<String>>,
     tls: Option<TlsConfig>,
 }
