@@ -1,7 +1,11 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::{btree_map::Entry, BTreeMap},
+};
 use vrl::prelude::*;
 
 use bytes::Bytes;
+use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 
 struct ParseXmlConfig<'a> {
@@ -44,6 +48,7 @@ impl Function for ParseXml {
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
+        let trim = arguments.optional("trim");
         let include_attr = arguments.optional("include_attr");
         let attr_prefix = arguments.optional("attr_prefix");
         let text_prop_name = arguments.optional("text_prop_name");
@@ -52,6 +57,7 @@ impl Function for ParseXml {
         let numbers_as_strings = arguments.optional("numbers_as_strings");
 
         Ok(Box::new(ParseXmlFn {
+            trim,
             value,
             include_attr,
             attr_prefix,
@@ -68,6 +74,11 @@ impl Function for ParseXml {
                 keyword: "value",
                 kind: kind::BYTES,
                 required: true,
+            },
+            Parameter {
+                keyword: "trim",
+                kind: kind::BOOLEAN,
+                required: false,
             },
             Parameter {
                 keyword: "include_attr",
@@ -107,6 +118,7 @@ impl Function for ParseXml {
 struct ParseXmlFn {
     value: Box<dyn Expression>,
 
+    trim: Option<Box<dyn Expression>>,
     include_attr: Option<Box<dyn Expression>>,
     attr_prefix: Option<Box<dyn Expression>>,
     text_prop_name: Option<Box<dyn Expression>>,
@@ -119,6 +131,11 @@ impl Expression for ParseXmlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;
+
+        let trim = match &self.trim {
+            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
+            None => true,
+        };
 
         let include_attr = match &self.include_attr {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
@@ -159,7 +176,10 @@ impl Expression for ParseXmlFn {
             numbers_as_strings,
         };
 
-        let doc = Document::parse(&string).map_err(|e| format!("unable to parse xml: {}", e))?;
+        // Trim whitespace around XML elements, if applicable.
+        let parse = if trim { trim_xml(&string) } else { string };
+
+        let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {}", e))?;
         let value = process_node(doc.root(), &config);
 
         Ok(value)
@@ -185,19 +205,42 @@ fn type_def() -> TypeDef {
 fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
     // Helper to recurse over a `Node`s children, and build an object.
     let recurse = |node: Node| -> BTreeMap<String, Value> {
-        node.children()
-            .into_iter()
-            .map(|n| {
-                // Use the default tag name if blank.
-                let name = if n.tag_name().name() == "" {
-                    config.text_prop_name.to_string()
-                } else {
-                    n.tag_name().name().to_string()
-                };
+        let mut map = BTreeMap::new();
 
-                (name, process_node(n, config))
-            })
-            .collect::<BTreeMap<_, _>>()
+        for n in node.children().into_iter().filter(|n| !n.is_comment()) {
+            // Use the default tag name if blank.
+            let name = if n.tag_name().name() == "" {
+                config.text_prop_name.to_string()
+            } else {
+                n.tag_name().name().to_string()
+            };
+
+            // Transform the node into a VRL `Value`.
+            let value = process_node(n, config);
+
+            // If the key already exists, add it. Otherwise, insert.
+            match map.entry(name) {
+                Entry::Occupied(mut entry) => {
+                    let v = entry.get_mut();
+
+                    // Push a value onto the existing array, or wrap in a `Value::Array`.
+                    match v {
+                        Value::Array(v) => v.push(value),
+                        v => {
+                            let prev = std::mem::replace(v, Value::Array(Vec::with_capacity(2)));
+                            if let Value::Array(v) = v {
+                                v.extend_from_slice(&[prev, value]);
+                            }
+                        }
+                    };
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(value);
+                }
+            }
+        }
+
+        map
     };
 
     match node.node_type() {
@@ -231,8 +274,19 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             node.text().expect("expected XML text node").to_string(),
         )),
         // Ignore comments and processing instructions
-        NodeType::Comment | NodeType::PI => Value::Object(recurse(node)),
+        _ => Value::Null,
     }
+}
+
+fn trim_xml<'a>(xml: &'a Cow<str>) -> Cow<'a, str> {
+    lazy_static::lazy_static! {
+        static ref RE: Regex = RegexBuilder::new(r">\s+?<")
+            .multi_line(true)
+            .build()
+            .expect("trimming regex failed");
+    }
+
+    RE.replace_all(xml, "><")
 }
 
 #[cfg(test)]
@@ -244,31 +298,61 @@ mod tests {
 
         simple_text {
             args: func_args![ value: r#"<a>test</a>"# ],
-            want: Ok(value!({"a": "test"})),
+            want: Ok(value!({ "a": "test" })),
             tdef: type_def(),
         }
 
         ignore_attr_by_default {
             args: func_args![ value: r#"<a href="https://vector.dev">test</a>"# ],
-            want: Ok(value!({"a": "test"})),
+            want: Ok(value!({ "a": "test" })),
             tdef: type_def(),
         }
 
         include_attr {
             args: func_args![ value: r#"<a href="https://vector.dev">test</a>"#, include_attr: true ],
-            want: Ok(value!({"a": { "@href": "https://vector.dev", "text": "test" } })),
+            want: Ok(value!({ "a": { "@href": "https://vector.dev", "text": "test" } })),
             tdef: type_def(),
         }
 
         include_attr_no_attributes {
             args: func_args![ value: r#"<a>test</a>"#, include_attr: true ],
-            want: Ok(value!({"a": { "text": "test" } })),
+            want: Ok(value!({ "a": { "text": "test" } })),
             tdef: type_def(),
         }
 
         custom_text_prop_name {
             args: func_args![ value: r#"<b>test</b>"#, include_attr: true, text_prop_name: "node" ],
-            want: Ok(value!({"b": { "node": "test" } })),
+            want: Ok(value!({ "b": { "node": "test" } })),
+            tdef: type_def(),
+        }
+
+        nested_object {
+            args: func_args![ value: r#"<a><b>one</b><c>two</c></a>"# ],
+            want: Ok(value!({ "a": { "b": "one", "c": "two" } })),
+            tdef: type_def(),
+        }
+
+        nested_object_array {
+            args: func_args![ value: r#"<a><b>one</b><b>two</b></a>"# ],
+            want: Ok(value!({ "a": { "b": ["one", "two"] } })),
+            tdef: type_def(),
+        }
+
+        header_and_comments {
+            args: func_args![ value: indoc!{r#"
+                <?xml version="1.0" encoding="ISO-8859-1"?>
+                <!-- Example found somewhere in the deep depths of the web -->
+                <note>
+                    <to>Tove</to>
+                    <!-- Randomly inserted inner comment -->
+                    <from>Jani</from>
+                    <heading>Reminder</heading>
+                    <body>Don't forget me this weekend!</body>
+                </note>
+                
+                <!-- Could literally be placed anywhere -->
+            "#}],
+            want: Ok(value!({ "note": { "to": "Tove", "from": "Jani", "heading": "Reminder", "body": "Don't forget me this weekend!" } })),
             tdef: type_def(),
         }
     ];
