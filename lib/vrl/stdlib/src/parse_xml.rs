@@ -428,5 +428,38 @@ mod tests {
             )),
             tdef: type_def(),
         }
+
+        just_strings {
+            args: func_args![ value: indoc!{r#"
+                <?xml version="1.0" encoding="ISO-8859-1"?>
+                <!-- All scalar types are just strings -->
+                <data>
+                    <item>true</item>
+                    <item>false</item>
+                    <item>string!</item>
+                    <!-- Still an empty object -->
+                    <item />
+                    <item>null</item>
+                    <item>1</item>
+                    <item>1.0</item>
+                </data>
+            "#}, parse_nulls: false, parse_bools: false, parse_numbers: false],
+            want: Ok(value!(
+                {
+                    "data": {
+                        "item": [
+                            "true",
+                            "false",
+                            "string!",
+                            {},
+                            "null",
+                            "1",
+                            "1.0"
+                        ]
+                    }
+                }
+            )),
+            tdef: type_def(),
+        }
     ];
 }
