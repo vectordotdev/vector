@@ -37,12 +37,12 @@ impl Function for ParseXml {
         &[Example {
             title: "parse XML",
             source: indoc! {r#"
-                value = s'<book category="CHILDREN"><title lang="en">Harry Potter</title><author>J K. Rowling</author><year>2005</year></book>';
+				value = s'<book category="CHILDREN"><title lang="en">Harry Potter</title><author>J K. Rowling</author><year>2005</year></book>';
 
-                parse_xml_to_json!(value, string_numbers: true)
+				parse_xml!(value, text_key: "value", parse_number: false)
             "#},
             result: Ok(
-                r#"{"book": { "year": "2005", "author": "J K. Rowling", "category": "CHILDREN", "title": { "lang": "en", "value": "Harry Potter" } } }"#,
+                r#"{ "book": { "@category": "CHILDREN", "title": { "@lang": "en", "value": "Harry Potter" }, "year": "2005", "author": "J K. Rowling" } }"#,
             ),
         }]
     }
@@ -396,7 +396,7 @@ mod tests {
                     <heading>Reminder</heading>
                     <body>Don't forget me this weekend!</body>
                 </note>
-                
+
                 <!-- Could literally be placed anywhere -->
             "#}],
             want: Ok(value!(

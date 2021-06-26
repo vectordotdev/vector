@@ -1375,7 +1375,7 @@ bench_function! {
                 <heading>Reminder</heading>
                 <body>Don't forget me this weekend!</body>
             </note>
-            
+
             <!-- Could literally be placed anywhere -->
         "#}],
         want: Ok(value!(
