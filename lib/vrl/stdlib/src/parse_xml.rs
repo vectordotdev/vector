@@ -201,34 +201,6 @@ fn type_def() -> TypeDef {
         .add_object::<(), Kind>(map! { (): inner_kind() })
 }
 
-/// Process a text node, and return the correct `Value` type based on config.
-fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
-    match text {
-        // Parse nulls.
-        "" | "null" if config.parse_nulls => Value::Null,
-        // Parse bools.
-        "true" if config.parse_bools => true.into(),
-        "false" if config.parse_bools => false.into(),
-        // String numbers.
-        _ if !config.parse_numbers => text.into(),
-        // Parse numbers, falling back to string.
-        _ => {
-            // Attempt an integer first (effectively a subset of float).
-            if let Ok(v) = text.parse::<i64>() {
-                return v.into();
-            }
-
-            // Then a float.
-            if let Ok(v) = text.parse::<f64>() {
-                return v.into();
-            }
-
-            // Fall back to string.
-            text.into()
-        }
-    }
-}
-
 /// Process an XML node, and return a VRL `Value`.
 fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
     // Helper to recurse over a `Node`s children, and build an object.
@@ -299,8 +271,35 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             _ => Value::Object(recurse(node)),
         },
         NodeType::Text => process_text(node.text().expect("expected XML text node"), config),
-        // Ignore comments and processing instructions
-        _ => Value::Null,
+        _ => unreachable!("shouldn't be other XML nodes"),
+    }
+}
+
+/// Process a text node, and return the correct `Value` type based on config.
+fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
+    match text {
+        // Parse nulls.
+        "" | "null" if config.parse_nulls => Value::Null,
+        // Parse bools.
+        "true" if config.parse_bools => true.into(),
+        "false" if config.parse_bools => false.into(),
+        // String numbers.
+        _ if !config.parse_numbers => text.into(),
+        // Parse numbers, falling back to string.
+        _ => {
+            // Attempt an integer first (effectively a subset of float).
+            if let Ok(v) = text.parse::<i64>() {
+                return v.into();
+            }
+
+            // Then a float.
+            if let Ok(v) = text.parse::<f64>() {
+                return v.into();
+            }
+
+            // Fall back to string.
+            text.into()
+        }
     }
 }
 
