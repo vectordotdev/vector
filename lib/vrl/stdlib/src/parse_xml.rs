@@ -42,7 +42,7 @@ impl Function for ParseXml {
 				parse_xml!(value, text_key: "value", parse_number: false)
             "#},
             result: Ok(
-                r#"{ "book": { "@category": "CHILDREN", "title": { "@lang": "en", "value": "Harry Potter" }, "year": "2005", "author": "J K. Rowling" } }"#,
+                r#"{ "book": { "@category": "CHILDREN", "author": "J K. Rowling", "title": { "@lang": "en", "value": "Harry Potter" }, "year": "2005" } }"#,
             ),
         }]
     }

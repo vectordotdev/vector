@@ -81,9 +81,17 @@ remap: functions: parse_xml: {
 
 				parse_xml!(value, text_key: "value", parse_number: false)
 				"""#
-			return: #"""
-				{ "book": { "@category": "CHILDREN", "author": "J K. Rowling", "title": { "@lang": "en", "value": "Harry Potter" }, "year": "2005" } }"
-				"""#
+			return: {
+				"book": {
+					"@category": "CHILDREN"
+					"author":    "J K. Rowling"
+					"title": {
+						"@lang": "en"
+						"value": "Harry Potter"
+					}
+					"year": "2005"
+				}
+			}
 		},
 	]
 }
