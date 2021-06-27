@@ -7,8 +7,8 @@ remap: functions: parse_xml: {
 		"""
 	notices: [
 		"""
-				Valid XML must contain exactly one root node. Always returns an object.
-		""",
+			Valid XML must contain exactly one root node. Always returns an object.
+			""",
 	]
 
 	arguments: [
@@ -82,14 +82,7 @@ remap: functions: parse_xml: {
 				parse_xml!(value, text_key: "value", parse_number: false)
 				"""#
 			return: #"""
-					{
-						"book": {
-							"@category": "CHILDREN",
-							"title": { "@lang": "en", "value": "Harry Potter" },
-							"year": "2005",
-							"author": "J K. Rowling"
-						}
-					}
+				{ "book": { "@category": "CHILDREN", "author": "J K. Rowling", "title": { "@lang": "en", "value": "Harry Potter" }, "year": "2005" } }"
 				"""#
 		},
 	]
