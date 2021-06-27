@@ -4,7 +4,6 @@ use std::{
 };
 use vrl::prelude::*;
 
-use bytes::Bytes;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 
@@ -270,7 +269,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                 for attr in node.attributes() {
                     map.insert(
                         format!("{}{}", config.attr_prefix, attr.name()),
-                        Value::Bytes(Bytes::from(attr.value().to_string())),
+                        attr.value().into(),
                     );
                 }
             }
