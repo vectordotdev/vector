@@ -3661,6 +3661,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "lua-src"
+version = "543.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "029180f994b9b36f47d905f92569b516acf7d073778e2e781c15ee375b1ca27d"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "luajit-src"
+version = "210.1.4+resty8404d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd98051767391af4fa24b5d3a9b6dace632bf2d92c6a6e0abf566109649aa75b"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "lucet-module"
 version = "0.7.0-dev"
 source = "git+https://github.com/bytecodealliance/lucet.git?rev=b1863dacc8c92c11e5434fc8815d9b9a26cfe3db#b1863dacc8c92c11e5434fc8815d9b9a26cfe3db"
@@ -4097,6 +4115,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "mlua"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff25078fb9dc28e915fa72bf6128e35db8af8e07f27a746ddd95dc69b640e2dd"
+dependencies = [
+ "bstr",
+ "cc",
+ "lua-src",
+ "luajit-src",
+ "num-traits",
+ "once_cell",
+ "pkg-config",
 ]
 
 [[package]]
@@ -5826,19 +5859,6 @@ name = "rle-decode-fast"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cabe4fa914dec5870285fa7f71f602645da47c486e68486d2b4ceb4a343e90ac"
-
-[[package]]
-name = "rlua"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25fa5b2c667bae0b6218361e96d365e414fe4a0fa80f476b9631aa2dea2c6881"
-dependencies = [
- "bitflags",
- "bstr",
- "cc",
- "libc",
- "num-traits",
-]
 
 [[package]]
 name = "rmp"
@@ -8157,6 +8177,7 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
+ "mlua",
  "mongodb",
  "nix 0.21.0",
  "nom 6.1.2",
@@ -8187,7 +8208,6 @@ dependencies = [
  "rdkafka",
  "regex",
  "reqwest",
- "rlua",
  "rmp-serde",
  "rmpv",
  "rusoto_cloudwatch",
@@ -8314,6 +8334,7 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
+ "mlua",
  "once_cell",
  "pest",
  "pest_derive",
@@ -8324,7 +8345,6 @@ dependencies = [
  "prost-types",
  "quickcheck",
  "regex",
- "rlua",
  "serde",
  "serde_json",
  "shared",

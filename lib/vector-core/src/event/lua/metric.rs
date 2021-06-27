@@ -1,26 +1,26 @@
-use super::util::{table_to_set, table_to_timestamp, timestamp_to_table, type_name};
+use super::util::{table_to_timestamp, timestamp_to_table};
 use crate::event::{metric, Metric, MetricKind, MetricValue, StatisticKind};
-use rlua::prelude::*;
+use mlua::prelude::*;
 use std::collections::BTreeMap;
 
 impl<'a> ToLua<'a> for MetricKind {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by rlua
-    fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
+    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
+    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             MetricKind::Absolute => "absolute",
             MetricKind::Incremental => "incremental",
         };
-        ctx.create_string(kind).map(LuaValue::String)
+        lua.create_string(kind).map(LuaValue::String)
     }
 }
 
 impl<'a> FromLua<'a> for MetricKind {
-    fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
+    fn from_lua(value: LuaValue<'a>, _: &'a Lua) -> LuaResult<Self> {
         match value {
             LuaValue::String(s) if s == "absolute" => Ok(MetricKind::Absolute),
             LuaValue::String(s) if s == "incremental" => Ok(MetricKind::Incremental),
             _ => Err(LuaError::FromLuaConversionError {
-                from: type_name(&value),
+                from: value.type_name(),
                 to: "MetricKind",
                 message: Some(
                     "Metric kind should be either \"incremental\" or \"absolute\"".to_string(),
@@ -31,22 +31,22 @@ impl<'a> FromLua<'a> for MetricKind {
 }
 
 impl<'a> ToLua<'a> for StatisticKind {
-    fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
+    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             StatisticKind::Summary => "summary",
             StatisticKind::Histogram => "histogram",
         };
-        ctx.create_string(kind).map(LuaValue::String)
+        lua.create_string(kind).map(LuaValue::String)
     }
 }
 
 impl<'a> FromLua<'a> for StatisticKind {
-    fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
+    fn from_lua(value: LuaValue<'a>, _: &'a Lua) -> LuaResult<Self> {
         match value {
             LuaValue::String(s) if s == "summary" => Ok(StatisticKind::Summary),
             LuaValue::String(s) if s == "histogram" => Ok(StatisticKind::Histogram),
             _ => Err(LuaError::FromLuaConversionError {
-                from: type_name(&value),
+                from: value.type_name(),
                 to: "StatisticKind",
                 message: Some(
                     "Statistic kind should be either \"summary\" or \"histogram\"".to_string(),
@@ -57,16 +57,16 @@ impl<'a> FromLua<'a> for StatisticKind {
 }
 
 impl<'a> ToLua<'a> for Metric {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by rlua
-    fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
-        let tbl = ctx.create_table()?;
+    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
+    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+        let tbl = lua.create_table()?;
 
         tbl.set("name", self.name())?;
         if let Some(namespace) = self.namespace() {
             tbl.set("namespace", namespace)?;
         }
         if let Some(ts) = self.data.timestamp {
-            tbl.set("timestamp", timestamp_to_table(ctx, ts)?)?;
+            tbl.set("timestamp", timestamp_to_table(lua, ts)?)?;
         }
         if let Some(tags) = self.series.tags {
             tbl.set("tags", tags)?;
@@ -75,22 +75,22 @@ impl<'a> ToLua<'a> for Metric {
 
         match self.data.value {
             MetricValue::Counter { value } => {
-                let counter = ctx.create_table()?;
+                let counter = lua.create_table()?;
                 counter.set("value", value)?;
                 tbl.set("counter", counter)?;
             }
             MetricValue::Gauge { value } => {
-                let gauge = ctx.create_table()?;
+                let gauge = lua.create_table()?;
                 gauge.set("value", value)?;
                 tbl.set("gauge", gauge)?;
             }
             MetricValue::Set { values } => {
-                let set = ctx.create_table()?;
-                set.set("values", ctx.create_sequence_from(values.into_iter())?)?;
+                let set = lua.create_table()?;
+                set.set("values", lua.create_sequence_from(values.into_iter())?)?;
                 tbl.set("set", set)?;
             }
             MetricValue::Distribution { samples, statistic } => {
-                let distribution = ctx.create_table()?;
+                let distribution = lua.create_table()?;
                 let sample_rates: Vec<_> = samples.iter().map(|s| s.rate).collect();
                 let values: Vec<_> = samples.into_iter().map(|s| s.value).collect();
                 distribution.set("values", values)?;
@@ -103,7 +103,7 @@ impl<'a> ToLua<'a> for Metric {
                 count,
                 sum,
             } => {
-                let aggregated_histogram = ctx.create_table()?;
+                let aggregated_histogram = lua.create_table()?;
                 let counts: Vec<_> = buckets.iter().map(|b| b.count).collect();
                 let buckets: Vec<_> = buckets.into_iter().map(|b| b.upper_limit).collect();
                 aggregated_histogram.set("buckets", buckets)?;
@@ -117,7 +117,7 @@ impl<'a> ToLua<'a> for Metric {
                 count,
                 sum,
             } => {
-                let aggregated_summary = ctx.create_table()?;
+                let aggregated_summary = lua.create_table()?;
                 let values: Vec<_> = quantiles.iter().map(|q| q.value).collect();
                 let quantiles: Vec<_> = quantiles.into_iter().map(|q| q.upper_limit).collect();
                 aggregated_summary.set("quantiles", quantiles)?;
@@ -133,12 +133,12 @@ impl<'a> ToLua<'a> for Metric {
 }
 
 impl<'a> FromLua<'a> for Metric {
-    fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
+    fn from_lua(value: LuaValue<'a>, _: &'a Lua) -> LuaResult<Self> {
         let table = match &value {
             LuaValue::Table(table) => table,
             other => {
                 return Err(LuaError::FromLuaConversionError {
-                    from: type_name(&other),
+                    from: other.type_name(),
                     to: "Metric",
                     message: Some("Metric should be a Lua table".to_string()),
                 })
@@ -166,7 +166,7 @@ impl<'a> FromLua<'a> for Metric {
             }
         } else if let Some(set) = table.get::<_, Option<LuaTable>>("set")? {
             MetricValue::Set {
-                values: set.get::<_, LuaTable>("values").and_then(table_to_set)?,
+                values: set.get("values")?,
             }
         } else if let Some(distribution) = table.get::<_, Option<LuaTable>>("distribution")? {
             let values: Vec<f64> = distribution.get("values")?;
@@ -198,7 +198,7 @@ impl<'a> FromLua<'a> for Metric {
             }
         } else {
             return Err(LuaError::FromLuaConversionError {
-                from: type_name(&value),
+                from: value.type_name(),
                 to: "Metric",
                 message: Some("Cannot find metric value, expected presence one of \"counter\", \"gauge\", \"set\", \"distribution\", \"aggregated_histogram\", \"aggregated_summary\"".to_string()),
             });
@@ -218,16 +218,15 @@ mod test {
     use shared::assert_event_data_eq;
 
     fn assert_metric(metric: Metric, assertions: Vec<&'static str>) {
-        Lua::new().context(|ctx| {
-            ctx.globals().set("metric", metric).unwrap();
-            for assertion in assertions {
-                assert!(
-                    ctx.load(assertion).eval::<bool>().expect(assertion),
-                    "{}",
-                    assertion
-                );
-            }
-        });
+        let lua = Lua::new();
+        lua.globals().set("metric", metric).unwrap();
+        for assertion in assertions {
+            assert!(
+                lua.load(assertion).eval::<bool>().expect(assertion),
+                "{}",
+                assertion
+            );
+        }
     }
 
     #[test]
@@ -401,9 +400,7 @@ mod test {
                 value: 0.577_215_66,
             },
         );
-        Lua::new().context(|ctx| {
-            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
-        });
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -439,9 +436,7 @@ mod test {
                 .collect(),
         ))
         .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
-        Lua::new().context(|ctx| {
-            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
-        });
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -457,9 +452,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.618_033_9 },
         );
-        Lua::new().context(|ctx| {
-            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
-        });
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -479,9 +472,7 @@ mod test {
                     .collect(),
             },
         );
-        Lua::new().context(|ctx| {
-            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
-        });
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -502,9 +493,7 @@ mod test {
                 statistic: StatisticKind::Histogram,
             },
         );
-        Lua::new().context(|ctx| {
-            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
-        });
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -526,9 +515,7 @@ mod test {
                 sum: 975.2,
             },
         );
-        Lua::new().context(|ctx| {
-            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
-        });
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -553,8 +540,6 @@ mod test {
                 sum: 975.2,
             },
         );
-        Lua::new().context(|ctx| {
-            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
-        });
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 }
