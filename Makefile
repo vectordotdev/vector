@@ -302,8 +302,8 @@ test-behavior: ## Runs behaviorial test
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
-test-integration: test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
+test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
+test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-splunk test-integration-dnstap
 
@@ -357,6 +357,18 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh elasticsearch stop
+endif
+
+.PHONY: test-integration-eventstoredb_metrics
+test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh eventstoredb_metrics stop
+	@scripts/setup_integration_env.sh eventstoredb_metrics start
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features eventstoredb_metrics-integration-tests --lib ::eventstoredb_metrics:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh eventstoredb_metrics stop
 endif
 
 .PHONY: test-integration-fluent

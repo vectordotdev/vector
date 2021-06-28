@@ -422,6 +422,7 @@ sources-logs = [
 sources-metrics = [
   "sources-apache_metrics",
   "sources-aws_ecs_metrics",
+  "sources-eventstoredb_metrics",
   "sources-host_metrics",
   "sources-internal_metrics",
   "sources-mongodb_metrics",
@@ -439,6 +440,7 @@ sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
 sources-dnstap = ["bytesize", "base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
 sources-docker_logs = ["docker"]
+sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["bytesize", "file-source"]
 sources-fluent = ["base64", "bytesize", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes"]
@@ -635,6 +637,7 @@ all-integration-tests = [
   "clickhouse-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
+  "eventstoredb_metrics-integration-tests",
   "fluent-integration-tests",
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
@@ -681,6 +684,7 @@ azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
+eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent", "uuid"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
