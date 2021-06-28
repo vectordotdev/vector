@@ -60,8 +60,8 @@ components: sources: eventstoredb_metrics: {
 			required:    false
 			warnings: []
 			type: string: {
-				examples: ["https://localhost:2113/"]
-				default: "https://localhost:2113/"
+				examples: ["https://localhost:2113/stats"]
+				default: "https://localhost:2113/stats"
 				syntax:  "literal"
 			}
 		}
@@ -71,7 +71,7 @@ components: sources: eventstoredb_metrics: {
 			required:    false
 			warnings: []
 			type: uint: {
-				default: 3
+				default: 15
 				unit:    "seconds"
 			}
 		}
@@ -102,57 +102,56 @@ components: sources: eventstoredb_metrics: {
 			}
 		}
 
-		memory_usage: {
-			description:       "Amount of used memory on the machine."
+		process_memory_used_bytes: { or caches
+			description:       "The number of bytes of main memory used by the EventStoreDB node."
 			type:              "gauge"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-
-		disk_io_read_bytes: {
-			description:       "Number of bytes read from the drive."
+		disk_read_bytes_total: {
+			description:       "The accumulated number of bytes read in from disk."
 			type:              "counter"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-		disk_io_written_bytes: {
-			description:       "Number of bytes written to the drive."
+		disk_written_bytes_total: {
+			description:       "The accumulated number of bytes written out to disk."
 			type:              "counter"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-		disk_io_read_ops: {
-			description:       "Number of read IOPS from the drive."
+		disk_read_ops_total: {
+			description:       "The accumulated number of read IOPS."
 			type:              "counter"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-		disk_io_write_ops: {
-			description:       "Number of write IOPS to the drive."
+		disk_write_ops_total: {
+			description:       "The accumulated number of write IOPS."
 			type:              "counter"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-		free_memory: {
-			description:       "Amount of free memory on the machine."
+		memory_free_bytes: {
+			description:       "The number of bytes of main memory not used."
 			type:              "gauge"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-		drive_total_bytes: {
-			description:       "Capacity of the drive in bytes."
+		disk_total_bytes: {
+			description:       "The total number of bytes in disk."
 			type:              "gauge"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-		drive_available_bytes: {
-			description:       "Amount of available storage in bytes."
+		disk_free_bytes: {
+			description:       "The number of bytes free on disk."
 			type:              "gauge"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-		drive_used_bytes: {
-			description:       "Amount of used storage in bytes."
+		disk_used_bytes: {
+			description:       "The number of bytes used on disk."
 			type:              "gauge"
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags

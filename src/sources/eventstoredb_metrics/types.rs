@@ -21,7 +21,7 @@ impl Stats {
 
         result.push(
             Metric::new(
-                "memory_usage",
+                "process_memory_used_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge {
                     value: self.proc.mem as f64,
@@ -34,7 +34,7 @@ impl Stats {
 
         result.push(
             Metric::new(
-                "disk_io_read_bytes",
+                "disk_read_bytes_total",
                 MetricKind::Absolute,
                 MetricValue::Counter {
                     value: self.proc.disk_io.read_bytes as f64,
@@ -47,7 +47,7 @@ impl Stats {
 
         result.push(
             Metric::new(
-                "disk_io_written_bytes",
+                "disk_written_bytes_total",
                 MetricKind::Absolute,
                 MetricValue::Counter {
                     value: self.proc.disk_io.written_bytes as f64,
@@ -60,7 +60,7 @@ impl Stats {
 
         result.push(
             Metric::new(
-                "disk_io_read_ops",
+                "disk_read_ops_total",
                 MetricKind::Absolute,
                 MetricValue::Counter {
                     value: self.proc.disk_io.read_ops as f64,
@@ -73,7 +73,7 @@ impl Stats {
 
         result.push(
             Metric::new(
-                "disk_io_write_ops",
+                "disk_write_ops_total",
                 MetricKind::Absolute,
                 MetricValue::Counter {
                     value: self.proc.disk_io.write_ops as f64,
@@ -86,7 +86,7 @@ impl Stats {
 
         result.push(
             Metric::new(
-                "free_memory",
+                "memory_free_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge {
                     value: self.sys.free_mem as f64,
@@ -102,7 +102,7 @@ impl Stats {
 
             result.push(
                 Metric::new(
-                    "drive_total_bytes",
+                    "disk_total_bytes",
                     MetricKind::Absolute,
                     MetricValue::Gauge {
                         value: drive.stats.total_bytes as f64,
@@ -115,7 +115,7 @@ impl Stats {
 
             result.push(
                 Metric::new(
-                    "drive_available_bytes",
+                    "disk_free_bytes",
                     MetricKind::Absolute,
                     MetricValue::Gauge {
                         value: drive.stats.available_bytes as f64,
@@ -128,7 +128,7 @@ impl Stats {
 
             result.push(
                 Metric::new(
-                    "drive_used_bytes",
+                    "disk_used_bytes",
                     MetricKind::Absolute,
                     MetricValue::Gauge {
                         value: drive.stats.used_bytes as f64,

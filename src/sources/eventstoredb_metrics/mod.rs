@@ -27,11 +27,11 @@ struct EventStoreDbConfig {
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
-    3
+    15
 }
 
 pub fn default_endpoint() -> String {
-    "https://localhost:2113/".to_string()
+    "https://localhost:2113/stats".to_string()
 }
 
 inventory::submit! {
@@ -74,17 +74,7 @@ fn eventstoredb(
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
     let client = HttpClient::new(tls_settings)?;
-    let mut str = String::new();
-
-    str.push_str(endpoint);
-
-    if !endpoint.ends_with('/') {
-        str.push('/');
-    }
-
-    str.push_str("stats");
-
-    let url: Uri = str.parse()?;
+    let url: Uri = endpoint.parse()?;
 
     Ok(Box::pin(
         async move {
@@ -92,7 +82,7 @@ fn eventstoredb(
                 let req = Request::get(&url)
                     .header("content-type", "application/json")
                     .body(Body::empty())
-                    .unwrap();
+                    .expect("Building request should be infallible.");
 
                 match client.send(req).await {
                     Err(error) => {
@@ -148,10 +138,10 @@ mod integration_tests {
     use crate::{test_util, Pipeline};
     use tokio::time::Duration;
 
-    const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/";
+    const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/stats";
 
     #[tokio::test]
-    async fn scrap_something() {
+    async fn scrape_something() {
         test_util::trace_init();
         let config = EventStoreDbConfig {
             endpoint: EVENTSTOREDB_SCRAP_ADDRESS.to_owned(),
