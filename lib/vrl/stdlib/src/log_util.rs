@@ -64,8 +64,8 @@ lazy_static! {
         (-|\[(-|(?P<timestamp>[^\[]*))\])\s+        # Match `-` or `[` followed by `-` or any character except `]`, `]` and at least one whitespace.
         (-|\[(-|(?P<module>[^:]*):                  # Match `-` or `[` followed by `-` or any character except `:`.
         (?P<severity>[^\[]*))\])\s+                 # Match ary character except `]`, `]` and at least one whitespace.
-        (-|\[\s*pid\s*(-|(?P<pid>[^:]*):            # Match `-` or `[` followed by `pid`, `-` or any character except `:`.
-        \s*tid\s*(?P<thread>[^\[]*))\])\s           # Match `tid` followed by any character except `]`, `]` and at least one whitespace.
+        (-|\[\s*pid\s*(-|(?P<pid>[^:]*)             # Match `-` or `[` followed by `pid`, `-` or any character except `:`.
+        (:\s*tid\s*(?P<thread>[^\[]*))?)\])\s       # Match `tid` followed by any character except `]`, `]` and at least one whitespace.
         (-|\[\s*client\s*(-|(?P<client>[^:]*):      # Match `-` or `[` followed by `client`, `-` or any character except `:`.
         (?P<port>[^\[]*))\])\s                      # Match `-` or `[` followed by `-` or any character except `]`, `]` and at least one whitespace.
         (-|(?P<message>.*))                         # Match `-` or any character.

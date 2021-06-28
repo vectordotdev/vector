@@ -162,6 +162,7 @@ urls: {
 	eof:                                                      "\(wikipedia)/wiki/End-of-file#EOF_character"
 	etsy:                                                     "https://www.etsy.com"
 	event_proto:                                              "\(vector_repo)/blob/master/lib/vector-core/proto/event.proto"
+	eventstoredb_stats_client:                                "https://developers.eventstore.com/server/v21.2/docs/diagnostics/stats.html"
 	exit_codes:                                               "https://docs.rs/exitcode/latest/exitcode/#constants"
 	externally_tagged_representation:                         "https://serde.rs/enum-representations.html#externally-tagged"
 	fail_safe:                                                "https://en.wikipedia.org/wiki/Fail-safe"
