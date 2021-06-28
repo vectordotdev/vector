@@ -36,11 +36,10 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGGREGATOR,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, false),
                     HELM_VALUES_DUMMY_TOPOLOGY,
-                    &override_name,
-                    false,
-                ),
+                ],
                 ..Default::default()
             },
         )
@@ -73,7 +72,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGGREGATOR,
             VectorConfig {
-                custom_helm_values: &config_override_name("", &override_name, false),
+                custom_helm_values: vec![&config_override_name(&override_name, false)],
                 ..Default::default()
             },
         )

@@ -3,6 +3,7 @@ use std::borrow::Cow;
 mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;
+mod aggregate;
 mod ansi_stripper;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
@@ -22,6 +23,8 @@ mod aws_kinesis_streams;
 pub(crate) mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
+#[cfg(feature = "sinks-azure_blob")]
+pub(crate) mod azure_blob;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
@@ -133,6 +136,7 @@ pub mod kubernetes;
 pub use self::adaptive_concurrency::*;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
+pub use self::aggregate::*;
 pub use self::ansi_stripper::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub use self::apache_metrics::*;

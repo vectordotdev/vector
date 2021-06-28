@@ -14,8 +14,6 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-#[cfg(feature = "sources-host_metrics")]
-use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
 use crate::tap;
 #[cfg(feature = "api-client")]
@@ -145,9 +143,6 @@ impl Application {
 
                     return Err(code);
                 };
-
-                #[cfg(feature = "sources-host_metrics")]
-                host_metrics::init_roots();
 
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 

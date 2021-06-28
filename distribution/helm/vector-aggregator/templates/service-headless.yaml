@@ -1,3 +1,4 @@
+{{- if eq (include "vector-aggregator.servicePortsPresent" .) "true" -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -11,3 +12,4 @@ spec:
   selector:
     {{- include "libvector.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: aggregator
+{{- end }}

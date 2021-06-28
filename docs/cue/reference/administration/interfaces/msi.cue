@@ -63,7 +63,11 @@ administration: interfaces: msi: {
 	}
 
 	role_implementations: {
-		agent:      role_implementations._file_agent
+		agent: role_implementations._file_agent & {
+			variables: config: sources: logs: {
+				include: [#"C:\\Server\\example.com\logs\\*.log"#]
+			}
+		}
 		aggregator: role_implementations._vector_aggregator
 	}
 }

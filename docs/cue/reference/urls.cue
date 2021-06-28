@@ -79,6 +79,8 @@ urls: {
 	aws_sqs_api:                                              "\(aws_docs)/AWSSimpleQueueService/latest/APIReference/Welcome.html"
 	aws_sqs_create:                                           "\(aws_docs)/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-create-queue.html"
 	aws_vpc_flow_logs:                                        "\(aws_docs)/vpc/latest/userguide/flow-logs.html"
+	azure_blob:                                               "https://azure.microsoft.com/en-us/services/storage/blobs/"
+	azure_blob_endpoints:                                     "https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-rest-api"
 	azure_monitor:                                            "https://azure.microsoft.com/en-us/services/monitor/"
 	azure_monitor_logs_endpoints:                             "https://docs.microsoft.com/en-us/rest/api/monitor/"
 	base64:                                                   "\(wikipedia)/wiki/Base64"
