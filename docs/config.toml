@@ -160,6 +160,7 @@ weight = 2
 
 [[languages.en.menus.footer]]
 name = "Components"
+url = "/components"
 identifier = "components"
 weight = 2
 
@@ -183,6 +184,7 @@ weight = 3
 
 [[languages.en.menus.footer]]
 name = "Setup"
+url = "/docs/setup"
 identifier = "setup"
 weight = 3
 
@@ -212,10 +214,11 @@ weight = 4
 
 [[languages.en.menus.footer]]
 name = "Community"
+url = "/community"
 identifier = "community"
 weight = 4
 
-[[menus.footer]]
+[[languages.en.menus.footer]]
 name = "GitHub"
 url = "https://github.com/timberio/vector"
 parent = "community"
