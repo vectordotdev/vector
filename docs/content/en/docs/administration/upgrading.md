@@ -7,5 +7,3 @@ tags: ["upgrade"]
 ---
 
 How you upgrade Vector depends largely on your installation method.
-
-{{< administration/upgrading >}}

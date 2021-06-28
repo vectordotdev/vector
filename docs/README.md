@@ -29,12 +29,17 @@ make serve
     ---
     ```
 
-    The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit.
+    The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit. If Hugo ever does allow for semver sorting, we should remove the `weight`s.
+
+## Known issues
+
+* Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
 
 [cue]: https://cue-lang.org
 [esbuild]: https://github.com/evanw/esbuild
 [hugo]: https://gohugo.io
 [netlify_toml]: ../netlify.toml
 [sass]: https://sass-lang.com
+[typography]: https://github.com/tailwindlabs/tailwindcss-typography
 [vector]: https://vector.dev
 [yarn]: https://yarnpkg.com
