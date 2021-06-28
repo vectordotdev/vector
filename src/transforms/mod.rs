@@ -4,6 +4,8 @@ use snafu::Snafu;
 pub mod add_fields;
 #[cfg(feature = "transforms-add_tags")]
 pub mod add_tags;
+#[cfg(feature = "transforms-aggregate")]
+pub mod aggregate;
 #[cfg(feature = "transforms-ansi_stripper")]
 pub mod ansi_stripper;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
