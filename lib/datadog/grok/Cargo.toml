@@ -19,15 +19,20 @@ inventory = { version = "0.1.10", default-features = false }
 async-trait = "0.1.50"
 typetag = { version = "0.1.7", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
+itertools = { version = "0.10.1", default-features = false }
+serde_json = { version = "1.0.64", default-features = false }
+percent-encoding = { version = "2.1.0", default-features = false }
+bytes = "1.0.0"
+enum_derive = "0.1.3"
+custom_derive = "0.1.2"
+strum = "0.21.0"
+strum_macros = "0.21"
 
 # Internal
-vrl = { package = "vrl", path = "../../vrl/core" }
-vrl-compiler = { path = "../../vrl/compiler" }
-vrl-parser = { package = "vrl-parser", path = "../../vrl/parser" }
-vrl-stdlib = { package = "vrl-stdlib", path = "../../vrl/stdlib" }
 shared = { path = "../../shared" }
 lookup = { path = "../../lookup" }
-vector_core = { path = "../../vector-core", features = ["vrl"] }
+vector_core = { path = "../../vector-core"}
+parsing = { path = "../../parsing"}
 
 [build-dependencies]
 lalrpop = "0.19"

@@ -1,7 +1,7 @@
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
-use datadog_grok::vrl::compile_to_vrl;
+use datadog_grok::parse_grok::parse_grok;
 use vector_core::{
     event::{Event, VrlTarget},
     Result,
@@ -54,7 +54,7 @@ pub struct Grok {
 
 impl Grok {
     pub fn new(config: DataDogGrokConfig) -> crate::Result<Self> {
-        let program = compile_to_vrl(config.field, &config.helper_rules, &config.parsing_rules)
+        let program = parse_grok(config.field, &config.helper_rules, &config.parsing_rules)
             .map_err(|diagnostics| {
                 Formatter::new("", diagnostics) /*.colored()*/
                     .to_string()
@@ -197,187 +197,6 @@ mod tests {
         assert_eq!(event["custom.http._x_forwarded_for"], Value::Null);
         assert_eq!(event["custom.network.bytes_written"], 2326.into());
         assert_eq!(event["custom.network.client.ip"], "127.0.0.1".into());
-    }
-
-    #[tokio::test]
-    async fn ignores_runtime_errors() {
-        let event = parse_log(
-            Event::from(r##"some_string_value"##),
-            vec![],
-            vec![
-                r#"test_number_conversion_error %{notSpace:numerical_field:scale(10)}"#.to_string(), // scale() fails here on a string value
-            ],
-            None,
-        )
-        .await;
-
-        assert_eq!(
-            event.get("custom.numerical_field"),
-            Some(Value::Null).as_ref()
-        );
-    }
-
-    #[tokio::test]
-    async fn validates_function_arguments() {
-        let event = Event::from("23");
-        let metadata = event.metadata().clone();
-        let result = DataDogGrokConfig {
-            field: None,
-            helper_rules: vec![],
-            parsing_rules: vec![
-                r#"test_number_conversion_error %{number:numerical_field:scale()}"#.to_string(), // scale() has no parameters, but one is required
-            ],
-        }
-        .build(&GlobalOptions::default())
-        .await;
-
-        assert!(result.is_err());
-        match result {
-            Ok(_) => panic!("we should fail to build this transform"),
-            Err(e) => {
-                assert!(format!("{}", e).contains("Invalid arguments for the function 'scale'"));
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn validates_grok() {
-        let event = Event::from("23");
-        let metadata = event.metadata().clone();
-        let result = DataDogGrokConfig {
-            field: None,
-            helper_rules: vec![],
-            parsing_rules: vec![r#"invalid_grok_rule %{unknownRule:field}"#.to_string()],
-        }
-        .build(&GlobalOptions::default())
-        .await;
-
-        assert!(result.is_err());
-        match result {
-            Ok(_) => panic!("we should fail to build this transform"),
-            Err(e) => {
-                assert!(format!("{}", e).contains(r#"The given pattern definition name "unknownRule" could not be found in the definition map"#));
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn error_if_invalid_grok_rule() {
-        let event = Event::from("23");
-        let metadata = event.metadata().clone();
-        let result = DataDogGrokConfig {
-            field: None,
-            helper_rules: vec![],
-            parsing_rules: vec![r#"invalid_grok_rule %{:} abc"#.to_string()],
-        }
-        .build(&GlobalOptions::default())
-        .await;
-
-        assert!(result.is_err());
-        match result {
-            Ok(_) => panic!("we should fail to build this transform"),
-            Err(e) => {
-                assert!(format!("{}", e).contains("Failed to parse grok expression: '%{:}'"));
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn parses_non_default_source_field() {
-        let event = parse_log(
-            Event::from(btreemap! {
-            "custom_source_field" =>  "other",
-            "message" => "message"}),
-            vec![],
-            vec![r#"test %{notSpace:field}"#.to_string()],
-            Some("custom_source_field".to_string()),
-        )
-        .await;
-
-        assert_eq!(event["custom.field"], "other".into());
-    }
-
-    #[tokio::test]
-    async fn supports_matchers() {
-        test_grok_pattern(vec![
-            (
-                "%{numberStr:field}",
-                "-1.2",
-                Value::Bytes("-1.2".into()).into(),
-            ),
-            ("%{number:field}", "-1.2", Value::Float(-1.2_f64).into()),
-            ("%{number:field}", "-1", Value::Float(-1_f64).into()),
-            (
-                "%{numberExt:field}",
-                "-1234e+3",
-                Value::Float(-1234e+3_f64).into(),
-            ),
-            (
-                "%{numberExt:field}",
-                ".1e+3",
-                Value::Float(0.1e+3_f64).into(),
-            ),
-            ("%{integer:field}", "-2", Value::Integer(-2).into()),
-            ("%{integerExt:field}", "+2", Value::Integer(2).into()),
-            ("%{integerExt:field}", "-2", Value::Integer(-2).into()),
-            ("%{integerExt:field}", "-1e+2", Value::Integer(-100).into()),
-            ("%{integerExt:field}", "1234.1e+5", None),
-            ("%{boolean:field}", "tRue", Value::Boolean(true).into()), // true/false are default values(case-insensitive)
-            ("%{boolean:field}", "False", Value::Boolean(false).into()),
-            (
-                r#"%{boolean("ok", "no"):field}"#,
-                "ok",
-                Value::Boolean(true).into(),
-            ),
-            (
-                r#"%{boolean("ok", "no"):field}"#,
-                "no",
-                Value::Boolean(false).into(),
-            ),
-            // (r#"date("HH:mm:ss")"#, "14:20:15", 51615000.into()), //TODO
-            (r#"%{boolean("ok", "no"):field}"#, "No", None),
-            (
-                "%{doubleQuotedString:field}",
-                r#""test  ""#,
-                Value::Bytes(r#""test  ""#.into()).into(),
-            ),
-        ])
-        .await;
-    }
-
-    #[tokio::test]
-    async fn supports_filters() {
-        test_grok_pattern(vec![
-            ("%{data:field:number}", "1.0", Value::Float(1.0_f64).into()),
-            ("%{data:field:integer}", "1", Value::Integer(1).into()),
-            (r#"%{data:field:nullIf("-")}"#, "-", Value::Null.into()),
-            (r#"%{data:field:nullIf("-")}"#, "abc", Value::Bytes("abc".into()).into()),
-            ("%{data:field:boolean}", "tRue", Value::Boolean(true).into()),
-            ("%{data:field:boolean}", "false", Value::Boolean(false).into()),
-            (
-                "%{data:field:json}",
-                r#"{"bool": true, "array": ["abc"]}"#,
-                Some(Value::from(
-                    btreemap! { "bool" => true, "array" => Value::Array(vec!["abc".into()])},
-                )),
-            ),
-            ("%{data:field:json}", r#"not a valid json"#, Value::Null.into()),
-            (
-                "%{data:field:rubyhash}",
-                r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
-                Some(Value::from(
-                    btreemap! { "test" => "value", "testNum" => 0.2, "testObj" => Value::from(btreemap! {"testBool" => true})},
-                )),
-            ),
-            ("%{data:field:querystring}", "?productId=superproduct&promotionCode=superpromo", Some(Value::from(
-                btreemap! { "productId" => "superproduct", "promotionCode" => "superpromo"},
-            ))),
-            ("%{data:field:lowercase}", "aBC", Value::Bytes("abc".into()).into()),
-            ("%{data:field:uppercase}", "Abc",  Value::Bytes("ABC".into()).into()),
-            ("%{data:field:decodeuricomponent}", "%2Fservice%2Ftest",  Value::Bytes("/service/test".into()).into()),
-            ("%{integer:field:scale(10)}", "1",  Value::Integer(10).into()),
-        ])
-        .await;
     }
 
     async fn test_grok_pattern(tests: Vec<(&str, &str, Option<Value>)>) {

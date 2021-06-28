@@ -1,0 +1,14 @@
+[package]
+name = "parsing"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+
+[dependencies]
+nom = "6.0.1"
+bytes = "1.0.0"
+form_urlencoded = "1.0.0"
+
+# Internal
+vector_core = { path = "../vector-core"}
+shared = { path = "../shared" }

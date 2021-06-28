@@ -124,6 +124,8 @@ mod parse_aws_vpc_flow_log;
 mod parse_common_log;
 #[cfg(feature = "parse_csv")]
 mod parse_csv;
+#[cfg(feature = "parse_datadog_grok")]
+mod parse_datadog_grok;
 #[cfg(feature = "parse_duration")]
 mod parse_duration;
 #[cfg(feature = "parse_glog")]
@@ -221,6 +223,7 @@ mod uuid_v4;
 pub use crate::array::Array;
 #[cfg(feature = "md5")]
 pub use crate::md5::Md5;
+use crate::parse_datadog_grok::ParseDatadogGrok;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
 #[cfg(feature = "append")]
@@ -546,6 +549,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseDuration),
         #[cfg(feature = "parse_glog")]
         Box::new(ParseGlog),
+        #[cfg(feature = "parse_datadog_grok")]
+        Box::new(ParseDatadogGrok),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
         #[cfg(feature = "parse_json")]

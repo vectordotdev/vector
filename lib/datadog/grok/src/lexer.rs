@@ -1,13 +1,12 @@
 use crate::lexer::StringLiteral::Escaped;
 use std::iter::Peekable;
 use std::str::CharIndices;
-use vrl::prelude::NotNan;
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
 pub type Spanned<'input, Loc> = (Loc, Tok<'input>, Loc);
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Token<S> {
     LRule,
     RRule,
@@ -26,7 +25,7 @@ pub enum Token<S> {
     Exponent,
 
     IntegerLiteral(i64),
-    FloatLiteral(NotNan<f64>),
+    FloatLiteral(f64),
     StringLiteral(StringLiteral<S>),
     Identifier(S),
     ExtendedIdentifier(S),

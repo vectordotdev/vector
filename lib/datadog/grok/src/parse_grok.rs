@@ -1,289 +1,351 @@
-use std::collections::HashMap;
+use std::sync::Arc;
 
-use lazy_static::lazy_static;
-use regex::Regex;
+use grok::Grok;
+use itertools::FoldWhile::{Continue, Done};
+use itertools::Itertools;
 
 use lookup::LookupBuf;
+use percent_encoding::percent_decode;
+use shared::btreemap;
+use shared::conversion::Conversion;
+use vector_core::event::Value;
 
-use crate::ast;
-use crate::ast::{Function, GrokPattern};
-use crate::parse_grok_pattern::parse_grok_pattern;
-use vrl::Value;
+use crate::ast as grok_ast;
+use crate::ast::FunctionArgument;
+use crate::grok_filter::apply_filter;
+use crate::parse_grok_rules::Error as GrokStaticError;
+use crate::parse_grok_rules::{parse_grok_rules, GrokRule};
+use parsing::{query_string, ruby_hash};
+use regex::Regex;
+use std::collections::BTreeMap;
+use std::convert::TryInto;
 
-#[derive(Debug, Clone)]
-pub struct GrokRule {
-    pub pattern: String,
-    pub filters: HashMap<LookupBuf, Vec<ast::Function>>,
-}
-
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
-    #[error("Failed to parse grok expression: '{}'", .0)]
-    InvalidGrokExpression(String),
-    #[error("Invalid arguments for the function '{}'", .0)]
-    InvalidFunctionArguments(String),
-    #[error("Unsupported filter '{}'", .0)]
-    UnsupportedFilter(String),
+    #[error("failed to apply filter '{}'" , .0)]
+    FailedToApplyFilter(String),
+    #[error("value does not match any rule")]
+    NoMatch,
 }
 
-/**
-Parses DD grok rules.
-
-Here is an example:
-access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)
-access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#
-
-You can write parsing rules with the %{MATCHER:EXTRACT:FILTER} syntax:
-- Matcher: A rule (possibly a reference to another token rule) that describes what to expect (number, word, notSpace, etc.)
-- Extract (optional): An identifier representing the capture destination for the piece of text matched by the Matcher.
-- Filter (optional): A post-processor of the match to transform it.
-
-Each rule can reference parsing rules defined above itself in the list.
-Only one can match any given log. The first one that matches, from top to bottom, is the one that does the parsing.
-For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
-*/
-pub fn parse_grok_rules(
-    support_rules: &Vec<String>,
-    match_rules: &Vec<String>,
-) -> Result<Vec<GrokRule>, Error> {
-    let mut prev_rule_definitions: HashMap<&str, String> = HashMap::new();
-    let mut prev_rule_destinations: HashMap<&str, HashMap<LookupBuf, Vec<ast::Function>>> =
-        HashMap::new();
-
-    // parse support rules to reference them later in the match rules
-    support_rules
+pub fn parse_grok(source_field: &str, grok_rules: &Vec<GrokRule>) -> Result<Value, Error> {
+    grok_rules
         .iter()
-        .filter(|&r| !r.is_empty())
-        .map(|r| parse_grok_rule(r, &mut prev_rule_definitions, &mut prev_rule_destinations))
-        .collect::<Result<Vec<GrokRule>, Error>>()?;
-
-    // parse match rules and return them
-    let match_rules = match_rules
-        .iter()
-        .filter(|&r| !r.is_empty())
-        .map(|r| parse_grok_rule(r, &mut prev_rule_definitions, &mut prev_rule_destinations))
-        .collect::<Result<Vec<GrokRule>, Error>>()?;
-
-    Ok(match_rules)
+        .fold_while(Err(Error::NoMatch), |_, rule| {
+            let result = apply_grok_rule(source_field, rule);
+            if let Err(Error::NoMatch) = result {
+                Continue(result)
+            } else {
+                Done(result)
+            }
+        })
+        .into_inner()
 }
 
-fn parse_grok_rule<'a>(
-    rule: &'a String,
-    mut prev_rule_patterns: &mut HashMap<&'a str, String>,
-    mut prev_rule_filters: &mut HashMap<&'a str, HashMap<LookupBuf, Vec<Function>>>,
-) -> Result<GrokRule, Error> {
-    let mut split_whitespace = rule.splitn(2, " ");
-    let split = split_whitespace.by_ref();
-    let rule_name = split.next().unwrap();
-    let mut rule_def = split.next().unwrap().to_string();
+fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
+    let mut parsed = Value::from(btreemap! {});
 
-    let rule_def_cloned = rule_def.clone();
-    lazy_static! {
-        static ref GROK_PATTER_RE: Regex = Regex::new(r"%\{.+?\}").unwrap();
-    }
-    // find all patterns %{}
-    let raw_grok_patterns = GROK_PATTER_RE
-        .find_iter(rule_def_cloned.as_str())
-        .map(|rule| rule.as_str())
-        .collect::<Vec<&str>>();
-    // parse them
-    let grok_patterns = raw_grok_patterns
-        .iter()
-        .map(|pattern| {
-            parse_grok_pattern(pattern).map_err(|e| Error::InvalidGrokExpression(e.to_string()))
-        })
-        .collect::<Result<Vec<GrokPattern>, Error>>()?;
+    if let Some(ref matches) = grok_rule.pattern.match_against(source) {
+        for (name, value) in matches.iter() {
+            let path: LookupBuf = name.parse().expect("path always should be valid");
+            parsed.insert(path, Value::from(value));
+        }
 
-    let mut filters: HashMap<LookupBuf, Vec<ast::Function>> = HashMap::new();
-
-    let pure_grok_patterns: Vec<String> = grok_patterns
-        .iter()
-        .map(|rule| {
-            purify_grok_pattern(
-                &mut prev_rule_patterns,
-                &mut prev_rule_filters,
-                &mut filters,
-                &rule,
-            )
-        })
-        .collect::<Result<Vec<String>, Error>>()?;
-
-    // replace grok patterns with "purified" ones
-    let mut pure_pattern_it = pure_grok_patterns.iter();
-    for r in raw_grok_patterns {
-        rule_def = rule_def.replace(r, pure_pattern_it.next().unwrap().as_str());
-    }
-
-    // collect all filters to apply later
-    grok_patterns
-        .iter()
-        .filter(|&rule| {
-            rule.destination.is_some() && rule.destination.as_ref().unwrap().filter_fn.is_some()
-        })
-        .for_each(|rule| {
-            let dest = rule.destination.as_ref().unwrap();
-            filters
-                .entry(dest.path.clone())
-                .and_modify(|v| v.push(dest.filter_fn.as_ref().unwrap().clone()))
-                .or_insert(vec![dest.filter_fn.as_ref().unwrap().clone()]);
+        // apply filters
+        grok_rule.filters.iter().for_each(|(path, filters)| {
+            filters.iter().for_each(|filter| {
+                let result = apply_filter(
+                    parsed
+                        .get(path)
+                        .expect("the field value is missing")
+                        .unwrap(),
+                    filter,
+                );
+                if result.is_ok() {
+                    parsed.insert(path.to_owned(), result.unwrap());
+                } else {
+                    parsed.insert(path.to_owned(), Value::Null);
+                }
+            });
         });
 
-    let mut pattern = String::new();
-    pattern.push('^');
-    pattern.push_str(rule_def.as_str());
-    pattern.push('$');
-
-    // store rule definitions and filters in case this rule is referenced in the next rules
-    prev_rule_patterns.insert(rule_name, rule_def);
-    prev_rule_filters.insert(rule_name, filters.clone());
-
-    Ok(GrokRule { pattern, filters })
-}
-
-/// Converts each rule to a pure grok rule:
-///  - strips filters and "remembers" them to apply later
-///  - replaces references to previous rules with actual definitions
-///  - replaces match functions with corresponding regex groups
-fn purify_grok_pattern(
-    prev_rule_definitions: &mut HashMap<&str, String>,
-    prev_rule_filters: &mut HashMap<&str, HashMap<LookupBuf, Vec<Function>>>,
-    mut filters: &mut HashMap<LookupBuf, Vec<Function>>,
-    rule: &GrokPattern,
-) -> Result<String, Error> {
-    let mut res = String::new();
-    if prev_rule_definitions.contains_key(rule.match_fn.name.as_str()) {
-        // this is a reference to a previous rule - replace it and copy all destinations from the prev rule
-        res.push_str(
-            prev_rule_definitions
-                .get(rule.match_fn.name.as_str())
-                .unwrap(),
-        );
-        if let Some(d) = prev_rule_filters.get(rule.match_fn.name.as_str()) {
-            d.iter().for_each(|(path, function)| {
-                filters.insert(path.to_owned(), function.to_owned());
-            });
-        }
-        Ok(res)
-    } else if rule.match_fn.name == "regex"
-        || rule.match_fn.name == "date"
-        || rule.match_fn.name == "boolean"
-    {
-        // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
-        res.push_str("(?");
-        res.push_str("<");
-        if let Some(destination) = &rule.destination {
-            res.push_str(destination.path.to_string().as_str());
-        }
-        res.push_str(">");
-        res.push_str(process_match_function(&mut filters, &rule)?.as_str());
-        res.push_str(")");
-
-        Ok(res)
+        Ok(parsed)
     } else {
-        // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
-        res.push_str("%{");
-
-        res.push_str(process_match_function(&mut filters, &rule)?.as_str());
-
-        if let Some(destination) = &rule.destination {
-            res.push_str(":");
-            res.push_str(destination.path.to_string().as_str());
-        }
-        res.push_str("}");
-
-        Ok(res)
+        Err(Error::NoMatch)
     }
 }
 
-fn process_match_function(
-    filters: &mut HashMap<LookupBuf, Vec<Function>>,
-    pattern: &ast::GrokPattern,
-) -> Result<String, Error> {
-    let match_fn = &pattern.match_fn;
-    let result = match match_fn.name.as_ref() {
-        "regex" => {
-            if match_fn.args.is_some() {
-                if let ast::FunctionArgument::ARG(Value::Bytes(b)) =
-                    &match_fn.args.as_ref().unwrap()[0]
-                {
-                    return Ok(String::from_utf8_lossy(&b).to_string());
-                }
-            }
-            Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
-        }
-        "date" => Ok("13\\/Jul\\/2016:10:55:36 \\+0000".to_string()), // TODO in a follow-up PR
-        "integer" => replace_with_pattern_and_add_as_filter(
-            "integerStr",
-            Function::new("integer"),
-            filters,
-            pattern,
-        ),
-        "integerExt" => replace_with_pattern_and_add_as_filter(
-            "integerExtStr",
-            Function::new("integerExt"),
-            filters,
-            pattern,
-        ),
-        "number" => replace_with_pattern_and_add_as_filter(
-            "numberStr",
-            Function::new("number"),
-            filters,
-            pattern,
-        ),
-        "numberExt" => replace_with_pattern_and_add_as_filter(
-            "numberExtStr",
-            Function::new("numberExt"),
-            filters,
-            pattern,
-        ),
-        "boolean" => {
-            if match_fn.args.is_some() {
-                let args = match_fn.args.as_ref().unwrap();
-                if args.len() == 2 {
-                    if let ast::FunctionArgument::ARG(true_pattern) = &args[0] {
-                        if let ast::FunctionArgument::ARG(false_pattern) = &args[1] {
-                            return replace_with_pattern_and_add_as_filter(
-                                format!(
-                                    "{}|{}",
-                                    true_pattern.try_bytes_utf8_lossy().map_err(|_| {
-                                        Error::InvalidFunctionArguments(match_fn.name.clone())
-                                    })?,
-                                    false_pattern.try_bytes_utf8_lossy().map_err(|_| {
-                                        Error::InvalidFunctionArguments(match_fn.name.clone())
-                                    })?
-                                )
-                                .as_str(),
-                                match_fn.clone(),
-                                filters,
-                                pattern,
-                            );
-                        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_simple_grok() {
+        let rules = parse_grok_rules(
+            &vec![],
+            &vec![
+                "simple %{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+                    .to_string(),
+            ],
+        )
+        .expect("should parse rules");
+        let parsed = parse_grok("2020-10-02T23:22:12.223222Z info Hello world", &rules).unwrap();
+
+        assert_eq!(
+            parsed,
+            Value::from(btreemap! {
+                "timestamp" => "2020-10-02T23:22:12.223222Z",
+                "level" => "info",
+                "message" => "Hello world"
+            })
+        );
+    }
+
+    #[test]
+    fn parses_complex_grok() {
+        let rules = parse_grok_rules(
+            // helper rules
+            &vec![
+                r#"_auth %{notSpace:http.auth:nullIf("-")}"#.to_string(),
+                r#"_bytes_written %{integer:network.bytes_written}"#.to_string(),
+                r#"_client_ip %{ipOrHost:network.client.ip}"#.to_string(),
+                r#"_version HTTP\/(?<http.version>\d+\.\d+)"#.to_string(),
+                r#"_url %{notSpace:http.url}"#.to_string(),
+                r#"_ident %{notSpace:http.ident}"#.to_string(),
+                r#"_user_agent %{regex("[^\\\"]*"):http.useragent}"#.to_string(),
+                r#"_referer %{notSpace:http.referer}"#.to_string(),
+                r#"_status_code %{integer:http.status_code}"#.to_string(),
+                r#"_method %{word:http.method}"#.to_string(),
+                r#"_date_access %{date("dd/MMM/yyyy:HH:mm:ss Z"):date_access}"#.to_string(),
+                r#"_x_forwarded_for %{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#.to_string()],
+            // parsing rules
+            &vec![
+                r#"access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
+                r#"access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
+            ]).expect("should parse rules");
+        let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36 +0000] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules).unwrap();
+
+        assert_eq!(
+            parsed,
+            Value::from(btreemap! {
+                "date_access" => "13/Jul/2016:10:55:36 +0000",
+                "duration" => 202000000.0,
+                "http" => btreemap! {
+                    "auth" => "frank",
+                    "ident" => "-",
+                    "method" => "GET",
+                    "status_code" => 200,
+                    "url" => "/apache_pb.gif",
+                    "version" => "1.0",
+                    "referer" => "http://www.perdu.com/",
+                    "useragent" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36",
+                    "_x_forwarded_for" => Value::Null,
+                },
+                "network" => btreemap! {
+                    "bytes_written" => 2326,
+                    "client" => btreemap! {
+                        "ip" => "127.0.0.1"
                     }
                 }
-                Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
+            })
+        );
+    }
+
+    #[test]
+    fn supports_matchers() {
+        test_grok_pattern(vec![
+            (
+                "%{numberStr:field}",
+                "-1.2",
+                Ok(Value::Bytes("-1.2".into())),
+            ),
+            ("%{number:field}", "-1.2", Ok(Value::Float(-1.2_f64))),
+            ("%{number:field}", "-1", Ok(Value::Float(-1_f64))),
+            (
+                "%{numberExt:field}",
+                "-1234e+3",
+                Ok(Value::Float(-1234e+3_f64)),
+            ),
+            ("%{numberExt:field}", ".1e+3", Ok(Value::Float(0.1e+3_f64))),
+            ("%{integer:field}", "-2", Ok(Value::Integer(-2))),
+            ("%{integerExt:field}", "+2", Ok(Value::Integer(2))),
+            ("%{integerExt:field}", "-2", Ok(Value::Integer(-2))),
+            ("%{integerExt:field}", "-1e+2", Ok(Value::Integer(-100))),
+            ("%{integerExt:field}", "1234.1e+5", Err(Error::NoMatch)),
+            ("%{boolean:field}", "tRue", Ok(Value::Boolean(true))), // true/false are default values(case-insensitive)
+            ("%{boolean:field}", "False", Ok(Value::Boolean(false))),
+            (
+                r#"%{boolean("ok", "no"):field}"#,
+                "ok",
+                Ok(Value::Boolean(true)),
+            ),
+            (
+                r#"%{boolean("ok", "no"):field}"#,
+                "no",
+                Ok(Value::Boolean(false)),
+            ),
+            (r#"%{boolean("ok", "no"):field}"#, "No", Err(Error::NoMatch)),
+            (
+                "%{doubleQuotedString:field}",
+                r#""test  ""#,
+                Ok(Value::Bytes(r#""test  ""#.into())),
+            ),
+        ]);
+    }
+
+    #[test]
+    fn supports_filters() {
+        test_grok_pattern(vec![
+            ("%{data:field:number}", "1.0", Ok(Value::Float(1.0_f64))),
+            ("%{data:field:integer}", "1", Ok(Value::Integer(1))),
+            (r#"%{data:field:nullIf("-")}"#, "-", Ok(Value::Null)),
+            (
+                r#"%{data:field:nullIf("-")}"#,
+                "abc",
+                Ok(Value::Bytes("abc".into())),
+            ),
+            ("%{data:field:boolean}", "tRue", Ok(Value::Boolean(true))),
+            ("%{data:field:boolean}", "false", Ok(Value::Boolean(false))),
+            (
+                "%{data:field:json}",
+                r#"{ "bool_field": true, "array": ["abc"] }"#,
+                Ok(Value::from(
+                    btreemap! { "bool_field" => Value::Boolean(true), "array" => Value::Array(vec!["abc".into()])},
+                )),
+            ),
+            (
+                "%{data:field:rubyhash}",
+                r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
+                Ok(Value::from(
+                    btreemap! { "test" => "value", "testNum" => 0.2, "testObj" => Value::from(btreemap! {"testBool" => true})},
+                )),
+            ),
+            (
+                "%{data:field:querystring}",
+                "?productId=superproduct&promotionCode=superpromo",
+                Ok(Value::from(
+                    btreemap! { "productId" => "superproduct", "promotionCode" => "superpromo"},
+                )),
+            ),
+            (
+                "%{data:field:lowercase}",
+                "aBC",
+                Ok(Value::Bytes("abc".into())),
+            ),
+            (
+                "%{data:field:uppercase}",
+                "Abc",
+                Ok(Value::Bytes("ABC".into())),
+            ),
+            (
+                "%{data:field:decodeuricomponent}",
+                "%2Fservice%2Ftest",
+                Ok(Value::Bytes("/service/test".into())),
+            ),
+            ("%{integer:field:scale(10)}", "1", Ok(Value::Float(10.0))),
+            ("%{number:field:scale(0.5)}", "10.0", Ok(Value::Float(5.0))),
+        ]);
+    }
+
+    fn test_grok_pattern(tests: Vec<(&str, &str, Result<Value, Error>)>) {
+        for (filter, k, v) in tests {
+            let rules = parse_grok_rules(&vec![], &vec![format!(r#"test {}"#, filter)])
+                .expect("should parse rules");
+            let parsed = parse_grok(k, &rules);
+
+            if v.is_ok() {
+                assert_eq!(
+                    parsed.unwrap().get("field").unwrap().unwrap().to_owned(),
+                    v.unwrap()
+                );
             } else {
-                replace_with_pattern_and_add_as_filter(
-                    "[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]",
-                    match_fn.clone(),
-                    filters,
-                    pattern,
-                )
+                assert_eq!(parsed, v);
             }
         }
-        // otherwise just add it as is, it should be a known grok pattern
-        grok_pattern_name => Ok(grok_pattern_name.to_string()),
-    };
-    result
-}
-
-fn replace_with_pattern_and_add_as_filter(
-    new_pattern: &str,
-    filter: Function,
-    filters: &mut HashMap<LookupBuf, Vec<Function>>,
-    pattern: &ast::GrokPattern,
-) -> Result<String, Error> {
-    if let Some(destination) = &pattern.destination {
-        filters.insert(destination.path.clone(), vec![filter]);
     }
-    Ok(new_pattern.to_string())
+
+    #[test]
+    fn fails_on_invalid_grok_format() {
+        assert_eq!(
+            parse_grok_rules(&vec![], &vec!["%{data}".to_string()])
+                .unwrap_err()
+                .to_string(),
+            "failed to parse grok expression '%{data}': format must be: 'ruleName definition'"
+        );
+    }
+
+    #[test]
+    fn fails_on_unknown_pattern_definition() {
+        assert_eq!(
+            parse_grok_rules(&vec![], &vec!["test %{unknown}".to_string()])
+                .unwrap_err()
+                .to_string(),
+            r#"failed to parse grok expression '^%{unknown}$': The given pattern definition name "unknown" could not be found in the definition map"#
+        );
+    }
+
+    #[test]
+    fn fails_on_unknown_filter() {
+        assert_eq!(
+            parse_grok_rules(
+                &vec![],
+                &vec!["test %{data:field:unknownFilter}".to_string()]
+            )
+            .unwrap_err()
+            .to_string(),
+            r#"unknown filter 'unknownFilter'"#
+        );
+    }
+
+    #[test]
+    fn fails_on_invalid_matcher_parameter() {
+        assert_eq!(
+            parse_grok_rules(&vec![], &vec!["test_rule %{regex(1):field}".to_string()])
+                .unwrap_err()
+                .to_string(),
+            r#"invalid arguments for the function 'regex'"#
+        );
+    }
+
+    #[test]
+    fn fails_on_invalid_filter_parameter() {
+        assert_eq!(
+            parse_grok_rules(
+                &vec![],
+                &vec!["test_rule %{data:field:scale()}".to_string()]
+            )
+            .unwrap_err()
+            .to_string(),
+            r#"invalid arguments for the function 'scale'"#
+        );
+    }
+
+    #[test]
+    fn sets_field_to_null_on_filter_runtime_error() {
+        let rules = parse_grok_rules(&vec![], &vec!["test_rule %{data:field:number}".to_string()])
+            .expect("should parse rules");
+        let parsed = parse_grok("not a number", &rules).unwrap();
+
+        assert_eq!(
+            parsed,
+            Value::from(btreemap! {
+                "field" => Value::Null,
+            })
+        );
+    }
+
+    #[test]
+    fn fails_on_no_match() {
+        let rules = parse_grok_rules(
+            &vec![],
+            &vec![
+                "test_rule %{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+                    .to_string(),
+            ],
+        )
+        .expect("should parse rules");
+        let error = parse_grok("an ungrokkable message", &rules).unwrap_err();
+
+        assert_eq!(error, Error::NoMatch);
+    }
 }

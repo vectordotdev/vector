@@ -16,7 +16,7 @@ mod tests {
     use crate::ast::FunctionArgument;
 
     use lookup::{LookupBuf, SegmentBuf};
-    use vrl_core::prelude::*;
+    use vector_core::event::Value;
 
     fn from_path_segments(path_segments: Vec<&str>) -> LookupBuf {
         LookupBuf::from_segments(
@@ -46,12 +46,12 @@ mod tests {
         assert_eq!(filter.name, "integer");
         let args = filter.args.unwrap();
         let mut expected_args = vec![
-            value!("a. df"),
-            value!(0.123),
-            value!(1.23e-32_f64),
-            value!(true),
+            "a. df".into(),
+            0.123.into(),
+            1.23e-32_f64.into(),
+            true.into(),
             Value::Null,
-            value!(123e-5),
+            123e-5.into(),
         ];
         for (i, arg) in args.iter().enumerate() {
             |arg| match &arg {

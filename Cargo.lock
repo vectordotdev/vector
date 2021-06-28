@@ -558,8 +558,8 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "strum",
- "strum_macros",
+ "strum 0.18.0",
+ "strum_macros 0.18.0",
  "thiserror",
  "typed-builder 0.5.1",
  "uuid 0.8.2",
@@ -1648,6 +1648,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "custom_derive"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef8ae57c4978a2acd8b869ce6b9ca1dfe817bff704c220209fdef2c0b75a01b9"
+
+[[package]]
 name = "cvt"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1748,26 +1754,31 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bytes 1.0.1",
+ "custom_derive",
  "derivative 2.2.0",
+ "enum_derive",
  "grok",
  "indoc",
  "inventory",
+ "itertools 0.10.1",
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
  "lookup",
+ "parsing",
+ "percent-encoding",
  "regex",
  "serde",
+ "serde_json",
  "serde_yaml",
  "shared",
+ "strum 0.21.0",
+ "strum_macros 0.21.1",
  "thiserror",
  "tokio",
  "typetag",
  "vector_core",
- "vrl",
- "vrl-compiler",
- "vrl-parser",
- "vrl-stdlib",
 ]
 
 [[package]]
@@ -1995,6 +2006,12 @@ dependencies = [
  "quote 1.0.9",
  "syn 1.0.72",
 ]
+
+[[package]]
+name = "enum_derive"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "406ac2a8c9eedf8af9ee1489bee9e50029278a6456c740f7454cf8a158abc816"
 
 [[package]]
 name = "env_logger"
@@ -4691,6 +4708,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "parsing"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.0.1",
+ "form_urlencoded",
+ "nom 6.1.2",
+ "shared",
+ "vector_core",
+]
+
+[[package]]
 name = "paste"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6917,10 +6945,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
 
 [[package]]
+name = "strum"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
+
+[[package]]
 name = "strum_macros"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87c85aa3f8ea653bfd3ddf25f7ee357ee4d204731f6aa9ad04002306f6e2774c"
+dependencies = [
+ "heck",
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "syn 1.0.72",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
 dependencies = [
  "heck",
  "proc-macro2 1.0.26",
@@ -8350,6 +8396,7 @@ dependencies = [
  "cidr-utils",
  "criterion",
  "csv",
+ "datadog-grok",
  "grok",
  "hex",
  "hostname",
@@ -8357,6 +8404,7 @@ dependencies = [
  "lookup",
  "md-5",
  "nom 6.1.2",
+ "parsing",
  "percent-encoding",
  "regex",
  "rust_decimal",

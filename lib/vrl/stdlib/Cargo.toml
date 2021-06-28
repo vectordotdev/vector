@@ -9,6 +9,8 @@ license = "MPL-2.0"
 [dependencies]
 vrl = { path = "../core" }
 lookup = { path = "../../lookup" }
+parsing = { path = "../../parsing" }
+datadog-grok = { path = "../../datadog/grok" }
 
 base64 = { version = "0.13", optional = true }
 bytes = { version = "1.0.0", optional = true }
@@ -101,6 +103,7 @@ default = [
     "parse_csv",
     "parse_duration",
     "parse_glog",
+    "parse_datadog_grok",
     "parse_grok",
     "parse_json",
     "parse_key_value",
@@ -206,6 +209,7 @@ parse_common_log = ["chrono"]
 parse_csv = ["csv"]
 parse_duration = ["rust_decimal"]
 parse_glog = ["chrono"]
+parse_datadog_grok = ["grok"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]

@@ -3,8 +3,8 @@ extern crate lalrpop_util;
 lalrpop_mod!(pub parser);
 
 mod ast;
+mod grok_filter;
 mod lexer;
-mod parse_grok;
+pub mod parse_grok;
 mod parse_grok_pattern;
-pub mod vrl;
-mod vrl_helpers;
+pub mod parse_grok_rules;

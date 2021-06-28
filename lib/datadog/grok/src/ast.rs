@@ -1,5 +1,6 @@
 use lookup::LookupBuf;
-use vrl::Value;
+use regex::Regex;
+use vector_core::event::Value;
 
 #[derive(Clone, Debug)]
 pub struct GrokPattern {
@@ -17,22 +18,6 @@ pub struct Destination {
 pub struct Function {
     pub name: String,
     pub args: Option<Vec<FunctionArgument>>,
-}
-
-impl Function {
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            args: None,
-        }
-    }
-
-    pub fn new_with_args(name: &str, args: Option<Vec<FunctionArgument>>) -> Self {
-        Self {
-            name: name.to_string(),
-            args,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
