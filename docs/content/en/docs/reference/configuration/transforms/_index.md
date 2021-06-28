@@ -6,6 +6,7 @@ component_type: transforms
 layout: components
 weight: 2
 tags: ["components", "transforms"]
+aliases: ["/transforms"]
 ---
 
 ## Available transforms
