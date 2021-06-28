@@ -544,13 +544,11 @@ impl HttpSink for ElasticSearchCommon {
     type Output = Vec<u8>;
 
     fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
-        match event {
-            Event::Log(_) => self.encode_log(event),
-            Event::Metric(metric) => self
-                .metric_to_log
-                .transform_one(metric)
-                .and_then(|log| self.encode_log(log.into())),
-        }
+        let log = match event {
+            Event::Log(log) => Some(log),
+            Event::Metric(metric) => self.metric_to_log.transform_one(metric),
+        };
+        log.and_then(|log| self.encode_log(log.into()))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
