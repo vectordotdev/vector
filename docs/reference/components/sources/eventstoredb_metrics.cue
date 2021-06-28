@@ -102,7 +102,7 @@ components: sources: eventstoredb_metrics: {
 			}
 		}
 
-		process_memory_used_bytes: { or caches
+		process_memory_used_bytes: {
 			description:       "The number of bytes of main memory used by the EventStoreDB node."
 			type:              "gauge"
 			default_namespace: "eventstoredb"
