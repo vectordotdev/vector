@@ -942,12 +942,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "build_const"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39092a32794787acd8525ee150305ff051b0aa6cc2abaf193924f5ab05425f39"
-
-[[package]]
 name = "bumpalo"
 version = "3.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1361,15 +1355,6 @@ dependencies = [
  "log",
  "thiserror",
  "wasmparser 0.58.0",
-]
-
-[[package]]
-name = "crc"
-version = "1.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
-dependencies = [
- "build_const",
 ]
 
 [[package]]
@@ -2231,7 +2216,7 @@ dependencies = [
  "bstr",
  "bytes 1.0.1",
  "chrono",
- "crc 2.0.0",
+ "crc",
  "criterion",
  "dashmap",
  "flate2",
@@ -5251,14 +5236,14 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "3.0.0"
+version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbb9bcb03bed33d78771217614135f5a101785d337e93856e2f8d50825392054"
+checksum = "83b4422e82143ae595af7a6bb99cd64dcbc8d3dc5c386c61d543e46b4a0ec1ca"
 dependencies = [
  "bit-vec 0.6.3",
  "bytes 1.0.1",
  "chrono",
- "crc 1.8.1",
+ "crc",
  "futures 0.3.15",
  "futures-io",
  "futures-timer",
