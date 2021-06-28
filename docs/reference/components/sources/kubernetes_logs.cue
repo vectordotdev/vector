@@ -434,6 +434,20 @@ components: sources: kubernetes_logs: {
 				"""
 		}
 
+		globbing: {
+			title: "Globbing"
+			body:  """
+				By default, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+				ignores compressed and temporary files. This behavior can be configured with the
+				[`exclude_paths_glob_patterns`](\(urls.vector_kubernetes_logs_source)#configuration) option.
+
+				[Globbing](\(urls.globbing)) is used to continually discover `Pod`s log files
+				at a rate defined by the `glob_minimum_cooldown` option. In environments when files are
+				rotated rapidly, we recommend lowering the `glob_minimum_cooldown` to catch files
+				before they are compressed.
+				"""
+		}
+
 		pod_exclusion: {
 			title: "Pod exclusion"
 			body:  """
