@@ -45,7 +45,7 @@ impl Expression for IpNtoaFn {
             .resolve(ctx)?
             .try_integer()?
             .try_into()
-            .map_err(|_| format!("cannot convert to bytes: integer does not fit in u32"))?;
+            .map_err(|_| String::from("cannot convert to bytes: integer does not fit in u32"))?;
 
         let ip = Ipv4Addr::from(u32::from_be(i));
 
