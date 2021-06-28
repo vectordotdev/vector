@@ -191,7 +191,7 @@ recommend using these transforms only when truly necessary, for several reasons:
 [console]: /docs/reference/configuration/sinks/console
 [examples]: /docs/reference/vrl/examples
 [functions]: /docs/reference/vrl/functions
-[generator]: /docs/reference/configuration/transforms/generator
+[generator]: /docs/reference/configuration/sources/generator
 [lua]: https://lua.org
 [lua_transform]: /docs/reference/configuration/transforms/lua
 [paths]: /docs/reference/vrl/expressions/#path
@@ -204,4 +204,4 @@ recommend using these transforms only when truly necessary, for several reasons:
 [transforms]: /transforms
 [vrl]: /docs/reference/vrl
 [wasm]: https://webassembly.org
-[wasm_transform]: /docs/reference/transforms/wasm
+[wasm_transform]: /docs/reference/configuration/transforms/wasm
