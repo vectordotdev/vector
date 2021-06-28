@@ -238,7 +238,7 @@ async-nats = { version = "0.9.18", default-features = false, optional = true }
 nom = { version = "6.1.2", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
-once_cell = { version = "1.7", default-features = false }
+once_cell = { version = "1.8", default-features = false }
 openssl = { version = "0.10.35", default-features = false }
 openssl-probe = { version = "0.1.4", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
