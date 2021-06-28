@@ -35,7 +35,6 @@ use shared::btreemap;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
-use std::sync::Once;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 
@@ -720,6 +719,8 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
 fn init_roots() {
     #[cfg(target_os = "linux")]
     {
+        use std::sync::Once;
+
         static INIT: Once = Once::new();
 
         INIT.call_once(|| {
