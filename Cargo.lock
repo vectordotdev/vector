@@ -892,9 +892,9 @@ dependencies = [
 
 [[package]]
 name = "bson"
-version = "2.0.0-beta.1"
+version = "2.0.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82b538f08f421ed777d19b7dadf2c0a8ee36e4a1571691fcb4b8fb760825abd2"
+checksum = "2b02bc64b55fdb0d2b0833c0d1370ea4a814c15ada4740543a164c5158c0c03a"
 dependencies = [
  "ahash",
  "base64 0.13.0",
@@ -4092,9 +4092,9 @@ checksum = "717e29a243b81f8130e31e24e04fb151b04a44b5a7d05370935f7d937e9de06d"
 
 [[package]]
 name = "mongodb"
-version = "2.0.0-beta.1"
+version = "2.0.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5914bd2dfa3a20660f95a8713ed7ae971ac00ed3b3a668051dff055c92b57c62"
+checksum = "6a21067b394508fd75179faee57ae1e21148e2faab21acb97ebc90e1d47fe0e8"
 dependencies = [
  "async-trait",
  "base64 0.13.0",
