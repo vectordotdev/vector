@@ -154,8 +154,13 @@ async fn s3_object_decoder(
     content_encoding: Option<&str>,
     content_type: Option<&str>,
     mut body: rusoto_s3::StreamingBody,
-) -> Option<Box<dyn tokio::io::AsyncRead + Send + Unpin>> {
-    let first = body.next().await?;
+) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
+    let first = if let Some(first) = body.next().await {
+        first
+    } else {
+        return Box::new(tokio::io::empty());
+    };
+
     let r = tokio::io::BufReader::new(
         rusoto_s3::StreamingBody::new(stream::iter(Some(first)).chain(body)).into_async_read(),
     );
@@ -168,7 +173,7 @@ async fn s3_object_decoder(
     };
 
     use Compression::*;
-    Some(match compression {
+    match compression {
         Auto => unreachable!(), // is mapped above
         None => Box::new(r),
         Gzip => Box::new({
@@ -181,7 +186,7 @@ async fn s3_object_decoder(
             decoder.multiple_members(true);
             decoder
         }),
-    })
+    }
 }
 
 /// try to determine the compression given the:

@@ -394,11 +394,6 @@ impl IngestorProcess {
                 )
                 .await;
 
-                let object_reader = match object_reader {
-                    Some(reader) => reader,
-                    None => return Ok(()),
-                };
-
                 // Record the read error seen to propagate up later so we avoid ack'ing the SQS
                 // message
                 //
