@@ -23,6 +23,10 @@ Here's an example representation of a log event (as JSON):
 }
 ```
 
+## Schema
+
+{{< config/log-schema >}}
+
 ## How it works
 
 ### Schemas

@@ -378,6 +378,145 @@
   </div>
   {{ end }}
 
+  {{/* Data schemas (logs and metrics) */}}
+  {{ with .data_schema }}
+  <div class="flex flex-col divide-y dark:divide-gray-700">
+    <div class="prose dark:prose-dark py-4 px-6">
+      {{ .description | markdownify }}
+    </div>
+
+    {{/* Options */}}
+    <div class="py-4 px-6">
+      <span>
+        {{ partial "heading.html" (dict "text" "Options" "level" 3) }}
+      </span>
+
+      <div class="mt-4 border rounded flex flex-col divide-y dark:divide-gray-700 dark:border-gray-700">
+        {{ range $k, $v := .type.object.options }}
+        {{ $name := $k }}
+        {{ $id := cond (eq $name "*") "star" $name }}
+        <div class="py-4 px-6">
+          <span class="flex items-center justify-between">
+            <span>
+              <h3 id="{{ $id }}" class="font-semibold font-mono text-sm dark:text-primary">
+                <a href="#{{ $id }}">
+                  {{ $name }}
+                </a>
+              </h3>
+            </span>
+
+            <span class="flex space-x-1">
+              {{ if $v.common }}
+              {{ partial "badge.html" (dict "word" "common" "color" "indigo") }}
+              {{ end }}
+
+              {{ if $v.required }}
+              {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+              {{ else }}
+              {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
+              {{ end }}
+
+              {{ range $k, $v := $v.type }}
+              {{ $type := cond (eq $k "object") "table" $k }}
+              {{ partial "badge.html" (dict "word" $type "color" "green") }}
+              {{ end }}
+            </span>
+          </span>
+
+          {{ with $v.description }}
+          <div class="mt-3">
+            {{ . | markdownify }}
+          </div>
+          {{ end }}
+
+          <div>
+            {{ range $k, $v := $v.type }}
+            {{ if eq $k "object" }}
+            <div class="mt-3">
+              <div class="border rounded flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
+                {{ range $k, $v := $v.options }}
+                {{ $id := printf "%s-%s" $name $k }}
+                <div class="py-3 px-5">
+                  <span class="flex justify-between items-center">
+                    <span class="font-mono font-semibold">
+                      <h4 id="{{ $id }}">
+                        <a href="#{{ $id }}">
+                          {{ $k }}
+                        </a>
+                      </h4>
+                    </span>
+
+                    <span class="flex space-x-1">
+                      {{ if $v.required }}
+                      {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                      {{ else }}
+                      {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
+                      {{ end }}
+
+                      {{ range $k, $v := $v.type }}
+                      {{ partial "badge.html" (dict "word" $k "color" "green") }}
+
+                      {{ with $v.syntax }}
+                      {{ partial "badge.html" (dict "word" . "color" "gray") }}
+                      {{ end }}
+
+                      {{ if $v.enum }}
+                      {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
+                      {{ end }}
+                      {{ end }}
+                    </span>
+                  </span>
+
+                  <div class="prose dark:prose-dark">
+                    {{ $v.description | markdownify }}
+                  </div>
+
+                  {{ range $k, $v := $v.type }}
+                  {{ with $v.examples }}
+                  <div class="mt-2">
+                    <span class="font-semibold">
+                      Examples
+                    </span>
+
+                    <span class="flex space-x-2">
+                      {{ range . }}
+                      <span class="font-mono text-sm text-secondary dark:text-primary">
+                        {{ . }}
+                      </span>
+                      {{ end }}
+                    </span>
+                  </div>
+                  {{ end }}
+                  {{ end }}
+                </div>
+                {{ end }}
+              </div>
+            </div>
+            {{ end }}
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+      </div>
+    </div>
+
+    {{/* Examples */}}
+    {{ with .type.object.examples }}
+    <div class="py-4 px-6">
+      <span>
+        {{ partial "heading.html" (dict "text" "Examples" "level" 3) }}
+      </span>
+
+      <div class="mt-4 flex flex-col divide-y dark:divide-gray-700 dark:border-gray-700">
+        {{ range . }}
+        {{ template "code" . }}
+        {{ end }}
+      </div>
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+
   {{/* VRL function info (/vrl/functions) */}}
   {{ with .vrl_functions }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
