@@ -6,6 +6,7 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -14,6 +15,8 @@ use vrl::{Program, Runtime, Terminate};
 #[derivative(Default)]
 pub struct RemapConfig {
     pub source: String,
+    #[serde(default)]
+    pub timezone: TimeZone,
     pub drop_on_error: bool,
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
@@ -48,6 +51,7 @@ impl TransformConfig for RemapConfig {
 #[derive(Debug, Clone)]
 pub struct Remap {
     program: Program,
+    timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
 }
@@ -62,6 +66,7 @@ impl Remap {
 
         Ok(Remap {
             program,
+            timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
         })
