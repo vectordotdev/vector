@@ -225,9 +225,7 @@ impl HttpSink for LokiSink {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
         let event = match &self.encoding.codec() {
-            Encoding::Json => {
-                serde_json::to_string(&log.all_fields()).expect("json encoding should never fail")
-            }
+            Encoding::Json => serde_json::to_string(&log).expect("json encoding should never fail"),
 
             Encoding::Text => log
                 .get(log_schema().message_key())
@@ -508,7 +506,39 @@ mod integration_tests {
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
         assert_eq!(events.len(), outputs.len());
         for (i, output) in outputs.iter().enumerate() {
-            let expected_json = serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
+            let expected_json = serde_json::to_string(&events[i].as_log()).unwrap();
+            assert_eq!(output, &expected_json);
+        }
+    }
+
+    // https://github.com/timberio/vector/issues/7815
+    #[tokio::test]
+    async fn json_nested_fields() {
+        let (stream, sink) = build_sink("json").await;
+
+        let events = random_lines(100)
+            .take(10)
+            .map(|line| {
+                let mut event = Event::from(line);
+                let log = event.as_mut_log();
+                log.insert("foo.bar", "baz");
+                event
+            })
+            .collect::<Vec<_>>();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events.clone().into_iter().map(
+                move |event| Ok(event.into_log().with_batch_notifier(&batch).into()),
+            )))
+            .await
+            .unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(events.len(), outputs.len());
+        for (i, output) in outputs.iter().enumerate() {
+            let expected_json = serde_json::to_string(&events[i].as_log()).unwrap();
             assert_eq!(output, &expected_json);
         }
     }

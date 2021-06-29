@@ -45,6 +45,8 @@ mod dnstap;
 mod docker_logs;
 mod elasticsearch;
 mod encoding_transcode;
+#[cfg(feature = "sources-eventstoredb_metrics")]
+mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
 #[cfg(feature = "transforms-filter")]
@@ -174,6 +176,8 @@ pub(crate) use self::dnstap::*;
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
 pub use self::encoding_transcode::*;
+#[cfg(feature = "sources-eventstoredb_metrics")]
+pub use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]
 pub use self::exec::*;
 #[cfg(any(
