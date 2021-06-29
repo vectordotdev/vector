@@ -1,7 +1,7 @@
 ---
 title: VRL expression reference
 short: Expressions
-weight: 2
+weight: 4
 ---
 
 ## Syntax

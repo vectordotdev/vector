@@ -1,7 +1,7 @@
 ---
 title: Vector Remap Language (VRL)
 description: A domain-specific language for modifying your observability data
-short: Remap Language
+short: Vector Remap Language
 weight: 4
 ---
 

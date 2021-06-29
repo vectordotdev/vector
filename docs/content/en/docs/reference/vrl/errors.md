@@ -1,7 +1,7 @@
 ---
 title: VRL error reference
 short: Errors
-weight: 3
+weight: 2
 ---
 
 VRL is a [fail-safe][fail_safety] language, which means that a VRL program doesn't compile unless every potential error is handled. Observability data is notoriously unpredictable and fail safety ensures that your VRL programs elegantly handle malformed data.
