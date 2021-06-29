@@ -3,9 +3,10 @@ title: "The new GraphQL API for Vector"
 description: "Extending observability into your own apps and infrastructure."
 date: "2020-12-08"
 authors: ["leebenson"]
-tags:
+badges:
   type: announcement
   domains: ["graphql api", "observability"]
+tags: ["graphql", "api", "metrics"]
 ---
 
 Although Vector is an observability tool, it's nonetheless important to be able
@@ -29,7 +30,7 @@ This is just the beginning. In the near future, the API will enable you to both
 observe _and_ control Vector remotely, programmatically, and on demand. Stay
 tuned!
 
-## Take it for a spin &mdash; in our live playground
+## Take it for a spin in our live playground
 
 Try our new [**GraphQL public playground
 today**](https://playground.vector.dev:8686/playground), which enables you to
@@ -172,12 +173,11 @@ We chose GraphQL over REST or gRPC for a few reasons:
 - Universal browser support, making it an ideal protocol for web usage (or
   apps!).
 
-## Our first API client &mdash; `top`
+## Our first API clien: `top`
 
 To help you visualize your Vector instance in action,
-[v0.11.0](https://vector.dev/releases/0.11.0/) also brings you `vector top`
-&mdash; our new terminal dashboard CLI tool that's powered by the Vector GraphQL
-API.
+[v0.11.0](https://vector.dev/releases/0.11.0/) also brings you `vector top`, our
+new terminal dashboard CLI tool powered by the Vector GraphQL API.
 
 To enable it, run:
 

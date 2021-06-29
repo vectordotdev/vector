@@ -31,7 +31,7 @@
         {{ partial "blog/authors.html" . }}
       </div>
 
-      {{ with .Params.tags }}
+      {{ with .Params.badges }}
       <div class="block space-y-1.5">
         {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "type" "word" .type "color" "indigo" "inline" true) }}
 

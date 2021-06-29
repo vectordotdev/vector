@@ -3,9 +3,10 @@ title: "First-class Kubernetes integration for Vector"
 description: "Vector is now the backbone of observability on Kubernetes"
 date: "2020-11-26"
 authors: ["binarylogic"]
-tags:
+badges:
   type: announcement
   domains: ["kubernetes", "deployment", "ops"]
+tags: ["kubernetes", "k8s", "aggregator"]
 ---
 
 After months of development, [over 100 pull requests][pulls], and intensive QA in clusters producing over 20 terabytes of event data a day, we're pleased to announce our first-class [Kubernetes] integration for Vector in [version 0.11][v_0_11]. We strove to make even this initial integration rock solid and production ready because we aim to make Vector the default pipeline for all Kubernetes observability data.
@@ -50,6 +51,7 @@ ARC isn't specific to Kubernetes but it *is* particularly useful in highly elast
 To install Vector in your Kubernetes cluster, check out our [Kubernetes installation documentation][install], which includes instructions for:
 
 * Standard installation using [kubectl] and [Kustomize]
+
 * Deployment using [Helm]
 
 Both installation options enable you to easily deploy Vector [agents][agent] to your Nodes. In an upcoming release, we'll also provide support for deploying Vector as a centralized [aggregator].

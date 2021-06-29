@@ -188,11 +188,9 @@ vector --config /etc/vector/vector.json
 {{< jump "/docs/reference/configuration/transforms" >}}
 {{< jump "/docs/reference/configuration/sinks" >}}
 
-
 ### Advanced
 
 {{< jump "/docs/reference/configuration/global-options" >}}
-{{< jump "/docs/reference/configuration/tests" >}}
 {{< jump "/docs/reference/configuration/template-syntax" >}}
 
 ## How it works

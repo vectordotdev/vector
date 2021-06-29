@@ -1,9 +1,10 @@
 ---
 title: Unit Testing Your Configs
 description: Learn how to write and execute unit tests for your Vector configs
-author_github: Jeffail
+author_github: jeffail
 domain: config
 weight: 4
+tags: ["testing", "configs", "unit testing", "level up", "guides", "guide"]
 ---
 
 {{< requirement >}}

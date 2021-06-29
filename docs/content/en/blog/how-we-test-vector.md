@@ -3,8 +3,9 @@ title: "How we test Vector"
 description: "A survey of techniques we've found useful"
 date: "2020-07-13"
 authors: ["lukesteensen"]
-tags:
+badges:
   type: post
+tags: ["testing", "tests"]
 ---
 
 When we set out to build Vector, we knew that reliability and performance were

@@ -5,6 +5,7 @@ description: Learn how to manage log schemas with Vector.
 author_github: https://github.com/hoverbear
 domain: schemas
 weight: 2
+tags: ["schemas", "schema management", "logs", "level up", "guides", "guide"]
 ---
 
 {{< requirement >}}

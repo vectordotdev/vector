@@ -1,6 +1,7 @@
 ---
 title: VRL function reference
 short: Functions
+show_toc: true
 weight: 1
 ---
 

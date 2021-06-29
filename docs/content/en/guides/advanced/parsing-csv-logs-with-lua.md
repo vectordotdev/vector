@@ -5,6 +5,7 @@ authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
 weight: 6
+tags: ["lua", "csv", "logs", "transform", "advanced", "guides", "guide"]
 ---
 
 {{< requirement title="Pre-requisites" >}}

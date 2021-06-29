@@ -5,6 +5,7 @@ authors: ["jszwedko"]
 domains: ["sources", "transforms"]
 transforms: ["aws_cloudwatch_logs_subscription_parser"]
 weight: 4
+tags: ["aws", "cloudwatch", "logs", "firehose", "advanced", "guides", "guide"]
 ---
 
 {{< requirement title="Pre-requisites" >}}
@@ -25,8 +26,8 @@ running Vector instances over HTTPS.
 You will learn how to:
 
 - Configure Vector to consume AWS CloudWatch Log events via the
- `[aws_kinesis_firehose][aws_kinesis_firehose]]` source and
- `[aws_cloudwatch_logs_subscription_parser][aws_cloudwatch_logs_subscription_parser]`
+ [`aws_kinesis_firehose`][aws_kinesis_firehose]] source and
+ [`aws_cloudwatch_logs_subscription_parser`][aws_cloudwatch_logs_subscription_parser]
  transform
 - Configure [AWS Kinesis Firehose][AWS Kinesis Firehose] to forward events to
   a remotely running Vector instance (or instances)
@@ -105,7 +106,7 @@ Let's take a look at the configuration we will be using:
 
 This will configure `vector` to listen for Firehose messages on the configured
 port. These messages will then be transformed, via the
-`[aws_cloudwatch_logs_subscription_parser][aws_cloudwatch_logs_subscription_parser]`
+[`aws_cloudwatch_logs_subscription_parser`][aws_cloudwatch_logs_subscription_parser]
 to extract the individual log events, and then the `json_parser` to parse these
 events. Finally, they are written to the console.
 
@@ -123,7 +124,7 @@ See their guide for more examples.
 
 ## Deploying Vector
 
-First, deploy vector with the `[aws_kinesis_firehose][aws_kinesis_firehose]` source. See example
+First, deploy vector with the [`aws_kinesis_firehose`][aws_kinesis_firehose] source. See example
 configuration above.
 
 {{< info >}}
@@ -362,7 +363,7 @@ group we've setup. We can use Vector for this too!
 ```
 
 This will read lines from `stdin` and write them to CloudWatch Logs. See the
-[AWS Authentication](https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs/#aws-authentication)
+[AWS Authentication](/docs/reference/sinks/aws_cloudwatch_logs/#aws-authentication)
 section for this sink to see how to configure the AWS credentials Vector will
 need to write to AWS.
 
@@ -446,7 +447,7 @@ send it as an HTTP request:
 }
 ```
 
-The `[aws_kinesis_firehose][aws_kinesis_firehose]` source:
+The [`aws_kinesis_firehose`][aws_kinesis_firehose] source:
 
 ```toml
 [sources.firehose]
@@ -499,7 +500,7 @@ If we formatted it, it would look like:
 ```
 
 To extract the originating events from this subscription event, we can use the
-`[aws_cloudwatch_logs_subscription_parser][aws_cloudwatch_logs_subscription_parser]`
+[`aws_cloudwatch_logs_subscription_parser`][aws_cloudwatch_logs_subscription_parser]
 transform:
 
 ```toml
@@ -550,7 +551,7 @@ context:
 - `timestamp` is overwritten with the timestamp from the log event
 
 This is pretty good, but, our original events are also JSON, so let's parse
-those out using the `[json_parser][json_parser]` transform:
+those out using the [`json_parser`][json_parser] transform:
 
 ```toml
 [transforms.json]

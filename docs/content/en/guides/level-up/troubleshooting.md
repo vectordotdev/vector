@@ -4,6 +4,7 @@ description: A guide to debugging and troubleshooting Vector
 author_github: binarylogic
 domain: operations
 weight: 5
+tags: ["troubleshooting", "level up", "guides", "guide"]
 ---
 
 This guide covers troubleshooting Vector. The sections are intended to be

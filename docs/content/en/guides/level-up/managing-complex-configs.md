@@ -4,6 +4,7 @@ description: Strategies for building and managing complex Vector configs
 author_github: https://github.com/Jeffail
 domain: config
 weight: 3
+tags: ["configuration", "config", "level up", "guides", "guide"]
 ---
 
 {{< requirement >}}

@@ -345,27 +345,27 @@ url = "/docs/reference/vrl"
 weight = 3
 
 [[languages.en.menus.flyout]]
-name = "Expressions"
-parent = "vrl"
-url = "/docs/reference/vrl/expressions"
-weight = 1
-
-[[languages.en.menus.flyout]]
 name = "Functions"
 parent = "vrl"
 url = "/docs/reference/vrl/functions"
-weight = 2
+weight = 1
 
 [[languages.en.menus.flyout]]
 name = "Errors"
 parent = "vrl"
 url = "/docs/reference/vrl/errors"
-weight = 3
+weight = 2
 
 [[languages.en.menus.flyout]]
 name = "Examples"
 parent = "vrl"
 url = "/docs/reference/vrl/examples"
+weight = 3
+
+[[languages.en.menus.flyout]]
+name = "Expressions"
+parent = "vrl"
+url = "/docs/reference/vrl/expressions"
 weight = 4
 
 [[languages.en.enus.flyout]]

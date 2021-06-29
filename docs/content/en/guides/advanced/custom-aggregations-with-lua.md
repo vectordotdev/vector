@@ -5,6 +5,7 @@ authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
 weight: 2
+tags: ["lua", "aggregation", "transform", "advanced", "guides", "guide"]
 ---
 
 While Vector's built-in [transforms][docs.transforms] are fast, sometimes they are not expressive

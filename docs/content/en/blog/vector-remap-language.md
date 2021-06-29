@@ -4,9 +4,10 @@ short: VRL
 description: A fast and safe way to transform observability data
 authors: ["binarylogic"]
 date: "2021-02-15"
-tags:
+badges:
   type: announcement
   domains: ["remap"]
+tags: ["vector remap language", "vrl", "dsl", "expression oriented"]
 ---
 
 **Vector Remap Language** (VRL) is an [expression-oriented][expression_oriented]

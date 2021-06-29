@@ -3,8 +3,9 @@ title: "Accelerating Vector with Datadog"
 description: "Timber (and Vector) have been acquired by Datadog"
 date: "2021-02-11"
 authors: ["binarylogic", "zsherman"]
-tags:
+badges:
   type: announcement
+tags: ["datadog", "acquisition"]
 ---
 
 We're excited to announce that Timber and Vector are now officially part of [Datadog][datadog]!

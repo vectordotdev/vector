@@ -4,9 +4,10 @@ short: Adaptive request concurrency
 description: Improving reliability and performance across your entire observability infrastructure
 authors: ["lucperkins"]
 date: "2020-11-24"
-tags:
+badges:
   type: announcement
   domains: ["networking", "performance", "reliability"]
+tags: ["arc", "adaptive request concurrency", "networking", "concurrency", "http", "rate limiting"]
 ---
 
 Observability pipelines have become critical infrastructure in the current technological landscape, which is why we've built [Vector] to provide extremely high throughput with the tiniest resource footprint we can manage ([Rust] is a huge help here). But this is not enough in the real world: your observability pipeline needs to provide optimal performance and efficiency while *also* being a good infrastructure citizen and playing nicely with services like [Elasticsearch] and [Clickhouse].

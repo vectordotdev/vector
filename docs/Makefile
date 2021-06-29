@@ -4,6 +4,7 @@ clean:
 setup:
 	yarn
 
+# Build JSON from CUE sources
 build-cue:
 	./scripts/build-cue.sh
 
@@ -16,8 +17,6 @@ serve: setup build-cue
 production-build:
 	hugo \
 	--minify
-
-local-production-build: setup build-cue production-build run-link-checker
 
 ci-production-build: setup build-cue production-build run-link-checker algolia
 
@@ -41,7 +40,10 @@ algolia:
 	yarn run algolia-config
 	yarn run algolia-index
 
-# Useful for debugging issues that arise only on the deployed production site
+# Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
 	make setup build-cue production-build
 	python -m http.server 8000 --directory ./public --bind 127.0.0.1
+
+# Full production build without Algolia updates (for debugging, link checking, etc.)
+local-production-build: clean setup build-cue production-build run-link-checker

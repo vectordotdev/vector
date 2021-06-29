@@ -3,7 +3,7 @@ package metadata
 remap: functions: decode_percent: {
 	category:    "Codec"
 	description: """
-		Decodes a [percent encoded](\(urls.percent_encoded_bytes)) `value` like a URL.
+		Decodes a [percent-encoded](\(urls.percent_encoded_bytes)) `value` like a URL.
 		"""
 
 	arguments: [

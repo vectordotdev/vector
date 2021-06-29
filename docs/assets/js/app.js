@@ -117,23 +117,10 @@ const manageState = () => {
   }, useLocalStorage);
 }
 
-const showCodeFilename = () => {
-  const classes = "font-semibold font-mono tracking-wide text-gray-50 dark:text-gray-200 bg-dark dark:bg-black py-1.5 px-2 rounded text-sm";
-  var els = document.getElementsByClassName("highlight");
-  for (var i = 0; i < els.length; i++) {
-    if (els[i].title.length) {
-      var newNode = document.createElement("div");
-      newNode.innerHTML = `<span class="${classes}">${els[i].title}</span>`;
-      els[i].parentNode.insertBefore(newNode, els[i]);
-    }
-  }
-}
-
 const main = () => {
   sayHello();
   clearLocalStorageOnNewGeneration();
   manageState();
-  showCodeFilename();
 }
 
 main();

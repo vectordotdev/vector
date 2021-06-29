@@ -5,6 +5,7 @@ description: Use Vector to parse, structure, shape, and transform observability 
 author_github: lucperkins
 domain: processing
 weight: 1
+tags: ["transform", "observability", "level up", "guides", "guide"]
 ---
 
 {{< requirement >}}
@@ -195,7 +196,6 @@ recommend using these transforms only when truly necessary, for several reasons:
    than Lua, but Wasm is more difficult to use because you need to add a
    Wasm compilation step to your Vector workflow.
 
-[docs.about.concepts]: /docs/about/concepts/
 [docs.architecture.pipeline-model]: /docs/about/under-the-hood/architecture/pipeline-model/
 [docs.lua]: /docs/reference/configuration/transforms/lua/
 [docs.setup.quickstart]: /docs/setup/quickstart/

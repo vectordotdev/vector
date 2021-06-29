@@ -5,6 +5,7 @@ authors: ["hoverbear"]
 domain: transforms
 transforms: ["wasm"]
 weight: 3
+tags: ["webassembly", "wasm", "transform", "advanced", "guides", "guide"]
 ---
 
 {{< requirement title="Pre-requisites" >}}

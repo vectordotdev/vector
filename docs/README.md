@@ -5,8 +5,9 @@ This directory houses the assets used to build Vector's website and documentatio
 ## Prerequisites
 
 * The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`][netlify_toml].
-* The [CUE] configuration and validation tool. See the value of `CUE_VERSION` in [`amplify.yml`](./amplify.yml) to see which version of CUE is currently being used for the docs.
-* [Yarn]
+* The [CUE] configuration and validation language. See the value of `CUE_VERSION` in [`amplify.yml`](./amplify.yml) to see which version of CUE is currently being used for the docs.
+* The [Yarn] package manager (used for static assets).
+* [htmltest] for link checking.
 
 ## Run the site locally
 
@@ -37,9 +38,11 @@ make serve
 
 [cue]: https://cue-lang.org
 [esbuild]: https://github.com/evanw/esbuild
+[htmltest]: https://github.com/wjdp/htmltest
 [hugo]: https://gohugo.io
 [netlify_toml]: ../netlify.toml
 [sass]: https://sass-lang.com
+[tailwind]: https://tailwindcss.com
 [typography]: https://github.com/tailwindlabs/tailwindcss-typography
 [vector]: https://vector.dev
 [yarn]: https://yarnpkg.com
