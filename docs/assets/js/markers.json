@@ -148,5 +148,15 @@
     "name": "Lima",
     "coordinates": [-77.0428, -12.0464],
     "population": 10750000
+  },
+  {
+    "name": "Ridgefield, WA",
+    "coordinates": [-122.6882, 45.8143],
+    "population": 7767
+  },
+  {
+    "name": "Soldotna, AK",
+    "coordinates": [-151.0583, 60.4878],
+    "population": 4649
   }
 ]
