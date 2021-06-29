@@ -9,7 +9,7 @@ remap: functions: parse_int: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The number to format as a string."
+			description: "The string to parse."
 			required:    true
 			type: ["string"]
 		},
