@@ -292,6 +292,13 @@ mod tests {
                 record.to_owned(),
                 record.to_owned(),
             ),
+            (
+                Compression::Gzip,
+                Compression::Gzip,
+                true,
+                String::new(),
+                String::new(),
+            ),
         ];
 
         for (source_record_compression, record_compression, success, record, expected) in cases {
