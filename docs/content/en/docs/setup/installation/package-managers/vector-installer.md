@@ -11,4 +11,4 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 
 ## Management
 
-{{< jump "/docs/administration/process-management" "vector-executable" >}}
+{{< jump "/docs/administration/management" "vector-executable" >}}

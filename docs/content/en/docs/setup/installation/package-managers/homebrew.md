@@ -29,6 +29,6 @@ brew remove vector
 
 ## Management
 
-{{< jump "/docs/administration/process-management" "homebrew" >}}
+{{< jump "/docs/administration/management" "homebrew" >}}
 
 [homebrew]: https://brew.sh

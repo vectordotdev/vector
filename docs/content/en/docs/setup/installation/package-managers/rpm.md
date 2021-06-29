@@ -30,6 +30,6 @@ sudo rpm -e vector
 
 ## Management
 
-{{< jump "/docs/administration/process-management" "apt-dpkg-rpm-yum" >}}
+{{< jump "/docs/administration/management" "apt-dpkg-rpm-yum" >}}
 
 [rpm]: https://rpm.org/

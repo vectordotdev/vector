@@ -40,7 +40,7 @@ sudo yum remove vector
 
 ## Management
 
-{{< jump "/docs/administration/process-management" "apt-dpkg-rpm-yum" >}}
+{{< jump "/docs/administration/management" "apt-dpkg-rpm-yum" >}}
 
 [add_repo]: https://cloudsmith.io/~timber/repos/vector/setup/#formats-rpm
 [cloudsmith]: https://cloudsmith.io/~timber/repos/vector/packages/

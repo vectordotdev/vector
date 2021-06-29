@@ -16,6 +16,6 @@ powershell Invoke-WebRequest https://packages.timber.io/vector/{{< version >}}/v
 
 ## Management
 
-{{< jump "/docs/administration/process-management" "windows" >}}
+{{< jump "/docs/administration/management" "windows" >}}
 
 [installer]: https://en.wikipedia.org/wiki/Windows_Installer

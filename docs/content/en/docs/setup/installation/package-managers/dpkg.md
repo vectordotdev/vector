@@ -34,6 +34,6 @@ dpkg -r vector-{{< version >}}-amd64
 
 ## Management
 
-{{< jump "/docs/administration/process-management" "apt-dpkg-rpm-yum" >}}
+{{< jump "/docs/administration/management" "apt-dpkg-rpm-yum" >}}
 
 [dpkg]: https://wiki.debian.org/dpkg

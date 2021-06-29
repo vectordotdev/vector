@@ -75,6 +75,6 @@ helm uninstall --namespace vector vector
 
 ## Management
 
-{{< jump "/docs/administration/process-management" "helm" >}}
+{{< jump "/docs/administration/management" "helm" >}}
 
 [helm]: https://helm.sh

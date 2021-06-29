@@ -23,7 +23,7 @@
           </code>
         </td>
         <td>
-          {{ .description }}
+          {{ .description | markdownify }}
         </td>
         <td>
           {{ $href := printf "/docs/about/under-the-hood/architecture/data-model/metric/#%s" .type }}

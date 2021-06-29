@@ -4,75 +4,60 @@ weight: 5
 tags: ["validate", "configuration"]
 ---
 
-Vector provides a subcommand, [`validate`][validate], that checks the validity of any number of configuration files and
-then exits. Here's an example usage:
+Vector provides a subcommand, [`validate`][validate], that checks the validity of your Vector configuration and exist.
+Here's an example:
 
 ```bash
 vector validate /etc/vector/vector.toml
 ```
 
-You can also check multiple files
+You can also check multiple files:
 
+```bash
+vector validate /etc/vector/vector*.toml
+```
 
+## How validation works
 
+The [`validate`][validate] subcommand performs several sets of checks on the configuration you point
+it to. If validation succeeds, Vector exits with a code of `0`; if it fails, it exits with a code of
+`78`. At any time, you can see documentation for the command by running `vector validate --help`.
+
+### Correctness checks
+
+These checks verify the correctness of fields for [components] defined within all configuration
+files, including:
+
+1. That all of the [sources], [transforms], and [sinks] include all required fields.
+2. All fields are of the proper type.
+
+### Topology checks
+
+These checks verify that the configuration file contains a valid topology:
+
+1. At least one [source][sources] is defined
+1. At least one [sink][sinks] is defined
+1. All inputs for each topology component (specified using the `inputs` parameter) contain at least
+  one value.
+1. All inputs refer to valid and upstream [sources] or [transforms].
+
+### Environment checks
+
+Finally, these checks ensure that Vector is running in an environment that can support the
+configured topology:
+
+1. All components have the pre-requisites to run, e.g. data directories exist and are writable.
+1. All sinks can connect to their specified targets.
+
+These environment checks can be disabled using the [`--no-environment`][no_environment] flag:
+
+```bash
+vector validate --no-environment /etc/vector/vector.toml
+```
+
+[components]: /components
+[no_environment]: /docs/reference/cli/#validate-no-environment
+[sinks]: /sinks
+[sources]: /sources
+[transforms]: /transforms
 [validate]: /docs/reference/cli/#validate
-
-
-
-{{% tabs default="All checks" %}}
-{{% tab title="All checks" %}}
-
-```bash
-vector validate /etc/vector/vector.toml
-```
-
-The `validate` subcommand checks the correctness of fields for components defined within a configuration file, including:
-
-1. That [sources](/docs/reference/configuration/sources), [transforms](/docs/reference/configuration/transforms), and [sinks](/docs/reference/configuration/sinks) include all non-optional fields.
-2. All fields are of the proper type.
-
-The following group of checks verifies that the configuration file contains a valid topology, and can be disabled with flags such as `--no-topolog`y, expanding the above checks with the following:
-
-3. At least one source is defined.
-4. At least one sink is defined.
-5. All `inputs` contain at least one value (cannot be empty).
-6. All `inputs` refer to valid and upstream source or transform components.
-
-The following group of checks require the runtime environment to pass successfully, and can be disabled with flags such as `--no-environment`, expanding the above checks with the following:
-
-7. All components are capable of running, for example that data directories exist and are writable, etc.
-8. All sinks are able to connect to their targets.
-
-If validation fails, Vector exits with a code of `78`; if validation succeeds, Vector exits with a code of `0`.
-
-To see other customization options for the validate subcommand run vector validate `--help`.
-
-{{% /tab %}}
-{{% tab title="Config only" %}}
-
-```bash
-vector validate --no-environment --no-topology /etc/vector/*.toml
-```
-
-The `validate` subcommand checks the correctness of fields for components defined within a configuration file, including:
-
-1. That sources, transforms, and sinks include all non-optional fields.
-2. All fields are of the proper type.
-
-The following group of checks verifies that the configuration file contains a valid topology and can be disabled with flags such as `--no-topology`, expanding the above checks with the following:
-
-3. At least one source is defined.
-4. At least one sink is defined.
-5. All `inputs` contain at least one value (cannot be empty).
-6. All `inputs` refer to valid and upstream source or transform components.
-
-The following group of checks require the runtime environment to pass successfully, and can be disabled with flags such as `--no-environment`, expanding the above checks with the following:
-
-7. All components can run, for example that data directories exist and are writable, etc.
-8. All sinks can connect to their targets.
-
-If validation fails, Vector exits with a code of `78`; if validation succeeds, Vector exists with a code of `0`.
-
-To see other customization options for the `validate` subcommand run `vector validate --help`.
-{{% /tab %}}
-{{% /tabs %}}

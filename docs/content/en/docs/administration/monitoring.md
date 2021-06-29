@@ -122,7 +122,7 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [rfc_2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [sinks]: /sinks
 [sources]: /sources
-[starting]: /docs/administration/process-management
+[starting]: /docs/administration/management
 [topology]: /docs/about/concepts/#topology
 [transform]: /transforms
 [troubleshooting]: /guides/level-up/troubleshooting

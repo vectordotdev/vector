@@ -42,6 +42,6 @@ nix-env --uninstall vector
 
 ## Management
 
-{{< jump "/docs/administration/process-management" "nix" >}}
+{{< jump "/docs/administration/management" "nix" >}}
 
 [nix]: https://nixos.org

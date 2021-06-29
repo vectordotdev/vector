@@ -13,7 +13,7 @@ Vector was built to be easy to [install] and operate on a wide variety of [opera
 
 [configuration]: /docs/reference/configuration
 [install]: /docs/setup/installation
-[managing]: /docs/administration/process-management
+[managing]: /docs/administration/management
 [os]: /docs/setup/installation/operating-systems
 [platforms]: /docs/setup/installation/platforms
 [validating]: /docs/administration/validating
