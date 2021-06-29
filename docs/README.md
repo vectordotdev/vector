@@ -4,6 +4,8 @@ This directory houses the assets used to build Vector's website and documentatio
 
 ## Prerequisites
 
+In order to run the site locally, you need to have these installed:
+
 * The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`][netlify_toml].
 * The [CUE] configuration and validation language. See the value of `CUE_VERSION` in [`amplify.yml`](./amplify.yml) to see which version of CUE is currently being used for the docs.
 * The [Yarn] package manager (used for static assets).

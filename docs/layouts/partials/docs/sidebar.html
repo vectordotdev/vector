@@ -36,11 +36,10 @@
     {{ range . }}
     {{ $open := .IsAncestor $section }}
     <div x-data="{ open: {{ $open }} }">
-      <p class="flex justify-between items-center">
+      <span class="flex justify-between items-center">
         {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
-
         {{ template "chevron-icon" }}
-      </p>
+      </span>
 
       {{ with .Pages }}
       <div x-show.transition.duration.300ms="open">
@@ -75,10 +74,10 @@
 {{ $section := .section }}
 {{ $open := .ctx.IsAncestor $section }}
 <div x-data="{ open: {{ $open }} }">
-  <p class="flex justify-between items-center">
+  <span class="flex justify-between items-center">
     {{ template "link" (dict "here" $here "url" .ctx.RelPermalink "title" (.ctx.Params.short | default .ctx.Title)) }}
     {{ template "chevron-icon" }}
-  </p>
+  </span>
 
   <div x-show.transition.duration.300ms="open" class="flex flex-col space-y-0.5 pl-3.5 my-0.5">
     {{ with .ctx.Sections }}
@@ -111,7 +110,7 @@
 
 {{ define "link" }}
 {{ $isActive := eq .here .url }}
-<a href="{{ .url }}" class="block tracking-tight leading-snug dark:text-gray-400 text-gray-700 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
+<a href="{{ .url }}" class="flex-1 tracking-tight leading-snug dark:text-gray-400 text-gray-700 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
   {{ .title }}
 </a>
 {{ end }}
@@ -125,13 +124,6 @@
 </a>
 {{ end }}
 
-{{ define "external-link-icon" }}
-{{/* Heroicon: outline/external-link */}}
-<svg xmlns="http://www.w3.org/2000/svg" class="pl-0.5 dark:text-gray-400 text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-</svg>
-{{ end }}
-
 {{ define "meta-menu" }}
 {{ range .  }}
 <p class="flex items-start">
@@ -141,7 +133,10 @@
         {{ .Name }}
       </span>
 
-      {{ template "external-link-icon" }}
+      {{/* Heroicon: outline/external-link */}}
+      <svg xmlns="http://www.w3.org/2000/svg" class="pl-0.5 dark:text-gray-400 text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+      </svg>
     </span>
   </a>
 </p>
