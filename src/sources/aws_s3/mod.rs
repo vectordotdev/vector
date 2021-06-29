@@ -4,6 +4,8 @@ use crate::{
     line_agg,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
 };
+use async_compression::tokio::bufread;
+use futures::{stream, stream::StreamExt};
 use rusoto_core::Region;
 use rusoto_s3::S3Client;
 use rusoto_sqs::SqsClient;
@@ -145,16 +147,18 @@ enum CreateSqsIngestorError {
     RegionParse { source: rusoto::region::ParseError },
 }
 
-fn s3_object_decoder(
+/// None if body is empty
+async fn s3_object_decoder(
     compression: Compression,
     key: &str,
     content_encoding: Option<&str>,
     content_type: Option<&str>,
-    body: rusoto_s3::StreamingBody,
-) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    use async_compression::tokio::bufread;
-
-    let r = tokio::io::BufReader::new(body.into_async_read());
+    mut body: rusoto_s3::StreamingBody,
+) -> Option<Box<dyn tokio::io::AsyncRead + Send + Unpin>> {
+    let first = body.next().await?;
+    let r = tokio::io::BufReader::new(
+        rusoto_s3::StreamingBody::new(stream::iter(Some(first)).chain(body)).into_async_read(),
+    );
 
     let compression = match compression {
         Auto => {
@@ -164,7 +168,7 @@ fn s3_object_decoder(
     };
 
     use Compression::*;
-    match compression {
+    Some(match compression {
         Auto => unreachable!(), // is mapped above
         None => Box::new(r),
         Gzip => Box::new({
@@ -177,7 +181,7 @@ fn s3_object_decoder(
             decoder.multiple_members(true);
             decoder
         }),
-    }
+    })
 }
 
 /// try to determine the compression given the:
@@ -274,6 +278,15 @@ mod integration_tests {
     use rusoto_core::Region;
     use rusoto_s3::{PutObjectRequest, S3Client, S3};
     use rusoto_sqs::{Sqs, SqsClient};
+
+    #[tokio::test]
+    async fn s3_empty_message_gzip() {
+        trace_init();
+
+        let key = uuid::Uuid::new_v4().to_string();
+
+        test_event(key, Some("gzip"), None, None, Vec::new(), Vec::new()).await;
+    }
 
     #[tokio::test]
     async fn s3_process_message() {

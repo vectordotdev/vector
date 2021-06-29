@@ -391,7 +391,13 @@ impl IngestorProcess {
                     object.content_encoding.as_deref(),
                     object.content_type.as_deref(),
                     body,
-                );
+                )
+                .await;
+
+                let object_reader = match object_reader {
+                    Some(reader) => reader,
+                    None => return Ok(()),
+                };
 
                 // Record the read error seen to propagate up later so we avoid ack'ing the SQS
                 // message
