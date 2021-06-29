@@ -1,6 +1,6 @@
 use crate::{
     event::{Event, LogEvent, Value},
-    internal_events::{SocketEventReceived, SocketMode},
+    internal_events::{SocketDecodeFrameFailed, SocketEventReceived, SocketMode},
     sources::util::{
         decoding::{DecodingBuilder, DecodingConfig},
         SocketListenAddr, TcpSource,
@@ -122,7 +122,10 @@ impl TcpSource for RawTcpSource {
         let value = match (context.decode)(frame) {
             Ok(value) => value,
             Err(error) => {
-                error!(message = "Failed decoding frame.", %error);
+                emit!(SocketDecodeFrameFailed {
+                    mode: SocketMode::Tcp,
+                    error
+                });
                 return None;
             }
         };

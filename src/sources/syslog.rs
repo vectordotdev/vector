@@ -8,7 +8,9 @@ use crate::{
         SourceDescription,
     },
     event::{Event, Value},
-    internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
+    internal_events::{
+        SocketMode, SyslogEventReceived, SyslogInvalidUtf8FrameReceived, SyslogUdpReadError,
+    },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -146,7 +148,10 @@ impl SourceConfig for SyslogConfig {
                 |host_key, default_host, frame, _| match std::str::from_utf8(&frame) {
                     Ok(line) => Some(event_from_str(host_key, default_host, line)),
                     Err(error) => {
-                        error!(message = "Received frame containing invalid UTF-8.", %error);
+                        emit!(SyslogInvalidUtf8FrameReceived {
+                            mode: SocketMode::Unix,
+                            error
+                        });
                         None
                     }
                 },
@@ -441,7 +446,12 @@ pub fn udp(
                             let received_from = received_from.ip().to_string().into();
 
                             std::str::from_utf8(&bytes)
-                                .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
+                                .map_err(|error| {
+                                    emit!(SyslogInvalidUtf8FrameReceived {
+                                        mode: SocketMode::Udp,
+                                        error
+                                    })
+                                })
                                 .ok()
                                 .map(|s| Ok(event_from_str(&host_key, Some(received_from), s)))
                         }

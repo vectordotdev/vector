@@ -5,7 +5,9 @@ use super::util::{
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{BatchNotifier, LogEvent, Value},
-    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
+    internal_events::{
+        KafkaDecodeMessageFailed, KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed,
+    },
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -177,7 +179,7 @@ async fn kafka_source(
                 let message = match decode(Bytes::from(payload.to_owned())) {
                     Ok(message) => message,
                     Err(error) => {
-                        error!(message = "Error decoding event.", %error);
+                        emit!(KafkaDecodeMessageFailed { error });
                         continue;
                     }
                 };

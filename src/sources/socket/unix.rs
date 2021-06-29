@@ -1,6 +1,6 @@
 use crate::{
     event::{Event, LogEvent, Value},
-    internal_events::{SocketEventReceived, SocketMode},
+    internal_events::{SocketDecodeFrameFailed, SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source, decoding::DecodingConfig},
@@ -58,7 +58,10 @@ fn build_event(
     let value = match decode(frame) {
         Ok(value) => value,
         Err(error) => {
-            error!(message = "Failed decoding frame.", %error);
+            emit!(SocketDecodeFrameFailed {
+                mode: SocketMode::Tcp,
+                error
+            });
             return None;
         }
     };

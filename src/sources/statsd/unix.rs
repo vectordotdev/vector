@@ -1,5 +1,6 @@
 use crate::{
     event::{Event, Value},
+    internal_events::StatsdInvalidUtf8FrameReceived,
     shutdown::ShutdownSignal,
     sources::util::build_unix_stream_source,
     sources::Source,
@@ -24,7 +25,7 @@ fn build_event(
     match std::str::from_utf8(&frame) {
         Ok(line) => super::parse_event(line),
         Err(error) => {
-            error!(message = "Received frame containing invalid UTF-8.", %error);
+            emit!(StatsdInvalidUtf8FrameReceived { error });
             None
         }
     }

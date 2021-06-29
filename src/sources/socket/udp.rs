@@ -1,6 +1,8 @@
 use crate::{
     event::{Event, LogEvent},
-    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
+    internal_events::{
+        SocketDecodeFrameFailed, SocketEventReceived, SocketMode, SocketReceiveError,
+    },
     shutdown::ShutdownSignal,
     sources::{
         util::decoding::{DecodingBuilder, DecodingConfig},
@@ -104,7 +106,10 @@ pub fn udp(
                         let value = match decode(frame) {
                             Ok(value) => value,
                             Err(error) => {
-                                error!(message = "Failed decoding frame.", %error);
+                                emit!(SocketDecodeFrameFailed {
+                                    mode: SocketMode::Tcp,
+                                    error
+                                });
                                 continue;
                             }
                         };
