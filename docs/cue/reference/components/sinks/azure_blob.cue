@@ -138,51 +138,38 @@ components: sinks: azure_blob: {
 		object_naming: {
 			title: "Object naming"
 			body:  """
-				By default, Vector will name your blobs in the following format:
+				By default, Vector names your blobs different based on whether or not the blobs are compressed.
 
-				<Tabs
-				  block={true}
-				  defaultValue="without_compression"
-				  values={[
-				    { label: 'Without Compression', value: 'without_compression', },
-				    { label: 'With Compression', value: 'with_compression', },
-				  ]
-				}>
-
-				<TabItem value="without_compression">
+				Here is the format without compression:
 
 				```text
 				<key_prefix><timestamp>-<uuidv4>.log
 				```
 
-				For example:
+				Here's an example blob name *without* compression:
 
 				```text
 				blob/2021-06-23/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
 				```
 
-				</TabItem>
-				<TabItem value="with_compression">
+				And here is the format *with* compression:
 
 				```text
 				<key_prefix><timestamp>-<uuidv4>.log.gz
 				```
 
-				For example:
+				An example blob name with compression:
 
 				```text
 				blob/2021-06-23/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log.gz
 				```
 
-				</TabItem>
-				</Tabs>
-
 				Vector appends a [UUIDV4](\(urls.uuidv4)) token to ensure there are no name
-				conflicts in the unlikely event 2 Vector instances are writing data at the same
+				conflicts in the unlikely event that two Vector instances are writing data at the same
 				time.
 
-				You can control the resulting name via the `blob_prefix`, `blob_time_format`,
-				and `blob_append_uuid` options.
+				You can control the resulting name via the [`blob_prefix`](#blob_prefix),
+				[`blob_time_format`](#blob_time_format), and [`blob_append_uuid`](#blob_append_uuid) options.
 				"""
 		}
 	}
