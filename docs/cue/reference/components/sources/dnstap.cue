@@ -1201,68 +1201,67 @@ components: sources: dnstap: {
 	how_it_works: {
 		server_uds: {
 			title: "Server Unix Domain Socket (UDS)"
-			body: #"""
-				The dnstap source component receives dnstap data through a Unix
-				Domain Socket (a.k.a. UDS). Path of the UDS must be specified
-				explicitly in dnstap source configuration.
+			body: """
+				The `dnstap` source receives dnstap data through a Unix Domain Socket (aka UDS). The
+				path of the UDS must be explicitly specified in the source's configuration.
 
-				Upon startup, the dnstap source component will create a new server
-				UDS at the specified path. If the path of UDS has been occupied already,
-				it'll be deleted first automatically.
+				Upon startup, the `dnstap` source creates a new server UDS at the specified path.
+				If the path of UDS is already in use, Vector automatically deletes it before
+				creating a new path.
 
-				Default permissions of the UDS is determined by current "umask" value.
-				To customize it to allow local BIND server to send dnstap data to the UDS,
-				user can specify the desired UDS permissions (a.k.a. file mode) explicitly
-				in dnstap source configuration. For example, to set its permission as "0774",
-				add option "socket_file_mode" in dnstap source configuration like below:
+				The default permissions of the UDS are determined by the current `umask` value.
+				To customize it to allow the local BIND server to send dnstap data to the UDS,
+				you can specify the desired UDS permissions (for example the file mode) explicitly
+				in the `dnstap` source configuration. To set its permissions to `0774`, for example,
+				add the `socket_file_mode` option:
 
 				```toml
 				[sources.my_dnstap_source]
 				type = "dnstap"
-				# ...
 				socket_file_mode: 0o774
+				# Other configs
 				```
-				"""#
+				"""
 			sub_sections: [
 				{
-					title: "Work With Remote BIND server"
-					body: #"""
-						The dnstap source component can create server UDS only on local
-						machine, but it's also possible to work with remote BIND server
-						too. To do it, you'd have to forward the server UDS from Vector's
-						hosting machine to the remote BIND server (e.g. through "ssh")
-						once Vector starts.
-						Make sure the Unix domain sockets on both local and remote machines
-						having appropriate permissions set.
-						"""#
+					title: "Using a remote BIND server"
+					body: """
+						While the `dnstap` source can create server UDS paths only on the local
+						machine, you can also use it with remote BIND servers by forwarding the
+						server UDS from the machine Vector is running on to the remote BIND server
+						(for example via SSH) once Vector starts. Make sure that the Unix domain
+						sockets on both the local and remote machines have appropriate permissions
+						set.
+						"""
 				},
 			]
 		}
 
 		manipulate_uds_buffer_size: {
 			title: "Manipulate UDS Buffer Size"
-			body: #"""
-				The dnstap source component supports configuring UDS buffer size for
-				both receiving and sending, which may be helpful to handle spiked DNS
-				traffic more smoothly for some high performance use scenarios.
+			body: """
+				The `dnstap` source supports configuring the UDS buffer for both receiving and
+				sending, which may be helpful for handling DNS traffic spikes more smoothly in
+				high-usage scenarios in which performance is of paramount concern.
 
-				To configure receive/send buffer size for the server UDS, add options
-				"socket_receive_buffer_size" and "socket_send_buffer_size" in dnstap
-				configuration accordingly, like below:
+				To configure the send/receive buffer size for the server UDS, set the
+				[`socket_receive_buffer_size`](#socket_receive_buffer_size) and
+				[`socket_send_buffer_size`](#socket_send_buffer_size) parameters in the component's
+				configuration. Here's an example:
 
 				```toml
 				[sources.my_dnstap_source]
 				type = "dnstap"
-				# ...
 				socket_receive_buffer_size = 10_485_760
 				socket_send_buffer_size = 10_485_760
+				# Other configs
 				```
 
-				And certainly, for the buffer size settings to actually take effects,
-				you'd have to ensure that the system-wide settings of max socket
-				receive/send buffer sizes (i.e. values of '/proc/sys/net/core/rmem_max'
-				and '/proc/sys/net/core/wmem_max' on Linux) are large enough.
-				"""#
+				For the buffer size settings to take effect, you need to ensure that the system-wide
+				settings for send/receive buffer sizes (i.e. the values of
+				`/proc/sys/net/core/rmem_max` and `/proc/sys/net/core/wmem_max` on Linux) are
+				large enough.
+				"""
 		}
 	}
 

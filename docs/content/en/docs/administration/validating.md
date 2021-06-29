@@ -4,7 +4,20 @@ weight: 5
 tags: ["validate", "configuration"]
 ---
 
-Vector provides a subcommand, `validate`, that checks the validity of any number of configuration files and then exits.
+Vector provides a subcommand, [`validate`][validate], that checks the validity of any number of configuration files and
+then exits. Here's an example usage:
+
+```bash
+vector validate /etc/vector/vector.toml
+```
+
+You can also check multiple files
+
+
+
+[validate]: /docs/reference/cli/#validate
+
+
 
 {{% tabs default="All checks" %}}
 {{% tab title="All checks" %}}

@@ -50,7 +50,7 @@ A **sink** is a destination for events. Each sink's design and transmission meth
 
 ## Pipeline
 
-A **pipeline** is a [directed acyclic graph][dag] of [components]. Each component is a node on the graph with directed edges. Data must flow in one direction, from sources to sinks. Components can produce zero or more events.
+A **pipeline** is a [directed acyclic graph][dag] of [components]. Each component is a node in the graph with directed edges. Data must flow in one direction, from sources to sinks. Components can produce zero or more events.
 
 {{< jump "/docs/about/under-the-hood/architecture/pipeline-model" >}}
 

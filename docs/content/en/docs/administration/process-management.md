@@ -1,20 +1,16 @@
 ---
-title: Process management
-description: Something
+title: Management
+description: How to start, stop, reload, and restart your Vector instance
 short: Management
 weight: 1
 tags: ["process", "admin", "reload", "start", "stop", "restart"]
 ---
 
-This document shows you how to manage the Vector process on various platforms. *How* you manage the Vector process is largely dependent on how you installed it.
-
-## Administrate
-
-The sections below show you how to administer your Vector instance—start, stop, reload, etc.—on these available platforms:
+The sections below show you how to administer your Vector instance—start, stop, reload, etc.—in a variety of settings:
 
 * [Vector executable](#vector-executable) (no process manager)
-* [Linux](#linux)
-* [macOS](#macos)
+* [Linux](#linux) (systemctl process manager)
+* [macOS](#macos) (Homebrew service manager)
 * [Windows](#windows)
 * [Docker](#docker)
 * [Kubernetes with Helm](#helm)
@@ -74,7 +70,7 @@ executable](#vector-executable) section.
 
 ### macOS
 
-If you're running Vector on macOS, you can manage it either using the [executable](#vector-executable) commands or using
+If you're running Vector on macOS, you can manage it using either the [executable](#vector-executable) commands or
 [Homebrew](#homebrew).
 
 #### Homebrew
