@@ -296,8 +296,8 @@ mod tests {
                 Compression::Gzip,
                 Compression::Gzip,
                 true,
-                String::new(),
-                String::new(),
+                Vec::new(),
+                Vec::new(),
             ),
         ];
 
