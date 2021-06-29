@@ -34,6 +34,7 @@ syslog_loose = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
+roxmltree = { version = "0.14.1", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
@@ -118,6 +119,7 @@ default = [
     "parse_timestamp",
     "parse_tokens",
     "parse_url",
+    "parse_xml",
     "push",
     "redact",
     "replace",
@@ -225,6 +227,7 @@ parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_tokens = ["shared/tokenize"]
 parse_url = ["url"]
+parse_xml = ["roxmltree", "lazy_static", "regex"]
 push = []
 redact = []
 replace = []
