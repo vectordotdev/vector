@@ -10,6 +10,12 @@ use tracing::{debug, info};
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
+const HELM_VALUES_LOWER_GLOB: &str = indoc! {r#"
+    kubernetesLogsSource:
+      rawConfig: |
+        glob_minimum_cooldown_ms = 5000
+"#};
+
 const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
     sinks:
       stdout:
@@ -67,11 +73,11 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -167,11 +173,11 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK_RAW_CONFIG,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -263,11 +269,11 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -383,11 +389,11 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -460,11 +466,11 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -558,11 +564,11 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -695,11 +701,11 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -880,6 +886,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     const CONFIG: &str = indoc! {r#"
         kubernetesLogsSource:
           rawConfig: |
+            glob_minimum_cooldown_ms = 5000
             extra_label_selector = "my_custom_negative_label_selector!=my_val"
             extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
     "#};
@@ -889,11 +896,11 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
-                    &format!("{}\n{}", CONFIG, HELM_VALUES_STDOUT_SINK),
-                    &override_name,
-                    true,
-                ),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    CONFIG,
+                    HELM_VALUES_STDOUT_SINK,
+                ],
                 ..Default::default()
             },
         )
@@ -1082,11 +1089,11 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1241,6 +1248,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         kubernetesLogsSource:
           rawConfig: |
             exclude_paths_glob_patterns = ["/var/log/pods/{}_test-pod_*/excluded/**"]
+            glob_minimum_cooldown_ms = 5000
     "#},
         pod_namespace
     );
@@ -1250,11 +1258,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
-                    &format!("{}\n{}", config, HELM_VALUES_STDOUT_SINK),
-                    &override_name,
-                    true,
-                ),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    config,
+                    HELM_VALUES_STDOUT_SINK,
+                ],
                 ..Default::default()
             },
         )
@@ -1408,11 +1416,11 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1535,11 +1543,11 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_ADDITIONAL_CONFIGMAP,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
             },
         )
@@ -1631,11 +1639,11 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK,
-                    &override_name,
-                    true,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1778,7 +1786,10 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name("", &override_name, true),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1836,7 +1847,7 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
             "test-vector",
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: vec![HELM_VALUES_STDOUT_SINK, HELM_VALUES_LOWER_GLOB],
                 ..Default::default()
             },
         )

@@ -2,9 +2,9 @@ use crate::{
     config::log_schema,
     event::Event,
     internal_events::aws_s3::source::{
-        SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
-        SqsMessageProcessingSucceeded, SqsMessageReceiveFailed, SqsMessageReceiveSucceeded,
-        SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
+        SqsMessageDeleteBatchFailed, SqsMessageDeletePartialFailure, SqsMessageDeleteSucceeded,
+        SqsMessageProcessingFailed, SqsMessageProcessingSucceeded, SqsMessageReceiveFailed,
+        SqsMessageReceiveSucceeded, SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -18,8 +18,8 @@ use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
 use rusoto_sqs::{
-    DeleteMessageError, DeleteMessageRequest, Message, ReceiveMessageError, ReceiveMessageRequest,
-    Sqs, SqsClient,
+    DeleteMessageBatchError, DeleteMessageBatchRequest, DeleteMessageBatchRequestEntry,
+    DeleteMessageBatchResult, Message, ReceiveMessageError, ReceiveMessageRequest, Sqs, SqsClient,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
@@ -244,6 +244,7 @@ impl IngestorProcess {
             })
             .unwrap_or_default();
 
+        let mut delete_entries = Vec::new();
         for message in messages {
             let receipt_handle = match message.receipt_handle {
                 None => {
@@ -267,28 +268,44 @@ impl IngestorProcess {
                         message_id: &message_id
                     });
                     if self.state.delete_message {
-                        // TODO: SQS supports DeleteMessageBatch, so we could collapse this from 10
-                        // delete calls in serial to a single batch of 10 deletes.  not sure how
-                        // this would interact with E2E acknowledgements, though, in the future.
-                        match self.delete_message(receipt_handle).await {
-                            Ok(_) => {
-                                emit!(SqsMessageDeleteSucceeded {
-                                    message_id: &message_id
-                                });
-                            }
-                            Err(err) => {
-                                emit!(SqsMessageDeleteFailed {
-                                    error: &err,
-                                    message_id: &message_id,
-                                });
-                            }
-                        }
+                        delete_entries.push(DeleteMessageBatchRequestEntry {
+                            id: message_id,
+                            receipt_handle,
+                        });
                     }
                 }
                 Err(err) => {
                     emit!(SqsMessageProcessingFailed {
                         message_id: &message_id,
                         error: &err,
+                    });
+                }
+            }
+        }
+
+        if !delete_entries.is_empty() {
+            // We need these for a correct error message if the batch fails overall.
+            let cloned_entries = delete_entries.clone();
+            match self.delete_messages(delete_entries).await {
+                Ok(result) => {
+                    // Batch deletes can have partial successes/failures, so we have to check
+                    // for both cases and emit accordingly.
+                    if !result.successful.is_empty() {
+                        emit!(SqsMessageDeleteSucceeded {
+                            message_ids: result.successful,
+                        });
+                    }
+
+                    if !result.failed.is_empty() {
+                        emit!(SqsMessageDeletePartialFailure {
+                            entries: result.failed
+                        });
+                    }
+                }
+                Err(err) => {
+                    emit!(SqsMessageDeleteBatchFailed {
+                        entries: cloned_entries,
+                        error: err,
                     });
                 }
             }
@@ -481,15 +498,15 @@ impl IngestorProcess {
             .await
     }
 
-    async fn delete_message(
+    async fn delete_messages(
         &mut self,
-        receipt_handle: String,
-    ) -> Result<(), RusotoError<DeleteMessageError>> {
+        entries: Vec<DeleteMessageBatchRequestEntry>,
+    ) -> Result<DeleteMessageBatchResult, RusotoError<DeleteMessageBatchError>> {
         self.state
             .sqs_client
-            .delete_message(DeleteMessageRequest {
+            .delete_message_batch(DeleteMessageBatchRequest {
                 queue_url: self.state.queue_url.clone(),
-                receipt_handle,
+                entries,
             })
             .await
     }

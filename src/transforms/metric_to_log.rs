@@ -2,7 +2,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
     },
-    event::{self, Event, LogEvent},
+    event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogFailedSerialize,
     transforms::{FunctionTransform, Transform},
     types::Conversion,
@@ -74,13 +74,9 @@ impl MetricToLog {
             timezone,
         }
     }
-}
 
-impl FunctionTransform for MetricToLog {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let metric = event.into_metric();
-
-        let retval = serde_json::to_value(&metric)
+    pub fn transform_one(&self, metric: Metric) -> Option<LogEvent> {
+        serde_json::to_value(&metric)
             .map_err(|error| emit!(MetricToLogFailedSerialize { error }))
             .ok()
             .and_then(|value| match value {
@@ -106,10 +102,18 @@ impl FunctionTransform for MetricToLog {
                         log.insert(&log_schema().host_key(), host);
                     }
 
-                    Some(log.into())
+                    Some(log)
                 }
                 _ => None,
-            });
+            })
+    }
+}
+
+impl FunctionTransform for MetricToLog {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+        let retval: Option<Event> = self
+            .transform_one(event.into_metric())
+            .map(|log| log.into());
         output.extend(retval.into_iter())
     }
 }

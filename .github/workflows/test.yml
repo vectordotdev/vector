@@ -198,6 +198,16 @@ jobs:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
 
+  cross-linux-check:
+    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    runs-on: ubuntu-latest
+    name: Cross - Linux
+    needs: cross-linux
+    steps:
+      - name: Check cross matrix status
+        if: ${{ needs.cross-linux.result != 'success' }}
+        run: exit 1
+
   test-mac:
     name: Unit - Mac
     # Full CI suites for this platform were only recently introduced.

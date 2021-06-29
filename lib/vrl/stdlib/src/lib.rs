@@ -56,8 +56,12 @@ mod get_hostname;
 mod includes;
 #[cfg(feature = "integer")]
 mod integer;
+#[cfg(feature = "ip_aton")]
+mod ip_aton;
 #[cfg(feature = "ip_cidr_contains")]
 mod ip_cidr_contains;
+#[cfg(feature = "ip_ntoa")]
+mod ip_ntoa;
 #[cfg(feature = "ip_subnet")]
 mod ip_subnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -277,8 +281,12 @@ pub use get_hostname::GetHostname;
 pub use includes::Includes;
 #[cfg(feature = "integer")]
 pub use integer::Integer;
+#[cfg(feature = "ip_aton")]
+pub use ip_aton::IpAton;
 #[cfg(feature = "ip_cidr_contains")]
 pub use ip_cidr_contains::IpCidrContains;
+#[cfg(feature = "ip_ntoa")]
+pub use ip_ntoa::IpNtoa;
 #[cfg(feature = "ip_subnet")]
 pub use ip_subnet::IpSubnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -484,8 +492,12 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Includes),
         #[cfg(feature = "integer")]
         Box::new(Integer),
+        #[cfg(feature = "ip_aton")]
+        Box::new(IpAton),
         #[cfg(feature = "ip_cidr_contains")]
         Box::new(IpCidrContains),
+        #[cfg(feature = "ip_ntoa")]
+        Box::new(IpNtoa),
         #[cfg(feature = "ip_subnet")]
         Box::new(IpSubnet),
         #[cfg(feature = "ip_to_ipv6")]

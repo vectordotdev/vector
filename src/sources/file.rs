@@ -1067,7 +1067,7 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let received = run_file_source(&config, false, acking, async {
+            let received = run_file_source(&config, true, acking, async {
                 let mut file = File::create(&path).unwrap();
                 sleep_500_millis().await;
                 writeln!(&mut file, "first line").unwrap();

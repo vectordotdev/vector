@@ -248,6 +248,25 @@ mod tests {
             tdef: TypeDef::new().fallible().object(type_def_error()),
         }
 
+        error_line_thread_id {
+            args: func_args![
+                value: r#"[2021-06-04 15:40:27.138633] [php7:emerg] [pid 4803] [client 95.223.77.60:35106] PHP Parse error:  syntax error, unexpected \'->\' (T_OBJECT_OPERATOR) in /var/www/prod/releases/master-c7225365fd9faa26262cffeeb57b31bd7448c94a/source/index.php on line 14"#,
+                timestamp_format: "%Y-%m-%d %H:%M:%S.%f",
+                format: "error",
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-04T15:40:27.000138633Z").unwrap().into()),
+                "message" => "PHP Parse error:  syntax error, unexpected \\\'->\\\' (T_OBJECT_OPERATOR) in /var/www/prod/releases/master-c7225365fd9faa26262cffeeb57b31bd7448c94a/source/index.php on line 14",
+                "module" => "php7",
+                "severity" => "emerg",
+                "pid" => 4803,
+                "client" => "95.223.77.60",
+                "port" => 35106
+
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+        }
+
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -",
                              format: "common",

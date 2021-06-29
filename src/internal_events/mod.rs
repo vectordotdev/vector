@@ -3,6 +3,7 @@ use std::borrow::Cow;
 mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;
+mod aggregate;
 mod ansi_stripper;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
@@ -22,6 +23,8 @@ mod aws_kinesis_streams;
 pub(crate) mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
+#[cfg(feature = "sinks-azure_blob")]
+pub(crate) mod azure_blob;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
@@ -42,6 +45,8 @@ mod dnstap;
 mod docker_logs;
 mod elasticsearch;
 mod encoding_transcode;
+#[cfg(feature = "sources-eventstoredb_metrics")]
+mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
 #[cfg(feature = "transforms-filter")]
@@ -133,6 +138,7 @@ pub mod kubernetes;
 pub use self::adaptive_concurrency::*;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
+pub use self::aggregate::*;
 pub use self::ansi_stripper::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub use self::apache_metrics::*;
@@ -170,6 +176,8 @@ pub(crate) use self::dnstap::*;
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
 pub use self::encoding_transcode::*;
+#[cfg(feature = "sources-eventstoredb_metrics")]
+pub use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]
 pub use self::exec::*;
 #[cfg(any(

@@ -20,7 +20,6 @@ use std::{
     task::{Context, Poll},
 };
 use tower::Service;
-use tracing::Span;
 use tracing_futures::Instrument;
 
 #[derive(Debug, Snafu)]
@@ -37,7 +36,6 @@ pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future
 
 pub struct HttpClient<B = Body> {
     client: Client<HttpsConnector<HttpConnector>, B>,
-    span: Span,
     user_agent: HeaderValue,
 }
 
@@ -70,20 +68,15 @@ where
         let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
             .expect("Invalid header value for version!");
 
-        let span = tracing::info_span!("http");
-
-        Ok(HttpClient {
-            client,
-            span,
-            user_agent,
-        })
+        Ok(HttpClient { client, user_agent })
     }
 
     pub fn send(
         &self,
         mut request: Request<B>,
     ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
-        let _enter = self.span.enter();
+        let span = tracing::info_span!("http");
+        let _enter = span.enter();
 
         default_request_headers(&mut request, &self.user_agent);
 
@@ -122,7 +115,7 @@ where
             });
             Ok(response)
         }
-        .instrument(self.span.clone());
+        .instrument(span.clone());
 
         Box::pin(fut)
     }
@@ -167,7 +160,6 @@ impl<B> Clone for HttpClient<B> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
-            span: self.span.clone(),
             user_agent: self.user_agent.clone(),
         }
     }

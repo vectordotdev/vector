@@ -34,7 +34,9 @@ criterion_group!(
               get_env_var,
               get_hostname,
               includes,
+              ip_aton,
               ip_cidr_contains,
+              ip_ntoa,
               ip_subnet,
               ip_to_ipv6,
               ipv6_to_ipv4,
@@ -415,7 +417,15 @@ bench_function! {
         args: func_args![value: value!(["foo", 1, true, [1,2,3]]), item: value!("foo")],
         want: Ok(value!(true)),
     }
+}
 
+bench_function! {
+    ip_aton => vrl_stdlib::IpAton;
+
+    valid {
+        args: func_args![value: "1.2.3.4"],
+        want: Ok(value!(67305985)),
+    }
 }
 
 bench_function! {
@@ -429,6 +439,15 @@ bench_function! {
     ipv6 {
         args: func_args![cidr: "2001:4f8:3:ba::/64", value: "2001:4f8:3:ba:2e0:81ff:fe22:d1f1"],
         want: Ok(true),
+    }
+}
+
+bench_function! {
+    ip_ntoa => vrl_stdlib::IpNtoa;
+
+    valid {
+        args: func_args![value: 67305985],
+        want: Ok(value!("1.2.3.4")),
     }
 }
 
