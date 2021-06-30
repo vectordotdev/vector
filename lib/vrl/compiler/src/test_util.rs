@@ -53,7 +53,8 @@ macro_rules! bench_function {
                     let mut compiler_state = $crate::state::Compiler::default();
                     let mut runtime_state = $crate::state::Runtime::default();
                     let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
-                    let mut ctx = $crate::Context::new(&mut target, &mut runtime_state);
+                    let tz = shared::TimeZone::default();
+                    let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                     b.iter(|| {
                         let got = expression.resolve(&mut ctx).map_err(|e| e.to_string());
@@ -84,7 +85,8 @@ macro_rules! test_function {
                         let mut compiler_state = $crate::state::Compiler::default();
                         let mut runtime_state = $crate::state::Runtime::default();
                         let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
-                        let mut ctx = $crate::Context::new(&mut target, &mut runtime_state);
+                        let tz = shared::TimeZone::default();
+                        let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                         let got_value = expression.resolve(&mut ctx)
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

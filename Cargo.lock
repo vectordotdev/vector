@@ -8551,6 +8551,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "shared",
  "structopt 0.3.22",
  "tracing-subscriber",
  "vrl",
