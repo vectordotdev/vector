@@ -37,7 +37,8 @@ impl Function for FormatInt {
             Example {
                 title: "format decimal integer",
                 source: r#"format_int!(42)"#,
-                result: Ok("42"),
+                // extra "s are needed to avoid being read as an integer by tests
+                result: Ok("\"42\""),
             },
             Example {
                 title: "format hexidecimal integer",
