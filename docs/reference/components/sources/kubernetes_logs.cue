@@ -239,7 +239,7 @@ components: sources: kubernetes_logs: {
 			    `lines` value is, the greater the chance of it not reading the last file/logs of 
 				the container.
 				"""
-			required:      false
+			required: false
 			type: uint: {
 				default: 1
 				unit:    "lines"
