@@ -611,9 +611,10 @@ Here are original events with all of the additional context!
 
 [aws_auth]: /docs/reference/configuration/sinks/aws_cloudwatch_logs/#aws-authentication
 [AWS CloudWatch Logs subscriptions]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Subscriptions.html
-[aws_kinesis_firehose]: /docs/reference/source/aws_kinesis_firehose/
-[aws_cloudwatch_logs_subscription_parser]: /docs/reference/transform/aws_cloudwatch_logs_subscription_parser/
+[aws_kinesis_firehose]: /docs/reference/configuration/sources/aws_kinesis_firehose/
+[aws_cloudwatch_logs_subscription_parser]: /docs/reference/configuration/transforms/aws_cloudwatch_logs_subscription_parser/
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [AWS Kinesis Firehose]: https://aws.amazon.com/kinesis/data-firehose/?kinesis-blogs.sort-by=item.additionalFields.createdDate&kinesis-blogs.sort-order=desc
 [flog]: https://github.com/mingrammer/flog
-[json_parser]: /docs/reference/transforms/json_parser
+[json_parser]: /docs/reference/vrl/functions/#parse_json
+m

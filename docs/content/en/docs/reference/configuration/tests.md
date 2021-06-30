@@ -1,7 +1,6 @@
 ---
 title: Unit tests reference
 short: Unit tests
-draft: true
 weight: 5
 ---
 
@@ -12,7 +11,3 @@ You can execute tests within a configuration file using the `test` subcommand:
 ```bash
 vector test /etc/vector/*.toml
 ```
-
-## Configuration
-
-{{< config/unit-tests >}}

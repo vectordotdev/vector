@@ -3,6 +3,9 @@ $spacing-vertical: 0
 $transition-fast: 0
 
 // Main page globe icon
+$globe-light-gray: rgb(216,216,216)
+$globe-dark-gray: rgb(88,88,88)
+
 $globe-ocean-color: rgb(0, 0, 0)
 $globe-land-color: rgb(88,88,88)
 
@@ -176,10 +179,20 @@ $globe-land-color: rgb(88,88,88)
         transition: all $transition-fast ease
 
 // Spinning globe in the main page community section
-#globe-wrapper
-  #globe
-    svg
-      fill: $globe-ocean-color
+.dark
+  #globe-wrapper
+    #globe
+      svg
+        fill: $globe-dark-gray
 
-      .land
-        fill: $globe-land-color
+        .land
+          fill: $globe-light-gray
+
+.light
+  #globe-wrapper
+    #globe
+      svg
+        fill: $globe-light-gray
+
+        .land
+          fill: $globe-dark-gray
