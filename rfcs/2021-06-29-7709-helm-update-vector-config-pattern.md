@@ -4,7 +4,7 @@ This RFC proposes an update for our current configuration to fully embrace our s
 
 ## Scope
 
-This RFC will cover the component configuration keys and the default `sinks` and `sources` defined under unique keys in 
+This RFC will cover the component configuration keys and the default `sinks` and `sources` defined under unique keys in
 our Helm charts today. We provide defaults configurations for the following components:
 
 vector-agent:
