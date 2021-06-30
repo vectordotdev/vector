@@ -7109,9 +7109,9 @@ dependencies = [
 
 [[package]]
 name = "syslog_loose"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b87c43adeba9354cdb8527ad333bae41caf5cad5ce5cbeb8b11eafcf9de5e07a"
+checksum = "7ba220e129d488c177105615a9f8dfff3df9c90ca0297f9eae49d8ef0bf13dbf"
 dependencies = [
  "chrono",
  "nom 6.1.2",
