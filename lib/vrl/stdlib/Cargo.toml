@@ -64,6 +64,7 @@ default = [
     "flatten",
     "float",
     "floor",
+    "format_int",
     "format_number",
     "format_timestamp",
     "get_env_var",
@@ -105,6 +106,7 @@ default = [
     "parse_duration",
     "parse_glog",
     "parse_grok",
+    "parse_int",
     "parse_json",
     "parse_key_value",
     "parse_klog",
@@ -172,6 +174,7 @@ exists = []
 flatten = []
 float = []
 floor = []
+format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
 get_env_var = []
@@ -213,6 +216,7 @@ parse_csv = ["csv"]
 parse_duration = ["rust_decimal"]
 parse_glog = ["chrono"]
 parse_grok = ["grok"]
+parse_int = []
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
 parse_klog = ["chrono"]
