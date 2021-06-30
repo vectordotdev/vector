@@ -363,9 +363,8 @@ group we've setup. We can use Vector for this too!
 ```
 
 This will read lines from `stdin` and write them to CloudWatch Logs. See the
-[AWS Authentication](/docs/reference/sinks/aws_cloudwatch_logs/#aws-authentication)
-section for this sink to see how to configure the AWS credentials Vector will
-need to write to AWS.
+[AWS Authentication][aws_auth] section for this sink to see how to configure the
+AWS credentials Vector will need to write to AWS.
 
 Alternatively, you can publish events directly to a CloudWatch Log group through
 the AWS console. First create a log stream within the group, click into it, and
@@ -376,7 +375,7 @@ Let's send some logs. For this, I'm using
 log data.
 
 ```bash
-$ flog -f json | vector --config config.toml
+flog -f json | vector --config config.toml
 ```
 
 This will send some logs to your log group. Within 300 seconds (the default
@@ -610,12 +609,11 @@ This will give us the final result of:
 
 Here are original events with all of the additional context!
 
+[aws_auth]: /docs/reference/configuration/sinks/aws_cloudwatch_logs/#aws-authentication
 [AWS CloudWatch Logs subscriptions]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Subscriptions.html
-[aws_kinesis_firehose]: https://vector.dev/docs/reference/source/aws_kinesis_firehose/
-[aws_cloudwatch_logs_subscription_parser]: https://vector.dev/docs/reference/transform/aws_cloudwatch_logs_subscription_parser/
+[aws_kinesis_firehose]: /docs/reference/source/aws_kinesis_firehose/
+[aws_cloudwatch_logs_subscription_parser]: /docs/reference/transform/aws_cloudwatch_logs_subscription_parser/
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [AWS Kinesis Firehose]: https://aws.amazon.com/kinesis/data-firehose/?kinesis-blogs.sort-by=item.additionalFields.createdDate&kinesis-blogs.sort-order=desc
 [flog]: https://github.com/mingrammer/flog
-[json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
-
-
+[json_parser]: /docs/reference/transforms/json_parser
