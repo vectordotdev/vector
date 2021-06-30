@@ -187,7 +187,7 @@ components: sources: kubernetes_logs: {
 				"""
 			required: false
 			type: array: {
-				default: []
+				default: ["**/*.gz", "**/*.tmp"]
 				items: type: string: {
 					examples: ["**/exclude/**"]
 					syntax: "literal"
@@ -431,6 +431,20 @@ components: sources: kubernetes_logs: {
 				* The `extra_label_selector` option specifies the label selector to
 				  filter `Pod`s with, to be used in addition to the [built-in
 				  `vector.dev/exclude` filter](#pod-exclusion).
+				"""
+		}
+
+		globbing: {
+			title: "Globbing"
+			body:  """
+				By default, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+				ignores compressed and temporary files. This behavior can be configured with the
+				[`exclude_paths_glob_patterns`](\(urls.vector_kubernetes_logs_source)#configuration) option.
+
+				[Globbing](\(urls.globbing)) is used to continually discover `Pod`s log files
+				at a rate defined by the `glob_minimum_cooldown` option. In environments when files are
+				rotated rapidly, we recommend lowering the `glob_minimum_cooldown` to catch files
+				before they are compressed.
 				"""
 		}
 
