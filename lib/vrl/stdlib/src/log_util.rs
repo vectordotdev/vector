@@ -123,6 +123,7 @@ fn parse_time(
 ) -> std::result::Result<DateTime<Utc>, String> {
     timezone
         .datetime_from_str(time, format)
+        .or_else(|_| DateTime::parse_from_str(time, &format).map(Into::into))
         .map_err(|err| err.to_string())
 }
 
