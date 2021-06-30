@@ -24,19 +24,19 @@ cli: {
 	#ArgType: "string" | "list"
 
 	#Commands: [Command=string]: {
-		description: !=""
-		name:        Command
-		flags?:      #Flags
-		options?:    #Options
-		args?:       #Args
+		description:  !=""
+		name:         Command
+		flags?:       #Flags
+		options?:     #Options
+		args?:        #Args
 		experimental: bool | *false
 	}
 
 	#Flags: [Flag=string]: {
-		flag:        "--\(Flag)"
-		description: string
-		env_var?:    string
-		name:        Flag
+		flag:         "--\(Flag)"
+		description:  string
+		env_var?:     string
+		name:         Flag
 		experimental: bool | *false
 
 		if _short != _|_ {
@@ -47,15 +47,15 @@ cli: {
 	}
 
 	#Options: [Option=string]: {
-		option:      "--\(Option)"
-		default?:    string | int
-		description: string
-		enum?:       #Enum
-		name:        Option
-		type:        #OptionType
-		env_var?:    string
-		example?:    string
-		required:    bool | *false
+		option:       "--\(Option)"
+		default?:     string | int
+		description:  string
+		enum?:        #Enum
+		name:         Option
+		type:         #OptionType
+		env_var?:     string
+		example?:     string
+		required:     bool | *false
 		experimental: bool | *false
 
 		if default == _|_ {
@@ -111,7 +111,7 @@ cli: {
 				Send internal tracing spans to a local APM-enabled
 				Datadog agent with a granularity matching the current log level.
 				"""
-			env_var: "VECTOR_ENABLE_DATADOG_TRACING"
+			env_var:      "VECTOR_ENABLE_DATADOG_TRACING"
 			experimental: true
 		}
 	}
