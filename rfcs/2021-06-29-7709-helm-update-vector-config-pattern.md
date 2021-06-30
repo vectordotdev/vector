@@ -34,7 +34,8 @@ Our default configurations are provided directly in the ConfigMap raw, or contai
 Users can opt-out of our configuration by providing their configuration file under a `customConfig` key which disables
 our default configurations for Vector and it's related Kubernetes resources.
 
-Ignoring backward compatibility with existing keys, the vector-agent ConfigMap template would be replaced with the following:
+The following example for the vector-agent chart ignores backward compatibility with existing keys for simplicity.
+The ConfigMap template would be replaced with the following:
 
 ```yaml
 {{- if (empty .Values.existingConfigMap) -}}
@@ -115,6 +116,10 @@ customConfig: {}
   #      inputs: ["host_metrics", "internal_metrics"]
   #      address: 0.0.0.0:9090
 ```
+
+We will be able to support the existing deprecated fields until the 1.0 release by not rendering the new YAML based
+configuration if any deprecated config key is used or enabled, and if a combination of new and old keys are used we
+can use a `fail` function to terminate chart rendering early.
 
 ## Doc-level Proposal
 
