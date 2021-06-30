@@ -96,7 +96,7 @@ impl FunctionTransform for Remap {
 
         let mut runtime = Runtime::default();
 
-        let result = runtime.resolve(&mut target, &self.program);
+        let result = runtime.resolve(&mut target, &self.program, &self.timezone);
 
         match result {
             Ok(_) => {
@@ -165,6 +165,7 @@ mod tests {
   .copy = .copy_from
 "#
             .to_string(),
+            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
         };
@@ -196,6 +197,7 @@ mod tests {
                 . = .events
             "#}
             .to_owned(),
+            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
         };
@@ -224,6 +226,7 @@ mod tests {
                 .not_an_int = int!(.bar)
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
         };
@@ -250,6 +253,7 @@ mod tests {
                 .not_an_int = int!(.bar)
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
         };
@@ -271,6 +275,7 @@ mod tests {
                 .foo = "foo"
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
         };
@@ -297,6 +302,7 @@ mod tests {
                 abort
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
         };
@@ -323,6 +329,7 @@ mod tests {
                 abort
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: true,
         };
@@ -346,6 +353,7 @@ mod tests {
                        .namespace = "zerk"
                        .kind = "incremental""#
                 .to_string(),
+            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
         };
