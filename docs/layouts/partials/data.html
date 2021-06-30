@@ -1357,7 +1357,12 @@
 </span>
 
 <div class="my-2.5">
+  {{ if or (reflect.IsMap .input) (reflect.IsSlice .input) }}
+  {{ $event := .input | jsonify }}
+  {{ highlight $event "json" "" }}
+  {{ else }}
   {{ .input | markdownify }}
+  {{ end }}
 </div>
 
 <span>
