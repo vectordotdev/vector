@@ -34,19 +34,19 @@ A **metric** event represents a numerical operation performed on a time series. 
 
 Vector wouldn't be very useful if it couldn't ingest data. A **source** defines where Vector should pull data from, or how it should receive data pushed to it. A [topology][topologies] can have any number of sources, and as they ingest data they proceed to normalize it into [events] (see the next section). This sets the stage for easy and consistent processing of your data. Examples of sources include `file`, `syslog`, `statsd`, and `stdin`.
 
-{{< jump "/docs/reference/configuration/sources" >}}
+{{< jump "/sources" >}}
 
 ### Transforms
 
 A **transform** is responsible for mutating events as they are transported by Vector. This might involve parsing, filtering, sampling, or aggregating. You can have any number of transforms in your pipeline and how they are composed is up to you.
 
-{{< jump "/docs/reference/configuration/transforms" >}}
+{{< jump "/transforms" >}}
 
 ### Sinks
 
 A **sink** is a destination for events. Each sink's design and transmission method is dictated by the downstream service it interacts with. The `socket` sink, for example, streams individual events, while the `aws_s3` sink buffers and flushes data.
 
-{{< jump "/docs/reference/configuration/sinks" >}}
+{{< jump "/sinks" >}}
 
 ## Pipeline
 

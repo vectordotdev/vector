@@ -57,41 +57,114 @@
 
 {{ define "table" }}
 {{ $cmd := .cmd }}
-<div class="grid grid-cols-5 border-b-2 dark:border-gray-700 pb-1 font-semibold">
-  <div class="col-span-2">
-    {{ .title }}
-  </div>
-  <div class="col-span-3">
-    Description
-  </div>
-</div>
+<table>
+  <thead>
+    <tr>
+      <th>
+        {{ .title }}
+      </th>
+      <th>
+        Description
+      </th>
+      <th>
+        Environment variable
+      </th>
+      <th>
+        Default
+      </th>
+    </tr>
+  </thead>
 
-<div class="pt-2">
-  {{ range .items }}
-  {{ $id := substr .flag 2 }} {{/* Hash ID for the URL (convert --foo to foo) */}}
-  {{ $href := printf "%s-%s" $cmd $id }}
-  <div class="grid grid-cols-5">
-    <div class="col-span-2" id="{{ $href }}">
-      <span>
-        {{ $comma := and .flag .short }}
-        {{ with .flag }}
+  <tbody>
+    {{ range .items }}
+    <tr>
+      {{ if .flag }}
+      {{ $id := substr .flag 2 }}
+      {{ $href := printf "%s-%s" $cmd $id }}
+      {{ $comma := and .flag .short }}
+      <td id="{{ $href }}">
         <span class="text-xs font-mono font-semibold text-primary-dark dark:text-primary">
-          {{- . -}}
+          {{- .flag -}}
         </span>
-        {{- end }}
-        {{ if $comma }}, {{ end }}
+        {{ if $comma }},<br />{{ end }}
         {{ with .short }}
         <span class="text-xs font-mono font-semibold text-primary-dark dark:text-primary">
           {{ . }}
         </span>
         {{ end }}
-      </span>
-    </div>
+      </td>
+      {{ end }}
 
-    <div class="col-span-3 prose-sm dark:prose-dark">
-      {{ .description | markdownify }}
-    </div>
-  </div>
-  {{ end }}
-</div>
+      {{ if .option }}
+      {{ $id := substr .option 2 }}
+      {{ $href := printf "%s-%s" $cmd $id }}
+      {{ $comma := and .option .short }}
+      <td id="{{ $href }}">
+        <span class="text-xs font-mono font-semibold text-primary-dark dark:text-primary">
+          {{- .option -}}
+        </span>
+        {{ if $comma }},<br />{{ end }}
+        {{ with .short }}
+        <span class="text-xs font-mono font-semibold text-primary-dark dark:text-primary">
+          {{ . }}
+        </span>
+        {{ end }}
+      </td>
+      {{ end }}
+      <td>
+        <div class="prose dark:prose-dark">
+          {{ .description | markdownify }}
+        </div>
+
+        {{ with .enum }}
+        <div class="mt-4">
+          <span class="font-semibold">
+            Enum options
+          </span>
+
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  Option
+                </th>
+                <th>
+                  Description
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {{ range $k, $v := . }}
+              <tr>
+                <td>
+                  <code>
+                    {{ $k }}
+                  </code>
+                </td>
+                <td>
+                  {{ $v }}
+                </td>
+              </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+        {{ end }}
+      </td>
+      <td>
+        <code>
+          {{ .env_var }}
+        </code>
+      </td>
+
+      <td>
+        <code>
+          {{ .default }}
+        </code>
+      </td>
+    </tr>
+    {{ end }}
+  </tbody>
+</table>
 {{ end }}

@@ -166,7 +166,7 @@ components: sources: http: {
 			}
 		}
 		structured: {
-			description: "An individual line from a `application/json` request"
+			description: "An individual line from an `application/json` request"
 			fields: {
 				"*": {
 					common:        false

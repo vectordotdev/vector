@@ -29,6 +29,7 @@ cli: {
 		flags?:      #Flags
 		options?:    #Options
 		args?:       #Args
+		experimental: bool | *false
 	}
 
 	#Flags: [Flag=string]: {
@@ -36,6 +37,7 @@ cli: {
 		description: string
 		env_var?:    string
 		name:        Flag
+		experimental: bool | *false
 
 		if _short != _|_ {
 			short: "-\(_short)"
@@ -54,6 +56,7 @@ cli: {
 		env_var?:    string
 		example?:    string
 		required:    bool | *false
+		experimental: bool | *false
 
 		if default == _|_ {
 			required: true
@@ -105,10 +108,11 @@ cli: {
 		}
 		"enable-datadog-tracing": {
 			description: """
-				  [experimental] Send internal tracing spans to a local APM-enabled
-				  Datadog agent with a granularity matching the current log level.
+				Send internal tracing spans to a local APM-enabled
+				Datadog agent with a granularity matching the current log level.
 				"""
 			env_var: "VECTOR_ENABLE_DATADOG_TRACING"
+			experimental: true
 		}
 	}
 
