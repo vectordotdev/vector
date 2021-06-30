@@ -3,11 +3,10 @@ $spacing-vertical: 0
 $transition-fast: 0
 
 // Main page globe icon
-$globe-light-gray: rgb(216,216,216)
-$globe-dark-gray: rgb(88,88,88)
-
-$globe-ocean-color: rgb(0, 0, 0)
-$globe-land-color: rgb(88,88,88)
+$globe-dark-mode-land: rgb(32, 32, 32)
+$globe-dark-mode-water: rgb(66, 66, 98)
+$globe-light-mode-land: rgb(168, 168, 168)
+$globe-light-mode-water: rgb(216, 216, 216)
 
 @keyframes indexHeroInitial
   0%
@@ -183,16 +182,16 @@ $globe-land-color: rgb(88,88,88)
   #globe-wrapper
     #globe
       svg
-        fill: $globe-dark-gray
+        fill: $globe-dark-mode-water
 
         .land
-          fill: $globe-light-gray
+          fill: $globe-dark-mode-land
 
 .light
   #globe-wrapper
     #globe
       svg
-        fill: $globe-light-gray
+        fill: $globe-light-mode-water
 
         .land
-          fill: $globe-dark-gray
+          fill: $globe-light-mode-land
