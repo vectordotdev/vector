@@ -11,6 +11,10 @@ spec:
   minReadySeconds: 1
   updateStrategy:
     type: {{ .Values.updateStrategy }}
+    {{- if eq .Values.updateStrategy "RollingUpdate" }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.maxUnavailable }}
+    {{- end }}
   template:
     metadata:
       annotations:
@@ -74,6 +78,10 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             # Host log directory mount.
             - name: var-log

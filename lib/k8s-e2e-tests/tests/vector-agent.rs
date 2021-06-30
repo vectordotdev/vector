@@ -10,6 +10,12 @@ use tracing::{debug, info};
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
+const HELM_VALUES_LOWER_GLOB: &str = indoc! {r#"
+    kubernetesLogsSource:
+      rawConfig: |
+        glob_minimum_cooldown_ms = 5000
+"#};
+
 const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
     sinks:
       stdout:
@@ -67,7 +73,11 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -163,10 +173,11 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK_RAW_CONFIG,
-                    &override_name,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -258,7 +269,11 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -374,7 +389,11 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -447,7 +466,11 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -541,7 +564,11 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -674,7 +701,11 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -689,7 +720,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
 
-    let affinity_pod = create_affinity_pod(&framework, &pod_namespace, &affinity_label).await?;
+    let affinity_ns_name = format!("{}-affinity", pod_namespace);
+    let affinity_ns = framework.namespace(&affinity_ns_name).await?;
+    let affinity_pod = create_affinity_pod(&framework, &affinity_ns_name, &affinity_label).await?;
 
     let excluded_test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
@@ -699,7 +732,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             vec![("vector.dev/exclude", "true")],
             vec![],
             Some((&affinity_label, "yes")),
-            Some(&pod_namespace),
+            Some(&affinity_ns_name),
         ))?)
         .await?;
 
@@ -722,7 +755,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             vec![],
             vec![],
             Some((&affinity_label, "yes")),
-            Some(&pod_namespace),
+            Some(&affinity_ns_name),
         ))?)
         .await?;
     framework
@@ -832,6 +865,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     drop(excluded_test_pod);
     drop(control_test_pod);
     drop(affinity_pod);
+    drop(affinity_ns);
     drop(test_namespace);
     drop(vector);
     Ok(())
@@ -852,6 +886,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     const CONFIG: &str = indoc! {r#"
         kubernetesLogsSource:
           rawConfig: |
+            glob_minimum_cooldown_ms = 5000
             extra_label_selector = "my_custom_negative_label_selector!=my_val"
             extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
     "#};
@@ -861,10 +896,11 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
-                    &format!("{}\n{}", CONFIG, HELM_VALUES_STDOUT_SINK),
-                    &override_name,
-                ),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    CONFIG,
+                    HELM_VALUES_STDOUT_SINK,
+                ],
                 ..Default::default()
             },
         )
@@ -1053,7 +1089,11 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1208,6 +1248,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         kubernetesLogsSource:
           rawConfig: |
             exclude_paths_glob_patterns = ["/var/log/pods/{}_test-pod_*/excluded/**"]
+            glob_minimum_cooldown_ms = 5000
     "#},
         pod_namespace
     );
@@ -1217,10 +1258,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
-                    &format!("{}\n{}", config, HELM_VALUES_STDOUT_SINK),
-                    &override_name,
-                ),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    config,
+                    HELM_VALUES_STDOUT_SINK,
+                ],
                 ..Default::default()
             },
         )
@@ -1374,7 +1416,11 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1397,8 +1443,9 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a pod for our other pods to have an affinity to to ensure they are all deployed on
     // the same node.
-    let affinity_ns = framework.namespace(&pod_namespace).await?;
-    let affinity_pod = create_affinity_pod(&framework, &pod_namespace, &affinity_label).await?;
+    let affinity_ns_name = format!("{}-affinity", pod_namespace);
+    let affinity_ns = framework.namespace(&affinity_ns_name).await?;
+    let affinity_pod = create_affinity_pod(&framework, &affinity_ns_name, &affinity_label).await?;
 
     let mut test_pods = vec![];
     for ns in &expected_namespaces {
@@ -1411,7 +1458,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
                 vec![],
                 vec![],
                 Some((affinity_label.as_str(), "yes")),
-                Some(&pod_namespace),
+                Some(&affinity_ns_name),
             ))?)
             .await?;
         framework
@@ -1427,7 +1474,12 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     // Make sure we read the correct nodes logs.
     let vector_pod = framework
-        .get_vector_pod_with_pod(&pod_namespace, "affinity-pod", &namespace, &override_name)
+        .get_vector_pod_with_pod(
+            &affinity_ns_name,
+            "affinity-pod",
+            &namespace,
+            &override_name,
+        )
         .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
@@ -1491,10 +1543,11 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_ADDITIONAL_CONFIGMAP,
-                    &override_name,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
             },
         )
@@ -1586,7 +1639,11 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1729,7 +1786,10 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name("", &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1773,6 +1833,132 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     metrics::assert_host_metrics_present(&vector_metrics_url).await?;
 
     drop(vector_metrics_port_forward);
+    drop(vector);
+    Ok(())
+}
+
+#[tokio::test]
+async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework
+        .vector(
+            "test-vector",
+            HELM_CHART_VECTOR_AGENT,
+            VectorConfig {
+                custom_helm_values: vec![HELM_VALUES_STDOUT_SINK, HELM_VALUES_LOWER_GLOB],
+                ..Default::default()
+            },
+        )
+        .await?;
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            // This allows us to read and checkpoint the first log
+            // then ensure we just read the new marker after restarting Vector
+            "echo CHECKED_MARKER; sleep 60; echo MARKER",
+            vec![],
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the rest of the log lines.
+    let mut got_marker = false;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            // A log from something other than our test pod, pretend we don't
+            // see it.
+            return FlowControlCommand::GoOn;
+        }
+
+        // Ensure we got the marker.
+        assert_eq!(val["message"], "CHECKED_MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+    assert!(got_marker);
+
+    // Sleep to ensure checkpoints are written
+    // https://github.com/timberio/vector/issues/7898
+    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+
+    framework
+        .restart_rollout("test-vector", "daemonset/vector-agent", vec![])
+        .await?;
+    // We need to wait for the new pod to start
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+    got_marker = false;
+    // We need to start reading from the newly started pod
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            return FlowControlCommand::GoOn;
+        }
+
+        if val["message"].eq("CHECKED_MARKER") {
+            panic!("Checkpointed marker should not be found");
+        };
+
+        assert_eq!(val["message"], "MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+
+    assert!(got_marker);
+
+    drop(test_pod);
+    drop(test_namespace);
     drop(vector);
     Ok(())
 }

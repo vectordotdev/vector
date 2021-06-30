@@ -275,7 +275,6 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use indoc::indoc;
     use serde_json::value::RawValue;
-    use std::iter::FromIterator;
 
     #[test]
     fn generate_config() {
@@ -299,11 +298,10 @@ mod tests {
             severity_key: Some("anumber".into()),
         };
 
-        let log = LogEvent::from_iter(
-            [("message", "hello world"), ("anumber", "100")]
-                .iter()
-                .copied(),
-        );
+        let log = [("message", "hello world"), ("anumber", "100")]
+            .iter()
+            .copied()
+            .collect::<LogEvent>();
         let json = sink.encode_event(Event::from(log)).unwrap().item;
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
@@ -388,8 +386,8 @@ mod tests {
             severity_key: None,
         };
 
-        let log1 = LogEvent::from_iter([("message", "hello")].iter().copied());
-        let log2 = LogEvent::from_iter([("message", "world")].iter().copied());
+        let log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
+        let log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
         let event1 = sink.encode_event(Event::from(log1)).unwrap().item;
         let event2 = sink.encode_event(Event::from(log2)).unwrap().item;
 

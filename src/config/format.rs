@@ -9,7 +9,7 @@ use std::path::Path;
 pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Format {
     /// TOML format is used.
     Toml,

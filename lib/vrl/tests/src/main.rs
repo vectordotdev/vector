@@ -304,17 +304,20 @@ fn print_result(failed_count: usize) {
 
 fn vrl_value_to_json_value(value: Value) -> serde_json::Value {
     use serde_json::Value::*;
-    use std::iter::FromIterator;
 
     match value {
         v @ Value::Bytes(_) => String(v.try_bytes_utf8_lossy().unwrap().into_owned()),
         Value::Integer(v) => v.into(),
         Value::Float(v) => v.into_inner().into(),
         Value::Boolean(v) => v.into(),
-        Value::Object(v) => serde_json::Value::from_iter(
-            v.into_iter().map(|(k, v)| (k, vrl_value_to_json_value(v))),
-        ),
-        Value::Array(v) => serde_json::Value::from_iter(v.into_iter().map(vrl_value_to_json_value)),
+        Value::Object(v) => v
+            .into_iter()
+            .map(|(k, v)| (k, vrl_value_to_json_value(v)))
+            .collect::<serde_json::Value>(),
+        Value::Array(v) => v
+            .into_iter()
+            .map(vrl_value_to_json_value)
+            .collect::<serde_json::Value>(),
         Value::Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
         Value::Regex(v) => v.to_string().into(),
         Value::Null => Null,

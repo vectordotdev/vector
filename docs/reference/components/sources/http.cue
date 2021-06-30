@@ -79,6 +79,7 @@ components: sources: http: {
 					text:   "Newline-delimited text, with each line forming a message."
 					ndjson: "Newline-delimited JSON objects, where each line must contain a JSON object."
 					json:   "Array of JSON objects, which must be a JSON array containing JSON objects."
+					binary: "Binary or text, whole http request body is considered as one message."
 				}
 				syntax: "literal"
 			}

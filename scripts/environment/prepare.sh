@@ -1,8 +1,6 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
-PATH=$PATH:$HOME/.cargo/bin
-
 rustup toolchain install "$(cat rust-toolchain)"
 rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
@@ -20,3 +18,6 @@ sudo npm -g install markdownlint-cli
 
 pip3 install jsonschema==3.2.0
 pip3 install remarshal==0.11.2
+
+# Make sure our release build settings are present.
+. scripts/environment/release-flags.sh

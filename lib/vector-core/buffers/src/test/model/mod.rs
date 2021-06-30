@@ -172,7 +172,7 @@ fn model_check() {
                 },
                 Action::Recv => match Stream::poll_next(Pin::new(&mut rx), &mut rcv_context) {
                     Poll::Pending => {
-                        assert_eq!(true, model.is_empty())
+                        assert!(model.is_empty())
                     }
                     Poll::Ready(val) => {
                         assert_eq!(model.recv(), val);

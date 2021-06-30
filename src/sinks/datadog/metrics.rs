@@ -1,3 +1,4 @@
+use super::healthcheck;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, Sample, StatisticKind},
@@ -12,12 +13,12 @@ use crate::{
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError, UriParseError, VectorSink,
+        Healthcheck, UriParseError, VectorSink,
     },
 };
 use chrono::{DateTime, Utc};
 use futures::{stream, FutureExt, SinkExt};
-use http::{uri::InvalidUri, Request, StatusCode, Uri};
+use http::{uri::InvalidUri, Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -182,7 +183,12 @@ impl_generate_config_from_default!(DatadogConfig);
 impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(None)?;
-        let healthcheck = healthcheck(self.clone(), client.clone()).boxed();
+        let healthcheck = healthcheck(
+            self.get_api_endpoint(),
+            self.api_key.clone(),
+            client.clone(),
+        )
+        .boxed();
 
         let batch = BatchSettings::default()
             .events(20)
@@ -288,24 +294,6 @@ fn build_uri(host: &str, endpoint: &'static str) -> crate::Result<Uri> {
     Ok(uri)
 }
 
-async fn healthcheck(config: DatadogConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}/api/v1/validate", config.get_api_endpoint())
-        .parse::<Uri>()
-        .context(UriParseError)?;
-
-    let request = Request::get(uri)
-        .header("DD-API-KEY", config.api_key)
-        .body(hyper::Body::empty())
-        .unwrap();
-
-    let response = client.send(request).await?;
-
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
-    }
-}
-
 fn encode_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter()
@@ -409,7 +397,7 @@ fn encode_events(
                     statistic: StatisticKind::Histogram,
                 } => {
                     // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
-                    if let Some(s) = stats(&samples) {
+                    if let Some(s) = stats(samples) {
                         let mut result = vec![
                             DatadogMetric {
                                 metric: format!("{}.min", &fullname),

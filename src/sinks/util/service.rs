@@ -186,9 +186,7 @@ pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
 impl<T: ConcurrencyOption> TowerRequestConfig<T> {
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
-            concurrency: self
-                .concurrency()
-                .parse_concurrency(&defaults.concurrency()),
+            concurrency: self.concurrency().parse_concurrency(defaults.concurrency()),
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs

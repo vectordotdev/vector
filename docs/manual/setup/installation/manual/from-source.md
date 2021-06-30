@@ -400,6 +400,7 @@ features one has to pass a comma-separated list of component features.
 | `sources-vector`                                     | Enables building of [`vector` source][docs.sources.vector].                                                                                |
 | `transforms-add_fields`                              | Enables building of [`add_fields` transform][docs.transforms.add_fields].                                                                  |
 | `transforms-add_tags`                                | Enables building of [`add_tags` transform][docs.transforms.add_tags].                                                                      |
+| `transforms-aggregate`                               | Enables building of [`aggregate` transform][docs.transforms.aggregate].                                                                      |
 | `transforms-ansi_stripper`                           | Enables building of [`ansi_stripper` transform][docs.transforms.ansi_stripper].                                                            |
 | `transforms-aws_cloudwatch_logs_subscription_parser` | Enables building of [`aws_cloudwatch_logs_subscription_parser` transform][docs.transforms.aws_cloudwatch_logs_subscription_parser].        |
 | `transforms-aws_ec2_metadata`                        | Enables building of [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_metadata].                                                      |
@@ -527,6 +528,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sources.vector]: /docs/reference/sources/vector/
 [docs.transforms.add_fields]: /docs/reference/transforms/add_fields/
 [docs.transforms.add_tags]: /docs/reference/transforms/add_tags/
+[docs.transforms.aggregate]: /docs/reference/transforms/aggregate/
 [docs.transforms.ansi_stripper]: /docs/reference/transforms/ansi_stripper/
 [docs.transforms.aws_cloudwatch_logs_subscription_parser]: /docs/reference/transforms/aws_cloudwatch_logs_subscription_parser/
 [docs.transforms.aws_ec2_metadata]: /docs/reference/transforms/aws_ec2_metadata/

@@ -652,7 +652,7 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("neither");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -662,7 +662,7 @@ mod test {
         );
 
         event.as_mut_log().insert("message", "foo");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.eq: \"bar\", third_thing.eq: [\"hello\", \"world\"] ]".to_owned())
@@ -670,15 +670,15 @@ mod test {
 
         event.as_mut_log().insert("other_thing", "bar");
         event.as_mut_log().insert("third_thing", "hello");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("third_thing", "world");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("message", "not foo");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ message.equals: \"foo\" ]".to_owned())
@@ -704,7 +704,7 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("neither");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -715,31 +715,31 @@ mod test {
 
         event.as_mut_log().insert("message", "hello foo world");
         event.as_mut_log().insert("third_thing", "hello world");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.contains: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "hello bar world");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
             .insert("third_thing", "not hell0 or w0rld");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ third_thing.contains: [\"hello\", \"world\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("third_thing", "world");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("message", "not fo0");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ message.contains: \"foo\" ]".to_owned())
@@ -761,7 +761,7 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("neither");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -771,18 +771,18 @@ mod test {
         );
 
         event.as_mut_log().insert("message", "foo hello world");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.prefix: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "bar hello world");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("message", "not prefixed");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ message.prefix: \"foo\" ]".to_owned())
@@ -808,7 +808,7 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("neither");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -819,20 +819,20 @@ mod test {
 
         event.as_mut_log().insert("third_thing", "hello world");
         event.as_mut_log().insert("message", "foo hello world");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.starts_with: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "bar hello world");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
             .insert("third_thing", "wrong hello world");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -841,11 +841,11 @@ mod test {
         );
 
         event.as_mut_log().insert("third_thing", "world");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("message", "not prefixed");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ message.starts_with: \"foo\" ]".to_owned())
@@ -871,7 +871,7 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("neither");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -882,29 +882,29 @@ mod test {
 
         event.as_mut_log().insert("message", "hello world foo");
         event.as_mut_log().insert("third_thing", "hello world");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.ends_with: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "hello world bar");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("third_thing", "hello world bad");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ third_thing.ends_with: [\"hello\", \"world\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("third_thing", "world hello");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("message", "not suffixed");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ message.ends_with: \"foo\" ]".to_owned())
@@ -930,7 +930,7 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("not foo");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.neq: \"bar\", third_thing.neq: [\"hello\", \"world\"] ]".to_owned())
@@ -940,18 +940,18 @@ mod test {
         event
             .as_mut_log()
             .insert("third_thing", "not hello or world");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("third_thing", "world");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("third_thing", "hello");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
@@ -959,14 +959,14 @@ mod test {
 
         event.as_mut_log().insert("third_thing", "safe");
         event.as_mut_log().insert("other_thing", "bar");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("message", "foo");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -991,25 +991,25 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("starts with a bang");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "at the end");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("other_thing", "end up here");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
         );
 
         event.as_mut_log().insert("message", "foo");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -1034,14 +1034,14 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("ignored message");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\", bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("foo", "10.1.2.3");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err(
@@ -1051,22 +1051,22 @@ mod test {
         );
 
         event.as_mut_log().insert("bar", "2000::");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("bar", "192.168.255.255");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("foo", "192.200.200.200");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
         );
 
         event.as_mut_log().insert("foo", "not an ip");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
@@ -1082,18 +1082,18 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("ignored field");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ foo.exists: true ]".to_owned())
         );
 
         event.as_mut_log().insert("foo", "not ignored");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("bar", "also not ignored");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ bar.exists: false ]".to_owned())
@@ -1109,21 +1109,21 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]".to_owned())
         );
 
         event.as_mut_log().insert("foo", "helloworld");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ bar.length_eq: 4 ]".to_owned())
         );
 
         event.as_mut_log().insert("bar", vec![0, 1, 2, 3]);
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
     }
 
@@ -1137,11 +1137,11 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = Event::from("ignored field");
-        assert_eq!(cond.check(&event), true);
+        assert!(cond.check(&event));
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("foo", "not ignored");
-        assert_eq!(cond.check(&event), false);
+        assert!(!cond.check(&event));
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ foo.not_exists: true ]".into())

@@ -3,8 +3,9 @@ use crate::{
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::EncodingConfig, http::RequestConfig, BatchConfig, Compression, Concurrency,
-            TowerRequestConfig,
+            encoding::{EncodingConfig, EncodingConfigWithDefault},
+            http::RequestConfig,
+            BatchConfig, Compression, Concurrency, TowerRequestConfig,
         },
     },
 };
@@ -38,12 +39,17 @@ pub enum NewRelicLogsRegion {
     Eu,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+#[derivative(Default)]
 pub struct NewRelicLogsConfig {
     pub license_key: Option<String>,
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -63,9 +69,11 @@ impl GenerateConfig for NewRelicLogsConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Json,
 }
 
@@ -153,8 +161,7 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: None,
             compression: self.compression,
-            encoding: self.encoding.clone().into_encoding(),
-
+            encoding: EncodingConfig::<Encoding>::from(self.encoding.clone()).into_encoding(),
             batch,
             request,
 
@@ -268,7 +275,7 @@ mod tests {
         concurrency = 12
         rate_limit_num = 24
     "#;
-        let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
+        let nr_config: NewRelicLogsConfig = toml::from_str(config).unwrap();
 
         let http_config = nr_config.create_config().unwrap();
 
@@ -307,7 +314,7 @@ mod tests {
         concurrency = 12
         rate_limit_num = 24
     "#;
-        let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
+        let nr_config: NewRelicLogsConfig = toml::from_str(config).unwrap();
 
         nr_config.create_config().unwrap();
     }
