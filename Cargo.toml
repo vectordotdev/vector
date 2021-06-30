@@ -250,6 +250,7 @@ pulsar = { version = "3.0.1", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.1", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
+redis = { version = "0.20.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 # make sure to update the external docs when the Lua version changes
 rlua = { version = "0.17.0", default-features = true, optional = true }
@@ -575,6 +576,7 @@ sinks-logs = [
   "sinks-new_relic_logs",
   "sinks-papertrail",
   "sinks-pulsar",
+  "sinks-redis",
   "sinks-sematext",
   "sinks-socket",
   "sinks-splunk_hec",
@@ -621,6 +623,7 @@ sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]
 sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]
 sinks-pulsar = ["avro-rs", "pulsar"]
+sinks-redis = ["redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
 sinks-splunk_hec = ["bytesize"]
@@ -653,6 +656,7 @@ all-integration-tests = [
   "postgresql_metrics-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
+  "redis-integration-tests",
   "splunk-integration-tests",
   "dnstap-integration-tests",
 ]
@@ -700,6 +704,7 @@ nginx-integration-tests = ["sources-nginx_metrics"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["bytesize", "sinks-prometheus", "sources-prometheus"]
 pulsar-integration-tests = ["sinks-pulsar"]
+redis-integration-tests = ["sinks-redis"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 dnstap-integration-tests = ["sources-dnstap"]
 

@@ -398,6 +398,8 @@ urls: {
 	rust_tier_1_platform:                                     "https://forge.rust-lang.org/release/platform-support.html#tier-1"
 	rust_tokio:                                               "\(github)/tokio-rs/tokio"
 	rustup:                                                   "https://rustup.rs"
+	redis:                                                    "https://redis.io"
+	redis_rs:                                                 "https://github.com/mitsuhiko/redis-rs"
 	sematext:                                                 "https://sematext.com"
 	sematext_create_logs_app:                                 "https://apps.sematext.com/ui/integrations"
 	sematext_es:                                              "https://sematext.com/docs/logs/index-events-via-elasticsearch-api/"
