@@ -235,7 +235,11 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
     })
 }
 
+#[cfg(test)]
 mod test {
+    use super::{s3_object_decoder, Compression};
+    use tokio::io::AsyncReadExt;
+
     #[test]
     fn determine_compression() {
         use super::Compression;
@@ -263,6 +267,26 @@ mod test {
             );
         }
     }
+
+    #[tokio::test]
+    async fn decode_empty_message_gzip() {
+        let key = uuid::Uuid::new_v4().to_string();
+
+        let mut data = Vec::new();
+        s3_object_decoder(
+            Compression::Auto,
+            &key,
+            Some("gzip"),
+            None,
+            rusoto_s3::StreamingBody::new(futures::stream::empty()),
+        )
+        .await
+        .read_to_end(&mut data)
+        .await
+        .unwrap();
+
+        assert!(data.is_empty());
+    }
 }
 
 #[cfg(feature = "aws-s3-integration-tests")]
@@ -283,15 +307,6 @@ mod integration_tests {
     use rusoto_core::Region;
     use rusoto_s3::{PutObjectRequest, S3Client, S3};
     use rusoto_sqs::{Sqs, SqsClient};
-
-    #[tokio::test]
-    async fn s3_empty_message_gzip() {
-        trace_init();
-
-        let key = uuid::Uuid::new_v4().to_string();
-
-        test_event(key, Some("gzip"), None, None, Vec::new(), Vec::new()).await;
-    }
 
     #[tokio::test]
     async fn s3_process_message() {
