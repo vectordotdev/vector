@@ -37,13 +37,42 @@ pub struct Opts {
 }
 
 impl Opts {
-    pub fn timezone(&self) -> Result<TimeZone, Error> {
+    fn timezone(&self) -> Result<TimeZone, Error> {
         if let Some(ref tz) = self.timezone {
             TimeZone::parse(&tz)
                 .ok_or_else(|| Error::Parse(format!("unable to parse timezone: {}", tz)))
         } else {
             Ok(TimeZone::default())
         }
+    }
+
+    fn read_program(&self) -> Result<String, Error> {
+        match self.program.as_ref() {
+            Some(source) => Ok(source.to_owned()),
+            None => match self.program_file.as_ref() {
+                Some(path) => read(File::open(path)?),
+                None => Ok("".to_owned()),
+            },
+        }
+    }
+
+    fn read_into_objects(&self) -> Result<Vec<Value>, Error> {
+        let input = match self.input_file.as_ref() {
+            Some(path) => read(File::open(path)?),
+            None => read(io::stdin()),
+        }?;
+
+        match input.as_str() {
+            "" => Ok(vec![Value::Object(BTreeMap::default())]),
+            _ => input
+                .lines()
+                .map(|line| Ok(serde_to_vrl(serde_json::from_str(&line)?)))
+                .collect::<Result<Vec<Value>, Error>>(),
+        }
+    }
+
+    fn should_open_repl(&self) -> bool {
+        self.program.is_none() && self.program_file.is_none()
     }
 }
 
@@ -60,18 +89,19 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 fn run(opts: &Opts) -> Result<(), Error> {
     let tz = opts.timezone()?;
     // Run the REPL if no program or program file is specified
-    if should_open_repl(opts) {
+    if opts.should_open_repl() {
         // If an input file is provided, use that for the REPL objects, otherwise provide a
         // generic default object.
-        let repl_objects = match &opts.input_file {
-            Some(file) => read_into_objects(Some(file))?,
-            None => default_objects(),
+        let repl_objects = if opts.input_file.is_some() {
+            opts.read_into_objects()?
+        } else {
+            default_objects()
         };
 
         repl(repl_objects, &tz)
     } else {
-        let objects = read_into_objects(opts.input_file.as_ref())?;
-        let source = read_program(opts.program.as_deref(), opts.program_file.as_ref())?;
+        let objects = opts.read_into_objects()?;
+        let source = opts.read_program()?;
         let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
@@ -117,31 +147,6 @@ fn execute(
         .map_err(Error::Runtime)
 }
 
-fn read_program(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, Error> {
-    match source {
-        Some(source) => Ok(source.to_owned()),
-        None => match file {
-            Some(path) => read(File::open(path)?),
-            None => Ok("".to_owned()),
-        },
-    }
-}
-
-fn read_into_objects(input: Option<&PathBuf>) -> Result<Vec<Value>, Error> {
-    let input = match input {
-        Some(path) => read(File::open(path)?),
-        None => read(io::stdin()),
-    }?;
-
-    match input.as_str() {
-        "" => Ok(vec![Value::Object(BTreeMap::default())]),
-        _ => input
-            .lines()
-            .map(|line| Ok(serde_to_vrl(serde_json::from_str(&line)?)))
-            .collect::<Result<Vec<Value>, Error>>(),
-    }
-}
-
 fn serde_to_vrl(value: serde_json::Value) -> Value {
     use serde_json::Value;
 
@@ -165,10 +170,6 @@ fn read<R: Read>(mut reader: R) -> Result<String, Error> {
     reader.read_to_string(&mut buffer)?;
 
     Ok(buffer)
-}
-
-fn should_open_repl(opts: &Opts) -> bool {
-    opts.program.is_none() && opts.program_file.is_none()
 }
 
 fn default_objects() -> Vec<Value> {
