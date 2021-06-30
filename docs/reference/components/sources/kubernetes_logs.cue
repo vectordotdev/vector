@@ -234,9 +234,9 @@ components: sources: kubernetes_logs: {
 			description: """
 				The number of lines to read when generating a unique fingerprint of a log file.
 				This is helpful when some containers share common first log lines.
-				WARNING: If the file has less than this amount of lines then it won't be read at all. 
-				This is important since container logs are broken up into several files, so the greater 
-			    `lines` value is, the greater the chance of it not reading the last file/logs of 
+				WARNING: If the file has less than this amount of lines then it won't be read at all.
+				This is important since container logs are broken up into several files, so the greater
+				`lines` value is, the greater the chance of it not reading the last file/logs of
 				the container.
 				"""
 			required: false
