@@ -6,11 +6,9 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use futures::{SinkExt, StreamExt};
+use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, collections::HashMap};
+use snafu::Snafu;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -83,13 +81,26 @@ impl From<NatsSourceConfig> for async_nats::Options {
     }
 }
 
+fn get_subscription_stream(
+    subscription: async_nats::Subscription,
+) -> impl Stream<Item = async_nats::Message> {
+    stream::unfold(subscription, |subscription| async move {
+        match subscription.next().await {
+            Some(msg) => Some((msg, subscription)),
+            None => None,
+        }
+    })
+}
+
 async fn nats_source(
     _connection: async_nats::Connection,
     subscription: async_nats::Subscription,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
 ) -> Result<(), ()> {
-    while let Some(msg) = subscription.next().await {
+    let stream = get_subscription_stream(subscription).take_until(shutdown);
+    pin_mut!(stream);
+    while let Some(msg) = stream.next().await {
         emit!(NatsEventReceived {
             byte_size: msg.data.len(),
         });
