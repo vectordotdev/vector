@@ -138,3 +138,45 @@ async fn create_subscription(
 
     Ok((nc, subscription))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<NatsSourceConfig>();
+    }
+}
+
+#[cfg(feature = "nats-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::test_util::{collect_n, random_lines_with_stream, random_string, trace_init};
+    use std::{thread, time::Duration};
+
+    #[tokio::test]
+    async fn nats_happy() {
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSourceConfig {
+            name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://127.0.0.1:4222".to_owned(),
+            queue: None,
+        };
+
+        let (nc, sub) = create_subscription(&conf).await.unwrap();
+        let nc_pub = nc.clone();
+
+        let (tx, rx) = Pipeline::new_test();
+        tokio::spawn(nats_source(nc, sub, ShutdownSignal::noop(), tx));
+        let msg = "my message";
+        nc_pub.publish(&subject, msg).await.unwrap();
+
+        let events = collect_n(rx, 1).await;
+        println!("Received event  {:?}", events[0].as_log());
+        assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
+    }
+}
