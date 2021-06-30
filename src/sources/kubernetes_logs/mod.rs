@@ -94,6 +94,10 @@ pub struct Config {
     #[serde(default = "default_max_line_bytes")]
     max_line_bytes: usize,
 
+    /// How many first lines in a file are used for fingerprinting.
+    #[serde(default = "default_fingerprint_lines")]
+    fingerprint_lines: usize,
+
     /// This value specifies not exactly the globbing, but interval
     /// between the polling the files to watch from the `paths_provider`.
     /// This is quite efficient, yet might still create some load of the
@@ -166,6 +170,7 @@ struct Source {
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
     max_line_bytes: usize,
+    fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
@@ -211,6 +216,7 @@ impl Source {
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
             max_line_bytes: config.max_line_bytes,
+            fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
@@ -232,6 +238,7 @@ impl Source {
             exclude_paths,
             max_read_bytes,
             max_line_bytes,
+            fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             timezone,
@@ -298,7 +305,7 @@ impl Source {
                     // Max line length to expect during fingerprinting, see the
                     // explanation above.
                     ignored_header_bytes: 0,
-                    lines: 1,
+                    lines: fingerprint_lines,
                 },
                 max_line_length: max_line_bytes,
                 ignore_not_found: true,
@@ -453,6 +460,10 @@ fn default_max_line_bytes() -> usize {
 
 fn default_glob_minimum_cooldown_ms() -> usize {
     60000
+}
+
+fn default_fingerprint_lines() -> usize {
+    1
 }
 
 /// This function construct the effective field selector to use, based on
