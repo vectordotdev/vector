@@ -88,7 +88,7 @@ lazy_static! {
         )"\s+                                   # Match any non space character
         (?P<status>\d+)\s+                      # Match numbers
         (?P<size>\d+)\s+                        # Match numbers
-        "(-|(?P<referer>[^"]+))"\s+             # Match `-` or any non double-quote character
+        "(-|(?P<referrer>[^"]+))"\s+            # Match `-` or any non double-quote character
         "(-|(?P<agent>[^"]+))"                  # Match `-` or any non double-quote character
         (\s+"(-|(?P<compression>[^"]+))")?      # Match `-` or any non double-quote character
         \s*$                                    # Match any number of whitespaces (to be discarded).

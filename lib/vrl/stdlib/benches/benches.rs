@@ -1177,7 +1177,7 @@ bench_function! {
             "protocol": "HTTP/1.1",
             "status": 404,
             "size": 153,
-            "referer": "http://localhost/somewhere",
+            "referrer": "http://localhost/somewhere",
             "agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36",
             "compression": "2.75",
         })),
