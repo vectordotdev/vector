@@ -223,7 +223,8 @@ mod uuid_v4;
 pub use crate::array::Array;
 #[cfg(feature = "md5")]
 pub use crate::md5::Md5;
-use crate::parse_datadog_grok::ParseDatadogGrok;
+#[cfg(feature = "parse_datadog_grok")]
+pub use crate::parse_datadog_grok::ParseDatadogGrok;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
 #[cfg(feature = "append")]

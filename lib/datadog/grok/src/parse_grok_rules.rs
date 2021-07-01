@@ -1,18 +1,18 @@
 use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::fmt::Write;
+use std::sync::Arc;
 
+use grok::Grok;
 use lazy_static::lazy_static;
 use regex::Regex;
 
 use lookup::LookupBuf;
+use vector_core::event::Value;
 
-use crate::ast;
-use crate::ast::GrokPattern;
+use crate::ast::{self, GrokPattern};
 use crate::grok_filter::GrokFilter;
 use crate::parse_grok_pattern::parse_grok_pattern;
-use grok::Grok;
-use std::convert::TryFrom;
-use std::sync::Arc;
-use vector_core::event::Value;
 
 #[derive(Debug, Clone)]
 pub struct GrokRule {
@@ -209,8 +209,7 @@ fn purify_grok_pattern(
         || rule.match_fn.name == "boolean"
     {
         // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
-        res.push_str("(?");
-        res.push_str("<");
+        res.push_str("(?<");
         if let Some(destination) = &rule.destination {
             res.push_str(destination.path.to_string().as_str());
         }
@@ -226,8 +225,7 @@ fn purify_grok_pattern(
         res.push_str(process_match_function(&mut filters, &rule)?.as_str());
 
         if let Some(destination) = &rule.destination {
-            res.push_str(":");
-            res.push_str(destination.path.to_string().as_str());
+            write!(res, ":{}", destination.path).unwrap();
         }
         res.push_str("}");
 
@@ -243,7 +241,7 @@ fn process_match_function(
     let result = match match_fn.name.as_ref() {
         "regex" => {
             if match_fn.args.is_some() {
-                if let ast::FunctionArgument::ARG(Value::Bytes(b)) =
+                if let ast::FunctionArgument::Arg(Value::Bytes(b)) =
                     &match_fn.args.as_ref().unwrap()[0]
                 {
                     return Ok(String::from_utf8_lossy(&b).to_string());
@@ -280,8 +278,8 @@ fn process_match_function(
             if match_fn.args.is_some() {
                 let args = match_fn.args.as_ref().unwrap();
                 if args.len() == 2 {
-                    if let ast::FunctionArgument::ARG(true_pattern) = &args[0] {
-                        if let ast::FunctionArgument::ARG(false_pattern) = &args[1] {
+                    if let ast::FunctionArgument::Arg(true_pattern) = &args[0] {
+                        if let ast::FunctionArgument::Arg(false_pattern) = &args[1] {
                             let regex = Regex::new(
                                 format!("^{}$", true_pattern.to_string_lossy()).as_str(),
                             )

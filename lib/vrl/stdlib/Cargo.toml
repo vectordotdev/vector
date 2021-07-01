@@ -36,6 +36,7 @@ syslog_loose = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
+datadog_grok = { package = "datadog-grok", path = "../../datadog/grok", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
@@ -103,7 +104,6 @@ default = [
     "parse_csv",
     "parse_duration",
     "parse_glog",
-    "parse_datadog_grok",
     "parse_grok",
     "parse_json",
     "parse_key_value",
@@ -209,7 +209,7 @@ parse_common_log = ["chrono"]
 parse_csv = ["csv"]
 parse_duration = ["rust_decimal"]
 parse_glog = ["chrono"]
-parse_datadog_grok = ["grok"]
+parse_datadog_grok = []
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]

@@ -186,8 +186,6 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 # Lookup
 lookup = { path = "lib/lookup" }
 
-# DataDog
-datadog_grok = { package ="datadog-grok", path = "lib/datadog/grok" }
 
 # External libs
 anyhow = { version = "1.0.41", default-features = false }
@@ -472,7 +470,6 @@ transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-coercer",
   "transforms-concat",
-  "transforms-datadog_grok_parser",
   "transforms-dedupe",
   "transforms-field_filter",
   "transforms-filter",
@@ -513,7 +510,6 @@ transforms-aws_cloudwatch_logs_subscription_parser= []
 transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
 transforms-concat = []
-transforms-datadog_grok_parser = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
 transforms-filter = []

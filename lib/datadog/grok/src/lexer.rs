@@ -1,6 +1,6 @@
+use std::{iter::Peekable, str::CharIndices};
+
 use crate::lexer::StringLiteral::Escaped;
-use std::iter::Peekable;
-use std::str::CharIndices;
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;

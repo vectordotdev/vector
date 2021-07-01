@@ -36,7 +36,7 @@ impl TryFrom<&Function> for GrokFilter {
         match f.name.as_str() {
             "boolean" => {
                 if f.args.is_some() && !f.args.as_ref().unwrap().is_empty() {
-                    if let FunctionArgument::ARG(Value::Bytes(ref bytes)) =
+                    if let FunctionArgument::Arg(Value::Bytes(ref bytes)) =
                         f.args.as_ref().unwrap()[0]
                     {
                         let pattern = String::from_utf8_lossy(bytes);
@@ -55,7 +55,7 @@ impl TryFrom<&Function> for GrokFilter {
             }
             "nullIf" => {
                 if f.args.is_some() && !f.args.as_ref().unwrap().is_empty() {
-                    if let FunctionArgument::ARG(ref null_value) = f.args.as_ref().unwrap()[0] {
+                    if let FunctionArgument::Arg(ref null_value) = f.args.as_ref().unwrap()[0] {
                         return Ok(GrokFilter::NullIf(null_value.to_string_lossy()));
                     }
                 }
@@ -64,8 +64,8 @@ impl TryFrom<&Function> for GrokFilter {
             "scale" => {
                 if f.args.is_some() && !f.args.as_ref().unwrap().is_empty() {
                     let scale_factor = match f.args.as_ref().unwrap()[0] {
-                        FunctionArgument::ARG(Value::Integer(scale_factor)) => scale_factor as f64,
-                        FunctionArgument::ARG(Value::Float(scale_factor)) => scale_factor,
+                        FunctionArgument::Arg(Value::Integer(scale_factor)) => scale_factor as f64,
+                        FunctionArgument::Arg(Value::Float(scale_factor)) => scale_factor,
                         _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
                     };
                     return Ok(GrokFilter::Scale(scale_factor));

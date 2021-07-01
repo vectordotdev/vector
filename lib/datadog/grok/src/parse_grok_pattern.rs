@@ -55,7 +55,7 @@ mod tests {
         ];
         for (i, arg) in args.iter().enumerate() {
             |arg| match &arg {
-                FunctionArgument::ARG(arg) => assert_eq!(arg, expected_args.get(i).unwrap()),
+                FunctionArgument::Arg(arg) => assert_eq!(arg, expected_args.get(i).unwrap()),
                 _ => panic!("failed to parse arguments"),
             };
         }

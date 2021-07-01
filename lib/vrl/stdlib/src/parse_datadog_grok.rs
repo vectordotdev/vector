@@ -47,26 +47,6 @@ impl Function for ParseDatadogGrok {
         "parse_datadog_grok"
     }
 
-    fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "parsing_rules",
-                kind: kind::ARRAY,
-                required: true,
-            },
-            Parameter {
-                keyword: "helper_rules",
-                kind: kind::ARRAY,
-                required: false,
-            },
-        ]
-    }
-
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "parses DataDog grok rules",
@@ -160,6 +140,26 @@ impl Function for ParseDatadogGrok {
             .map_err(|e| Box::new(Error::GrokParsingError(e)) as Box<dyn DiagnosticError>)?;
 
         Ok(Box::new(ParseDatadogGrokFn { value, grok_rules }))
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &[
+            Parameter {
+                keyword: "value",
+                kind: kind::BYTES,
+                required: true,
+            },
+            Parameter {
+                keyword: "parsing_rules",
+                kind: kind::ARRAY,
+                required: true,
+            },
+            Parameter {
+                keyword: "helper_rules",
+                kind: kind::ARRAY,
+                required: false,
+            },
+        ]
     }
 }
 

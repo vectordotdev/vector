@@ -72,8 +72,8 @@ QualifiedName: String = <start:Identifier> <end:("." Identifier)*> => {
 ArgsList = "(" <CommaList<Arg>> ")";
 
 Arg: FunctionArgument = {
-    Literal => FunctionArgument::ARG(<>),
-    FunctionOrRef => FunctionArgument::FUNCTION(<>),
+    Literal => FunctionArgument::Arg(<>),
+    FunctionOrRef => FunctionArgument::Function(<>),
 };
 
 Literal: Value = {

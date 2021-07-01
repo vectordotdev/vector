@@ -21,6 +21,6 @@ pub struct Function {
 
 #[derive(Clone, Debug)]
 pub enum FunctionArgument {
-    FUNCTION(Function),
-    ARG(Value),
+    Function(Function),
+    Arg(Value),
 }
