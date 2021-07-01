@@ -265,6 +265,29 @@ components: sinks: elasticsearch: {
 				syntax: "template"
 			}
 		}
+		metrics: {
+			common:      false
+			description: "Options for metrics."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					host_tag: {
+						common:      false
+						description: "Tag key that identifies the source host."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "hostname"
+							examples: ["host", "hostname"]
+							syntax: "literal"
+						}
+					}
+					timezone: configuration._timezone
+				}
+			}
+		}
 		mode: {
 			common:      true
 			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk_action` is set to `create`."

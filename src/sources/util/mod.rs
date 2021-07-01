@@ -1,7 +1,7 @@
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 mod body_decoding;
 mod encoding_config;
-#[cfg(feature = "sources-file")]
+#[cfg(any(feature = "sources-file", feature = "sources-kafka"))]
 pub(crate) mod finalizer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;

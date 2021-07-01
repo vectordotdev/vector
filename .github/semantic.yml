@@ -118,6 +118,7 @@ scopes:
   - aws_ecs_metrics source # Anything `aws_ecs_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - aws_s3 source # Anything `aws_s3` source related
+  - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related
   - generator source # Anything `generator` source related
@@ -178,6 +179,7 @@ scopes:
   - aws_kinesis_streams sink # Anything `aws_kinesis_streams` sink related
   - aws_s3 sink # Anything `aws_s3` sink related
   - aws_sqs sink # Anything `aws_sqs` sink related
+  - azure_blob sink # Anything `azure_blob` sink related
   - azure_monitor_logs sink # Anything `azure_monitor_logs` sink related
   - blackhole sink # Anything `blackhole` sink related
   - clickhouse sink # Anything `clickhouse` sink related
@@ -204,6 +206,7 @@ scopes:
   - prometheus_exporter sink # Anything `prometheus_exporter` sink related
   - prometheus_remote_write sink # Anything `prometheus_remote_write` sink related
   - pulsar sink # Anything `pulsar` sink related
+  - redis sink # Anything `redis` sink related
   - sematext_logs sink # Anything `sematext_logs` sink related
   - sematext_metrics sink # Anything `sematext_metrics` sink related
   - socket sink # Anything `socket` sink related

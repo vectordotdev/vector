@@ -148,7 +148,6 @@ spec:
     metadata:
       annotations:
         
-        checksum/config: 2e32b2eca9854ebc0d3877ff9cb719ac16698a6e976a05151945729a41eb058d
         
       labels:
         app.kubernetes.io/name: vector-aggregator

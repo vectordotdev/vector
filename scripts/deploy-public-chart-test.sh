@@ -43,7 +43,7 @@ VECTOR_TEST_HELM="${VECTOR_TEST_HELM:-"helm"}"
 CUSTOM_RESOURCE_CONFIGS_FILE="${CUSTOM_RESOURCE_CONFIGS_FILE:-""}"
 
 # Allow optionally passing custom Helm values.
-CUSTOM_HELM_VALUES_FILE="${CUSTOM_HELM_VALUES_FILE:-""}"
+CUSTOM_HELM_VALUES_FILES="${CUSTOM_HELM_VALUES_FILES:-""}"
 
 # Allow overriding the local repo name, useful to use multiple external repo
 CUSTOM_HELM_REPO_LOCAL_NAME="${CUSTOM_HELM_REPO_LOCAL_NAME:-"local_repo"}"
@@ -60,9 +60,11 @@ up() {
 
 
   HELM_VALUES=()
-  if [[ -n "$CUSTOM_HELM_VALUES_FILE" ]]; then
-    HELM_VALUES=(--values "$CUSTOM_HELM_VALUES_FILE")
-  fi
+  for file in $CUSTOM_HELM_VALUES_FILES ; do
+    HELM_VALUES+=(
+      --values "$file"
+    )
+  done
 
   set -x
   $VECTOR_TEST_HELM install \

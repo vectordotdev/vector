@@ -977,7 +977,7 @@ fn parse_edns(dns_message: &TrustDnsMessage) -> Option<OptPseudoSection> {
 
 fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {
     edns.options()
-        .options()
+        .as_ref()
         .iter()
         .map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
@@ -1048,11 +1048,16 @@ fn parse_loc_rdata_coordinates(coordinates: u32, dir: &str) -> String {
 fn parse_character_string(decoder: &mut BinDecoder<'_>) -> DnsParserResult<String> {
     let raw_len = decoder
         .read_u8()
-        .map_err(|source| DnsMessageParserError::TrustDnsError { source })?;
+        .map_err(|source| DnsMessageParserError::TrustDnsError {
+            source: ProtoError::from(source),
+        })?;
     let len = raw_len.unverified() as usize;
-    let raw_text = decoder
-        .read_slice(len)
-        .map_err(|source| DnsMessageParserError::TrustDnsError { source })?;
+    let raw_text =
+        decoder
+            .read_slice(len)
+            .map_err(|source| DnsMessageParserError::TrustDnsError {
+                source: ProtoError::from(source),
+            })?;
     match raw_text.verify_unwrap(|r| r.len() == len) {
         Ok(verified_text) => Ok(String::from_utf8_lossy(verified_text).to_string()),
         Err(raw_data) => Err(DnsMessageParserError::SimpleError {
@@ -1069,21 +1074,27 @@ fn parse_character_string(decoder: &mut BinDecoder<'_>) -> DnsParserResult<Strin
 fn parse_u8(decoder: &mut BinDecoder<'_>) -> DnsParserResult<u8> {
     Ok(decoder
         .read_u8()
-        .map_err(|source| DnsMessageParserError::TrustDnsError { source })?
+        .map_err(|source| DnsMessageParserError::TrustDnsError {
+            source: ProtoError::from(source),
+        })?
         .unverified())
 }
 
 fn parse_u16(decoder: &mut BinDecoder<'_>) -> DnsParserResult<u16> {
     Ok(decoder
         .read_u16()
-        .map_err(|source| DnsMessageParserError::TrustDnsError { source })?
+        .map_err(|source| DnsMessageParserError::TrustDnsError {
+            source: ProtoError::from(source),
+        })?
         .unverified())
 }
 
 fn parse_u32(decoder: &mut BinDecoder<'_>) -> DnsParserResult<u32> {
     Ok(decoder
         .read_u32()
-        .map_err(|source| DnsMessageParserError::TrustDnsError { source })?
+        .map_err(|source| DnsMessageParserError::TrustDnsError {
+            source: ProtoError::from(source),
+        })?
         .unverified())
 }
 
@@ -1091,7 +1102,9 @@ fn parse_vec(decoder: &mut BinDecoder<'_>, buffer_len: u8) -> DnsParserResult<Ve
     let len = buffer_len as usize;
     Ok(decoder
         .read_vec(len)
-        .map_err(|source| DnsMessageParserError::TrustDnsError { source })?
+        .map_err(|source| DnsMessageParserError::TrustDnsError {
+            source: ProtoError::from(source),
+        })?
         .unverified())
 }
 
@@ -1102,7 +1115,9 @@ fn parse_vec_with_u16_len(
     let len = buffer_len as usize;
     Ok(decoder
         .read_vec(len)
-        .map_err(|source| DnsMessageParserError::TrustDnsError { source })?
+        .map_err(|source| DnsMessageParserError::TrustDnsError {
+            source: ProtoError::from(source),
+        })?
         .unverified())
 }
 

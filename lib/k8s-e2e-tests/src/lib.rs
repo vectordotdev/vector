@@ -48,9 +48,9 @@ pub fn is_multinode() -> bool {
     env::var("MULTINODE".to_string()).is_ok()
 }
 
-/// Adds a fullnameOverride entry to the given config. This allows multiple tests
-/// to be run against the same cluster without the role anmes clashing.
-pub fn config_override_name(config: &str, name: &str, cleanup: bool) -> String {
+/// Create config adding fullnameOverride entry. This allows multiple tests
+/// to be run against the same cluster without the role names clashing.
+pub fn config_override_name(name: &str, cleanup: bool) -> String {
     let vectordir = if is_multinode() {
         format!("{}-vector", name)
     } else {
@@ -97,12 +97,10 @@ pub fn config_override_name(config: &str, name: &str, cleanup: bool) -> String {
         fullnameOverride: "{}"
         {}
         {}
-        {}
         "#,
         name,
         volumeconfig,
         cleanupconfig,
-        config
     )
 }
 

@@ -29,6 +29,7 @@ impl Function for EncodeLogfmt {
         // parameters for the delimiters.
         let key_value_delimiter = expr!("=");
         let field_delimiter = expr!(" ");
+        let flatten_boolean = expr!(true);
 
         let value = arguments.required("value");
         let fields = arguments.optional("fields_ordering");
@@ -38,6 +39,7 @@ impl Function for EncodeLogfmt {
             fields,
             key_value_delimiter,
             field_delimiter,
+            flatten_boolean,
         }))
     }
 
