@@ -25,10 +25,10 @@ fn read_grok_patterns() {
         .expect("can read 'patterns' dir")
         .filter_map(|path| File::open(path.expect("can read 'patterns' dir").path()).ok())
         .flat_map(|f| BufReader::new(f).lines().filter_map(|l| l.ok()))
-        .filter(|line| !line.starts_with("#") && !line.is_empty())
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
         .for_each(|line| {
             let (key, value) =
-                line.split_at(line.find(" ").expect("pattern is 'ruleName definition'"));
+                line.split_at(line.find(' ').expect("pattern is 'ruleName definition'"));
             write!(output, "\t(\"{}\", r#\"{}\"#),", key, &value[1..])
                 .expect("can append patterns");
         });
