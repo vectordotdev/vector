@@ -61,7 +61,10 @@ module.exports = {
             },
             '.no-prose': {
               a: {
-                color: 'inherit',
+                color: theme('colors.primary-dark', 'currentColor'),
+                '&:hover': {
+                  color: theme('colors.secondary'),
+                },
               },
               'p + .highlight': {
                 'margin-top': '0.75rem',
@@ -69,9 +72,6 @@ module.exports = {
               'p, h1, h2, h3, h4, h5, h6': {
                 margin: 0,
                 padding: 0,
-                a: {
-                  color: 'inherit',
-                },
               },
               '.highlight, pre.chroma': {
                 margin: 0,

@@ -507,6 +507,7 @@ administration: _
 components:     _
 configuration:  _
 data_model:     _
+glossary:       _
 process:        _
 releases:       _
 remap:          _
