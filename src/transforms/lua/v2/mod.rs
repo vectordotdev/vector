@@ -115,7 +115,17 @@ const GC_INTERVAL: usize = 16;
 pub struct Lua {
     lua: mlua::Lua,
     invocations_after_gc: usize,
-    timers: Vec<Timer>,
+    hook_init: Option<mlua::RegistryKey>,
+    hook_process: mlua::RegistryKey,
+    hook_shutdown: Option<mlua::RegistryKey>,
+    timers: Vec<(Timer, mlua::RegistryKey)>,
+}
+
+// Helper to create `RegistryKey` from Lua function code
+fn make_registry_value(lua: &mlua::Lua, source: &str) -> mlua::Result<mlua::RegistryKey> {
+    lua.load(source)
+        .eval::<mlua::Function>()
+        .and_then(|f| lua.create_registry_value(f))
 }
 
 impl Lua {
@@ -148,43 +158,42 @@ impl Lua {
             lua.load(source).eval().context(InvalidSource)?;
         }
 
-        if let Some(hooks_init) = &config.hooks.init {
-            let hooks_init: mlua::Function<'_> =
-                lua.load(hooks_init).eval().context(InvalidHooksInit)?;
-            lua.set_named_registry_value("hooks_init", Some(hooks_init))?;
-        }
+        let hook_init_code = config.hooks.init.as_ref();
+        let hook_init = hook_init_code
+            .map(|code| make_registry_value(&lua, code))
+            .transpose()
+            .context(InvalidHooksInit)?;
 
-        let hooks_process: mlua::Function<'_> = lua
-            .load(&config.hooks.process)
-            .eval()
-            .context(InvalidHooksProcess)?;
-        lua.set_named_registry_value("hooks_process", hooks_process)?;
+        let hook_process =
+            make_registry_value(&lua, &config.hooks.process).context(InvalidHooksProcess)?;
 
-        if let Some(hooks_shutdown) = &config.hooks.shutdown {
-            let hooks_shutdown: mlua::Function<'_> = lua
-                .load(hooks_shutdown)
-                .eval()
-                .context(InvalidHooksShutdown)?;
-            lua.set_named_registry_value("hooks_shutdown", Some(hooks_shutdown))?;
-        }
+        let hook_shutdown_code = config.hooks.shutdown.as_ref();
+        let hook_shutdown = hook_shutdown_code
+            .map(|code| make_registry_value(&lua, &code))
+            .transpose()
+            .context(InvalidHooksShutdown)?;
 
         for (id, timer) in config.timers.iter().enumerate() {
-            let handler: mlua::Function<'_> = lua
+            let handler_key = lua
                 .load(&timer.handler)
-                .eval()
+                .eval::<mlua::Function>()
+                .and_then(|f| lua.create_registry_value(f))
                 .context(InvalidTimerHandler)?;
 
-            lua.set_named_registry_value(&format!("timer_handler_{}", id), handler)?;
-            timers.push(Timer {
+            let timer = Timer {
                 id: id as u32,
                 interval_seconds: timer.interval_seconds,
-            });
+            };
+            timers.push((timer, handler_key));
         }
 
         Ok(Self {
             lua,
             invocations_after_gc: 0,
             timers,
+            hook_init,
+            hook_process,
+            hook_shutdown,
         })
     }
 
@@ -196,9 +205,9 @@ impl Lua {
                 output.push(event);
                 Ok(())
             })?;
-            let process = lua.named_registry_value::<_, mlua::Function<'_>>("hooks_process")?;
 
-            process.call((event, emit))
+            lua.registry_value::<mlua::Function>(&self.hook_process)?
+                .call((event, emit))
         });
 
         self.attempt_gc();
@@ -251,8 +260,8 @@ impl RuntimeTransform for Lua {
         let lua = &self.lua;
         let _ = lua
             .scope(|scope| -> mlua::Result<()> {
-                let process = lua.named_registry_value::<_, mlua::Function<'_>>("hooks_process")?;
-                process.call((event, wrap_emit_fn(scope, emit_fn)?))
+                lua.registry_value::<mlua::Function>(&self.hook_process)?
+                    .call((event, wrap_emit_fn(scope, emit_fn)?))
             })
             .context(RuntimeErrorHooksProcess)
             .map_err(|e| emit!(LuaBuildError { error: e }));
@@ -267,8 +276,10 @@ impl RuntimeTransform for Lua {
         let lua = &self.lua;
         let _ = lua
             .scope(|scope| -> mlua::Result<()> {
-                match lua.named_registry_value::<_, Option<mlua::Function<'_>>>("hooks_init")? {
-                    Some(init) => init.call((wrap_emit_fn(scope, emit_fn)?,)),
+                match &self.hook_init {
+                    Some(key) => lua
+                        .registry_value::<mlua::Function>(key)?
+                        .call(wrap_emit_fn(scope, emit_fn)?),
                     None => Ok(()),
                 }
             })
@@ -285,8 +296,10 @@ impl RuntimeTransform for Lua {
         let lua = &self.lua;
         let _ = lua
             .scope(|scope| -> mlua::Result<()> {
-                match lua.named_registry_value::<_, Option<mlua::Function<'_>>>("hooks_shutdown")? {
-                    Some(shutdown) => shutdown.call((wrap_emit_fn(scope, emit_fn)?,)),
+                match &self.hook_shutdown {
+                    Some(key) => lua
+                        .registry_value::<mlua::Function>(key)?
+                        .call(wrap_emit_fn(scope, emit_fn)?),
                     None => Ok(()),
                 }
             })
@@ -303,10 +316,9 @@ impl RuntimeTransform for Lua {
         let lua = &self.lua;
         let _ = lua
             .scope(|scope| -> mlua::Result<()> {
-                let handler_name = format!("timer_handler_{}", timer.id);
-                let handler = lua.named_registry_value::<_, mlua::Function<'_>>(&handler_name)?;
-
-                handler.call((wrap_emit_fn(scope, emit_fn)?,))
+                let handler_key = &self.timers[timer.id as usize].1;
+                lua.registry_value::<mlua::Function>(handler_key)?
+                    .call(wrap_emit_fn(scope, emit_fn)?)
             })
             .context(RuntimeErrorTimerHandler)
             .map_err(|error| error!(%error, rate_limit = 30));
@@ -315,7 +327,7 @@ impl RuntimeTransform for Lua {
     }
 
     fn timers(&self) -> Vec<Timer> {
-        self.timers.clone()
+        self.timers.iter().map(|(timer, _)| timer.clone()).collect()
     }
 }
 
