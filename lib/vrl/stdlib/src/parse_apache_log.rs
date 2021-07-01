@@ -190,6 +190,7 @@ mod tests {
                 "size" => 2326,
             }),
             tdef: TypeDef::new().fallible().object(type_def_common()),
+            tz: shared::TimeZone::default(),
         }
 
         combined_line_valid {
@@ -211,6 +212,7 @@ mod tests {
                 "agent" => "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
             }),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tz: shared::TimeZone::default(),
         }
 
         combined_line_missing_fields_valid {
@@ -230,6 +232,7 @@ mod tests {
                 "size" => 84170,
             }),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tz: shared::TimeZone::default(),
         }
 
         error_line_valid {
@@ -247,6 +250,7 @@ mod tests {
                 "port" => 24259
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::default(),
         }
 
         error_line_thread_id {
@@ -266,6 +270,7 @@ mod tests {
 
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::default(),
         }
 
         log_line_valid_empty {
@@ -274,6 +279,7 @@ mod tests {
             ],
             want: Ok(btreemap! {}),
             tdef: TypeDef::new().fallible().object(type_def_common()),
+            tz: shared::TimeZone::default(),
         }
 
         log_line_valid_empty_variant {
@@ -282,6 +288,7 @@ mod tests {
             ],
             want: Ok(btreemap! {}),
             tdef: TypeDef::new().fallible().object(type_def_common()),
+            tz: shared::TimeZone::default(),
         }
 
         log_line_valid_with_local_timestamp_format {
@@ -297,6 +304,20 @@ mod tests {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::default(),
+        }
+
+        log_line_valid_with_timezone {
+            args: func_args![
+                value: "[2021/06/03 09:30:50] - - - -",
+                timestamp_format: "%Y/%m/%d %H:%M:%S",
+                format: "error",
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T07:30:50Z").unwrap().into()),
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::Named(chrono_tz::Europe::Paris),
         }
 
         log_line_invalid {
@@ -305,6 +326,7 @@ mod tests {
             ],
             want: Err("failed parsing common log line"),
             tdef: TypeDef::new().fallible().object(type_def_common()),
+            tz: shared::TimeZone::default(),
         }
 
         log_line_invalid_timestamp {
@@ -313,6 +335,7 @@ mod tests {
             ],
             want: Err("failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tz: shared::TimeZone::default(),
         }
     ];
 }

@@ -146,16 +146,6 @@ mod tests {
             tdef: TypeDef::new().fallible().object(type_def()),
         }
 
-        log_line_valid_with_timestamp_format {
-            args: func_args![value: r#"- - - [2000-10-10T20:55:36Z] "-" - -"#,
-                             timestamp_format: "%+",
-            ],
-            want: Ok(btreemap! {
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
-            }),
-            tdef: TypeDef::new().fallible().object(type_def()),
-        }
-
         log_line_invalid {
             args: func_args![value: r#"not a common log line"#],
             want: Err("failed parsing common log line"),
