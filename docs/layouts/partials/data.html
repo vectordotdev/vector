@@ -364,7 +364,7 @@
             Examples
           </span>
 
-          {{ template "config-toggler" (dict "size" 5) }}
+          {{ template "config-toggler" (dict "size" 4) }}
         </span>
 
         <div x-show="open">
@@ -597,7 +597,7 @@
               Examples
             </span>
 
-            {{ template "config-toggler" (dict "size" 5) }}
+            {{ template "config-toggler" (dict "size" 4) }}
           </span>
 
           <div x-show="open" class="pt-4 flex flex-col space-y-5 overflow-x-scroll">
@@ -1467,16 +1467,16 @@
 {{ end }}
 
 {{ define "config-toggler" }}
-{{ $size := .size | default 6 }}
+{{ $size := .size | default 4 }}
 <a @click="open = !open" class="cursor-pointer">
-  {{/* Heroicon: outline/plus */}}
+  {{/* Heroicon: outline/chevron-down */}}
   <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
   </svg>
 
-  {{/* Heroicon: outline/minus-sm */}}
-  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+  {{/* Heroicon: outline/chevron-up */}}
+  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}"fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
   </svg>
 </a>
 {{ end }}
@@ -1633,14 +1633,14 @@
 
 {{ define "vrl-toggler" }}
 <button @click="open = !open">
-  {{/* Heroicon: outline/plus */}}
-  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class=" h-5 w-5 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+  {{/* Heroicon: outline/chevron-down */}}
+  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
   </svg>
 
-  {{/* Heroicon: outline/minus-sm */}}
-  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-5 2-5 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+  {{/* Heroicon: outline/chevron-up */}}
+  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
   </svg>
 </button>
 {{ end }}
