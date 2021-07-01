@@ -32,5 +32,5 @@ jobs:
         with:
           context: .
           file: ./scripts/environment/Dockerfile
-          push: github.ref == 'refs/heads/master'
+          push: ${{ github.ref == 'refs/heads/master' }}
           tags: timberio/ci_image:latest
