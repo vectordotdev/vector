@@ -14,8 +14,6 @@ pub mod aws_ec2_metadata;
 pub mod coercer;
 #[cfg(feature = "transforms-concat")]
 pub mod concat;
-#[cfg(feature = "transforms-datadog_grok_parser")]
-pub mod datadog_grok_parser;
 #[cfg(feature = "transforms-dedupe")]
 pub mod dedupe;
 #[cfg(feature = "transforms-field_filter")]
