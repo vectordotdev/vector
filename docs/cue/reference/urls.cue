@@ -514,6 +514,7 @@ urls: {
 	vector_privacy_policy:                                    "\(vector_repo)/blob/master/PRIVACY.md"
 	vector_programmable_transforms:                           "/components/?functions%5B%5D=program"
 	vector_pull_requests:                                     "\(vector_repo)/pulls"
+	vector_readme: "\(vector_repo)/blob/master/README.md"
 	vector_receiving_sources:                                 "/components/?functions%5B%5D=receive"
 	vector_regex_parser:                                      "/docs/reference/configuration/transforms/regex_parser"
 	vector_releases:                                          "/releases/latest/"
