@@ -58,40 +58,17 @@ components: sinks: nats: {
 	}
 
 	configuration: {
-		url: {
-			description: "The NATS URL to connect to. The url _must_ take the form of `nats://server:port`."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
-				syntax: "literal"
-			}
-		}
-		subject: {
-			description: "The NATS subject to publish messages to."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
-				syntax: "template"
-			}
-		}
-		name: {
-			common:      false
-			description: "A name assigned to the NATS connection."
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["foo", "API Name Option Example"]
-				syntax: "literal"
-			}
-		}
+		url: components._nats.configuration.url
+		subject: components._nats.configuration.subject
+		name: components._nats.configuration.name
 	}
 
 	input: {
 		logs:    true
 		metrics: null
 	}
+
+	how_it_works: components._nats.how_it_works
 
 	telemetry: metrics: {
 		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total

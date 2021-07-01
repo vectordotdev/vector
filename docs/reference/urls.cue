@@ -311,6 +311,7 @@ urls: {
 	musl_allocator:                                           "https://musl.libc.org/releases.html"
 	musl_builder_docker_image:                                "\(vector_repo)/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile"
 	nats:                                                     "https://nats.io/"
+	nats_rs:                                                  "\(github)/nats-io/nats.rs"
 	new_bug_report:                                           "\(vector_repo)/issues/new?labels=type%3A+bug"
 	new_feature_request:                                      "\(vector_repo)/issues/new?labels=type%3A+new+feature"
 	new_relic:                                                "https://newrelic.com/"
