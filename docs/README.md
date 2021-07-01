@@ -34,6 +34,14 @@ make serve
 
     The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit. If Hugo ever does allow for semver sorting, we should remove the `weight`s.
 
+## Redirects
+
+Redirects for vector.dev are defined in three difference places (depending on the use):
+
+1. Domain-level redirects, e.g. chat.vector.dev to our Discord server, are defined in [`netlify.toml`](../netlify.toml) in the repo root.
+2. Splat-style redirects (which can't be defined as Hugo aliases) are defined in [`./static/_redirects`](./static/_redirects).
+3. Redirects for specific pages are defined in the `aliases` field in that page's front matter.
+
 ## Known issues
 
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
