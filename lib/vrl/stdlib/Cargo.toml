@@ -39,6 +39,7 @@ roxmltree = { version = "0.14.1", optional = true }
 [dev-dependencies]
 anyhow = "1"
 criterion = "0.3"
+chrono-tz = "0.5"
 
 [features]
 default = [

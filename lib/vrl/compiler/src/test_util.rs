@@ -71,10 +71,18 @@ macro_rules! bench_function {
 macro_rules! test_function {
 
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr,  $(,)* })+) => {
-        test_function!($name => $func; before_each => {} $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, })+);
+        test_function!($name => $func; before_each => {} $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: shared::TimeZone::default(), })+);
+    };
+
+    ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr, tz: $tz:expr,  $(,)* })+) => {
+        test_function!($name => $func; before_each => {} $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: $tz, })+);
     };
 
     ($name:tt => $func:path; before_each => $before:block $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr,  $(,)* })+) => {
+        test_function!($name => $func; before_each => $before $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: shared::TimeZone::default(), })+);
+    };
+
+    ($name:tt => $func:path; before_each => $before:block $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr, tz: $tz:expr,  $(,)* })+) => {
         $crate::paste!{$(
             #[test]
             fn [<$name _ $case:snake:lower>]() {
@@ -85,7 +93,7 @@ macro_rules! test_function {
                         let mut compiler_state = $crate::state::Compiler::default();
                         let mut runtime_state = $crate::state::Runtime::default();
                         let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
-                        let tz = shared::TimeZone::default();
+                        let tz = $tz;
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                         let got_value = expression.resolve(&mut ctx)
