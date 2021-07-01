@@ -1777,6 +1777,7 @@ dependencies = [
  "strum_macros 0.21.1",
  "thiserror",
  "tokio",
+ "tracing 0.1.26",
  "typetag",
  "vector_core",
 ]

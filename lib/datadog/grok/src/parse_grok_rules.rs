@@ -6,7 +6,7 @@ use regex::Regex;
 use lookup::LookupBuf;
 
 use crate::ast;
-use crate::ast::{Destination, Function, FunctionArgument, GrokPattern};
+use crate::ast::GrokPattern;
 use crate::grok_filter::GrokFilter;
 use crate::parse_grok_pattern::parse_grok_pattern;
 use grok::Grok;

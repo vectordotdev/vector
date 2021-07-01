@@ -1,18 +1,5 @@
-use nom::{
-    branch::alt,
-    bytes::complete::{escaped, tag, take_while},
-    character::complete::{alphanumeric1 as alphanumeric, char, one_of},
-    combinator::{cut, map, value},
-    error::{context, ContextError, FromExternalError, ParseError},
-    multi::separated_list0,
-    number::complete::double,
-    sequence::{preceded, separated_pair, terminated},
-    IResult,
-};
 use parsing::ruby_hash;
-use std::num::ParseIntError;
 use vrl::prelude::*;
-use vrl::Value;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRubyHash;

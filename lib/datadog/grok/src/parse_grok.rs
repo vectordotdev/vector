@@ -1,29 +1,18 @@
-use std::sync::Arc;
-
-use grok::Grok;
 use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 
 use lookup::LookupBuf;
-use percent_encoding::percent_decode;
 use shared::btreemap;
-use shared::conversion::Conversion;
 use vector_core::event::Value;
 
-use crate::ast as grok_ast;
-use crate::ast::FunctionArgument;
 use crate::grok_filter::apply_filter;
-use crate::parse_grok_rules::Error as GrokStaticError;
-use crate::parse_grok_rules::{parse_grok_rules, GrokRule};
-use parsing::{query_string, ruby_hash};
-use regex::Regex;
-use std::collections::BTreeMap;
-use std::convert::TryInto;
+use crate::parse_grok_rules::GrokRule;
+use tracing::error;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
-    #[error("failed to apply filter '{}'" , .0)]
-    FailedToApplyFilter(String),
+    #[error("failed to apply filter '{}' to '{}'", .0, .1)]
+    FailedToApplyFilter(String, String),
     #[error("value does not match any rule")]
     NoMatch,
 }
@@ -48,7 +37,12 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
         for (name, value) in matches.iter() {
             let path: LookupBuf = name.parse().expect("path always should be valid");
-            parsed.insert(path, Value::from(value));
+            parsed
+                .insert(path, Value::from(value))
+                .map_err(
+                    |error| error!(message = "Error updating field value", path = %name, %error),
+                )
+                .unwrap();
         }
 
         // apply filters
@@ -62,9 +56,15 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
                     filter,
                 );
                 if result.is_ok() {
-                    parsed.insert(path.to_owned(), result.unwrap());
+                    parsed
+                        .insert(path.to_owned(), result.unwrap())
+                        .map_err(|error| error!(message = "Error updating field value", path = %path, %error))
+                        .unwrap();
                 } else {
-                    parsed.insert(path.to_owned(), Value::Null);
+                    parsed
+                        .insert(path.to_owned(), Value::Null)
+                        .map_err(|error| error!(message = "Error updating field value", path = %path, %error))
+                        .unwrap();
                 }
             });
         });

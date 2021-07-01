@@ -37,7 +37,7 @@ DestinationAndFilter: Destination = ":" <path:Lookup> <filter_fn:(FilterFn)?> =>
 
 FilterFn: Function = ":" <FunctionOrRef>;
 
-pub Lookup: LookupBuf = {
+Lookup: LookupBuf = {
   <s: PathSegment> <l: Lookup?> => match l {
     None => LookupBuf::from(s),
     Some(mut l) => {

@@ -1,5 +1,4 @@
 use lookup::LookupBuf;
-use regex::Regex;
 use vector_core::event::Value;
 
 #[derive(Clone, Debug)]

@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use shared::btreemap;
 use std::collections::BTreeMap;
 use vector_core::event::Value;
 

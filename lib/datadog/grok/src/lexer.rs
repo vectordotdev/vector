@@ -307,6 +307,7 @@ pub struct Exponent<'input> {
     pub value: &'input str,
 }
 
+#[allow(dead_code)] // used by generated lalrpop parser
 impl<'input> FloatingPointLiteral<'input> {
     pub fn parse(&self) -> f64 {
         let mut fp = String::new();

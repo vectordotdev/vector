@@ -1,16 +1,15 @@
 use crate::ast::{Function, FunctionArgument};
 use crate::parse_grok::Error as GrokRuntimeError;
-use crate::parse_grok_rules::{Error as GrokStaticError, Error};
-use lazy_static::lazy_static;
+use crate::parse_grok_rules::Error as GrokStaticError;
 use parsing::{query_string, ruby_hash};
 use percent_encoding::percent_decode;
 use regex::Regex;
 use shared::conversion::Conversion;
 use std::convert::TryFrom;
-use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::string::ToString;
 use strum_macros::Display;
+use tracing::error;
 use vector_core::event::Value;
 
 #[derive(Debug, Display, Clone)]
@@ -42,7 +41,8 @@ impl TryFrom<&Function> for GrokFilter {
                     {
                         let pattern = String::from_utf8_lossy(bytes);
                         Ok(GrokFilter::Boolean(Some(
-                            Regex::new(pattern.deref()).map_err(|e| {
+                            Regex::new(pattern.deref()).map_err(|error| {
+                                error!(message = "Error compiling regex", path = %pattern, %error);
                                 GrokStaticError::InvalidFunctionArguments(f.name.clone())
                             })?,
                         )))
@@ -90,24 +90,43 @@ impl TryFrom<&Function> for GrokFilter {
 pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRuntimeError> {
     match filter {
         GrokFilter::Integer => match value {
-            Value::Bytes(v) => Ok(Conversion::Integer
-                .convert(v.to_owned())
-                .map_err(|e| GrokRuntimeError::FailedToApplyFilter(filter.to_string()))?),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            Value::Bytes(v) => Ok(Conversion::Integer.convert(v.to_owned()).map_err(|_e| {
+                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string_lossy())
+            })?),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::IntegerExt => match value {
             Value::Bytes(v) => Ok(String::from_utf8_lossy(v)
                 .parse::<f64>()
-                .map_err(|e| GrokRuntimeError::FailedToApplyFilter(filter.to_string()))
+                .map_err(|_e| {
+                    GrokRuntimeError::FailedToApplyFilter(
+                        filter.to_string(),
+                        value.to_string_lossy(),
+                    )
+                })
                 .map(|f| (f as i64).into())
-                .map_err(|e| GrokRuntimeError::FailedToApplyFilter(filter.to_string()))?),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+                .map_err(|_e| {
+                    GrokRuntimeError::FailedToApplyFilter(
+                        filter.to_string(),
+                        value.to_string_lossy(),
+                    )
+                })?),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Number | GrokFilter::NumberExt => match value {
-            Value::Bytes(v) => Ok(Conversion::Float
-                .convert(v.to_owned())
-                .map_err(|e| GrokRuntimeError::FailedToApplyFilter(filter.to_string()))?),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            Value::Bytes(v) => Ok(Conversion::Float.convert(v.to_owned()).map_err(|_e| {
+                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string_lossy())
+            })?),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Boolean(true_pattern) => match value {
             Value::Bytes(v) => {
@@ -119,53 +138,88 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
                 };
                 Ok(is_true.into())
             }
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::NullIf(null_value) => match value {
-            Value::Bytes(v) => {
+            Value::Bytes(_) => {
                 if value.to_string_lossy() == *null_value {
                     Ok(Value::Null)
                 } else {
                     Ok(value.to_owned())
                 }
             }
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Scale(scale_factor) => match value {
             Value::Integer(v) => Ok(Value::Float((*v as f64) * scale_factor)),
             Value::Float(v) => Ok(Value::Float(*v * scale_factor)),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Json => match value {
             Value::Bytes(bytes) => serde_json::from_slice::<'_, serde_json::Value>(bytes.as_ref())
-                .map_err(|e| {
-                    println!("{}", e);
-                    GrokRuntimeError::FailedToApplyFilter(filter.to_string())
+                .map_err(|_e| {
+                    GrokRuntimeError::FailedToApplyFilter(
+                        filter.to_string(),
+                        value.to_string_lossy(),
+                    )
                 })
                 .map(|v| v.into()),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Rubyhash => match value {
             Value::Bytes(bytes) => ruby_hash::parse(String::from_utf8_lossy(&bytes).as_ref())
-                .map_err(|e| GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+                .map_err(|_e| {
+                    GrokRuntimeError::FailedToApplyFilter(
+                        filter.to_string(),
+                        value.to_string_lossy(),
+                    )
+                }),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Querystring => match value {
-            Value::Bytes(bytes) => query_string::parse(bytes)
-                .map_err(|e| GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            Value::Bytes(bytes) => query_string::parse(bytes).map_err(|_e| {
+                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string_lossy())
+            }),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Lowercase => match value {
             Value::Bytes(bytes) => Ok(String::from_utf8_lossy(&bytes).to_lowercase().into()),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Uppercase => match value {
             Value::Bytes(bytes) => Ok(String::from_utf8_lossy(&bytes).to_uppercase().into()),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
         GrokFilter::Decodeuricomponent => match value {
             Value::Bytes(bytes) => Ok(percent_decode(bytes).decode_utf8_lossy().to_string().into()),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(filter.to_string())),
+            _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                filter.to_string(),
+                value.to_string_lossy(),
+            )),
         },
     }
 }

@@ -12,8 +12,6 @@ use nom::{
     sequence::{preceded, separated_pair, terminated},
     IResult,
 };
-use shared::btreemap;
-use shared::conversion::Conversion;
 use vector_core::event::Value;
 
 trait HashParseError<T>: ParseError<T> + ContextError<T> + FromExternalError<T, ParseIntError> {}

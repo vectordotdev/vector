@@ -1,9 +1,7 @@
 use datadog_grok::parse_grok_rules::Error as GrokError;
 use datadog_grok::parse_grok_rules::GrokRule;
 use datadog_grok::{parse_grok, parse_grok_rules};
-use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::Arc;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
