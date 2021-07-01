@@ -4,6 +4,7 @@ description: Output metric events to a [Prometheus exporter](https://prometheus.
 kind: sink
 layout: component
 tags: ["prometheus", "exporter", "component", "sink", "metrics"]
+aliases: ["/docs/reference/sinks/prometheus"]
 ---
 
 {{/* This doc is generated using:

@@ -10,6 +10,7 @@ badges:
   type: "new feature"
   domains: ["sources"]
   sources: ["kubernetes"]
+aliases: ["/blog/kubernetes-source-alpha"]
 ---
 
 We're currently [experimenting with Kubernetes integration](https://github.com/timberio/vector/issues/260)

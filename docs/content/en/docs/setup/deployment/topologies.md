@@ -2,6 +2,7 @@
 title: Deployment topologies
 short: Topologies
 weight: 2
+aliases: ["/setup/deployment/pipelines"]
 ---
 
 In the previous section we covered the various [deployment strategies][roles] used to collect and forward data. You combine these

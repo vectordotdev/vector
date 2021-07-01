@@ -5,6 +5,7 @@ author_github: https://github.com/Jeffail
 domain: config
 weight: 3
 tags: ["configuration", "config", "level up", "guides", "guide"]
+aliases: ["/docs/setup/guides/advanced-configs"]
 ---
 
 {{< requirement >}}

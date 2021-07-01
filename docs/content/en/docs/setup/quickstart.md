@@ -3,6 +3,7 @@ title: Vector quickstart
 description: Get up and running
 short: Quickstart
 weight: 1
+aliases: ["/docs/setup/getting-started", "/docs/setup/guides/getting-started"]
 ---
 
 Welcome to Vector! Vector is a high-performance observability data pipeline that enables you to collect, transform, and route all of your logs and metrics.

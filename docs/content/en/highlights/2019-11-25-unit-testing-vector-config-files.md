@@ -9,6 +9,7 @@ hide_on_release_notes: false
 badges:
   type: "new feature"
   domains: ["config"]
+aliases: ["/blog/unit-testing-vector-config-files"]
 ---
 
 Today we're excited to announce beta support for unit testing Vector

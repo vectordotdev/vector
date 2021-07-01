@@ -1,6 +1,6 @@
 ---
 date: "2020-03-31"
-title: "New AWS EC2 Medata Transform"
+title: "New AWS EC2 Metadata Transform"
 description: "Enrich your events with EC2 metadata"
 authors: ["binarylogic"]
 pr_numbers: [1325]
@@ -10,6 +10,7 @@ badges:
   type: "new feature"
   domains: ["transforms"]
   transforms: ["aws_ec2_metadata"]
+aliases: ["/blog/ec2-metadata"]
 ---
 
 Are your events the laughing-stock of the data warehouse? Then enrich them with

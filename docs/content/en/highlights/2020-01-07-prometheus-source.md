@@ -10,6 +10,7 @@ badges:
   type: "new feature"
   domains: ["sources"]
   sources: ["prometheus"]
+aliases: ["/blog/prometheus-source"]
 ---
 
 We love [Prometheus][urls.prometheus], but we also love [options](https://www.mms.com/en-us/shop/single-color)

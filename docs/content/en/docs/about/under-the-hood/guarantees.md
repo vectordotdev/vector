@@ -1,5 +1,6 @@
 ---
 title: Guarantees
+aliases: ["/docs/about/guarantees"]
 ---
 
 Vector attempts to make it clear which guarantees you can expect from it. We categorize all components by their targeted delivery guarantee and also by their general stability. This helps you make the appropriate trade-offs for your use case.

@@ -4,6 +4,7 @@ description: Collect metrics via the [Prometheus](https://prometheus.io) client
 kind: source
 layout: component
 tags: ["prometheus", "scrape", "component", "source", "metrics"]
+aliases: ["/docs/reference/sources/prometheus"]
 ---
 
 {{/* This doc is generated using:

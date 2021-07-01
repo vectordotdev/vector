@@ -10,6 +10,7 @@ badges:
   type: "new feature"
   domains: ["platforms"]
   platforms: ["windows"]
+aliases: ["/blog/windows-support"]
 ---
 
 We're excited to announce that Vector can now be installed on Windows!

@@ -4,6 +4,7 @@ description: Collect logs using the [socket](https://en.wikipedia.org/wiki/Netwo
 kind: source
 layout: component
 tags: ["socket", "component", "source", "logs"]
+aliases: ["/docs/reference/sources/tcp", "/docs/reference/sources/udp"]
 ---
 
 {{/* This doc is generated using:

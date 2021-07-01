@@ -57,19 +57,9 @@ algola_public_api_key = "5f712eef8e5dcf4ac4bbbd0099960626"
 algolia_index_prod = "vector_docs_prod"
 algolia_index_staging = "vector_docs_staging"
 
-# Redirects
-[mediaTypes."text/netlify"]
-delimiter = ""
-
-[outputFormats.REDIRECTS]
-baseName = "_redirects"
-mediaType = "text/netlify"
-isPlainText = true
-notAlternative = true
-
 # Outputs (including search.json and _redirects files)
 [outputs]
-home = ["HTML", "RSS", "SEARCH", "REDIRECTS"]
+home = ["HTML", "RSS", "SEARCH"]
 
 # CSS generation
 [[params.css]]

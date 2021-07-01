@@ -2,6 +2,7 @@
 title: Configuring Vector
 short: Configuration
 weight: 3
+aliases: ["/docs/configuration", "/docs/setup/configuration"]
 ---
 
 Vector is configured using a configuration file. This section contains a comprehensive reference of all Vector configuration options.

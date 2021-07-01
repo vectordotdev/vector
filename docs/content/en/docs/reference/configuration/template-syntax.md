@@ -1,6 +1,7 @@
 ---
 title: Template syntax
 weight: 6
+aliases: ["/docs/reference/templates", "/docs/reference/configuration/templates"]
 ---
 
 Vector supports a template syntax for some configuration options. This allows for dynamic values derived from event data. Options that support this syntax will be clearly documented as such in the option description.

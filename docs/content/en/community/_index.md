@@ -18,6 +18,7 @@ buttons:
   ionicon: logo-github
   icon_classes: text-dark dark:text-gray-200
   url: https://github.com/timberio/vector
+aliases: ["/mailing_list"]
 ---
 
 ### How do I contribute to Vector?

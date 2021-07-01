@@ -9,6 +9,7 @@ hide_on_release_notes: false
 badges:
   type: "new feature"
   domains: ["networking"]
+aliases: ["/blog/custom-dns"]
 ---
 
 We're modern progressive parents and aren't about to tell Vector who it can and

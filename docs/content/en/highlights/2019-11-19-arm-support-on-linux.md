@@ -10,6 +10,7 @@ badges:
   type: "new feature"
   domains: ["platforms"]
   platforms: ["arm64", "arm7"]
+aliases: ["/blog/arm-support-on-linux"]
 ---
 
 Vector now supports [ARM architectures][urls.arm] on the Linux platform! These

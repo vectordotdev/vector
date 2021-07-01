@@ -2,6 +2,7 @@
 title: Unit testing Vector configurations
 short: Unit tests
 weight: 5
+aliases: ["/docs/reference/tests"]
 ---
 
 Vector enables you to unit test [transforms] in your processing topology
