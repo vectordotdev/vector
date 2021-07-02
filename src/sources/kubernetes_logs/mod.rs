@@ -91,7 +91,6 @@ pub struct Config {
     max_line_bytes: usize,
 
     /// How many first lines in a file are used for fingerprinting.
-    #[serde(default = "default_fingerprint_lines")]
     fingerprint_lines: usize,
 
     /// This value specifies not exactly the globbing, but interval
@@ -143,6 +142,7 @@ impl Default for Config {
             exclude_paths_glob_patterns: default_path_exclusion(),
             max_read_bytes: default_max_read_bytes(),
             max_line_bytes: default_max_line_bytes(),
+            fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             ingestion_timestamp_field: None,
             timezone: None,
