@@ -57,6 +57,8 @@ pub mod papertrail;
 pub mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 pub mod pulsar;
+#[cfg(feature = "sinks-redis")]
+pub mod redis;
 #[cfg(feature = "sinks-sematext")]
 pub mod sematext;
 #[cfg(feature = "sinks-socket")]
