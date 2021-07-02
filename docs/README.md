@@ -42,6 +42,29 @@ Redirects for vector.dev are defined in three difference places (depending on th
 2. Splat-style redirects (which can't be defined as Hugo aliases) are defined in [`./static/_redirects`](./static/_redirects).
 3. Redirects for specific pages are defined in the `aliases` field in that page's front matter.
 
+## Link checker
+
+vector.dev uses the [htmltest] link checker to sniff out broken links. Whenever the site is built in CI, be it the preview build or the production build, all internal links on the site are checked. If *any* link is broken, the build fails. If you push changes to the docs/site and your build yields a big red X but running the site locally works fine, scan the CI output for broken links. There's a good chance that that's your culprit.
+
+You can run the full CI builds locally, with link checking included:
+
+```shell
+# Production
+make local-production-build
+
+# Preview
+make local-preview-build
+```
+
+The standard link checking configuration is in [`.htmltest.yml`](./.htmltest.yml). As you can see from this config, external links are *not* checked (`CheckExternal: false`). That's because external link checking makes builds highly brittle, as they become dependent upon external systems, i.e. if CloudFlare has an outage or an external site is down, the vector.dev build fails. The trade-off here, of course, is that broken external links can go undetected. The semi-solution is to periodically run ad hoc external link checks:
+
+```shell
+make local-production-build
+make run-external-link-checker
+```
+
+That second make command runs htmltest using the [`.htmltest.external.yml`](./htmltest.external.yml) configuration, which sets `CheckExternal` to `true`. We should strive to run this periodically in local environments to make sure we don't have too much drift over time.
+
 ## Known issues
 
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.

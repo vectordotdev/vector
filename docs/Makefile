@@ -48,5 +48,7 @@ run-production-site-locally:
 	make setup build-cue production-build
 	python -m http.server 8000 --directory ./public --bind 127.0.0.1
 
-# Full production build without Algolia updates (for debugging, link checking, etc.)
+# Full local builds without Algolia updates (for debugging, link checking, etc.)
 local-production-build: clean setup build-cue production-build run-link-checker
+
+local-preview-build: clean setup build-cue preview-build run-link-checker
