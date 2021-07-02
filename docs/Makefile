@@ -32,6 +32,9 @@ ci-preview-build: setup build-cue preview-build algolia
 run-link-checker:
 	htmltest
 
+run-external-link-checker:
+	htmltest --conf ./.htmltest.external.yml
+
 # Check links without rebuilding the CUE sources. Optimal for fixing links locally.
 check-links: production-build run-link-checker
 

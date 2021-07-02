@@ -173,7 +173,7 @@ components: sources: aws_s3: components._aws & {
 				configuration option is used).
 
 				You will commonly want to use [transforms](\(urls.vector_transforms)) to
-				parse the data.  For example, to parse VPC flow logs sent to S3 you can
+				parse the data. For example, to parse VPC flow logs sent to S3 you can
 				chain the `tokenizer` transform:
 
 				```toml
@@ -248,6 +248,8 @@ components: sources: aws_s3: components._aws & {
 		{
 			platform: "aws"
 			_service: "s3"
+			_docs_tag: "AmazonS3"
+			_url_fragment: "API"
 
 			policies: [
 				{

@@ -436,13 +436,14 @@ components: {
 		#Policy: {
 			#RequiredFor: "write" | "healthcheck"
 
+			// TODO: come up with a less janky URL generation scheme
 			_action:        !=""
 			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
 			docs_url:       !=""
 			required_when?: !=""
 
 			if platform == "aws" {
-				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/APIReference/API_\(_action).html"
+				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/\(_url_fragment)/API_\(_action).html"
 				action:   "\(_service):\(_action)"
 			}
 			if platform == "gcp" {
@@ -457,6 +458,7 @@ components: {
 		// _docs_tag is used to ed to construct URLs, e.g. "AmazonCloudWatchLogs" in
 		// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html
 		_docs_tag: *_service | !=""
+		_url_fragment:  != "" | *"APIReference"
 
 		// For use in the view layer
 		platform_title: !=""

@@ -567,7 +567,7 @@ components: sources: file: {
 				* Use [POSIX ACLs](\(urls.posix_acls)) to grant access to the
 				  files to the `vector` user
 				* Grant the `CAP_DAC_READ_SEARCH` [Linux
-				  capability](\(urls.linux_capability)]. This capability
+				  capability](\(urls.linux_capability)). This capability
 				  bypasses the file system permissions checks to allow
 				  Vector to read any file. This is not recommended as it gives
 				  Vector more permissions than it requires, but it is

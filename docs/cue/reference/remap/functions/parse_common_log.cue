@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_common_log: {
 	category: "Parse"
 	description: """
-		Parses the `value` using the [Common Log Format](https://httpd.apache.org/docs/1.3/logs.html#common) (CLF).
+		Parses the `value` using the [Common Log Format](\(urls.apache_common)) (CLF).
 		"""
 	notices: [
 		"""

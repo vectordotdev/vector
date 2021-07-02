@@ -122,6 +122,6 @@ We want Vector to become the backbone of observability in Kubernetes. If you sha
 [prometheus]: https://prometheus.io
 [pulls]: https://github.com/timberio/vector/pulls?q=is%3Apr+sort%3Aupdated-desc+kubernetes+is%3Aclosed
 [sinks]: /docs/reference/configuration/sinks/
-[tools]: https://landscape.cncf.io/category=observability-and-analysis&format=card-mode
+[tools]: https://landscape.cncf.io/card-mode?category=observability-and-analysis
 [transforms]: /docs/reference/configuration/transforms/
 [v_0_11]: /releases/0.11.0/

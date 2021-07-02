@@ -122,7 +122,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 	permissions: iam: [
 		{
 			platform: "aws"
-			_service: "logs"
+			_service: "AmazonCloudWatchLogs"
 
 			policies: [
 				{

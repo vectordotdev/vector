@@ -20,7 +20,7 @@ Assembling and maintaining these pipelines piecemeal can be a tough and unreward
 
 **Vendor-first** is tempting, but usually expensive and invasive. The vendor provides their custom collectors and client libraries for you to integrate, and you simply ship them all your data. In the end, you're limited to their capabilities, locked in to their ecosystem, and paying more and more every month as your data volume grows.
 
-**Trusted open source stacks** give you a bit more flexibility, but with a significantly higher maintenance burden. You have to pick the right implementation of each sub-component (eight years ago there were already at least [20 implementations of statsd](http://www.joemiller.me/2011/09/21/list-of-statsd-server-implementations/)), ensure they'll work together well, and then maintain and scale them for the lifetime of the infrastructure. Adding new capabilities or changing storage backends generally means adding a whole new set of components to run, often overlapping with some you're already running.
+**Trusted open source stacks** give you a bit more flexibility, but with a significantly higher maintenance burden. You have to pick the right implementation of each sub-component (eight years ago there were already at least [20 implementations of statsd][statsd]), ensure they'll work together well, and then maintain and scale them for the lifetime of the infrastructure. Adding new capabilities or changing storage backends generally means adding a whole new set of components to run, often overlapping with some you're already running.
 
 Finally, there are teams with the resources and organizational willpower to **build their own solutions**. This gives you an enormous amount of flexibility and power, but with an equally impressive price tag in engineering time.
 
@@ -39,3 +39,5 @@ The end result is a tool that can **be** your pipeline, rather than just another
 ## Try it out!
 
 We're still very early in the process of building Vector, but it's already at a stage where we believe it's competitive with existing tools and ready to be trialled for production use. Not every feature mentioned above is present yet, but we're happy with the foundation and working quickly to flesh everything out. If you're interested in giving it a try, check out the project on GitHub, our docs, and please reach out! We'd love to hear about your use cases and are excited to see where we can take this project together.
+
+[statsd]: https://joemiller.me/2011/09/list-of-statsd-server-implementations

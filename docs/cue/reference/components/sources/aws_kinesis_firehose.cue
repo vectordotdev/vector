@@ -97,7 +97,7 @@ components: sources: aws_kinesis_firehose: {
 				The compression of records within the Firehose message.
 
 				Some services, like AWS CloudWatch Logs, will [compress the events with
-				gzip](\(urls.aws_cloudwatch_logs_firehose), before sending them AWS Kinesis Firehose. This option
+				gzip](\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option
 				can be used to automatically decompress them before forwarding them to the next component.
 
 				Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol))

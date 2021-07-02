@@ -416,6 +416,7 @@ components: sinks: aws_s3: components._aws & {
 			platform:  "aws"
 			_service:  "s3"
 			_docs_tag: "AmazonS3"
+			_url_fragment: "API"
 
 			policies: [
 				{
@@ -423,7 +424,7 @@ components: sinks: aws_s3: components._aws & {
 					required_for: ["healthcheck"]
 				},
 				{
-					_action: "ListBucket"
+					_action: "ListBuckets"
 					required_for: ["healthcheck"]
 				},
 				{

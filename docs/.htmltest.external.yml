@@ -1,0 +1,11 @@
+DirectoryPath: public
+IgnoreDirectoryMissingTrailingSlash: true
+CheckExternal: true
+IgnoreAltMissing: true
+IgnoreEmptyHref: true
+IgnoreURLs:
+- "github.com"
+- "packages.timber.io"
+- "localhost"
+- "https://www.microsoft.com/en-us/windows"
+- "maxmind.com"
