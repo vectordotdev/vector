@@ -108,6 +108,10 @@ fn decode_record(
 ) -> Result<Bytes, RecordDecodeError> {
     let buf = base64::decode(record.data.as_bytes()).context(Base64 {})?;
 
+    if buf.is_empty() {
+        return Ok(Bytes::default());
+    }
+
     match compression {
         Compression::None => Ok(Bytes::from(buf)),
         Compression::Gzip => decode_gzip(&buf[..]).with_context(|| Decompression {

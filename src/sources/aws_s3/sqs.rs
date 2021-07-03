@@ -391,7 +391,8 @@ impl IngestorProcess {
                     object.content_encoding.as_deref(),
                     object.content_type.as_deref(),
                     body,
-                );
+                )
+                .await;
 
                 // Record the read error seen to propagate up later so we avoid ack'ing the SQS
                 // message
