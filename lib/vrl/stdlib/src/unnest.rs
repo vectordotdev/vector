@@ -113,17 +113,25 @@ impl Expression for UnnestFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.path
-            .type_def(state)
-            .fallible_unless(Kind::Object)
-            .restrict_array()
-            .add_null()
+        match state.target_type_def() {
+            Some(root_type_def) => root_type_def
+                .clone()
+                .invert_array_at_path(&self.path.path())
+                .fallible(),
+            None => self
+                .path
+                .type_def(state)
+                .fallible_unless(Kind::Object)
+                .restrict_array()
+                .add_null(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::btreemap;
 
     #[test]
     fn unnest() {
@@ -134,27 +142,55 @@ mod tests {
                     value!([{"hostname": "localhost", "events": {"message": "hello"}}, {"hostname": "localhost", "events": {"message": "world"}}]),
                 ),
                 UnnestFn::new("events"),
+                TypeDef::new()
+                    .array_mapped::<(), TypeDef>(btreemap! {
+                        () => TypeDef::new().object::<&'static str, TypeDef>(btreemap! {
+                            "hostname" => TypeDef::new().bytes(),
+                            "events" => TypeDef::new().object::<&'static str, TypeDef>(btreemap! {
+                                "message" => TypeDef::new().bytes()
+                            })
+                        })
+                    })
+                    .fallible(),
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err(r#"expected "array", got "null""#.to_owned()),
                 UnnestFn::new("unknown"),
+                TypeDef::new().fallible(),
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err(r#"expected "array", got "string""#.to_owned()),
                 UnnestFn::new("hostname"),
+                TypeDef::new().fallible(),
             ),
         ];
 
-        for (object, exp, func) in cases {
+        let compiler = state::Compiler::new_with_type_def(
+            TypeDef::new().object::<&'static str, TypeDef>(btreemap! {
+                "hostname" => TypeDef::new().bytes(),
+                "events" => TypeDef::new().array_mapped::<(), TypeDef>(btreemap! {
+                        () => TypeDef::new().object::<&'static str, TypeDef>(btreemap! {
+                            "message" => TypeDef::new().bytes()
+                        })
+                }),
+            }),
+        );
+
+        for (object, expected, func, expected_typedef) in cases {
             let mut object: Value = object.into();
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state);
+
+            let typedef = func.type_def(&compiler);
+
             let got = func
                 .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-            assert_eq!(got, exp);
+
+            assert_eq!(got, expected);
+            assert_eq!(typedef, expected_typedef);
         }
     }
 }

@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM ubuntu:groovy
 
 RUN apt-get update \
   && apt-get install -y \
