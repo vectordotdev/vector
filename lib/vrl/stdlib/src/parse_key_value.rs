@@ -321,7 +321,6 @@ fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                 char(delimiter),
                 map(
                     opt(escaped(
-                        // take_while1(|c: char| c != '\\' && c != delimiter),
                         recognize(many1(tuple((
                             take_while1(|c: char| c != '\\' && c != delimiter),
                             // Consume \something
@@ -381,18 +380,25 @@ fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
     standalone_key: bool,
-) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
-    move |input| {
-        alt((
-            parse_delimited('"', key_value_delimiter),
-            verify(parse_delimited('"', field_delimiter), |_: &str| {
-                standalone_key
-            }),
-            verify(parse_undelimited(key_value_delimiter), |s: &str| {
-                !standalone_key || !s.contains(field_delimiter)
-            }),
-            parse_undelimited(field_delimiter),
-        ))(input)
+) -> Box<dyn Fn(&'a str) -> IResult<&'a str, &'a str, E> + 'a> {
+    if standalone_key {
+        Box::new(move |input| {
+            alt((
+                parse_delimited('"', key_value_delimiter),
+                parse_delimited('"', field_delimiter),
+                verify(parse_undelimited(key_value_delimiter), |s: &str| {
+                    !s.contains(field_delimiter)
+                }),
+                parse_undelimited(field_delimiter),
+            ))(input)
+        })
+    } else {
+        Box::new(move |input| {
+            alt((
+                parse_delimited('"', key_value_delimiter),
+                parse_undelimited(key_value_delimiter),
+            ))(input)
+        })
     }
 }
 
