@@ -258,7 +258,7 @@ impl fmt::Display for Expr {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Ident(pub String);
+pub struct Ident(pub(crate) String);
 
 impl Ident {
     pub fn new(ident: impl Into<String>) -> Self {
