@@ -85,6 +85,15 @@ fn time_format_for_format(format: &[u8]) -> String {
     }
 }
 
+fn rename_referrer(mut value: Value) -> Value {
+    if let Some(obj) = value.as_object_mut() {
+        if let Some(referer) = obj.remove("referrer") {
+            obj.insert("referer".into(), referer);
+        }
+    }
+    value
+}
+
 #[derive(Debug, Clone)]
 struct ParseNginxLogFn {
     value: Box<dyn Expression>,
@@ -108,7 +117,9 @@ impl Expression for ParseNginxLogFn {
 
         let captures = regex.captures(&message).ok_or("failed parsing log line")?;
 
-        log_util::log_fields(&regex, &captures, &timestamp_format).map_err(Into::into)
+        log_util::log_fields(&regex, &captures, &timestamp_format)
+            .map(rename_referrer)
+            .map_err(Into::into)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -124,34 +135,34 @@ impl Expression for ParseNginxLogFn {
 
 fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
     map! {
-         "client": Kind::Bytes,
-         "user": Kind::Bytes | Kind::Null,
-         "timestamp": Kind::Timestamp,
-         "request": Kind::Bytes,
-         "method": Kind::Bytes,
-         "path": Kind::Bytes,
-         "protocol": Kind::Bytes,
-         "status": Kind::Integer,
-         "size": Kind::Integer,
-         "referrer": Kind::Bytes | Kind::Null,
-         "agent": Kind::Bytes | Kind::Null,
-         "compression": Kind::Bytes | Kind::Null,
+        "client": Kind::Bytes,
+        "user": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Timestamp,
+        "request": Kind::Bytes,
+        "method": Kind::Bytes,
+        "path": Kind::Bytes,
+        "protocol": Kind::Bytes,
+        "status": Kind::Integer,
+        "size": Kind::Integer,
+        "referer": Kind::Bytes | Kind::Null,
+        "agent": Kind::Bytes | Kind::Null,
+        "compression": Kind::Bytes | Kind::Null,
     }
 }
 
 fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
     map! {
-         "timestamp": Kind::Timestamp,
-         "severity": Kind::Bytes,
-         "pid": Kind::Integer,
-         "tid": Kind::Integer,
-         "cid": Kind::Integer,
-         "message": Kind::Bytes,
-         "client": Kind::Bytes | Kind::Null,
-         "server": Kind::Bytes | Kind::Null,
-         "request": Kind::Bytes | Kind::Null,
-         "host": Kind::Bytes | Kind::Null,
-         "port": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Timestamp,
+        "severity": Kind::Bytes,
+        "pid": Kind::Integer,
+        "tid": Kind::Integer,
+        "cid": Kind::Integer,
+        "message": Kind::Bytes,
+        "client": Kind::Bytes | Kind::Null,
+        "server": Kind::Bytes | Kind::Null,
+        "request": Kind::Bytes | Kind::Null,
+        "host": Kind::Bytes | Kind::Null,
+        "port": Kind::Bytes | Kind::Null,
     }
 }
 
@@ -246,8 +257,9 @@ mod tests {
         }
 
         error_line_with_referrer {
-            args: func_args![value: r#"2021/06/03 09:30:50 [error] 32#32: *6 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 10.244.0.0, server: localhost, request: "GET /favicon.ico HTTP/1.1", host: "65.21.190.83:31256", referrer: "http://65.21.190.83:31256/""#,
-                             format: "error"
+            args: func_args![
+                value: r#"2021/06/03 09:30:50 [error] 32#32: *6 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 10.244.0.0, server: localhost, request: "GET /favicon.ico HTTP/1.1", host: "65.21.190.83:31256", referrer: "http://65.21.190.83:31256/""#,
+                format: "error"
             ],
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T09:30:50Z").unwrap().into()),
@@ -260,7 +272,7 @@ mod tests {
                 "server" => "localhost",
                 "request" => "GET /favicon.ico HTTP/1.1",
                 "host" => "65.21.190.83:31256",
-                "referrer" => "http://65.21.190.83:31256/",
+                "referer" => "http://65.21.190.83:31256/",
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
         }
