@@ -48,8 +48,8 @@ Only one can match any given log. The first one that matches, from top to bottom
 For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
 */
 pub fn parse_grok_rules(
-    helper_rules: &Vec<String>,
-    parsing_rules: &Vec<String>,
+    helper_rules: &[String],
+    parsing_rules: &[String],
 ) -> Result<Vec<GrokRule>, Error> {
     let mut prev_rule_definitions: HashMap<&str, String> = HashMap::new();
     let mut prev_rule_filters: HashMap<&str, HashMap<LookupBuf, Vec<GrokFilter>>> = HashMap::new();
@@ -72,7 +72,7 @@ pub fn parse_grok_rules(
 }
 
 fn parse_rules<'a>(
-    parsing_rules: &'a Vec<String>,
+    parsing_rules: &'a [String],
     mut prev_rule_definitions: &mut HashMap<&'a str, String>,
     mut prev_rule_filters: &mut HashMap<&'a str, HashMap<LookupBuf, Vec<GrokFilter>>>,
     mut grok: &mut Grok,
@@ -92,23 +92,27 @@ fn parse_rules<'a>(
 }
 
 fn parse_grok_rule<'a>(
-    rule: &'a String,
+    rule: &'a str,
     mut prev_rule_definitions: &mut HashMap<&'a str, String>,
     mut prev_rule_filters: &mut HashMap<&'a str, HashMap<LookupBuf, Vec<GrokFilter>>>,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
-    let mut split_whitespace = rule.splitn(2, " ");
+    let mut split_whitespace = rule.splitn(2, ' ');
     let split = split_whitespace.by_ref();
-    let rule_name = split.next().ok_or(Error::InvalidGrokExpression(
-        rule.clone(),
-        "format must be: 'ruleName definition'".into(),
-    ))?;
+    let rule_name = split.next().ok_or_else(|| {
+        Error::InvalidGrokExpression(
+            rule.to_string(),
+            "format must be: 'ruleName definition'".into(),
+        )
+    })?;
     let mut rule_def = split
         .next()
-        .ok_or(Error::InvalidGrokExpression(
-            rule.clone(),
-            "format must be: 'ruleName definition'".into(),
-        ))?
+        .ok_or_else(|| {
+            Error::InvalidGrokExpression(
+                rule.to_string(),
+                "format must be: 'ruleName definition'".into(),
+            )
+        })?
         .to_string();
 
     let rule_def_cloned = rule_def.clone();
@@ -167,7 +171,7 @@ fn parse_grok_rule<'a>(
             filters
                 .entry(dest.path.clone())
                 .and_modify(|v| v.push(filter.clone()))
-                .or_insert(vec![filter.clone()]);
+                .or_insert_with(|| vec![filter.clone()]);
         });
 
     let mut pattern = String::new();
@@ -192,12 +196,7 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
     grok_patterns
         .iter()
         // group-by is a bit suboptimal with extra cloning, but acceptable since parsing usually happens only once
-        .group_by(|pattern| {
-            pattern
-                .destination
-                .as_ref()
-                .map_or(None, |d| Some(d.path.clone()))
-        })
+        .group_by(|pattern| pattern.destination.as_ref().map(|d| d.path.clone()))
         .into_iter()
         .flat_map(|(path, patterns)| match path {
             Some(path) => patterns
@@ -248,7 +247,6 @@ fn purify_grok_pattern(
                 filters.insert(path.to_owned(), function.to_owned());
             });
         }
-        Ok(res)
     } else if pattern.match_fn.name == "regex"
         || pattern.match_fn.name == "date"
         || pattern.match_fn.name == "boolean"
@@ -258,11 +256,9 @@ fn purify_grok_pattern(
         if let Some(destination) = &pattern.destination {
             res.push_str(destination.path.to_string().as_str());
         }
-        res.push_str(">");
+        res.push('>');
         res.push_str(process_match_function(&mut filters, &pattern)?.as_str());
-        res.push_str(")");
-
-        Ok(res)
+        res.push(')');
     } else {
         // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
         res.push_str("%{");
@@ -272,10 +268,9 @@ fn purify_grok_pattern(
         if let Some(destination) = &pattern.destination {
             write!(res, ":{}", destination.path).unwrap();
         }
-        res.push_str("}");
-
-        Ok(res)
+        res.push('}');
     }
+    Ok(res)
 }
 
 fn process_match_function(

@@ -100,9 +100,7 @@ fn insert_map(
             working_lookup,
             value,
         ),
-        None => {
-            return Ok(map.insert(name.to_string(), value));
-        }
+        None => Ok(map.insert(name.to_string(), value)),
     }
 }
 

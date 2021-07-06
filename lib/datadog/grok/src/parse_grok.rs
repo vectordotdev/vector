@@ -18,7 +18,7 @@ pub enum Error {
     NoMatch,
 }
 
-pub fn parse_grok(source_field: &str, grok_rules: &Vec<GrokRule>) -> Result<Value, Error> {
+pub fn parse_grok(source_field: &str, grok_rules: &[GrokRule]) -> Result<Value, Error> {
     grok_rules
         .iter()
         .fold_while(Err(Error::NoMatch), |_, rule| {
@@ -54,8 +54,8 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
                         .unwrap(),
                     filter,
                 );
-                if result.is_ok() {
-                        insert_field(&mut parsed, path.to_owned(), result.unwrap())
+                if let Ok(value) = result {
+                        insert_field(&mut parsed, path.to_owned(), value)
                         .map_err(|error| error!(message = "Error updating field value", path = %path, %error))
                         .unwrap();
                 } else {
@@ -76,13 +76,12 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
 mod tests {
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;
-    use lookup::Look;
 
     #[test]
     fn parses_simple_grok() {
         let rules = parse_grok_rules(
-            &vec![],
-            &vec![
+            &[],
+            &[
                 "simple %{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                     .to_string(),
             ],
@@ -104,7 +103,7 @@ mod tests {
     fn parses_complex_grok() {
         let rules = parse_grok_rules(
             // helper rules
-            &vec![
+            &[
                 r#"_auth %{notSpace:http.auth:nullIf("-")}"#.to_string(),
                 r#"_bytes_written %{integer:network.bytes_written}"#.to_string(),
                 r#"_client_ip %{ipOrHost:network.client.ip}"#.to_string(),
@@ -118,7 +117,7 @@ mod tests {
                 r#"_date_access %{date("dd/MMM/yyyy:HH:mm:ss Z"):date_access}"#.to_string(),
                 r#"_x_forwarded_for %{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#.to_string()],
             // parsing rules
-            &vec![
+            &[
                 r#"access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
                 r#"access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
             ]).expect("should parse rules");
@@ -248,7 +247,7 @@ mod tests {
 
     fn test_grok_pattern(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
-            let rules = parse_grok_rules(&vec![], &vec![format!(r#"test {}"#, filter)])
+            let rules = parse_grok_rules(&[], &[format!(r#"test {}"#, filter)])
                 .expect("should parse rules");
             let parsed = parse_grok(k, &rules);
 
@@ -269,7 +268,7 @@ mod tests {
     #[test]
     fn fails_on_invalid_grok_format() {
         assert_eq!(
-            parse_grok_rules(&vec![], &vec!["%{data}".to_string()])
+            parse_grok_rules(&[], &["%{data}".to_string()])
                 .unwrap_err()
                 .to_string(),
             "failed to parse grok expression '%{data}': format must be: 'ruleName definition'"
@@ -279,7 +278,7 @@ mod tests {
     #[test]
     fn fails_on_unknown_pattern_definition() {
         assert_eq!(
-            parse_grok_rules(&vec![], &vec!["test %{unknown}".to_string()])
+            parse_grok_rules(&[], &["test %{unknown}".to_string()])
                 .unwrap_err()
                 .to_string(),
             r#"failed to parse grok expression '^%{unknown}$': The given pattern definition name "unknown" could not be found in the definition map"#
@@ -289,12 +288,9 @@ mod tests {
     #[test]
     fn fails_on_unknown_filter() {
         assert_eq!(
-            parse_grok_rules(
-                &vec![],
-                &vec!["test %{data:field:unknownFilter}".to_string()]
-            )
-            .unwrap_err()
-            .to_string(),
+            parse_grok_rules(&[], &["test %{data:field:unknownFilter}".to_string()])
+                .unwrap_err()
+                .to_string(),
             r#"unknown filter 'unknownFilter'"#
         );
     }
@@ -302,7 +298,7 @@ mod tests {
     #[test]
     fn fails_on_invalid_matcher_parameter() {
         assert_eq!(
-            parse_grok_rules(&vec![], &vec!["test_rule %{regex(1):field}".to_string()])
+            parse_grok_rules(&[], &["test_rule %{regex(1):field}".to_string()])
                 .unwrap_err()
                 .to_string(),
             r#"invalid arguments for the function 'regex'"#
@@ -312,19 +308,16 @@ mod tests {
     #[test]
     fn fails_on_invalid_filter_parameter() {
         assert_eq!(
-            parse_grok_rules(
-                &vec![],
-                &vec!["test_rule %{data:field:scale()}".to_string()]
-            )
-            .unwrap_err()
-            .to_string(),
+            parse_grok_rules(&[], &["test_rule %{data:field:scale()}".to_string()])
+                .unwrap_err()
+                .to_string(),
             r#"invalid arguments for the function 'scale'"#
         );
     }
 
     #[test]
     fn sets_field_to_null_on_filter_runtime_error() {
-        let rules = parse_grok_rules(&vec![], &vec!["test_rule %{data:field:number}".to_string()])
+        let rules = parse_grok_rules(&[], &["test_rule %{data:field:number}".to_string()])
             .expect("should parse rules");
         let parsed = parse_grok("not a number", &rules).unwrap();
 
@@ -339,8 +332,8 @@ mod tests {
     #[test]
     fn fails_on_no_match() {
         let rules = parse_grok_rules(
-            &vec![],
-            &vec![
+            &[],
+            &[
                 "test_rule %{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                     .to_string(),
             ],
@@ -354,8 +347,8 @@ mod tests {
     #[test]
     fn appends_to_the_same_field() {
         let rules = parse_grok_rules(
-            &vec![],
-            &vec![
+            &[],
+            &[
                 r#"simple %{integer:some.nested.field} %{notSpace:some.nested.field:uppercase} %{notSpace:some.nested.field:nullIf("-")}"#
                     .to_string(),
             ],

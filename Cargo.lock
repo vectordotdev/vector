@@ -564,7 +564,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "strum 0.18.0",
+ "strum",
  "strum_macros 0.18.0",
  "thiserror",
  "typed-builder 0.5.1",
@@ -1711,12 +1711,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "custom_derive"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef8ae57c4978a2acd8b869ce6b9ca1dfe817bff704c220209fdef2c0b75a01b9"
-
-[[package]]
 name = "cvt"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1815,15 +1809,9 @@ checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 name = "datadog-grok"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-trait",
  "bytes 1.0.1",
- "custom_derive",
  "derivative 2.2.0",
- "enum_derive",
  "grok",
- "indoc",
- "inventory",
  "itertools 0.10.1",
  "lalrpop",
  "lalrpop-util",
@@ -1834,14 +1822,11 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "serde_yaml",
  "shared",
  "snafu",
- "strum 0.21.0",
  "strum_macros 0.21.1",
  "thiserror",
  "tracing 0.1.26",
- "typetag",
 ]
 
 [[package]]
@@ -2087,12 +2072,6 @@ dependencies = [
  "quote 1.0.9",
  "syn 1.0.72",
 ]
-
-[[package]]
-name = "enum_derive"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "406ac2a8c9eedf8af9ee1489bee9e50029278a6456c740f7454cf8a158abc816"
 
 [[package]]
 name = "env_logger"
@@ -4797,9 +4776,7 @@ name = "parsing"
 version = "0.1.0"
 dependencies = [
  "bytes 1.0.1",
- "chrono",
  "form_urlencoded",
- "lookup",
  "nom 6.1.2",
  "serde",
  "serde_json",
@@ -7129,12 +7106,6 @@ name = "strum"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
-
-[[package]]
-name = "strum"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
 
 [[package]]
 name = "strum_macros"

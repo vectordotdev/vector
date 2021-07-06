@@ -115,7 +115,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
             parse_hash,
             map(parse_array, Value::Array),
             map(parse_bytes, Value::Bytes),
-            map(double, |value| Value::Float(value)),
+            map(double, Value::Float),
             map(parse_boolean, Value::Boolean),
         )),
     )(input)
@@ -143,11 +143,12 @@ pub fn parse(input: &str) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::btreemap;
 
     #[test]
     fn test_parse_empty_object() {
         let result = parse("{}").unwrap();
-        assert!(result.as_map().unwrap().is_empty());
+        assert_eq!(result, Value::from(btreemap! {}))
     }
 
     #[test]

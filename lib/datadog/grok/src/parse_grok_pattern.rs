@@ -1,6 +1,6 @@
 use crate::ast::GrokPattern;
 use crate::lexer::Lexer;
-lalrpop_mod!(pub parser);
+use crate::parser;
 
 /// Parses grok patterns as %{MATCHER:FIELD:FILTER}
 pub fn parse_grok_pattern(input: &str) -> Result<GrokPattern, &str> {
@@ -54,7 +54,7 @@ mod tests {
             123e-5.into(),
         ];
         for (i, arg) in args.iter().enumerate() {
-            |arg| match &arg {
+            match arg {
                 FunctionArgument::Arg(arg) => assert_eq!(arg, expected_args.get(i).unwrap()),
                 _ => panic!("failed to parse arguments"),
             };

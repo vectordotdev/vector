@@ -120,7 +120,7 @@ impl Function for ParseDatadogGrok {
             .collect::<std::result::Result<Vec<String>, _>>()?;
         let helper_rules = arguments
             .optional_array("helper_rules")?
-            .unwrap_or(vec![])
+            .unwrap_or_default()
             .into_iter()
             .map(|expr| {
                 expr.as_value()

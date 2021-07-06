@@ -67,7 +67,7 @@ impl<T: Into<Value>> From<Option<T>> for Value {
 
 impl From<i64> for Value {
     fn from(value: i64) -> Self {
-        Value::Integer(i64::from(value))
+        Value::Integer(value)
     }
 }
 

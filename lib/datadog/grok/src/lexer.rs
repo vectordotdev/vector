@@ -22,7 +22,6 @@ pub enum Token<S> {
     False,
 
     Sign(S),
-    Exponent,
 
     IntegerLiteral(i64),
     FloatLiteral(f64),
@@ -36,12 +35,6 @@ pub enum Token<S> {
 pub enum Error {
     #[error("invalid literal")]
     Literal { start: usize },
-
-    #[error("invalid escape character: \\{}", .ch.unwrap_or_default())]
-    EscapeChar { start: usize, ch: Option<char> },
-
-    #[error("unexpected parse error")]
-    UnexpectedParseError(String),
 
     #[error("invalid numeric literal")]
     NumericLiteral(String),
@@ -75,7 +68,7 @@ impl<'input> Iterator for Lexer<'input> {
                     '(' => Some(Ok(self.token(start, LParen))),
                     ')' => Some(Ok(self.token(start, RParen))),
 
-                    '.' if self.test_peek(|ch| is_digit(ch)) => Some(self.numeric_literal(start)),
+                    '.' if self.test_peek(is_digit) => Some(self.numeric_literal(start)),
                     '.' => Some(Ok(self.token(start, Dot))),
                     ':' => Some(Ok(self.token(start, Colon))),
                     ',' => Some(Ok(self.token(start, Comma))),
@@ -229,7 +222,7 @@ impl<'input> Lexer<'input> {
             }
         });
 
-        if is_float || num.starts_with(".") {
+        if is_float || num.starts_with('.') {
             num.parse()
                 .map_err(|_| Error::NumericLiteral(num.to_string()))
                 .map(|n| (start, Token::FloatLiteral(n), end))
@@ -313,12 +306,12 @@ impl<'input> FloatingPointLiteral<'input> {
         let mut fp = String::new();
         fp.push_str(self.integral.unwrap_or_default());
         if let Some(f) = &self.fraction {
-            fp.push_str(".");
+            fp.push('.');
             fp.push_str(f);
         }
 
         if let Some(exp) = &self.exponent {
-            fp.push_str("e");
+            fp.push('e');
             fp.push_str(exp.sign.unwrap_or_default());
             fp.push_str(exp.value);
         }

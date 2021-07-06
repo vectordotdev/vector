@@ -32,6 +32,7 @@ pub fn parse(bytes: &Bytes) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::btreemap;
 
     #[test]
     fn test_parses_complete() {
