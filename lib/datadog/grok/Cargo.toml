@@ -3,7 +3,7 @@ name = "datadog-grok"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
-build = "src/build.rs" # LALRPOP preprocessing
+build = "build.rs" # LALRPOP preprocessing
 
 [dependencies]
 serde = { version = "1.0.126", default-features = false, features = ["derive"] }
