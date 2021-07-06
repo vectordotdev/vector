@@ -211,6 +211,7 @@ components: transforms: lua: {
 			warnings: []
 			type: string: {
 				enum: {
+					"1": "Lua transform API version 1"
 					"2": "Lua transform API version 2"
 				}
 				syntax: "literal"
@@ -234,6 +235,7 @@ components: transforms: lua: {
 		{
 			title: "Add, rename, & remove log fields"
 			configuration: {
+				version: "2"
 				hooks: process: """
 					function (event, emit)
 						-- Add root level field
@@ -266,6 +268,7 @@ components: transforms: lua: {
 		{
 			title: "Add, rename, remove metric tags"
 			configuration: {
+				version: "2"
 				hooks: process: """
 					function (event, emit)
 						-- Add tag
@@ -308,6 +311,7 @@ components: transforms: lua: {
 		{
 			title: "Drop an event"
 			configuration: {
+				version: "2"
 				hooks: process: """
 					function (event, emit)
 						-- Drop event entirely by not calling the `emit` function
@@ -323,6 +327,7 @@ components: transforms: lua: {
 		{
 			title: "Iterate over log fields"
 			configuration: {
+				version: "2"
 				hooks: process: """
 					function (event, emit)
 						-- Remove all fields where the value is "-"
@@ -347,6 +352,7 @@ components: transforms: lua: {
 		{
 			title: "Parse timestamps"
 			configuration: {
+				version: "2"
 				hooks: {
 					init: """
 						-- Parse timestamps like `2020-04-07 06:26:02.643`
@@ -388,6 +394,7 @@ components: transforms: lua: {
 		{
 			title: "Count the number of logs"
 			configuration: {
+				version: "2"
 				hooks: {
 					init:     "init"
 					process:  "process"
