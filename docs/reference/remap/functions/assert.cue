@@ -37,16 +37,16 @@ remap: functions: assert: {
 		{
 			title: "Assertion (true)"
 			source: #"""
-				ok, err = assert("foo" == "foo", message: "Foo must be foo!")
+				ok, err = assert("foo" == "foo", message: "\"foo\" must be \"foo\"!")
 				"""#
 			return: true
 		},
 		{
 			title: "Assertion (false)"
 			source: #"""
-				ok, err = assert("foo" == "bar", message: "Foo must be foo!")
+				ok, err = assert("foo" == "bar", message: "\"foo\" must be \"foo\"!")
 				"""#
-			return: #"function call error for "assert" at (10:61): Foo must be foo!"#
+			return: #"function call error for "assert" at (10:69): "foo" must be "foo"!"#
 		},
 	]
 }
