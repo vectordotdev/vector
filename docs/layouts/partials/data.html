@@ -140,7 +140,7 @@
         </span>
 
         {{ with $v.examples }}
-        {{ $json := . | jsonify }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
         <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
           <span class="flex justify-between items-center">
             <span class="text-sm">
@@ -646,7 +646,7 @@
   {{ with .vrl_real_world_examples }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
     {{ range . }}
-    {{ $input := dict "message" .input.log.message | jsonify }}
+    {{ $input := dict "message" .input.log.message | jsonify (dict "indent" "  ") }}
     {{ $vrlSourceCode := highlight .source "toml" "" }}
     {{ $output := .output | jsonify (dict "indent" "  ") }}
     {{ $outputCode := highlight $output "json" "" }}
@@ -1365,7 +1365,7 @@
 
 <div class="my-2.5">
   {{ if or (reflect.IsMap .input) (reflect.IsSlice .input) }}
-  {{ $event := .input | jsonify }}
+  {{ $event := .input | jsonify (dict "indent" "  ") }}
   {{ highlight $event "json" "" }}
   {{ else }}
   {{ .input | markdownify }}

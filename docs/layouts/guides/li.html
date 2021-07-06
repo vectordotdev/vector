@@ -1,9 +1,9 @@
 {{ $title := .Params.short | default .Title }}
 {{ $section := cond (eq .CurrentSection.Parent.Title "Integrate") "Integrate" .CurrentSection.Title }}
 
-<div>
+<div class="cursor-pointer">
   <a href="{{ .RelPermalink }}">
-    <div class="border rounded-md py-3 px-5 shadow-sm hover:shadow-lg hover:border-secondary dark:hover:border-primary dark:border-gray-700">
+    <div class="border rounded-md py-4 px-6 hover:border-secondary dark:hover:border-primary dark:border-gray-700">
       <span class="uppercase text-xs tracking-tight text-gray-500 dark:text-gray-300">
         {{ $section }}
       </span>
