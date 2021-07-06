@@ -952,9 +952,9 @@ impl TypeDef {
         self
     }
 
-    fn remove_segment<I>(kind: KindInfo, mut path: std::iter::Peekable<I>) -> KindInfo
+    fn remove_segment<'a, I>(kind: KindInfo, mut path: std::iter::Peekable<I>) -> KindInfo
     where
-        I: std::iter::Iterator<Item = SegmentBuf> + Clone,
+        I: std::iter::Iterator<Item = &'a SegmentBuf> + Clone,
     {
         match kind {
             KindInfo::Unknown => {
@@ -1042,7 +1042,9 @@ impl TypeDef {
                                     .into_iter()
                                     .filter_map(|(idx, kindinfo)| match idx {
                                         // TODO negative indexing could be a challenge.
-                                        Index::Index(idx) if index > 0 && idx == index as usize => {
+                                        Index::Index(idx)
+                                            if *index > 0 && idx == *index as usize =>
+                                        {
                                             None
                                         }
                                         _ => Some((idx, kindinfo)),
@@ -1060,7 +1062,7 @@ impl TypeDef {
 
     /// Removes the given path from the typedef
     pub fn remove_path(mut self, path: &LookupBuf) -> Self {
-        let segments = path.clone().into_segments();
+        let segments = path.as_segments();
         let peekable = segments.into_iter().peekable();
 
         self.kind = Self::remove_segment(self.kind, peekable);
