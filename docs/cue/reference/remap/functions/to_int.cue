@@ -23,6 +23,8 @@ remap: functions: to_int: {
 	return: {
 		types: ["integer"]
 		rules: [
+			"If `value` is an integer, it will be returned as-is.",
+			"If `value` is a float, it will be truncated to its integer portion.",
 			"If `value` is a string, it must be the string representation of an integer or else an error is raised.",
 			"If `value` is a boolean, `0` is returned for `false` and `1` is returned for `true`.",
 			"If `value` is a timestamp, a [Unix timestamp](\(urls.unix_timestamp)) (in seconds) is returned.",
