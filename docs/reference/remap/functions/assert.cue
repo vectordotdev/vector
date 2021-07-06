@@ -10,7 +10,7 @@ remap: functions: assert: {
 		"""
 			The `assert` function should be used in a standalone fashion and only when you want to abort the program. You
 			should avoid it in logical expressions and other situations in which you want the program to continue if the
-			condition evalues to `false`.
+			condition evaluates to `false`.
 			""",
 	]
 
@@ -23,7 +23,7 @@ remap: functions: assert: {
 		},
 		{
 			name:        "message"
-			description: "The failure message that's reported if `condition` evalues to `false`."
+			description: "The failure message that's reported if `condition` evaluates to `false`."
 			required:    true
 			type: ["string"]
 		},
