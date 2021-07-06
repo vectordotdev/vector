@@ -2,9 +2,10 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 
 use lookup::LookupBuf;
+use parsing::value::Value;
 use shared::btreemap;
-use vector_core::event::Value;
 
+use crate::field_traversal::{get_field, insert_field};
 use crate::grok_filter::apply_filter;
 use crate::parse_grok_rules::GrokRule;
 use tracing::error;
@@ -37,8 +38,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
         for (name, value) in matches.iter() {
             let path: LookupBuf = name.parse().expect("path always should be valid");
-            parsed
-                .insert(path, Value::from(value))
+            insert_field(&mut parsed, path, Value::from(value))
                 .map_err(
                     |error| error!(message = "Error updating field value", path = %name, %error),
                 )
@@ -49,20 +49,17 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
         grok_rule.filters.iter().for_each(|(path, filters)| {
             filters.iter().for_each(|filter| {
                 let result = apply_filter(
-                    parsed
-                        .get(path)
+                    get_field(&parsed, path)
                         .expect("the field value is missing")
                         .unwrap(),
                     filter,
                 );
                 if result.is_ok() {
-                    parsed
-                        .insert(path.to_owned(), result.unwrap())
+                        insert_field(&mut parsed, path.to_owned(), result.unwrap())
                         .map_err(|error| error!(message = "Error updating field value", path = %path, %error))
                         .unwrap();
                 } else {
-                    parsed
-                        .insert(path.to_owned(), Value::Null)
+                        insert_field(&mut parsed, path.to_owned(), Value::Null)
                         .map_err(|error| error!(message = "Error updating field value", path = %path, %error))
                         .unwrap();
                 }
@@ -78,6 +75,8 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parse_grok_rules::parse_grok_rules;
+    use lookup::Look;
 
     #[test]
     fn parses_simple_grok() {
@@ -255,7 +254,10 @@ mod tests {
 
             if v.is_ok() {
                 assert_eq!(
-                    parsed.unwrap().get("field").unwrap().unwrap().to_owned(),
+                    get_field(&parsed.unwrap(), "field")
+                        .unwrap()
+                        .unwrap()
+                        .to_owned(),
                     v.unwrap()
                 );
             } else {
@@ -347,5 +349,24 @@ mod tests {
         let error = parse_grok("an ungrokkable message", &rules).unwrap_err();
 
         assert_eq!(error, Error::NoMatch);
+    }
+
+    #[test]
+    fn appends_to_the_same_field() {
+        let rules = parse_grok_rules(
+            &vec![],
+            &vec![
+                r#"simple %{integer:some.nested.field} %{notSpace:some.nested.field:uppercase} %{notSpace:some.nested.field:nullIf("-")}"#
+                    .to_string(),
+            ],
+        )
+            .expect("should parse rules");
+        let parsed = parse_grok("1 info -", &rules).unwrap();
+
+        let value = get_field(&parsed, &LookupBuf::from_str("some.nested.field").unwrap());
+        assert_eq!(
+            *value.expect("ok").expect("value"),
+            Value::Array(vec![1.into(), "INFO".into(), Value::Null])
+        );
     }
 }

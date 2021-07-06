@@ -1,5 +1,6 @@
 use std::num::ParseIntError;
 
+use crate::value::Value;
 use bytes::Bytes;
 use nom::{
     branch::alt,
@@ -12,7 +13,6 @@ use nom::{
     sequence::{preceded, separated_pair, terminated},
     IResult,
 };
-use vector_core::event::Value;
 
 trait HashParseError<T>: ParseError<T> + ContextError<T> + FromExternalError<T, ParseIntError> {}
 impl<T, E: ParseError<T> + ContextError<T> + FromExternalError<T, ParseIntError>> HashParseError<T>

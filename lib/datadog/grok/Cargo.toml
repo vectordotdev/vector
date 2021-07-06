@@ -27,13 +27,12 @@ custom_derive = "0.1.2"
 strum = "0.21.0"
 strum_macros = "0.21"
 tracing = { version = "0.1.26", default-features = false }
-tokio = { version = "1", features = ["sync"] } # is it the right way to enable sync?
+snafu = { version = "0.6", default-features = false }
 
 # Internal
 shared = { path = "../../shared" }
-lookup = { path = "../../lookup" }
-vector_core = { path = "../../vector-core"}
 parsing = { path = "../../parsing"}
+lookup = { path = "../../lookup"}
 
 [build-dependencies]
 lalrpop = "0.19"

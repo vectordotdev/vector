@@ -9,7 +9,7 @@ license = "MPL-2.0"
 [dependencies]
 vrl = { path = "../core" }
 lookup = { path = "../../lookup" }
-parsing = { path = "../../parsing" }
+parsing = { path = "../../parsing", features = ["vrl"] }
 datadog_grok = { package="datadog-grok", path = "../../datadog/grok" }
 
 base64 = { version = "0.13", optional = true }

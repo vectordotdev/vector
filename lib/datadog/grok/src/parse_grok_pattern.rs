@@ -16,7 +16,7 @@ mod tests {
     use crate::ast::FunctionArgument;
 
     use lookup::{LookupBuf, SegmentBuf};
-    use vector_core::event::Value;
+    use parsing::value::Value;
 
     fn from_path_segments(path_segments: Vec<&str>) -> LookupBuf {
         LookupBuf::from_segments(

@@ -1,16 +1,15 @@
 use crate::ast::{Function, FunctionArgument};
 use crate::parse_grok::Error as GrokRuntimeError;
 use crate::parse_grok_rules::Error as GrokStaticError;
+use parsing::value::Value;
 use parsing::{query_string, ruby_hash};
 use percent_encoding::percent_decode;
 use regex::Regex;
-use shared::conversion::Conversion;
 use std::convert::TryFrom;
 use std::ops::Deref;
 use std::string::ToString;
 use strum_macros::Display;
 use tracing::error;
-use vector_core::event::Value;
 
 #[derive(Debug, Display, Clone)]
 pub enum GrokFilter {
@@ -90,9 +89,15 @@ impl TryFrom<&Function> for GrokFilter {
 pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRuntimeError> {
     match filter {
         GrokFilter::Integer => match value {
-            Value::Bytes(v) => Ok(Conversion::Integer.convert(v.to_owned()).map_err(|_e| {
-                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string_lossy())
-            })?),
+            Value::Bytes(v) => Ok(String::from_utf8_lossy(v)
+                .parse::<i64>()
+                .map_err(|_e| {
+                    GrokRuntimeError::FailedToApplyFilter(
+                        filter.to_string(),
+                        value.to_string_lossy(),
+                    )
+                })?
+                .into()),
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string_lossy(),
@@ -120,9 +125,15 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::Number | GrokFilter::NumberExt => match value {
-            Value::Bytes(v) => Ok(Conversion::Float.convert(v.to_owned()).map_err(|_e| {
-                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string_lossy())
-            })?),
+            Value::Bytes(v) => Ok(String::from_utf8_lossy(v)
+                .parse::<f64>()
+                .map_err(|_e| {
+                    GrokRuntimeError::FailedToApplyFilter(
+                        filter.to_string(),
+                        value.to_string_lossy(),
+                    )
+                })?
+                .into()),
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string_lossy(),

@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::lexer::*;
-use vector_core::event::Value;
+use parsing::value::Value;
 use lookup::{LookupBuf, SegmentBuf, FieldBuf};
 grammar<'err, 'input>(input: &'input str);
 

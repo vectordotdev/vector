@@ -1836,13 +1836,12 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shared",
+ "snafu",
  "strum 0.21.0",
  "strum_macros 0.21.1",
  "thiserror",
- "tokio",
  "tracing 0.1.26",
  "typetag",
- "vector_core",
 ]
 
 [[package]]
@@ -4798,10 +4797,14 @@ name = "parsing"
 version = "0.1.0"
 dependencies = [
  "bytes 1.0.1",
+ "chrono",
  "form_urlencoded",
+ "lookup",
  "nom 6.1.2",
+ "serde",
+ "serde_json",
  "shared",
- "vector_core",
+ "vrl",
 ]
 
 [[package]]
@@ -8452,6 +8455,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "once_cell",
+ "parsing",
  "pest",
  "pest_derive",
  "pin-project 1.0.7",

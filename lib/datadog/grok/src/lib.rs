@@ -3,6 +3,7 @@ extern crate lalrpop_util;
 lalrpop_mod!(pub parser);
 
 mod ast;
+mod field_traversal;
 mod grok_filter;
 mod lexer;
 pub mod parse_grok;

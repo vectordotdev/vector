@@ -1,6 +1,6 @@
+use crate::value::Value;
 use bytes::Bytes;
 use std::collections::BTreeMap;
-use vector_core::event::Value;
 
 pub fn parse(bytes: &Bytes) -> Result<Value, String> {
     let mut query_string = bytes.as_ref();
