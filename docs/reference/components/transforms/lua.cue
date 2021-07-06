@@ -354,11 +354,9 @@ components: transforms: lua: {
 			configuration: {
 				version: "2"
 				hooks: {
-					init: """
-						-- Parse timestamps like `2020-04-07 06:26:02.643`
-						timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
-
-						function parse_timestamp(str)
+					source: """
+						  timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
+						  function parse_timestamp(str)
 							local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
 							local ms = 0
 							if millis and millis ~= "" then
@@ -373,14 +371,14 @@ components: transforms: lua: {
 								sec     = tonumber(sec),
 								nanosec = ms * 1000000
 							}
-						end
-						"""
-					process: """
-						function (event, emit)
+						  end
+
+						  function process(event, emit)
 							event.log.timestamp = parse_timestamp(event.log.timestamp_string)
 							emit(event)
-						end
+						  end
 						"""
+					process: "process"
 				}
 			}
 			input: log: {
