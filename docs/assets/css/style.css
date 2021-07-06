@@ -13,11 +13,11 @@
   }
 
   .search-results-list {
-    @apply flex flex-col divide-y dark:divide-gray-700;
+    @apply grid grid-cols-2 md:grid-cols-3;
   }
 
   .search-results-list .search-result {
-    @apply text-dark dark:text-gray-200 py-2 hover:text-secondary dark:hover:text-primary;
+    @apply text-dark dark:text-gray-200 py-2 hover:text-secondary dark:hover:text-primary cursor-pointer;
   }
 
   .code-sample-filename {

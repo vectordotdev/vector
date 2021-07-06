@@ -3,18 +3,25 @@ title: Guarantees
 aliases: ["/docs/about/guarantees"]
 ---
 
-Vector attempts to make it clear which guarantees you can expect from it. We categorize all components by their targeted delivery guarantee and also by their general stability. This helps you make the appropriate trade-offs for your use case.
+Vector attempts to make it clear which guarantees you can expect from it. We categorize all
+components by their targeted delivery guarantee and also by their general stability. This helps you
+make the appropriate trade-offs for your use case.
 
-Here you can find an overview of delivery guarantee types and their meaning as well as how we label the stability of our components. Next, you can head over to the [components] page and use filters to see which components support specific guarantees.
+Here you can find an overview of delivery guarantee types and their meaning as well as how we label
+the stability of our components. Next, you can head over to the [components] page and use filters to
+see which components support specific guarantees.
 
 ## Delivery guarantees
 
 ### At-least-once
 
-The **at-least-once** delivery guarantee ensures that an [event] received by a Vector component will be delivered at least once. While rare, it is possible for an event to be delivered more than once. See the [Does Vector support exactly-once delivery?](#faq-at-least-once) FAQ below).
+The **at-least-once** delivery guarantee ensures that an [event] received by a Vector component is
+ultimately delivered at least once. While rare, it is possible for an event to be delivered more
+than once. See the [Does Vector support exactly-once delivery?](#faq-at-least-once) FAQ below).
 
 {{< warning >}}
-In order to achieve at-least-once delivery between restarts your source must be configured to use disk-based buffers:
+In order to achieve at-least-once delivery between restarts your source must be configured to use
+disk-based buffers:
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
@@ -31,32 +38,38 @@ Refer to each [sink's][sinks] documentation for further guidance on its buffer o
 
 ### Best effort
 
-A **best-effort** delivery guarantee means that a Vector component makes a best effort to deliver each event but it can't _guarantee_ delivery. This is usually due to limitations of the underlying protocol, which is outside Vector's control.
+A **best-effort** delivery guarantee means that a Vector component makes a best effort to deliver
+each event but it can't _guarantee_ delivery. This is usually due to limitations of the underlying
+protocol, which is outside Vector's control.
 
-Note that this is _not_ the same as at-most-once delivery, as it'is still possible for Vector to introduce duplicates under extreme circumstances.
+Note that this is _not_ the same as at-most-once delivery, as it'is still possible for Vector to
+introduce duplicates under extreme circumstances.
 
 ## Stability guarantees
 
 ### Stable
 
-The `stable` status is a _subjective_ status defined by the Vector team. It's intended to give you a general idea of a feature's suitability for production environments. A feature is considered stable if it meets the following criteria:
+The `stable` status is a _subjective_ status defined by the Vector team. It's intended to give you a
+general idea of a feature's suitability for production environments. A feature is considered stable
+if it meets the following criteria:
 
-1. A meaningful number of users (generally over 50) have been using the feature in a production environment for a sustained period of time without issue.
+1. A meaningful number of users (generally over 50) have been using the feature in a production
+    environment for a sustained period of time without issue.
 2. The feature has had sufficient time (generally more than 4 months) to be community tested.
+
 3. The feature API is stable and unlikely to change.
+
 4. There are no major [open bugs][bugs] for the feature.
 
 ### Beta
 
-The `beta` status means that a feature has not met the criteria outlined in
-the [stable](#stable) section and therefore should be used with caution
-in production environments.
+The `beta` status means that a feature has not met the criteria outlined in the [stable](#stable)
+section and therefore should be used with caution in production environments.
 
 ### Deprecated
 
-The `deprecated` status means that a feature will be removed in the next major
-version of Vector. We will provide ample time to transition and, when possible,
-we will strive to retain backward compatibility.
+The `deprecated` status means that a feature will be removed in the next major version of Vector. We
+will provide ample time to transition and, when possible, strive to retain backward compatibility.
 
 ## FAQs
 

@@ -1,27 +1,28 @@
 remap: concepts: event: {
 	title:       "Event"
 	description: """
-		VRL programs operate on observability [events](\(urls.vector_data_model)). This VRL program, for example, adds
-		a field to a log event:
+		VRL programs operate on observability [events](\(urls.vector_data_model)). This VRL program,
+		for example, adds a field to a log event:
 
 		```vrl
 		.new_field = "new value"
 		```
 
-		The event, `.`, at hand is the entire context of the VRL program.
+		The event at hand, represented by `.`, is the entire context of the VRL program.
 
-		The event can be set to a value other than an object; for example (`. = 5`). If it is set to an array, each
-		element of that array will be emitted as its own event from the `remap` function. For any elements that are not
-		an object, or if the top-level `.` is set to a scalar value, that value will be set as the `message` key on the
+		The event can be set to a value other than an object, for example `. = 5`. If it is set to
+		an array, each element of that array is emitted as its own event from the [`remap`
+		transform](\(urls.vector_remap_transform)). For any elements that aren't an object, or if
+		the top-level `.` is set to a scalar value, that value is set as the `message` key on the
 		emitted object.
 
-		For example:
+		This expression, for example...
 
 		```vrl
 		. = ["hello", 1, true, { "foo": "bar" }]
 		```
 
-		Will result in the following four events being emitted:
+		...results in these four events being emitted:
 
 		```json
 		{ "message": "hello" }
@@ -35,7 +36,8 @@ remap: concepts: event: {
 		path: {
 			title:       "Paths"
 			description: """
-				[Path expressions](\(urls.vrl_path_expressions)) enable you to access values inside the event:
+				[Path expressions](\(urls.vrl_path_expressions)) enable you to access values inside
+				the event:
 
 				```ruby
 				.kubernetes.pod_id

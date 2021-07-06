@@ -2,6 +2,7 @@
 title: Deployment topologies
 short: Topologies
 weight: 2
+show_toc: true
 aliases: ["/setup/deployment/pipelines"]
 ---
 

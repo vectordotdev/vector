@@ -5,7 +5,3 @@ title: Example
 description: A page for experimenting and doodling
 draft: true
 ---
-
-## Dynamic expressions
-
-{{< vrl/dynamic-expressions >}}

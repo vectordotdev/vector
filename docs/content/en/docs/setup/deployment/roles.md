@@ -2,6 +2,7 @@
 title: Deployment roles
 short: Roles
 weight: 1
+show_toc: true
 aliases: ["/docs/setup/deployment/strategies"]
 ---
 

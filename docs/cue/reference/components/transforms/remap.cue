@@ -124,30 +124,34 @@ components: transforms: "remap": {
 			title: "Lazy Event Mutation"
 			body:  #"""
 				When you make changes to an event through VRL's path assignment syntax, the change
-				is not immediately applied to the actual event. If the program fails to run to
-				completion, any changes made until that point are dropped, and the event is kept in
+				isn't immediately applied to the actual event. If the program fails to run to
+				completion, any changes made until that point are dropped and the event is kept in
 				its original state.
 
 				If you want to make sure your event is changed as expected, you have to rewrite
-				your program to never fail at runtime (the compiler will help you with this).
+				your program to never fail at runtime (the compiler can help you with this).
 
 				Alternatively, if you want to ignore/drop events that caused the program to fail,
 				you can set the `drop_on_error` configuration value to `true`.
 
-				Learn more about Runtime Errors in the [Vector Remap Language
+				Learn more about runtime errors in the [Vector Remap Language
 				reference](\#(urls.vrl_runtime_errors)).
 				"""#
 		}
 		emitting_multiple_events: {
 			title: "Emitting multiple log events"
 			body: #"""
-				Multiple log events can be emitted from remap by assigning an array
-				to the root path `.`. One log event will be emitted for each input
-				element of the array.
+				Multiple log events can be emitted from remap by assigning an array to the root path
+				`.`. One log event is emitted for each input element of the array.
 
-				If any of the array elements is not an object, a log event will
-				be created that uses the element value as the `message` key. For
-				example, `123` will be emitted as `{ "message": 123 }`
+				If any of the array elements isn't an object, a log event is created that uses the
+				element's value as the `message` key. For example, `123` is emitted as:
+
+				```json
+				{
+				  "message": 123
+				}
+				```
 				"""#
 		}
 	}
