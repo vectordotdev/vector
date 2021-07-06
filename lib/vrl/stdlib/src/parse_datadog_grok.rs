@@ -52,48 +52,50 @@ impl Function for ParseDatadogGrok {
             title: "parses DataDog grok rules",
             source: indoc! {r#"
                 value = s'127.0.0.1 - frank [13/Jul/2016:10:55:36 +0000] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-"'
-                parsing_rules = [
-                    "access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)",
-                    "access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"
-                ]
-                helper_rules = [
-                    "_auth %{notSpace:http.auth:nullIf("-")}",
-                    "_bytes_written %{integer:network.bytes_written}",
-                    "_client_ip %{ipOrHost:network.client.ip}",
-                    "_version HTTP\/(?<http.version>\d+\.\d+)",
-                    "_url %{notSpace:http.url}",
-                    "_ident %{notSpace:http.ident}",
-                    "_user_agent %{regex("[^\\\"]*"):http.useragent}",
-                    "_referer %{notSpace:http.referer}",
-                    "_status_code %{integer:http.status_code}",
-                    "_method %{word:http.method}",
-                    "_date_access %{date("dd/MMM/yyyy:HH:mm:ss Z"):date_access}",
-                    "_x_forwarded_for %{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"
-                ]
 
-                parse_grok!(value, parsing_rules, helper_rules)
+                parse_datadog_grok!(
+                    value, 
+                    parsing_rules : [
+                        s'access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)',
+                        s'access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*'
+                    ],
+                    helper_rules : [
+                        s'_auth %{notSpace:http.auth:nullIf("-")}',
+                        s'_bytes_written %{integer:network.bytes_written}',
+                        s'_client_ip %{ipOrHost:network.client.ip}',
+                        s'_version HTTP\/(?<http.version>\d+\.\d+)',
+                        s'_url %{notSpace:http.url}',
+                        s'_ident %{notSpace:http.ident}',
+                        s'_user_agent %{regex("[^\\\"]*"):http.useragent}',
+                        s'_referer %{notSpace:http.referer}',
+                        s'_status_code %{integer:http.status_code}',
+                        s'_method %{word:http.method}',
+                        s'_date_access %{date("dd/MMM/yyyy:HH:mm:ss Z"):date_access}',
+                        s'_x_forwarded_for %{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}'
+                    ]
+                )
             "#},
             result: Ok(indoc! {r#"
             {
-                "date_access" : "13/Jul/2016:10:55:36 +0000",
-                "duration" : 202000000.0,
-                "http" : {
-                    "auth" : "frank",
-                    "ident" : "-",
-                    "method" : "GET",
-                    "status_code" : 200,
-                    "url" : "/apache_pb.gif",
-                    "version" : "1.0",
-                    "referer" : "http://www.perdu.com/",
-                    "useragent" : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36",
-                    "_x_forwarded_for" : Value::Null,
-                },
-                "network" : {
-                    "bytes_written" : 2326,
-                    "client" : {
-                        "ip" : "127.0.0.1"
-                    }
+              "date_access": "13/Jul/2016:10:55:36 +0000",
+              "duration": 202000000.0,
+              "http": {
+                "_x_forwarded_for": null,
+                "auth": "frank",
+                "ident": "-",
+                "method": "GET",
+                "referer": "http://www.perdu.com/",
+                "status_code": 200,
+                "url": "/apache_pb.gif",
+                "useragent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36",
+                "version": "1.0"
+              },
+              "network": {
+                "bytes_written": 2326,
+                "client": {
+                  "ip": "127.0.0.1"
                 }
+              }
             }
             "#}),
         }]
