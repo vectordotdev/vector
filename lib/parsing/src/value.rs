@@ -1,11 +1,11 @@
 use bytes::Bytes;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 
-#[derive(PartialEq, PartialOrd, Debug, Clone, Deserialize)]
+#[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
