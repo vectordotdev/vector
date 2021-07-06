@@ -37,9 +37,9 @@
 
 /docs/reference/components/sinks.cue @timberio/vector-integrations
 /docs/reference/components/sinks/ @timberio/vector-integrations
-/docs/reference/components/sinks/aws* @timberio/vector-aws
+/docs/reference/components/sinks/aws* @timberio/vector-integrations
 /docs/reference/components/sinks/datadog* @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sinks/gcp* @timberio/vector-gcp
+/docs/reference/components/sinks/gcp* @timberio/vector-integrations
 /docs/reference/components/sinks/http.cue @timberio/vector-core @timberio/vector-integrations
 /docs/reference/components/sinks/kubernetes* @timberio/vector-kubernetes
 /docs/reference/components/sinks/socket.cue @timberio/vector-core @timberio/vector-integrations
@@ -47,9 +47,9 @@
 
 /docs/reference/components/sources.cue @timberio/vector-integrations
 /docs/reference/components/sources/ @timberio/vector-integrations
-/docs/reference/components/sources/aws* @timberio/vector-aws
+/docs/reference/components/sources/aws* @timberio/vector-integrations
 /docs/reference/components/sources/datadog* @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sources/gcp* @timberio/vector-gcp
+/docs/reference/components/sources/gcp* @timberio/vector-integrations
 /docs/reference/components/sources/host* @timberio/vector-core @timberio/vector-integrations
 /docs/reference/components/sources/http.cue @timberio/vector-core @timberio/vector-integrations
 /docs/reference/components/sources/internal_* @timberio/vector-core @timberio/vector-integrations
@@ -59,8 +59,8 @@
 
 /docs/reference/components/transforms.cue @timberio/vector-processing
 /docs/reference/components/transforms/* @timberio/vector-processing
-/docs/reference/components/transforms/aws* @timberio/vector-aws
-/docs/reference/components/transforms/gcp* @timberio/vector-gcp
+/docs/reference/components/transforms/aws* @timberio/vector-integrations
+/docs/reference/components/transforms/gcp* @timberio/vector-integrations
 /docs/reference/components/transforms/kubernetes* @timberio/vector-kubernetes
 
 /docs/reference/data_model.cue @timberio/vector-core @timberio/vector-processing
@@ -134,14 +134,14 @@
 /src/internal_events/adaptive_concurrency* @timberio/vector-core
 /src/internal_events/apache_* @timberio/vector-integrations
 /src/internal_events/api* @timberio/vector-enterprise
-/src/internal_events/aws* @timberio/vector-aws
+/src/internal_events/aws* @timberio/vector-integrations
 /src/internal_events/blackhole.rs @timberio/vector-support
 /src/internal_events/console.rs @timberio/vector-integrations
 /src/internal_events/datadog* @timberio/vector-core @timberio/vector-integrations
 /src/internal_events/dedupe.rs @timberio/vector-processing
 /src/internal_events/docker* @timberio/vector-integrations
 /src/internal_events/elasticsearch.rs @timberio/vector-integrations
-/src/internal_events/gcp* @timberio/vector-gcp
+/src/internal_events/gcp* @timberio/vector-integrations
 /src/internal_events/file.rs @timberio/vector-core @timberio/vector-integrations
 /src/internal_events/filter.rs @timberio/vector-processing
 /src/internal_events/generator.rs @timberio/vector-support
@@ -185,20 +185,20 @@
 /src/mapping/ @timberio/vector-processing
 /src/metrics.rs @timberio/vector-core @timberio/vector-processing
 /src/prometheus.rs @timberio/vector-integrations
-/src/rusoto/ @timberio/vector-aws
+/src/rusoto/ @timberio/vector-integrations
 /src/sinks/ @timberio/vector-integrations
-/src/sinks/aws* @timberio/vector-aws
+/src/sinks/aws* @timberio/vector-integrations
 /src/sinks/datadog* @timberio/vector-core
-/src/sinks/gcp* @timberio/vector-gcp
+/src/sinks/gcp* @timberio/vector-integrations
 /src/sinks/http* @timberio/vector-core @timberio/vector-integrations
 /src/sinks/kubernetes* @timberio/vector-kubernetes
 /src/sinks/socket* @timberio/vector-core @timberio/vector-integrations
 /src/sinks/vector* @timberio/vector-core @timberio/vector-integrations
 /src/sinks/util/ @timberio/vector-core @timberio/vector-integrations
 /src/sources/ @timberio/vector-integrations
-/src/sources/aws* @timberio/vector-aws
+/src/sources/aws* @timberio/vector-integrations
 /src/sources/datadog* @timberio/vector-core
-/src/sources/gcp* @timberio/vector-gcp
+/src/sources/gcp* @timberio/vector-integrations
 /src/sources/http* @timberio/vector-core @timberio/vector-integrations
 /src/sources/kubernetes* @timberio/vector-core @timberio/vector-kubernetes
 /src/sources/socket* @timberio/vector-core @timberio/vector-integrations
@@ -209,9 +209,9 @@
 /src/top/ @timberio/vector-enterprise
 /src/topology/ @timberio/vector-core
 /src/transforms/ @timberio/vector-processing
-/src/transforms/aws* @timberio/vector-aws
+/src/transforms/aws* @timberio/vector-integrations
 /src/transforms/datadog* @timberio/vector-core
-/src/transforms/gcp* @timberio/vector-gcp
+/src/transforms/gcp* @timberio/vector-integrations
 /src/transforms/kubernetes* @timberio/vector-core @timberio/vector-kubernetes
 
 #
