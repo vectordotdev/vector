@@ -1,3 +1,5 @@
+{{- $deprecatedConfig := or .Values.logSchema .Values.vectorApi.enabled .Values.kubernetesLogsSource.enabled .Values.vectorSink.enabled .Values.internalMetricsSource.enabled .Values.hostMetricsSource.enabled .Values.prometheusSink.enabled .Values.sources .Values.transforms .Values.sinks -}}
+
 {{- if (empty .Values.existingConfigMap) -}}
 apiVersion: v1
 kind: ConfigMap
@@ -6,6 +8,35 @@ metadata:
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 data:
+  {{- if .Values.customConfig }}
+  {{- if and .Values.customConfig $deprecatedConfig }}{{ fail "Can't use deprecated keys with customConfig" }}{{- end }}
+  vector.yaml: |
+{{ tpl (toYaml .Values.customConfig) . | indent 4 }}
+  {{- else if (not $deprecatedConfig) }}
+  vector.yaml: |
+    # Configuration for Vector.
+    # Docs: https://vector.dev/docs/
+    data_dir: "/vector-data-dir"
+    sources:
+      host_metrics:
+        type: host_metrics
+        filesystem:
+          devices:
+            excludes: ["binfmt_misc"]
+          filesystems:
+            excludes: ["binfmt_misc"]
+          mountpoints:
+            excludes: ["*/proc/sys/fs/binfmt_misc"]
+      internal_metrics:
+        type: internal_metrics
+      kubernetes_logs:
+        type: kubernetes_logs
+    sinks:
+      prometheus_sink:
+        type: prometheus_exporter
+        inputs: ["host_metrics", "internal_metrics"]
+        address: 0.0.0.0:9090
+  {{- end }}
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
   managed.toml: |

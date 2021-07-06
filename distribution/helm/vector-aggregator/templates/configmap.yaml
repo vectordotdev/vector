@@ -1,3 +1,5 @@
+{{- $deprecatedConfig := or .Values.logSchema .Values.vectorApi.enabled .Values.vectorSource.enabled .Values.internalMetricsSource.enabled .Values.prometheusSink.enabled .Values.sources .Values.transforms .Values.sinks -}}
+
 {{- if (empty .Values.existingConfigMap) -}}
 apiVersion: v1
 kind: ConfigMap
@@ -6,6 +8,28 @@ metadata:
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 data:
+  {{- if .Values.customConfig }}
+  {{- if and .Values.customConfig $deprecatedConfig }}{{ fail "Can't use deprecated keys with customConfig" }}{{- end }}
+  vector.yaml: |
+{{ tpl (toYaml .Values.customConfig) . | indent 4 }}
+  {{- else if (not $deprecatedConfig) }}
+  vector.yaml: |
+    # Configuration for Vector.
+    # Docs: https://vector.dev/docs/
+    data_dir: "/vector-data-dir"
+    sources:
+      internal_metrics:
+        type: internal_metrics
+      vector:
+        type: vector
+        address: 0.0.0.0:9000
+        version: "2"
+    sinks:
+      prometheus_sink:
+        type: prometheus_exporter
+        inputs: ["internal_metrics"]
+        address: 0.0.0.0:9090
+  {{- end }}
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
   managed.toml: |

@@ -42,8 +42,8 @@ spec:
           image: {{ include "libvector.image" . | quote }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
           args:
-            - --config
-            - /etc/vector/*.toml
+            - --config-dir
+            - /etc/vector/
           env:
             {{- include "libvector.globalEnv" . | nindent 12 }}
             {{- with .Values.env }}

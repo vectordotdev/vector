@@ -46,8 +46,8 @@ spec:
           command:
             {{- toYaml .Values.command | nindent 12 }}
           args:
-            - --config
-            - /etc/vector/*.toml
+            - --config-dir
+            - /etc/vector/
           env:
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:
