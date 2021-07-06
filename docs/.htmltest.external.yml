@@ -4,6 +4,7 @@ CheckExternal: true
 IgnoreAltMissing: true
 IgnoreEmptyHref: true
 IgnoreURLs:
+# We have to ignore this due to rate limiting
 - "github.com"
 - "packages.timber.io"
 - "localhost"

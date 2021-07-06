@@ -19,6 +19,10 @@
   .search-results-list .search-result {
     @apply text-dark dark:text-gray-200 py-2 hover:text-secondary dark:hover:text-primary;
   }
+
+  .code-sample-filename {
+    @apply font-semibold font-mono tracking-wide text-gray-200 dark:text-gray-200 bg-dark dark:bg-black py-1.5 px-2 rounded text-sm;
+  }
 }
 
 [x-cloak] {

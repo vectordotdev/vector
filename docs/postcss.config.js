@@ -11,6 +11,7 @@ const safeClasses = {
     "search-input",
     "search-results-list",
     "search-result",
+    "code-sample-filename",
     /^ais-/, // All Algolia-specific classes
     "type"
   ]

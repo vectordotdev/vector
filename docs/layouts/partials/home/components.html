@@ -11,10 +11,11 @@
 
   <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
     {{ range $types }}
+    {{ $moreHref := printf "/docs/reference/configuration/%s" (. | lower) }}
     {{ $type := . }}
     {{ $components := where site.RegularPages ".CurrentSection.Params.short" . }}
     {{ $num := len $components }}
-    <div>
+    <div class="flex flex-col space-y-3">
       <span class="text-xl text-gray-600 dark:text-gray-100 text-primaryfont-light tracking-wide">
         <span class="font-extrabold">
           {{ $num }}
@@ -22,19 +23,23 @@
         {{ $type | lower }}
       </span>
 
-      <div class="mt-4 grid grid-cols-3 md:grid-cols-2 gap-1.5">
-        {{ range $components }}
+      <div class="mt-4 flex flex-col space-y-1.5">
+        {{ range first 10 $components }}
         {{ $title := .Params.short | default .Title }}
         {{ template "component-chip" (dict "title" $title "href" .RelPermalink) }}
         {{ end }}
       </div>
+
+      <a href="{{ $moreHref }}" class="text-dark dark:text-gray-300 hover:text-secondary dark:hover:text-primary">
+        more...
+      </a>
     </div>
     {{ end }}
   </div>
 </div>
 
 {{ define "component-chip" }}
-<a href="{{ .href }}" class="font-light text-gray-600 dark:text-gray-300 hover:text-secondary dark:hover:text-primary leading-tight">
+<a href="{{ .href }}" class="border dark:border-gray-700 rounded py-2 px-3 text-sm font-light text-gray-600 dark:text-gray-300 hover:text-secondary hover:border-secondary dark:hover:text-primary leading-tight dark:hover:border-primary">
   {{ .title }}
 </a>
 {{ end }}
