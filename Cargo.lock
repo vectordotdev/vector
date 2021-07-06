@@ -7030,13 +7030,13 @@ dependencies = [
 
 [[package]]
 name = "structopt"
-version = "0.3.21"
+version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5277acd7ee46e63e5168a80734c9f6ee81b1367a7d8772a2d765df2a3705d28c"
+checksum = "69b041cdcb67226aca307e6e7be44c8806423d83e018bd662360a93dabce4d71"
 dependencies = [
  "clap",
  "lazy_static",
- "structopt-derive 0.4.14",
+ "structopt-derive 0.4.15",
 ]
 
 [[package]]
@@ -7053,9 +7053,9 @@ dependencies = [
 
 [[package]]
 name = "structopt-derive"
-version = "0.4.14"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ba9cdfda491b814720b6b06e0cac513d922fc407582032e8706e9f137976f90"
+checksum = "7813934aecf5f51a54775e00068c237de98489463968231a51746bbbc03f9c10"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -7262,18 +7262,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.25"
+version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa6f76457f59514c7eeb4e59d891395fab0b2fd1d40723ae737d64153392e9c6"
+checksum = "93119e4feac1cbe6c798c34d3a53ea0026b0b1de6a120deef895137c0529bfe2"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.25"
+version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a36768c0fbf1bb15eca10defa29526bda730a2376c2ab4393ccfa16fb1a318d"
+checksum = "060d69a0afe7796bf42e9e2ff91f5ee691fb15c53d38b4b62a9a53eb23164745"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
@@ -8278,7 +8278,7 @@ dependencies = [
  "socket2 0.4.0",
  "stream-cancel",
  "strip-ansi-escapes",
- "structopt 0.3.21",
+ "structopt 0.3.22",
  "syslog",
  "syslog_loose",
  "tempfile",
@@ -8447,7 +8447,7 @@ dependencies = [
  "regex",
  "rustyline",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.22",
  "thiserror",
  "vrl",
  "vrl-stdlib",
@@ -8545,7 +8545,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.22",
  "tracing-subscriber",
  "vrl",
  "vrl-parser",
