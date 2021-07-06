@@ -1,6 +1,12 @@
 use crate::ast::GrokPattern;
 use crate::lexer::Lexer;
-use crate::parser;
+use lalrpop_util::lalrpop_mod;
+
+lalrpop_mod!(
+    #[allow(clippy::all)]
+    #[allow(unused)]
+    parser
+);
 
 /// Parses grok patterns as %{MATCHER:FIELD:FILTER}
 pub fn parse_grok_pattern(input: &str) -> Result<GrokPattern, &str> {
