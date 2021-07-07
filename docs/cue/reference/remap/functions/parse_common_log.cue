@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: parse_common_log: {
-	category: "Parse"
+	category:    "Parse"
 	description: """
 		Parses the `value` using the [Common Log Format](\(urls.apache_common)) (CLF).
 		"""

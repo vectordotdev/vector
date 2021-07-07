@@ -413,9 +413,9 @@ components: sinks: aws_s3: components._aws & {
 
 	permissions: iam: [
 		{
-			platform:  "aws"
-			_service:  "s3"
-			_docs_tag: "AmazonS3"
+			platform:      "aws"
+			_service:      "s3"
+			_docs_tag:     "AmazonS3"
 			_url_fragment: "API"
 
 			policies: [

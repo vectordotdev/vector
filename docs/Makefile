@@ -1,3 +1,5 @@
+CUE = ./scripts/cue.sh
+
 clean:
 	rm -rf public resources
 
@@ -5,10 +7,23 @@ setup:
 	yarn
 
 # Build JSON from CUE sources
-build-cue:
-	./scripts/build-cue.sh
+cue-build:
+	${CUE} build
 
-serve: setup build-cue
+# Other CUE commands
+cue-check:
+	${CUE} check
+
+cue-fmt:
+	${CUE} fmt
+
+cue-list:
+	${CUE} list
+
+cue-vet:
+	${CUE} vet
+
+serve: setup cue-build
 	hugo server \
 	--buildDrafts \
 	--buildFuture
@@ -18,7 +33,7 @@ production-build:
 	hugo \
 	--minify
 
-ci-production-build: setup build-cue production-build run-link-checker algolia
+ci-production-build: setup cue-build production-build run-link-checker algolia
 
 # Preview site
 preview-build:
@@ -27,7 +42,7 @@ preview-build:
 	--buildFuture \
 	--minify
 
-ci-preview-build: setup build-cue preview-build algolia
+ci-preview-build: setup cue-build preview-build algolia
 
 run-link-checker:
 	htmltest
@@ -45,10 +60,10 @@ algolia:
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
-	make setup build-cue production-build
+	make setup cue-build production-build
 	python -m http.server 8000 --directory ./public --bind 127.0.0.1
 
 # Full local builds without Algolia updates (for debugging, link checking, etc.)
-local-production-build: clean setup build-cue production-build run-link-checker
+local-production-build: clean setup cue-build production-build run-link-checker
 
-local-preview-build: clean setup build-cue preview-build run-link-checker
+local-preview-build: clean setup cue-build preview-build run-link-checker
