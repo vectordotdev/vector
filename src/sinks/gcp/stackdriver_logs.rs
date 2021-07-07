@@ -3,6 +3,7 @@ use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
+    internal_events::TemplateRenderingFailed,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -162,9 +163,17 @@ impl HttpSink for StackdriverSink {
     fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let mut labels = HashMap::with_capacity(self.config.resource.labels.len());
         for (key, template) in &self.config.resource.labels {
-            if let Ok(value) = template.render_string(&event) {
-                labels.insert(key.clone(), value);
-            }
+            let value = template
+                .render_string(&event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("resource.labels"),
+                        drop_event: true,
+                    });
+                })
+                .ok()?;
+            labels.insert(key.clone(), value);
         }
 
         let mut log = event.into_log();
