@@ -1,7 +1,7 @@
 //! TypeDefs
 //!
 //! The type definitions for typedefs record the various possible type definitions for the state
-//! that can be passed through a Vrl program.
+//! that can be passed through a VRL program.
 //!
 //! `TypeDef` contains a `KindInfo`.
 //!
@@ -1053,9 +1053,10 @@ impl TypeDef {
                         }
 
                         (TypeKind::Array(array), Some(SegmentBuf::Index(index)), None) => {
-                            let indexed = array.iter().any(|(idx, _kindinfo)| matches!(idx, 
+                            let indexed = array.iter().any(|(idx, _kindinfo)| {
+                                matches!(idx,
                                 Index::Index(idx) if *index > 0 && *idx == *index as usize)
-                            );
+                            });
 
                             TypeKind::Array(
                                 array

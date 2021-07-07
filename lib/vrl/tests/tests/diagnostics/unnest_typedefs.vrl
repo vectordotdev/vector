@@ -7,9 +7,9 @@
 .b = unnest!(.noog.nork[2].(ning | nong).nonk)
 .c = unnest!(.noog.nork)
 
-[ contains(.a[0].noog.nork[2].ning.nonk, "ana"),
+[
+  contains(.a[0].noog.nork[2].ning.nonk, "ana"),
   contains(.b[0].noog.nork[2].ning.nonk || "flanana", "ana"),
   contains(.b[0].noog.nork[2].nong.nonk || "flanana", "ana"),
   contains(.c[2].noog.nork.ning.nonk[1], "ana")
 ]
-
