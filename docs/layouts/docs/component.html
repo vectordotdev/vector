@@ -89,25 +89,28 @@
           {{/* How it works */}}
           {{ with $config.how_it_works }}
           {{ partial "heading.html" (dict "text" "How it works" "level" 2) }}
+
           {{ range $k, $v := . }}
-          {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
+          <div>
+            {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
 
-          {{ with .svg }}
-          {{ partial "svg.html" (dict "src" .) }}
-          {{ end }}
+            {{ with .svg }}
+            {{ partial "svg.html" (dict "src" .) }}
+            {{ end }}
 
-          {{ $v.body | $.Page.RenderString }}
+            {{ $v.body | $.Page.RenderString }}
 
-          {{ with $v.sub_sections }}
-          {{ range . }}
-          {{ partial "heading.html" (dict "text" .title "level" 4) }}
+            {{ with $v.sub_sections }}
+            {{ range . }}
+            {{ partial "heading.html" (dict "text" .title "level" 4) }}
 
-          {{ with .svg }}
-          {{ partial "svg.html" (dict "src" .) }}
-          {{ end }}
+            {{ with .svg }}
+            {{ partial "svg.html" (dict "src" .) }}
+            {{ end }}
 
-          {{ .body | $.Page.RenderString }}
-          {{ end }}
+            {{ .body | $.Page.RenderString }}
+            {{ end }}
+          </div>
           {{ end }}
 
           {{ end }}

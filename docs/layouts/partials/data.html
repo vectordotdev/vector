@@ -259,7 +259,9 @@
     </div>
     {{ else }}
     {{ $example := index . 0 }}
-    {{ template "example" $example }}
+    <div class="py-2 px-3">
+      {{ template "example" $example }}
+    </div>
     {{ end }}
   </div>
   {{ end }}
@@ -1385,21 +1387,23 @@
   {{ end }}
 </div>
 
-{{ if reflect.IsSlice .output }}
-{{ $multiple := gt (len .output) 1 }}
-{{ if $multiple }}
-{{ $kind := "" }}
-{{ $event := slice }}
-{{ range .output }}
-{{ if .log }}
-{{ $kind = "log" }}
-{{ $event = $event | append .log }}
-{{ end }}
-{{ if .metric }}
-{{ $kind = "metric" }}
-{{ $event = $event | append .metric }}
-{{ end }}
-{{ end }}
+<div class="my-2.5">
+  {{ if reflect.IsSlice .output }}
+  {{ $multiple := gt (len .output) 1 }}
+  {{ if $multiple }}
+  {{ $kind := "" }}
+  {{ $event := slice }}
+  {{ range .output }}
+  {{ if .log }}
+  {{ $kind = "log" }}
+  {{ $event = $event | append .log }}
+  {{ end }}
+  {{ if .metric }}
+  {{ $kind = "metric" }}
+  {{ $event = $event | append .metric }}
+  {{ end }}
+  {{ end }}
+</div>
 
 {{ if eq $kind "log" }}
 <span>
@@ -1414,7 +1418,9 @@
 {{ end }}
 
 {{ $json := $event | jsonify (dict "indent" "  ") }}
-{{ highlight $json "json" "" }}
+<div class="mt-2.5">
+  {{ highlight $json "json" "" }}
+</div>
 {{ else }}
 {{ $out := index .output 0 }}
 {{ with $out.metric }}
