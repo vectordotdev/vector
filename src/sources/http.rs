@@ -106,7 +106,7 @@ impl SourceConfig for SimpleHttpConfig {
         };
         source.run(
             self.address,
-            &self.path.as_str(),
+            self.path.as_str(),
             self.strict_path,
             &self.tls,
             &self.auth,

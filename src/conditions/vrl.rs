@@ -56,7 +56,7 @@ impl ConditionConfig for VrlConfig {
 
 #[derive(Clone)]
 pub struct Vrl {
-    program: Program,
+    pub(super) program: Program,
 }
 
 impl Vrl {
@@ -80,7 +80,7 @@ impl Vrl {
 
 impl Condition for Vrl {
     fn check(&self, event: &Event) -> bool {
-        self.run(&event)
+        self.run(event)
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => false,

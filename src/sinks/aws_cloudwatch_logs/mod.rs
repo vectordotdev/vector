@@ -527,10 +527,10 @@ async fn healthcheck(
             None => {
                 if config.group_name.is_dynamic() {
                     info!("Skipping healthcheck log group check: `group_name` is dynamic.");
-                    return Ok(());
+                    Ok(())
                 } else if config.create_missing_group.unwrap_or(true) {
                     info!("Skipping healthcheck log group check: `group_name` will be created if missing.");
-                    return Ok(());
+                    Ok(())
                 } else {
                     Err(HealthcheckError::NoLogGroup.into())
                 }
@@ -573,7 +573,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 }
 
                 RusotoError::Unknown(res)
-                    if rusoto_core::proto::json::Error::parse(&res)
+                    if rusoto_core::proto::json::Error::parse(res)
                         .filter(|error| error.typ.as_str() == "ThrottlingException")
                         .is_some() =>
                 {

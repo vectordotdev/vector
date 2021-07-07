@@ -124,7 +124,7 @@ pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     stream! {
         loop {
             interval.tick().await;
-            for ev in capture_metrics(&controller) {
+            for ev in capture_metrics(controller) {
                 if let Event::Metric(m) = ev {
                     yield m;
                 }
@@ -140,7 +140,7 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     stream! {
         loop {
             interval.tick().await;
-            yield capture_metrics(&controller)
+            yield capture_metrics(controller)
                 .filter_map(|m| match m {
                     Event::Metric(m) => Some(m),
                     _ => None,

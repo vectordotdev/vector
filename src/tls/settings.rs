@@ -226,7 +226,7 @@ impl TlsOptions {
                     .into_iter();
 
                 let crt = crt_stack.next().ok_or(TlsError::MissingCertificate)?;
-                let key = load_key(&key_file, &self.key_pass)?;
+                let key = load_key(key_file, &self.key_pass)?;
 
                 let mut ca_stack = Stack::new().context(NewCaStack)?;
                 for intermediate in crt_stack {
@@ -253,7 +253,7 @@ impl TlsOptions {
         let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12)?;
         // Verify password
         let key_pass = self.key_pass.as_deref().unwrap_or("");
-        pkcs12.parse(&key_pass).context(ParsePkcs12)?;
+        pkcs12.parse(key_pass).context(ParsePkcs12)?;
         Ok(Some(IdentityStore(der, key_pass.to_string())))
     }
 }

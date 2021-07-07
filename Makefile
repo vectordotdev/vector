@@ -301,11 +301,11 @@ test-behavior: ## Runs behaviorial test
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
-test-integration: test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
+test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
+test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-splunk test-integration-dnstap
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -317,6 +317,18 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh aws stop
+endif
+
+.PHONY: test-integration-azure
+test-integration-azure: ## Runs Azure integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh azure stop
+	@scripts/setup_integration_env.sh azure start
+	sleep 5 # Many services are very slow... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features azure-integration-tests --lib ::azure_ -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh azure stop
 endif
 
 .PHONY: test-integration-clickhouse
@@ -345,6 +357,18 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh elasticsearch stop
+endif
+
+.PHONY: test-integration-eventstoredb_metrics
+test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh eventstoredb_metrics stop
+	@scripts/setup_integration_env.sh eventstoredb_metrics start
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features eventstoredb_metrics-integration-tests --lib ::eventstoredb_metrics:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh eventstoredb_metrics stop
 endif
 
 .PHONY: test-integration-fluent
@@ -489,6 +513,18 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 endif
 
+.PHONY: test-integration-redis
+test-integration-redis: ## Runs Redis integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh redis stop
+	@scripts/setup_integration_env.sh redis start
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features redis-integration-tests --lib ::redis:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh redis stop
+endif
+
 .PHONY: test-integration-splunk
 test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -612,7 +648,7 @@ check: ## Run prerequisite code checks
 
 .PHONY: check-all
 check-all: ## Check everything
-check-all: check-fmt check-clippy check-style check-markdown check-docs
+check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts
 check-all: check-helm-lint check-helm-dependencies check-helm-snapshots

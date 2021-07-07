@@ -206,7 +206,7 @@ where
         let client = self.client.clone();
 
         Box::pin(async move {
-            let method = match request.method().as_ref() {
+            let method = match request.method() {
                 "POST" => Method::POST,
                 "PUT" => Method::PUT,
                 "DELETE" => Method::DELETE,

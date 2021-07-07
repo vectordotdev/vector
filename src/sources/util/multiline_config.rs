@@ -30,13 +30,12 @@ impl TryFrom<&MultilineConfig> for line_agg::Config {
             .with_context(|| InvalidMultilineStartPattern { start_pattern })?;
         let condition_pattern = Regex::new(condition_pattern)
             .with_context(|| InvalidMultilineConditionPattern { condition_pattern })?;
-        let mode = mode.clone();
         let timeout = Duration::from_millis(*timeout_ms);
 
         Ok(Self {
             start_pattern,
             condition_pattern,
-            mode,
+            mode: *mode,
             timeout,
         })
     }

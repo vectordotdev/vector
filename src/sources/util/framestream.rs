@@ -801,7 +801,7 @@ mod test {
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
         let shutdown_success = shutdown_complete.await;
-        assert_eq!(true, shutdown_success);
+        assert!(shutdown_success);
     }
 
     #[tokio::test(flavor = "multi_thread")]

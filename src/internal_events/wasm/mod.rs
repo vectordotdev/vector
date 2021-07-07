@@ -17,7 +17,7 @@ enum State {
 
 impl State {
     /// Cheaply turn into a `&'static str` so you don't need to format it for metrics.
-    pub fn as_const_str(&self) -> &'static str {
+    pub fn as_const_str(self) -> &'static str {
         match self {
             State::Beginning => BEGINNING,
             State::Completed => COMPLETED,

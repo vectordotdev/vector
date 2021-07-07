@@ -14,6 +14,8 @@ pub mod datadog;
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
+#[cfg(feature = "sources-eventstoredb_metrics")]
+pub mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 pub mod exec;
 #[cfg(feature = "sources-file")]

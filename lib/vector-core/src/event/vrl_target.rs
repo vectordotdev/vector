@@ -2,7 +2,7 @@ use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
 use crate::config::log_schema;
 use lookup::LookupBuf;
 use snafu::Snafu;
-use std::{collections::BTreeMap, convert::TryFrom, iter::FromIterator};
+use std::{collections::BTreeMap, convert::TryFrom};
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
@@ -167,11 +167,12 @@ impl vrl_core::Target for VrlTarget {
                             Some(timestamp) => return Ok(Some(timestamp.into())),
                             None => continue,
                         },
-                        ["kind"] => return Ok(Some(metric.data.kind.clone().into())),
+                        ["kind"] => return Ok(Some(metric.data.kind.into())),
                         ["tags"] => {
                             return Ok(metric.tags().map(|map| {
-                                let iter = map.iter().map(|(k, v)| (k.clone(), v.clone().into()));
-                                vrl_core::Value::from_iter(iter)
+                                map.iter()
+                                    .map(|(k, v)| (k.clone(), v.clone().into()))
+                                    .collect::<vrl_core::Value>()
                             }))
                         }
                         ["tags", field] => match metric.tag_value(field) {
@@ -227,8 +228,9 @@ impl vrl_core::Target for VrlTarget {
                         ["timestamp"] => return Ok(metric.data.timestamp.take().map(Into::into)),
                         ["tags"] => {
                             return Ok(metric.series.tags.take().map(|map| {
-                                let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                                vrl_core::Value::from_iter(iter)
+                                map.into_iter()
+                                    .map(|(k, v)| (k, v.into()))
+                                    .collect::<vrl_core::Value>()
                             }))
                         }
                         ["tags", field] => return Ok(metric.remove_tag(field).map(Into::into)),

@@ -21,6 +21,7 @@ hostname = { version = "0.3", optional = true }
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
 nom = { version = "6", optional = true }
+percent-encoding = { version = "2.1", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -29,10 +30,11 @@ sha-2 = { package = "sha2", version = "0.9", optional = true }
 sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.10", optional = true }
+syslog_loose = { version = "0.12", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
+roxmltree = { version = "0.14.1", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
@@ -49,24 +51,30 @@ default = [
     "compact",
     "contains",
     "decode_base64",
+    "decode_percent",
     "del",
     "downcase",
     "encode_base64",
     "encode_json",
+    "encode_key_value",
     "encode_logfmt",
+    "encode_percent",
     "ends_with",
     "exists",
     "flatten",
     "float",
     "floor",
+    "format_int",
     "format_number",
     "format_timestamp",
     "get_env_var",
     "get_hostname",
     "includes",
     "integer",
+    "ip_aton",
     "ip_cidr_contains",
     "ip_subnet",
+    "ip_ntoa",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_array",
@@ -98,6 +106,7 @@ default = [
     "parse_duration",
     "parse_glog",
     "parse_grok",
+    "parse_int",
     "parse_json",
     "parse_key_value",
     "parse_klog",
@@ -112,6 +121,7 @@ default = [
     "parse_timestamp",
     "parse_tokens",
     "parse_url",
+    "parse_xml",
     "push",
     "redact",
     "replace",
@@ -151,23 +161,29 @@ ceil = []
 compact = []
 contains = []
 decode_base64 = ["base64"]
+decode_percent = ["percent-encoding"]
 del = []
 downcase = []
 encode_base64 = ["base64"]
 encode_json = ["serde_json"]
-encode_logfmt = []
+encode_key_value = []
+encode_logfmt = ["encode_key_value"]
+encode_percent = ["percent-encoding"]
 ends_with = []
 exists = []
 flatten = []
 float = []
 floor = []
+format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
 get_env_var = []
 get_hostname = ["hostname"]
 includes = []
 integer = []
+ip_aton = []
 ip_cidr_contains = ["cidr-utils"]
+ip_ntoa = []
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
@@ -200,6 +216,7 @@ parse_csv = ["csv"]
 parse_duration = ["rust_decimal"]
 parse_glog = ["chrono"]
 parse_grok = ["grok"]
+parse_int = []
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
 parse_klog = ["chrono"]
@@ -214,6 +231,7 @@ parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_tokens = ["shared/tokenize"]
 parse_url = ["url"]
+parse_xml = ["roxmltree", "lazy_static", "regex"]
 push = []
 redact = []
 replace = []
