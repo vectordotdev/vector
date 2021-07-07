@@ -457,8 +457,8 @@ components: {
 		_service: !="" // The slug of the service, e.g. "s3" or "firehose"
 		// _docs_tag is used to ed to construct URLs, e.g. "AmazonCloudWatchLogs" in
 		// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html
-		_docs_tag: *_service | !=""
-		_url_fragment:  != "" | *"APIReference"
+		_docs_tag:     *_service | !=""
+		_url_fragment: !="" | *"APIReference"
 
 		// For use in the view layer
 		platform_title: !=""

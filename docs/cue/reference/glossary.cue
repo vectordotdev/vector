@@ -1,29 +1,29 @@
 package metadata
 
 #Term: {
-	term: != ""
-	description: != ""
+	term:        !=""
+	description: !=""
 }
 
 #Glossary: [#Term, ...#Term]
 
 glossary: #Glossary & [
-	{
-		term: "Batch"
+		{
+		term:        "Batch"
 		description: """
 			A [batched payload](\(urls.vector_log)) within a [sink](#sink). It is a batch of events
 			encoded into a payload that the downstream service understands.
 			"""
 	},
 	{
-		term: "Benchmark"
+		term:        "Benchmark"
 		description: """
 			A test designed to measure performance and resource usage. You can learn more about
 			Vector's benchmarks in the Vector repo's [main README](\(urls.vector_readme)).
 			"""
 	},
 	{
-		term: "Binary"
+		term:        "Binary"
 		description: "The static binary that Vector compiles to."
 	},
 	{
@@ -42,7 +42,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Configuration"
+		term:        "Configuration"
 		description: """
 			The settings and options used to control Vector's behavior. You can learn more about
 			Vector's configuration on the [Configuration](\(urls.vector_configuration)) page.
@@ -56,7 +56,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Event"
+		term:        "Event"
 		description: """
 			A single unit of data that flows through Vector. You can learn more about events on the
 			[Data model](\(urls.vector_data_model)) page.
@@ -76,11 +76,11 @@ glossary: #Glossary & [
 			"""#
 	},
 	{
-		term: "GitHub"
+		term:        "GitHub"
 		description: "The service used to host Vector's source code."
 	},
 	{
-		term: "Guide"
+		term:        "Guide"
 		description: """
 			A tutorial or walkthrough of a specific subject. You can see Vector’s guides in the
 			[Guides](\(urls.vector_guides)) section.
@@ -101,7 +101,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Parser"
+		term:        "Parser"
 		description: "A [transform](#transform) that parses [event](#event) data."
 	},
 	{
@@ -118,13 +118,13 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Repo"
+		term:        "Repo"
 		description: """
 			A Git repository, usually the [Vector Git repository](\(urls.vector_repo)).
 			"""
 	},
 	{
-		term: "Role"
+		term:        "Role"
 		description: """
 			A capacity in which Vector is deployed. For more, see the listing of available
 			[roles](\(urls.vector_roles)) for Vector.
@@ -138,7 +138,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Rust"
+		term:        "Rust"
 		description: """
 			The [Rust programming language](\(urls.rust)). Vector is written exclusively in Rust and
 			takes heavy advantage of Rust's core features, such as memory efficiency and memory
@@ -153,7 +153,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Sink"
+		term:        "Sink"
 		description: """
 			One of the core [component](#component) types in Vector, **sinks** deliver observability
 			to a variety of [available destinations](\(urls.vector_sinks)). Sinks are the terminus
@@ -161,7 +161,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Source"
+		term:        "Source"
 		description: """
 			One of the core [component](#component) types in Vector, **sources** take in
 			observability data from a wide range of [available targets](\(urls.vector_sources)).
@@ -176,7 +176,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Table"
+		term:        "Table"
 		description: """
 			The [TOML table type](\(urls.toml_table)), which is a collection of key/value pairs
 			directly akin to data types like dicts (Python), objects (JavaScript), and hashes
@@ -184,7 +184,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Topology"
+		term:        "Topology"
 		description: """
 			A [deployment topology](\(urls.vector_topologies)) under which Vector is deployed.
 			"""
@@ -199,7 +199,7 @@ glossary: #Glossary & [
 			"""
 	},
 	{
-		term: "Vector Remap Language"
+		term:        "Vector Remap Language"
 		description: """
 			An expression-oriented domain-specific language (DSL) that you can use to modify
 			observability data in Vector and also for other tasks, such as specifying Boolean
@@ -213,5 +213,5 @@ glossary: #Glossary & [
 			[examples](\(urls.vrl_examples)), and the overview of [VRL
 			expressions](\(urls.vrl_expressions)).
 			"""
-	}
+	},
 ]
