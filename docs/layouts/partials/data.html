@@ -1387,23 +1387,21 @@
   {{ end }}
 </div>
 
-<div class="my-2.5">
-  {{ if reflect.IsSlice .output }}
-  {{ $multiple := gt (len .output) 1 }}
-  {{ if $multiple }}
-  {{ $kind := "" }}
-  {{ $event := slice }}
-  {{ range .output }}
-  {{ if .log }}
-  {{ $kind = "log" }}
-  {{ $event = $event | append .log }}
-  {{ end }}
-  {{ if .metric }}
-  {{ $kind = "metric" }}
-  {{ $event = $event | append .metric }}
-  {{ end }}
-  {{ end }}
-</div>
+{{ if reflect.IsSlice .output }}
+{{ $multiple := gt (len .output) 1 }}
+{{ if $multiple }}
+{{ $kind := "" }}
+{{ $event := slice }}
+{{ range .output }}
+{{ if .log }}
+{{ $kind = "log" }}
+{{ $event = $event | append .log }}
+{{ end }}
+{{ if .metric }}
+{{ $kind = "metric" }}
+{{ $event = $event | append .metric }}
+{{ end }}
+{{ end }}
 
 {{ if eq $kind "log" }}
 <span>
