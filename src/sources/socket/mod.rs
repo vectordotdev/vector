@@ -74,15 +74,35 @@ impl GenerateConfig for SocketConfig {
     }
 }
 
+struct FooParser;
+
+impl crate::sources::util::decoding::Parser for FooParser {
+    fn parse(&self, bytes: bytes::Bytes) -> crate::Result<crate::event::Event> {
+        Ok(crate::event::Event::new_empty_log())
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let tcp = tcp::RawTcpSource {
-                    config: config.clone(),
+                let framer = if true {
+                    Box::new(codec::BytesDelimitedCodec::new('\n' as u8))
+                } else {
+                    Box::new(codec::BytesDelimitedCodec::new('\t' as u8))
                 };
+
+                let decoder = crate::sources::util::decoding::Decoder {
+                    framer,
+                    parser: FooParser,
+                };
+
+                let tcp = std::sync::Arc::new(tcp::RawTcpSource {
+                    decoder,
+                    config: config.clone(),
+                });
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
                     config.address(),

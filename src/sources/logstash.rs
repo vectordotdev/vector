@@ -91,22 +91,17 @@ impl TcpSource for LogstashSource {
     }
 
     // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#ack-frame-type
-    fn build_ack(&self, frame: &LogstashEventFrame) -> Bytes {
+    fn build_ack(&self, event: &Event) -> Bytes {
+        let log = event.as_log();
         let mut bytes: Vec<u8> = Vec::with_capacity(6);
-        bytes.push(frame.protocol.into());
+        bytes.push(log.get("protocol").unwrap().into());
         bytes.push(LogstashFrameType::Ack.into());
-        bytes.extend(frame.sequence_number.to_be_bytes().iter());
+        bytes.extend(log.get("sequence_number").unwrap().to_be_bytes().iter());
         Bytes::from(bytes)
     }
 
-    fn build_event(&self, frame: LogstashEventFrame, host: Bytes) -> Option<Event> {
-        let mut log = LogEvent::from(
-            frame
-                .fields
-                .into_iter()
-                .map(|(key, value)| (key, Value::from(value)))
-                .collect::<BTreeMap<_, _>>(),
-        );
+    fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize) {
+        let log = event.as_mut_log();
         if log.get(log_schema().host_key()).is_none() {
             log.insert(log_schema().host_key(), host);
         }
@@ -122,7 +117,6 @@ impl TcpSource for LogstashSource {
                 .unwrap_or_else(|| Value::from(chrono::Utc::now()));
             log.insert(log_schema().timestamp_key(), timestamp);
         }
-        Some(Event::from(log))
     }
 }
 

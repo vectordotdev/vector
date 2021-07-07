@@ -87,14 +87,12 @@ impl TcpSource for FluentSource {
         FluentDecoder::new()
     }
 
-    fn build_event(&self, frame: FluentFrame, host: Bytes) -> Option<Event> {
-        let mut log = LogEvent::from(frame);
+    fn handle_event(&self, event: &mut Event, host: Bytes, _byte_size: usize) {
+        let log = event.as_mut_log();
 
         if !log.contains(log_schema().host_key()) {
             log.insert(log_schema().host_key(), host);
         }
-
-        Some(Event::from(log))
     }
 }
 

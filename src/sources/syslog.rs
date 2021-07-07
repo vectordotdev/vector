@@ -165,6 +165,15 @@ impl SourceConfig for SyslogConfig {
     }
 }
 
+struct SyslogParser;
+
+impl crate::sources::util::decoding::Parser for SyslogParser {
+    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
+        let line: &str = bytes;
+        Ok(event_from_str(&self.host_key, &line))
+    }
+}
+
 #[derive(Debug, Clone)]
 struct SyslogTcpSource {
     max_length: usize,
@@ -172,16 +181,17 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = LinesCodecError;
-    type Decoder = SyslogDecoder;
+    type Error = std::io::Error;
+    type Decoder = crate::sources::util::decoding::Decoder<SyslogParser>;
 
     fn decoder(&self) -> Self::Decoder {
-        SyslogDecoder::new(self.max_length)
+        crate::sources::util::decoding::Decoder {
+            framer: SyslogDecoder::new(self.max_length),
+            parser: SyslogParser,
+        }
     }
 
-    fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
-        Some(event_from_str(&self.host_key, Some(host), &frame))
-    }
+    fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize) {}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -73,22 +73,28 @@ impl TcpConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct RawTcpSource {
+pub struct RawTcpSource<D: tokio_util::codec::Decoder<Item = (Event, usize)>> {
     pub config: TcpConfig,
+    decoder: D,
 }
 
-impl TcpSource for RawTcpSource {
-    type Error = std::io::Error;
-    type Decoder = BytesDelimitedCodec;
+impl<D> TcpSource for RawTcpSource<D>
+where
+    D: tokio_util::codec::Decoder<Item = (Event, usize)> + Send + Sync + 'static,
+    D::Error: From<std::io::Error>
+        + crate::sources::util::TcpIsErrorFatal
+        + std::fmt::Debug
+        + std::fmt::Display
+        + Send,
+{
+    type Error = D::Error;
+    type Decoder = D;
 
     fn decoder(&self) -> Self::Decoder {
-        BytesDelimitedCodec::new_with_max_length(b'\n', self.config.max_length)
+        self.decoder
     }
 
-    fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
-        let byte_size = frame.len();
-        let mut event = Event::from(frame);
-
+    fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize) {
         event.as_mut_log().insert(
             crate::config::log_schema().source_type_key(),
             Bytes::from("socket"),
@@ -103,8 +109,6 @@ impl TcpSource for RawTcpSource {
             byte_size,
             mode: SocketMode::Tcp
         });
-
-        Some(event)
     }
 }
 

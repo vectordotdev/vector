@@ -12,6 +12,7 @@ use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use socket2::SockRef;
+use std::sync::Arc;
 use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
@@ -69,25 +70,22 @@ impl IsErrorFatal for std::io::Error {
     }
 }
 
-pub trait TcpSource: Clone + Send + Sync + 'static
-where
-    <<Self as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
-{
+pub trait TcpSource: Send + Sync + 'static {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
     type Error: From<io::Error> + IsErrorFatal + std::fmt::Debug + std::fmt::Display + Send;
-    type Decoder: Decoder<Error = Self::Error> + Send + 'static + Send;
+    type Decoder: Decoder<Item = (Event, usize), Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
+    fn handle_event(&self, frame: &mut Event, host: Bytes, byte_size: usize);
 
-    fn build_ack(&self, _frame: &<Self::Decoder as Decoder>::Item) -> Bytes {
+    fn build_ack(&self, _frame: &Event) -> Bytes {
         Bytes::new()
     }
 
     fn run(
-        self,
+        self: Arc<Self>,
         addr: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
@@ -130,7 +128,7 @@ where
                 .for_each(move |connection| {
                     let shutdown_signal = shutdown_signal.clone();
                     let tripwire = tripwire.clone();
-                    let source = self.clone();
+                    let source = Arc::clone(&self);
                     let out = out.clone();
                     let connection_gauge = connection_gauge.clone();
 
@@ -171,7 +169,7 @@ where
                                 socket,
                                 keepalive,
                                 receive_buffer_bytes,
-                                source,
+                                source.as_ref(),
                                 tripwire,
                                 host,
                                 out,
@@ -189,12 +187,12 @@ where
     }
 }
 
-async fn handle_stream<T>(
+async fn handle_stream<T: ?Sized>(
     mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
-    source: T,
+    source: &T,
     mut tripwire: BoxFuture<'static, ()>,
     host: Bytes,
     mut out: impl Sink<Event> + Send + 'static + Unpin,
@@ -249,23 +247,23 @@ async fn handle_stream<T>(
             },
             res = reader.next() => {
                 match res {
-                    Some(Ok(frame)) => {
+                    Some(Ok((mut event, byte_size))) => {
                         let host = host.clone();
-                        let ack = source.build_ack(&frame);
+                        let ack = source.build_ack(&event);
 
-                        if let Some(event) = source.build_event(frame, host) {
-                            match out.send(event).await {
-                                Ok(_) => {
-                                    let stream = reader.get_mut();
-                                    if let Err(error) = stream.write_all(&ack).await {
-                                        emit!(TcpSendAckError{ error });
-                                        break;
-                                    }
-                                }
-                                Err(_) => {
-                                    warn!("Failed to send event.");
+                        source.handle_event(&mut event, host, byte_size);
+
+                        match out.send(event).await {
+                            Ok(_) => {
+                                let stream = reader.get_mut();
+                                if let Err(error) = stream.write_all(&ack).await {
+                                    emit!(TcpSendAckError{ error });
                                     break;
                                 }
+                            }
+                            Err(_) => {
+                                warn!("Failed to send event.");
+                                break;
                             }
                         }
                     }
