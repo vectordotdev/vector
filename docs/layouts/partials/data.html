@@ -1365,7 +1365,7 @@
 
 <div class="my-2.5">
   {{ if or (reflect.IsMap .input) (reflect.IsSlice .input) }}
-  {{ $event := .input | jsonify (dict "indent" "  ") }}
+  {{ $event := .input | jsonify (dict "indent" "  ") | safeJS }}
   {{ highlight $event "json" "" }}
   {{ else }}
   {{ .input | markdownify }}
