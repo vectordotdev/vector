@@ -3,6 +3,7 @@ use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
+    internal_events::TemplateRenderingFailed,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -12,6 +13,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use futures::{FutureExt, SinkExt};
@@ -89,7 +91,7 @@ pub struct StackdriverResource {
     #[serde(rename = "type")]
     pub type_: String,
     #[serde(flatten)]
-    pub labels: HashMap<String, String>,
+    pub labels: HashMap<String, Template>,
 }
 
 inventory::submit! {
@@ -159,6 +161,21 @@ impl HttpSink for StackdriverSink {
     type Output = Vec<BoxedRawValue>;
 
     fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+        let mut labels = HashMap::with_capacity(self.config.resource.labels.len());
+        for (key, template) in &self.config.resource.labels {
+            let value = template
+                .render_string(&event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("resource.labels"),
+                        drop_event: true,
+                    });
+                })
+                .ok()?;
+            labels.insert(key.clone(), value);
+        }
+
         let mut log = event.into_log();
         let severity = self
             .severity_key
@@ -172,9 +189,16 @@ impl HttpSink for StackdriverSink {
 
         let log = event.into_log();
 
-        let mut entry = map::Map::with_capacity(3);
+        let mut entry = map::Map::with_capacity(4);
         entry.insert("jsonPayload".into(), json!(log));
         entry.insert("severity".into(), json!(severity));
+        entry.insert(
+            "resource".into(),
+            json!({
+                "type": self.config.resource.type_,
+                "labels": labels,
+            }),
+        );
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
         if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
@@ -188,10 +212,6 @@ impl HttpSink for StackdriverSink {
         let events = serde_json::json!({
             "log_name": self.config.log_name(),
             "entries": events,
-            "resource": {
-                "type": self.config.resource.type_,
-                "labels": self.config.resource.labels,
-            }
         });
 
         let body = serde_json::to_vec(&events).unwrap();
@@ -288,7 +308,8 @@ mod tests {
             log_id = "testlogs"
             resource.type = "generic_node"
             resource.namespace = "office"
-            encoding.except_fields = ["anumber"]
+            resource.node_id = "{{ node_id }}"
+            encoding.except_fields = ["anumber", "node_id"]
         "#})
         .unwrap();
 
@@ -298,15 +319,18 @@ mod tests {
             severity_key: Some("anumber".into()),
         };
 
-        let log = [("message", "hello world"), ("anumber", "100")]
-            .iter()
-            .copied()
-            .collect::<LogEvent>();
+        let log = [
+            ("message", "hello world"),
+            ("anumber", "100"),
+            ("node_id", "10.10.10.1"),
+        ]
+        .iter()
+        .copied()
+        .collect::<LogEvent>();
         let json = sink.encode_event(Event::from(log)).unwrap().item;
-        let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
-            body,
-            "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
+            json,
+            serde_json::json!({"jsonPayload":{"message":"hello world"},"severity":100,"resource":{"type":"generic_node","labels":{"namespace":"office","node_id":"10.10.10.1"}}})
         );
     }
 
@@ -335,10 +359,9 @@ mod tests {
         );
 
         let json = sink.encode_event(Event::from(log)).unwrap().item;
-        let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
-            body,
-            "{\"jsonPayload\":{\"message\":\"hello world\",\"timestamp\":\"2020-01-01T12:30:00Z\"},\"severity\":100,\"timestamp\":\"2020-01-01T12:30:00Z\"}"
+            json,
+            serde_json::json!({"jsonPayload":{"message":"hello world","timestamp":"2020-01-01T12:30:00Z"},"severity":100,"resource":{"type":"generic_node","labels":{"namespace":"office"}},"timestamp":"2020-01-01T12:30:00Z"})
         );
     }
 
@@ -416,22 +439,28 @@ mod tests {
                         "severity": 0,
                         "jsonPayload": {
                             "message": "hello"
+                        },
+                        "resource": {
+                            "type": "generic_node",
+                            "labels": {
+                                "namespace": "office"
+                            }
                         }
                     },
                     {
                         "severity": 0,
                         "jsonPayload": {
                             "message": "world"
+                        },
+                        "resource": {
+                            "type": "generic_node",
+                            "labels": {
+                                "namespace": "office"
+                            }
                         }
                     }
                 ],
                 "log_name": "projects/project/logs/testlogs",
-                "resource": {
-                    "labels": {
-                        "namespace": "office",
-                    },
-                    "type": "generic_node"
-                }
             })
         );
     }

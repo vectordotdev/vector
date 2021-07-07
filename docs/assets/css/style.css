@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #28d9f2;
+  --secondary: #f44af5;
+}
+
+@layer components {
+  .search-input {
+    @apply bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md sm:text-sm text-gray-800 dark:text-gray-400 placeholder-gray-400 leading-5 block w-full pl-10 pr-3 focus:outline-none focus:bg-white focus:text-gray-900;
+  }
+
+  .search-results-list {
+    @apply grid grid-cols-2 md:grid-cols-3;
+  }
+
+  .search-results-list .search-result {
+    @apply text-dark dark:text-gray-200 py-2 hover:text-secondary dark:hover:text-primary cursor-pointer;
+  }
+
+  .code-sample-filename {
+    @apply font-semibold font-mono tracking-wide text-gray-200 dark:text-gray-200 bg-dark dark:bg-black py-1.5 px-2 rounded text-sm;
+  }
+}
+
+[x-cloak] {
+  display: none !important;
+}
+
+// Some rules that Tailwind can't really cover
+.jump + .jump, .admonition + .admonition {
+  margin-top: 0.5rem;
+}
+
+.svg svg {
+  max-width: 100%;
+  height: auto;
+}
+
+// Algolia search stuff
+.dark .ais-Highlight-highlighted {
+  color: var(--primary);
+}
+
+.light .ais-Highlight-highlighted {
+  color: var(--secondary);
+}
