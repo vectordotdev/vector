@@ -211,8 +211,8 @@ components: sinks: gcp_stackdriver_logs: {
 						warnings: []
 						type: string: {
 							default: null
-							examples: ["vector-123456", "Twilight"]
-							syntax: "literal"
+							examples: ["vector-123456", "Twilight", "{{ container_name }}"]
+							syntax: "template"
 						}
 					}
 				}
