@@ -36,7 +36,6 @@ jobs:
       # Set job outputs to values from filter step
       outputs:
         source: ${{ steps.filter.outputs.source }}
-        docs: ${{ steps.filter.outputs.docs }}
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
@@ -63,8 +62,6 @@ jobs:
               - "rust-toolchain"
             deny:
               - 'deny.toml'
-            docs:
-              - 'docs/**'
             dependencies:
               - 'Cargo.toml'
               - 'Cargo.lock'
@@ -265,16 +262,6 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: |
-          TEMP=$(mktemp -d)
-          CUE_VERSION=0.4.0-beta.1
-          curl \
-              -L "https://github.com/cuelang/cue/releases/download/v${CUE_VERSION}/cue_v${CUE_VERSION}_linux_amd64.tar.gz" \
-              -o "${TEMP}/cue_v${CUE_VERSION}_linux_amd64.tar.gz"
-          tar \
-              -xvf "${TEMP}/cue_v${CUE_VERSION}_linux_amd64.tar.gz" \
-              -C "${TEMP}"
-          sudo cp "${TEMP}/cue" /usr/bin/cue
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       # We always make sure to stop any previous sccache process before starting it fresh, that
@@ -339,9 +326,6 @@ jobs:
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds
         run: make slim-builds
-      - name: Check Cue docs
-        if: needs.changes.outputs.docs == 'true' || needs.changes.outputs.source == 'true'
-        run: make check-docs
       - name: Check code format || needs.changes.outputs.source == 'true'
         if: needs.changes.outputs.source == 'true'
         run: make check-fmt

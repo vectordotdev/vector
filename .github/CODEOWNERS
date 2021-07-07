@@ -35,48 +35,48 @@
 # docs
 #
 
-/docs/reference/components/sinks.cue @timberio/vector-integrations
-/docs/reference/components/sinks/ @timberio/vector-integrations
-/docs/reference/components/sinks/aws* @timberio/vector-integrations
-/docs/reference/components/sinks/datadog* @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sinks/gcp* @timberio/vector-integrations
-/docs/reference/components/sinks/http.cue @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sinks/kubernetes* @timberio/vector-kubernetes
-/docs/reference/components/sinks/socket.cue @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sinks/vector.cue @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sinks.cue @timberio/vector-integrations
+/docs/cue/reference/components/sinks/ @timberio/vector-integrations
+/docs/cue/reference/components/sinks/aws* @timberio/vector-integrations
+/docs/cue/reference/components/sinks/datadog* @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sinks/gcp* @timberio/vector-integrations
+/docs/cue/reference/components/sinks/http.cue @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sinks/kubernetes* @timberio/vector-kubernetes
+/docs/cue/reference/components/sinks/socket.cue @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sinks/vector.cue @timberio/vector-core @timberio/vector-integrations
 
-/docs/reference/components/sources.cue @timberio/vector-integrations
-/docs/reference/components/sources/ @timberio/vector-integrations
-/docs/reference/components/sources/aws* @timberio/vector-integrations
-/docs/reference/components/sources/datadog* @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sources/gcp* @timberio/vector-integrations
-/docs/reference/components/sources/host* @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sources/http.cue @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sources/internal_* @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sources/kubernetes* @timberio/vector-kubernetes
-/docs/reference/components/sources/socket.cue @timberio/vector-core @timberio/vector-integrations
-/docs/reference/components/sources/vector.cue @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sources.cue @timberio/vector-integrations
+/docs/cue/reference/components/sources/ @timberio/vector-integrations
+/docs/cue/reference/components/sources/aws* @timberio/vector-integrations
+/docs/cue/reference/components/sources/datadog* @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sources/gcp* @timberio/vector-integrations
+/docs/cue/reference/components/sources/host* @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sources/http.cue @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sources/internal_* @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sources/kubernetes* @timberio/vector-kubernetes
+/docs/cue/reference/components/sources/socket.cue @timberio/vector-core @timberio/vector-integrations
+/docs/cue/reference/components/sources/vector.cue @timberio/vector-core @timberio/vector-integrations
 
-/docs/reference/components/transforms.cue @timberio/vector-processing
-/docs/reference/components/transforms/* @timberio/vector-processing
-/docs/reference/components/transforms/aws* @timberio/vector-integrations
-/docs/reference/components/transforms/gcp* @timberio/vector-integrations
-/docs/reference/components/transforms/kubernetes* @timberio/vector-kubernetes
+/docs/cue/reference/components/transforms.cue @timberio/vector-processing
+/docs/cue/reference/components/transforms/* @timberio/vector-processing
+/docs/cue/reference/components/transforms/aws* @timberio/vector-integrations
+/docs/cue/reference/components/transforms/gcp* @timberio/vector-integrations
+/docs/cue/reference/components/transforms/kubernetes* @timberio/vector-kubernetes
 
-/docs/reference/data_model.cue @timberio/vector-core @timberio/vector-processing
-/docs/reference/data_model/ @timberio/vector-core @timberio/vector-processing
+/docs/cue/reference/data_model.cue @timberio/vector-core @timberio/vector-processing
+/docs/cue/reference/data_model/ @timberio/vector-core @timberio/vector-processing
 
-/docs/reference/installation.cue @timberio/vector-integrations
-/docs/reference/installation/ @timberio/vector-integrations
-/docs/reference/installation/**/kubectl* @timberio/vector-kubernetes
-/docs/reference/installation/**/helm* @timberio/vector-kubernetes
-/docs/reference/installation/**/kubernetes* @timberio/vector-kubernetes
+/docs/cue/reference/installation.cue @timberio/vector-integrations
+/docs/cue/reference/installation/ @timberio/vector-integrations
+/docs/cue/reference/installation/**/kubectl* @timberio/vector-kubernetes
+/docs/cue/reference/installation/**/helm* @timberio/vector-kubernetes
+/docs/cue/reference/installation/**/kubernetes* @timberio/vector-kubernetes
 
-/docs/reference/releases.cue @timberio/vector-releasing
-/docs/reference/releases/ @timberio/vector-releasing
+/docs/cue/reference/releases.cue @timberio/vector-releasing
+/docs/cue/reference/releases/ @timberio/vector-releasing
 
-/docs/reference/remap.cue @timberio/vector-processing
-/docs/reference/remap/ @timberio/vector-processing
+/docs/cue/reference/remap.cue @timberio/vector-processing
+/docs/cue/reference/remap/ @timberio/vector-processing
 
 #
 # distribution
