@@ -7,7 +7,7 @@ use crate::{
     sinks::{
         util::{
             batch::{Batch, BatchError},
-            encode_event,
+            encode_log,
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpSink, PartitionHttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
@@ -300,13 +300,13 @@ impl HttpSink for DatadogLogsTextService {
                 .unwrap_or(&self.default_api_key),
         );
 
-        encode_event(event, &self.config.encoding).map(|e| {
+        encode_log(event, &self.config.encoding).map(|e| {
             emit!(DatadogLogEventProcessed {
-                byte_size: e.item.len(),
+                byte_size: e.len(),
                 count: 1,
             });
 
-            PartitionInnerBuffer::new(e.item, api_key)
+            PartitionInnerBuffer::new(e, api_key)
         })
     }
 

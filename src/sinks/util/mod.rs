@@ -90,10 +90,7 @@ pub enum Encoding {
 * the given encoding. If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(
-    mut event: Event,
-    encoding: &EncodingConfig<Encoding>,
-) -> Option<EncodedEvent<Bytes>> {
+pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
@@ -107,14 +104,10 @@ pub fn encode_event(
             Ok(bytes)
         }
     };
-    let (_fields, metadata) = log.into_parts();
 
     b.map(|mut b| {
         b.push(b'\n');
-        EncodedEvent {
-            item: Bytes::from(b),
-            metadata: Some(metadata),
-        }
+        Bytes::from(b)
     })
     .map_err(|error| error!(message = "Unable to encode.", %error))
     .ok()
