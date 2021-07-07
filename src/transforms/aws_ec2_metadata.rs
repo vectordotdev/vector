@@ -199,7 +199,7 @@ impl Ec2MetadataTransform {
                     read_ref.into_iter().for_each(|(k, v)| {
                         if let Some(value) = v.get_one() {
                             metric
-                                .insert_tag(k.clone(), String::from_utf8(value.to_vec()).unwrap());
+                                .insert_tag(k.clone(), String::from_utf8_lossy(value).to_string());
                         }
                     });
                 }
