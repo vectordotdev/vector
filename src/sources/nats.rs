@@ -6,6 +6,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -112,6 +113,8 @@ async fn nats_source(
             log_schema().message_key(),
             Value::from(Bytes::from(msg.data)),
         );
+
+        log.insert(log_schema().timestamp_key(), Utc::now());
 
         // Add source type
         log.insert(log_schema().source_type_key(), Bytes::from("nats"));

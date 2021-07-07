@@ -6,13 +6,6 @@ components: sources: nats: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: false
-				can_verify_hostname:    false
-				enabled_default:        false
-			}
 			from: components._nats.features.collect.from
 		}
 		multiline: enabled: false
@@ -21,7 +14,7 @@ components: sources: nats: {
 	classes: {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
-		delivery:      "at_least_once"
+		delivery:      "best_effort"
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
@@ -33,10 +26,7 @@ components: sources: nats: {
 		platform_name: null
 	}
 
-	configuration: {
-		url: components._nats.configuration.url
-		subject: components._nats.configuration.subject
-		name: components._nats.configuration.name
+	configuration: components._nats.configuration & {
 		queue: {
 			common:      false
 			description: "NATS Queue Group to join"
@@ -64,11 +54,8 @@ components: sources: nats: {
 	}
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
-		send_errors_total:       components.sources.internal_metrics.output.metrics.send_errors_total
 	}
 
 	how_it_works: components._nats.how_it_works
