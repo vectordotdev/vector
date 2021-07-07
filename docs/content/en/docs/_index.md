@@ -1,5 +1,5 @@
 ---
-title: The Vector documentation
+title: Documentation
 description: Your gateway to the world of Vector
 short: Docs home
 weight: 1

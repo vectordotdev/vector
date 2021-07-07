@@ -46,8 +46,13 @@ const renderHits = (renderOptions, _isFirstRender) => {
         .map(
           item =>
             `<li class="search-result">
-               <a href="${item.url}">
-               ${instantsearch.highlight({ attribute: 'title', hit: item, highlightedTagName: "strong" })}
+               <a href="${item.url}" class="search-result-link">
+                 <span class="search-result-section">
+                   ${instantsearch.highlight({ attribute: 'section', hit: item })}
+                 </span>
+                 <span class="search-result-title">
+                   ${instantsearch.highlight({ attribute: 'title', hit: item, highlightedTagName: "strong" })}
+                 </span>
                </a>
              </li>`
         )
