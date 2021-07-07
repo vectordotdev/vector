@@ -527,20 +527,6 @@ mod integration_tests {
     use futures::{SinkExt, StreamExt};
 
     const HOST: &str = "http://localhost:8111";
-    const TEST_METADATA: [(&str, &str); 12] = [
-        (AVAILABILITY_ZONE_KEY, "ww-region-1a"),
-        (PUBLIC_IPV4_KEY, "192.1.1.1"),
-        (PUBLIC_HOSTNAME_KEY, "mock-public-hostname"),
-        (LOCAL_IPV4_KEY, "192.1.1.2"),
-        (LOCAL_HOSTNAME_KEY, "mock-hostname"),
-        (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
-        (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
-        (INSTANCE_TYPE_KEY, "t2.micro"),
-        (REGION_KEY, "us-east-1"),
-        (VPC_ID_KEY, "mock-vpc-id"),
-        (SUBNET_ID_KEY, "mock-subnet-id"),
-        ("role-name[0]", "mock-user"),
-    ];
 
     fn make_metric() -> Metric {
         Metric::new(
@@ -579,8 +565,22 @@ mod integration_tests {
         let metric = make_metric();
         let mut expected_log = log.clone();
         let mut expected_metric = metric.clone();
+        let test_metadata = [
+            (AVAILABILITY_ZONE_KEY, "ww-region-1a"),
+            (PUBLIC_IPV4_KEY, "192.1.1.1"),
+            (PUBLIC_HOSTNAME_KEY, "mock-public-hostname"),
+            (LOCAL_IPV4_KEY, "192.1.1.2"),
+            (LOCAL_HOSTNAME_KEY, "mock-hostname"),
+            (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
+            (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
+            (INSTANCE_TYPE_KEY, "t2.micro"),
+            (REGION_KEY, "us-east-1"),
+            (VPC_ID_KEY, "mock-vpc-id"),
+            (SUBNET_ID_KEY, "mock-subnet-id"),
+            (&format!("{}[{}]", ROLE_NAME_KEY, "0"), "mock-user"),
+        ];
 
-        for (k, v) in TEST_METADATA.iter().cloned() {
+        for (k, v) in test_metadata.iter().cloned() {
             expected_log.insert(k, v);
             expected_metric.insert_tag(k.to_string(), v.to_string());
         }
@@ -668,7 +668,9 @@ mod integration_tests {
                 Some(&"ww-region-1a".into())
             );
             assert_eq!(
-                event_metric.as_metric().tag_value("ec2.metadata.availability-zone"),
+                event_metric
+                    .as_metric()
+                    .tag_value("ec2.metadata.availability-zone"),
                 Some("ww-region-1a".to_string())
             );
         }
