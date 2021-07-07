@@ -179,7 +179,7 @@ mod tests {
         );
 
         for (object, expected, func, expected_typedef) in cases {
-            let mut object: Value = object.into();
+            let mut object = object.clone();
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state);
 
