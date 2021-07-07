@@ -1,0 +1,45 @@
+{{ $date := .Date | dateFormat "January 2, 2006" }}
+<div>
+  <a href="{{ .RelPermalink }}">
+    <div class="flex flex-col border rounded-lg p-6 dark:border-gray-700 shadow-md hover:shadow-lg hover:border-secondary dark:hover:border-primary">
+      <div class="flex-1">
+        <span class="text-2xl font-bold tracking-tight dark:text-gray-200">
+          {{ .Title }}
+        </span>
+
+        <div class="mt-2.5 flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+          <time datetime="{{ $date }}">
+            {{ $date }}
+          </time>
+          <span aria-hidden="true">
+            &middot;
+          </span>
+          <span>
+            <strong>{{ .ReadingTime }}</strong> min read
+          </span>
+        </div>
+
+        {{ with .Description }}
+        <p class="my-5 text-semibold text-gray-500 dark:text-gray-300">
+          {{ . }}
+        </p>
+        {{ end }}
+      </div>
+
+      {{/* Author(s) info */}}
+      <div class="mb-5">
+        {{ partial "blog/authors.html" . }}
+      </div>
+
+      {{ with .Params.badges }}
+      <div class="block space-y-1.5">
+        {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "type" "word" .type "color" "indigo" "inline" true) }}
+
+        {{ range .domains }}
+        {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "domain" "word" . "color" "green" "inline" true) }}
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+  </a>
+</div>

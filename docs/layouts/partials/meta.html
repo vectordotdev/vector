@@ -1,0 +1,36 @@
+{{ $url := .Permalink }}
+{{ $desc := (cond .IsHome site.Params.description .Description) | markdownify | plainify }}
+{{ $author := site.Author }}
+{{ $favicon := site.Params.favicon | absURL }}
+{{ $img := site.Params.site_logo | absURL }}
+{{ $imgAlt := printf "Logo for %s" site.Title }}
+{{ $twitter := printf "@%s" site.Params.social.twitter_handle }}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+<meta http-equiv="x-ua-compatible" content="id=edge">
+{{ with $desc }}
+<meta name="description" content="{{ . }}">
+{{ end }}
+{{ with $author }}
+<meta name="author" content="{{ . }}">
+{{ end }}
+
+{{ hugo.Generator }}
+
+<link rel="shortcut icon" href="{{ $favicon }}">
+<link rel="canonical" href="{{ $url }}">
+
+{{/* Twitter Card metadata */}}
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="{{ $img }}">
+<meta name="twitter:image:alt" content="{{ $imgAlt }}">
+<meta name="twitter:site" content="{{ $twitter }}">
+<meta name="twitter:creator" content="{{ $twitter }}">
+
+{{/* OpenGraph metadata */}}
+<meta property="og:title" content="{{ .Title }}">
+<meta property="og:image" content="{{ $img }}">
+<meta property="og:url" content="{{ $url }}">
+{{ with $desc }}
+<meta property="og:description" content="{{ . }}">
+{{ end }}

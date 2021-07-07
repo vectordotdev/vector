@@ -79,7 +79,7 @@ Vector**][docs.installation].
 
 ### Administration
 
-* [**Process management**][docs.administration.process-management]
+* [**Management**][docs.administration.management]
 * [**Monitoring & observing**][docs.administration.monitoring]
 * [**Upgrading**][docs.administration.upgrading]
 * [**Validating**][docs.administration.validating]
@@ -157,7 +157,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.about.concepts]: https://vector.dev/docs/about/concepts/
 [docs.about.under-the-hood]: https://vector.dev/docs/about/under-the-hood/
 [docs.administration.monitoring]: https://vector.dev/docs/administration/monitoring/
-[docs.administration.process-management]: https://vector.dev/docs/administration/process-management/
+[docs.administration.management]: https://vector.dev/docs/administration/management/
 [docs.administration.upgrading]: https://vector.dev/docs/administration/upgrading/
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.architecture.concurrency-model]: https://vector.dev/docs/about/under-the-hood/architecture/concurrency-model/
