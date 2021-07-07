@@ -180,7 +180,6 @@ impl HttpSink for StackdriverSink {
 
         let log = event.into_log();
 
-        let mut entry = map::Map::with_capacity(3);
         let mut entry = map::Map::with_capacity(4);
         entry.insert("jsonPayload".into(), json!(log));
         entry.insert("severity".into(), json!(severity));
