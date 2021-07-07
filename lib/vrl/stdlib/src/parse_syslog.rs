@@ -1,4 +1,5 @@
-use chrono::{DateTime, Datelike, Utc};
+use chrono::{DateTime, Datelike, Local, Utc};
+use shared::TimeZone;
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
@@ -57,7 +58,14 @@ impl Expression for ParseSyslogFn {
         let value = self.value.resolve(ctx)?;
         let message = value.try_bytes_utf8_lossy()?;
 
-        let parsed = syslog_loose::parse_message_with_year_exact(&message, resolve_year)?;
+        let parsed = match ctx.timezone() {
+            TimeZone::Local => {
+                syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, Some(Local))
+            }
+            TimeZone::Named(tz) => {
+                syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, Some(*tz))
+            }
+        }?;
 
         Ok(message_to_value(parsed))
     }
@@ -149,7 +157,7 @@ fn type_def() -> BTreeMap<&'static str, TypeDef> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::prelude::*;
+    use chrono::TimeZone;
     use shared::btreemap;
 
     test_function![
