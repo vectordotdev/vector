@@ -10,13 +10,14 @@ set -euo pipefail
 ROOT=$(git rev-parse --show-toplevel)
 CUE_SOURCES="${ROOT}/docs/cue"
 JSON_OUT="${ROOT}/docs/data/docs.json"
+CHECK_DOCS_SCRIPT="${ROOT}/scripts/check-docs.sh"
 
 list-docs-files() {
   find "${CUE_SOURCES}" -name '*.cue'
 }
 
 cmd_check() {
-  ${ROOT}/scripts/check-docs.sh
+  ${CHECK_DOCS_SCRIPT}
 }
 
 cmd_format() {
