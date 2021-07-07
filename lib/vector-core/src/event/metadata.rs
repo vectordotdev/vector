@@ -65,6 +65,11 @@ impl EventMetadata {
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
         self.finalizers.add(finalizer);
     }
+
+    /// Swap this metadata with empty metadata and return the original.
+    pub fn take(&mut self) -> Self {
+        std::mem::take(self)
+    }
 }
 
 impl EventDataEq for EventMetadata {
