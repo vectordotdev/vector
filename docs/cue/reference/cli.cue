@@ -201,6 +201,8 @@ cli: {
 				```
 				vector graph --config /etc/vector/vector.toml | dot -Tsvg > graph.svg
 				```
+
+				You can also visualize the output online at [webgraphviz.com](http://www.webgraphviz.com/).
 				"""
 
 			options: _config_options
