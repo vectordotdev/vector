@@ -577,9 +577,9 @@ mod integration_tests {
 
         let log = LogEvent::default();
         let metric = make_metric();
-
         let mut expected_log = log.clone();
         let mut expected_metric = metric.clone();
+
         for (k, v) in TEST_METADATA.iter().cloned() {
             expected_log.insert(k, v);
             expected_metric.insert_tag(k.to_string(), v.to_string());
@@ -599,7 +599,7 @@ mod integration_tests {
     async fn fields() {
         let config = Ec2Metadata {
             endpoint: Some(HOST.to_string()),
-            fields: Some(vec!["public-ipv4".into(), "region".into()]),
+            fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
             ..Default::default()
         };
         let transform = config
@@ -615,14 +615,23 @@ mod integration_tests {
         sleep(Duration::from_secs(1)).await;
 
         let log = LogEvent::default();
-        let mut expected = log.clone();
+        let metric = make_metric();
+        let mut expected_log = log.clone();
+        let mut expected_metric = metric.clone();
+
+        expected_log.insert(PUBLIC_IPV4_KEY, "192.1.1.1");
+        expected_log.insert(REGION_KEY, "us-east-1");
+        expected_metric.insert_tag(PUBLIC_IPV4_KEY.to_string(), "192.1.1.1".to_string());
+        expected_metric.insert_tag(REGION_KEY.to_string(), "us-east-1".to_string());
+
         tx.send(log.into()).await.unwrap();
+        tx.send(metric.into()).await.unwrap();
 
-        let event = stream.next().await.unwrap();
+        let event_log = stream.next().await.unwrap();
+        let event_metric = stream.next().await.unwrap();
 
-        expected.insert("public-ipv4", "192.1.1.1");
-        expected.insert("region", "us-east-1");
-        assert_eq!(event.into_log(), expected);
+        assert_eq!(event_log.into_log(), expected_log);
+        assert_eq!(event_metric.into_metric(), expected_metric);
     }
 
     #[tokio::test]
@@ -646,13 +655,21 @@ mod integration_tests {
             sleep(Duration::from_secs(1)).await;
 
             let log = LogEvent::default();
-            tx.send(log.into()).await.unwrap();
+            let metric = make_metric();
 
-            let event = stream.next().await.unwrap();
+            tx.send(log.into()).await.unwrap();
+            tx.send(metric.into()).await.unwrap();
+
+            let event_log = stream.next().await.unwrap();
+            let event_metric = stream.next().await.unwrap();
 
             assert_eq!(
-                event.as_log().get("ec2.metadata.availability-zone"),
+                event_log.as_log().get("ec2.metadata.availability-zone"),
                 Some(&"ww-region-1a".into())
+            );
+            assert_eq!(
+                event_metric.as_metric().tag_value("ec2.metadata.availability-zone"),
+                Some("ww-region-1a".to_string())
             );
         }
 
@@ -676,13 +693,21 @@ mod integration_tests {
             sleep(Duration::from_secs(1)).await;
 
             let log = LogEvent::default();
-            tx.send(log.into()).await.unwrap();
+            let metric = make_metric();
 
-            let event = stream.next().await.unwrap();
+            tx.send(log.into()).await.unwrap();
+            tx.send(metric.into()).await.unwrap();
+
+            let event_log = stream.next().await.unwrap();
+            let event_metric = stream.next().await.unwrap();
 
             assert_eq!(
-                event.as_log().get("availability-zone"),
+                event_log.as_log().get(AVAILABILITY_ZONE_KEY),
                 Some(&"ww-region-1a".into())
+            );
+            assert_eq!(
+                event_metric.as_metric().tag_value(AVAILABILITY_ZONE_KEY),
+                Some("ww-region-1a".to_string())
             );
         }
     }
