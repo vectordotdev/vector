@@ -4,7 +4,7 @@ use crate::http::HttpClient;
 use crate::sinks::gcp;
 use crate::sinks::util::buffer::metrics::MetricsBuffer;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig};
+use crate::sinks::util::{BatchConfig, BatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{TlsOptions, TlsSettings};
 use chrono::{DateTime, Utc};
@@ -104,7 +104,7 @@ impl HttpSink for HttpEventSink {
     type Input = Metric;
     type Output = Vec<Metric>;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let metric = event.into_metric();
 
         match metric.value() {
@@ -115,7 +115,6 @@ impl HttpSink for HttpEventSink {
                 None
             }
         }
-        .map(EncodedEvent::new)
     }
 
     async fn build_request(

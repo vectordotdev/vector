@@ -9,7 +9,7 @@ use crate::{
             batch::Batch,
             encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
             http::{HttpSink, PartitionHttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, Concurrency, EncodedEvent, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, Concurrency, JsonArrayBuffer,
             PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -193,7 +193,7 @@ impl HttpSink for DatadogEventsService {
     type Input = PartitionInnerBuffer<serde_json::Value, ApiKey>;
     type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, ApiKey>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let log = event.as_mut_log();
 
         if !log.contains("title") {
@@ -239,10 +239,7 @@ impl HttpSink for DatadogEventsService {
             .as_ref()
             .unwrap_or(&self.default_api_key);
 
-        Some(EncodedEvent {
-            item: PartitionInnerBuffer::new(json_event, Arc::clone(api_key)),
-            metadata: Some(metadata),
-        })
+        Some(PartitionInnerBuffer::new(json_event, Arc::clone(api_key)))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {

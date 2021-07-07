@@ -10,8 +10,8 @@ use crate::{
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpSink, PartitionHttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, Compression, EncodedEvent, Encoding,
-            JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, VecBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
+            PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -243,7 +243,7 @@ impl HttpSink for DatadogLogsJsonService {
     type Input = PartitionInnerBuffer<serde_json::Value, ApiKey>;
     type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, ApiKey>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let log = event.as_mut_log();
 
         if let Some(message) = log.remove(log_schema().message_key()) {
@@ -267,10 +267,7 @@ impl HttpSink for DatadogLogsJsonService {
             .as_ref()
             .unwrap_or(&self.default_api_key);
 
-        Some(EncodedEvent {
-            item: PartitionInnerBuffer::new(json_event, Arc::clone(api_key)),
-            metadata: Some(metadata),
-        })
+        Some(PartitionInnerBuffer::new(json_event, Arc::clone(api_key)))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -294,7 +291,7 @@ impl HttpSink for DatadogLogsTextService {
     type Input = PartitionInnerBuffer<Bytes, ApiKey>;
     type Output = PartitionInnerBuffer<Vec<Bytes>, ApiKey>;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let api_key = Arc::clone(
             event
                 .metadata()
@@ -309,10 +306,7 @@ impl HttpSink for DatadogLogsTextService {
                 count: 1,
             });
 
-            EncodedEvent {
-                item: PartitionInnerBuffer::new(e.item, api_key),
-                metadata: e.metadata,
-            }
+            PartitionInnerBuffer::new(e.item, api_key)
         })
     }
 
