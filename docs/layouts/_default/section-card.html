@@ -1,0 +1,15 @@
+{{ $title := .Params.short | default .Title }}
+<div class="column is-one-third">
+  <div class="card is-hoverable">
+    <div class="card-header">
+      <a class="card-header-title is-space-between" href="{{ .RelPermalink }}">
+        <span class="icon mr-1 has-text-primary">
+          <i class="fas fa-file-alt"></i>
+        </span>
+        <span class="text">
+          {{ $title }}
+        </span>
+      </a>
+    </div>
+  </div>
+</div>

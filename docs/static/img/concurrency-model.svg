@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="842px" height="494px" viewBox="0 0 842 494" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>concurrency-model</title>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="concurrency-model" transform="translate(1.000000, 1.000000)">
+            <g id="Group">
+                <g>
+                    <rect id="Rectangle" fill-opacity="0.25" fill="#FFFFFF" fill-rule="nonzero" x="0" y="0" width="300" height="240" rx="3"></rect>
+                    <rect id="Rectangle" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="300" height="240" rx="3"></rect>
+                    <text id="Source-(socket-based)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
+                        <tspan x="59" y="30">Source (socket-based)</tspan>
+                    </text>
+                </g>
+                <g transform="translate(12.000000, 48.000000)">
+                    <g>
+                        <g>
+                            <rect id="Rectangle" fill-opacity="0.25" fill="#28D9F2" fill-rule="nonzero" x="0" y="0" width="276" height="72" rx="3"></rect>
+                            <rect id="Rectangle" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="276" height="72" rx="3"></rect>
+                            <text id="Connection" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                <tspan x="100" y="27">Connection</tspan>
+                            </text>
+                        </g>
+                        <g transform="translate(8.000000, 40.000000)">
+                            <g>
+                                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="112" height="24" rx="3"></rect>
+                                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="112" height="24" rx="3"></rect>
+                                <text id="Parse" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                    <tspan x="36" y="17">Parse</tspan>
+                                </text>
+                            </g>
+                            <g transform="translate(148.000000, 0.000000)">
+                                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="111" height="24" rx="3"></rect>
+                                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="111" height="24" rx="3"></rect>
+                                <text id="Add-fields" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                    <tspan x="22.5" y="17">Add fields</tspan>
+                                </text>
+                            </g>
+                            <g transform="translate(120.000000, 6.000000)" id="Path" stroke="#788896" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="1.13686838e-13" y1="6" x2="16" y2="6" stroke-width="4"></line>
+                                <polygon stroke-width="2" fill="#788896" fill-rule="nonzero" points="12.9079 0.45905 20 6 12.9079 11.54095"></polygon>
+                            </g>
+                        </g>
+                    </g>
+                    <g transform="translate(0.000000, 83.000000)">
+                        <g>
+                            <rect id="Rectangle" fill-opacity="0.25" fill="#28D9F2" fill-rule="nonzero" x="0" y="0" width="276" height="72" rx="3"></rect>
+                            <rect id="Rectangle" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="276" height="72" rx="3"></rect>
+                            <text id="Connection" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                <tspan x="100" y="27">Connection</tspan>
+                            </text>
+                        </g>
+                        <g transform="translate(8.000000, 41.000000)">
+                            <g>
+                                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="112" height="24" rx="3"></rect>
+                                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="112" height="24" rx="3"></rect>
+                                <text id="Parse" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                    <tspan x="36" y="17">Parse</tspan>
+                                </text>
+                            </g>
+                            <g transform="translate(148.000000, 0.000000)">
+                                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="111" height="24" rx="3"></rect>
+                                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="111" height="24" rx="3"></rect>
+                                <text id="Add-fields" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                    <tspan x="22.5" y="17">Add fields</tspan>
+                                </text>
+                            </g>
+                            <g transform="translate(120.000000, 6.000000)" id="Path" stroke="#788896" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="1.13686838e-13" y1="6" x2="16" y2="6" stroke-width="4"></line>
+                                <polygon stroke-width="2" fill="#788896" fill-rule="nonzero" points="12.9079 0.45905 20 6 12.9079 11.54095"></polygon>
+                            </g>
+                        </g>
+                    </g>
+                    <text id="..." fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="21" font-weight="normal">
+                        <tspan x="129" y="176">...</tspan>
+                    </text>
+                </g>
+            </g>
+            <g id="Group" transform="translate(0.000000, 252.000000)">
+                <g>
+                    <rect id="Rectangle" fill-opacity="0.25" fill="#FFFFFF" fill-rule="nonzero" x="0" y="0" width="300" height="240" rx="3"></rect>
+                    <rect id="Rectangle" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="300" height="240" rx="3"></rect>
+                    <text id="Source-(file-based)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
+                        <tspan x="73.5" y="30">Source (file-based)</tspan>
+                    </text>
+                </g>
+                <g transform="translate(12.000000, 48.000000)">
+                    <g>
+                        <g>
+                            <rect id="Rectangle" fill-opacity="0.25" fill="#3DDCF3" fill-rule="nonzero" x="0" y="0" width="276" height="72" rx="3"></rect>
+                            <rect id="Rectangle" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="276" height="72" rx="3"></rect>
+                            <text id="file" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                <tspan x="128" y="27">file</tspan>
+                            </text>
+                        </g>
+                        <g transform="translate(8.000000, 40.000000)">
+                            <g>
+                                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="112" height="24" rx="3"></rect>
+                                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="112" height="24" rx="3"></rect>
+                                <text id="Parse" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                    <tspan x="36" y="17">Parse</tspan>
+                                </text>
+                            </g>
+                            <g transform="translate(148.000000, 0.000000)">
+                                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="111" height="24" rx="3"></rect>
+                                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="111" height="24" rx="3"></rect>
+                                <text id="Add-fields" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                    <tspan x="22.5" y="17">Add fields</tspan>
+                                </text>
+                            </g>
+                            <g transform="translate(120.000000, 6.000000)" id="Path" stroke="#788896" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="1.13686838e-13" y1="6" x2="16" y2="6" stroke-width="4"></line>
+                                <polygon stroke-width="2" fill="#788896" fill-rule="nonzero" points="12.9079 0.45905 20 6 12.9079 11.54095"></polygon>
+                            </g>
+                        </g>
+                    </g>
+                    <g transform="translate(0.000000, 83.000000)">
+                        <g>
+                            <rect id="Rectangle" fill-opacity="0.25" fill="#28D9F2" fill-rule="nonzero" x="0" y="0" width="276" height="72" rx="3"></rect>
+                            <rect id="Rectangle" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="276" height="72" rx="3"></rect>
+                            <text id="file" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                <tspan x="128" y="27">file</tspan>
+                            </text>
+                        </g>
+                        <g transform="translate(8.000000, 41.000000)">
+                            <g>
+                                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="112" height="24" rx="3"></rect>
+                                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="112" height="24" rx="3"></rect>
+                                <text id="Parse" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                    <tspan x="36" y="17">Parse</tspan>
+                                </text>
+                            </g>
+                            <g transform="translate(148.000000, 0.000000)">
+                                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="111" height="24" rx="3"></rect>
+                                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="111" height="24" rx="3"></rect>
+                                <text id="Add-fields" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                                    <tspan x="22.5" y="17">Add fields</tspan>
+                                </text>
+                            </g>
+                            <g transform="translate(120.000000, 6.000000)" id="Path" stroke="#788896" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="1.13686838e-13" y1="6" x2="16" y2="6" stroke-width="4"></line>
+                                <polygon stroke-width="2" fill="#788896" fill-rule="nonzero" points="12.9079 0.45905 20 6 12.9079 11.54095"></polygon>
+                            </g>
+                        </g>
+                    </g>
+                    <text id="..." fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="21" font-weight="normal">
+                        <tspan x="129" y="176">...</tspan>
+                    </text>
+                </g>
+            </g>
+            <g id="Group" transform="translate(394.000000, 221.000000)">
+                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="192" height="47" rx="3"></rect>
+                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="192" height="47" rx="3"></rect>
+                <text id="Dedupe" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
+                    <tspan x="64" y="29.5">Dedupe</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(648.000000, 221.000000)">
+                <rect id="Rectangle" fill-opacity="0.25" fill="#FFFFFF" fill-rule="nonzero" x="0" y="0" width="192" height="47" rx="3"></rect>
+                <rect id="Rectangle" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="192" height="47" rx="3"></rect>
+                <text id="Sink" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
+                    <tspan x="78" y="29.5">Sink</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(287.000000, 100.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M0,0 L25,0 C33.28426,0 40,6.71574 40,15 L40,129.5 C40,137.78426 46.71574,144.5 55,144.5 L95,144.5" id="Path" stroke-width="4"></path>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="91.9079 138.95905 99 144.5 91.9079 150.04095"></polygon>
+            </g>
+            <g id="Group" transform="translate(287.000000, 184.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M0,0 L25,0 C33.28426,0 40,6.71574 40,15 L40,45.5 C40,53.78426 46.71574,60.5 55,60.5 L95,60.5" id="Path" stroke-width="4"></path>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="91.9079 54.95905 99 60.5 91.9079 66.04095"></polygon>
+            </g>
+            <g id="Group" transform="translate(287.000000, 238.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M0,114 L25,114 C33.28426,114 40,107.28426 40,99 L40,21 C40,12.71574 46.71574,6 55,6 L95,6" id="Path" stroke-width="4"></path>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="91.9079 0.45905 99 6 91.9079 11.54095"></polygon>
+            </g>
+            <g id="Group" transform="translate(287.000000, 238.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M0,198 L25,198 C33.28426,198 40,191.28426 40,183 L40,21.5 C40,13.21574 46.71574,6.5 55,6.5 L95,6.5" id="Path" stroke-width="4"></path>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="91.9079 0.95905 99 6.5 91.9079 12.04095"></polygon>
+            </g>
+            <g id="Group" transform="translate(594.000000, 238.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="0" y1="6.5" x2="42" y2="6.5" id="Path" stroke-width="4"></line>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="38.9079 0.95905 46 6.5 38.9079 12.04095"></polygon>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -648,7 +648,7 @@ check: ## Run prerequisite code checks
 
 .PHONY: check-all
 check-all: ## Check everything
-check-all: check-fmt check-clippy check-style check-markdown check-docs
+check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts
 check-all: check-helm-lint check-helm-dependencies check-helm-snapshots

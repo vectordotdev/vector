@@ -1,0 +1,2 @@
+{{ $file := printf "static/%s" .src }}
+{{ $file | readFile | safeHTML }}
