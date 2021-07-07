@@ -99,6 +99,8 @@ pub enum FingerprintConfig {
         #[serde(alias = "fingerprint_bytes")]
         bytes: Option<usize>,
         ignored_header_bytes: usize,
+        #[serde(default = "default_lines")]
+        lines: usize,
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
@@ -126,6 +128,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             FingerprintConfig::Checksum {
                 bytes,
                 ignored_header_bytes,
+                lines,
             } => {
                 let bytes = match bytes {
                     Some(bytes) => {
@@ -137,6 +140,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
                 FingerprintStrategy::Checksum {
                     bytes,
                     ignored_header_bytes,
+                    lines,
                 }
             }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
@@ -146,6 +150,10 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 
 fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
+}
+
+fn default_lines() -> usize {
+    1
 }
 
 #[derive(Debug)]
@@ -168,6 +176,7 @@ impl Default for FileConfig {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: None,
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             ignore_not_found: false,
             host_key: None,
@@ -488,6 +497,7 @@ mod tests {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: Some(8),
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             data_dir: Some(dir.path().to_path_buf()),
             glob_minimum_cooldown_ms: 100, // millis
@@ -524,6 +534,7 @@ mod tests {
             FingerprintConfig::Checksum {
                 bytes: None,
                 ignored_header_bytes: 0,
+                lines: 1
             }
         );
 
@@ -550,6 +561,7 @@ mod tests {
             FingerprintConfig::Checksum {
                 bytes: Some(128),
                 ignored_header_bytes: 512,
+                lines: 1
             }
         );
 
@@ -1055,7 +1067,7 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let received = run_file_source(&config, false, acking, async {
+            let received = run_file_source(&config, true, acking, async {
                 let mut file = File::create(&path).unwrap();
                 sleep_500_millis().await;
                 writeln!(&mut file, "first line").unwrap();
@@ -1175,7 +1187,7 @@ mod tests {
             writeln!(&mut file, "short").unwrap();
             writeln!(&mut file, "this is too long").unwrap();
             writeln!(&mut file, "11 eleven11").unwrap();
-            let super_long = std::iter::repeat("This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
+            let super_long = "This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved".repeat(10000);
             writeln!(&mut file, "{}", super_long).unwrap();
             writeln!(&mut file, "exactly 10").unwrap();
             writeln!(&mut file, "it can end on a line that's too long").unwrap();
@@ -1604,7 +1616,7 @@ mod tests {
         let data_dir = config.data_dir.clone().unwrap();
         let acks = !matches!(acking_mode, NoAcks);
 
-        tokio::spawn(file::file_source(&config, data_dir, shutdown, tx, acks));
+        tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
 
         inner.await;
 

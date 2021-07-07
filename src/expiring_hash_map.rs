@@ -254,7 +254,7 @@ mod tests {
 
         let mut fut = task::spawn(map.next_expired());
         assert_eq!(unwrap_ready(fut.poll()).unwrap().unwrap().0, "val");
-        assert_eq!(fut.is_woken(), false);
+        assert!(!fut.is_woken());
     }
 
     // TODO: rewrite this test with tokio::time::clock when it's available.
@@ -275,9 +275,9 @@ mod tests {
         assert_pending!(fut.poll());
 
         // Sleep twice the ttl, to guarantee we're over the deadline.
-        assert_eq!(fut.is_woken(), false);
+        assert!(!fut.is_woken());
         tokio::time::sleep(ttl * 2).await;
-        assert_eq!(fut.is_woken(), true);
+        assert!(fut.is_woken());
 
         // Then, after deadline, has to be ready.
         assert_eq!(

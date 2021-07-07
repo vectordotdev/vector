@@ -224,8 +224,8 @@ impl TagCardinalityLimit {
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
                             emit!(TagCardinalityLimitRejectingEvent {
-                                tag_key: &key,
-                                tag_value: &value,
+                                tag_key: key,
+                                tag_value: value,
                             });
                             return None;
                         }
@@ -236,8 +236,8 @@ impl TagCardinalityLimit {
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
                             emit!(TagCardinalityLimitRejectingTag {
-                                tag_key: &key,
-                                tag_value: &value,
+                                tag_key: key,
+                                tag_value: value,
                             });
                             to_delete.push(key.clone());
                         }

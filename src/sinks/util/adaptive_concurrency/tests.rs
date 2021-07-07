@@ -384,7 +384,7 @@ async fn run_test(params: TestParams) -> TestResults {
     // This is crude and dumb, but it works, and the tests run fast and
     // the results are highly repeatable.
     while stats.lock().expect("Poisoned stats lock").completed < params.requests {
-        time::advance(Duration::from_millis(0)).await;
+        time::sleep(Duration::from_millis(1)).await;
     }
     topology.stop().await;
 
@@ -402,7 +402,7 @@ async fn run_test(params: TestParams) -> TestResults {
         .into_inner()
         .expect("Failed to unwrap controller_stats Mutex");
 
-    let metrics = capture_metrics(&controller)
+    let metrics = capture_metrics(controller)
         .map(Event::into_metric)
         .map(|event| (event.name().to_string(), event))
         .collect::<HashMap<_, _>>();

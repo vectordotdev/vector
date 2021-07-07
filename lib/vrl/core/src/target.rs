@@ -1,4 +1,4 @@
-use crate::{Value};
+use crate::Value;
 use lookup::LookupBuf;
 
 /// Any target object you want to remap using VRL has to implement this trait.

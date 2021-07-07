@@ -50,6 +50,7 @@ pub mod providers;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;
+#[cfg(windows)]
 pub mod service;
 pub mod shutdown;
 pub mod signal;

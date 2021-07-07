@@ -4,6 +4,8 @@ use crate::{
     line_agg,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
 };
+use async_compression::tokio::bufread;
+use futures::{stream, stream::StreamExt};
 use rusoto_core::Region;
 use rusoto_s3::S3Client;
 use rusoto_sqs::SqsClient;
@@ -145,16 +147,23 @@ enum CreateSqsIngestorError {
     RegionParse { source: rusoto::region::ParseError },
 }
 
-fn s3_object_decoder(
+/// None if body is empty
+async fn s3_object_decoder(
     compression: Compression,
     key: &str,
     content_encoding: Option<&str>,
     content_type: Option<&str>,
-    body: rusoto_s3::StreamingBody,
+    mut body: rusoto_s3::StreamingBody,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    use async_compression::tokio::bufread;
+    let first = if let Some(first) = body.next().await {
+        first
+    } else {
+        return Box::new(tokio::io::empty());
+    };
 
-    let r = tokio::io::BufReader::new(body.into_async_read());
+    let r = tokio::io::BufReader::new(
+        rusoto_s3::StreamingBody::new(stream::iter(Some(first)).chain(body)).into_async_read(),
+    );
 
     let compression = match compression {
         Auto => {
@@ -226,7 +235,11 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
     })
 }
 
+#[cfg(test)]
 mod test {
+    use super::{s3_object_decoder, Compression};
+    use tokio::io::AsyncReadExt;
+
     #[test]
     fn determine_compression() {
         use super::Compression;
@@ -253,6 +266,26 @@ mod test {
                 content_type,
             );
         }
+    }
+
+    #[tokio::test]
+    async fn decode_empty_message_gzip() {
+        let key = uuid::Uuid::new_v4().to_string();
+
+        let mut data = Vec::new();
+        s3_object_decoder(
+            Compression::Auto,
+            &key,
+            Some("gzip"),
+            None,
+            rusoto_s3::StreamingBody::new(futures::stream::empty()),
+        )
+        .await
+        .read_to_end(&mut data)
+        .await
+        .unwrap();
+
+        assert!(data.is_empty());
     }
 }
 

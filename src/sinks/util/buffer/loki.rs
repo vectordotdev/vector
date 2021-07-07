@@ -131,7 +131,7 @@ impl Batch for LokiBuffer {
         let partition = &item.partition;
         if self.latest_timestamps.is_none() {
             self.partition = Some(item.partition.clone());
-            self.latest_timestamps = Some(self.global_timestamps.take(&partition));
+            self.latest_timestamps = Some(self.global_timestamps.take(partition));
         }
         let latest_timestamp = self
             .latest_timestamps

@@ -75,7 +75,7 @@ impl sort::SortableByField<SinksSortFieldName> for Sink {
 impl Sink {
     /// Sink name
     pub async fn name(&self) -> &str {
-        &self.get_name()
+        self.get_name()
     }
 
     /// Sink type

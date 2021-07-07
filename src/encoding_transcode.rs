@@ -267,7 +267,7 @@ mod tests {
     fn test_decoder_long_input() {
         let mut d = Decoder::new(UTF_8);
 
-        let long_input = std::iter::repeat("This line is super long and will take up more space than Decoder's internal buffer, just to make sure that everything works properly when multiple inner decode calls are involved").take(10000).collect::<String>();
+        let long_input = "This line is super long and will take up more space than Decoder's internal buffer, just to make sure that everything works properly when multiple inner decode calls are involved".repeat(10000);
 
         assert_eq!(
             d.decode_to_utf8(Bytes::from(long_input.clone())),
@@ -381,7 +381,7 @@ mod tests {
     fn test_encoder_long_input() {
         let mut d = Encoder::new(UTF_8);
 
-        let long_input = std::iter::repeat("This line is super long and will take up more space than Encoder's internal buffer, just to make sure that everything works properly when multiple inner encode calls are involved").take(10000).collect::<String>();
+        let long_input = "This line is super long and will take up more space than Encoder's internal buffer, just to make sure that everything works properly when multiple inner encode calls are involved".repeat(10000);
 
         assert_eq!(
             d.encode_from_utf8(long_input.as_str()),

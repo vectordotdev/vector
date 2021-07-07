@@ -4,6 +4,7 @@ use rlua::prelude::*;
 use std::collections::BTreeMap;
 
 impl<'a> ToLua<'a> for MetricKind {
+    #![allow(clippy::wrong_self_convention)] // this trait is defined by rlua
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let kind = match self {
             MetricKind::Absolute => "absolute",
@@ -56,6 +57,7 @@ impl<'a> FromLua<'a> for StatisticKind {
 }
 
 impl<'a> ToLua<'a> for Metric {
+    #![allow(clippy::wrong_self_convention)] // this trait is defined by rlua
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let tbl = ctx.create_table()?;
 
