@@ -88,32 +88,47 @@
 
           {{/* How it works */}}
           {{ with $config.how_it_works }}
-          {{ partial "heading.html" (dict "text" "How it works" "level" 2) }}
+          <div class="no-prose mt-12">
+            <span>
+              {{ partial "heading.html" (dict "text" "How it works" "level" 2) }}
+            </span>
 
-          {{ range $k, $v := . }}
-          <div>
-            {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
+            <div class="mt-8 flex flex-col space-y-6">
+              {{ range $k, $v := . }}
+              <div>
+                <span>
+                  {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
+                </span>
 
-            {{ with .svg }}
-            {{ partial "svg.html" (dict "src" .) }}
-            {{ end }}
+                {{ with .svg }}
+                {{ partial "svg.html" (dict "src" .) }}
+                {{ end }}
 
-            {{ $v.body | $.Page.RenderString }}
+                <div class="mt-2 prose dark:prose-dark">
+                  {{ $v.body | markdownify }}
+                </div>
 
-            {{ with $v.sub_sections }}
-            {{ range . }}
-            {{ partial "heading.html" (dict "text" .title "level" 4) }}
+                {{ with $v.sub_sections }}
+                <div class="mt-2">
+                  {{ range . }}
+                  <span>
+                    {{ partial "heading.html" (dict "text" .title "level" 4) }}
+                  </span>
 
-            {{ with .svg }}
-            {{ partial "svg.html" (dict "src" .) }}
-            {{ end }}
+                  {{ with .svg }}
+                  {{ partial "svg.html" (dict "src" .) }}
+                  {{ end }}
 
-            {{ .body | $.Page.RenderString }}
-            {{ end }}
+                  <div class="mt-2 prose dark:prose-dark">
+                    {{ .body | markdownify }}
+                  </div>
+                  {{ end }}
+                </div>
+                {{ end }}
+              </div>
+              {{ end }}
+            </div>
           </div>
-          {{ end }}
-
-          {{ end }}
           {{ end }}
         </div>
       </div>

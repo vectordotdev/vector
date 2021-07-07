@@ -552,10 +552,10 @@ components: sources: kubernetes_logs: {
 						    cpu: "6000m"
 						```
 
-						**As with all Kubernetes resource limit recommendations, use these
-						as a reference point and adjust as ncessary. If your configured
-						Vector pipeline is complex, you may need more resources. If you
-						have a pipeline you may need less.**
+						As with all Kubernetes resource limit recommendations, **use these
+						as a reference point and adjust as ncessary**. If your configured
+						Vector pipeline is complex, you may need more resources; if you
+						have a more straightforward pipeline, you may need less.
 						"""
 				},
 			]
