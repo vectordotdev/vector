@@ -186,14 +186,24 @@ impl TaskTransform for Ec2MetadataTransform {
 
 impl Ec2MetadataTransform {
     fn transform_one(&mut self, mut event: Event) -> Event {
-        let log = event.as_mut_log();
-
         if let Some(read_ref) = self.state.read() {
-            read_ref.into_iter().for_each(|(k, v)| {
-                if let Some(value) = v.get_one() {
-                    log.insert(k.clone(), value.clone());
+            match event {
+                Event::Log(ref mut log) => {
+                    read_ref.into_iter().for_each(|(k, v)| {
+                        if let Some(value) = v.get_one() {
+                            log.insert(k.clone(), value.clone());
+                        }
+                    });
                 }
-            });
+                Event::Metric(ref mut metric) => {
+                    read_ref.into_iter().for_each(|(k, v)| {
+                        if let Some(value) = v.get_one() {
+                            metric
+                                .insert_tag(k.clone(), String::from_utf8(value.to_vec()).unwrap());
+                        }
+                    });
+                }
+            }
         }
 
         event
