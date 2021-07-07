@@ -62,8 +62,17 @@ async fn run(
 
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
+        let hostname = crate::get_hostname();
+
         let metrics = capture_metrics(controller);
-        out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
+
+        out.send_all(&mut stream::iter(metrics.map(|mut metric| {
+            if let Ok(hostname) = &hostname {
+                metric.insert_tag("host".into(), hostname.into());
+            }
+            Ok(metric.into())
+        })))
+        .await?;
     }
 
     Ok(())
