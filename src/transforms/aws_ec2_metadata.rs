@@ -159,11 +159,11 @@ impl TransformConfig for Ec2Metadata {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn transform_type(&self) -> &'static str {
@@ -511,10 +511,34 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{config::GlobalOptions, event::LogEvent, test_util::trace_init};
+    use crate::{
+        config::GlobalOptions, event::metric, event::LogEvent, event::Metric, test_util::trace_init,
+    };
     use futures::{SinkExt, StreamExt};
 
     const HOST: &str = "http://localhost:8111";
+    const TEST_METADATA: [(&str, &str); 12] = [
+        (AVAILABILITY_ZONE_KEY, "ww-region-1a"),
+        (PUBLIC_IPV4_KEY, "192.1.1.1"),
+        (PUBLIC_HOSTNAME_KEY, "mock-public-hostname"),
+        (LOCAL_IPV4_KEY, "192.1.1.2"),
+        (LOCAL_HOSTNAME_KEY, "mock-hostname"),
+        (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
+        (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
+        (INSTANCE_TYPE_KEY, "t2.micro"),
+        (REGION_KEY, "us-east-1"),
+        (VPC_ID_KEY, "mock-vpc-id"),
+        (SUBNET_ID_KEY, "mock-subnet-id"),
+        ("role-name[0]", "mock-user"),
+    ];
+
+    fn make_metric() -> Metric {
+        Metric::new(
+            "event",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 1.0 },
+        )
+    }
 
     #[test]
     fn generate_config() {
@@ -542,25 +566,23 @@ mod integration_tests {
         sleep(Duration::from_secs(1)).await;
 
         let log = LogEvent::default();
-        let mut expected = log.clone();
+        let metric = make_metric();
+
+        let mut expected_log = log.clone();
+        let mut expected_metric = metric.clone();
+        for (k, v) in TEST_METADATA.iter().cloned() {
+            expected_log.insert(k, v);
+            expected_metric.insert_tag(k.to_string(), v.to_string());
+        }
+
         tx.send(log.into()).await.unwrap();
+        tx.send(metric.into()).await.unwrap();
 
-        let event = stream.next().await.unwrap();
+        let event_log = stream.next().await.unwrap();
+        let event_metric = stream.next().await.unwrap();
 
-        expected.insert("availability-zone", "ww-region-1a");
-        expected.insert("public-ipv4", "192.1.1.1");
-        expected.insert("public-hostname", "mock-public-hostname");
-        expected.insert("local-ipv4", "192.1.1.2");
-        expected.insert("local-hostname", "mock-hostname");
-        expected.insert("instance-id", "i-096fba6d03d36d262");
-        expected.insert("ami-id", "ami-05f27d4d6770a43d2");
-        expected.insert("instance-type", "t2.micro");
-        expected.insert("region", "us-east-1");
-        expected.insert("vpc-id", "mock-vpc-id");
-        expected.insert("subnet-id", "mock-subnet-id");
-        expected.insert("role-name[0]", "mock-user");
-
-        assert_eq!(event.into_log(), expected);
+        assert_eq!(event_log.into_log(), expected_log);
+        assert_eq!(event_metric.into_metric(), expected_metric);
     }
 
     #[tokio::test]
