@@ -1,0 +1,2 @@
+{{ $errors := site.Data.docs.remap.errors }}
+{{ partial "data.html" (dict "vrl_compile_time_errors" $errors) }}
