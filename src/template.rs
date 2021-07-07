@@ -24,7 +24,7 @@ lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone)]
 pub struct Template {
     src: String,
     has_ts: bool,
