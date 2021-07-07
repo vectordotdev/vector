@@ -15,7 +15,7 @@ components: sources: nats: {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "best_effort"
-		development:   "stable"
+		development:   "beta"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -37,7 +37,7 @@ components: sources: nats: {
 				syntax: "literal"
 			}
 		}
-    }
+	}
 
 	output: logs: record: {
 		description: "An individual NATS record"
@@ -54,8 +54,8 @@ components: sources: nats: {
 	}
 
 	telemetry: metrics: {
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 
 	how_it_works: components._nats.how_it_works
