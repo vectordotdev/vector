@@ -44,23 +44,21 @@ remap: functions: merge: {
 			title: "Object merge (shallow)"
 			source: #"""
 				merge(
-				  {
-				    "parent1": {
-				      "child1": 1,
-				      "child2": 2
-				    }
-				  },
-				  {
-				    "parent2": {
-					  "child3": 3
-				    }
-				  },
-				  {
-				    "parent1": {
-				  	  "child2": 4,
-				      "child5": 5
-				    }
-				  }
+					{
+						"parent1": {
+							"child1": 1,
+							"child2": 2
+						},
+						"parent2": {
+							"child3": 3
+						}
+					},
+					{
+						"parent1": {
+							"child2": 4,
+							"child5": 5
+						}
+					}
 				)
 				"""#
 			return: {
@@ -75,22 +73,22 @@ remap: functions: merge: {
 			title: "Object merge (deep)"
 			source: #"""
 				merge(
-				  {
-				    "parent1": {
-				      "child1": 1,
-				      "child2": 2
+					{
+						"parent1": {
+							"child1": 1,
+							"child2": 2
+						},
+						"parent2": {
+							"child3": 3
+						}
 					},
-				    "parent2": {
-				      "child3": 3
-				    }
-				  },
-				  {
-				    "parent1": {
-				      "child2": 4,
-				      "child5": 5
-				    }
-				  },
-				  deep: true
+					{
+						"parent1": {
+							"child2": 4,
+							"child5": 5
+						}
+					},
+					deep: true
 				)
 				"""#
 			return: {
