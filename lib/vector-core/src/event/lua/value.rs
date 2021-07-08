@@ -11,9 +11,7 @@ impl<'a> ToLua<'a> for Value {
             Value::Float(f) => Ok(LuaValue::Number(f)),
             Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
             Value::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
-            Value::Map(m) => lua
-                .create_table_from(m.into_iter().map(|(k, v)| (k, v)))
-                .map(LuaValue::Table),
+            Value::Map(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
             Value::Array(a) => lua.create_sequence_from(a.into_iter()).map(LuaValue::Table),
             Value::Null => lua.create_string("").map(LuaValue::String),
         }

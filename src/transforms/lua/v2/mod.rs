@@ -327,7 +327,7 @@ impl RuntimeTransform for Lua {
     }
 
     fn timers(&self) -> Vec<Timer> {
-        self.timers.iter().map(|(timer, _)| timer.clone()).collect()
+        self.timers.iter().map(|(timer, _)| *timer).collect()
     }
 }
 

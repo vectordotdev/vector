@@ -6,8 +6,7 @@ impl<'a> ToLua<'a> for LogEvent {
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let (fields, _metadata) = self.into_parts();
         // The metadata is handled when converting the enclosing `Event`.
-        lua.create_table_from(fields.into_iter().map(|(k, v)| (k, v)))
-            .map(LuaValue::Table)
+        lua.create_table_from(fields).map(LuaValue::Table)
     }
 }
 
