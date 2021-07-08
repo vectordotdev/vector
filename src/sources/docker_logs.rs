@@ -578,6 +578,7 @@ impl EventStreamBuilder {
 
         let core = Arc::clone(&self.core);
 
+        let mut error = false;
         let events_stream = stream
             .map(|value| {
                 match value {
@@ -607,7 +608,10 @@ impl EventStreamBuilder {
                     }
                 }
             })
-            .take_while(|v| ready(v.is_ok()))
+            .take_while(|v| {
+                error |= v.is_err();
+                ready(v.is_ok())
+            })
             .filter_map(|v| ready(v.unwrap()))
             .take_until(self.shutdown.clone());
 
@@ -634,9 +638,9 @@ impl EventStreamBuilder {
             container_id: info.id.as_str()
         });
 
-        let result = match result {
-            Ok(()) => Ok(info),
-            Err(crate::pipeline::ClosedError) => Err(info.id),
+        let result = match (result, error) {
+            (Ok(()), false) => Ok(info),
+            (Err(crate::pipeline::ClosedError), _) | (_, true) => Err(info.id),
         };
 
         self.finish(result);
