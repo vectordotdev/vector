@@ -10,7 +10,6 @@ rustup run stable cargo install cargo-deb --version 1.29.2
 rustup run stable cargo install cross --version 0.2.1
 
 cd scripts
-bundle update --bundler
 bundle install
 cd ..
 

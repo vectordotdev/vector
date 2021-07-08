@@ -17,13 +17,14 @@ use snafu::Snafu;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
+use std::hash::Hash;
 use std::path::PathBuf;
 
 lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
 pub struct Template {
     src: String,
     has_ts: bool,

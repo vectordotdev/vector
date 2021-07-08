@@ -136,8 +136,8 @@ components: sinks: gcp_stackdriver_logs: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["vector-logs"]
-				syntax: "literal"
+				examples: ["vector-logs", "{{ component_name }}"]
+				syntax: "template"
 			}
 		}
 		organization_id: {
@@ -211,8 +211,8 @@ components: sinks: gcp_stackdriver_logs: {
 						warnings: []
 						type: string: {
 							default: null
-							examples: ["vector-123456", "Twilight"]
-							syntax: "literal"
+							examples: ["vector-123456", "Twilight", "{{ container_name }}"]
+							syntax: "template"
 						}
 					}
 				}
