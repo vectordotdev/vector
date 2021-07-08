@@ -10,6 +10,7 @@ import path from "path";
 
 dotEnv.config();
 
+// Types
 type Payload = {
   level: number;
   domId?: string;
@@ -29,8 +30,13 @@ type AlgoliaRecord = {
   content: string;
 };
 
+// Constants
+
 // @ts-ignore
 const algoliaIndexName = process.env.ALGOLIA_INDEX_NAME || "";
+
+const DEBUG = process.env.DEBUG === "true" || false;
+
 const algoliaBatchSize = 100;
 const publicPath = path.resolve(__dirname, "..", "public");
 const tagHierarchy = {
@@ -171,28 +177,38 @@ async function indexHTMLFiles(
         if (usedIds[rec.objectID]) {
           // The objectID is the url of the section of the page that the record covers.
           // If you have a duplicate here somehow two records point to the same thing.
-          console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
-          console.log(JSON.stringify(rec, null, 2));
+
+          if (DEBUG) {
+            console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
+            console.log(JSON.stringify(rec, null, 2));
+          }
         }
 
         usedIds[rec.objectID] = true;
 
         if (rec.level > 1 && rec.level < 6 && rec.tags.length == 0) {
           // The h2 -> h5 should have a set of tags that are the "path" within the file.
-          console.log(chalk.yellow("Found h2 -> h5 with no tags."));
-          console.log(JSON.stringify(rec, null, 2));
+          if (DEBUG) {
+            console.log(chalk.yellow("Found h2 -> h5 with no tags."));
+            console.log(JSON.stringify(rec, null, 2));
+          }
         }
       }
 
       if (index === null) {
-        console.log(chalk.magenta("\nRecords for:"));
-        console.log(chalk.cyan(file));
-        console.log(JSON.stringify(algoliaRecords, null, 2));
+        if (DEBUG) {
+          console.log(chalk.magenta("\nRecords for:"));
+          console.log(chalk.cyan(file));
+          console.log(JSON.stringify(algoliaRecords, null, 2));
+        }
       } else {
         for (const chnk of chunk(algoliaRecords, algoliaBatchSize)) {
           try {
             await index.saveObjects(chnk);
-            console.log(chalk.cyan(file));
+
+            if (DEBUG) {
+              console.log(chalk.cyan(file));
+            }
           } catch (err) {
             console.trace(err);
             process.exit(1);
