@@ -6,8 +6,8 @@ impl<'a> ToLua<'a> for Event {
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         match self {
-            Event::Log(log) => table.set("log", log.to_lua(lua)?)?,
-            Event::Metric(metric) => table.set("metric", metric.to_lua(lua)?)?,
+            Event::Log(log) => table.raw_set("log", log.to_lua(lua)?)?,
+            Event::Metric(metric) => table.raw_set("metric", metric.to_lua(lua)?)?,
         }
         Ok(LuaValue::Table(table))
     }
@@ -25,7 +25,7 @@ impl<'a> FromLua<'a> for Event {
                 })
             }
         };
-        match (table.get("log")?, table.get("metric")?) {
+        match (table.raw_get("log")?, table.raw_get("metric")?) {
             (LuaValue::Table(log), LuaValue::Nil) => {
                 Ok(Event::Log(LogEvent::from_lua(LuaValue::Table(log), lua)?))
             }

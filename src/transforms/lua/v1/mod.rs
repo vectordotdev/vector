@@ -65,6 +65,7 @@ pub struct Lua {
     search_dirs: Vec<String>,
     #[derivative(Debug = "ignore")]
     lua: mlua::Lua,
+    vector_func: mlua::RegistryKey,
     invocations_after_gc: usize,
 }
 
@@ -109,13 +110,13 @@ impl Lua {
         }
 
         let func = lua.load(&source).into_function().context(InvalidLua)?;
-        lua.set_named_registry_value("vector_func", func)
-            .context(InvalidLua)?;
+        let vector_func = lua.create_registry_value(func).context(InvalidLua)?;
 
         Ok(Self {
             source,
             search_dirs,
             lua,
+            vector_func,
             invocations_after_gc: 0,
         })
     }
@@ -124,13 +125,13 @@ impl Lua {
         let lua = &self.lua;
         let globals = lua.globals();
 
-        globals.set("event", LuaEvent { inner: event })?;
+        globals.raw_set("event", LuaEvent { inner: event })?;
 
-        let func = lua.named_registry_value::<_, mlua::Function<'_>>("vector_func")?;
+        let func = lua.registry_value::<mlua::Function<'_>>(&self.vector_func)?;
         func.call(())?;
 
         let result = globals
-            .get::<_, Option<LuaEvent>>("event")
+            .raw_get::<_, Option<LuaEvent>>("event")
             .map(|option| option.map(|lua_event| lua_event.inner));
 
         self.invocations_after_gc += 1;
@@ -236,14 +237,14 @@ impl mlua::UserData for LuaEvent {
             let state = lua.create_table()?;
             {
                 let keys = lua.create_table_from(event.inner.as_log().keys().map(|k| (k, true)))?;
-                state.set("event", event)?;
-                state.set("keys", keys)?;
+                state.raw_set("event", event)?;
+                state.raw_set("keys", keys)?;
             }
             let function =
                 lua.create_function(|lua, (state, prev): (mlua::Table, Option<String>)| {
-                    let event: LuaEvent = state.get("event")?;
-                    let keys: mlua::Table = state.get("keys")?;
-                    let next: mlua::Function = lua.globals().get("next")?;
+                    let event: LuaEvent = state.raw_get("event")?;
+                    let keys: mlua::Table = state.raw_get("keys")?;
+                    let next: mlua::Function = lua.globals().raw_get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
                     match key.clone().and_then(|k| event.inner.as_log().get(k)) {
                         Some(value) => Ok((key, Some(lua.create_string(&value.as_bytes())?))),
