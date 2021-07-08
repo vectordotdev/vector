@@ -48,12 +48,12 @@ Common Vector container ports used by the built-in metrics pipeline.
 Internal metrics are common, so we share and reuse the definition.
 */}}
 {{- define "libvector.metricsContainerPorts" -}}
-{{- if .Values.prometheusSink -}}
-{{- if .Values.prometheusSink.enabled -}}
+{{- with .Values.prometheusSink }}
+{{- if .enabled -}}
 - name: metrics
-  containerPort: {{ .Values.prometheusSink.listenPort }}
+  containerPort: {{ .listenPort }}
   protocol: TCP
-{{- else if not .Values.customConfig -}}
+{{- else if not $.Values.customConfig -}}
 - name: metrics
   containerPort: 9090
   protocol: TCP
