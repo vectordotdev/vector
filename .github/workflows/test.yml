@@ -39,7 +39,6 @@ jobs:
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
-        docs: ${{ steps.filter.outputs.docs }}
       steps:
       - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2
@@ -61,8 +60,6 @@ jobs:
               - "Cargo.toml"
               - "Makefile"
               - "rust-toolchain"
-            docs:
-              - 'docs/**'
             deny:
               - 'deny.toml'
             dependencies:
