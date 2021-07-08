@@ -93,25 +93,26 @@ components: sinks: loki: {
 		}}
 		labels: {
 			description: """
-				A set of labels that will be attached to each batch of events. These values are also templateable to
-				allow events to provide dynamic label values. Note: if the set of label values has high cardinality,
-				this can cause drastic performance issues with Loki. To ensure this doesn't happen, you should try to
-				reduce the number of unique label values.
+					A set of labels that will be attached to each batch of events.  Both keys and values are templateable to
+					allow events to provide dynamic labels. Note: If the set of labels has high cardinality this can cause
+					drastic performance issues with Loki. To ensure this does not happen one should try to reduce the amount
+					of unique label keys and values.
 				"""
 			required: true
 			warnings: []
 			type: object: {
 				examples: [
 					{
-						"forwarder": "vector"
-						"event":     "{{ event_field }}"
-						"key":       "value"
+						"forwarder":             "vector"
+						"event":                 "{{ event_field }}"
+						"key":                   "value"
+						"\"{{ event_field }}\"": "{{ another_event_field }}"
 					},
 				]
 				options: {
 					"*": {
 						common:      false
-						description: "Any Loki label"
+						description: "Any Loki label, templateable"
 						required:    false
 						type: string: {
 							default: null
