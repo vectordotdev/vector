@@ -1,7 +1,7 @@
 [build]
 base = "docs"
 publish = "public"
-ignore = "git diff --quiet $COMMIT_REF $CACHED_COMMIT_REF -- docs/"
+ignore = "./docs/scripts/build-ignore.sh"
 
 [build.environment]
 HUGO_VERSION = "0.84.0"
