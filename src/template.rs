@@ -17,7 +17,7 @@ use snafu::Snafu;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::path::PathBuf;
 
 lazy_static! {
