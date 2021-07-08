@@ -1,5 +1,4 @@
 use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
-use crc::Crc;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -8,8 +7,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use tracing::trace_span;
-
-const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 
 #[derive(Clone)]
 pub struct Fingerprinter {
@@ -37,6 +34,7 @@ pub enum FingerprintStrategy {
 pub enum FileFingerprint {
     #[serde(rename = "checksum")]
     BytesChecksum(u64),
+    #[serde(alias = "first_line_checksum")]
     FirstLinesChecksum(u64),
     DevInode(u64, u64),
     Unknown(u64),
@@ -53,7 +51,7 @@ impl FileFingerprint {
                 let mut buf = Vec::with_capacity(std::mem::size_of_val(dev) * 2);
                 buf.write_all(&dev.to_be_bytes()).expect("writing to array");
                 buf.write_all(&ino.to_be_bytes()).expect("writing to array");
-                FINGERPRINT_CRC.checksum(&buf[..])
+                crc::crc64::checksum_ecma(&buf[..])
             }
             Unknown(c) => *c,
         }
@@ -94,7 +92,7 @@ impl Fingerprinter {
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
                 fingerprinter_read_until(fp, b'\n', lines, buffer)?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
+                let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
                 Ok(FirstLinesChecksum(fingerprint))
             }
         }
@@ -151,7 +149,7 @@ impl Fingerprinter {
                 let mut fp = fs::File::open(path)?;
                 fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
                 fp.read_exact(&mut buffer[..bytes])?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
+                let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
                 Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
             }
             _ => Ok(None),
@@ -193,7 +191,7 @@ fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use super::{FileFingerprint, FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
     use std::{collections::HashSet, fs, io::Error, path::Path, time::Duration};
     use tempfile::tempdir;
 
@@ -226,9 +224,12 @@ mod test {
         assert!(fingerprinter
             .get_fingerprint_of_file(&empty_path, &mut buf)
             .is_err());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&full_line_path, &mut buf)
-            .is_ok());
+        assert_eq!(
+            fingerprinter
+                .get_fingerprint_of_file(&full_line_path, &mut buf)
+                .unwrap(),
+            FileFingerprint::FirstLinesChecksum(8302183670541403209),
+        );
         assert!(fingerprinter
             .get_fingerprint_of_file(&not_full_line_path, &mut buf)
             .is_err());
@@ -298,7 +299,10 @@ mod test {
         assert!(run(&incomlete_line).is_err());
         assert!(run(&incomplete_under_max_line_length_by_one).is_err());
 
-        assert!(run(&one_line).is_ok());
+        assert_eq!(
+            run(&one_line).unwrap(),
+            FileFingerprint::FirstLinesChecksum(12790833211255586118)
+        );
         assert!(run(&one_line_duplicate).is_ok());
         assert!(run(&one_line_continued).is_ok());
         assert!(run(&different_two_lines).is_ok());
@@ -356,7 +360,10 @@ mod test {
 
         assert!(run(&incomlete_lines).is_err());
 
-        assert!(run(&two_lines).is_ok());
+        assert_eq!(
+            run(&two_lines).unwrap(),
+            FileFingerprint::FirstLinesChecksum(8288549968916239272)
+        );
         assert!(run(&two_lines_duplicate).is_ok());
         assert!(run(&two_lines_continued).is_ok());
         assert!(run(&different_three_lines).is_ok());
