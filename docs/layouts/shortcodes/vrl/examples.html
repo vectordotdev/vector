@@ -1,0 +1,9 @@
+{{ $category := .Get 0 }}
+{{ $funcs := slice }}
+{{ range site.Data.docs.remap.functions }}
+{{ if eq .category $category }}
+{{ $funcs = $funcs | append . }}
+{{ end }}
+{{ end }}
+
+{{ partial "data.html" (dict "vrl_examples" $funcs) }}

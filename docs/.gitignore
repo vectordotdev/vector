@@ -1,0 +1,20 @@
+# Environment variables
+.env
+
+# Hugo-generated assets
+public/
+resources/
+hugo_stats.json
+assets/jsconfig.json
+
+# JavaScript, Sass, CSS, etc.
+node_modules/
+
+# CUE-generated assets
+data/docs.json
+
+# htmltest generated
+tmp/
+
+# Yarn errors
+yarn-error.log

@@ -34,7 +34,6 @@ use tokio::{
     process::Command,
     time::sleep,
 };
-use tracing_futures::Instrument;
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 
@@ -143,8 +142,7 @@ impl SourceConfig for JournaldConfig {
                 remap_priority: self.remap_priority,
                 out: cx.out,
             }
-            .run_shutdown(cx.shutdown, start)
-            .instrument(info_span!("journald-server")),
+            .run_shutdown(cx.shutdown, start),
         ))
     }
 
