@@ -1,0 +1,5 @@
+{{ $searchJs := "js/search.tsx" }}
+{{ $jsOpts := dict "defines" (dict "process.env.NODE_ENV" "\"development\"") }}
+{{ $babelOpts := dict "noComments" true }}
+{{ $compiled := resources.Get $searchJs | js.Build $jsOpts | babel $babelOpts }}
+<script src="{{ $compiled.RelPermalink }}"></script>

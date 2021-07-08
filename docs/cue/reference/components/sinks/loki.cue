@@ -93,10 +93,10 @@ components: sinks: loki: {
 		}}
 		labels: {
 			description: """
-					A set of labels that will be attached to each batch of events.  Both keys and values are templateable to
-					allow events to provide dynamic labels. Note: If the set of labels has high cardinality this can cause
-					drastic performance issues with Loki. To ensure this does not happen one should try to reduce the amount
-					of unique label keys and values.
+				A set of labels that are attached to each batch of events. Both keys and values are templatable, which
+				enables you to attach dynamic labels to events. Note: If the set of labels has high cardinality, this
+				can cause drastic performance issues with Loki. To prevent this from happening, reduce the number of
+				unique label keys and values.
 				"""
 			required: true
 			warnings: []
