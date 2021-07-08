@@ -24,7 +24,7 @@ lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
 pub struct Template {
     src: String,
     has_ts: bool,
@@ -41,13 +41,6 @@ pub enum TemplateParseError {
 pub enum TemplateRenderingError {
     #[snafu(display("Missing fields on event: {:?}", missing_keys))]
     MissingKeys { missing_keys: Vec<String> },
-}
-
-impl Hash for Template {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.src.hash(state);
-    }
 }
 
 impl TryFrom<&str> for Template {
