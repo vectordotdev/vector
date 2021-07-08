@@ -112,10 +112,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(300));
 
         let output = capture_metrics(controller)
-            .map(|event| {
-                let m = event.into_metric();
-                (m.name().to_string(), m)
-            })
+            .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 
         assert_eq!(&MetricValue::Gauge { value: 2.0 }, output["foo"].value());

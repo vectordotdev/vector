@@ -120,12 +120,12 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Metric> 
         let metric = &metrics[i];
         if metric.name() == "events_out_total" {
             let alias = metric.clone().with_name("processed_events_total");
-            metrics.push(alias.into());
+            metrics.push(alias);
         }
     }
 
     let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
-    metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle).into());
+    metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
 
     metrics.into_iter()
 }
