@@ -77,7 +77,7 @@ impl Function for ParseDatadogGrok {
             "#},
             result: Ok(indoc! {r#"
             {
-              "date_access": "13/Jul/2016:10:55:36 +0000",
+              "date_access": 1468407336000,
               "duration": 202000000.0,
               "http": {
                 "_x_forwarded_for": null,

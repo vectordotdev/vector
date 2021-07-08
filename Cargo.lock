@@ -1810,6 +1810,8 @@ name = "datadog-grok"
 version = "0.1.0"
 dependencies = [
  "bytes 1.0.1",
+ "chrono",
+ "chrono-tz",
  "derivative 2.2.0",
  "grok",
  "itertools 0.10.1",
@@ -1818,6 +1820,7 @@ dependencies = [
  "lazy_static",
  "lookup",
  "parsing",
+ "peeking_take_while",
  "percent-encoding",
  "regex",
  "serde",

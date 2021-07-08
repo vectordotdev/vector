@@ -1,4 +1,5 @@
 mod ast;
+mod date;
 mod field_traversal;
 mod grok_filter;
 mod lexer;

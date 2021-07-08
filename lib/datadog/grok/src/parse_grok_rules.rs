@@ -11,9 +11,11 @@ use lookup::LookupBuf;
 use parsing::value::Value;
 
 use crate::ast::{self, Destination, GrokPattern};
+use crate::date;
 use crate::grok_filter::GrokFilter;
 use crate::parse_grok_pattern::parse_grok_pattern;
 use itertools::{Itertools, Position};
+use tracing::error;
 
 #[derive(Debug, Clone)]
 pub struct GrokRule {
@@ -289,7 +291,48 @@ fn process_match_function(
             }
             Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
         }
-        "date" => Ok("13\\/Jul\\/2016:10:55:36 \\+0000".to_string()), // TODO in a follow-up PR
+        "date" => {
+            let args_opt = match_fn.args.as_ref();
+            if match_fn.args.is_some()
+                && !args_opt.unwrap().is_empty()
+                && args_opt.unwrap().len() <= 2
+            {
+                if let ast::FunctionArgument::Arg(Value::Bytes(b)) = &args_opt.unwrap()[0] {
+                    let format = String::from_utf8_lossy(b);
+                    let result = date::time_format_to_regex(&format, true)
+                        .map_err(|_e| Error::InvalidFunctionArguments(match_fn.name.clone()))?;
+                    let mut tz_regex_opt = None;
+                    if result.tz_captured {
+                        tz_regex_opt = Some(Regex::new(&result.regex).map_err(|error| {
+                            error!(message = "Error compiling regex", regex = %result.regex, %error);
+                            Error::InvalidFunctionArguments(match_fn.name.clone())
+                        })?);
+                    }
+                    let strp_format = date::convert_time_format(&format).map_err(|error| {
+                        error!(message = "Error compiling regex", regex = %result.regex, %error);
+                        Error::InvalidFunctionArguments(match_fn.name.clone())
+                    })?;
+                    let mut tz = None;
+                    if args_opt.unwrap().len() > 1 {
+                        if let ast::FunctionArgument::Arg(Value::Bytes(b)) = &args_opt.unwrap()[1] {
+                            tz = Some(String::from_utf8_lossy(b).to_string());
+                        }
+                    }
+                    let filter = GrokFilter::Date(strp_format, tz_regex_opt, tz, result.with_tz);
+                    let result = date::time_format_to_regex(&format, false).map_err(|error| {
+                        error!(message = "Invalid time format", format = %format, %error);
+                        Error::InvalidFunctionArguments(match_fn.name.clone())
+                    })?;
+                    return replace_with_pattern_and_add_as_filter(
+                        &result.regex,
+                        filter,
+                        filters,
+                        pattern,
+                    );
+                }
+            }
+            Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
+        }
         "integer" => replace_with_pattern_and_add_as_filter(
             "integerStr",
             GrokFilter::Integer,
