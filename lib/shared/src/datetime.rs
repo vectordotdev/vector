@@ -11,7 +11,7 @@ pub enum TimeZone {
     Named(Tz),
 }
 
-/// This is a wrapper trait to allow `TimeZone` types to be passed genericly.
+/// This is a wrapper trait to allow `TimeZone` types to be passed generically.
 impl TimeZone {
     pub fn datetime_from_str(&self, s: &str, format: &str) -> Result<DateTime<Utc>, ParseError> {
         match self {
