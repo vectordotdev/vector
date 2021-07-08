@@ -9,7 +9,7 @@ metadata:
     {{- include "libvector.labels" . | nindent 4 }}
 data:
   {{- if .Values.customConfig }}
-  {{- if and .Values.customConfig $deprecatedConfig }}{{ fail "Can't use deprecated keys with customConfig" }}{{- end }}
+  {{- if and .Values.customConfig $deprecatedConfig }}{{ fail "Can't use the following deprecated keys with customConfig: logSchema, vectorApi,  vectorSource, internalMetricsSource, prometheusSink, sources, transforms, sinks" }}{{- end }}
   vector.yaml: |
 {{ tpl (toYaml .Values.customConfig) . | indent 4 }}
   {{- else if (not $deprecatedConfig) }}
