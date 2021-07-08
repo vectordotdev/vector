@@ -3,6 +3,7 @@
 {{ $siteGeneration := site.Params.site_generation }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
+import { FastClick } from 'fastclick';
 
 const sayHello = () => {
   console.log('Welcome to the Vector website and documentation!');
@@ -17,6 +18,14 @@ const clearLocalStorageOnNewGeneration = () => {
   }
 
   localStorage.setItem('generation', currentGeneration);
+}
+
+const applyFastclick = () => {
+  if ('addEventListener' in document) {
+    document.addEventListener('DOMContentLoaded', () => {
+      FastClick.attach(document.body);
+    }, false);
+  }
 }
 
 /* Global state management */
@@ -118,6 +127,7 @@ const manageState = () => {
 }
 
 const main = () => {
+  applyFastclick();
   sayHello();
   clearLocalStorageOnNewGeneration();
   manageState();
