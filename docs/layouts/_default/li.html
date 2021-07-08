@@ -1,0 +1,13 @@
+{{ $title := .Params.short | default .Title }}
+<a href="{{ .RelPermalink }}" class="border dark:border-gray-700 rounded-md py-2 px-3.5 hover:bg-gray-50 dark:hover:bg-black flex justify-between items-center">
+  <span class="flex-1 dark:text-gray-300 text-gray-700 tracking-tight text-base leading-tight">
+    {{ $title }}
+  </span>
+
+  {{/* Heroicon: outline/chevron-right */}}
+  <span>
+    <svg xmlns="http://www.w3.org/2000/svg" class="text-secondary dark:text-primary h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+    </svg>
+  </span>
+</a>

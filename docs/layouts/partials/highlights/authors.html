@@ -1,0 +1,22 @@
+<div class="flex items-center">
+  <div class="flex-shrink-0">
+    <div class="flex -space-x-1 relative z-0 overflow-hidden">
+      {{ range .Params.authors }}
+      {{ $img := printf "https://github.com/%s.png" . }}
+      {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
+      <img class="relative z-30 inline-block h-8 w-8 rounded-full ring-1 ring-white dark:ring-dark" src="{{ $img }}" alt="Author photo for {{ $name }}">
+      {{ end }}
+    </div>
+  </div>
+
+
+  <div class="ml-4 flex flex-col space-y-1">
+    {{ range .Params.authors }}
+    {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
+    {{ $link := printf "https://github.com/%s" . }}
+    <a href="{{ $link }}" class="text-md font-bold tracking-tight text-gray-700 hover:text-secondary dark:text-gray-200">
+      {{ $name }}
+    </a>
+    {{ end }}
+  </div>
+</div>

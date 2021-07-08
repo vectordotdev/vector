@@ -204,9 +204,10 @@ mod tests {
             Compression::Auto => panic!("cannot encode records as Auto"),
             Compression::Gzip => {
                 let mut buffer = Vec::new();
-
-                let mut gz = GzEncoder::new(record, flate2::Compression::fast());
-                gz.read_to_end(&mut buffer)?;
+                if !record.is_empty() {
+                    let mut gz = GzEncoder::new(record, flate2::Compression::fast());
+                    gz.read_to_end(&mut buffer)?;
+                }
                 buffer
             }
             Compression::None => record.to_vec(),
@@ -291,6 +292,13 @@ mod tests {
                 false,
                 record.to_owned(),
                 record.to_owned(),
+            ),
+            (
+                Compression::Gzip,
+                Compression::Gzip,
+                true,
+                Vec::new(),
+                Vec::new(),
             ),
         ];
 

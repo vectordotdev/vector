@@ -15,7 +15,8 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
-  - docs                # A documentation change
+  - docs                # A documentation change.
+  - website             # A website change that isn't a docs content change (CSS, HTML templates, search, etc.).
 
 scopes:
   - new source
@@ -213,3 +214,12 @@ scopes:
   - splunk_hec sink # Anything `splunk_hec` sink related
   - statsd sink # Anything `statsd` sink related
   - vector sink # Anything `vector` sink related
+
+  # website
+  - blog # Anything related to the Vector blog
+  - css # Anything related to vector.dev's CSS and aesthetics
+  - guides # Anything related to Vector's guides
+  - highlights # Anything related to vector.dev highlights
+  - javascript # Anything related to the JavaScript functionality on vector.dev
+  - search # Anything related to the website's Algolia search indexing/config
+  - template # Anything related to website HTML and other templates

@@ -29,6 +29,7 @@ criterion_group!(
               //exists
               flatten,
               floor,
+              format_int,
               format_number,
               format_timestamp,
               get_env_var,
@@ -71,6 +72,7 @@ criterion_group!(
               parse_grok,
               parse_key_value,
               parse_klog,
+              parse_int,
               parse_json,
               parse_nginx_log,
               parse_query_string,
@@ -366,6 +368,20 @@ bench_function! {
     literal {
         args: func_args![value: 1234.56725, precision: 4],
         want: Ok(1234.5672),
+    }
+}
+
+bench_function! {
+    format_int => vrl_stdlib::FormatInt;
+
+    decimal {
+        args: func_args![value: 42],
+        want: Ok("42"),
+    }
+
+    hexidecimal {
+        args: func_args![value: 42, base: 16],
+        want: Ok(value!("2a")),
     }
 }
 
@@ -1065,6 +1081,25 @@ bench_function! {
             "level": "info",
             "message": "Hello world",
         })),
+    }
+}
+
+bench_function! {
+    parse_int => vrl_stdlib::ParseInt;
+
+    decimal {
+        args: func_args![value: "-42"],
+        want: Ok(-42),
+    }
+
+    hexidecimal {
+        args: func_args![value: "0x2a"],
+        want: Ok(42),
+    }
+
+    explicit_hexidecimal {
+        args: func_args![value: "2a", base: 16],
+        want: Ok(42),
     }
 }
 
