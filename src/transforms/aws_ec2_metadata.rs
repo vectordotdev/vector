@@ -626,7 +626,8 @@ mod integration_tests {
             endpoint: Some(HOST.to_string()),
             fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
             ..Default::default()
-        }).await;
+        })
+        .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
         let mut stream = transform.transform(Box::pin(rx));
@@ -651,7 +652,8 @@ mod integration_tests {
             endpoint: Some(HOST.to_string()),
             fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
             ..Default::default()
-        }).await;
+        })
+        .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
         let mut stream = transform.transform(Box::pin(rx));
@@ -677,7 +679,8 @@ mod integration_tests {
                 endpoint: Some(HOST.to_string()),
                 namespace: Some("ec2.metadata".into()),
                 ..Default::default()
-            }).await;
+            })
+            .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
             let mut stream = transform.transform(Box::pin(rx));
@@ -702,7 +705,8 @@ mod integration_tests {
                 endpoint: Some(HOST.to_string()),
                 namespace: Some("".into()),
                 ..Default::default()
-            }).await;
+            })
+            .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
             let mut stream = transform.transform(Box::pin(rx));
@@ -729,8 +733,8 @@ mod integration_tests {
                 endpoint: Some(HOST.to_string()),
                 namespace: Some("ec2.metadata".into()),
                 ..Default::default()
-            }).await;
-
+            })
+            .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
             let mut stream = transform.transform(Box::pin(rx));
@@ -757,7 +761,8 @@ mod integration_tests {
                 endpoint: Some(HOST.to_string()),
                 namespace: Some("".into()),
                 ..Default::default()
-            }).await;
+            })
+            .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
             let mut stream = transform.transform(Box::pin(rx));
