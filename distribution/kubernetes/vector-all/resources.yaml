@@ -52,13 +52,7 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
-    
     data_dir = "/vector-data-dir"
-    
-    [api]
-      enabled = false
-      address = "0.0.0.0:8686"
-      playground = true
     
     [log_schema]
       host_key = "host"
@@ -117,13 +111,7 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
-    
     data_dir = "/vector-data-dir"
-    
-    [api]
-      enabled = false
-      address = "0.0.0.0:8686"
-      playground = true
     
     [log_schema]
       host_key = "host"
@@ -275,8 +263,8 @@ spec:
           command:
             []
           args:
-            - --config
-            - /etc/vector/*.toml
+            - --config-dir
+            - /etc/vector/
           env:
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:
@@ -407,8 +395,8 @@ spec:
           image: "timberio/vector:latest-debian"
           imagePullPolicy: "IfNotPresent"
           args:
-            - --config
-            - /etc/vector/*.toml
+            - --config-dir
+            - /etc/vector/
           env:
             
             - name: "LOG"
