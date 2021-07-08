@@ -29,8 +29,7 @@ data:
         type: prometheus_exporter
         inputs: ["internal_metrics"]
         address: 0.0.0.0:9090
-  {{- end }}
-  {{- if $deprecatedConfig }}
+  {{- else }}
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
   managed.toml: |

@@ -174,7 +174,7 @@ customConfig: {}
   #      address: 0.0.0.0:9090
 
 # Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping.
-# To be used in clusters that rely on prometheus-operator to gether metrics.
+# To be used in clusters that rely on prometheus-operator to gather metrics.
 # You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
 # using prometheus-operator Helm chart to allow `PodMonitor` resources
 # dicovery in all namespaces.
@@ -321,7 +321,7 @@ prometheusSink:
   # `prometheus.io/scrape` to discover scrape targets.
   addPodAnnotations: false
   # Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping.
-  # To be used in clusters that rely on prometheus-operator to gether metrics.
+  # To be used in clusters that rely on prometheus-operator to gather metrics.
   # You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
   # using prometheus-operator Helm chart to allow `PodMonitor` resources
   # dicovery in all namespaces.
