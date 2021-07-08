@@ -1,4 +1,4 @@
-{{- $deprecatedConfig := or .Values.logSchema .Values.vectorApi.enabled .Values.vectorSource.enabled .Values.internalMetricsSource.enabled .Values.prometheusSink.enabled .Values.sources .Values.transforms .Values.sinks -}}
+{{- $deprecatedConfig := or .Values.logSchema.enabled .Values.vectorApi.enabled .Values.vectorSource.enabled .Values.internalMetricsSource.enabled .Values.prometheusSink.enabled .Values.sources .Values.transforms .Values.sinks -}}
 
 {{- if (empty .Values.existingConfigMap) -}}
 apiVersion: v1
@@ -30,6 +30,7 @@ data:
         inputs: ["internal_metrics"]
         address: 0.0.0.0:9090
   {{- end }}
+  {{- if $deprecatedConfig }}
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
   managed.toml: |
@@ -50,4 +51,5 @@ data:
 
     {{- include "libvector.vectorTopology" .Values | nindent 4 -}}
 
+  {{- end }}
 {{- end }}

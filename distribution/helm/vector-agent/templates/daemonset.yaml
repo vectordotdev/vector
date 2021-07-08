@@ -61,7 +61,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            {{- if .Values.hostMetricsSource.enabled }}
+            {{- if or .Values.hostMetricsSource.enabled (not .Values.customConfig) }}
             - name: PROCFS_ROOT
               value: /host/proc
             - name: SYSFS_ROOT
@@ -93,12 +93,16 @@ spec:
               readOnly: true
             # Vector data dir mount.
             - name: data-dir
+            {{- if .Values.globalOptions.enabled }}
               mountPath: "{{ .Values.globalOptions.dataDir }}"
+            {{- else }}
+              mountPath: "{{ .Values.customConfig.data_dir | default "/vector-data-dir" }}"
+            {{- end }}
             # Vector config dir mount.
             - name: config-dir
               mountPath: /etc/vector
               readOnly: true
-            {{- if .Values.hostMetricsSource.enabled }}
+            {{- if or .Values.hostMetricsSource.enabled (not .Values.customConfig) }}
             # Host procsfs mount.
             - name: procfs
               mountPath: /host/proc
@@ -146,7 +150,7 @@ spec:
               {{- with .Values.extraConfigDirSources }}
               {{- toYaml . | nindent 14 }}
               {{- end }}
-        {{- if .Values.hostMetricsSource.enabled }}
+        {{- if or .Values.hostMetricsSource.enabled (not .Values.customConfig) }}
         # Host procsfs.
         - name: procfs
           hostPath:
