@@ -1,6 +1,6 @@
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, heartbeat, list, metrics,
+    config, generate, graph, heartbeat, list, metrics,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -127,16 +127,17 @@ impl Application {
 
                 if let Some(s) = sub_command {
                     let code = match s {
-                        SubCommand::Validate(v) => validate::validate(&v, color).await,
+                        SubCommand::Generate(g) => generate::cmd(&g),
+                        SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
-                        SubCommand::Generate(g) => generate::cmd(&g),
+                        #[cfg(windows)]
+                        SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "api-client")]
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(feature = "api-client")]
                         SubCommand::Tap(t) => tap::cmd(&t).await,
-                        #[cfg(windows)]
-                        SubCommand::Service(s) => service::cmd(&s),
+                        SubCommand::Validate(v) => validate::validate(&v, color).await,
                         #[cfg(feature = "vrl-cli")]
                         SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),
                     };

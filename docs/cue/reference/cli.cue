@@ -13,6 +13,49 @@ _default_flags: {
 	}
 }
 
+_config_options: {
+	"config": {
+		_short: "c"
+		description: """
+			Read configuration from one or more files. Wildcard paths are
+			supported. If zero files are specified the default config path
+			`/etc/vector/vector.toml` will be targeted.
+			TOML, YAML and JSON file formats are supported.
+			The format to interpret the file with is determined from
+			the file extension (.toml, .yaml, .json).
+			We will fallback to TOML if we are unable to detect
+			a supported format.
+			"""
+		type:    "string"
+		default: "/etc/vector/vector.toml"
+		env_var: "VECTOR_CONFIG"
+	}
+	"config-toml": {
+		description: """
+			Read configuration from one or more files. Wildcard paths are
+			supported. TOML file format is assumed.
+			"""
+		type:    "string"
+		env_var: "VECTOR_CONFIG_TOML"
+	}
+	"config-json": {
+		description: """
+			Read configuration from one or more files. Wildcard paths are
+			supported. JSON file format is assumed.
+			"""
+		type:    "string"
+		env_var: "VECTOR_CONFIG_JSON"
+	}
+	"config-yaml": {
+		description: """
+			Read configuration from one or more files. Wildcard paths are
+			supported. YAML file format is assumed.
+			"""
+		type:    "string"
+		env_var: "VECTOR_CONFIG_YAML"
+	}
+}
+
 cli: {
 	#Args: [Arg=string]: {
 		description: !=""
@@ -116,7 +159,7 @@ cli: {
 		}
 	}
 
-	options: {
+	options: _config_options & {
 		"color": {
 			description: "Control when ANSI terminal formatting is used."
 			default:     "auto"
@@ -126,46 +169,6 @@ cli: {
 				never:  "Disable ANSI terminal formatting."
 			}
 			env_var: "VECTOR_COLOR"
-		}
-		"config": {
-			_short: "c"
-			description: """
-				Read configuration from one or more files. Wildcard paths are
-				supported. If zero files are specified the default config path
-				`/etc/vector/vector.toml` will be targeted.
-				TOML, YAML and JSON file formats are supported.
-				The format to interpret the file with is determined from
-				the file extension (`.toml`, `.yaml`, `.json`).
-				We will fallback to TOML if we are unable to detect
-				a supported format.
-				"""
-			type:    "string"
-			default: "/etc/vector/vector.toml"
-			env_var: "VECTOR_CONFIG"
-		}
-		"config-toml": {
-			description: """
-				Read configuration from one or more files. Wildcard paths are
-				supported. TOML file format is assumed.
-				"""
-			type:    "string"
-			env_var: "VECTOR_CONFIG_TOML"
-		}
-		"config-json": {
-			description: """
-				Read configuration from one or more files. Wildcard paths are
-				supported. JSON file format is assumed.
-				"""
-			type:    "string"
-			env_var: "VECTOR_CONFIG_JSON"
-		}
-		"config-yaml": {
-			description: """
-				Read configuration from one or more files. Wildcard paths are
-				supported. YAML file format is assumed.
-				"""
-			type:    "string"
-			env_var: "VECTOR_CONFIG_YAML"
 		}
 		"threads": {
 			_short: "t"
@@ -188,6 +191,22 @@ cli: {
 	}
 
 	commands: {
+		"graph": {
+			description: """
+				Generate a visual representation of topologies. The output is in the [DOT format](\(urls.dot_format))
+				which can be rendered using [GraphViz](\(urls.graphviz)).
+
+				Example:
+
+				```
+				vector graph --config /etc/vector/vector.toml | dot -Tsvg > graph.svg
+				```
+
+				You can also visualize the output online at [webgraphviz.com](http://www.webgraphviz.com/).
+				"""
+
+			options: _config_options
+		}
 		"generate": {
 			description: "Generate a Vector configuration containing a list of components"
 
