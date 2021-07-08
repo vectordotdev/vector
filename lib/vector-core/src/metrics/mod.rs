@@ -115,11 +115,11 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Metric> 
         metrics.push(Metric::from_metric_kv(key, handle.get_inner()));
     });
 
-    // Add alias `metrics_processed_total` for `metrics_out_total`.
+    // Add alias `events_processed_total` for `events_out_total`.
     for i in 0..metrics.len() {
         let metric = &metrics[i];
-        if metric.name() == "metrics_out_total" {
-            let alias = metric.clone().with_name("processed_metrics_total");
+        if metric.name() == "events_out_total" {
+            let alias = metric.clone().with_name("processed_events_total");
             metrics.push(alias.into());
         }
     }
