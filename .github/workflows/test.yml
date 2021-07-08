@@ -39,6 +39,7 @@ jobs:
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
+        docs: ${{ steps.filter.outputs.docs }}
       steps:
       - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2
@@ -60,6 +61,8 @@ jobs:
               - "Cargo.toml"
               - "Makefile"
               - "rust-toolchain"
+            docs:
+              - 'docs/**'
             deny:
               - 'deny.toml'
             dependencies:
@@ -308,6 +311,7 @@ jobs:
     runs-on: ubuntu-20.04
     container: timberio/ci_image
     needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.3.4
         with:
