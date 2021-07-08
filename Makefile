@@ -188,11 +188,11 @@ build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector
 	@echo "Output to ${<}"
 
 .PHONY: build-x86_64-unknown-linux-musl
-build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector ## Build a release binary for the x86_64-unknown-linux-musl triple.
 	@echo "Output to ${<}"
 
 .PHONY: build-aarch64-unknown-linux-musl
-build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-musl triple.
 	@echo "Output to ${<}"
 
 .PHONY: build-armv7-unknown-linux-gnueabihf
@@ -305,7 +305,7 @@ test-integration: test-integration-aws test-integration-azure test-integration-c
 test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-splunk test-integration-dnstap
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -513,6 +513,18 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh pulsar stop
 endif
 
+.PHONY: test-integration-redis
+test-integration-redis: ## Runs Redis integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh redis stop
+	@scripts/setup_integration_env.sh redis start
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features redis-integration-tests --lib ::redis:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh redis stop
+endif
+
 .PHONY: test-integration-splunk
 test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -636,7 +648,7 @@ check: ## Run prerequisite code checks
 
 .PHONY: check-all
 check-all: ## Check everything
-check-all: check-fmt check-clippy check-style check-markdown check-docs
+check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts
 check-all: check-helm-lint check-helm-dependencies check-helm-snapshots

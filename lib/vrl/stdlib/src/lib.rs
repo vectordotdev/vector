@@ -44,6 +44,8 @@ mod flatten;
 mod float;
 #[cfg(feature = "floor")]
 mod floor;
+#[cfg(feature = "format_int")]
+mod format_int;
 #[cfg(feature = "format_number")]
 mod format_number;
 #[cfg(feature = "format_timestamp")]
@@ -136,6 +138,8 @@ mod parse_duration;
 mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
+#[cfg(feature = "parse_int")]
+mod parse_int;
 #[cfg(feature = "parse_json")]
 mod parse_json;
 #[cfg(feature = "parse_key_value")]
@@ -273,6 +277,8 @@ pub use flatten::Flatten;
 pub use float::Float;
 #[cfg(feature = "floor")]
 pub use floor::Floor;
+#[cfg(feature = "format_int")]
+pub use format_int::FormatInt;
 #[cfg(feature = "format_number")]
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
@@ -353,6 +359,8 @@ pub use parse_duration::ParseDuration;
 pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::ParseGrok;
+#[cfg(feature = "parse_int")]
+pub use parse_int::ParseInt;
 #[cfg(feature = "parse_json")]
 pub use parse_json::ParseJson;
 #[cfg(feature = "parse_key_value")]
@@ -486,6 +494,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Float),
         #[cfg(feature = "floor")]
         Box::new(Floor),
+        #[cfg(feature = "format_int")]
+        Box::new(FormatInt),
         #[cfg(feature = "format_number")]
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
@@ -568,6 +578,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseGlog),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
+        #[cfg(feature = "parse_int")]
+        Box::new(ParseInt),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
         #[cfg(feature = "parse_apache_log")]
