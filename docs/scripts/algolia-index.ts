@@ -36,7 +36,6 @@ type AlgoliaRecord = {
 const algoliaIndexName = process.env.ALGOLIA_INDEX_NAME || "";
 
 const DEBUG = process.env.DEBUG === "true" || false;
-
 const algoliaBatchSize = 100;
 const publicPath = path.resolve(__dirname, "..", "public");
 const tagHierarchy = {
@@ -224,12 +223,17 @@ async function indexHTMLFiles(
 }
 
 async function buildIndex() {
-  const algolia = algoliasearch(
-    process.env.ALGOLIA_APP_ID || "",
-    process.env.ALGOLIA_ADMIN_KEY || ""
-  );
+  const appId = process.env.ALGOLIA_APP_ID || "";
+  const adminPublicKey = process.env.ALGOLIA_ADMIN_KEY || "";
+
+  console.log(`Building Vector search index`);
+
+  const algolia = algoliasearch(appId, adminPublicKey);
 
   let algoliaIndex: SearchIndex | null = null;
+
+  console.log(`Initializing index ${algoliaIndexName}`);
+  algoliaIndex = algolia.initIndex(algoliaIndexName);
 
   let files = await glob(`${publicPath}/docs/about/**/**.html`);
   console.log(chalk.blue("Indexing docs/about..."));
