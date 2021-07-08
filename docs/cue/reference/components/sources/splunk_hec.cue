@@ -88,9 +88,12 @@ components: sources: splunk_hec: {
 			description: "If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client would if it was communicating with the Splunk HEC endpoint directly. If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated."
 			required:    false
 			warnings: []
-			type: array: items: type: string: {
-				examples: ["A94A8FE5CCB19BA61C4C08"]
-				syntax: "literal"
+			type: array: {
+				default: null
+				items: type: string: {
+					examples: ["A94A8FE5CCB19BA61C4C08"]
+					syntax: "literal"
+				}
 			}
 		}
 	}
