@@ -8,6 +8,8 @@ import glob from "glob-promise";
 import chunk from "lodash.chunk";
 import path from "path";
 
+dotEnv.config();
+
 type Payload = {
   level: number;
   domId?: string;
@@ -27,9 +29,10 @@ type AlgoliaRecord = {
   content: string;
 };
 
-const algoliaIndexName = process.env.ALGOLIA_INDEX_NAME;
+// @ts-ignore
+const algoliaIndexName = process.env.ALGOLIA_INDEX_NAME || "";
 const algoliaBatchSize = 100;
-const publicPath = path.resolve(__dirname, "../..", "public");
+const publicPath = path.resolve(__dirname, "..", "public");
 const tagHierarchy = {
   h1: 6,
   h2: 5,
@@ -69,15 +72,15 @@ async function indexHTMLFiles(
     const html = fs.readFileSync(file, "utf-8");
     const $ = cheerio.load(html);
     const containers = $(".algolia-container");
+    // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
+    // @ts-ignore
     $(".highlight").each((_, d) => $(d).remove());
     const payload: Payload = [];
     const traverse = (node?: Element) => {
       if (!node) {
         return;
       }
-
-      console.log(node.tagName);
 
       const level = tagHierarchy[node.tagName];
 
@@ -205,48 +208,44 @@ async function indexHTMLFiles(
 }
 
 async function buildIndex() {
-  dotEnv.config();
-
-  const DEBUG = false;
-
   const algolia = algoliasearch(
     process.env.ALGOLIA_APP_ID || "",
-    process.env.ALGOLIA_ADMIN_KEY
+    process.env.ALGOLIA_ADMIN_KEY || ""
   );
 
   let algoliaIndex: SearchIndex | null = null;
 
-  if (!DEBUG) {
-    algoliaIndex = algolia.initIndex(algoliaIndexName);
-
-    const exists = await algoliaIndex.exists();
-
-    if (!exists) {
-      console.error(`Index "${algoliaIndexName}" does not exist.`);
-      process.exit(1);
-    }
-
-    await algoliaIndex.setSettings({
-      ranking: [
-        "typo",
-        "geo",
-        "words",
-        "filters",
-        "proximity",
-        "attribute",
-        "exact",
-        "custom",
-      ],
-      customRanking: ["desc(level)", "desc(ranking)"],
-      searchableAttributes: ["title", "content", "unordered(tags)"],
-      attributesToSnippet: ["title:10", "content:10"],
-      snippetEllipsisText: "…",
-    });
-  }
-
   let files = await glob(`${publicPath}/docs/about/**/**.html`);
   console.log(chalk.blue("Indexing docs/about..."));
   await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+
+  files = await glob(`${publicPath}/docs/administration/**/**.html`);
+  console.log(chalk.blue("Indexing docs/administration..."));
+  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+
+  files = await glob(`${publicPath}/docs/setup/**/**.html`);
+  console.log(chalk.blue("Indexing docs/setup..."));
+  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+
+  files = await glob(`${publicPath}/docs/meta/glossary/**/**.html`);
+  console.log(chalk.blue("Indexing docs/meta/glossary..."));
+  await indexHTMLFiles(algoliaIndex, "Docs", files, 30);
+
+  files = await glob(`${publicPath}/guides/advanced/**/**.html`);
+  console.log(chalk.blue("Indexing guides/advanced..."));
+  await indexHTMLFiles(algoliaIndex, "Advanced Guides", files, 40);
+
+  files = await glob(`${publicPath}/guides/getting-started/**/**.html`);
+  console.log(chalk.blue("Indexing guides/getting-started..."));
+  await indexHTMLFiles(algoliaIndex, "Getting Started Guides", files, 40);
+
+  files = await glob(`${publicPath}/guides/integrate/**/**.html`);
+  console.log(chalk.blue("Indexing guides/integrate..."));
+  await indexHTMLFiles(algoliaIndex, "Integration Guides", files, 20);
+
+  files = await glob(`${publicPath}/reference/components/**/**.html`);
+  console.log(chalk.blue("Indexing reference/components..."));
+  await indexHTMLFiles(algoliaIndex, "Components", files, 50);
 }
 
 buildIndex().catch((err) => {
