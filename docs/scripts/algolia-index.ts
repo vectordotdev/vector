@@ -69,8 +69,8 @@ async function indexHTMLFiles(
     const html = fs.readFileSync(file, "utf-8");
     const $ = cheerio.load(html);
     const containers = $(".algolia-container");
-    //$(".algolia-no-index").each((_, d) => $(d).remove());
-    //$(".highlight").each((_, d) => $(d).remove());
+    $(".algolia-no-index").each((_, d) => $(d).remove());
+    $(".highlight").each((_, d) => $(d).remove());
     const payload: Payload = [];
     const traverse = (node?: Element) => {
       if (!node) {
