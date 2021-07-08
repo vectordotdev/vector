@@ -1,4 +1,6 @@
 use crate::grammar::{unescape, DEFAULT_FIELD};
+use std::collections::BTreeMap;
+use vrl::Value;
 
 use regex::Regex;
 
@@ -320,6 +322,15 @@ impl QueryNode {
             output.push(c);
         }
         output
+    }
+
+    /// Returns `true` if a node matches against a VRL object.
+    pub fn matches_vrl_object(&self, obj: BTreeMap<String, Value>) -> bool {
+        match self {
+            Self::MatchAllDocs => true,
+            Self::MatchNoDocs => false,
+            _ => false,
+        }
     }
 
     fn quoted_escape(input: &str) -> String {

@@ -106,6 +106,8 @@ mod r#match;
 mod match_any;
 #[cfg(feature = "match_array")]
 mod match_array;
+#[cfg(feature = "match_datadog_query")]
+mod match_datadog_query;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -540,6 +542,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(MatchAny),
         #[cfg(feature = "match_array")]
         Box::new(MatchArray),
+        #[cfg(feature = "match_datadog_query")]
+            Box::new()
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
