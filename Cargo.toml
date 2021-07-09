@@ -166,7 +166,7 @@ rmpv = { version = "0.4.7", default-features = false, features = ["with-serde"],
 
 # Prost
 prost = { version = "0.7.0", default-features = false, features = ["std"]  }
-prost-types = { version = "0.7.0", default-features = false }
+prost-types = { version = "0.8.0", default-features = false }
 
 # GCP
 goauth = { version = "0.10.0", default-features = false, optional = true }
