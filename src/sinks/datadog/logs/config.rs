@@ -1,4 +1,4 @@
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
+use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
 use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service;
@@ -35,6 +35,11 @@ pub struct DatadogLogsConfig {
     )]
     pub(crate) encoding: EncodingConfigWithDefault<Encoding>,
     tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    proxy: ProxyConfig,
 
     #[serde(default)]
     compression: Option<Compression>,
@@ -116,8 +121,9 @@ impl DatadogLogsConfig {
             &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
             false,
         )?;
+        let proxy = cx.globals.proxy.build(&self.proxy);
 
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, proxy)?;
         let healthcheck = healthcheck(
             service.clone(),
             client.clone(),
