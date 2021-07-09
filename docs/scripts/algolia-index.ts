@@ -248,10 +248,11 @@ async function buildIndex() {
   let r6 = await indexHTMLFiles(algoliaIndex, "Level up guides", files, 40);
   allRecords.push(...r6);
 
-  console.log(chalk.blue(`Writing final index JSON to ${targetFile}`));
+  console.log(chalk.green(`Success. ${allRecords.length} records have been successfully indexed.`));
+  console.log(chalk.blue(`Writing final index JSON to ${targetFile}...`));
 
   fs.writeFile(targetFile, JSON.stringify(allRecords), () => {
-    console.log(chalk.blue(`Finished writing final index JSOn to ${targetFile}`));
+    console.log(chalk.green(`Success. Wrote final index JSON to ${targetFile}.`));
   });
 }
 
