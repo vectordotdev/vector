@@ -1,6 +1,7 @@
 ---
 date: "2021-07-13"
 title: "Introduction of `customConfig` and deprecation notice for TOML based config keys"
+short: "Introduction of `customConfig`"
 description: "Configure Vector directly through your `values.yaml` without having to converting to TOML"
 authors: ["spencergilbert"]
 pr_numbers: [8079]
@@ -12,14 +13,20 @@ badges:
   domains: ["config"]
 ---
 
-...
+With the release of Vector 0.15.0, we have introduced a new method of configuring Vector through Helm.
+This new method uses YAML configuration files, and in a coming release will become the default configuration
+method.
 
 ## Upgrade Guide
 
-We've configured the ConfigMap template to `fail` if the deprecated keys are
-enabled at the same time as the new YAML based configurations. The following
-values can be used to disable the old deprecated keys and use the new YAML
-based configuration with default values.
+Those using the `sources`, `transforms`, and `sinks` keys are already YAML (excluding any usage of `rawConfig`)
+and only need to be moved under the new `customConfig` and properly indented. For configurations taking advantage
+of the named keys (`kubernetesLogsSource`, `vectorSink`, etc), users can reference the the YAML configuration
+provided in the `values.yaml`.
+
+We've configured the ConfigMap template to `fail` if the deprecated keys are enabled at the same time
+as the new YAML based configurations. The following values can be used to disable the old deprecated
+keys and use the new YAML based configuration with default values.
 
 ```yaml title="disable-deprecated.yaml"
 globalOptions:
@@ -42,10 +49,9 @@ prometheusSink:
   enabled: false
 ```
 
-With the deprecated keys disabled, custom Vector configuration can be provided
-in raw YAML and is passed through the `tpl` function to allow templating.
-
-Below is an example of values using `customConfig` and templating.
+With the deprecated keys disabled, a custom Vector configuration can be provided in raw YAML and is passed
+through a `tpl` function to allow for the evaluation of Helm templates contained within. Below is an example
+of values using `customConfig` and templating.
 
 ```yaml title="cusomConfig.yaml"
 customConfig:
