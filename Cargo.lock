@@ -1811,16 +1811,10 @@ version = "0.1.0"
 dependencies = [
  "itertools 0.10.1",
  "lazy_static",
- "lookup",
  "ordered-float",
  "pest",
  "pest_derive",
  "regex",
- "vrl",
- "vrl-compiler",
- "vrl-diagnostic",
- "vrl-parser",
- "vrl-stdlib",
 ]
 
 [[package]]
@@ -8514,6 +8508,7 @@ dependencies = [
  "cidr-utils",
  "criterion",
  "csv",
+ "datadog-search-syntax",
  "grok",
  "hex",
  "hostname",

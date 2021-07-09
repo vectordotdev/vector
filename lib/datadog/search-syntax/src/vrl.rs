@@ -243,19 +243,6 @@ fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
 /// in order to accommodate expansion to multiple fields where relevant.
 fn parse_node(node: &QueryNode) -> Vec<ast::Expr> {
     match node {
-        // Match everything.
-        QueryNode::MatchAllDocs => vec![make_bool(true)],
-        // Matching nothing.
-        QueryNode::MatchNoDocs => vec![make_bool(false)],
-        // Field existence.
-        QueryNode::AttributeExists { attr } => make_queries(attr)
-            .into_iter()
-            .map(|(_, query)| make_function_call("exists", vec![query]))
-            .collect(),
-        QueryNode::AttributeMissing { attr } => make_queries(attr)
-            .into_iter()
-            .map(|(_, query)| make_not(make_function_call("exists", vec![query])))
-            .collect(),
         // Equality.
         QueryNode::AttributeTerm { attr, value }
         | QueryNode::QuotedAttribute {
