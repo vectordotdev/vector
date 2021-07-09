@@ -7,6 +7,7 @@ import fs from "fs";
 import glob from "glob-promise";
 import chunk from "lodash.chunk";
 import path from "path";
+import { title } from "process";
 
 dotEnv.config();
 
@@ -22,6 +23,7 @@ type AlgoliaRecord = {
   objectID: string;
   pageUrl: string;
   itemUrl: string;
+  pageTitle: string;
   level: number;
   title: string;
   tags: string[];
@@ -78,7 +80,9 @@ async function indexHTMLFiles(
   for (const file of files) {
     const html = fs.readFileSync(file, "utf-8");
     const $ = cheerio.load(html);
-    const containers = $(".algolia-container");
+    const containers = $("main");
+    const pageTitle = $("title").text();
+
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
     // @ts-ignore
@@ -122,6 +126,7 @@ async function indexHTMLFiles(
           objectID: itemUrl,
           pageUrl,
           itemUrl,
+          pageTitle: pageTitle,
           level: item.level,
           title: item.content,
           section,
@@ -142,6 +147,7 @@ async function indexHTMLFiles(
           objectID: itemUrl,
           pageUrl,
           itemUrl,
+          pageTitle: pageTitle,
           level: item.level,
           title: item.content,
           section,
@@ -159,6 +165,7 @@ async function indexHTMLFiles(
           objectID: itemUrl,
           pageUrl,
           itemUrl,
+          pageTitle: pageTitle,
           level: item.level,
           title: item.content,
           section,
