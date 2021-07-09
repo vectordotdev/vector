@@ -23,7 +23,6 @@
     "@types/topojson-specification": "^1.0.1",
     "algoliasearch": "^4.10.3",
     "alpinejs": "^2.8.2",
-    "atomic-algolia": "^0.3.19",
     "autoprefixer": "^10.2.5",
     "babel-preset-next": "^1.4.0",
     "chalk": "^4.1.1",

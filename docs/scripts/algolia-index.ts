@@ -259,15 +259,11 @@ async function buildIndex() {
   console.log(chalk.blue("Indexing guides/getting-started..."));
   await indexHTMLFiles(algoliaIndex, "Getting Started Guides", files, 40);
 
-  files = await glob(`${publicPath}/guides/integrate/**/**.html`);
-  console.log(chalk.blue("Indexing guides/integrate..."));
-  await indexHTMLFiles(algoliaIndex, "Integration Guides", files, 20);
-
-  files = await glob(`${publicPath}/reference/components/**/**.html`);
-  console.log(chalk.blue("Indexing reference/components..."));
-  await indexHTMLFiles(algoliaIndex, "Components", files, 50);
+  files = await glob(`${publicPath}/docs/reference/configuration/**/**.html`);
+  console.log(chalk.blue("Indexing Vector components..."));
+  await indexHTMLFiles(algoliaIndex, "Configuration", files, 50);
 }
 
 buildIndex().catch((err) => {
-  console.trace(err);
+  console.trace(chalk.yellow(err));
 });
