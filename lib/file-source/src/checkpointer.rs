@@ -1,4 +1,7 @@
-use super::{fingerprinter::FileFingerprint, FilePosition};
+use super::{
+    fingerprinter::{FileFingerprint, Fingerprinter},
+    FilePosition,
+};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use glob::glob;
@@ -80,12 +83,6 @@ impl CheckpointsView {
         }
     }
 
-    pub fn contains_bytes_checksums(&self) -> bool {
-        self.checkpoints
-            .iter()
-            .any(|entry| matches!(entry.key(), FileFingerprint::BytesChecksum(_)))
-    }
-
     pub fn remove_expired(&self) {
         let now = Utc::now();
 
@@ -108,6 +105,12 @@ impl CheckpointsView {
             self.modified_times.remove(&fng);
             self.removed_times.remove(&fng);
         }
+    }
+
+    pub fn contains_bytes_checksums(&self) -> bool {
+        self.checkpoints
+            .iter()
+            .any(|entry| matches!(entry.key(), FileFingerprint::BytesChecksum(_)))
     }
 
     fn load(&self, checkpoint: Checkpoint) {
@@ -154,13 +157,32 @@ impl CheckpointsView {
         }
     }
 
-    fn maybe_upgrade(&self, fresh: impl Iterator<Item = FileFingerprint>) {
-        for fng in fresh {
-            if let Some((_, pos)) = self
-                .checkpoints
-                .remove(&FileFingerprint::Unknown(fng.as_legacy()))
+    fn maybe_upgrade(
+        &self,
+        path: &Path,
+        fng: FileFingerprint,
+        fingerprinter: &Fingerprinter,
+        fingerprint_buffer: &mut Vec<u8>,
+    ) {
+        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(&path, fingerprint_buffer)
+        {
+            self.update_key(old_checksum, fng)
+        }
+
+        if let Some((_, pos)) = self
+            .checkpoints
+            .remove(&FileFingerprint::Unknown(fng.as_legacy()))
+        {
+            self.update(fng, pos);
+        }
+
+        if self.checkpoints.get(&fng).is_none() {
+            if let Ok(Some(fingerprint)) =
+                fingerprinter.get_legacy_checksum(&path, fingerprint_buffer)
             {
-                self.update(fng, pos);
+                if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
+                    self.update(fng, pos);
+                }
             }
         }
     }
@@ -247,11 +269,17 @@ impl Checkpointer {
         self.checkpoints.get(fng)
     }
 
-    /// Scan through a given list of fresh fingerprints (i.e. not legacy
-    /// Unknown) to see if any match an existing legacy fingerprint. If so,
-    /// upgrade the existing fingerprint.
-    pub fn maybe_upgrade(&mut self, fresh: impl Iterator<Item = FileFingerprint>) {
-        self.checkpoints.maybe_upgrade(fresh)
+    /// Scan through a given list of fresh fingerprints to see if any match an existing legacy
+    /// fingerprint. If so, upgrade the existing fingerprint.
+    pub fn maybe_upgrade(
+        &mut self,
+        path: &Path,
+        fresh: FileFingerprint,
+        fingerprinter: &Fingerprinter,
+        fingerprint_buffer: &mut Vec<u8>,
+    ) {
+        self.checkpoints
+            .maybe_upgrade(path, fresh, fingerprinter, fingerprint_buffer)
     }
 
     /// Persist the current checkpoints state to disk, making our best effort to
@@ -380,6 +408,7 @@ impl Checkpointer {
 #[cfg(test)]
 mod test {
     use super::{
+        super::{FingerprintStrategy, Fingerprinter},
         Checkpoint, Checkpointer, FileFingerprint, FilePosition, STABLE_FILE_NAME, TMP_FILE_NAME,
     };
     use chrono::{Duration, Utc};
@@ -484,9 +513,21 @@ mod test {
 
     #[test]
     fn test_checkpointer_fingerprint_upgrades() {
+        let log_dir = tempdir().unwrap();
+        let path = log_dir.path().join("test.log");
+        let data = "hello\n";
+        std::fs::write(&path, data).unwrap();
+
         let new_fingerprint = FileFingerprint::DevInode(1, 2);
         let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.as_legacy());
         let position: FilePosition = 1234;
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::DevInode,
+            max_line_length: 1000,
+            ignore_not_found: false,
+        };
+
+        let mut buf = Vec::new();
 
         let data_dir = tempdir().unwrap();
         {
@@ -500,7 +541,48 @@ mod test {
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
-            chkptr.maybe_upgrade(std::iter::once(new_fingerprint));
+            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf);
+
+            assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
+            assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
+        }
+    }
+
+    #[test]
+    fn test_checkpointer_fingerprint_upgrades_legacy_checksum() {
+        let log_dir = tempdir().unwrap();
+        let path = log_dir.path().join("test.log");
+        let data = "hello\n";
+        std::fs::write(&path, data).unwrap();
+
+        let old_fingerprint = FileFingerprint::FirstLinesChecksum(18057733963141331840);
+        let new_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
+        let position: FilePosition = 6;
+
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            max_line_length: 1000,
+            ignore_not_found: false,
+        };
+
+        let mut buf = Vec::new();
+
+        let data_dir = tempdir().unwrap();
+        {
+            let mut chkptr = Checkpointer::new(&data_dir.path());
+            chkptr.update_checkpoint(old_fingerprint, position);
+            assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
+            chkptr.write_checkpoints().ok();
+        }
+        {
+            let mut chkptr = Checkpointer::new(&data_dir.path());
+            chkptr.read_checkpoints(None);
+            assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
+
+            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf);
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
@@ -630,7 +712,7 @@ mod test {
 
         assert!(chkptr.checkpoints.contains_bytes_checksums());
 
-        chkptr.checkpoints.update_key(old, new);
+        chkptr.maybe_upgrade(&log_path, new, &fingerprinter, &mut buf);
 
         assert!(!chkptr.checkpoints.contains_bytes_checksums());
         assert_eq!(Some(1234), chkptr.get_checkpoint(new));
