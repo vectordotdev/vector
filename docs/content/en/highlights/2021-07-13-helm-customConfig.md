@@ -54,7 +54,7 @@ into the `customConfig` key and converted into snake-case.
 
 ### vectorApi
 
-[Vector API](https://vector.dev/docs/reference/api/) configuration can be moved as is under a `customConfig.api` key.
+[Vector API](https://vector.dev/docs/reference/api/) options can be moved as is under a `customConfig.api` key.
 The `extraContainerPorts` or `service` key should be used to expose the port configured in `customConfig`.
 
 ```diff title="values.yaml"
