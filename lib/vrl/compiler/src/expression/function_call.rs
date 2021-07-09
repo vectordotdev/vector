@@ -214,7 +214,7 @@ impl Expression for FunctionCall {
                     mut labels,
                     notes,
                 } => {
-                    labels.push(Label::primary("function call error", self.span));
+                    labels.push(Label::primary(message.clone(), self.span));
 
                     ExpressionError::Error {
                         message: format!(
