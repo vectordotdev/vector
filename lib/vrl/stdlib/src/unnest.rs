@@ -113,16 +113,29 @@ impl Expression for UnnestFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        match state.target_type_def() {
-            Some(root_type_def) => {
-                invert_array_at_path(root_type_def, &self.path.path()).fallible()
+        use expression::Target;
+
+        match self.path.target() {
+            Target::External => match state.target_type_def() {
+                Some(root_type_def) => {
+                    invert_array_at_path(root_type_def, &self.path.path()).fallible()
+                }
+                None => self
+                    .path
+                    .type_def(state)
+                    .fallible_unless(Kind::Object)
+                    .restrict_array()
+                    .add_null(),
+            },
+            Target::Internal(v) => {
+                invert_array_at_path(&v.type_def(state), &self.path.path()).fallible()
             }
-            None => self
-                .path
-                .type_def(state)
-                .fallible_unless(Kind::Object)
-                .restrict_array()
-                .add_null(),
+            Target::FunctionCall(f) => {
+                invert_array_at_path(&f.type_def(state), &self.path.path()).fallible()
+            }
+            Target::Container(c) => {
+                invert_array_at_path(&c.type_def(state), &self.path.path()).fallible()
+            }
         }
     }
 }
