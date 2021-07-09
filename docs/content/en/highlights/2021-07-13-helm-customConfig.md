@@ -17,37 +17,230 @@ With the release of Vector 0.15.0, we have introduced a new method of configurin
 This new method uses YAML configuration files, and in a coming release will become the default configuration
 method.
 
+**You do not need to upgrade immediately. The deprecated keys will not be removed before Vector hits 1.0**
+
 ## Upgrade Guide
 
-Those using the `sources`, `transforms`, and `sinks` keys are already YAML (excluding any usage of `rawConfig`)
-and only need to be moved under the new `customConfig` and properly indented. For configurations taking advantage
-of the named keys (`kubernetesLogsSource`, `vectorSink`, etc), users can reference the the YAML configuration
-provided in the `values.yaml`.
+### globalOptions and logSchema
+
+Any [global options](https://vector.dev/docs/reference/configuration/global-options/) can be moved directly
+into the `customConfig` key and converted into snake-case.
+
+```diff title="values.yaml"
+   globalOptions:
++    enabled: false
+     dataDir: "/vector-data-dir"
+   logSchema:
++    enabled: false
+     hostKey: "host"
+     messageKey: "message"
+     sourceTypeKey: "source_type"
+     timestampKey: "timestamp"
+   ...
++  customConfig:
++    data_dir: "/vector-data-dir"
++    log_schema:
++      host_key: host
++      message_key: message
++      source_type_key: source_type
++      timestamp_key: timestamp
++  ...
+```
+
+### vectorApi
+
+[Vector API](https://vector.dev/docs/reference/api/) configuration can be moved as is under a `customConfig.api` key.
+The `extraContainerPorts` or `service` key should be used to expose the port configured in `customConfig`.
+
+```diff title="values.yaml"
+   vectorApi:
++    enabled: false
+     address: "0.0.0.0:8686"
+     playground: true
+   ...
++  customConfig:
++    ...
++    api:
++      enabled: true
++      address: 127.0.0.1:8686
++      playground: true
++    ...
+```
+
+### kubernetesLogsSource
+
+The vector-agent chart will continue to mount the hostPaths required to access Pod logs.
+
+```diff title="values.yaml"
+   kubernetesLogsSource:
++    enabled: false
+     sourceId: kubernetes_logs
+     config: {}
+     rawConfig: null
+   ...
++  customConfig:
++    ...
++    sources:
++      ...
++      kubernetes_logs:
++        type: kubernetes_logs
++    ...
+```
+
+### vectorSource
+
+The `extraContainerPorts` or `service` key should be used to expose the port configured in `customConfig`.
+
+```diff title="values.yaml"
+   vectorSource:
++    enabled: false
+     sourceId: vector
+     listenAddress: "0.0.0.0"
+     listenPort: "9000"
+     config: {}
+     nodePort: null
+     rawConfig: null
+   ...
++  customConfig:
++    ...
++    sources:
++      ...
++      vector:
++        type: vector
++        address: 0.0.0.0:9000
++    ...
+```
+
+### vectorSink
+
+```diff title="values.yaml"
+   vectorSink:
++    enabled: false
+     sinkId: vector_sink
+     inputs: ["kubernetes_logs"]
+     host: vector
+     port: "9000"
+     config: {}
+     rawConfig: null
+   ...
++  customConfig:
++    ...
++    sinks:
++      ...
++      vector_sink:
++        type: vector
++        inputs: ["kubernetes_logs"]
++        address: vector:9000
++    ...
+```
+
+### internalMetricsSource
+
+```diff title="values.yaml"
+   internalMetricsSource:
++    enabled: false
+     sourceId: internal_metrics
+     config: {}
+     rawConfig: null
+   ...
++  customConfig:
++    ...
++    sources:
++      ...
++      internal_metrics:
++        type: internal_metrics
++    ...
+```
+
+### hostMetricsSource
+
+Users should set the PROCFS_ROOT and SYSFS_ROOT environment variables, as well as mounting the
+required hostPaths.
+
+```diff title="values.yaml"
+   hostMetricsSource:
++    enabled: false
+     sourceId: host_metrics
+     config:
+       filesystem:
+         devices:
+           excludes: [binfmt_misc]
+         filesystems:
+           excludes: [binfmt_misc]
+         mountpoints:
+           excludes: ["*/proc/sys/fs/binfmt_misc"]
+     rawConfig: null
+   ...
++  customConfig:
++    ...
++    sources:
++      ...
++      host_metrics:
++        type: host_metrics
++        filesystem:
++          devices:
++            excludes: ["binfmt_misc"]
++          filesystems:
++            excludes: ["binfmt_misc"]
++          mountPoints:
++            excludes: ["*/proc/sys/fs/binfmt_misc"]
++  env:
++    - name: PROCFS_ROOT
++      value: /host/proc
++    - name: SYSFS_ROOT
++      value: /host/sys
++  extraVolumeMounts:
++    - name: procfs
++      mountPath: /host/proc
++      readOnly: true
++    - name: sysfs
++      mountPath: /host/sys
++      readOnly: true
++  extraVolumes:
++    - name: procfs
++      hostPath:
++        path: /proc
++    - name: sysfs
++      hostPath:
++        path: /sys
++    ...
+```
+
+### prometheusSink
+
+The `extraContainerPorts` or `service` key should be used to expose the port configured in `customConfig`.
+
+The `prometheusSink.podMonitor` key has been moved to a top level key and can be accessed directly at
+`podMonitor`. The `addPodAnnotations` option has been removed in favor setting the required annotations
+with the `podAnnotations` key.
+
+```diff title="values.yaml"
+   prometheusSink:
++    enabled: false
+     sinkId: prometheus_sink
+     inputs: []
+     excludeInternalMetrics: false
+     listenAddress: "0.0.0.0"
+     listenPort: "9090"
+     config: {}
+     rawConfig: null
+   ...
++  customConfig:
++    ...
++    sinks:
++      ...
++      prometheus_sink:
++        type: prometheus_exporter
++        inputs: ["host_metrics", "internal_metrics"]
++        address: 0.0.0.0:9090
++    ...
+```
+
+## Using `customConfig`
 
 We've configured the ConfigMap template to `fail` if the deprecated keys are enabled at the same time
 as the new YAML based configurations. The following values can be used to disable the old deprecated
 keys and use the new YAML based configuration with default values.
-
-```yaml title="disable-deprecated.yaml"
-globalOptions:
-  enabled: false
-logSchema:
-  enabled: false
-vectorApi:
-  enabled: false
-kubernetesLogsSource:
-  enabled: false
-vectorSource:
-  enabled: false
-vectorSink:
-  enabled: false
-internalMetricsSource:
-  enabled: false
-hostMetricsSource:
-  enabled: false
-prometheusSink:
-  enabled: false
-```
 
 With the deprecated keys disabled, a custom Vector configuration can be provided in raw YAML and is passed
 through a `tpl` function to allow for the evaluation of Helm templates contained within. Below is an example
@@ -61,7 +254,7 @@ customConfig:
     require_healthy: false
   api:
     enabled: true
-    address: "127.0.0.1:{{ with index .Values.service.ports 0 }}{{ .port }}{{ end }}"
+    address: "0.0.0.0:{{ with index .Values.service.ports 0 }}{{ .port }}{{ end }}"
     playground: false
   sources:
     internal_logs:
