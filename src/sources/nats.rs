@@ -86,14 +86,12 @@ fn get_subscription_stream(
     subscription: async_nats::Subscription,
 ) -> impl Stream<Item = async_nats::Message> {
     stream::unfold(subscription, |subscription| async move {
-        match subscription.next().await {
-            Some(msg) => Some((msg, subscription)),
-            None => None,
-        }
+        subscription.next().await.map(|msg| (msg, subscription))
     })
 }
 
 async fn nats_source(
+    // Take ownership of the connection so it doesn't get dropped.
     _connection: async_nats::Connection,
     subscription: async_nats::Subscription,
     shutdown: ShutdownSignal,
@@ -119,9 +117,8 @@ async fn nats_source(
         // Add source type
         log.insert(log_schema().source_type_key(), Bytes::from("nats"));
 
-        match out.send(event).await {
-            Err(error) => error!(message = "Error sending to sink.", %error),
-            Ok(_) => (),
+        if let Err(error) = out.send(event).await {
+            error!(message = "Error sending to sink.", %error)
         }
     }
     Ok(())
@@ -156,8 +153,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{collect_n, random_lines_with_stream, random_string, trace_init};
-    use std::{thread, time::Duration};
+    use crate::test_util::{collect_n, random_string};
 
     #[tokio::test]
     async fn nats_happy() {
