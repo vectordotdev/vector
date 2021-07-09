@@ -21,6 +21,11 @@ method.
 
 ## Upgrade Guide
 
+### Breaking: updated container args
+
+The argument passed to Vector has been changed to `--config-dir` which will load any TOML, YAML, or JSON
+files added to the "/etc/vector" directory.
+
 ### globalOptions and logSchema
 
 Any [global options](https://vector.dev/docs/reference/configuration/global-options/) can be moved directly
