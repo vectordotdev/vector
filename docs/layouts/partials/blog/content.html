@@ -1,3 +1,4 @@
+{{ $date := .Date | dateFormat "January 2, 2006" }}
 <div id="page-content">
   <div class="mb-4 md:mb-6">
     {{ partial "breadcrumb.html" . }}
@@ -29,5 +30,7 @@
     {{ partial "blog/authors.html" . }}
   </div>
 
-  {{ partial "content.html" . }}
+  <div class="mt-12 prose dark:prose-dark tracking-tight">
+    {{ .Content }}
+  </div>
 </div>
