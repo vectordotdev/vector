@@ -114,10 +114,9 @@ impl Expression for UnnestFn {
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         match state.target_type_def() {
-            Some(root_type_def) => root_type_def
-                .clone()
-                .invert_array_at_path(&self.path.path())
-                .fallible(),
+            Some(root_type_def) => {
+                invert_array_at_path(root_type_def, &self.path.path()).fallible()
+            }
             None => self
                 .path
                 .type_def(state)
@@ -126,6 +125,24 @@ impl Expression for UnnestFn {
                 .add_null(),
         }
     }
+}
+
+/// Assuming path points at an Array, this will take the typedefs for that array,
+/// And will remove it returning a set of it's elements.
+///
+/// For example the typedef for this object:
+/// `{ "nonk" => { "shnoog" => [ { "noog" => 2 }, { "noog" => 3 } ] } }`
+///
+/// Is converted to a typedef for this array:
+/// `[ { "nonk" => { "shnoog" => { "noog" => 2 } } },
+///    { "nonk" => { "shnoog" => { "noog" => 3 } } },
+///  ]`
+///
+pub fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
+    typedef
+        .at_path(path.clone())
+        .restrict_array()
+        .map_array(|kind| typedef.update_path(path, &kind))
 }
 
 #[cfg(test)]

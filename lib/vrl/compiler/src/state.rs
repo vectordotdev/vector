@@ -29,7 +29,6 @@ pub struct Compiler {
 
 impl Compiler {
     /// Creates a new compiler that starts with an initial given typedef.
-    /// Currently this is just being used for tests.
     pub fn new_with_type_def(type_def: TypeDef) -> Self {
         Self {
             target: Some(assignment::Details {
