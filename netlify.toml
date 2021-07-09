@@ -1,7 +1,7 @@
 [build]
 base = "docs"
 publish = "public"
-ignore = "git diff --quiet HEAD^ HEAD ./docs"
+ignore = "./scripts/build-ignore.sh"
 
 [build.environment]
 HUGO_VERSION = "0.84.0"
