@@ -62,7 +62,7 @@ The `extraContainerPorts` or `service` key should be used to expose the port con
 +    ...
 +    api:
 +      enabled: true
-+      address: 127.0.0.1:8686
++      address: 0.0.0.0:8686
 +      playground: true
 +    ...
 ```
@@ -251,7 +251,7 @@ customConfig:
   data_dir: "/custom-data-dir"
   healthchecks:
     enabled: true
-    require_healthy: false
+    require_healthy: true
   api:
     enabled: true
     address: "0.0.0.0:{{ with index .Values.service.ports 0 }}{{ .port }}{{ end }}"
