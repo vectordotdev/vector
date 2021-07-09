@@ -5,7 +5,6 @@
   "maxValuesPerFacet": 100,
   "searchableAttributes": [
     "title",
-    "pageTitle",
     "content",
     "unordered(tags)"
   ],
@@ -16,7 +15,6 @@
   "attributesForFaceting": null,
   "attributesToSnippet": [
     "title:10",
-    "pageTitle:10",
     "content:10"
   ],
   "attributesToHighlight": null,
