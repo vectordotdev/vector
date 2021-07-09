@@ -19,7 +19,7 @@ const Result = ({ hit, components }) => {
           <components.Highlight hit={hit} attribute="title" />
         </p>
         <p className="text-gray-600 text-sm">
-          <components.Snippet hit={hit} attribute="description" />
+          <components.Snippet hit={hit} attribute="content" />
         </p>
       </div>
     </a>
