@@ -791,7 +791,7 @@ mod test {
 
     #[test]
     fn inc_buffer_aggregated_summaries() {
-        let buffer = dbg!(rebuffer_aggregated_summaries::<IncrementalMetricNormalize>());
+        let buffer = rebuffer_aggregated_summaries::<IncrementalMetricNormalize>();
 
         // Since aggregated summaries cannot be added, they don't work
         // as incremental metrics and this results in an empty buffer.
