@@ -243,25 +243,21 @@ async function buildIndex() {
   console.log(chalk.blue("Indexing docs/administration..."));
   await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
 
+  files = await glob(`${publicPath}/docs/reference/**/**.html`);
+  console.log(chalk.blue("Indexing docs/reference..."));
+  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+
   files = await glob(`${publicPath}/docs/setup/**/**.html`);
   console.log(chalk.blue("Indexing docs/setup..."));
   await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
 
-  files = await glob(`${publicPath}/docs/meta/glossary/**/**.html`);
-  console.log(chalk.blue("Indexing docs/meta/glossary..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 30);
-
   files = await glob(`${publicPath}/guides/advanced/**/**.html`);
   console.log(chalk.blue("Indexing guides/advanced..."));
-  await indexHTMLFiles(algoliaIndex, "Advanced Guides", files, 40);
+  await indexHTMLFiles(algoliaIndex, "Advanced guides", files, 40);
 
-  files = await glob(`${publicPath}/guides/getting-started/**/**.html`);
-  console.log(chalk.blue("Indexing guides/getting-started..."));
-  await indexHTMLFiles(algoliaIndex, "Getting Started Guides", files, 40);
-
-  files = await glob(`${publicPath}/docs/reference/configuration/**/**.html`);
-  console.log(chalk.blue("Indexing Vector components..."));
-  await indexHTMLFiles(algoliaIndex, "Configuration", files, 50);
+  files = await glob(`${publicPath}/guides/level-up/**/**.html`);
+  console.log(chalk.blue("Indexing guides/level-up..."));
+  await indexHTMLFiles(algoliaIndex, "Level up guides", files, 40);
 }
 
 buildIndex().catch((err) => {
