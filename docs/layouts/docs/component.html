@@ -22,7 +22,7 @@
           {{ partial "hero.html" . }}
         </div>
 
-        <div class="prose dark:prose-dark tracking-tight pb-32" id="page-content">
+        <div class="algolia-container prose dark:prose-dark tracking-tight pb-32" id="page-content">
           {{ with $config.alias }}
           {{ partial "heading.html" (dict "text" "Alias" "level" 2) }}
 
