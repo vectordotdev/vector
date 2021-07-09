@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
+use shared::TimeZone;
 use vector::transforms::{
     add_fields::AddFields,
     coercer::CoercerConfig,
@@ -48,6 +49,7 @@ fn benchmark_remap(c: &mut Criterion) {
                     .copy = string!(.copy_from)
                 "#}
                 .to_string(),
+                timezone: TimeZone::default(),
                 drop_on_error: true,
                 drop_on_abort: true,
             })
@@ -109,6 +111,7 @@ fn benchmark_remap(c: &mut Criterion) {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: ".bar = parse_json!(string!(.foo))".to_owned(),
+                timezone: TimeZone::default(),
                 drop_on_error: true,
                 drop_on_abort: true,
             })
@@ -179,6 +182,7 @@ fn benchmark_remap(c: &mut Criterion) {
                     .timestamp = parse_timestamp!(string!(.timestamp), format: "%d/%m/%Y:%H:%M:%S %z")
                 "#}
                 .to_owned(),
+                timezone: TimeZone::default(),
                 drop_on_error: true,
                 drop_on_abort: true,
             })
