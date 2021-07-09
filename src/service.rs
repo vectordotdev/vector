@@ -181,7 +181,6 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-#[cfg(windows)]
 fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::ExitCode {
     use crate::vector_windows;
 
@@ -225,14 +224,8 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
     }
 }
 
-#[cfg(unix)]
-fn control_service(_service: &ServiceInfo, _action: ControlAction) -> exitcode::ExitCode {
-    error!("Service commands are currently not supported on this platform.");
-    exitcode::UNAVAILABLE
-}
-
 fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
-    let config_paths = config::process_paths(&config_paths)?;
+    let config_paths = config::process_paths(config_paths)?;
     match config::load_from_paths(&config_paths) {
         Ok(_) => Some(
             config_paths

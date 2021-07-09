@@ -122,7 +122,6 @@ mod tests {
     };
     use super::*;
     use crate::assert_downcast_matches;
-    use approx::assert_relative_eq;
     use snafu::Snafu;
     use std::{
         sync::{Mutex, MutexGuard},
@@ -279,7 +278,7 @@ mod tests {
         assert_eq!(in_flight.mean, 1.0);
 
         let observed_rtt = stats.observed_rtt.stats().unwrap();
-        assert_relative_eq!(observed_rtt.mean, 1.0, epsilon = 0.002);
+        assert_eq!(observed_rtt.mean, 1.0);
     }
 
     #[tokio::test]

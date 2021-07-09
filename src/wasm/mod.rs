@@ -120,7 +120,7 @@ impl WasmModule {
             .remove_embed_ctx::<Option<Registration>>()
             .and_then(|v| v);
 
-        if let None = registration {
+        if registration.is_none() {
             error!("Not registered! Please fill your `init` call with a `Registration::transform().register()`.");
         }
 

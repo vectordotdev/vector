@@ -79,11 +79,10 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGGREGATOR,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, false),
                     HELM_VALUES_DDOG_AGG_TOPOLOGY,
-                    &override_name,
-                    false,
-                ),
+                ],
                 ..Default::default()
             },
         )
@@ -103,11 +102,10 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
             "https://helm.datadoghq.com",
             // VectorConfig is a generic config container
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&datadog_override_name, false),
                     datadog_chart_values,
-                    &datadog_override_name,
-                    false,
-                ),
+                ],
                 ..Default::default()
             },
         )

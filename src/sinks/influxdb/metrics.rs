@@ -206,7 +206,7 @@ fn merge_tags(
     tags: Option<&HashMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
     match (event.tags().cloned(), tags) {
-        (Some(mut event_tags), Some(ref config_tags)) => {
+        (Some(mut event_tags), Some(config_tags)) => {
             event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(event_tags)
         }
@@ -249,7 +249,7 @@ fn encode_events(
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
         let tags = merge_tags(&event, tags);
-        let (metric_type, fields) = get_type_and_fields(event.value(), &quantiles);
+        let (metric_type, fields) = get_type_and_fields(event.value(), quantiles);
 
         if let Err(error) = influx_line_protocol(
             protocol_version,
@@ -320,7 +320,7 @@ fn get_type_and_fields(
                 StatisticKind::Histogram => &[0.95] as &[_],
                 StatisticKind::Summary => quantiles,
             };
-            let fields = encode_distribution(&samples, quantiles);
+            let fields = encode_distribution(samples, quantiles);
             ("distribution", fields)
         }
     }

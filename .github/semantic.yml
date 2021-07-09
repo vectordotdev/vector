@@ -15,7 +15,8 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
-  - docs                # A documentation change
+  - docs                # A documentation change.
+  - website             # A website change that isn't a docs content change (CSS, HTML templates, search, etc.).
 
 scopes:
   - new source
@@ -118,6 +119,7 @@ scopes:
   - aws_ecs_metrics source # Anything `aws_ecs_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - aws_s3 source # Anything `aws_s3` source related
+  - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related
   - generator source # Anything `generator` source related
@@ -178,6 +180,7 @@ scopes:
   - aws_kinesis_streams sink # Anything `aws_kinesis_streams` sink related
   - aws_s3 sink # Anything `aws_s3` sink related
   - aws_sqs sink # Anything `aws_sqs` sink related
+  - azure_blob sink # Anything `azure_blob` sink related
   - azure_monitor_logs sink # Anything `azure_monitor_logs` sink related
   - blackhole sink # Anything `blackhole` sink related
   - clickhouse sink # Anything `clickhouse` sink related
@@ -204,9 +207,19 @@ scopes:
   - prometheus_exporter sink # Anything `prometheus_exporter` sink related
   - prometheus_remote_write sink # Anything `prometheus_remote_write` sink related
   - pulsar sink # Anything `pulsar` sink related
+  - redis sink # Anything `redis` sink related
   - sematext_logs sink # Anything `sematext_logs` sink related
   - sematext_metrics sink # Anything `sematext_metrics` sink related
   - socket sink # Anything `socket` sink related
   - splunk_hec sink # Anything `splunk_hec` sink related
   - statsd sink # Anything `statsd` sink related
   - vector sink # Anything `vector` sink related
+
+  # website
+  - blog # Anything related to the Vector blog
+  - css # Anything related to vector.dev's CSS and aesthetics
+  - guides # Anything related to Vector's guides
+  - highlights # Anything related to vector.dev highlights
+  - javascript # Anything related to the JavaScript functionality on vector.dev
+  - search # Anything related to the website's Algolia search indexing/config
+  - template # Anything related to website HTML and other templates

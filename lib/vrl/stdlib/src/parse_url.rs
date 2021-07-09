@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::iter::FromIterator;
 use url::Url;
 use vrl::prelude::*;
 
@@ -90,7 +89,9 @@ fn url_to_value(url: Url) -> Value {
             .into(),
     );
 
-    Value::from_iter(map.into_iter().map(|(k, v)| (k.to_owned(), v)))
+    map.into_iter()
+        .map(|(k, v)| (k.to_owned(), v))
+        .collect::<Value>()
 }
 
 fn type_def() -> BTreeMap<&'static str, TypeDef> {

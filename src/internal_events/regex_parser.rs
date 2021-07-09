@@ -10,7 +10,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
     fn emit_logs(&self) {
         warn!(
             message = "Regex pattern failed to match.",
-            field = &super::truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
+            field = &super::truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
             internal_log_rate_secs = 30
         );
     }

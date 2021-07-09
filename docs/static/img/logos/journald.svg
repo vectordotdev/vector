@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64px" height="64px" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 63.1 (92452) - https://sketch.com -->
+    <title>Icon</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Icon" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="journald" transform="translate(0.000000, 23.000000)" fill-rule="nonzero">
+            <path d="M0.821253133,0.1677193 L0.821253133,18.8512281 L8.12128098,18.8512281 L8.12128098,15.9768421 L3.74126427,15.9768421 L3.74126427,3.04210526 L8.12128098,3.04210526 L8.12128098,0.1677193 L0.821253133,0.1677193 Z M56.3014648,0.1677193 L56.3014648,3.04210526 L60.6814814,3.04210526 L60.6814814,15.9768421 L56.3014648,15.9768421 L56.3014648,18.8512281 L63.6014926,18.8512281 L63.6014926,0.1677193 L56.3014648,0.1677193 Z" id="Shape" fill="#000000"></path>
+            <polygon id="Path" fill="#30D475" points="33.6713785 9.5094737 46.8114286 2.32350877 46.8114286 16.6954386"></polygon>
+            <ellipse id="Oval" fill="#30D475" cx="22.7220667" cy="9.5101923" rx="6.57002506" ry="6.46736842"></ellipse>
+        </g>
+    </g>
+</svg>

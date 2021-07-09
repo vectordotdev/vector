@@ -52,7 +52,7 @@ pub async fn build_pieces(
     for (name, source) in config
         .sources
         .iter()
-        .filter(|(name, _)| diff.sources.contains_new(&name))
+        .filter(|(name, _)| diff.sources.contains_new(name))
     {
         let (tx, rx) = futures::channel::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
@@ -106,7 +106,7 @@ pub async fn build_pieces(
     for (name, transform) in config
         .transforms
         .iter()
-        .filter(|(name, _)| diff.transforms.contains_new(&name))
+        .filter(|(name, _)| diff.transforms.contains_new(name))
     {
         let trans_inputs = &transform.inputs;
 
@@ -171,7 +171,7 @@ pub async fn build_pieces(
     for (name, sink) in config
         .sinks
         .iter()
-        .filter(|(name, _)| diff.sinks.contains_new(&name))
+        .filter(|(name, _)| diff.sinks.contains_new(name))
     {
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
@@ -183,7 +183,7 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(name) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, &name);
+            let buffer = sink.buffer.build(&config.global.data_dir, name);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", name, error));

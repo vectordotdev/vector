@@ -22,7 +22,7 @@ use std::{
     time::{self, Duration},
 };
 use tokio::time::sleep;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, trace_span, Instrument};
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -163,6 +163,7 @@ where
                         Err(error) => emitter.emit_file_checkpoint_write_failed(error),
                     }
                 })
+                .instrument(trace_span!("writing checkpoints file"))
                 .await
                 .ok();
 
@@ -183,9 +184,13 @@ where
         // or write new checkpoints, on every iteration.
         let mut next_glob_time = time::Instant::now();
         loop {
+            let _loop_span = trace_span!("file_server_iteration").entered();
+
             // Glob find files to follow, but not too often.
             let now_time = time::Instant::now();
             if next_glob_time <= now_time {
+                let _discovery_span = trace_span!("file_discovery").entered();
+
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
 
@@ -202,7 +207,10 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
-                for path in self.paths_provider.paths().into_iter() {
+
+                let paths = trace_span!("paths_provider").in_scope(|| self.paths_provider.paths());
+
+                for path in paths.into_iter() {
                     if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                         &path,
                         &mut fingerprint_buffer,
@@ -260,9 +268,12 @@ where
             }
 
             // Collect lines by polling files.
+            let reading_span = trace_span!("reading").entered();
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
+                let _span = trace_span!("reading", path = ?watcher.path).entered();
+
                 if !watcher.should_read() {
                     continue;
                 }
@@ -324,6 +335,7 @@ where
                     break;
                 }
             }
+            drop(reading_span);
 
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
@@ -341,7 +353,11 @@ where
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
             let mut stream = stream::once(futures::future::ok(to_send));
-            let result = block_on(chans.send_all(&mut stream));
+            let result = block_on(
+                chans
+                    .send_all(&mut stream)
+                    .instrument(trace_span!("sending")),
+            );
             match result {
                 Ok(()) => {}
                 Err(error) => {

@@ -236,5 +236,18 @@ mod tests {
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }
+
+        non_structured_data_in_message {
+            args: func_args![value: "<131>Jun 8 11:54:08 master apache_error [Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message"],
+            want: Ok(btreemap!{
+                "appname" => "apache_error",
+                "facility" => "local0",
+                "hostname" => "master",
+                "severity" => "err",
+                "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(2021, 6, 8).and_hms_milli(11, 54, 8, 0)),
+                "message" => "[Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
     ];
 }

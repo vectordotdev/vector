@@ -33,13 +33,13 @@ pub struct WasmConfig {
     pub options: HashMap<String, serde_json::Value>,
 }
 
-impl Into<WasmModuleConfig> for WasmConfig {
-    fn into(self) -> WasmModuleConfig {
+impl From<WasmConfig> for WasmModuleConfig {
+    fn from(config: WasmConfig) -> Self {
         WasmModuleConfig::new(
             Role::Transform,
-            self.module,
-            self.artifact_cache,
-            self.options,
+            config.module,
+            config.artifact_cache,
+            config.options,
             defaults::HEAP_MEMORY_SIZE,
         )
     }
@@ -102,16 +102,8 @@ impl TaskTransform for Wasm {
         let mut inner = self;
 
         Box::pin(
-            task.filter_map(move |event| {
-                ready({
-                    inner
-                        .module
-                        .process(event)
-                        .map(|events| stream::iter(events))
-                        .ok()
-                })
-            })
-            .flatten(),
+            task.filter_map(move |event| ready(inner.module.process(event).map(stream::iter).ok()))
+                .flatten(),
         )
     }
 }

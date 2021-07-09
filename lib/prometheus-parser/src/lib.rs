@@ -79,7 +79,7 @@ pub struct SummaryMetric {
     pub count: u32,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, PartialOrd)]
 pub struct HistogramBucket {
     pub bucket: f64,
     pub count: u32,

@@ -18,6 +18,8 @@ mod compact;
 mod contains;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_percent")]
+mod decode_percent;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
@@ -26,8 +28,12 @@ mod downcase;
 mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
+#[cfg(feature = "encode_key_value")]
+mod encode_key_value;
 #[cfg(feature = "encode_logfmt")]
 mod encode_logfmt;
+#[cfg(feature = "encode_percent")]
+mod encode_percent;
 #[cfg(feature = "ends_with")]
 mod ends_with;
 #[cfg(feature = "exists")]
@@ -38,6 +44,8 @@ mod flatten;
 mod float;
 #[cfg(feature = "floor")]
 mod floor;
+#[cfg(feature = "format_int")]
+mod format_int;
 #[cfg(feature = "format_number")]
 mod format_number;
 #[cfg(feature = "format_timestamp")]
@@ -50,8 +58,12 @@ mod get_hostname;
 mod includes;
 #[cfg(feature = "integer")]
 mod integer;
+#[cfg(feature = "ip_aton")]
+mod ip_aton;
 #[cfg(feature = "ip_cidr_contains")]
 mod ip_cidr_contains;
+#[cfg(feature = "ip_ntoa")]
+mod ip_ntoa;
 #[cfg(feature = "ip_subnet")]
 mod ip_subnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -124,6 +136,8 @@ mod parse_duration;
 mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
+#[cfg(feature = "parse_int")]
+mod parse_int;
 #[cfg(feature = "parse_json")]
 mod parse_json;
 #[cfg(feature = "parse_key_value")]
@@ -152,6 +166,8 @@ mod parse_timestamp;
 mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
+#[cfg(feature = "parse_xml")]
+mod parse_xml;
 #[cfg(feature = "push")]
 mod push;
 #[cfg(feature = "redact")]
@@ -233,6 +249,8 @@ pub use compact::Compact;
 pub use contains::Contains;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_percent")]
+pub use decode_percent::DecodePercent;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
@@ -241,8 +259,12 @@ pub use downcase::Downcase;
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
+#[cfg(feature = "encode_key_value")]
+pub use encode_key_value::EncodeKeyValue;
 #[cfg(feature = "encode_logfmt")]
 pub use encode_logfmt::EncodeLogfmt;
+#[cfg(feature = "encode_percent")]
+pub use encode_percent::EncodePercent;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
@@ -253,6 +275,8 @@ pub use flatten::Flatten;
 pub use float::Float;
 #[cfg(feature = "floor")]
 pub use floor::Floor;
+#[cfg(feature = "format_int")]
+pub use format_int::FormatInt;
 #[cfg(feature = "format_number")]
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
@@ -265,8 +289,12 @@ pub use get_hostname::GetHostname;
 pub use includes::Includes;
 #[cfg(feature = "integer")]
 pub use integer::Integer;
+#[cfg(feature = "ip_aton")]
+pub use ip_aton::IpAton;
 #[cfg(feature = "ip_cidr_contains")]
 pub use ip_cidr_contains::IpCidrContains;
+#[cfg(feature = "ip_ntoa")]
+pub use ip_ntoa::IpNtoa;
 #[cfg(feature = "ip_subnet")]
 pub use ip_subnet::IpSubnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -329,6 +357,8 @@ pub use parse_duration::ParseDuration;
 pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::ParseGrok;
+#[cfg(feature = "parse_int")]
+pub use parse_int::ParseInt;
 #[cfg(feature = "parse_json")]
 pub use parse_json::ParseJson;
 #[cfg(feature = "parse_key_value")]
@@ -357,6 +387,8 @@ pub use parse_timestamp::ParseTimestamp;
 pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
+#[cfg(feature = "parse_xml")]
+pub use parse_xml::ParseXml;
 #[cfg(feature = "push")]
 pub use push::Push;
 #[cfg(feature = "match")]
@@ -434,6 +466,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Contains),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
+        #[cfg(feature = "decode_percent")]
+        Box::new(DecodePercent),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
@@ -442,8 +476,12 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
+        #[cfg(feature = "encode_key_value")]
+        Box::new(EncodeKeyValue),
         #[cfg(feature = "encode_logfmt")]
         Box::new(EncodeLogfmt),
+        #[cfg(feature = "encode_percent")]
+        Box::new(EncodePercent),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
@@ -454,6 +492,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Float),
         #[cfg(feature = "floor")]
         Box::new(Floor),
+        #[cfg(feature = "format_int")]
+        Box::new(FormatInt),
         #[cfg(feature = "format_number")]
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
@@ -466,8 +506,12 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Includes),
         #[cfg(feature = "integer")]
         Box::new(Integer),
+        #[cfg(feature = "ip_aton")]
+        Box::new(IpAton),
         #[cfg(feature = "ip_cidr_contains")]
         Box::new(IpCidrContains),
+        #[cfg(feature = "ip_ntoa")]
+        Box::new(IpNtoa),
         #[cfg(feature = "ip_subnet")]
         Box::new(IpSubnet),
         #[cfg(feature = "ip_to_ipv6")]
@@ -530,6 +574,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseGlog),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
+        #[cfg(feature = "parse_int")]
+        Box::new(ParseInt),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
         #[cfg(feature = "parse_apache_log")]
@@ -564,6 +610,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
+        #[cfg(feature = "parse_xml")]
+        Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
         #[cfg(feature = "match")]

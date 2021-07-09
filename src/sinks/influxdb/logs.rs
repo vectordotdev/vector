@@ -182,7 +182,7 @@ impl HttpSink for InfluxDbLogsSink {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {
-                fields.insert(key, to_field(&value));
+                fields.insert(key, to_field(value));
             }
         });
 
@@ -270,7 +270,7 @@ mod tests {
             token = "my-token"
         "#};
 
-        toml::from_str::<InfluxDbLogsConfig>(&config).unwrap();
+        toml::from_str::<InfluxDbLogsConfig>(config).unwrap();
     }
 
     #[test]
@@ -291,7 +291,7 @@ mod tests {
         let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
-        let line_protocol = split_line_protocol(&string);
+        let line_protocol = split_line_protocol(string);
         assert_eq!("ns.vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
@@ -321,7 +321,7 @@ mod tests {
         let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
-        let line_protocol = split_line_protocol(&string);
+        let line_protocol = split_line_protocol(string);
         assert_eq!("ns.vector", line_protocol.0);
         assert_eq!(
             "host=aws.cloud.eur,metric_type=logs,source_type=file",
@@ -365,7 +365,7 @@ mod tests {
         let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
-        let line_protocol = split_line_protocol(&string);
+        let line_protocol = split_line_protocol(string);
         assert_eq!("ns.vector", line_protocol.0);
         assert_eq!(
             "host=aws.cloud.eur,metric_type=logs,source_type=file",
@@ -404,7 +404,7 @@ mod tests {
         let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
-        let line_protocol = split_line_protocol(&string);
+        let line_protocol = split_line_protocol(string);
         assert_eq!("ns.vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(
@@ -441,7 +441,7 @@ mod tests {
         let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
-        let line_protocol = split_line_protocol(&string);
+        let line_protocol = split_line_protocol(string);
         assert_eq!("ns.vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(
@@ -478,7 +478,7 @@ mod tests {
         let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
-        let line_protocol = split_line_protocol(&string);
+        let line_protocol = split_line_protocol(string);
         assert_eq!("ns.vector", line_protocol.0);
         assert_eq!(
             "as_a_tag=10,metric_type=logs,source_type=file",

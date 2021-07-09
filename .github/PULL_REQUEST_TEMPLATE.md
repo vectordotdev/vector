@@ -10,8 +10,8 @@
 
 Examples:
 
-  * enhancement(file source): Added `sort` option to sort discovered files
+  * enhancement(file source): Add `sort` option to sort discovered files
   * feat(new source): Initial `statsd` source
-  * fix(file source): Fixed a bug discovering new files
-  * chore(external docs): Clarified `batch_size` option
+  * fix(file source): Fix a bug discovering new files
+  * chore(external docs): Clarify `batch_size` option
 -->
