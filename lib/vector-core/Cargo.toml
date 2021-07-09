@@ -23,7 +23,7 @@ lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.16.0", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.6.0", default-features = false }
 metrics-util = { version = "0.9.1", default-features = false, features = ["std"] }
-mlua = { git = "https://github.com/khvzak/mlua.git", rev = "3bffe1d7c3a59dfbe41d07fcd21c641a2bf697dd", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { git = "https://github.com/khvzak/mlua.git", rev = "17162b1e0bcaa552350cf9b58c1c7116cbb7c883", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 once_cell = { version = "1.8", default-features = false }
 pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
