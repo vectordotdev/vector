@@ -7148,9 +7148,9 @@ dependencies = [
 
 [[package]]
 name = "syslog_loose"
-version = "0.12.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a8c15f0abf61b4bae4e7ff7281dacaa8953f723ece075c0808f5d79d1663d12"
+checksum = "cb6ef7fbec50f39dab5b134b7997e822086429d39920e1bd7db9a17c85f06eeb"
 dependencies = [
  "chrono",
  "nom 6.1.2",
@@ -8432,6 +8432,7 @@ dependencies = [
  "indoc",
  "lookup",
  "ordered-float",
+ "shared",
  "thiserror",
  "vrl-compiler",
  "vrl-diagnostic",
@@ -8450,6 +8451,7 @@ dependencies = [
  "regex",
  "rustyline",
  "serde_json",
+ "shared",
  "structopt 0.3.22",
  "thiserror",
  "vrl",
@@ -8510,6 +8512,7 @@ dependencies = [
  "base64 0.13.0",
  "bytes 1.0.1",
  "chrono",
+ "chrono-tz",
  "cidr-utils",
  "criterion",
  "csv",
@@ -8548,6 +8551,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "shared",
  "structopt 0.3.22",
  "tracing-subscriber",
  "vrl",

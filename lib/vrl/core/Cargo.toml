@@ -10,6 +10,7 @@ compiler = { package = "vrl-compiler", path = "../compiler" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
+shared = { path = "../../shared", default-features = false }
 
 bytes = "1.0.0"
 indoc = "1"
