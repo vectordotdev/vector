@@ -10,8 +10,6 @@ const indexName = process.env.ALGOLIA_INDEX_NAME
 const searchClient = algoliasearch(appId, apiKey)
 
 const Result = ({ hit, components }) => {
-  console.log(hit.itemUrl);
-
   return (
     <a href={hit.itemUrl}>
       <div className="pl-2">
