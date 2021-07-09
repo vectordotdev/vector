@@ -5175,7 +5175,7 @@ dependencies = [
  "indexmap",
  "nom 6.1.2",
  "num_enum",
- "prost",
+ "prost 0.8.0",
  "prost-build",
  "prost-types",
  "shared",
@@ -5221,7 +5221,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e6984d2f1a23009bd270b8bb56d0926810a3d483f59c987d77969e9d8e840b2"
 dependencies = [
  "bytes 1.0.1",
- "prost-derive",
+ "prost-derive 0.7.0",
+]
+
+[[package]]
+name = "prost"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de5e2533f59d08fcf364fd374ebda0692a70bd6d7e66ef97f306f45c6c5d8020"
+dependencies = [
+ "bytes 1.0.1",
+ "prost-derive 0.8.0",
 ]
 
 [[package]]
@@ -5236,7 +5246,7 @@ dependencies = [
  "log",
  "multimap",
  "petgraph",
- "prost",
+ "prost 0.7.0",
  "prost-types",
  "tempfile",
  "which 4.1.0",
@@ -5256,13 +5266,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "600d2f334aa05acb02a755e217ef1ab6dea4d51b58b7846588b747edec04efba"
+dependencies = [
+ "anyhow",
+ "itertools 0.10.1",
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "syn 1.0.72",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b518d7cdd93dab1d1122cf07fa9a60771836c668dde9d9e2a139f957f0d9f1bb"
 dependencies = [
  "bytes 1.0.1",
- "prost",
+ "prost 0.7.0",
 ]
 
 [[package]]
@@ -5282,9 +5305,9 @@ dependencies = [
  "native-tls",
  "nom 6.1.2",
  "pem",
- "prost",
+ "prost 0.7.0",
  "prost-build",
- "prost-derive",
+ "prost-derive 0.7.0",
  "rand 0.8.4",
  "regex",
  "tokio",
@@ -7556,8 +7579,8 @@ dependencies = [
  "hyper",
  "percent-encoding",
  "pin-project 1.0.7",
- "prost",
- "prost-derive",
+ "prost 0.7.0",
+ "prost-derive 0.7.0",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -8242,7 +8265,7 @@ dependencies = [
  "postgres-openssl",
  "pretty_assertions",
  "prometheus-parser",
- "prost",
+ "prost 0.8.0",
  "prost-build",
  "prost-types",
  "pulsar",
@@ -8385,7 +8408,7 @@ dependencies = [
  "pest_derive",
  "pin-project 1.0.7",
  "pretty_assertions",
- "prost",
+ "prost 0.8.0",
  "prost-build",
  "prost-types",
  "quickcheck",
