@@ -34,6 +34,7 @@ type AlgoliaRecord = {
 
 // @ts-ignore
 const algoliaIndexName = process.env.ALGOLIA_INDEX_NAME || "";
+const targetFile = "./public/search.json";
 
 const DEBUG = process.env.DEBUG === "true" || false;
 const algoliaBatchSize = 100;
@@ -70,8 +71,9 @@ async function indexHTMLFiles(
   section: string,
   files: string[],
   ranking: number
-) {
+): Promise<AlgoliaRecord[]> {
   const usedIds = {};
+  const algoliaRecords: AlgoliaRecord[] = [];
 
   for (const file of files) {
     const html = fs.readFileSync(file, "utf-8");
@@ -108,8 +110,6 @@ async function indexHTMLFiles(
     for (let i = 0; i < containers.length; i++) {
       traverse(containers.get(i) as Element);
     }
-
-    const algoliaRecords: AlgoliaRecord[] = [];
 
     let activeRecord: AlgoliaRecord | null = null;
 
@@ -193,36 +193,19 @@ async function indexHTMLFiles(
           }
         }
       }
-
-      if (index === null) {
-        if (DEBUG) {
-          console.log(chalk.magenta("\nRecords for:"));
-          console.log(chalk.cyan(file));
-          console.log(JSON.stringify(algoliaRecords, null, 2));
-        }
-      } else {
-        for (const chnk of chunk(algoliaRecords, algoliaBatchSize)) {
-          try {
-            await index.saveObjects(chnk);
-
-            if (DEBUG) {
-              console.log(chalk.cyan(file));
-            }
-          } catch (err) {
-            console.trace(err);
-            process.exit(1);
-          }
-        }
-      }
     }
   }
 
   console.log(
     chalk.green(`Success. Updated records for ${files.length} file(s).`)
   );
+
+  return algoliaRecords;
 }
 
 async function buildIndex() {
+  var allRecords: AlgoliaRecord[] = [];
+
   const appId = process.env.ALGOLIA_APP_ID || "";
   const adminPublicKey = process.env.ALGOLIA_ADMIN_KEY || "";
 
@@ -237,27 +220,39 @@ async function buildIndex() {
 
   let files = await glob(`${publicPath}/docs/about/**/**.html`);
   console.log(chalk.blue("Indexing docs/about..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  let r1 = await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  allRecords.push(...r1);
 
   files = await glob(`${publicPath}/docs/administration/**/**.html`);
   console.log(chalk.blue("Indexing docs/administration..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  let r2 = await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  allRecords.push(...r2);
 
   files = await glob(`${publicPath}/docs/reference/**/**.html`);
   console.log(chalk.blue("Indexing docs/reference..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  let r3 = await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  allRecords.push(...r3);
 
   files = await glob(`${publicPath}/docs/setup/**/**.html`);
   console.log(chalk.blue("Indexing docs/setup..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  let r4 = await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  allRecords.push(...r4);
 
   files = await glob(`${publicPath}/guides/advanced/**/**.html`);
   console.log(chalk.blue("Indexing guides/advanced..."));
-  await indexHTMLFiles(algoliaIndex, "Advanced guides", files, 40);
+  let r5 = await indexHTMLFiles(algoliaIndex, "Advanced guides", files, 40);
+  allRecords.push(...r5);
 
   files = await glob(`${publicPath}/guides/level-up/**/**.html`);
   console.log(chalk.blue("Indexing guides/level-up..."));
-  await indexHTMLFiles(algoliaIndex, "Level up guides", files, 40);
+  let r6 = await indexHTMLFiles(algoliaIndex, "Level up guides", files, 40);
+  allRecords.push(...r6);
+
+  console.log(chalk.blue(`Writing final index JSON to ${targetFile}`));
+
+  fs.writeFile(targetFile, JSON.stringify(allRecords), () => {
+    console.log(chalk.blue(`Finished writing final index JSOn to ${targetFile}`));
+  });
 }
 
 buildIndex().catch((err) => {

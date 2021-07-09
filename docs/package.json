@@ -2,7 +2,8 @@
   "private": true,
   "scripts": {
     "algolia-config": "algolia setsettings -a $ALGOLIA_APP_ID -k $ALGOLIA_ADMIN_KEY -n $ALGOLIA_INDEX_NAME -s algolia.json",
-    "algolia-index": "ts-node scripts/algolia-index.ts"
+    "algolia-index": "ts-node scripts/algolia-index.ts",
+    "algolia-upload": "atomic-algolia"
   },
   "dependencies": {
     "@algolia/autocomplete-js": "^1.2.1",
@@ -23,6 +24,7 @@
     "@types/topojson-specification": "^1.0.1",
     "algoliasearch": "^4.10.3",
     "alpinejs": "^2.8.2",
+    "atomic-algolia": "^0.3.19",
     "autoprefixer": "^10.2.5",
     "babel-preset-next": "^1.4.0",
     "chalk": "^4.1.1",

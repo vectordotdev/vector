@@ -57,6 +57,7 @@ check-links: production-build run-link-checker
 algolia:
 	yarn run algolia-config
 	yarn run algolia-index
+	yarn run algolia-upload
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
