@@ -10,8 +10,10 @@ const indexName = process.env.ALGOLIA_INDEX_NAME
 const searchClient = algoliasearch(appId, apiKey)
 
 const Result = ({ hit, components }) => {
+  console.log(hit.itemUrl);
+
   return (
-    <a href={hit.url}>
+    <a href={hit.itemUrl}>
       <div className="pl-2">
         <p className="text-gray-800 text-md mb-1 font-medium leading-relaxed">
           <components.Highlight hit={hit} attribute="title" />
@@ -95,7 +97,7 @@ const Search = () => {
               })
             },
             getItemUrl({ item }) {
-              return item.url
+              return item.itemUrl
             },
             onActive({ item, setContext }) {
               setContext({ preview: item })
