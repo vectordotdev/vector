@@ -303,7 +303,7 @@ impl RuntimeTransform for Lua {
                     None => Ok(()),
                 }
             })
-            .context(RuntimeErrorHooksInit)
+            .context(RuntimeErrorHooksShutdown)
             .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
