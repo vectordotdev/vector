@@ -333,25 +333,31 @@ impl DiagnosticError for ExpressionError {
     }
 
     fn message(&self) -> String {
+        use ExpressionError::*;
+
         match self {
-            ExpressionError::Abort { .. } => "aborted".to_owned(),
-            ExpressionError::Error { message, .. } => message.clone(),
+            Abort { .. } => "aborted".to_owned(),
+            Error { message, .. } => message.clone(),
         }
     }
 
     fn labels(&self) -> Vec<Label> {
+        use ExpressionError::*;
+
         match self {
-            ExpressionError::Abort { span } => {
+            Abort { span } => {
                 vec![Label::primary("aborted", span)]
             }
-            ExpressionError::Error { labels, .. } => labels.clone(),
+            Error { labels, .. } => labels.clone(),
         }
     }
 
     fn notes(&self) -> Vec<Note> {
+        use ExpressionError::*;
+
         match self {
-            ExpressionError::Abort { .. } => vec![],
-            ExpressionError::Error { notes, .. } => notes.clone(),
+            Abort { .. } => vec![],
+            Error { notes, .. } => notes.clone(),
         }
     }
 }
