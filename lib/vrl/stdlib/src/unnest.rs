@@ -117,25 +117,12 @@ impl Expression for UnnestFn {
 
         match self.path.target() {
             Target::External => match state.target_type_def() {
-                Some(root_type_def) => {
-                    invert_array_at_path(root_type_def, &self.path.path()).fallible()
-                }
-                None => self
-                    .path
-                    .type_def(state)
-                    .fallible_unless(Kind::Object)
-                    .restrict_array()
-                    .add_null(),
+                Some(root_type_def) => invert_array_at_path(root_type_def, &self.path.path()),
+                None => self.path.type_def(state).restrict_array().add_null(),
             },
-            Target::Internal(v) => {
-                invert_array_at_path(&v.type_def(state), &self.path.path()).fallible()
-            }
-            Target::FunctionCall(f) => {
-                invert_array_at_path(&f.type_def(state), &self.path.path()).fallible()
-            }
-            Target::Container(c) => {
-                invert_array_at_path(&c.type_def(state), &self.path.path()).fallible()
-            }
+            Target::Internal(v) => invert_array_at_path(&v.type_def(state), &self.path.path()),
+            Target::FunctionCall(f) => invert_array_at_path(&f.type_def(state), &self.path.path()),
+            Target::Container(c) => invert_array_at_path(&c.type_def(state), &self.path.path()),
         }
     }
 }
