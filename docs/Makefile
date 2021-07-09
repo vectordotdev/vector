@@ -26,11 +26,13 @@ cue-vet:
 serve: setup cue-build
 	hugo server \
 	--buildDrafts \
-	--buildFuture
+	--buildFuture \
+	--environment "development"
 
 # Live site
 production-build:
 	hugo \
+	--environment "production" \
 	--minify
 
 ci-production-build: setup cue-build production-build run-link-checker algolia
@@ -40,6 +42,7 @@ preview-build:
 	hugo \
 	--baseURL $(DEPLOY_PRIME_URL) \
 	--buildFuture \
+	--environment "preview" \
 	--minify
 
 ci-preview-build: setup cue-build preview-build algolia
