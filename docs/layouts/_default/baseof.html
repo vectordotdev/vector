@@ -35,7 +35,6 @@
 
     {{/* JS that needs to load at the start */}}
     {{ partial "javascript/head.html" . }}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@algolia/autocomplete-theme-classic" />
   </head>
   <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
     <div class="flex-1 z-1">
@@ -63,7 +62,7 @@
     {{ if .IsHome }}
     {{ partial "javascript/home.html" . }}
     {{ end }}
-    
+
     {{/* React component used for global search */}}
     {{ partial "javascript/search.html" . }}
   </body>

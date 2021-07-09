@@ -4,9 +4,9 @@ import algoliasearch from 'algoliasearch/lite'
 import { autocomplete, getAlgoliaResults } from '@algolia/autocomplete-js'
 
 // Algolia search
-const appId = 'EOIG7V0A2O'
-const apiKey = '5f712eef8e5dcf4ac4bbbd0099960626'
-const indexName = 'vector_docs_prod'
+const appId = process.env.ALGOLIA_APP_ID
+const apiKey = process.env.ALGOLIA_PUBLIC_API_KEY
+const indexName = process.env.ALGOLIA_INDEX_NAME
 const searchClient = algoliasearch(appId, apiKey)
 
 const Result = ({ hit, components }) => {
