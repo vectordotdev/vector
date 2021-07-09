@@ -159,11 +159,11 @@ impl TransformConfig for Ec2Metadata {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn transform_type(&self) -> &'static str {
@@ -186,14 +186,24 @@ impl TaskTransform for Ec2MetadataTransform {
 
 impl Ec2MetadataTransform {
     fn transform_one(&mut self, mut event: Event) -> Event {
-        let log = event.as_mut_log();
-
         if let Some(read_ref) = self.state.read() {
-            read_ref.into_iter().for_each(|(k, v)| {
-                if let Some(value) = v.get_one() {
-                    log.insert(k.clone(), value.clone());
+            match event {
+                Event::Log(ref mut log) => {
+                    read_ref.into_iter().for_each(|(k, v)| {
+                        if let Some(value) = v.get_one() {
+                            log.insert(k.clone(), value.clone());
+                        }
+                    });
                 }
-            });
+                Event::Metric(ref mut metric) => {
+                    read_ref.into_iter().for_each(|(k, v)| {
+                        if let Some(value) = v.get_one() {
+                            metric
+                                .insert_tag(k.clone(), String::from_utf8_lossy(value).to_string());
+                        }
+                    });
+                }
+            }
         }
 
         event
@@ -511,10 +521,43 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{config::GlobalOptions, event::LogEvent, test_util::trace_init};
+    use crate::{
+        config::GlobalOptions, event::metric, event::LogEvent, event::Metric,
+        test_util::trace_init, transforms::TaskTransform,
+    };
     use futures::{SinkExt, StreamExt};
 
     const HOST: &str = "http://localhost:8111";
+    const TEST_METADATA: [(&str, &str); 12] = [
+        (AVAILABILITY_ZONE_KEY, "ww-region-1a"),
+        (PUBLIC_IPV4_KEY, "192.1.1.1"),
+        (PUBLIC_HOSTNAME_KEY, "mock-public-hostname"),
+        (LOCAL_IPV4_KEY, "192.1.1.2"),
+        (LOCAL_HOSTNAME_KEY, "mock-hostname"),
+        (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
+        (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
+        (INSTANCE_TYPE_KEY, "t2.micro"),
+        (REGION_KEY, "us-east-1"),
+        (VPC_ID_KEY, "mock-vpc-id"),
+        (SUBNET_ID_KEY, "mock-subnet-id"),
+        ("role-name[0]", "mock-user"),
+    ];
+
+    fn make_metric() -> Metric {
+        Metric::new(
+            "event",
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 1.0 },
+        )
+    }
+
+    async fn make_transform(config: Ec2Metadata) -> Box<dyn TaskTransform> {
+        config
+            .build(&GlobalOptions::default())
+            .await
+            .unwrap()
+            .into_task()
+    }
 
     #[test]
     fn generate_config() {
@@ -522,18 +565,14 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn enrich() {
+    async fn enrich_log() {
         trace_init();
 
-        let config = Ec2Metadata {
+        let transform = make_transform(Ec2Metadata {
             endpoint: Some(HOST.to_string()),
             ..Default::default()
-        };
-        let transform = config
-            .build(&GlobalOptions::default())
-            .await
-            .unwrap()
-            .into_task();
+        })
+        .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
         let mut stream = transform.transform(Box::pin(rx));
@@ -542,39 +581,53 @@ mod integration_tests {
         sleep(Duration::from_secs(1)).await;
 
         let log = LogEvent::default();
-        let mut expected = log.clone();
+        let mut expected_log = log.clone();
+        for (k, v) in TEST_METADATA.iter().cloned() {
+            expected_log.insert(k, v);
+        }
+
         tx.send(log.into()).await.unwrap();
 
         let event = stream.next().await.unwrap();
-
-        expected.insert("availability-zone", "ww-region-1a");
-        expected.insert("public-ipv4", "192.1.1.1");
-        expected.insert("public-hostname", "mock-public-hostname");
-        expected.insert("local-ipv4", "192.1.1.2");
-        expected.insert("local-hostname", "mock-hostname");
-        expected.insert("instance-id", "i-096fba6d03d36d262");
-        expected.insert("ami-id", "ami-05f27d4d6770a43d2");
-        expected.insert("instance-type", "t2.micro");
-        expected.insert("region", "us-east-1");
-        expected.insert("vpc-id", "mock-vpc-id");
-        expected.insert("subnet-id", "mock-subnet-id");
-        expected.insert("role-name[0]", "mock-user");
-
-        assert_eq!(event.into_log(), expected);
+        assert_eq!(event.into_log(), expected_log);
     }
 
     #[tokio::test]
-    async fn fields() {
-        let config = Ec2Metadata {
+    async fn enrich_metric() {
+        trace_init();
+
+        let transform = make_transform(Ec2Metadata {
             endpoint: Some(HOST.to_string()),
-            fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
-        };
-        let transform = config
-            .build(&GlobalOptions::default())
-            .await
-            .unwrap()
-            .into_task();
+        })
+        .await;
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(100);
+        let mut stream = transform.transform(Box::pin(rx));
+
+        // We need to sleep to let the background task fetch the data.
+        sleep(Duration::from_secs(1)).await;
+
+        let metric = make_metric();
+        let mut expected_metric = metric.clone();
+        for (k, v) in TEST_METADATA.iter().cloned() {
+            expected_metric.insert_tag(k.to_string(), v.to_string());
+        }
+
+        tx.send(metric.into()).await.unwrap();
+
+        let event = stream.next().await.unwrap();
+        assert_eq!(event.into_metric(), expected_metric);
+    }
+
+    #[tokio::test]
+    async fn fields_log() {
+        let transform = make_transform(Ec2Metadata {
+            endpoint: Some(HOST.to_string()),
+            fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
+            ..Default::default()
+        })
+        .await;
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
         let mut stream = transform.transform(Box::pin(rx));
@@ -583,29 +636,51 @@ mod integration_tests {
         sleep(Duration::from_secs(1)).await;
 
         let log = LogEvent::default();
-        let mut expected = log.clone();
+        let mut expected_log = log.clone();
+        expected_log.insert(PUBLIC_IPV4_KEY, "192.1.1.1");
+        expected_log.insert(REGION_KEY, "us-east-1");
+
         tx.send(log.into()).await.unwrap();
 
         let event = stream.next().await.unwrap();
-
-        expected.insert("public-ipv4", "192.1.1.1");
-        expected.insert("region", "us-east-1");
-        assert_eq!(event.into_log(), expected);
+        assert_eq!(event.into_log(), expected_log);
     }
 
     #[tokio::test]
-    async fn namespace() {
+    async fn fields_metric() {
+        let transform = make_transform(Ec2Metadata {
+            endpoint: Some(HOST.to_string()),
+            fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
+            ..Default::default()
+        })
+        .await;
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(100);
+        let mut stream = transform.transform(Box::pin(rx));
+
+        // We need to sleep to let the background task fetch the data.
+        sleep(Duration::from_secs(1)).await;
+
+        let metric = make_metric();
+        let mut expected_metric = metric.clone();
+        expected_metric.insert_tag(PUBLIC_IPV4_KEY.to_string(), "192.1.1.1".to_string());
+        expected_metric.insert_tag(REGION_KEY.to_string(), "us-east-1".to_string());
+
+        tx.send(metric.into()).await.unwrap();
+
+        let event = stream.next().await.unwrap();
+        assert_eq!(event.into_metric(), expected_metric);
+    }
+
+    #[tokio::test]
+    async fn namespace_log() {
         {
-            let config = Ec2Metadata {
+            let transform = make_transform(Ec2Metadata {
                 endpoint: Some(HOST.to_string()),
                 namespace: Some("ec2.metadata".into()),
                 ..Default::default()
-            };
-            let transform = config
-                .build(&GlobalOptions::default())
-                .await
-                .unwrap()
-                .into_task();
+            })
+            .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
             let mut stream = transform.transform(Box::pin(rx));
@@ -614,10 +689,10 @@ mod integration_tests {
             sleep(Duration::from_secs(1)).await;
 
             let log = LogEvent::default();
+
             tx.send(log.into()).await.unwrap();
 
             let event = stream.next().await.unwrap();
-
             assert_eq!(
                 event.as_log().get("ec2.metadata.availability-zone"),
                 Some(&"ww-region-1a".into())
@@ -626,16 +701,12 @@ mod integration_tests {
 
         {
             // Set an empty namespace to ensure we don't prepend one.
-            let config = Ec2Metadata {
+            let transform = make_transform(Ec2Metadata {
                 endpoint: Some(HOST.to_string()),
                 namespace: Some("".into()),
                 ..Default::default()
-            };
-            let transform = config
-                .build(&GlobalOptions::default())
-                .await
-                .unwrap()
-                .into_task();
+            })
+            .await;
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
             let mut stream = transform.transform(Box::pin(rx));
@@ -644,13 +715,69 @@ mod integration_tests {
             sleep(Duration::from_secs(1)).await;
 
             let log = LogEvent::default();
+
             tx.send(log.into()).await.unwrap();
 
             let event = stream.next().await.unwrap();
-
             assert_eq!(
-                event.as_log().get("availability-zone"),
+                event.as_log().get(AVAILABILITY_ZONE_KEY),
                 Some(&"ww-region-1a".into())
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn namespace_metric() {
+        {
+            let transform = make_transform(Ec2Metadata {
+                endpoint: Some(HOST.to_string()),
+                namespace: Some("ec2.metadata".into()),
+                ..Default::default()
+            })
+            .await;
+
+            let (mut tx, rx) = futures::channel::mpsc::channel(100);
+            let mut stream = transform.transform(Box::pin(rx));
+
+            // We need to sleep to let the background task fetch the data.
+            sleep(Duration::from_secs(1)).await;
+
+            let metric = make_metric();
+
+            tx.send(metric.into()).await.unwrap();
+
+            let event = stream.next().await.unwrap();
+            assert_eq!(
+                event
+                    .as_metric()
+                    .tag_value("ec2.metadata.availability-zone"),
+                Some("ww-region-1a".to_string())
+            );
+        }
+
+        {
+            // Set an empty namespace to ensure we don't prepend one.
+            let transform = make_transform(Ec2Metadata {
+                endpoint: Some(HOST.to_string()),
+                namespace: Some("".into()),
+                ..Default::default()
+            })
+            .await;
+
+            let (mut tx, rx) = futures::channel::mpsc::channel(100);
+            let mut stream = transform.transform(Box::pin(rx));
+
+            // We need to sleep to let the background task fetch the data.
+            sleep(Duration::from_secs(1)).await;
+
+            let metric = make_metric();
+
+            tx.send(metric.into()).await.unwrap();
+
+            let event = stream.next().await.unwrap();
+            assert_eq!(
+                event.as_metric().tag_value(AVAILABILITY_ZONE_KEY),
+                Some("ww-region-1a".to_string())
             );
         }
     }
