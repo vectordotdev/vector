@@ -23,7 +23,7 @@ impl Function for Unnest {
                 title: "external target",
                 source: indoc! {r#"
                     . = {"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}
-                    . = unnest!(.events)
+                    . = unnest(.events)
                 "#},
                 result: Ok(
                     r#"[{"hostname": "localhost", "events": {"message": "hello"}}, {"hostname": "localhost", "events": {"message": "world"}}]"#,
@@ -33,7 +33,7 @@ impl Function for Unnest {
                 title: "variable target",
                 source: indoc! {r#"
                     foo = {"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}
-                    foo = unnest!(foo.events)
+                    foo = unnest(foo.events)
                 "#},
                 result: Ok(
                     r#"[{"hostname": "localhost", "events": {"message": "hello"}}, {"hostname": "localhost", "events": {"message": "world"}}]"#,
@@ -142,46 +142,16 @@ pub fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
     typedef
         .at_path(path.clone())
         .restrict_array()
-        .map_array(|kind| typedef.update_path(path, &kind))
+        .map_array(|kind| typedef.update_path(path, &kind).kind)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use shared::btreemap;
+    use std::collections::BTreeSet;
+    use type_def::KindInfo;
     use vrl::Index;
-
-    macro_rules! type_def {
-        (unknown) => {
-            TypeDef::new().unknown()
-        };
-
-        (bytes) => {
-            TypeDef::new().bytes()
-        };
-
-        (object { $($key:expr => $value:expr,)+ }) => {
-            TypeDef::new().object::<&'static str, TypeDef>(btreemap! (
-                $($key => $value,)+
-            ))
-        };
-
-        (array [ $($value:expr,)+ ]) => {
-            TypeDef::new().array_mapped::<(), TypeDef>(btreemap! (
-                $(() => $value,)+
-            ))
-        };
-
-        (array { $($idx:expr => $value:expr,)+ }) => {
-            TypeDef::new().array_mapped::<Index, TypeDef>(btreemap! (
-                $($idx => $value,)+
-            ))
-        };
-
-        (array) => {
-            TypeDef::new().array_mapped::<i32, TypeDef>(btreemap! ())
-        };
-    }
 
     #[test]
     fn type_def() {
@@ -374,26 +344,23 @@ mod tests {
                     } },
                 ] },
             },
-            // Not an array
-            /*TestCase {
+            // Non existent, the types we know are moved into the returned array.
+            TestCase {
                 old: type_def! { object {
-                    "nonk" => type_def! { object {
-                            "noog" => type_def! { bytes },
-                            "nork" => type_def! { bytes },
-                        } },
+                    "nonk" => type_def! { bytes },
                 } },
-                path: ".nonk",
-                new: type_def! { unknown },
-            },*/
+                path: ".norg",
+                new: type_def! { array [
+                    type_def! { object {
+                        "nonk" => type_def! { bytes },
+                    } },
+                ] },
+            },
         ];
 
         for case in cases {
             let path = LookupBuf::from_str(case.path).unwrap();
-            let new = case
-                .old
-                .at_path(path.clone())
-                .restrict_array()
-                .map_array(|kind| case.old.update_path(&path, &kind));
+            let new = invert_array_at_path(&case.old, &path);
             assert_eq!(case.new, new, "{}", path);
         }
     }
@@ -407,28 +374,40 @@ mod tests {
                     value!([{"hostname": "localhost", "events": {"message": "hello"}}, {"hostname": "localhost", "events": {"message": "world"}}]),
                 ),
                 UnnestFn::new("events"),
-                TypeDef::new()
-                    .array_mapped::<(), TypeDef>(btreemap! {
-                        () => TypeDef::new().object::<&'static str, TypeDef>(btreemap! {
-                            "hostname" => TypeDef::new().bytes(),
-                            "events" => TypeDef::new().object::<&'static str, TypeDef>(btreemap! {
-                                "message" => TypeDef::new().bytes()
-                            })
-                        })
-                    })
-                    .fallible(),
+                type_def! { array [
+                    type_def! { object {
+                        "hostname" => type_def! { bytes },
+                        "events" => type_def! { object {
+                            "message" => type_def! { bytes },
+                        } },
+                    } },
+                ] },
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err(r#"expected "array", got "null""#.to_owned()),
                 UnnestFn::new("unknown"),
-                TypeDef::new().fallible(),
+                type_def! { array [
+                    type_def! { object {
+                        "hostname" => type_def! { bytes },
+                        "events" => type_def! { array [
+                            type_def! { object {
+                                "message" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                ] },
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err(r#"expected "array", got "string""#.to_owned()),
                 UnnestFn::new("hostname"),
-                TypeDef::new().fallible(),
+                // The typedef in this case is not particularly important as we will have a compile
+                // error before we get to this point.
+                TypeDef {
+                    fallible: false,
+                    kind: KindInfo::Known(BTreeSet::new()),
+                },
             ),
         ];
 

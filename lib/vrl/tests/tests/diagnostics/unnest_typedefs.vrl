@@ -3,15 +3,15 @@
 
 .noog.nork[2].ning.nonk = ["banana", "nananaman", "annanas"]
 
-.a = unnest!(.noog.nork[2].ning.nonk)
-.b = unnest!(.noog.nork[2].(ning | nong).nonk)
-.c = unnest!(.noog.nork)
+.a = unnest(.noog.nork[2].ning.nonk)
+.b = unnest(.noog.nork[2].(ning | nong).nonk)
+.c = unnest(.noog.nork)
 
 zoog.zork[2].zing.zonk = ["banana", "nananaman", "annanas"]
 
-.za = unnest!(zoog.zork[2].zing.zonk)
-.zb = unnest!(zoog.zork[2].(zing | zong).zonk)
-.zc = unnest!(zoog.zork)
+.za = unnest(zoog.zork[2].zing.zonk)
+.zb = unnest(zoog.zork[2].(zing | zong).zonk)
+.zc = unnest(zoog.zork)
 
 [
   contains(.a[0].noog.nork[2].ning.nonk, "ana"),

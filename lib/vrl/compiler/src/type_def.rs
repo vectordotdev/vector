@@ -46,7 +46,7 @@ pub struct TypeDef {
     ///
     /// This is wrapped in a [`TypeKind`] enum, such that we encode details
     /// about potential inner kinds for collections (arrays or objects).
-    kind: KindInfo,
+    pub kind: KindInfo,
 }
 
 impl Sub<Kind> for TypeDef {
@@ -66,7 +66,7 @@ impl Sub<Kind> for TypeDef {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
-enum KindInfo {
+pub enum KindInfo {
     Unknown,
     Known(BTreeSet<TypeKind>),
 }
@@ -442,7 +442,7 @@ impl KindInfo {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
-enum TypeKind {
+pub enum TypeKind {
     Bytes,
     Integer,
     Float,
@@ -1113,11 +1113,11 @@ impl TypeDef {
         }
     }
 
-    /// Updates the type definition at the given path with the provided typedef.
-    pub fn update_path(&self, path: &LookupBuf, type_def: &TypeDef) -> Self {
+    /// Updates the type definition at the given path with the provided kind.
+    pub fn update_path(&self, path: &LookupBuf, kind: &KindInfo) -> Self {
         let segments = path.as_segments();
         let peekable = segments.iter().peekable();
-        let kind = Self::update_segment(&self.kind, peekable, &type_def.kind);
+        let kind = Self::update_segment(&self.kind, peekable, &kind);
 
         TypeDef {
             fallible: self.fallible,
@@ -1151,26 +1151,17 @@ impl TypeDef {
         }
     }
 
-    /// For any array type defs within this type, allows you to map the indexed type def to a new
-    /// type def.
+    /// For any array defined by this type def, allows you to map the indexed kind
+    /// to a new kind.
     pub fn map_array<F>(&self, f: F) -> Self
     where
-        F: Fn(TypeDef) -> TypeDef,
+        F: Fn(&KindInfo) -> KindInfo,
     {
         let newkind = self.kind.map(|k| match k {
             TypeKind::Array(array) => TypeKind::Array(
                 array
                     .iter()
-                    .map(|(index, kind)| {
-                        (
-                            *index,
-                            f(TypeDef {
-                                fallible: self.fallible,
-                                kind: kind.clone(),
-                            })
-                            .kind,
-                        )
-                    })
+                    .map(|(index, kind)| (*index, f(kind)))
                     .collect(),
             ),
             k => k.clone(),
@@ -1204,6 +1195,7 @@ impl From<Kind> for TypeDef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::type_def;
     use lookup::{FieldBuf, SegmentBuf};
     use shared::btreemap;
 
@@ -1236,40 +1228,8 @@ mod tests {
         assert_eq!(kind, expected);
     }
 
-    macro_rules! type_def {
-        (unknown) => {
-            TypeDef::new().unknown()
-        };
-
-        (bytes) => {
-            TypeDef::new().bytes()
-        };
-
-        (object { $($key:expr => $value:expr,)+ }) => {
-            TypeDef::new().object::<&'static str, TypeDef>(btreemap! (
-                $($key => $value,)+
-            ))
-        };
-
-        (array [ $($value:expr,)+ ]) => {
-            TypeDef::new().array_mapped::<(), TypeDef>(btreemap! (
-                $(() => $value,)+
-            ))
-        };
-
-        (array { $($idx:expr => $value:expr,)+ }) => {
-            TypeDef::new().array_mapped::<Index, TypeDef>(btreemap! (
-                $($idx => $value,)+
-            ))
-        };
-
-        (array) => {
-            TypeDef::new().array_mapped::<i32, TypeDef>(btreemap! ())
-        };
-    }
-
     #[test]
-    fn invert_array_at_path() {
+    fn update_path() {
         struct TestCase {
             old: TypeDef,
             path: &'static str,
@@ -1288,36 +1248,9 @@ mod tests {
                     ] },
                 } },
                 path: ".nonk",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { object {
-                            "noog" => type_def! { bytes },
-                            "nork" => type_def! { bytes },
-                        } },
-                    } },
-                ] },
-            },
-            // Provided example
-            TestCase {
-                old: type_def! { object {
-                    "nonk" => type_def! { object {
-                        "shnoog" => type_def! { array [
-                            type_def! { object {
-                                "noog" => type_def! { bytes },
-                            } },
-                        ] },
-                    } },
+                new: type_def! { object {
+                    "nonk" => type_def! { bytes },
                 } },
-                path: "nonk.shnoog",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { object {
-                            "shnoog" => type_def! { object {
-                                "noog" => type_def! { bytes },
-                            } },
-                        } },
-                    } },
-                ] },
             },
             // Same field in different branches
             TestCase {
@@ -1338,24 +1271,20 @@ mod tests {
                     } },
                 } },
                 path: "nonk.shnoog",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { object {
-                            "shnoog" => type_def! { object {
+                new: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { bytes },
+                    } },
+                    "nink" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
                                 "noog" => type_def! { bytes },
                             } },
-                        } },
-                        "nink" => type_def! { object {
-                            "shnoog" => type_def! { array [
-                                type_def! { object {
-                                    "noog" => type_def! { bytes },
-                                } },
-                            ] },
-                        } },
+                        ] },
                     } },
-                ] },
+                } },
             },
-            // Indexed any
+            // Indexed any should add the new type as a specific index and retain the any.
             TestCase {
                 old: type_def! { object {
                     "nonk" => type_def! { array [
@@ -1368,23 +1297,20 @@ mod tests {
                     ] },
                 } },
                 path: ".nonk[0].noog",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { array {
-                            (Index::Any) => type_def! { object {
-                                "noog" => type_def! { array [
-                                    type_def! { bytes },
-                                ] },
-                                "nork" => type_def! { bytes },
-                            } },
-                            // The index is added on top of the Any entry.
-                            (Index::Index(0)) => type_def! { object {
-                                "noog" => type_def! { bytes },
-                                "nork" => type_def! { bytes },
-                            } },
+                new: type_def! { object {
+                    "nonk" => type_def! { array {
+                        Index::Any => type_def! { object {
+                            "noog" => type_def! { array [
+                                type_def! { bytes },
+                            ] },
+                            "nork" => type_def! { bytes },
+                        } },
+                        Index::Index(0) => type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
                         } },
                     } },
-                ] },
+                } },
             },
             // Indexed specific
             TestCase {
@@ -1399,17 +1325,14 @@ mod tests {
                     } },
                 } },
                 path: ".nonk[0].noog",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { array {
-                            // The index is added on top of the Any entry.
-                            (Index::Index(0)) => type_def! { object {
-                                "noog" => type_def! { bytes },
-                                "nork" => type_def! { bytes },
-                            } },
+                new: type_def! { object {
+                    "nonk" => type_def! { array {
+                        Index::Index(0) => type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
                         } },
                     } },
-                ] },
+                } },
             },
             // More nested
             TestCase {
@@ -1424,16 +1347,11 @@ mod tests {
                     } },
                 } },
                 path: ".nonk.shnoog",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { object {
-                            "shnoog" => type_def! { object {
-                                "noog" => type_def! { bytes },
-                                "nork" => type_def! { bytes },
-                            } },
-                        } },
+                new: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { bytes },
                     } },
-                ] },
+                } },
             },
             // Coalesce
             TestCase {
@@ -1448,37 +1366,18 @@ mod tests {
                     } },
                 } },
                 path: ".(nonk | nork).shnoog",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { object {
-                            "shnoog" => type_def! { object {
-                                "noog" => type_def! { bytes },
-                                "nork" => type_def! { bytes },
-                            } },
-                        } }.add_null(),
-                    } },
-                ] },
-            },
-            // Not an array
-            /*TestCase {
-                old: type_def! { object {
+                new: type_def! { object {
                     "nonk" => type_def! { object {
-                            "noog" => type_def! { bytes },
-                            "nork" => type_def! { bytes },
-                        } },
+                        "shnoog" => type_def! { bytes },
+                    } }.add_null(),
                 } },
-                path: ".nonk",
-                new: type_def! { unknown },
-            },*/
+            },
         ];
 
+        let newkind = KindInfo::Known(std::iter::once(TypeKind::Bytes).collect());
         for case in cases {
             let path = LookupBuf::from_str(case.path).unwrap();
-            let new = case
-                .old
-                .at_path(path.clone())
-                .restrict_array()
-                .map_array(|kind| case.old.update_path(&path, &kind));
+            let new = case.old.update_path(&path, &newkind);
             assert_eq!(case.new, new, "{}", path);
         }
     }
