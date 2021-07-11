@@ -148,7 +148,7 @@ pub fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::btreemap;
+    use shared::{btreemap, TimeZone};
     use std::collections::BTreeSet;
     use type_def::KindInfo;
     use vrl::Index;
@@ -422,10 +422,11 @@ mod tests {
             }),
         );
 
+        let tz = TimeZone::default();
         for (object, expected, func, expected_typedef) in cases {
             let mut object = object.clone();
             let mut runtime_state = vrl::state::Runtime::default();
-            let mut ctx = Context::new(&mut object, &mut runtime_state);
+            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
             let typedef = func.type_def(&compiler);
 
