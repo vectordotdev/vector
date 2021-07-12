@@ -37,7 +37,7 @@ into a separate directory or into a sub-directory of "etc/vector".
 Any [global options](/docs/reference/configuration/global-options/) can be moved directly
 into the `customConfig` key and converted into snake-case.
 
-If you had 
+If you had the default `dataDir` and `logSchema` values, include:
 
 ```yaml title="values.yaml"
 customConfig:
