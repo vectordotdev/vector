@@ -48,6 +48,24 @@ configure:
   filename: "/etc/vector/vector.toml"
   below: "Configuration examples are in [TOML](https://toml.io) but Vector also supports [YAML](https://yaml.org) and [JSON](https://json.org)"
   example_configs:
+  - title: Ship redacted Datadog Agent logs to Datadog
+    config: |
+      [sources.datadog_agent]
+      type = "datadog_logs"
+      address = "localhost:80"
+
+      [transforms.remove_sensitive_user_info]
+      type = "remap"
+      inputs = ["datadog_agent"]
+      source = '''
+        redact(., filters: ["us_social_security_number"])
+      '''
+
+      [sinks.datadog_backend]
+      type = "datadog_logs"
+      inputs = ["remove_sensitive_info"]
+      default_api_key = "${DATADOG_API_KEY}"
+
   - title: Parse NGINX logs
     config: |
       [sources.nginx_error_log]
@@ -62,33 +80,6 @@ configure:
       source = '''
       # TODO
       '''
-  - title: Something else
-    config: |
-      [sources.do_something_else]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
-  - title: Other thing entirely
-    config: |
-      [sources.do_other_thing_entirely]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
-  - title: And yet another
-    config: |
-      [sources.and_yet_another]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
 
 # Installation section
 installation:
