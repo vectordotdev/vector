@@ -21,6 +21,7 @@ type Payload = {
 
 type AlgoliaRecord = {
   objectID: string;
+  pageTitle: string;
   pageUrl: string;
   itemUrl: string;
   level: number;
@@ -80,6 +81,8 @@ async function indexHTMLFiles(
     const html = fs.readFileSync(file, "utf-8");
     const $ = cheerio.load(html);
     const containers = $("main");
+    const pageTitle = $('meta[name="algolia:title"]').attr('content') || "";
+    console.log(pageTitle);
 
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
@@ -122,6 +125,7 @@ async function indexHTMLFiles(
       if (!activeRecord) {
         activeRecord = {
           objectID: itemUrl,
+          pageTitle,
           pageUrl,
           itemUrl,
           level: item.level,
@@ -142,6 +146,7 @@ async function indexHTMLFiles(
 
         activeRecord = {
           objectID: itemUrl,
+          pageTitle,
           pageUrl,
           itemUrl,
           level: item.level,
@@ -159,6 +164,7 @@ async function indexHTMLFiles(
 
         activeRecord = {
           objectID: itemUrl,
+          pageTitle,
           pageUrl,
           itemUrl,
           level: item.level,

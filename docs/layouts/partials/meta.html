@@ -34,3 +34,6 @@
 {{ with $desc }}
 <meta property="og:description" content="{{ . }}">
 {{ end }}
+
+{{/* For Algolia search */}}
+<meta name="algolia:title" content="{{ .Title }}">
