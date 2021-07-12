@@ -4622,9 +4622,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "492848ff47f11b7f9de0443b404e2c5775f695e1af6b7076ca25f999581d547a"
+checksum = "ff27b33e30432e7b9854936693ca103d8591b0501f7ae9f633de48cda3bf2a67"
 dependencies = [
  "async-trait",
  "crossbeam-channel 0.5.1",
@@ -4641,9 +4641,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-datadog"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8794eb897decce87294f264182580c0615a6df1c8bfd1db03de6eda39903e87d"
+checksum = "7f8691cf6ef48a74be14d40cf5748830d47df97d3d713c561f3354e8d38c41ab"
 dependencies = [
  "async-trait",
  "http",
@@ -4659,9 +4659,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-http"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b752610d59706ff7cae48003552b3d0bf19bcce532629c8a49095894f21c319"
+checksum = "1eeb0d4b230c69aa425f9c3aadf02ce7aa4b2bc9a4e9fbe59614108232078263"
 dependencies = [
  "async-trait",
  "bytes 1.0.1",
@@ -7733,9 +7733,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-opentelemetry"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2f4cb277b92a8ba1170b3b911056428ce2ef9993351baf5965bb0359a2e5963"
+checksum = "c47440f2979c4cd3138922840eec122e3c0ba2148bc290f756bd7fd60fc97fff"
 dependencies = [
  "opentelemetry",
  "tracing 0.1.26",
