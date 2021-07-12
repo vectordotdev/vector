@@ -39,7 +39,11 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			[transforms.json_parse]
 			type = "remap"
 			source = '''
-			  . = merge!(parse_json!(.message))
+			  parsed, err = parse_json(.message)
+			  if err != null {
+			    log(err, level: "error")
+			  }
+			  . = merge(parsed ?? {})
 			'''
 
 			[sinks.elasticsearch_out]
