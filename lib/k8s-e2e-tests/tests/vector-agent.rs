@@ -204,7 +204,7 @@ async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
-                    HELM_VALUES_CUSTOM_CONFIG
+                    HELM_VALUES_CUSTOM_CONFIG,
                 ],
                 ..Default::default()
             },
