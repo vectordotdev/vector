@@ -231,7 +231,7 @@ lazy_static = { version = "1.4.0", default-features = false }
 listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.6.5", default-features = false, optional = true }
-maxminddb = { version = "0.19.0", default-features = false, optional = true }
+maxminddb = { version = "0.20.0", default-features = false, optional = true }
 md-5 = { version = "0.9", optional = true }
 mongodb = { version = "2.0.0-beta.2", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.9.18", default-features = false, optional = true }
