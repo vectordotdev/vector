@@ -36,9 +36,15 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			message_key = "message"
 			topics = ["logs-*"]
 
+			[transforms.json_parse]
+			type = "remap"
+			source = '''
+			  . = parse_json!(.message)
+			'''
+
 			[sinks.elasticsearch_out]
 			type = "elasticsearch"
-			inputs = ["kafka_in"]
+			inputs = ["json_parse"]
 			endpoint = "http://10.24.32.122:9000"
 			index = "logs-via-kafka"
 			"""#
