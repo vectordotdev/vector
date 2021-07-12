@@ -2252,6 +2252,7 @@ dependencies = [
  "glob 0.3.0",
  "indexmap",
  "libc",
+ "pretty_assertions",
  "quickcheck",
  "scan_fmt",
  "serde",
