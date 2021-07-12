@@ -212,9 +212,6 @@ async function indexHTMLFiles(
 async function buildIndex() {
   var allRecords: AlgoliaRecord[] = [];
 
-  const appId = process.env.ALGOLIA_APP_ID || "";
-  const adminPublicKey = process.env.ALGOLIA_ADMIN_KEY || "";
-
   console.log(`Building Vector search index`);
 
   let files = await glob(`${publicPath}/docs/about/**/**.html`);
@@ -246,6 +243,11 @@ async function buildIndex() {
   console.log(chalk.blue("Indexing guides/level-up..."));
   let r6 = await indexHTMLFiles("Level up guides", files, 40);
   allRecords.push(...r6);
+
+  files = await glob(`${publicPath}/blog/**/**.html`);
+  console.log(chalk.blue("Indexing blog..."));
+  let r7 = await indexHTMLFiles("Blog", files, 40);
+  allRecords.push(...r7);
 
   console.log(chalk.green(`Success. ${allRecords.length} records have been successfully indexed.`));
   console.log(chalk.blue(`Writing final index JSON to ${targetFile}...`));
