@@ -138,17 +138,14 @@ impl Fingerprinter {
             .flatten()
     }
 
-    pub fn get_bytes_checksum(
-        &self,
-        path: &Path,
-        buffer: &mut Vec<u8>,
-    ) -> Result<Option<FileFingerprint>, io::Error> {
+    pub fn get_bytes_checksum(&self, path: &Path) -> Result<Option<FileFingerprint>, io::Error> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 bytes,
                 ignored_header_bytes,
                 lines: _,
             } => {
+                let mut buffer: Vec<u8> = Vec::with_capacity(bytes);
                 buffer.resize(bytes, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
@@ -161,11 +158,7 @@ impl Fingerprinter {
     }
 
     /// Calculates checksums using strategy pre-0.14.0
-    pub fn get_legacy_checksum(
-        &self,
-        path: &Path,
-        buffer: &mut Vec<u8>,
-    ) -> Result<Option<FileFingerprint>, io::Error> {
+    pub fn get_legacy_checksum(&self, path: &Path) -> Result<Option<FileFingerprint>, io::Error> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
@@ -176,10 +169,11 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
+                let mut buffer: Vec<u8> = Vec::with_capacity(self.max_line_length);
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                fingerprinter_read_until(fp, b'\n', lines, buffer)?;
+                fingerprinter_read_until(fp, b'\n', lines, &mut buffer)?;
                 let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }

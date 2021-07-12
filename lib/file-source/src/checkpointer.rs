@@ -83,6 +83,12 @@ impl CheckpointsView {
         }
     }
 
+    pub fn contains_bytes_checksums(&self) -> bool {
+        self.checkpoints
+            .iter()
+            .any(|entry| matches!(entry.key(), FileFingerprint::BytesChecksum(_)))
+    }
+
     pub fn remove_expired(&self) {
         let now = Utc::now();
 
@@ -105,12 +111,6 @@ impl CheckpointsView {
             self.modified_times.remove(&fng);
             self.removed_times.remove(&fng);
         }
-    }
-
-    pub fn contains_bytes_checksums(&self) -> bool {
-        self.checkpoints
-            .iter()
-            .any(|entry| matches!(entry.key(), FileFingerprint::BytesChecksum(_)))
     }
 
     fn load(&self, checkpoint: Checkpoint) {
@@ -157,15 +157,8 @@ impl CheckpointsView {
         }
     }
 
-    fn maybe_upgrade(
-        &self,
-        path: &Path,
-        fng: FileFingerprint,
-        fingerprinter: &Fingerprinter,
-        fingerprint_buffer: &mut Vec<u8>,
-    ) {
-        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(&path, fingerprint_buffer)
-        {
+    fn maybe_upgrade(&self, path: &Path, fng: FileFingerprint, fingerprinter: &Fingerprinter) {
+        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(&path) {
             self.update_key(old_checksum, fng)
         }
 
@@ -177,9 +170,7 @@ impl CheckpointsView {
         }
 
         if self.checkpoints.get(&fng).is_none() {
-            if let Ok(Some(fingerprint)) =
-                fingerprinter.get_legacy_checksum(&path, fingerprint_buffer)
-            {
+            if let Ok(Some(fingerprint)) = fingerprinter.get_legacy_checksum(&path) {
                 if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
                     self.update(fng, pos);
                 }
@@ -276,10 +267,8 @@ impl Checkpointer {
         path: &Path,
         fresh: FileFingerprint,
         fingerprinter: &Fingerprinter,
-        fingerprint_buffer: &mut Vec<u8>,
     ) {
-        self.checkpoints
-            .maybe_upgrade(path, fresh, fingerprinter, fingerprint_buffer)
+        self.checkpoints.maybe_upgrade(path, fresh, fingerprinter)
     }
 
     /// Persist the current checkpoints state to disk, making our best effort to
@@ -527,8 +516,6 @@ mod test {
             ignore_not_found: false,
         };
 
-        let mut buf = Vec::new();
-
         let data_dir = tempdir().unwrap();
         {
             let mut chkptr = Checkpointer::new(&data_dir.path());
@@ -541,7 +528,7 @@ mod test {
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
-            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf);
+            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter);
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
@@ -568,8 +555,6 @@ mod test {
             ignore_not_found: false,
         };
 
-        let mut buf = Vec::new();
-
         let data_dir = tempdir().unwrap();
         {
             let mut chkptr = Checkpointer::new(&data_dir.path());
@@ -582,7 +567,7 @@ mod test {
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
-            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf);
+            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter);
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
@@ -689,7 +674,7 @@ mod test {
 
         let mut buf = vec![0; 1024];
         let old = fingerprinter
-            .get_bytes_checksum(&log_path, &mut buf)
+            .get_bytes_checksum(&log_path)
             .expect("getting old checksum")
             .expect("still getting old checksum");
 
@@ -712,7 +697,7 @@ mod test {
 
         assert!(chkptr.checkpoints.contains_bytes_checksums());
 
-        chkptr.maybe_upgrade(&log_path, new, &fingerprinter, &mut buf);
+        chkptr.maybe_upgrade(&log_path, new, &fingerprinter);
 
         assert!(!chkptr.checkpoints.contains_bytes_checksums());
         assert_eq!(Some(1234), chkptr.get_checkpoint(new));
