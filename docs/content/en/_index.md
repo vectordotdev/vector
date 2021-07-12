@@ -47,8 +47,7 @@ configure:
   description: "A simple, composable format enables you to build flexible pipelines"
   filename: "/etc/vector/vector.toml"
   below: "Configuration examples are in [TOML](https://toml.io) but Vector also supports [YAML](https://yaml.org) and [JSON](https://json.org)"
-
-  # Actual example configs are in cue/examples.cue
+  # Example configs are specified in cue/examples.cue
 
 # Installation section
 installation:

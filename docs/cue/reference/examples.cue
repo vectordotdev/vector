@@ -17,7 +17,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			type = "remap"
 			inputs = ["datadog_agent"]
 			source = '''
-			redact(., filters: ["us_social_security_number"])
+			  redact(., filters: ["us_social_security_number"])
 			'''
 
 			[sinks.datadog_backend]
