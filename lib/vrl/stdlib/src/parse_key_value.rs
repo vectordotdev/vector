@@ -375,7 +375,7 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 
 /// Parses the key.
 /// Overall parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
-/// Standalone key are handle here so quoted standalone key that contains a delimiter will be dealt with correctly.
+/// Standalone key are handled here so a quoted standalone key that contains a delimiter will be dealt with correctly.
 fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
