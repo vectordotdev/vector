@@ -39,5 +39,5 @@ Generate effective service ports for headless service definition.
 Determines whether there are any ports present.
 */}}
 {{- define "vector-aggregator.servicePortsPresent" -}}
-{{- (not (empty .Values.service.ports)) }}
+{{- or (and .Values.vectorSource.enabled (not .Values.customConfig)) (not (empty .Values.service.ports)) }}
 {{- end }}
