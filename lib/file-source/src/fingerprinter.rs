@@ -158,6 +158,7 @@ impl Fingerprinter {
     }
 
     /// Calculates checksums using strategy pre-0.14.0
+    /// https://github.com/timberio/vector/issues/8182
     pub fn get_legacy_checksum(&self, path: &Path) -> Result<Option<FileFingerprint>, io::Error> {
         match self.strategy {
             FingerprintStrategy::Checksum {

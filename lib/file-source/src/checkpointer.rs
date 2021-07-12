@@ -502,7 +502,7 @@ mod test {
     }
 
     #[test]
-    fn test_checkpointer_fingerprint_upgrades() {
+    fn test_checkpointer_fingerprint_upgrades_unknown() {
         let log_dir = tempdir().unwrap();
         let path = log_dir.path().join("test.log");
         let data = "hello\n";
@@ -552,7 +552,7 @@ mod test {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 1000,
+            max_line_length: 102400,
             ignore_not_found: false,
         };
 
