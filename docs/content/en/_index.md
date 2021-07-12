@@ -48,7 +48,7 @@ configure:
   filename: "/etc/vector/vector.toml"
   below: "Configuration examples are in [TOML](https://toml.io) but Vector also supports [YAML](https://yaml.org) and [JSON](https://json.org)"
   example_configs:
-  - title: Ship redacted Datadog Agent logs to Datadog
+  - title: Redacted Datadog Agent logs to Datadog
     config: |
       [sources.datadog_agent]
       type = "datadog_logs"
@@ -66,7 +66,7 @@ configure:
       inputs = ["remove_sensitive_info"]
       default_api_key = "${DATADOG_API_KEY}"
 
-  - title: Ship logs from a Kafka topic to Elasticsearch
+  - title: Kafka topic to Elasticsearch
     config: |
       [sources.kafka_in]
       type = "kafka"
@@ -80,6 +80,19 @@ configure:
       inputs = ["kafka_in"]
       endpoint = "http://10.24.32.122:9000"
       index = "logs-via-kafka"
+
+  - title: Kubernetes logs to AWS S3
+    config: |
+      [sources.k8s_in]
+      type = "kubernetes_logs"
+      exclude_paths_glob_patterns = []
+
+      [sinks.aws_s3_out]
+      type = "aws_s3"
+      inputs = ["k8s_in"]
+      bucket = "k8s-logs"
+      region = "us-east-1"
+      compression = "gzip"
 
 # Installation section
 installation:
