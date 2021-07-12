@@ -181,7 +181,9 @@ existingConfigMap: ""
 
 # Specify custom contents for the Vector config
 ## ref: https://vector.dev/docs/reference/configuration/
-## Note a complete and valid configuration is required
+## Note a complete and valid configuration is required. If used, the deprecated
+## configuration keys will be ignored. More information can be found at:
+## https://vector.dev/highlights/2021-07-13-helm-customconfig
 customConfig: {}
   #  data_dir: "/vector-data-dir"
   #  sources:
@@ -217,14 +219,12 @@ podMonitor:
 # Global parts of the generated `vector` config.
 # DEPRECATED. Use customConfig instead
 globalOptions:
-  enabled: true
   # Specifies the (in-container) data dir used by `vector`.
   dataDir: "/vector-data-dir"
 
 # Schema part of the generated `vector` config.
 # DEPRECATED. Use customConfig instead
 logSchema:
-  enabled: true
   hostKey: "host"
   messageKey: "message"
   sourceTypeKey: "source_type"

@@ -36,10 +36,8 @@ into the `customConfig` key and converted into snake-case.
 
 ```diff title="values.yaml"
    globalOptions:
-+    enabled: false
      dataDir: "/vector-data-dir"
    logSchema:
-+    enabled: false
      hostKey: "host"
      messageKey: "message"
      sourceTypeKey: "source_type"
@@ -62,7 +60,7 @@ The `extraContainerPorts` or `service` key should be used to expose the port con
 
 ```diff title="values.yaml"
    vectorApi:
-+    enabled: false
+     enabled: true
      address: "0.0.0.0:8686"
      playground: true
    ...
@@ -81,7 +79,7 @@ The vector-agent chart will continue to mount the hostPaths required to access P
 
 ```diff title="values.yaml"
    kubernetesLogsSource:
-+    enabled: false
+     enabled: true
      sourceId: kubernetes_logs
      config: {}
      rawConfig: null
@@ -101,7 +99,7 @@ The `extraContainerPorts` or `service` key should be used to expose the port con
 
 ```diff title="values.yaml"
    vectorSource:
-+    enabled: false
+     enabled: true
      sourceId: vector
      listenAddress: "0.0.0.0"
      listenPort: "9000"
@@ -123,7 +121,7 @@ The `extraContainerPorts` or `service` key should be used to expose the port con
 
 ```diff title="values.yaml"
    vectorSink:
-+    enabled: false
+     enabled: true
      sinkId: vector_sink
      inputs: ["kubernetes_logs"]
      host: vector
@@ -146,7 +144,7 @@ The `extraContainerPorts` or `service` key should be used to expose the port con
 
 ```diff title="values.yaml"
    internalMetricsSource:
-+    enabled: false
+     enabled: true
      sourceId: internal_metrics
      config: {}
      rawConfig: null
@@ -162,12 +160,12 @@ The `extraContainerPorts` or `service` key should be used to expose the port con
 
 ### hostMetricsSource
 
-Users should set the `PROCFS_ROOT` and `SYSFS_ROOT` environment variables, as well as mounting the
-required hostPaths.
+The `vector-agent` chart will automatically set the `PROCFS_ROOT` and `SYSFS_ROOT` environment variables,
+as well as mounting the required hostPaths.
 
 ```diff title="values.yaml"
    hostMetricsSource:
-+    enabled: false
+     enabled: true
      sourceId: host_metrics
      config:
        filesystem:
@@ -192,25 +190,6 @@ required hostPaths.
 +            excludes: ["binfmt_misc"]
 +          mountPoints:
 +            excludes: ["*/proc/sys/fs/binfmt_misc"]
-+  env:
-+    - name: PROCFS_ROOT
-+      value: /host/proc
-+    - name: SYSFS_ROOT
-+      value: /host/sys
-+  extraVolumeMounts:
-+    - name: procfs
-+      mountPath: /host/proc
-+      readOnly: true
-+    - name: sysfs
-+      mountPath: /host/sys
-+      readOnly: true
-+  extraVolumes:
-+    - name: procfs
-+      hostPath:
-+        path: /proc
-+    - name: sysfs
-+      hostPath:
-+        path: /sys
 +    ...
 ```
 
@@ -224,7 +203,7 @@ with the `podAnnotations` key.
 
 ```diff title="values.yaml"
    prometheusSink:
-+    enabled: false
+     enabled: true
      sinkId: prometheus_sink
      inputs: []
      excludeInternalMetrics: false

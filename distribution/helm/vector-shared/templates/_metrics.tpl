@@ -49,13 +49,9 @@ Internal metrics are common, so we share and reuse the definition.
 */}}
 {{- define "libvector.metricsContainerPorts" -}}
 {{- with .Values.prometheusSink }}
-{{- if .enabled -}}
+{{- if and .enabled (not $.Values.customConfig) -}}
 - name: metrics
   containerPort: {{ .listenPort }}
-  protocol: TCP
-{{- else if not $.Values.customConfig -}}
-- name: metrics
-  containerPort: 9090
   protocol: TCP
 {{- end }}
 {{- end }}

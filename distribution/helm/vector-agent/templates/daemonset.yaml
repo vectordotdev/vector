@@ -61,12 +61,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            {{- if or .Values.hostMetricsSource.enabled (not .Values.customConfig) }}
             - name: PROCFS_ROOT
               value: /host/proc
             - name: SYSFS_ROOT
               value: /host/sys
-            {{- end }}
             {{- include "libvector.globalEnv" . | nindent 12 }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
@@ -102,7 +100,6 @@ spec:
             - name: config-dir
               mountPath: /etc/vector
               readOnly: true
-            {{- if or .Values.hostMetricsSource.enabled (not .Values.customConfig) }}
             # Host procsfs mount.
             - name: procfs
               mountPath: /host/proc
@@ -111,7 +108,6 @@ spec:
             - name: sysfs
               mountPath: /host/sys
               readOnly: true
-            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             # Extra volumes.
             {{- toYaml . | nindent 12 }}
@@ -150,7 +146,6 @@ spec:
               {{- with .Values.extraConfigDirSources }}
               {{- toYaml . | nindent 14 }}
               {{- end }}
-        {{- if or .Values.hostMetricsSource.enabled (not .Values.customConfig) }}
         # Host procsfs.
         - name: procfs
           hostPath:
@@ -159,7 +154,6 @@ spec:
         - name: sysfs
           hostPath:
             path: /sys
-        {{- end }}
         {{- with .Values.extraVolumes }}
         # Extra volumes.
         {{- toYaml . | nindent 8 }}
