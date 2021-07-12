@@ -43,7 +43,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			  if err != null {
 			    log(err, level: "error")
 			  }
-			  . = merge(parsed ?? {})
+			  . |= parsed ?? {}
 			'''
 
 			[sinks.elasticsearch_out]
