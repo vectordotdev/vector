@@ -15,8 +15,7 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
-  - docs                # A documentation change.
-  - website             # A website change that isn't a docs content change (CSS, HTML templates, search, etc.).
+  - docs                # A documentation change
 
 scopes:
   - new source
@@ -122,6 +121,7 @@ scopes:
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related
+  - fluent source # Anything `fluent` source related
   - generator source # Anything `generator` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
@@ -131,6 +131,7 @@ scopes:
   - journald source # Anything `journald` source related
   - kafka source # Anything `kafka` source related
   - kubernetes_logs source # Anything `kubernetes_logs` source related
+  - logstash source # Anything `logstash` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
   - nginx_metrics source # Anything `nginx_metrics` source related
   - postgresql_metrics source # Anything `postgresql_metrics` source related
@@ -216,10 +217,10 @@ scopes:
   - vector sink # Anything `vector` sink related
 
   # website
-  - blog # Anything related to the Vector blog
-  - css # Anything related to vector.dev's CSS and aesthetics
-  - guides # Anything related to Vector's guides
-  - highlights # Anything related to vector.dev highlights
-  - javascript # Anything related to the JavaScript functionality on vector.dev
-  - search # Anything related to the website's Algolia search indexing/config
-  - template # Anything related to website HTML and other templates
+  - blog website # Anything related to the Vector blog
+  - css website # Anything related to vector.dev's CSS and aesthetics
+  - guides website # Anything related to Vector's guides
+  - highlights website # Anything related to vector.dev highlights
+  - javascript website # Anything related to the JavaScript functionality on vector.dev
+  - search website # Anything related to the website's Algolia search indexing/config
+  - template website # Anything related to website HTML and other templates
