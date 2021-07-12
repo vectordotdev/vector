@@ -66,20 +66,20 @@ configure:
       inputs = ["remove_sensitive_info"]
       default_api_key = "${DATADOG_API_KEY}"
 
-  - title: Parse NGINX logs
+  - title: Ship logs from a Kafka topic to Elasticsearch
     config: |
-      [sources.nginx_error_log]
-      type = "file"
-      include = ["/var/log/nginx*.log"]
-      start_at_beginning = false
-      ignore_older = 86400
+      [sources.kafka_in]
+      type = "kafka"
+      bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+      group_id = "vector-logs"
+      message_key = "message"
+      topics = ["logs-*"]
 
-      [transforms.nginx_error_parser]
-      inputs = ["nginx_error_log"]
-      type = "remap"
-      source = '''
-      # TODO
-      '''
+      [sinks.elasticsearch_out]
+      type = "elasticsearch"
+      inputs = ["kafka_in"]
+      endpoint = "http://10.24.32.122:9000"
+      index = "logs-via-kafka"
 
 # Installation section
 installation:
