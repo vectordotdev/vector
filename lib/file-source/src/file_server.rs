@@ -116,7 +116,12 @@ where
         let checkpoints = checkpointer.view();
 
         for (path, file_id) in existing_files {
-            checkpointer.maybe_upgrade(&path, file_id, &self.fingerprinter);
+            checkpointer.maybe_upgrade(
+                &path,
+                file_id,
+                &self.fingerprinter,
+                &mut fingerprint_buffer,
+            );
 
             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
         }
