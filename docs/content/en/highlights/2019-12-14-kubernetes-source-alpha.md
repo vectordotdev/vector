@@ -1,7 +1,7 @@
 ---
 date: "2020-03-31"
 title: "New Kubernetes Source (alpha)"
-description: "Early adopters have a new Kuberenetes source to chew on"
+description: "Early adopters have a new Kubernetes source to chew on"
 authors: ["binarylogic"]
 pr_numbers: [893]
 release: "0.6.0"
