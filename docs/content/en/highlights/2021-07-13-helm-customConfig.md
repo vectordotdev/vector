@@ -1,8 +1,8 @@
 ---
 date: "2021-07-13"
-title: "Introduction of `customConfig` and deprecation notice for TOML based config keys"
-short: "Introduction of `customConfig`"
-description: "Configure Vector directly through your `values.yaml` without having to converting to TOML"
+title: "Introduction of `customConfig` Helm option and deprecation notice for TOML based config keys"
+short: "Introduction of `customConfig` in Helm charts"
+description: "Configure Vector directly through your Helm `values.yaml` without having to converting to TOML"
 authors: ["spencergilbert"]
 pr_numbers: [8079]
 release: "0.15.0"
@@ -26,9 +26,12 @@ method.
 The argument passed to Vector has been changed to `--config-dir` which will load any TOML, YAML, or JSON
 files added to the "/etc/vector" directory.
 
+If you have been including files that should not be loaded by Vector as configuration you should move them
+into a separate directory or into a sub-directory of "etc/vector".
+
 ### globalOptions and logSchema
 
-Any [global options](https://vector.dev/docs/reference/configuration/global-options/) can be moved directly
+Any [global options](/docs/reference/configuration/global-options/) can be moved directly
 into the `customConfig` key and converted into snake-case.
 
 ```diff title="values.yaml"
@@ -54,7 +57,7 @@ into the `customConfig` key and converted into snake-case.
 
 ### vectorApi
 
-[Vector API](https://vector.dev/docs/reference/api/) options can be moved as is under a `customConfig.api` key.
+[Vector API](/docs/reference/api/) options can be moved as is under a `customConfig.api` key.
 The `extraContainerPorts` or `service` key should be used to expose the port configured in `customConfig`.
 
 ```diff title="values.yaml"
@@ -159,7 +162,7 @@ The `extraContainerPorts` or `service` key should be used to expose the port con
 
 ### hostMetricsSource
 
-Users should set the PROCFS_ROOT and SYSFS_ROOT environment variables, as well as mounting the
+Users should set the `PROCFS_ROOT` and `SYSFS_ROOT` environment variables, as well as mounting the
 required hostPaths.
 
 ```diff title="values.yaml"
@@ -243,7 +246,7 @@ with the `podAnnotations` key.
 
 ## Using `customConfig`
 
-We've configured the ConfigMap template to `fail` if the deprecated keys are enabled at the same time
+We've configured the `ConfigMap` template to fail if the deprecated keys are enabled at the same time
 as the new YAML based configurations. The following values can be used to disable the old deprecated
 keys and use the new YAML based configuration with default values.
 
