@@ -4,20 +4,20 @@ import algoliasearch from 'algoliasearch/lite'
 import { autocomplete, getAlgoliaResults } from '@algolia/autocomplete-js'
 
 // Algolia search
-const appId = 'EOIG7V0A2O'
-const apiKey = '5f712eef8e5dcf4ac4bbbd0099960626'
-const indexName = 'vector_docs_prod'
+const appId = process.env.ALGOLIA_APP_ID
+const apiKey = process.env.ALGOLIA_PUBLIC_API_KEY
+const indexName = process.env.ALGOLIA_INDEX_NAME
 const searchClient = algoliasearch(appId, apiKey)
 
 const Result = ({ hit, components }) => {
   return (
-    <a href={hit.url}>
+    <a href={hit.itemUrl}>
       <div className="pl-2">
         <p className="text-gray-800 text-md mb-1 font-medium leading-relaxed">
           <components.Highlight hit={hit} attribute="title" />
         </p>
         <p className="text-gray-600 text-sm">
-          <components.Snippet hit={hit} attribute="description" />
+          <components.Snippet hit={hit} attribute="content" />
         </p>
       </div>
     </a>
@@ -95,7 +95,7 @@ const Search = () => {
               })
             },
             getItemUrl({ item }) {
-              return item.url
+              return item.itemUrl
             },
             onActive({ item, setContext }) {
               setContext({ preview: item })

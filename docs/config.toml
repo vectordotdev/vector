@@ -46,10 +46,11 @@ site_generation = 1
 [params.search]
 algolia_app_id = "EOIG7V0A2O"
 # Note that it's okay to use this on the front end: https://www.algolia.com/doc/guides/security/api-keys/#search-only-api-key
-algola_public_api_key = "5f712eef8e5dcf4ac4bbbd0099960626"
+algolia_public_api_key = "5f712eef8e5dcf4ac4bbbd0099960626"
 
 algolia_index_prod = "vector_docs_prod"
 algolia_index_staging = "vector_docs_staging"
+algolia_autocomplete_theme = "classic"
 
 # Outputs (including search.json and _redirects files)
 [outputs]
