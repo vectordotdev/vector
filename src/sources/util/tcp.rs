@@ -12,8 +12,7 @@ use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use socket2::SockRef;
-use std::sync::Arc;
-use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
+use std::{fmt, io, mem::drop, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -74,13 +73,18 @@ pub trait TcpSource: Send + Sync + 'static {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
     type Error: From<io::Error> + IsErrorFatal + std::fmt::Debug + std::fmt::Display + Send;
-    type Decoder: Decoder<Item = (Event, usize), Error = Self::Error> + Send + 'static;
+    type Item: Into<Event> + Send;
+    type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
-    fn decoder(&self) -> Self::Decoder;
+    fn create_decoder(&self) -> Self::Decoder;
 
-    fn handle_event(&self, frame: &mut Event, host: Bytes, byte_size: usize);
+    fn build_event(&self, item: Self::Item) -> Event {
+        item.into()
+    }
 
-    fn build_ack(&self, _frame: &Event) -> Bytes {
+    fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize);
+
+    fn build_ack(&self, _item: &Self::Item) -> Bytes {
         Bytes::new()
     }
 
@@ -169,7 +173,7 @@ pub trait TcpSource: Send + Sync + 'static {
                                 socket,
                                 keepalive,
                                 receive_buffer_bytes,
-                                source.as_ref(),
+                                source,
                                 tripwire,
                                 host,
                                 out,
@@ -192,7 +196,7 @@ async fn handle_stream<T: ?Sized>(
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
-    source: &T,
+    source: Arc<T>,
     mut tripwire: BoxFuture<'static, ()>,
     host: Bytes,
     mut out: impl Sink<Event> + Send + 'static + Unpin,
@@ -224,7 +228,7 @@ async fn handle_stream<T: ?Sized>(
         }
     }
 
-    let mut reader = FramedRead::new(socket, source.decoder());
+    let mut reader = FramedRead::new(socket, source.create_decoder());
 
     loop {
         tokio::select! {
@@ -247,17 +251,17 @@ async fn handle_stream<T: ?Sized>(
             },
             res = reader.next() => {
                 match res {
-                    Some(Ok((mut event, byte_size))) => {
+                    Some(Ok((item, byte_size))) => {
                         let host = host.clone();
-                        let ack = source.build_ack(&event);
-
+                        let ack = source.build_ack(&item);
+                        let mut event = source.build_event(item);
                         source.handle_event(&mut event, host, byte_size);
 
                         match out.send(event).await {
                             Ok(_) => {
                                 let stream = reader.get_mut();
                                 if let Err(error) = stream.write_all(&ack).await {
-                                    emit!(TcpSendAckError{ error });
+                                    emit!(TcpSendAckError { error });
                                     break;
                                 }
                             }

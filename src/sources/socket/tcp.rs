@@ -6,7 +6,6 @@ use crate::{
     tls::TlsConfig,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
 
@@ -72,10 +71,18 @@ impl TcpConfig {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct RawTcpSource<D: tokio_util::codec::Decoder<Item = (Event, usize)>> {
-    pub config: TcpConfig,
-    decoder: D,
+    config: TcpConfig,
+    create_decoder: Box<dyn Fn() -> D + Send + Sync>,
+}
+
+impl<D: tokio_util::codec::Decoder<Item = (Event, usize)>> RawTcpSource<D> {
+    pub fn new(config: TcpConfig, create_decoder: Box<dyn Fn() -> D + Send + Sync>) -> Self {
+        Self {
+            config,
+            create_decoder,
+        }
+    }
 }
 
 impl<D> TcpSource for RawTcpSource<D>
@@ -88,10 +95,11 @@ where
         + Send,
 {
     type Error = D::Error;
+    type Item = Event;
     type Decoder = D;
 
-    fn decoder(&self) -> Self::Decoder {
-        self.decoder
+    fn create_decoder(&self) -> Self::Decoder {
+        (self.create_decoder)()
     }
 
     fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize) {
