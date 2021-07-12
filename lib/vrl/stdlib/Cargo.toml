@@ -149,6 +149,7 @@ default = [
     "to_timestamp",
     "to_unix_timestamp",
     "truncate",
+    "unnest",
     "upcase",
     "uuid_v4",
 ]
@@ -259,6 +260,7 @@ to_syslog_severity = []
 to_timestamp = ["shared/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
 truncate = []
+unnest = []
 upcase = []
 uuid_v4 = ["bytes", "uuid"]
 
