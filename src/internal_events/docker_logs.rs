@@ -164,7 +164,6 @@ impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupported<'a> {
                 to get logs from the Docker daemon."#,
             error = ?self.error,
             container_id = ?self.container_id,
-            internal_log_rate_secs = 10
         );
     }
 
