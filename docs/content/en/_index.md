@@ -85,7 +85,6 @@ configure:
     config: |
       [sources.k8s_in]
       type = "kubernetes_logs"
-      exclude_paths_glob_patterns = []
 
       [sinks.aws_s3_out]
       type = "aws_s3"
@@ -93,6 +92,18 @@ configure:
       bucket = "k8s-logs"
       region = "us-east-1"
       compression = "gzip"
+
+  - title: Splunk HEC to Datadog
+    config: |
+      [sources.splunk_hec_in]
+      type = "splunk_hec"
+      address = "localhost:8080"
+      token = "${SPLUNK_HEC_TOKEN}"
+
+      [sinks.datadog_out]
+      type = "datadog_logs"
+      inputs = ["splunk_hec_in"]
+      default_api_key = "${DATADOG_API_KEY}"
 
 # Installation section
 installation:

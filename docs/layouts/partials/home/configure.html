@@ -36,10 +36,10 @@
         </div>
       </div>
 
-      <div class="p-4">
+      <div class="p-4 overflow-x-scroll">
         {{ range $configs }}
         {{ $code := highlight .config "toml" "" }}
-        <div x-show="config === '{{ .title }}'">
+        <div x-show="config === '{{ .title }}'" class="text-sm">
           {{ $code }}
         </div>
         {{ end }}
