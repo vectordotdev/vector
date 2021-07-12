@@ -401,6 +401,7 @@ mod test {
         Checkpoint, Checkpointer, FileFingerprint, FilePosition, STABLE_FILE_NAME, TMP_FILE_NAME,
     };
     use chrono::{Duration, Utc};
+    use pretty_assertions::assert_eq;
     use tempfile::tempdir;
 
     #[test]
@@ -702,5 +703,110 @@ mod test {
         assert!(!chkptr.checkpoints.contains_bytes_checksums());
         assert_eq!(Some(1234), chkptr.get_checkpoint(new));
         assert_eq!(None, chkptr.get_checkpoint(old));
+    }
+
+    // guards against accidental changes to the checkpoint serialization
+    #[test]
+    fn test_checkpointer_serialization() {
+        let fingerprints = vec![
+            (
+                FileFingerprint::DevInode(1, 2),
+                r#"{"version":"1","checkpoints":[{"fingerprint":{"dev_inode":[1,2]},"position":1234}]}"#,
+            ),
+            (
+                FileFingerprint::BytesChecksum(3456),
+                r#"{"version":"1","checkpoints":[{"fingerprint":{"checksum":3456},"position":1234}]}"#,
+            ),
+            (
+                FileFingerprint::FirstLinesChecksum(78910),
+                r#"{"version":"1","checkpoints":[{"fingerprint":{"first_lines_checksum":78910},"position":1234}]}"#,
+            ),
+            (
+                FileFingerprint::Unknown(1337),
+                r#"{"version":"1","checkpoints":[{"fingerprint":{"unknown":1337},"position":1234}]}"#,
+            ),
+        ];
+        for (fingerprint, expected) in fingerprints {
+            let expected: serde_json::Value = serde_json::from_str(expected).unwrap();
+
+            let position: FilePosition = 1234;
+            let data_dir = tempdir().unwrap();
+            let mut chkptr = Checkpointer::new(&data_dir.path());
+
+            chkptr.update_checkpoint(fingerprint, position);
+            chkptr.write_checkpoints().unwrap();
+
+            let got: serde_json::Value = {
+                let s = std::fs::read_to_string(data_dir.path().join("checkpoints.json")).unwrap();
+                let mut checkpoints: serde_json::Value = serde_json::from_str(&s).unwrap();
+                for checkpoint in checkpoints["checkpoints"].as_array_mut().unwrap() {
+                    checkpoint.as_object_mut().unwrap().remove("modified");
+                }
+                checkpoints
+            };
+
+            assert_eq!(expected, got);
+        }
+    }
+
+    // guards against accidental changes to the checkpoint deserialization and tests deserializing
+    // old checkpoint versions
+    #[test]
+    fn test_checkpointer_deserialization() {
+        let serialized_checkpoints = r#"
+{
+  "version": "1",
+  "checkpoints": [
+    {
+      "fingerprint": { "dev_inode": [ 1, 2 ] },
+      "position": 1234,
+      "modified": "2021-07-12T18:19:11.769003Z"
+    },
+    {
+      "fingerprint": { "checksum": 3456 },
+      "position": 1234,
+      "modified": "2021-07-12T18:19:11.769003Z"
+    },
+    {
+      "fingerprint": { "first_line_checksum": 1234 },
+      "position": 1234,
+      "modified": "2021-07-12T18:19:11.769003Z"
+    },
+    {
+      "fingerprint": { "first_lines_checksum": 78910 },
+      "position": 1234,
+      "modified": "2021-07-12T18:19:11.769003Z"
+    },
+    {
+      "fingerprint": { "unknown": 1337 },
+      "position": 1234,
+      "modified": "2021-07-12T18:19:11.769003Z"
+    }
+  ]
+}
+        "#;
+        let fingerprints = vec![
+            FileFingerprint::DevInode(1, 2),
+            FileFingerprint::BytesChecksum(3456),
+            FileFingerprint::FirstLinesChecksum(1234),
+            FileFingerprint::FirstLinesChecksum(78910),
+            FileFingerprint::Unknown(1337),
+        ];
+
+        let data_dir = tempdir().unwrap();
+
+        let mut chkptr = Checkpointer::new(&data_dir.path());
+
+        std::fs::write(
+            data_dir.path().join("checkpoints.json"),
+            serialized_checkpoints,
+        )
+        .unwrap();
+
+        chkptr.read_checkpoints(None);
+
+        for fingerprint in fingerprints {
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(1234))
+        }
     }
 }
