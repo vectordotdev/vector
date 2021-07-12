@@ -1,6 +1,7 @@
-use chrono::prelude::*;
+use chrono::prelude::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
+use shared::TimeZone;
 use std::collections::BTreeMap;
 use vrl::prelude::*;
 
@@ -114,26 +115,20 @@ lazy_static! {
     .expect("failed compiling regex for Nginx error log");
 }
 
-// Parse the time as Utc if we can extract the timezone.
-// If we can't `chrono` will error, and we will have to parse the time as a local time.
-fn parse_time(time: &str, format: &str) -> std::result::Result<DateTime<Utc>, String> {
-    DateTime::parse_from_str(time, &format)
-        .map(Into::into)
-        .or_else(|_| {
-            let parsed =
-                &chrono::NaiveDateTime::parse_from_str(time, &format).map_err(|error| {
-                    format!(
-                        r#"failed parsing timestamp {} using format {}: {}"#,
-                        time, format, error
-                    )
-                })?;
-
-            let result = Local.from_local_datetime(&parsed).earliest();
-
-            match result {
-                Some(result) => Ok(result.into()),
-                None => Ok(Local.from_utc_datetime(parsed).into()),
-            }
+// Parse the time as Utc from the given timezone
+fn parse_time(
+    time: &str,
+    format: &str,
+    timezone: &TimeZone,
+) -> std::result::Result<DateTime<Utc>, String> {
+    timezone
+        .datetime_from_str(time, format)
+        .or_else(|_| DateTime::parse_from_str(time, &format).map(Into::into))
+        .map_err(|err| {
+            format!(
+                "failed parsing timestamp {} using format {}: {}",
+                time, format, err
+            )
         })
 }
 
@@ -144,9 +139,10 @@ fn capture_value(
     name: &str,
     value: &str,
     timestamp_format: &str,
+    timezone: &TimeZone,
 ) -> std::result::Result<Value, String> {
     Ok(match name {
-        "timestamp" => Value::Timestamp(parse_time(&value, &timestamp_format)?),
+        "timestamp" => Value::Timestamp(parse_time(&value, &timestamp_format, timezone)?),
         "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
             value
                 .parse()
@@ -161,6 +157,7 @@ pub fn log_fields(
     regex: &Regex,
     captures: &Captures,
     timestamp_format: &str,
+    timezone: &TimeZone,
 ) -> std::result::Result<Value, String> {
     Ok(regex
         .capture_names()
@@ -169,7 +166,7 @@ pub fn log_fields(
                 captures.name(name).map(|value| {
                     Ok((
                         name.to_string(),
-                        capture_value(&name, &value.as_str(), &timestamp_format)?,
+                        capture_value(&name, &value.as_str(), &timestamp_format, timezone)?,
                     ))
                 })
             })

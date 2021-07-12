@@ -430,6 +430,10 @@ impl IngestorProcess {
                     None => lines,
                 };
 
+                let bucket_name = Bytes::from(s3_event.s3.bucket.name.as_str().as_bytes().to_vec());
+                let object_key = Bytes::from(s3_event.s3.object.key.as_str().as_bytes().to_vec());
+                let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
+
                 let mut stream = lines.filter_map(|line| {
                     emit!(SqsS3EventReceived {
                         byte_size: line.len()
@@ -438,10 +442,10 @@ impl IngestorProcess {
                     let mut event = Event::from(line);
 
                     let log = event.as_mut_log();
-                    log.insert("bucket", s3_event.s3.bucket.name.clone());
-                    log.insert("object", s3_event.s3.object.key.clone());
-                    log.insert("region", s3_event.aws_region.clone());
-                    log.insert(log_schema().timestamp_key(), timestamp);
+                    log.insert_flat("bucket", bucket_name.clone());
+                    log.insert_flat("object", object_key.clone());
+                    log.insert_flat("region", aws_region.clone());
+                    log.insert_flat(log_schema().timestamp_key(), timestamp);
 
                     if let Some(metadata) = &metadata {
                         for (key, value) in metadata {

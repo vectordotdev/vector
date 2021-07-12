@@ -43,12 +43,6 @@ favicon = "favicon.ico"
 site_generation = 1
 
 # Search
-[outputFormats.SEARCH]
-baseName = "search"
-isPlainText = true
-mediaType = "application/json"
-notAlternative = true
-
 [params.search]
 algolia_app_id = "EOIG7V0A2O"
 # Note that it's okay to use this on the front end: https://www.algolia.com/doc/guides/security/api-keys/#search-only-api-key
@@ -59,7 +53,7 @@ algolia_index_staging = "vector_docs_staging"
 
 # Outputs (including search.json and _redirects files)
 [outputs]
-home = ["HTML", "RSS", "SEARCH"]
+home = ["HTML", "RSS"]
 
 # CSS generation
 [[params.css]]

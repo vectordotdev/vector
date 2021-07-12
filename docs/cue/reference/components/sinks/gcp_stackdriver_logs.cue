@@ -136,8 +136,8 @@ components: sinks: gcp_stackdriver_logs: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["vector-logs"]
-				syntax: "literal"
+				examples: ["vector-logs", "{{ component_name }}"]
+				syntax: "template"
 			}
 		}
 		organization_id: {

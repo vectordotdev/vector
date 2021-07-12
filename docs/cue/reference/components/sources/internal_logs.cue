@@ -20,7 +20,7 @@ components: sources: internal_logs: {
 				name:     "Vector instance"
 				thing:    "a \(name)"
 				url:      urls.vector_docs
-				versions: ">= 0.11.0"
+				versions: ">= 0.12.0"
 			}
 		}
 		multiline: enabled: false

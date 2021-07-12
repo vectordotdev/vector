@@ -4,7 +4,7 @@ components: transforms: aws_ec2_metadata: {
 	title: "AWS EC2 Metadata"
 
 	description: """
-		Enriches log events with AWS EC2 environment metadata.
+		Enriches events with AWS EC2 environment metadata.
 		"""
 
 	classes: {
@@ -96,7 +96,14 @@ components: transforms: aws_ec2_metadata: {
 
 	input: {
 		logs:    true
-		metrics: null
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
 	}
 
 	output: logs: log: {
