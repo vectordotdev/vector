@@ -2,6 +2,11 @@ use vrl::prelude::*;
 
 use datadog_search_syntax::{normalize_fields, parse, Field, QueryNode};
 use lookup::{parser::parse_lookup, LookupBuf};
+use regex::Regex;
+
+lazy_static::lazy_static! {
+    static ref WORD_REGEX: Regex = Regex::new("^\"(.+)\"$").unwrap();
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;
@@ -75,50 +80,59 @@ fn matches_vrl_object(node: &QueryNode, obj: Value) -> bool {
         QueryNode::MatchAllDocs => true,
         QueryNode::AttributeExists { attr } => exists(attr, obj),
         QueryNode::AttributeMissing { attr } => !exists(attr, obj),
+        QueryNode::AttributeTerm { attr, value } => equals(attr, obj, value),
         _ => false,
     }
 }
 
 fn exists<T: AsRef<str>>(attr: T, obj: Value) -> bool {
-    normalize_fields(attr).into_iter().any(|f| match f {
-        Field::Default(p) | Field::Reserved(p) | Field::Facet(p) => {
-            let buf = match parse_lookup(p.as_str()) {
-                Ok(l) => l.into_buf(),
-                Err(_) => return false,
-            };
+    normalize_fields(attr).into_iter().any(|f| {
+        let path = match lookup_field(&f) {
+            Some(path) => path,
+            None => return false,
+        };
 
-            obj.get_by_path(&buf).is_some()
-        }
-        Field::Tag(t) => {
-            let buf = LookupBuf::from("tags");
-
-            match obj.get_by_path(&buf) {
+        match f {
+            // Tags exist by element value
+            Field::Tag(t) => match obj.get_by_path(&buf) {
                 Some(Value::Array(v)) => v.contains(&Value::Bytes(t.into())),
                 _ => false,
-            }
+            },
+            // Other fields exist by path
+            _ => obj.get_by_path(&buf).is_some(),
         }
     })
 }
 
-fn equals<T: AsRef<str>>(attr: T, obj: Value) -> bool {
-    normalize_fields(attr).into_iter().any(|f| match f {
-        Field::Default(p) | Field::Reserved(p) | Field::Facet(p) => {
-            let buf = match parse_lookup(p.as_str()) {
-                Ok(l) => l.into_buf(),
-                Err(_) => return false,
-            };
+fn equals<T: AsRef<str>>(attr: T, obj: Value, to_match: &str) -> bool {
+    normalize_fields(attr).into_iter().any(|f| {
+        let path = match lookup_field(&f) {
+            Some(b) => b,
+            _ => return false,
+        };
 
-            obj.get_by_path(&buf).is_some()
-        }
-        Field::Tag(t) => {
-            let buf = LookupBuf::from("tags");
-
-            match obj.get_by_path(&buf) {
+        match f {
+            // Tags are compared by element value
+            Field::Tag(t) => match obj.get_by_path(&buf) {
                 Some(Value::Array(v)) => v.contains(&Value::Bytes(t.into())),
                 _ => false,
-            }
+            },
+            // Default tags are compared by word boundary
+            Field::Default(_) => {}
+            _ => obj.get_by_path(&buf).is_some(),
         }
     })
+}
+
+/// If the provided field is a `Field::Tag`, will return a "tags" lookup buf. Otherwise,
+/// parses the field and returns a lookup buf is the lookup itself is valid.
+fn lookup_field(field: &Field) -> Option<LookupBuf> {
+    match field {
+        Field::Default(p) | Field::Reserved(p) | Field::Facet(p) => {
+            Some(parse_lookup(p.as_str())?.into_buf())
+        }
+        Field::Tag(t) => Some(LookupBuf::from("tags")),
+    }
 }
 
 #[cfg(test)]
@@ -160,6 +174,12 @@ mod test {
 
         tag_missing {
             args: func_args![value: value!({"tags": ["b","c"]}), query: "_missing_:a"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        equals_message {
+            args: func_args![value: value!({"message": ["b","c"]}), query: "_missing_:a"],
             want: Ok(true),
             tdef: type_def(),
         }
