@@ -52,7 +52,13 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
+    
     data_dir = "/vector-data-dir"
+    
+    [api]
+      enabled = false
+      address = "0.0.0.0:8686"
+      playground = true
     
     [log_schema]
       host_key = "host"
@@ -111,7 +117,13 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
+    
     data_dir = "/vector-data-dir"
+    
+    [api]
+      enabled = false
+      address = "0.0.0.0:8686"
+      playground = true
     
     [log_schema]
       host_key = "host"
@@ -171,53 +183,6 @@ subjects:
   - kind: ServiceAccount
     name: vector-agent
     namespace: vector
----
-# Source: vector/charts/vector-aggregator/templates/service-headless.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: vector-aggregator-headless
-  labels:
-    helm.sh/chart: vector-aggregator-0.0.0
-    app.kubernetes.io/name: vector-aggregator
-    app.kubernetes.io/instance: vector
-    app.kubernetes.io/version: "0.0.0"
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/part-of: vector-aggregator
-spec:
-  clusterIP: None
-  ports:
-  - port: 9000
-    name: vector
-    protocol: TCP
-  selector:
-    app.kubernetes.io/name: vector-aggregator
-    app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: aggregator
----
-# Source: vector/charts/vector-aggregator/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: vector-aggregator
-  labels:
-    helm.sh/chart: vector-aggregator-0.0.0
-    app.kubernetes.io/name: vector-aggregator
-    app.kubernetes.io/instance: vector
-    app.kubernetes.io/version: "0.0.0"
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/part-of: vector-aggregator
-spec:
-  type: ClusterIP
-  ports:
-  - port: 9000
-    targetPort: 9000
-    name: vector
-    protocol: TCP
-  selector:
-    app.kubernetes.io/name: vector-aggregator
-    app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: aggregator
 ---
 # Source: vector/charts/vector-agent/templates/daemonset.yaml
 apiVersion: apps/v1

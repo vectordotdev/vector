@@ -10,27 +10,6 @@ use tracing::{debug, info};
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
-const HELM_VALUES_DISABLE_DEPRECATED: &str = indoc! {r#"
-    globalOptions:
-      enabled: false
-    logSchema:
-      enabled: false
-    vectorApi:
-      enabled: false
-    kubernetesLogsSource:
-      enabled: false
-    vectorSource:
-      enabled: false
-    vectorSink:
-      enabled: false
-    internalMetricsSource:
-      enabled: false
-    hostMetricsSource:
-      enabled: false
-    prometheusSink:
-      enabled: false
-"#};
-
 const HELM_VALUES_LOWER_GLOB: &str = indoc! {r#"
     kubernetesLogsSource:
       rawConfig: |
@@ -225,8 +204,7 @@ async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
-                    HELM_VALUES_CUSTOM_CONFIG,
-                    HELM_VALUES_DISABLE_DEPRECATED,
+                    HELM_VALUES_CUSTOM_CONFIG
                 ],
                 ..Default::default()
             },
@@ -2108,41 +2086,5 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     drop(test_pod);
     drop(test_namespace);
     drop(vector);
-    Ok(())
-}
-
-/// This test validates that vector-agent picks up logs at the simplest case
-#[tokio::test]
-async fn test_template_fail() -> Result<(), Box<dyn std::error::Error>> {
-    let _guard = lock();
-    init();
-
-    let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
-    let framework = make_framework();
-    let override_name = get_override_name(&namespace, "vector-agent");
-
-    let mut failed = false;
-    let vector = framework
-        .vector(
-            &namespace,
-            HELM_CHART_VECTOR_AGENT,
-            VectorConfig {
-                custom_helm_values: vec![
-                    &config_override_name(&override_name, true),
-                    HELM_VALUES_CUSTOM_CONFIG,
-                ],
-                ..Default::default()
-            },
-        )
-        .await;
-    if vector.is_err() {
-        failed = true;
-    } else {
-        drop(pod_namespace);
-        drop(vector);
-    }
-
-    assert!(failed);
     Ok(())
 }
