@@ -91,10 +91,10 @@ spec:
               readOnly: true
             # Vector data dir mount.
             - name: data-dir
-            {{- if .Values.globalOptions.enabled }}
-              mountPath: "{{ .Values.globalOptions.dataDir }}"
-            {{- else }}
+            {{- if .Values.customConfig }}
               mountPath: "{{ .Values.customConfig.data_dir | default "/vector-data-dir" }}"
+            {{- else }}
+              mountPath: "{{ .Values.globalOptions.dataDir }}"
             {{- end }}
             # Vector config dir mount.
             - name: config-dir
