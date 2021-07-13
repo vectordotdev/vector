@@ -1,0 +1,28 @@
+{{ define "main" }}
+<div class="relative py-12 md:py-16 lg:py-20 px-4 sm:px-6 mx-auto max-w-7xl">
+  <div class="text-center">
+    <h2 class="dark:text-gray-50 font-secondary font-extrabold text-5xl lg:text-6xl leading-tight tracking-tight inline-flex space-x-5">
+      <span class="text-secondary dark:text-primary">404</span>
+      <span>Page not found</span>
+    </h2>
+
+    <p class="mt-6 text-2xl text-dark dark:text-gray-300 font-semibold">
+      Uh-oh! That link doesn't seem to exist.
+    </p>
+  </div>
+
+  <div class="mt-16">
+    <p class="text-xl text-dark dark:text-gray-200">
+      Below is a full listing of the site's pages in alphabetical order by title. We hope you find what you're looking for!
+    </p>
+
+    <div class="mt-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4">
+      {{ range site.AllPages }}
+      <a href="{{ .RelPermalink }}" class="text-sm text-dark dark:text-gray-200 hover:text-secondary dark:hover:text-primary">
+        {{ .Title }}
+      </a>
+      {{ end }}
+    </div>
+  </div>
+</div>
+{{ end }}

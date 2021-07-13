@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="572px" height="478px" viewBox="0 0 572 478" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>vrl-quadrant-comparison</title>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="vrl-quadrant-comparison" transform="translate(0.000000, 1.000000)">
+            <g id="Group" transform="translate(63.000000, 0.000000)" fill="#000000" fill-rule="nonzero">
+                <rect id="Rectangle" fill-opacity="0.1" x="0" y="0" width="250" height="204" rx="3"></rect>
+                <g transform="translate(13.000000, 60.000000)">
+                    <circle id="Oval" cx="18" cy="10" r="10"></circle>
+                    <g id="Static" transform="translate(0.000000, 25.000000)" font-family="Helvetica-Bold, Helvetica" font-size="13" font-weight="bold">
+                        <text>
+                            <tspan x="0" y="13">Static</tspan>
+                        </text>
+                    </g>
+                </g>
+            </g>
+            <g id="Group" transform="translate(321.000000, 0.000000)" fill-rule="nonzero">
+                <rect id="Rectangle" fill-opacity="0.1" fill="#000000" x="0" y="0" width="250" height="204" rx="3"></rect>
+                <g transform="translate(123.842593, 29.000000)">
+                    <circle id="Oval" fill="#28D9F2" cx="13.4722222" cy="10" r="10"></circle>
+                    <g id="VRL" transform="translate(0.000000, 25.000000)" fill="#000000" font-family="Helvetica-Bold, Helvetica" font-size="13" font-weight="bold">
+                        <text>
+                            <tspan x="0" y="13">VRL</tspan>
+                        </text>
+                    </g>
+                </g>
+            </g>
+            <rect id="Rectangle" fill-opacity="0.1" fill="#000000" fill-rule="nonzero" x="63" y="216" width="250" height="204" rx="3"></rect>
+            <g id="Group" transform="translate(321.000000, 216.000000)" fill="#000000" fill-rule="nonzero">
+                <rect id="Rectangle" fill-opacity="0.1" x="0" y="0" width="250" height="204" rx="3"></rect>
+                <g transform="translate(178.240741, 74.000000)">
+                    <g id="Runtimes" transform="translate(0.000000, 24.000000)" font-family="Helvetica-Bold, Helvetica" font-size="13" font-weight="bold">
+                        <text>
+                            <tspan x="0" y="13">Runtimes</tspan>
+                        </text>
+                    </g>
+                    <circle id="Oval" cx="33.1481481" cy="10" r="10"></circle>
+                </g>
+            </g>
+            <g id="Group-3" transform="translate(67.000000, 430.000000)">
+                <g id="Flexibility" transform="translate(202.000000, 22.000000)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="21" font-weight="normal">
+                    <text>
+                        <tspan x="0" y="20">Flexibility</tspan>
+                    </text>
+                </g>
+                <g id="Group" stroke-linecap="round" stroke-linejoin="round" stroke="#28D9F2">
+                    <line x1="0" y1="6" x2="499.418182" y2="6" id="Path" stroke-width="4"></line>
+                    <polygon id="Path" stroke-width="2" fill="#28D9F2" fill-rule="nonzero" points="495.876322 0.45905 504 6 495.876322 11.54095"></polygon>
+                </g>
+            </g>
+            <g id="Group-2" transform="translate(0.975789, 0.000000)">
+                <g id="Performance" transform="translate(13.484274, 207.515726) rotate(-90.000000) translate(-13.484274, -207.515726) translate(-89.515726, 194.515726)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="21" font-weight="normal">
+                    <text id="Performance-&amp;-Safety">
+                        <tspan x="0" y="20.515726">Performance &amp; Safety</tspan>
+                    </text>
+                </g>
+                <g id="Group" stroke-linecap="round" stroke-linejoin="round" transform="translate(38.024211, 0.000000)" stroke="#28D9F2">
+                    <line x1="6" y1="416" x2="6" y2="4" id="Path" stroke-width="4"></line>
+                    <polygon id="Path" stroke-width="2" fill="#28D9F2" fill-rule="nonzero" points="0.45905 7.0921 6 0 11.54095 7.0921"></polygon>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

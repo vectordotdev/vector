@@ -118,8 +118,10 @@ scopes:
   - aws_ecs_metrics source # Anything `aws_ecs_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - aws_s3 source # Anything `aws_s3` source related
+  - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related
+  - fluent source # Anything `fluent` source related
   - generator source # Anything `generator` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
@@ -129,6 +131,7 @@ scopes:
   - journald source # Anything `journald` source related
   - kafka source # Anything `kafka` source related
   - kubernetes_logs source # Anything `kubernetes_logs` source related
+  - logstash source # Anything `logstash` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
   - nginx_metrics source # Anything `nginx_metrics` source related
   - postgresql_metrics source # Anything `postgresql_metrics` source related
@@ -178,6 +181,7 @@ scopes:
   - aws_kinesis_streams sink # Anything `aws_kinesis_streams` sink related
   - aws_s3 sink # Anything `aws_s3` sink related
   - aws_sqs sink # Anything `aws_sqs` sink related
+  - azure_blob sink # Anything `azure_blob` sink related
   - azure_monitor_logs sink # Anything `azure_monitor_logs` sink related
   - blackhole sink # Anything `blackhole` sink related
   - clickhouse sink # Anything `clickhouse` sink related
@@ -204,9 +208,19 @@ scopes:
   - prometheus_exporter sink # Anything `prometheus_exporter` sink related
   - prometheus_remote_write sink # Anything `prometheus_remote_write` sink related
   - pulsar sink # Anything `pulsar` sink related
+  - redis sink # Anything `redis` sink related
   - sematext_logs sink # Anything `sematext_logs` sink related
   - sematext_metrics sink # Anything `sematext_metrics` sink related
   - socket sink # Anything `socket` sink related
   - splunk_hec sink # Anything `splunk_hec` sink related
   - statsd sink # Anything `statsd` sink related
   - vector sink # Anything `vector` sink related
+
+  # website
+  - blog website # Anything related to the Vector blog
+  - css website # Anything related to vector.dev's CSS and aesthetics
+  - guides website # Anything related to Vector's guides
+  - highlights website # Anything related to vector.dev highlights
+  - javascript website # Anything related to the JavaScript functionality on vector.dev
+  - search website # Anything related to the website's Algolia search indexing/config
+  - template website # Anything related to website HTML and other templates

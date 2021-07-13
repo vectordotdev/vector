@@ -119,6 +119,8 @@ impl_generate_config_from_default!(HostMetricsConfig);
 #[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        init_roots();
+
         let mut config = self.clone();
         config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
 
@@ -714,30 +716,36 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     metrics
 }
 
-pub fn init_roots() {
+fn init_roots() {
     #[cfg(target_os = "linux")]
     {
-        match std::env::var_os("PROCFS_ROOT") {
-            Some(procfs_root) => {
-                info!(
-                    message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
-                    custom = ?procfs_root
-                );
-                heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
-            }
-            None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
-        };
+        use std::sync::Once;
 
-        match std::env::var_os("SYSFS_ROOT") {
-            Some(sysfs_root) => {
-                info!(
-                    message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
-                    custom = ?sysfs_root
-                );
-                heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
+        static INIT: Once = Once::new();
+
+        INIT.call_once(|| {
+            match std::env::var_os("PROCFS_ROOT") {
+                Some(procfs_root) => {
+                    info!(
+                        message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
+                        custom = ?procfs_root
+                    );
+                    heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
+                }
+                None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
+            };
+
+            match std::env::var_os("SYSFS_ROOT") {
+                Some(sysfs_root) => {
+                    info!(
+                        message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
+                        custom = ?sysfs_root
+                    );
+                    heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
+                }
+                None => info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root."),
             }
-            None => info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root."),
-        }
+        });
     };
 }
 

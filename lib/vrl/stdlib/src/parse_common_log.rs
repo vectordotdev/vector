@@ -83,6 +83,7 @@ impl Expression for ParseCommonLogFn {
             &log_util::REGEX_APACHE_COMMON_LOG,
             &captures,
             &timestamp_format,
+            ctx.timezone(),
         )
         .map_err(Into::into)
     }

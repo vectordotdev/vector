@@ -30,14 +30,16 @@ sha-2 = { package = "sha2", version = "0.9", optional = true }
 sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.10", optional = true }
+syslog_loose = { version = "0.14", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
+roxmltree = { version = "0.14.1", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
 criterion = "0.3"
+chrono-tz = "0.5"
 
 [features]
 default = [
@@ -63,14 +65,17 @@ default = [
     "flatten",
     "float",
     "floor",
+    "format_int",
     "format_number",
     "format_timestamp",
     "get_env_var",
     "get_hostname",
     "includes",
     "integer",
+    "ip_aton",
     "ip_cidr_contains",
     "ip_subnet",
+    "ip_ntoa",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_array",
@@ -102,6 +107,7 @@ default = [
     "parse_duration",
     "parse_glog",
     "parse_grok",
+    "parse_int",
     "parse_json",
     "parse_key_value",
     "parse_klog",
@@ -116,6 +122,7 @@ default = [
     "parse_timestamp",
     "parse_tokens",
     "parse_url",
+    "parse_xml",
     "push",
     "redact",
     "replace",
@@ -142,6 +149,7 @@ default = [
     "to_timestamp",
     "to_unix_timestamp",
     "truncate",
+    "unnest",
     "upcase",
     "uuid_v4",
 ]
@@ -168,13 +176,16 @@ exists = []
 flatten = []
 float = []
 floor = []
+format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
 get_env_var = []
 get_hostname = ["hostname"]
 includes = []
 integer = []
+ip_aton = []
 ip_cidr_contains = ["cidr-utils"]
+ip_ntoa = []
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
@@ -207,6 +218,7 @@ parse_csv = ["csv"]
 parse_duration = ["rust_decimal"]
 parse_glog = ["chrono"]
 parse_grok = ["grok"]
+parse_int = []
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
 parse_klog = ["chrono"]
@@ -221,6 +233,7 @@ parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_tokens = ["shared/tokenize"]
 parse_url = ["url"]
+parse_xml = ["roxmltree", "lazy_static", "regex"]
 push = []
 redact = []
 replace = []
@@ -247,6 +260,7 @@ to_syslog_severity = []
 to_timestamp = ["shared/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
 truncate = []
+unnest = []
 upcase = []
 uuid_v4 = ["bytes", "uuid"]
 

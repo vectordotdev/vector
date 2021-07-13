@@ -1,0 +1,28 @@
+{{ $title := .Params.short | default .Title }}
+{{ $componentTag := .File.BaseFileName }}
+{{ $kind := .Params.kind }}
+<div>
+  <a href="{{ .RelPermalink }}">
+    <div class="no-prose border hover:border-4 rounded dark:border-gray-700 p-4 shadow-sm hover:border-secondary dark:hover:border-primary">
+      <span class="flex justify-between items-center text-sm">
+        <span class="text-gray-600 dark:text-gray-300">
+          {{ $title }}
+        </span>
+
+        {{ partial "badge.html" (dict "word" $kind "color" "indigo") }}
+      </span>
+
+      <div class="mt-3.5 overflow-x-auto">
+        <span class="text-xs font-mono bg-gray-100 text-dark dark:bg-gray-600 dark:text-gray-200 py-1 px-2 rounded font-bold">
+          {{ $componentTag }}
+        </span>
+      </div>
+
+      {{ with .Description }}
+      <div class="mt-3.5 prose-sm dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
+        {{ . | markdownify | plainify | safeHTML }}
+      </div>
+      {{ end }}
+    </div>
+  </a>
+</div>

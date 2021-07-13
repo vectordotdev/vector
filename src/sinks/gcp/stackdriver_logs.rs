@@ -1,8 +1,10 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
+use crate::template::TemplateRenderingError;
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
+    internal_events::TemplateRenderingFailed,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -12,6 +14,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use futures::{FutureExt, SinkExt};
@@ -34,7 +37,7 @@ enum HealthcheckError {
 pub struct StackdriverConfig {
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
-    pub log_id: String,
+    pub log_id: Template,
 
     pub resource: StackdriverResource,
     pub severity_key: Option<String>,
@@ -89,7 +92,7 @@ pub struct StackdriverResource {
     #[serde(rename = "type")]
     pub type_: String,
     #[serde(flatten)]
-    pub labels: HashMap<String, String>,
+    pub labels: HashMap<String, Template>,
 }
 
 inventory::submit! {
@@ -159,6 +162,32 @@ impl HttpSink for StackdriverSink {
     type Output = Vec<BoxedRawValue>;
 
     fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+        let mut labels = HashMap::with_capacity(self.config.resource.labels.len());
+        for (key, template) in &self.config.resource.labels {
+            let value = template
+                .render_string(&event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("resource.labels"),
+                        drop_event: true,
+                    });
+                })
+                .ok()?;
+            labels.insert(key.clone(), value);
+        }
+        let log_name = self
+            .config
+            .log_name(&event)
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("log_id"),
+                    drop_event: true,
+                });
+            })
+            .ok()?;
+
         let mut log = event.into_log();
         let severity = self
             .severity_key
@@ -172,9 +201,17 @@ impl HttpSink for StackdriverSink {
 
         let log = event.into_log();
 
-        let mut entry = map::Map::with_capacity(3);
+        let mut entry = map::Map::with_capacity(5);
+        entry.insert("logName".into(), json!(log_name));
         entry.insert("jsonPayload".into(), json!(log));
         entry.insert("severity".into(), json!(severity));
+        entry.insert(
+            "resource".into(),
+            json!({
+                "type": self.config.resource.type_,
+                "labels": labels,
+            }),
+        );
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
         if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
@@ -185,14 +222,7 @@ impl HttpSink for StackdriverSink {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
-        let events = serde_json::json!({
-            "log_name": self.config.log_name(),
-            "entries": events,
-            "resource": {
-                "type": self.config.resource.type_,
-                "labels": self.config.resource.labels,
-            }
-        });
+        let events = serde_json::json!({ "entries": events });
 
         let body = serde_json::to_vec(&events).unwrap();
 
@@ -257,14 +287,17 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
 }
 
 impl StackdriverConfig {
-    fn log_name(&self) -> String {
+    fn log_name(&self, event: &Event) -> Result<String, TemplateRenderingError> {
         use StackdriverLogName::*;
-        match &self.log_name {
-            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, self.log_id),
-            Folder(folder) => format!("folders/{}/logs/{}", folder, self.log_id),
-            Organization(org) => format!("organizations/{}/logs/{}", org, self.log_id),
-            Project(project) => format!("projects/{}/logs/{}", project, self.log_id),
-        }
+
+        let log_id = self.log_id.render_string(event)?;
+
+        Ok(match &self.log_name {
+            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, log_id),
+            Folder(folder) => format!("folders/{}/logs/{}", folder, log_id),
+            Organization(org) => format!("organizations/{}/logs/{}", org, log_id),
+            Project(project) => format!("projects/{}/logs/{}", project, log_id),
+        })
     }
 }
 
@@ -285,10 +318,11 @@ mod tests {
     fn encode_valid() {
         let config: StackdriverConfig = toml::from_str(indoc! {r#"
             project_id = "project"
-            log_id = "testlogs"
+            log_id = "{{ log_id }}"
             resource.type = "generic_node"
             resource.namespace = "office"
-            encoding.except_fields = ["anumber"]
+            resource.node_id = "{{ node_id }}"
+            encoding.except_fields = ["anumber", "node_id", "log_id"]
         "#})
         .unwrap();
 
@@ -298,15 +332,27 @@ mod tests {
             severity_key: Some("anumber".into()),
         };
 
-        let log = [("message", "hello world"), ("anumber", "100")]
-            .iter()
-            .copied()
-            .collect::<LogEvent>();
+        let log = [
+            ("message", "hello world"),
+            ("anumber", "100"),
+            ("node_id", "10.10.10.1"),
+            ("log_id", "testlogs"),
+        ]
+        .iter()
+        .copied()
+        .collect::<LogEvent>();
         let json = sink.encode_event(Event::from(log)).unwrap().item;
-        let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
-            body,
-            "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
+            json,
+            serde_json::json!({
+                "logName":"projects/project/logs/testlogs",
+                "jsonPayload":{"message":"hello world"},
+                "severity":100,
+                "resource":{
+                    "type":"generic_node",
+                    "labels":{"namespace":"office","node_id":"10.10.10.1"}
+                }
+            })
         );
     }
 
@@ -335,10 +381,17 @@ mod tests {
         );
 
         let json = sink.encode_event(Event::from(log)).unwrap().item;
-        let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
-            body,
-            "{\"jsonPayload\":{\"message\":\"hello world\",\"timestamp\":\"2020-01-01T12:30:00Z\"},\"severity\":100,\"timestamp\":\"2020-01-01T12:30:00Z\"}"
+            json,
+            serde_json::json!({
+                "logName":"projects/project/logs/testlogs",
+                "jsonPayload":{"message":"hello world","timestamp":"2020-01-01T12:30:00Z"},
+                "severity":100,
+                "resource":{
+                    "type":"generic_node",
+                    "labels":{"namespace":"office"}},
+                "timestamp":"2020-01-01T12:30:00Z"
+            })
         );
     }
 
@@ -413,25 +466,32 @@ mod tests {
             serde_json::json!({
                 "entries": [
                     {
+                        "logName": "projects/project/logs/testlogs",
                         "severity": 0,
                         "jsonPayload": {
                             "message": "hello"
+                        },
+                        "resource": {
+                            "type": "generic_node",
+                            "labels": {
+                                "namespace": "office"
+                            }
                         }
                     },
                     {
+                        "logName": "projects/project/logs/testlogs",
                         "severity": 0,
                         "jsonPayload": {
                             "message": "world"
+                        },
+                        "resource": {
+                            "type": "generic_node",
+                            "labels": {
+                                "namespace": "office"
+                            }
                         }
                     }
-                ],
-                "log_name": "projects/project/logs/testlogs",
-                "resource": {
-                    "labels": {
-                        "namespace": "office",
-                    },
-                    "type": "generic_node"
-                }
+                ]
             })
         );
     }

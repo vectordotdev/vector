@@ -10,15 +10,16 @@ use std::{
 use tracing::trace_span;
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
+const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Fingerprinter {
     pub strategy: FingerprintStrategy,
     pub max_line_length: usize,
     pub ignore_not_found: bool,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum FingerprintStrategy {
     Checksum {
         bytes: usize,
@@ -37,6 +38,7 @@ pub enum FingerprintStrategy {
 pub enum FileFingerprint {
     #[serde(rename = "checksum")]
     BytesChecksum(u64),
+    #[serde(alias = "first_line_checksum")]
     FirstLinesChecksum(u64),
     DevInode(u64, u64),
     Unknown(u64),
@@ -153,6 +155,34 @@ impl Fingerprinter {
                 fp.read_exact(&mut buffer[..bytes])?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// Calculates checksums using strategy pre-0.14.0
+    /// https://github.com/timberio/vector/issues/8182
+    pub fn get_legacy_checksum(
+        &self,
+        path: &Path,
+        buffer: &mut Vec<u8>,
+    ) -> Result<Option<FileFingerprint>, io::Error> {
+        match self.strategy {
+            FingerprintStrategy::Checksum {
+                ignored_header_bytes,
+                bytes: _,
+                lines,
+            }
+            | FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes,
+                lines,
+            } => {
+                buffer.resize(self.max_line_length, 0u8);
+                let mut fp = fs::File::open(path)?;
+                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
+                fingerprinter_read_until(fp, b'\n', lines, buffer)?;
+                let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(&buffer[..]);
+                Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
             _ => Ok(None),
         }

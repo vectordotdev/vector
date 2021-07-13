@@ -137,7 +137,7 @@ where
             let scope = ctx
                 .lookup_current()
                 .into_iter()
-                .flat_map(|span| span.from_root().chain(std::iter::once(span)));
+                .flat_map(|span| span.scope().from_root());
 
             scope.fold(RateLimitedSpanKeys::default(), |mut keys, span| {
                 let extensions = span.extensions();
