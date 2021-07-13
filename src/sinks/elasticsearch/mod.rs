@@ -1396,7 +1396,7 @@ mod integration_tests {
             .await
             .expect("Data stream creation error");
 
-        run_insert_tests_with_config(&cfg, true, BatchStatus::Delivered).await;
+        run_insert_tests_with_config(&cfg, false, BatchStatus::Delivered).await;
     }
 
     async fn run_insert_tests(
@@ -1442,6 +1442,10 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_events_with_stream(100, 100, Some(batch));
+        let events = events.map(|mut event| {
+            event.as_mut_log().insert("@timestamp", chrono::Utc::now());
+            event
+        });
         if break_events {
             // Break all but the first event to simulate some kind of partial failure
             let mut doit = false;
