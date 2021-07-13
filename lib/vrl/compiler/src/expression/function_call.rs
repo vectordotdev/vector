@@ -34,7 +34,7 @@ impl FunctionCall {
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
         funcs: &[Box<dyn Function>],
-        state: &State,
+        state: &mut State,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
 
@@ -175,6 +175,9 @@ impl FunctionCall {
                 abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
             });
         }
+
+        // Update the state if necessary.
+        expr.update_state(state);
 
         Ok(Self {
             abort_on_error,
