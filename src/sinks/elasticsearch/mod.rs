@@ -1118,6 +1118,7 @@ mod integration_tests {
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::{self, TlsOptions},
     };
+    use chrono::Utc;
     use futures::{stream, StreamExt};
     use http::{Request, StatusCode};
     use hyper::Body;
@@ -1429,7 +1430,14 @@ mod integration_tests {
         batch_status: BatchStatus,
     ) {
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
-        let index = config.index.clone().unwrap();
+        let index = match config.mode {
+            // Data stream mode uses an index name generated from the event.
+            ElasticSearchMode::DataStream => format!(
+                "{}",
+                Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
+            ),
+            ElasticSearchMode::Normal => config.index.clone().unwrap(),
+        };
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
