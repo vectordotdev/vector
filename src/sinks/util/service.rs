@@ -3,7 +3,7 @@ use super::{
         AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
     },
     retries::{FixedRetryPolicy, RetryLogic},
-    sink::Response,
+    sink::{Response, ServiceLogic},
     Batch, BatchSink, Partition, PartitionBatchSink,
 };
 use crate::buffers::Acker;
@@ -22,8 +22,8 @@ use tower::{
 };
 
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
-pub type TowerBatchedSink<S, B, L> = BatchSink<Svc<S, L>, B>;
-pub type TowerPartitionSink<S, B, L, K> = PartitionBatchSink<Svc<S, L>, B, K>;
+pub type TowerBatchedSink<S, B, RL, SL> = BatchSink<Svc<S, RL>, B, SL>;
+pub type TowerPartitionSink<S, B, RL, K, SL> = PartitionBatchSink<Svc<S, RL>, B, K, SL>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -246,16 +246,17 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn partition_sink<B, L, S, K>(
+    pub fn partition_sink<B, RL, S, K, SL>(
         &self,
-        retry_logic: L,
+        retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-    ) -> TowerPartitionSink<S, B, L, K>
+        service_logic: SL,
+    ) -> TowerPartitionSink<S, B, RL, K, SL>
     where
-        L: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -264,43 +265,48 @@ impl TowerRequestSettings {
         B::Input: Partition<K>,
         B::Output: Send + Clone + 'static,
         K: Hash + Eq + Clone + Send + 'static,
+        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        PartitionBatchSink::new(
+        PartitionBatchSink::new_with_logic(
             self.service(retry_logic, service),
             batch,
             batch_timeout,
             acker,
+            service_logic,
         )
     }
 
-    pub fn batch_sink<B, L, S>(
+    pub fn batch_sink<B, RL, S, SL>(
         &self,
-        retry_logic: L,
+        retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-    ) -> TowerBatchedSink<S, B, L>
+        service_logic: SL,
+    ) -> TowerBatchedSink<S, B, RL, SL>
     where
-        L: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
         S::Future: Send + 'static,
         B: Batch,
         B::Output: Send + Clone + 'static,
+        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        BatchSink::new(
+        BatchSink::new_with_logic(
             self.service(retry_logic, service),
             batch,
             batch_timeout,
             acker,
+            service_logic,
         )
     }
 
-    pub fn service<L, S, Request>(&self, retry_logic: L, service: S) -> Svc<S, L>
+    pub fn service<RL, S, Request>(&self, retry_logic: RL, service: S) -> Svc<S, RL>
     where
-        L: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -328,13 +334,13 @@ pub struct TowerRequestLayer<L, Request> {
     _pd: std::marker::PhantomData<Request>,
 }
 
-impl<S, L, Request> Layer<S> for TowerRequestLayer<L, Request>
+impl<S, RL, Request> Layer<S> for TowerRequestLayer<RL, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
     S::Response: Response + Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
-    L: RetryLogic<Response = S::Response> + Send + 'static,
+    RL: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
     type Service = BoxService<Request, S::Response, crate::Error>;

@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        sink::Response,
+        sink::{self, Response},
         BatchSettings, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
@@ -174,6 +174,7 @@ impl SqsSink {
                 VecBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
             .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
