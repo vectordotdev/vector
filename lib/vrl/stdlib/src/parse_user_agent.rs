@@ -30,7 +30,7 @@ impl Function for ParseUserAgent {
         indoc! {r#"
             Parses the provided `value` as a user agent.
 
-            Parses on the basis of best effort. Returned schema depends only on the configured mode,
+            Parses on the basis of best effort. Returned schema depends only on the configured `mode`,
             so if the function fails to parse a field it will set it to `null`.
         "#}
     }
@@ -68,9 +68,9 @@ impl Function for ParseUserAgent {
             },
             Example {
                 title: "enriched mode",
-                source: r#"parse_user_agent!("Opera/9.80 (Android; Opera Mini/5.1.22460/23.334; U; en) Presto/2.5.25 Version/10.54", mode: "enriched"")"#,
+                source: r#"parse_user_agent!("Opera/9.80 (J2ME/MIDP; Opera Mini/4.3.24214; iPhone; CPU iPhone OS 4_2_1 like Mac OS X; AppleWebKit/24.783; U; en) Presto/2.5.25 Version/10.54", mode: "enriched"")"#,
                 result: Ok(
-                    r#"{ "browser": { "family": "Opera Mini", "major": "5", "minor": "1", "patch": "22460", "version": "10.54" }, "device": { "brand": "Generic", "category": "smartphone", "family": "Generic Smartphone", "model": "Smartphone" }, "os": { "family": "Android", "major": null, "minor": null, "patch": null, "patch_minor": null, "version": null } }"#,
+                    r#"{ "browser": { "family": "Opera Mini", "major": "4", "minor": "3", "patch": "24214", "version": "10.54" }, "device": { "brand": "Apple", "category": "smartphone", "family": "iPhone", "model": "iPhone" }, "os": { "family": "iOS", "major": "4", "minor": "2", "patch": "1", "patch_minor": null, "version": "4.2.1" } }"#,
                 ),
             },
             Example {
@@ -152,7 +152,6 @@ impl Expression for ParseUserAgentFn {
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         self.mode.type_def()
-        
     }
 }
 
@@ -192,7 +191,6 @@ impl Mode {
             Enriched => "enriched",
         }
     }
-
 
     fn type_def(self) -> TypeDef {
         match self {
