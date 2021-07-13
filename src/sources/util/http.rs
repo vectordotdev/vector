@@ -14,7 +14,6 @@ use snap::raw::Decoder as SnappyDecoder;
 use std::{
     collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr, sync::Arc,
 };
-use tracing_futures::Instrument;
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
 use warp::{
     filters::{path::FullPath, path::Tail, BoxedFilter},
