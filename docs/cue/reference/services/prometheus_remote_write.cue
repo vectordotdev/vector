@@ -1,7 +1,7 @@
 package metadata
 
 services: prometheus_remote_write: {
-	name:     "Prometheus Remote Write Integrations"
+	name:     "Prometheus Remote Write Integration"
 	thing:    "a metrics database or service"
 	url:      urls.prometheus_remote_integrations
 	versions: null
