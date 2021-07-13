@@ -233,7 +233,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
-                        let _guard = span.enter();
                         debug!(message = "Handling HTTP request.", headers = ?headers);
 
                         let events = auth
@@ -246,9 +245,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             });
 
                         handle_request(events, acknowledgements, out.clone())
-                            .instrument(span.clone())
                     },
-                );
+                )
+                .with(warp::trace(move |_info| span.clone()));
 
             let ping = warp::get().and(warp::path("ping")).map(|| "pong");
             let routes = svc.or(ping).recover(|r: Rejection| async move {
