@@ -1476,7 +1476,7 @@ mod integration_tests {
         flush(common).await.expect("Flushing writes failed");
 
         let client = create_http_client();
-        let response = client
+        let mut response = client
             .get(&format!("{}/{}/_search", base_url, index))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
@@ -1500,7 +1500,7 @@ mod integration_tests {
             assert_eq!(input.len() as u64, total);
 
             let hits = response["hits"]["hits"]
-                .as_array()
+                .as_array_mut()
                 .expect("Elasticsearch response does not include hits->hits");
             let input = input
                 .into_iter()
@@ -1508,8 +1508,10 @@ mod integration_tests {
                 .collect::<Vec<_>>();
             for hit in hits {
                 let hit = hit
-                    .get("_source")
+                    .get_mut("_source")
                     .expect("Elasticsearch hit missing _source");
+                hit.as_object_mut().unwrap().remove("data_stream");
+                hit.as_object_mut().unwrap().remove("@timestamp");
                 assert!(input.contains(&hit));
             }
         }
