@@ -69,7 +69,7 @@ components: _nats: {
 				syntax: "template"
 			}
 		}
-		name: {
+		connection_name: {
 			common:      false
 			description: "A name assigned to the NATS connection."
 			required:    false

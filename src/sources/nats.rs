@@ -23,7 +23,7 @@ enum BuildError {
 #[serde(deny_unknown_fields)]
 pub struct NatsSourceConfig {
     url: String,
-    name: String,
+    connection_name: String,
     subject: String,
     queue: Option<String>,
 }
@@ -62,7 +62,7 @@ impl NatsSourceConfig {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
         async_nats::Options::new()
-            .with_name(&self.name)
+            .with_name(&self.connection_name)
             .reconnect_buffer_size(0)
     }
 
@@ -77,7 +77,7 @@ impl NatsSourceConfig {
 impl From<NatsSourceConfig> for async_nats::Options {
     fn from(config: NatsSourceConfig) -> Self {
         async_nats::Options::new()
-            .with_name(&config.name)
+            .with_name(&config.connection_name)
             .reconnect_buffer_size(0)
     }
 }
@@ -160,7 +160,7 @@ mod integration_tests {
         let subject = format!("test-{}", random_string(10));
 
         let conf = NatsSourceConfig {
-            name: "".to_owned(),
+            connection_name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://127.0.0.1:4222".to_owned(),
             queue: None,

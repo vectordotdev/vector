@@ -57,11 +57,7 @@ components: sinks: nats: {
 		notices: []
 	}
 
-	configuration: {
-		url: components._nats.configuration.url
-		subject: components._nats.configuration.subject
-		name: components._nats.configuration.name
-	}
+	configuration: components._nats.configuration & {}
 
 	input: {
 		logs:    true
