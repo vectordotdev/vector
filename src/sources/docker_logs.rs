@@ -43,7 +43,6 @@ const STREAM: &str = "stream";
 const CONTAINER: &str = "container_id";
 // Prevent short hostname from being wrongly regconized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
-const LOG_DRIVER_NOT_SUPPORTED_BACKOFF: Duration = Duration::from_secs(15);
 
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
@@ -291,7 +290,7 @@ struct DockerLogsSource {
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives ContainerLogInfo coming from event stream futures
-    main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, (ContainerId, Option<Duration>)>>,
+    main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, (ContainerId, Persistence)>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
     backoff_duration: Duration,
@@ -317,7 +316,7 @@ impl DockerLogsSource {
 
         // Channel of communication between main future and event_stream futures
         let (main_send, main_recv) =
-            mpsc::unbounded_channel::<Result<ContainerLogInfo, (ContainerId, Option<Duration>)>>();
+            mpsc::unbounded_channel::<Result<ContainerLogInfo, (ContainerId, Persistence)>>();
 
         // Starting with logs from now.
         // TODO: Is this exception acceptable?
@@ -419,17 +418,18 @@ impl DockerLogsSource {
                                         self.esb.restart(state);
                                     }
                                 },
-                                Err((id,backoff)) => {
+                                Err((id,persistence)) => {
                                     let state = self
                                         .containers
                                         .remove(&id)
                                         .expect("Every started ContainerId has it's ContainerState");
-                                    if state.is_running() {
-                                        let backoff=match backoff{
-                                            Some(backoff) => backoff.max(self.backoff_duration),
-                                            None => self.backoff_duration
-                                        };
-                                        self.containers.insert(id.clone(), self.esb.start(id, Some(backoff)));
+                                    match persistence{
+                                        Persistence::Transient => if state.is_running() {
+                                            let backoff= Some(self.backoff_duration);
+                                            self.containers.insert(id.clone(), self.esb.start(id, backoff));
+                                        }
+                                        // Forget the container since the error is permanent.
+                                        Persistence::Permanent => (),
                                     }
                                 }
                             }
@@ -511,7 +511,7 @@ struct EventStreamBuilder {
     /// Event stream futures send events through this
     out: Pipeline,
     /// End through which event stream futures send ContainerLogInfo to main future
-    main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, (ContainerId, Option<Duration>)>>,
+    main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, (ContainerId, Persistence)>>,
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
 }
@@ -547,7 +547,7 @@ impl EventStreamBuilder {
                 }),
             }
 
-            this.finish(Err((id, None)));
+            this.finish(Err((id, Persistence::Transient)));
         });
 
         ContainerState::new_running()
@@ -582,8 +582,7 @@ impl EventStreamBuilder {
 
         let core = Arc::clone(&self.core);
 
-        let mut error = false;
-        let mut backoff = None;
+        let mut error = None;
         let events_stream = stream
             .map(|value| {
                 match value {
@@ -603,21 +602,21 @@ impl EventStreamBuilder {
                                     error,
                                     container_id: info.id.as_str(),
                                 });
-                                backoff = Some(LOG_DRIVER_NOT_SUPPORTED_BACKOFF);
+                                Err(Persistence::Permanent)
                             }
                             _ => {
                                 emit!(DockerLogsCommunicationError {
                                     error,
                                     container_id: Some(info.id.as_str())
-                                })
+                                });
+                                Err(Persistence::Transient)
                             }
                         }
-                        Err(())
                     }
                 }
             })
             .take_while(|v| {
-                error = v.is_err();
+                error = v.as_ref().err().cloned();
                 ready(v.is_ok())
             })
             .filter_map(|v| ready(v.unwrap()))
@@ -647,14 +646,15 @@ impl EventStreamBuilder {
         });
 
         let result = match (result, error) {
-            (Ok(()), false) => Ok(info),
-            (Err(crate::pipeline::ClosedError), _) | (_, true) => Err((info.id, backoff)),
+            (Ok(()), None) => Ok(info),
+            (Err(crate::pipeline::ClosedError), _) => Err((info.id, Persistence::Permanent)),
+            (_, Some(occurrence)) => Err((info.id, occurrence)),
         };
 
         self.finish(result);
     }
 
-    fn finish(self, result: Result<ContainerLogInfo, (ContainerId, Option<Duration>)>) {
+    fn finish(self, result: Result<ContainerLogInfo, (ContainerId, Persistence)>) {
         // This can legaly fail when shutting down, and any other
         // reason should have been logged in the main future.
         let _ = self.main_send.send(result);
@@ -667,6 +667,12 @@ fn add_hostname(mut event: Event, host_key: &str, hostname: &Option<String>) -> 
     }
 
     event
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Persistence {
+    Transient,
+    Permanent,
 }
 
 /// Container ID as assigned by Docker.
