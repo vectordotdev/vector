@@ -27,8 +27,8 @@ remap: functions: parse_user_agent: {
 				fast: "Fastest mode but most unreliable. Uses parser from project [Woothee](\(urls.woothee))."
 				reliable: """
 					Provides greater reliability than `fast` and retains it's speed in common cases.
-					Parses with [Woothee](\(urls.woothee)) parser and with parser from [uap project](\(urls.uap)) if 
-					there are some missing fields that the first parser wasn't able to parse out 
+					Parses with [Woothee](\(urls.woothee)) parser and with parser from [uap project](\(urls.uap)) if
+					there are some missing fields that the first parser wasn't able to parse out
 					but the second one maybe can.
 					"""
 				enriched: """
@@ -116,7 +116,7 @@ remap: functions: parse_user_agent: {
 					patch:       "1"
 					patch_minor: null
 					version:     "4.2.1"
-				} 
+				}
 			}
 		},
 	]
