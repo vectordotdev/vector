@@ -180,10 +180,10 @@ service:
 existingConfigMap: ""
 
 # Specify custom contents for the Vector config
-## ref: https://vector.dev/docs/reference/configuration/
-## Note a complete and valid configuration is required. If used, the deprecated
-## configuration keys will be ignored. More information can be found at:
-## https://vector.dev/highlights/2021-07-13-helm-customconfig
+# ref: https://vector.dev/docs/reference/configuration/
+# Note a complete and valid configuration is required. If used, the deprecated
+# configuration keys will be ignored. More information can be found at:
+# https://vector.dev/highlights/2021-07-13-helm-customconfig
 customConfig: {}
   #  data_dir: "/vector-data-dir"
   #  sources:
