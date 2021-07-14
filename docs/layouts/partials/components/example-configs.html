@@ -1,24 +1,32 @@
 {{ $examples := .examples }}
 {{ $levels := slice "common" "advanced" }}
 {{ $formats := slice "toml" "yaml" "json" }}
-<div x-data="{ level: 'common', format: 'toml' }" class="no-prose">
-  <div class="flex space-x-2">
-    {{ range $levels }}
-    <button :class="{ 'text-primary': level === '{{ . }}' }" @click="level = '{{ . }}'">
-      {{ . | title }}
-    </button>
-    {{ end }}
+<div x-data="{ level: 'common', format: 'toml' }" class="no-prose mb-4 border dark:border-gray-700 rounded-md shadow py-4 px-6">
+  <span>
+    {{ partial "heading.html" (dict "text" "Example configurations" "level" 3) }}
+  </span>
 
-    {{ range $formats }}
-    <button :class="{ 'text-primary': format === '{{ . }}' }" @click="format = '{{ . }}'">
-      {{ . | upper }}
-    </button>
-    {{ end }}
+  <div class="flex justify-between mt-2 text-sm">
+    <div class="inline-flex space-x-2">
+      {{ range $levels }}
+      <button :class="{ 'text-secondary dark:text-primary': level === '{{ . }}' }" @click="level = '{{ . }}'">
+        {{ . | title }}
+      </button>
+      {{ end }}
+    </div>
+
+    <div class="inline-flex space-x-2">
+      {{ range $formats }}
+      <button :class="{ 'text-secondary dark:text-primary': format === '{{ . }}' }" @click="format = '{{ . }}'">
+        {{ . | upper }}
+      </button>
+      {{ end }}
+    </div>
   </div>
 
   {{ range $levels }}
   {{ $example := index $examples . }}
-  <div x-show="level === '{{ . }}'">
+  <div x-show="level === '{{ . }}'" class="mt-1.5">
     {{ range $format, $v := $example }}
     <div x-show="format === '{{ $format }}'">
       {{ highlight $v $format "" }}

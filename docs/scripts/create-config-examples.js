@@ -25,6 +25,7 @@ const makeCommonParams = (configuration) => {
     if (paramName != "type") {
       const param = configuration[paramName];
 
+      // Restrict to common params only
       if (param.common) {
         setExampleValue(required, paramName, param);
       }
@@ -34,16 +35,14 @@ const makeCommonParams = (configuration) => {
   return required;
 }
 
-const makeOptionalParams = (configuration) => {
+const makeAllParams = (configuration) => {
   var optional = {};
 
   for (const paramName in configuration) {
     if (paramName != "type") {
       const param = configuration[paramName];
 
-      if (!param.common) {
-        setExampleValue(optional, paramName, param);
-      }
+      setExampleValue(optional, paramName, param);
     }
   }
 
@@ -69,7 +68,7 @@ try {
       const configuration = component.configuration;
 
       const commonParams = makeCommonParams(configuration);
-      const optionalParams = makeOptionalParams(configuration);
+      const allParams = makeAllParams(configuration);
 
       const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
@@ -92,8 +91,7 @@ try {
             [keyName]: {
               "type": componentType,
               inputs: ['my-source-or-transform-id'],
-              ...commonParams,
-              ...optionalParams,
+              ...allParams,
             }
           }
         };
@@ -111,8 +109,7 @@ try {
           [kind]: {
             [keyName]: {
               "type": componentType,
-              ...commonParams,
-              ...optionalParams,
+              ...allParams,
             }
           }
         };
