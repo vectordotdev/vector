@@ -2,7 +2,7 @@ mod retry;
 
 use self::retry::{ElasticSearchRetryLogic, ElasticSearchServiceLogic};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
@@ -35,6 +35,9 @@ use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use vector_core::event::{Event, Value};
+
+/// The field name for the timestamp required by data stream mode
+const TIMESTAMP_KEY: &str = "@timestamp";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -128,8 +131,6 @@ impl NormalConfig {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
-    #[serde(default = "DataStreamConfig::default_timestamp")]
-    timestamp: String,
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     dtype: Template,
     #[serde(default = "DataStreamConfig::default_dataset")]
@@ -145,7 +146,6 @@ pub struct DataStreamConfig {
 impl Default for DataStreamConfig {
     fn default() -> Self {
         Self {
-            timestamp: Self::default_timestamp(),
             dtype: Self::default_type(),
             dataset: Self::default_dataset(),
             namespace: Self::default_namespace(),
@@ -156,10 +156,6 @@ impl Default for DataStreamConfig {
 }
 
 impl DataStreamConfig {
-    fn default_timestamp() -> String {
-        "@timestamp".into()
-    }
-
     fn default_type() -> Template {
         Template::try_from("logs").expect("couldn't build default type template")
     }
@@ -180,14 +176,15 @@ impl DataStreamConfig {
         true
     }
 
-    fn update_timestamp(&self, mut event: Event) -> Event {
+    fn fixup_timestamp(&self, mut event: Event) -> Event {
         // we keep it if the timestamp field is @timestamp
-        if self.timestamp == Self::default_timestamp() {
+        let timestamp_key = log_schema().timestamp_key();
+        if timestamp_key == TIMESTAMP_KEY {
             return event;
         }
         let log = event.as_mut_log().as_map_mut();
-        if let Some(value) = log.remove(&self.timestamp) {
-            log.insert(Self::default_timestamp(), value);
+        if let Some(value) = log.remove(timestamp_key) {
+            log.insert(TIMESTAMP_KEY.into(), value);
         }
         event
     }
@@ -311,7 +308,7 @@ pub enum ElasticSearchAuth {
     Aws(AwsAuthentication),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticSearchMode {
     Normal,
@@ -502,7 +499,7 @@ impl ElasticSearchCommon {
         let index = self.mode.index(&event)?;
 
         let mut event = if let Some(cfg) = self.mode.as_data_stream_config() {
-            cfg.update_timestamp(cfg.sync_fields(event))
+            cfg.fixup_timestamp(cfg.sync_fields(event))
         } else {
             event
         };
@@ -924,7 +921,6 @@ mod tests {
             data_stream: Some(DataStreamConfig {
                 auto_routing: false,
                 namespace: Template::try_from("something").unwrap(),
-                timestamp: log_schema().timestamp_key().into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1450,10 +1446,6 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_events_with_stream(100, 100, Some(batch));
-        let events = events.map(|mut event| {
-            event.as_mut_log().insert("@timestamp", chrono::Utc::now());
-            event
-        });
         if break_events {
             // Break all but the first event to simulate some kind of partial failure
             let mut doit = false;
@@ -1506,12 +1498,18 @@ mod integration_tests {
                 .into_iter()
                 .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
                 .collect::<Vec<_>>();
+
             for hit in hits {
                 let hit = hit
                     .get_mut("_source")
                     .expect("Elasticsearch hit missing _source");
-                hit.as_object_mut().unwrap().remove("data_stream");
-                hit.as_object_mut().unwrap().remove("@timestamp");
+                if config.mode == ElasticSearchMode::DataStream {
+                    let obj = hit.as_object_mut().unwrap();
+                    obj.remove("data_stream");
+                    // Un-rewrite the timestamp field
+                    let timestamp = obj.remove(TIMESTAMP_KEY).unwrap();
+                    obj.insert(log_schema().timestamp_key().into(), timestamp);
+                }
                 assert!(input.contains(&hit));
             }
         }
