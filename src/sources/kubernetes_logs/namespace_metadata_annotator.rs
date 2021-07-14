@@ -66,3 +66,94 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         log.insert_path(path, val.to_owned());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::assert_event_data_eq;
+
+    #[test]
+    fn test_annotate_from_metadata() {
+        let cases = vec![
+            (
+                FieldsSpec::default(),
+                ObjectMeta::default(),
+                LogEvent::default(),
+            ),
+            (
+                FieldsSpec::default(),
+                ObjectMeta {
+                    name: Some("sandbox0-name".to_owned()),
+                    uid: Some("sandbox0-uid".to_owned()),
+                    labels: vec![
+                        ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                        ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    ..ObjectMeta::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.namespace_labels.sandbox0-label0", "val0");
+                    log.insert("kubernetes.namespace_labels.sandbox0-label1", "val1");
+                    log
+                },
+            ),
+            (
+                FieldsSpec {
+                    namespace_labels: "ns_labels".to_owned(),
+                },
+                ObjectMeta {
+                    name: Some("sandbox0-name".to_owned()),
+                    uid: Some("sandbox0-uid".to_owned()),
+                    labels: vec![
+                        ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                        ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    ..ObjectMeta::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("ns_labels.sandbox0-label0", "val0");
+                    log.insert("ns_labels.sandbox0-label1", "val1");
+                    log
+                },
+            ),
+            // Ensure we properly handle labels with `.` as flat fields.
+            (
+                FieldsSpec::default(),
+                ObjectMeta {
+                    name: Some("sandbox0-name".to_owned()),
+                    uid: Some("sandbox0-uid".to_owned()),
+                    labels: vec![
+                        ("nested0.label0".to_owned(), "val0".to_owned()),
+                        ("nested0.label1".to_owned(), "val1".to_owned()),
+                        ("nested1.label0".to_owned(), "val2".to_owned()),
+                        ("nested2.label0.deep0".to_owned(), "val3".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+
+                    ..ObjectMeta::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.namespace_labels.nested0\\.label0", "val0");
+                    log.insert("kubernetes.namespace_labels.nested0\\.label1", "val1");
+                    log.insert("kubernetes.namespace_labels.nested1\\.label0", "val2");
+                    log.insert("kubernetes.namespace_labels.nested2\\.label0\\.deep0", "val3");
+                    log
+                },
+            ),
+        ];
+
+        for (fields_spec, metadata, expected) in cases.into_iter() {
+            let mut log = LogEvent::default();
+            annotate_from_metadata(&mut log, &fields_spec, &metadata);
+            assert_event_data_eq!(log, expected);
+        }
+    }
+}

@@ -77,8 +77,11 @@ pub struct Config {
     /// Override global data_dir
     data_dir: Option<PathBuf>,
 
-    /// Specifies the field names for metadata annotation.
+    /// Specifies the field names for Pod metadata annotation.
     annotation_fields: pod_metadata_annotator::FieldsSpec,
+
+    /// Specifies the field names for Namespace metadata annotation.
+    namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to exclude from reading the files.
     exclude_paths_glob_patterns: Vec<PathBuf>,
@@ -142,6 +145,7 @@ impl Default for Config {
             auto_partial_merge: true,
             data_dir: None,
             annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
+            namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec::default(),
             exclude_paths_glob_patterns: default_path_exclusion(),
             max_read_bytes: default_max_read_bytes(),
             max_line_bytes: default_max_line_bytes(),
@@ -257,8 +261,11 @@ impl Source {
             k8s::api_watcher::ApiWatcher::new(client.clone(), Pod::watch_pod_for_all_namespaces);
         let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
         let (state_reader, state_writer) = evmap::new();
-        let state_writer =
-            k8s::state::evmap::Writer::new(state_writer, Some(Duration::from_millis(10)), HashKey::Uid);
+        let state_writer = k8s::state::evmap::Writer::new(
+            state_writer,
+            Some(Duration::from_millis(10)),
+            HashKey::Uid,
+        );
         let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
         let state_writer =
             k8s::state::delayed_delete::Writer::new(state_writer, Duration::from_secs(60));
@@ -393,11 +400,11 @@ impl Source {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
                 if namespace.is_some() {
-                  let ns_info = ns_annotator.annotate(&mut event, namespace.unwrap());
+                    let ns_info = ns_annotator.annotate(&mut event, namespace.unwrap());
 
-                  if ns_info.is_none() {
-                    emit!(KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
-                  }
+                    if ns_info.is_none() {
+                        emit!(KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
+                    }
                 }
             }
 
