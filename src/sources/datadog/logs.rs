@@ -1,20 +1,21 @@
+use crate::sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
-    sources::{
-        self,
-        util::{decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
-    },
+    sources,
     tls::TlsConfig,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use vector_core::event::LogEvent;
+use warp::http::StatusCode;
 
 use warp::http::HeaderMap;
 
@@ -77,6 +78,12 @@ struct DatadogLogsSource {
     store_api_key: bool,
 }
 
+#[derive(Deserialize)]
+struct LogMsg {
+    pub message: String,
+    pub timestamp: i64,
+}
+
 impl HttpSource for DatadogLogsSource {
     fn build_events(
         &self,
@@ -86,7 +93,7 @@ impl HttpSource for DatadogLogsSource {
         request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         if body.is_empty() {
-            // The datadog agent may sent empty payload as keep alive
+            // The datadog agent may send an empty payload as a keep alive
             debug!(
                 message = "Empty payload ignored.",
                 internal_log_rate_secs = 30
@@ -100,18 +107,28 @@ impl HttpSource for DatadogLogsSource {
         }
         .map(Arc::from);
 
-        decode_body(body, Encoding::Json).map(|mut events| {
-            // Datadog API key in metadata & source type field
-            let key = log_schema().source_type_key();
-            for event in &mut events {
-                let log = event.as_mut_log();
+        let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Error parsing JSON: {:?}", error),
+            )
+        })?;
+        messages
+            .into_iter()
+            .map(|msg| {
+                let mut log = LogEvent::default();
+                log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
+                log.insert_flat("message".to_string(), msg.message);
+                log.insert_flat("timestamp".to_string(), msg.timestamp);
+                let key = log_schema().source_type_key();
                 log.try_insert(key, Bytes::from("datadog_logs"));
                 if let Some(k) = &api_key {
                     log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                 }
-            }
-            events
-        })
+                log
+            })
+            .map(|log| Ok(log.into()))
+            .collect()
     }
 }
 

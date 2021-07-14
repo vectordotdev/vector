@@ -1,9 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    emit,
     event::Event,
-    internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
 };
 use async_trait::async_trait;
@@ -14,7 +12,7 @@ use tokio::time::sleep_until;
 
 pub struct BlackholeSink {
     total_events: usize,
-    total_raw_bytes: usize,
+    // total_raw_bytes: usize,
     config: BlackholeConfig,
     acker: Acker,
     last: Option<Instant>,
@@ -71,7 +69,7 @@ impl BlackholeSink {
         BlackholeSink {
             config,
             total_events: 0,
-            total_raw_bytes: 0,
+            // total_raw_bytes: 0,
             acker,
             last: None,
         }
@@ -81,7 +79,7 @@ impl BlackholeSink {
 #[async_trait]
 impl StreamSink for BlackholeSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(event) = input.next().await {
+        while let Some(_event) = input.next().await {
             if let Some(rate) = self.config.rate {
                 let until = self.last.unwrap_or_else(Instant::now)
                     + Duration::from_secs_f32(1.0 / rate as f32);
