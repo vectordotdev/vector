@@ -1,6 +1,9 @@
 //! A state implementation backed by [`evmap`].
 
-use crate::kubernetes::{debounce::Debounce, hash_value::{HashValue, HashKey}};
+use crate::kubernetes::{
+    debounce::Debounce,
+    hash_value::{HashKey, HashValue},
+};
 use async_trait::async_trait;
 use evmap::WriteHandle;
 use futures::future::BoxFuture;
@@ -200,7 +203,8 @@ mod tests {
 
         let (state_reader, state_writer) = evmap::new();
         let flush_debounce_timeout = Duration::from_millis(100);
-        let mut state_writer = Writer::new(state_writer, Some(flush_debounce_timeout), HashKey::Uid);
+        let mut state_writer =
+            Writer::new(state_writer, Some(flush_debounce_timeout), HashKey::Uid);
 
         assert!(state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());

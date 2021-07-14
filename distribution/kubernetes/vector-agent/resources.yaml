@@ -89,6 +89,7 @@ rules:
   - apiGroups:
       - ""
     resources:
+      - namespaces
       - pods
     verbs:
       - watch

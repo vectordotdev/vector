@@ -144,7 +144,10 @@ mod tests {
                     log.insert("kubernetes.namespace_labels.nested0\\.label0", "val0");
                     log.insert("kubernetes.namespace_labels.nested0\\.label1", "val1");
                     log.insert("kubernetes.namespace_labels.nested1\\.label0", "val2");
-                    log.insert("kubernetes.namespace_labels.nested2\\.label0\\.deep0", "val3");
+                    log.insert(
+                        "kubernetes.namespace_labels.nested2\\.label0\\.deep0",
+                        "val3",
+                    );
                     log
                 },
             ),
