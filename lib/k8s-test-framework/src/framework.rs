@@ -1,7 +1,7 @@
 //! The test framework main entry point.
 
 use super::{
-    exec_tail, kubernetes_version, log_lookup, namespace, pod, port_forward, restart_rollout,
+    exec_tail, kubernetes_version, label, log_lookup, namespace, pod, port_forward, restart_rollout,
     test_pod, up_down, vector, wait_for_resource, wait_for_rollout, Interface, PortForwarder,
     Reader, Result,
 };
@@ -75,6 +75,16 @@ impl Framework {
         let mut manager = test_pod::manager(&self.interface.kubectl_command, config);
         manager.up().await?;
         Ok(manager)
+    }
+
+    /// Apply one or more labels to a `resource`.
+    pub async fn label<'a>(
+        &self,
+        namespace: &str,
+        resources: &str,
+        label: &str,
+    ) -> Result<()> {
+        label::run(&self.interface.kubectl_command, namespace, resources, label).await
     }
 
     /// Initialize log lookup for a particular `resource` in a particular
@@ -164,7 +174,7 @@ impl Framework {
     }
 
     /// Trigger a restart for a rollout of a `resource`.
-    /// Use `extr
+    /// Use `extra` to pass additional arguments to `kubectl`.
     pub async fn restart_rollout<'a>(
         &self,
         namespace: &str,
