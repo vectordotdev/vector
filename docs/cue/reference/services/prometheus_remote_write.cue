@@ -8,7 +8,7 @@ services: prometheus_remote_write: {
 
 	description: """
 		Databases and services that are capable of receiving data via the Prometheus
-		[`remote_write`](\(urls.prometheus_remote_write_protocol)).
+		[`remote_write protocol`](\(urls.prometheus_remote_write_protocol)).
 
 		Prometheus itself can also receive metrics via the `remote_write` protocol if the feature is enabled via
 		`--enable-feature=remote-write-receiver`.
