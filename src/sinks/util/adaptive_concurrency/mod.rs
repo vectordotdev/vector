@@ -37,6 +37,6 @@ pub struct AdaptiveConcurrencySettings {
 
     // This value avoided changing concurrency too aggressively when
     // there is fluctuation in the RTT measurements.
-    #[derivative(Default(value = "0.05"))]
-    pub(super) rtt_threshold_ratio: f64,
+    #[derivative(Default(value = "2.0"))]
+    pub(super) rtt_deviation_scale: f64,
 }

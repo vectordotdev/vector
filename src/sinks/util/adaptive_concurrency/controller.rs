@@ -191,7 +191,8 @@ impl<L> Controller<L> {
         past_rtt: MeanVariance,
         current_rtt: Option<f64>,
     ) {
-        let threshold = past_rtt.mean * self.settings.rtt_threshold_ratio;
+        let past_rtt_deviation = past_rtt.variance.sqrt();
+        let threshold = past_rtt_deviation * self.settings.rtt_deviation_scale;
 
         // Normal quick responses trigger an increase in the
         // concurrency limit. Note that we only check this if we had
@@ -201,7 +202,7 @@ impl<L> Controller<L> {
             && inner.reached_limit
             && !inner.had_back_pressure
             && current_rtt.is_some()
-            && current_rtt.unwrap() <= past_rtt.mean + threshold / 10.0
+            && current_rtt.unwrap() <= past_rtt.mean
         {
             // Increase (additive) the current concurrency limit
             self.semaphore.add_permits(1);
@@ -225,6 +226,7 @@ impl<L> Controller<L> {
             had_back_pressure: inner.had_back_pressure,
             current_rtt: current_rtt.map(Duration::from_secs_f64),
             past_rtt: Duration::from_secs_f64(past_rtt.mean),
+            past_rtt_deviation: Duration::from_secs_f64(past_rtt_deviation),
         });
     }
 }
