@@ -399,8 +399,8 @@ impl Source {
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
-                if namespace.is_some() {
-                    let ns_info = ns_annotator.annotate(&mut event, namespace.unwrap());
+                if let Some(name) = namespace {
+                    let ns_info = ns_annotator.annotate(&mut event, name);
 
                     if ns_info.is_none() {
                         emit!(KubernetesLogsEventNamespaceAnnotationFailed { event: &event });

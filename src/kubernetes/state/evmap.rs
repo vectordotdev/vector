@@ -40,7 +40,7 @@ where
         // Prepare flush debounce.
         let debounced_flush = flush_debounce_timeout.map(Debounce::new);
 
-        let hash_key = key.clone();
+        let hash_key = key;
 
         Self {
             inner,

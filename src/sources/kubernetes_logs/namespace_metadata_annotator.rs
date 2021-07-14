@@ -46,7 +46,7 @@ impl NamespaceMetadataAnnotator {
 impl NamespaceMetadataAnnotator {
     /// Annotates an event with the information from the [`Namespace::metadata`].
     /// The event has to have a [`POD_NAMESPACE`] field set.
-    pub fn annotate<'a>(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
+    pub fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
         let log = event.as_mut_log();
         let guard = self.namespace_state_reader.get(pod_namespace)?;
         let entry = guard.get_one()?;
