@@ -69,7 +69,7 @@ remap: functions: parse_user_agent: {
 			title: "Reliable mode"
 			source: #"""
 				parse_user_agent(
-					"Mozilla/4.0 (compatible; MSIE 7.66; Windows NT 5.1; SV1; .NET CLR 1.1.4322)"
+					"Mozilla/4.0 (compatible; MSIE 7.66; Windows NT 5.1; SV1; .NET CLR 1.1.4322)",
 					mode: "reliable"
 				)
 				"""#
@@ -91,7 +91,7 @@ remap: functions: parse_user_agent: {
 			title: "Enriched mode"
 			source: #"""
 				parse_user_agent(
-					"Opera/9.80 (J2ME/MIDP; Opera Mini/4.3.24214; iPhone; CPU iPhone OS 4_2_1 like Mac OS X; AppleWebKit/24.783; U; en) Presto/2.5.25 Version/10.54"
+					"Opera/9.80 (J2ME/MIDP; Opera Mini/4.3.24214; iPhone; CPU iPhone OS 4_2_1 like Mac OS X; AppleWebKit/24.783; U; en) Presto/2.5.25 Version/10.54",
 					mode: "enriched"
 				)
 				"""#

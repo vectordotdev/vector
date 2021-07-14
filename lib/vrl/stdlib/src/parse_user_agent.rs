@@ -452,7 +452,7 @@ fn into_value<'a>(iter: impl IntoIterator<Item = (&'a str, Option<String>)>) -> 
         .map(|(name, value)| {
             (
                 name.to_string(),
-                value.map(|s| s.to_owned().into()).unwrap_or(Value::Null),
+                value.map(|s| s.into()).unwrap_or(Value::Null),
             )
         })
         .collect()
