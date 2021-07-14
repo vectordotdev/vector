@@ -89,24 +89,24 @@ impl StreamSink for BlackholeSink {
                 self.last = Some(until);
             }
 
-            let message_len = match event {
-                Event::Log(log) => serde_json::to_string(&log),
-                Event::Metric(metric) => serde_json::to_string(&metric),
-            }
-            .map(|v| v.len())
-            .unwrap_or(0);
+            // let message_len = match event {
+            //     Event::Log(log) => serde_json::to_string(&log),
+            //     Event::Metric(metric) => serde_json::to_string(&metric),
+            // }
+            // .map(|v| v.len())
+            // .unwrap_or(0);
 
             self.total_events += 1;
-            self.total_raw_bytes += message_len;
+            // self.total_raw_bytes += message_len;
 
-            emit!(BlackholeEventReceived {
-                byte_size: message_len
-            });
+            // emit!(BlackholeEventReceived {
+            //     byte_size: message_len
+            // });
 
             if self.total_events % self.config.print_amount == 0 {
                 info!({
                     events = self.total_events,
-                    raw_bytes_collected = self.total_raw_bytes
+                    // raw_bytes_collected = self.total_raw_bytes
                 }, "Total events collected");
             }
 
