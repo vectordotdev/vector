@@ -41,7 +41,7 @@ user_agent_parsers:
 
   - regex: 'ArcGIS\.?(iOS|Android|NET|Qt)(?:-|\.)(\d+)\.(\d+)(?:\.(\d+)|)'
     family_replacement: 'ArcGIS Runtime SDK for $1'
-  
+
   - regex: 'ArcGIS\.Runtime\.(Qt)\.(\d+)\.(\d+)(?:\.(\d+)|)'
     family_replacement: 'ArcGIS Runtime SDK for $1'
 
