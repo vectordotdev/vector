@@ -4,21 +4,28 @@ const chalk = require('chalk');
 const TOML = require('@iarna/toml');
 const YAML = require('yaml');
 
-const makeRequiredParams = (configuration) => {
+const getExampleValue = (exampleConfig, paramName, param) => {
+  Object.keys(param.type).forEach((k) => {
+    if (param.type[k].default) {
+      exampleConfig[paramName] = param.type[k].default;
+    } else {
+      const examples = param.type[k].examples;
+
+      if ((examples != null) && (examples.length > 0)) {
+        exampleConfig[paramName] = examples[0];
+      }
+    }
+  });
+}
+
+const makeCommonParams = (configuration) => {
   var required = {};
 
   for (const paramName in configuration) {
     if (paramName != "type") {
       const param = configuration[paramName];
-      if (param.required) {
-        Object.keys(param.type).forEach((k) => {
-          const examples = param.type[k].examples;
 
-          if (examples != null && examples.length > 0) {
-            required[paramName] = examples[0];
-          }
-        });
-      }
+      getExampleValue(required, paramName, param);
     }
   }
 
@@ -31,15 +38,8 @@ const makeOptionalParams = (configuration) => {
   for (const paramName in configuration) {
     if (paramName != "type") {
       const param = configuration[paramName];
-      if (!param.required) {
-        Object.keys(param.type).forEach((k) => {
-          const examples = param.type[k].examples;
 
-          if (examples != null && examples.length > 0) {
-            optional[paramName] = examples[0];
-          }
-        });
-      }
+      getExampleValue(optional, paramName, param);
     }
   }
 
@@ -64,8 +64,8 @@ try {
       const component = componentsOfKind[componentType];
       const configuration = component.configuration;
 
-      const required = makeRequiredParams(configuration);
-      const optional = makeOptionalParams(configuration);
+      const commonParams = makeCommonParams(configuration);
+      const advancedParams = makeOptionalParams(configuration);
 
       const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
@@ -78,7 +78,7 @@ try {
             [keyName]: {
               "type": componentType,
               inputs: ['my-source-or-transform-id'], // Sinks and transforms need this
-              ...required,
+              ...commonParams,
             }
           }
         };
@@ -88,8 +88,8 @@ try {
             [keyName]: {
               "type": componentType,
               inputs: ['my-source-or-transform-id'],
-              ...required,
-              ...optional,
+              ...commonParams,
+              ...advancedParams,
             }
           }
         };
@@ -98,7 +98,7 @@ try {
           [kind]: {
             [keyName]: {
               "type": componentType,
-              ...required,
+              ...commonParams,
             }
           }
         };
@@ -107,15 +107,11 @@ try {
           [kind]: {
             [keyName]: {
               "type": componentType,
-              ...required,
-              ...optional,
+              ...commonParams,
+              ...advancedParams,
             }
           }
         };
-      }
-
-      if (componentType === "kubernetes_logs") {
-        console.log(common);
       }
 
       docs['components'][kind][componentType]['example_configs'] = {
