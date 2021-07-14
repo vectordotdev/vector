@@ -73,20 +73,24 @@ pub fn tests() -> Vec<Test> {
         .output()
         .expect("failed to execute process");
 
-    let Reference {
-        examples,
-        functions,
-        expressions,
-    } = serde_json::from_slice(&output.stdout).unwrap();
+    if output.stdout.is_empty() {
+        Vec::new()
+    } else {
+        let Reference {
+            examples,
+            functions,
+            expressions,
+        } = serde_json::from_slice(&output.stdout).unwrap();
 
-    examples_to_tests("reference", {
-        let mut map = HashMap::default();
-        map.insert("program".to_owned(), Examples { examples });
-        map
-    })
-    .chain(examples_to_tests("functions", functions))
-    .chain(examples_to_tests("expressions", expressions))
-    .collect()
+        examples_to_tests("reference", {
+            let mut map = HashMap::default();
+            map.insert("program".to_owned(), Examples { examples });
+            map
+        })
+        .chain(examples_to_tests("functions", functions))
+        .chain(examples_to_tests("expressions", expressions))
+        .collect()
+    }
 }
 
 fn examples_to_tests(

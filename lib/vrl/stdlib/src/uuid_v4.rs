@@ -41,6 +41,7 @@ impl Expression for UuidV4Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::TimeZone;
 
     test_type_def![default {
         expr: |_| { UuidV4Fn },
@@ -51,7 +52,8 @@ mod tests {
     fn uuid_v4() {
         let mut state = vrl::state::Runtime::default();
         let mut object: Value = map![].into();
-        let mut ctx = Context::new(&mut object, &mut state);
+        let tz = TimeZone::default();
+        let mut ctx = Context::new(&mut object, &mut state, &tz);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();
 
         assert!(matches!(&value, Value::Bytes(_)));

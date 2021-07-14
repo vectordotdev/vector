@@ -1,10 +1,9 @@
-use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{mem, str::Chars};
 
-lazy_static! {
-    static ref FAST_RE: Regex = Regex::new(r"\A\w+(\.\w+)*\z").unwrap();
+thread_local! {
+    pub static FAST_RE: Regex = Regex::new(r"\A\w+(\.\w+)*\z").unwrap();
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -71,7 +70,7 @@ impl<'a> Iterator for PathIter<'a> {
             ClosingBracket, Dot, End, Fast, Index, Invalid, Key, KeyEscape, OpeningBracket, Start,
         };
 
-        if self.state.is_start() && FAST_RE.is_match(self.path) {
+        if self.state.is_start() && FAST_RE.with(|re| re.is_match(self.path)) {
             self.state = Fast(self.path.split('.'));
         }
 

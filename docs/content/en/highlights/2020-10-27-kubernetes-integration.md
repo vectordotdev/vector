@@ -24,7 +24,7 @@ Kubernetes observability data.
 ## Feature highlights
 
 1.  [**A new `kubernetes_logs` source**][kubernetes_logs_source] - A new source
-    designed to handle the intricacies of Kuberenetes log collection. It'll
+    designed to handle the intricacies of Kubernetes log collection. It'll
     collect all Pod logs, merge split logs together, and enrich them with k8s
     metadata.
 2.  [**YAML config support**][config_formats_highlight] -

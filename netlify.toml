@@ -1,11 +1,12 @@
 [build]
 base = "docs"
 publish = "public"
-ignore = "git diff --quiet HEAD^ HEAD ./docs"
+
+# Reinstate this when we figure out how to target this better
+#ignore = "./scripts/build-ignore.sh"
 
 [build.environment]
 HUGO_VERSION = "0.84.0"
-HUGO_ENVIRONMENT = "production"
 ALGOLIA_INDEX_FILE="public/search.json"
 
 [context.production]

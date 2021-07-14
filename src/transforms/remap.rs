@@ -6,6 +6,7 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -14,6 +15,8 @@ use vrl::{Program, Runtime, Terminate};
 #[derivative(Default)]
 pub struct RemapConfig {
     pub source: String,
+    #[serde(default)]
+    pub timezone: TimeZone,
     pub drop_on_error: bool,
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
@@ -48,6 +51,7 @@ impl TransformConfig for RemapConfig {
 #[derive(Debug, Clone)]
 pub struct Remap {
     program: Program,
+    timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
 }
@@ -62,6 +66,7 @@ impl Remap {
 
         Ok(Remap {
             program,
+            timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
         })
@@ -91,7 +96,7 @@ impl FunctionTransform for Remap {
 
         let mut runtime = Runtime::default();
 
-        let result = runtime.resolve(&mut target, &self.program);
+        let result = runtime.resolve(&mut target, &self.program, &self.timezone);
 
         match result {
             Ok(_) => {
@@ -160,6 +165,7 @@ mod tests {
   .copy = .copy_from
 "#
             .to_string(),
+            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
         };
@@ -191,6 +197,7 @@ mod tests {
                 . = .events
             "#}
             .to_owned(),
+            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
         };
@@ -219,6 +226,7 @@ mod tests {
                 .not_an_int = int!(.bar)
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
         };
@@ -245,6 +253,7 @@ mod tests {
                 .not_an_int = int!(.bar)
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
         };
@@ -266,6 +275,7 @@ mod tests {
                 .foo = "foo"
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
         };
@@ -292,6 +302,7 @@ mod tests {
                 abort
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
         };
@@ -318,6 +329,7 @@ mod tests {
                 abort
                 .baz = 12
             "#},
+            timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: true,
         };
@@ -341,6 +353,7 @@ mod tests {
                        .namespace = "zerk"
                        .kind = "incremental""#
                 .to_string(),
+            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
         };

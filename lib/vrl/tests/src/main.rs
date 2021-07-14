@@ -1,6 +1,7 @@
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use glob::glob;
+use shared::TimeZone;
 use std::str::FromStr;
 use structopt::StructOpt;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
@@ -29,6 +30,19 @@ pub struct Cmd {
     /// during the test run.
     #[structopt(short, long)]
     logging: bool,
+
+    #[structopt(short = "tz", long)]
+    timezone: Option<String>,
+}
+
+impl Cmd {
+    fn timezone(&self) -> TimeZone {
+        if let Some(ref tz) = self.timezone {
+            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {}", tz))
+        } else {
+            TimeZone::default()
+        }
+    }
 }
 
 fn should_run(name: &str, pat: &Option<String>) -> bool {
@@ -113,10 +127,11 @@ fn main() {
         let program = vrl::compile(&test.source, &stdlib::all());
 
         let want = test.result.clone();
+        let timezone = cmd.timezone();
 
         match program {
             Ok(program) => {
-                let result = runtime.resolve(&mut test.object, &program);
+                let result = runtime.resolve(&mut test.object, &program, &timezone);
 
                 match result {
                     Ok(got) => {

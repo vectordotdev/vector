@@ -5,6 +5,7 @@ use crate::{
     internal_events::VrlConditionExecutionError,
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Value};
 
@@ -78,7 +79,9 @@ impl Vrl {
         //
         // see: https://github.com/timberio/vector/issues/4744
         let mut target = VrlTarget::new(event.clone());
-        Runtime::default().resolve(&mut target, &self.program)
+        // TODO: use timezone from remap config
+        let timezone = TimeZone::default();
+        Runtime::default().resolve(&mut target, &self.program, &timezone)
     }
 }
 

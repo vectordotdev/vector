@@ -1,4 +1,5 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
+use crate::template::TemplateRenderingError;
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
@@ -36,7 +37,7 @@ enum HealthcheckError {
 pub struct StackdriverConfig {
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
-    pub log_id: String,
+    pub log_id: Template,
 
     pub resource: StackdriverResource,
     pub severity_key: Option<String>,
@@ -175,6 +176,17 @@ impl HttpSink for StackdriverSink {
                 .ok()?;
             labels.insert(key.clone(), value);
         }
+        let log_name = self
+            .config
+            .log_name(&event)
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("log_id"),
+                    drop_event: true,
+                });
+            })
+            .ok()?;
 
         let mut log = event.into_log();
         let severity = self
@@ -189,7 +201,8 @@ impl HttpSink for StackdriverSink {
 
         let log = event.into_log();
 
-        let mut entry = map::Map::with_capacity(4);
+        let mut entry = map::Map::with_capacity(5);
+        entry.insert("logName".into(), json!(log_name));
         entry.insert("jsonPayload".into(), json!(log));
         entry.insert("severity".into(), json!(severity));
         entry.insert(
@@ -209,10 +222,7 @@ impl HttpSink for StackdriverSink {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
-        let events = serde_json::json!({
-            "log_name": self.config.log_name(),
-            "entries": events,
-        });
+        let events = serde_json::json!({ "entries": events });
 
         let body = serde_json::to_vec(&events).unwrap();
 
@@ -277,14 +287,17 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
 }
 
 impl StackdriverConfig {
-    fn log_name(&self) -> String {
+    fn log_name(&self, event: &Event) -> Result<String, TemplateRenderingError> {
         use StackdriverLogName::*;
-        match &self.log_name {
-            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, self.log_id),
-            Folder(folder) => format!("folders/{}/logs/{}", folder, self.log_id),
-            Organization(org) => format!("organizations/{}/logs/{}", org, self.log_id),
-            Project(project) => format!("projects/{}/logs/{}", project, self.log_id),
-        }
+
+        let log_id = self.log_id.render_string(event)?;
+
+        Ok(match &self.log_name {
+            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, log_id),
+            Folder(folder) => format!("folders/{}/logs/{}", folder, log_id),
+            Organization(org) => format!("organizations/{}/logs/{}", org, log_id),
+            Project(project) => format!("projects/{}/logs/{}", project, log_id),
+        })
     }
 }
 
@@ -305,11 +318,11 @@ mod tests {
     fn encode_valid() {
         let config: StackdriverConfig = toml::from_str(indoc! {r#"
             project_id = "project"
-            log_id = "testlogs"
+            log_id = "{{ log_id }}"
             resource.type = "generic_node"
             resource.namespace = "office"
             resource.node_id = "{{ node_id }}"
-            encoding.except_fields = ["anumber", "node_id"]
+            encoding.except_fields = ["anumber", "node_id", "log_id"]
         "#})
         .unwrap();
 
@@ -323,6 +336,7 @@ mod tests {
             ("message", "hello world"),
             ("anumber", "100"),
             ("node_id", "10.10.10.1"),
+            ("log_id", "testlogs"),
         ]
         .iter()
         .copied()
@@ -330,7 +344,15 @@ mod tests {
         let json = sink.encode_event(Event::from(log)).unwrap().item;
         assert_eq!(
             json,
-            serde_json::json!({"jsonPayload":{"message":"hello world"},"severity":100,"resource":{"type":"generic_node","labels":{"namespace":"office","node_id":"10.10.10.1"}}})
+            serde_json::json!({
+                "logName":"projects/project/logs/testlogs",
+                "jsonPayload":{"message":"hello world"},
+                "severity":100,
+                "resource":{
+                    "type":"generic_node",
+                    "labels":{"namespace":"office","node_id":"10.10.10.1"}
+                }
+            })
         );
     }
 
@@ -361,7 +383,15 @@ mod tests {
         let json = sink.encode_event(Event::from(log)).unwrap().item;
         assert_eq!(
             json,
-            serde_json::json!({"jsonPayload":{"message":"hello world","timestamp":"2020-01-01T12:30:00Z"},"severity":100,"resource":{"type":"generic_node","labels":{"namespace":"office"}},"timestamp":"2020-01-01T12:30:00Z"})
+            serde_json::json!({
+                "logName":"projects/project/logs/testlogs",
+                "jsonPayload":{"message":"hello world","timestamp":"2020-01-01T12:30:00Z"},
+                "severity":100,
+                "resource":{
+                    "type":"generic_node",
+                    "labels":{"namespace":"office"}},
+                "timestamp":"2020-01-01T12:30:00Z"
+            })
         );
     }
 
@@ -436,6 +466,7 @@ mod tests {
             serde_json::json!({
                 "entries": [
                     {
+                        "logName": "projects/project/logs/testlogs",
                         "severity": 0,
                         "jsonPayload": {
                             "message": "hello"
@@ -448,6 +479,7 @@ mod tests {
                         }
                     },
                     {
+                        "logName": "projects/project/logs/testlogs",
                         "severity": 0,
                         "jsonPayload": {
                             "message": "world"
@@ -459,8 +491,7 @@ mod tests {
                             }
                         }
                     }
-                ],
-                "log_name": "projects/project/logs/testlogs",
+                ]
             })
         );
     }

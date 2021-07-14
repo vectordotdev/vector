@@ -1,6 +1,3 @@
-# Environment variables
-.env
-
 # Hugo-generated assets
 public/
 resources/
