@@ -7,7 +7,7 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
+            retries::RetryLogic, sink, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
             TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
@@ -154,6 +154,7 @@ impl SinkConfig for TestConfig {
                 VecBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
             .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
@@ -403,8 +404,7 @@ async fn run_test(params: TestParams) -> TestResults {
         .expect("Failed to unwrap controller_stats Mutex");
 
     let metrics = capture_metrics(controller)
-        .map(Event::into_metric)
-        .map(|event| (event.name().to_string(), event))
+        .map(|metric| (metric.name().to_string(), metric))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them
     assert!(matches!(

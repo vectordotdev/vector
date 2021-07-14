@@ -6,8 +6,7 @@ const tableOfContents = () => {
     tocbot.init({
       tocSelector: '#toc',
       contentSelector: '#page-content',
-      headingSelector: 'h2, h3, h4, h5',
-      ignoreSelector: 'no-toc',
+      headingSelector: 'h2,h3,h4,h5',
       scrollSmoothDuration: 400
     });
   }

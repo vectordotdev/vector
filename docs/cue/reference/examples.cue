@@ -11,7 +11,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 		example: #"""
 			[sources.datadog_agent]
 			type = "datadog_logs"
-			address = "localhost:80"
+			address = "0.0.0.0:80"
 
 			[transforms.remove_sensitive_user_info]
 			type = "remap"
@@ -33,7 +33,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			type = "kafka"
 			bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 			group_id = "vector-logs"
-			message_key = "message"
+			key_field = "message"
 			topics = ["logs-*"]
 
 			[transforms.json_parse]
@@ -65,6 +65,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			bucket = "k8s-logs"
 			region = "us-east-1"
 			compression = "gzip"
+			encoding.codec = "json"
 			"""#
 	},
 	{
@@ -72,7 +73,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 		example: #"""
 			[sources.splunk_hec_in]
 			type = "splunk_hec"
-			address = "localhost:8080"
+			address = "0.0.0.0:8080"
 			token = "${SPLUNK_HEC_TOKEN}"
 
 			[sinks.datadog_out]
