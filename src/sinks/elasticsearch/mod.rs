@@ -37,7 +37,7 @@ use std::convert::TryFrom;
 use vector_core::event::{Event, Value};
 
 /// The field name for the timestamp required by data stream mode
-const TIMESTAMP_KEY: &str = "@timestamp";
+const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -176,15 +176,15 @@ impl DataStreamConfig {
         true
     }
 
-    fn fixup_timestamp(&self, mut event: Event) -> Event {
+    fn remap_timestamp(&self, mut event: Event) -> Event {
         // we keep it if the timestamp field is @timestamp
         let timestamp_key = log_schema().timestamp_key();
-        if timestamp_key == TIMESTAMP_KEY {
+        if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
             return event;
         }
         let log = event.as_mut_log().as_map_mut();
         if let Some(value) = log.remove(timestamp_key) {
-            log.insert(TIMESTAMP_KEY.into(), value);
+            log.insert(DATA_STREAM_TIMESTAMP_KEY.into(), value);
         }
         event
     }
@@ -499,7 +499,7 @@ impl ElasticSearchCommon {
         let index = self.mode.index(&event)?;
 
         let mut event = if let Some(cfg) = self.mode.as_data_stream_config() {
-            cfg.fixup_timestamp(cfg.sync_fields(event))
+            cfg.remap_timestamp(cfg.sync_fields(event))
         } else {
             event
         };
@@ -1506,7 +1506,7 @@ mod integration_tests {
                     let obj = hit.as_object_mut().unwrap();
                     obj.remove("data_stream");
                     // Un-rewrite the timestamp field
-                    let timestamp = obj.remove(TIMESTAMP_KEY).unwrap();
+                    let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
                     obj.insert(log_schema().timestamp_key().into(), timestamp);
                 }
                 assert!(input.contains(&hit));
