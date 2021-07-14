@@ -23,7 +23,7 @@ pub(self) fn instant_now() -> std::time::Instant {
 // values are the best balances found between competing outcomes.
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct AdaptiveConcurrencySettings {
     // This value maintained high concurrency without holding it too
     // high under adverse conditions.

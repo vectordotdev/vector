@@ -164,14 +164,13 @@ impl ConcurrencyOption for Concurrency {
 
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
-    #[serde(default)]
-    #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
+    #[serde(default, skip_serializing_if = "ConcurrencyOption::is_none")]
     pub concurrency: T, // 5
     /// The same as concurrency but with old deprecated name.
     /// Alias couldn't be used because of https://github.com/serde-rs/serde/issues/1504
-    #[serde(default)]
-    #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
+    #[serde(default, skip_serializing_if = "ConcurrencyOption::is_none")]
     pub in_flight_limit: T, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
