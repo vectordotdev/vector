@@ -54,28 +54,28 @@ impl Function for ParseUserAgent {
         &[
             Example {
                 title: "fast mode",
-                source: r#"parse_user_agent!("Mozilla Firefox 1.0.1 Mozilla/5.0 (X11; U; Linux i686; de-DE; rv:1.7.6) Gecko/20050223 Firefox/1.0.1")"#,
+                source: r#"parse_user_agent("Mozilla Firefox 1.0.1 Mozilla/5.0 (X11; U; Linux i686; de-DE; rv:1.7.6) Gecko/20050223 Firefox/1.0.1")"#,
                 result: Ok(
                     r#"{ "browser": { "family": "Firefox", "version": "1.0.1" }, "device": { "category": "pc" }, "os": { "family": "Linux", "version": null } }"#,
                 ),
             },
             Example {
                 title: "reliable mode",
-                source: r#"parse_user_agent!("Mozilla/4.0 (compatible; MSIE 7.66; Windows NT 5.1; SV1; .NET CLR 1.1.4322)", mode: "reliable"")"#,
+                source: r#"parse_user_agent("Mozilla/4.0 (compatible; MSIE 7.66; Windows NT 5.1; SV1; .NET CLR 1.1.4322)", mode: "reliable")"#,
                 result: Ok(
                     r#"{ "browser": { "family": "Internet Explorer", "version": "7.66" }, "device": { "category": "pc" }, "os": { "family": "Windows XP", "version": "NT 5.1" } }"#,
                 ),
             },
             Example {
                 title: "enriched mode",
-                source: r#"parse_user_agent!("Opera/9.80 (J2ME/MIDP; Opera Mini/4.3.24214; iPhone; CPU iPhone OS 4_2_1 like Mac OS X; AppleWebKit/24.783; U; en) Presto/2.5.25 Version/10.54", mode: "enriched"")"#,
+                source: r#"parse_user_agent("Opera/9.80 (J2ME/MIDP; Opera Mini/4.3.24214; iPhone; CPU iPhone OS 4_2_1 like Mac OS X; AppleWebKit/24.783; U; en) Presto/2.5.25 Version/10.54", mode: "enriched")"#,
                 result: Ok(
                     r#"{ "browser": { "family": "Opera Mini", "major": "4", "minor": "3", "patch": "24214", "version": "10.54" }, "device": { "brand": "Apple", "category": "smartphone", "family": "iPhone", "model": "iPhone" }, "os": { "family": "iOS", "major": "4", "minor": "2", "patch": "1", "patch_minor": null, "version": "4.2.1" } }"#,
                 ),
             },
             Example {
                 title: "device",
-                source: r#"parse_user_agent!("Mozilla/5.0 (Linux; Android 4.4.4; HP Slate 17 Build/KTU84P) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/33.0.0.0 Safari/537.36ESPN APP", mode: "enriched"")"#,
+                source: r#"parse_user_agent("Mozilla/5.0 (Linux; Android 4.4.4; HP Slate 17 Build/KTU84P) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/33.0.0.0 Safari/537.36ESPN APP", mode: "enriched")"#,
                 result: Ok(
                     r#"{ "browser": { "family": "ESPN", "major": null, "minor": null, "patch": null, "version": "33.0.0.0" }, "device": { "brand": "HP", "category": "smartphone", "family": "HP Slate 17", "model": "Slate 17" }, "os": { "family": "Android", "major": "4", "minor": "4", "patch": "4", "patch_minor": null, "version": "4.4.4" } }"#,
                 ),
