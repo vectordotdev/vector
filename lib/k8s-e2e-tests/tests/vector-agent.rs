@@ -708,9 +708,6 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
-    framework
-        .label(&pod_namespace, "namespace", "label3=fizzbuzz")
-        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -776,7 +773,6 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(val["kubernetes"]["pod_uid"].as_str().unwrap().len(), 36); // 36 is a standard UUID string length
         assert_eq!(val["kubernetes"]["pod_labels"]["label1"], "hello");
         assert_eq!(val["kubernetes"]["pod_labels"]["label2"], "world");
-        assert_eq!(val["kubernetes"]["namespace_labels"]["label3"], "fizzbuzz");
 
         if minor < 16 {
             assert!(val["kubernetes"]["pod_ip"].is_string());
