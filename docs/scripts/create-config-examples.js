@@ -4,7 +4,7 @@ const chalk = require('chalk');
 const TOML = require('@iarna/toml');
 const YAML = require('yaml');
 
-const getExampleValue = (exampleConfig, paramName, param) => {
+const setExampleValue = (exampleConfig, paramName, param) => {
   Object.keys(param.type).forEach((k) => {
     if (param.type[k].default) {
       exampleConfig[paramName] = param.type[k].default;
@@ -25,7 +25,9 @@ const makeCommonParams = (configuration) => {
     if (paramName != "type") {
       const param = configuration[paramName];
 
-      getExampleValue(required, paramName, param);
+      if (param.common) {
+        setExampleValue(required, paramName, param);
+      }
     }
   }
 
@@ -39,7 +41,9 @@ const makeOptionalParams = (configuration) => {
     if (paramName != "type") {
       const param = configuration[paramName];
 
-      getExampleValue(optional, paramName, param);
+      if (!param.common) {
+        setExampleValue(optional, paramName, param);
+      }
     }
   }
 
@@ -65,7 +69,7 @@ try {
       const configuration = component.configuration;
 
       const commonParams = makeCommonParams(configuration);
-      const advancedParams = makeOptionalParams(configuration);
+      const optionalParams = makeOptionalParams(configuration);
 
       const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
@@ -89,7 +93,7 @@ try {
               "type": componentType,
               inputs: ['my-source-or-transform-id'],
               ...commonParams,
-              ...advancedParams,
+              ...optionalParams,
             }
           }
         };
@@ -108,10 +112,14 @@ try {
             [keyName]: {
               "type": componentType,
               ...commonParams,
-              ...advancedParams,
+              ...optionalParams,
             }
           }
         };
+      }
+
+      if (componentType === "aws_ecs_metrics") {
+        console.log(JSON.stringify(advanced, null, 2));
       }
 
       docs['components'][kind][componentType]['example_configs'] = {
