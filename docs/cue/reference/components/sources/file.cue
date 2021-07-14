@@ -129,8 +129,8 @@ components: sources: file: {
 			common:      false
 			description: """
 				Delay between file discovery calls. This controls the interval at which Vector searches for files.
-				The higher the value the greater the chance of some short living files to be missed between
-				searches, but the lower the value the greater of performance impact file discovery will have.
+				Higher value result in greater chances of some short living files being missed between
+				searches, but lower value increases the performance impact of file discovery.
 				"""
 			required:    false
 			type: uint: {
