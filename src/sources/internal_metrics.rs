@@ -62,8 +62,17 @@ async fn run(
 
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
+        let hostname = crate::get_hostname();
+
         let metrics = capture_metrics(controller);
-        out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
+
+        out.send_all(&mut stream::iter(metrics.map(|mut metric| {
+            if let Ok(hostname) = &hostname {
+                metric.insert_tag("host".into(), hostname.into());
+            }
+            Ok(metric.into())
+        })))
+        .await?;
     }
 
     Ok(())
@@ -102,20 +111,14 @@ mod tests {
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        let output = capture_metrics(&controller)
-            .map(|event| {
-                let m = event.into_metric();
-                (m.name().to_string(), m)
-            })
+        let output = capture_metrics(controller)
+            .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 
-        assert_eq!(MetricValue::Gauge { value: 2.0 }, output["foo"].data.value);
-        assert_eq!(
-            MetricValue::Counter { value: 7.0 },
-            output["bar"].data.value
-        );
+        assert_eq!(&MetricValue::Gauge { value: 2.0 }, output["foo"].value());
+        assert_eq!(&MetricValue::Counter { value: 7.0 }, output["bar"].value());
 
-        match &output["baz"].data.value {
+        match &output["baz"].value() {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count,
@@ -132,7 +135,7 @@ mod tests {
             _ => panic!("wrong type"),
         }
 
-        match &output["quux"].data.value {
+        match &output["quux"].value() {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count,

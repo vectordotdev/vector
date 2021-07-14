@@ -3,6 +3,7 @@ use crate::event::{LogEvent, Value};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {
+    #![allow(clippy::wrong_self_convention)] // this trait is defined by rlua
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let (fields, _metadata) = self.into_parts();
         // The metadata is handled when converting the enclosing `Event`.

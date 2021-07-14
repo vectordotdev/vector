@@ -3,9 +3,9 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_until, take_while1},
     character::complete::{char, satisfy, space0},
-    combinator::{eof, map, opt, peek, rest},
+    combinator::{eof, map, opt, peek, recognize, rest, verify},
     error::{ContextError, ParseError, VerboseError},
-    multi::{many1, separated_list1},
+    multi::{many1, many_m_n, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -42,6 +42,11 @@ impl Function for ParseKeyValue {
                 kind: kind::BYTES,
                 required: false,
             },
+            Parameter {
+                keyword: "accept_standalone_key",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
         ]
     }
 
@@ -63,6 +68,11 @@ impl Function for ParseKeyValue {
                 result: Ok(
                     r#"{"app": "my-app", "ip": "1.2.3.4", "user": "", "msg": "hello-world"}"#,
                 ),
+            },
+            Example {
+                title: "standalone key",
+                source: r#"parse_key_value!(s'foo=bar foobar', whitespace: "strict")"#,
+                result: Ok(r#"{"foo": "bar", "foobar": true}"#),
             },
         ]
     }
@@ -86,11 +96,16 @@ impl Function for ParseKeyValue {
             })
             .unwrap_or_default();
 
+        let standalone_key = arguments
+            .optional("accept_standalone_key")
+            .unwrap_or_else(|| expr!(true));
+
         Ok(Box::new(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
             whitespace,
+            standalone_key,
         }))
     }
 }
@@ -147,6 +162,7 @@ pub(crate) struct ParseKeyValueFn {
     pub(crate) key_value_delimiter: Box<dyn Expression>,
     pub(crate) field_delimiter: Box<dyn Expression>,
     pub(crate) whitespace: Whitespace,
+    pub(crate) standalone_key: Box<dyn Expression>,
 }
 
 impl Expression for ParseKeyValueFn {
@@ -160,11 +176,14 @@ impl Expression for ParseKeyValueFn {
         let value = self.field_delimiter.resolve(ctx)?;
         let field_delimiter = value.try_bytes_utf8_lossy()?;
 
+        let standalone_key = self.standalone_key.resolve(ctx)?.try_boolean()?;
+
         let values = parse(
             &bytes,
             &key_value_delimiter,
             &field_delimiter,
             self.whitespace,
+            standalone_key,
         )?;
 
         Ok(Value::from_iter(values))
@@ -182,15 +201,22 @@ fn parse<'a>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
     whitespace: Whitespace,
+    standalone_key: bool,
 ) -> Result<Vec<(String, Value)>> {
-    let (rest, result) = parse_line(input, key_value_delimiter, field_delimiter, whitespace)
-        .map_err(|e| match e {
-            nom::Err::Error(e) | nom::Err::Failure(e) => {
-                // Create a descriptive error message if possible.
-                nom::error::convert_error(input, e)
-            }
-            _ => format!("{}", e),
-        })?;
+    let (rest, result) = parse_line(
+        input,
+        key_value_delimiter,
+        field_delimiter,
+        whitespace,
+        standalone_key,
+    )
+    .map_err(|e| match e {
+        nom::Err::Error(e) | nom::Err::Failure(e) => {
+            // Create a descriptive error message if possible.
+            nom::error::convert_error(input, e)
+        }
+        _ => format!("{}", e),
+    })?;
 
     if rest.trim().is_empty() {
         Ok(result)
@@ -205,10 +231,16 @@ fn parse_line<'a>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
     whitespace: Whitespace,
+    standalone_key: bool,
 ) -> IResult<&'a str, Vec<(String, Value)>, VerboseError<&'a str>> {
     separated_list1(
         parse_field_delimiter(field_delimiter),
-        parse_key_value(key_value_delimiter, field_delimiter, whitespace),
+        parse_key_value(
+            key_value_delimiter,
+            field_delimiter,
+            whitespace,
+            standalone_key,
+        ),
     )(input)
 }
 
@@ -228,26 +260,45 @@ fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 }
 
 /// Parse a single `key=value` tuple.
+/// Always accepts `key=`
+/// Accept standalone `key` if `standalone_key` is `true`
 fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
     whitespace: Whitespace,
+    standalone_key: bool,
 ) -> impl Fn(&'a str) -> IResult<&'a str, (String, Value), E> {
     move |input| {
         map(
             |input| match whitespace {
                 Whitespace::Strict => tuple((
-                    preceded(space0, parse_key(key_value_delimiter)),
-                    tag(key_value_delimiter),
+                    preceded(
+                        space0,
+                        parse_key(key_value_delimiter, field_delimiter, standalone_key),
+                    ),
+                    many_m_n(!standalone_key as usize, 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter),
                 ))(input),
                 Whitespace::Lenient => tuple((
-                    preceded(space0, parse_key(key_value_delimiter)),
-                    preceded(space0, tag(key_value_delimiter)),
-                    preceded(space0, parse_value(field_delimiter)),
+                    preceded(
+                        space0,
+                        parse_key(key_value_delimiter, field_delimiter, standalone_key),
+                    ),
+                    many_m_n(
+                        !standalone_key as usize,
+                        1,
+                        delimited(space0, tag(key_value_delimiter), space0),
+                    ),
+                    parse_value(field_delimiter),
                 ))(input),
             },
-            |(field, _, value): (&str, &str, Value)| (field.to_string(), value),
+            |(field, sep, value): (&str, Vec<&str>, Value)| {
+                if sep.len() == 1 {
+                    (field.to_string(), value)
+                } else {
+                    (field.to_string(), value!(true))
+                }
+            },
         )(input)
     }
 }
@@ -270,7 +321,14 @@ fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                 char(delimiter),
                 map(
                     opt(escaped(
-                        take_while1(|c: char| c != '\\' && c != delimiter),
+                        recognize(many1(tuple((
+                            take_while1(|c: char| c != '\\' && c != delimiter),
+                            // Consume \something
+                            opt(tuple((
+                                satisfy(|c| c == '\\'),
+                                satisfy(|c| c != '\\' && c != delimiter),
+                            ))),
+                        )))),
                         '\\',
                         satisfy(|c| c == '\\' || c == delimiter),
                     )),
@@ -316,21 +374,50 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 }
 
 /// Parses the key.
-/// Parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
+/// Overall parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
+/// Standalone key are handled here so a quoted standalone key that contains a delimiter will be dealt with correctly.
 fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
-) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
-    move |input| {
-        alt((
-            parse_delimited('"', key_value_delimiter),
-            parse_undelimited(key_value_delimiter),
-        ))(input)
+    field_delimiter: &'a str,
+    standalone_key: bool,
+) -> Box<dyn Fn(&'a str) -> IResult<&'a str, &'a str, E> + 'a> {
+    if standalone_key {
+        Box::new(move |input| {
+            alt((
+                parse_delimited('"', key_value_delimiter),
+                parse_delimited('"', field_delimiter),
+                verify(parse_undelimited(key_value_delimiter), |s: &str| {
+                    !s.contains(field_delimiter)
+                }),
+                parse_undelimited(field_delimiter),
+            ))(input)
+        })
+    } else {
+        Box::new(move |input| {
+            alt((
+                parse_delimited('"', key_value_delimiter),
+                parse_undelimited(key_value_delimiter),
+            ))(input)
+        })
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_quote_and_escape_char() {
+        assert_eq!(
+            Ok(vec![("key".to_string(), r#"a\a"#.into()),]),
+            parse(r#"key="a\a""#, "=", " ", Whitespace::Strict, true,)
+        );
+
+        assert_eq!(
+            Ok(vec![(r#"a\ a"#.to_string(), r#"val"#.into()),]),
+            parse(r#""a\ a"=val"#, "=", " ", Whitespace::Strict, true,)
+        );
+    }
 
     #[test]
     fn test_parse() {
@@ -349,7 +436,8 @@ mod test {
                 r#"ook=pook @timestamp=2020-12-31T12:43:22.2322232Z key#hash=value "key=with=special=characters"=value key="with special=characters""#,
                 "=",
                 " ",
-                Whitespace::Lenient
+                Whitespace::Lenient,
+                false,
             )
         );
     }
@@ -358,12 +446,12 @@ mod test {
     fn test_parse_key_value() {
         assert_eq!(
             Ok(("", ("ook".to_string(), "pook".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Lenient)("ook=pook")
+            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Lenient, false)("ook=pook")
         );
 
         assert_eq!(
             Ok(("", ("key".to_string(), "".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Strict)("key=")
+            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Strict, false)("key=")
         );
     }
 
@@ -374,7 +462,7 @@ mod test {
                 ("ook".to_string(), "pook".into()),
                 ("onk".to_string(), "ponk".into())
             ]),
-            parse("ook=pook onk=ponk", "=", " ", Whitespace::Lenient)
+            parse("ook=pook onk=ponk", "=", " ", Whitespace::Lenient, false)
         );
     }
 
@@ -385,7 +473,76 @@ mod test {
                 ("ook".to_string(), "".into()),
                 ("onk".to_string(), "ponk".into())
             ]),
-            parse("ook= onk=ponk", "=", " ", Whitespace::Strict)
+            parse("ook= onk=ponk", "=", " ", Whitespace::Strict, false)
+        );
+    }
+
+    #[test]
+    fn test_parse_standalone_key() {
+        assert_eq!(
+            Ok(vec![
+                ("foo".to_string(), "bar".into()),
+                ("foobar".to_string(), value!(true))
+            ]),
+            parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Lenient, true)
+        );
+    }
+
+    #[test]
+    fn test_multiple_standalone_key() {
+        assert_eq!(
+            Ok(vec![
+                ("foo".to_string(), "bar".into()),
+                ("foobar".to_string(), value!(true)),
+                ("bar".to_string(), "baz".into()),
+                ("barfoo".to_string(), value!(true)),
+            ]),
+            parse(
+                "foo=bar foobar bar=baz barfoo",
+                "=",
+                " ",
+                Whitespace::Lenient,
+                true
+            )
+        );
+    }
+
+    #[test]
+    fn test_only_standalone_key() {
+        assert_eq!(
+            Ok(vec![
+                ("foo".to_string(), value!(true)),
+                ("bar".to_string(), value!(true)),
+                ("foobar".to_string(), value!(true)),
+                ("baz".to_string(), value!(true)),
+                ("barfoo".to_string(), value!(true)),
+            ]),
+            parse(
+                "foo bar foobar baz barfoo",
+                "=",
+                " ",
+                Whitespace::Lenient,
+                true
+            )
+        );
+    }
+
+    #[test]
+    fn test_parse_single_standalone_key() {
+        assert_eq!(
+            Ok(vec![("foobar".to_string(), value!(true))]),
+            parse("foobar", ":", ",", Whitespace::Lenient, true)
+        );
+    }
+
+    #[test]
+    fn test_parse_standalone_key_strict() {
+        assert_eq!(
+            Ok(vec![
+                ("foo".to_string(), "bar".into()),
+                ("foobar".to_string(), value!(true))
+            ]),
+            parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Strict, true)
         );
     }
 
@@ -394,13 +551,37 @@ mod test {
         // delimited
         assert_eq!(
             Ok(("", "noog")),
-            parse_key::<VerboseError<&str>>("=")(r#""noog""#)
+            parse_key::<VerboseError<&str>>("=", " ", false)(r#""noog""#)
         );
 
         // undelimited
         assert_eq!(
             Ok(("", "noog")),
-            parse_key::<VerboseError<&str>>("=")("noog")
+            parse_key::<VerboseError<&str>>("=", " ", false)("noog")
+        );
+
+        // delimited with escaped char (1)
+        assert_eq!(
+            Ok(("=baz", r#"foo \" bar"#)),
+            parse_key::<VerboseError<&str>>("=", " ", false)(r#""foo \" bar"=baz"#)
+        );
+
+        // delimited with escaped char (2)
+        assert_eq!(
+            Ok(("=baz", r#"foo \\ \" \ bar"#)),
+            parse_key::<VerboseError<&str>>("=", " ", false)(r#""foo \\ \" \ bar"=baz"#)
+        );
+
+        // delimited with escaped char (3)
+        assert_eq!(
+            Ok(("=baz", r#"foo \ bar"#)),
+            parse_key::<VerboseError<&str>>("=", " ", false)(r#""foo \ bar"=baz"#)
+        );
+
+        // Standalone key
+        assert_eq!(
+            Ok((" bar=baz", "foo")),
+            parse_key::<VerboseError<&str>>("=", " ", true)(r#"foo bar=baz"#)
         );
     }
 
@@ -580,8 +761,9 @@ mod test {
                 value: r#"I am not a valid line."#,
                 key_value_delimiter: "--",
                 field_delimiter: "||",
+                accept_standalone_key: false,
             ],
-            want: Err("0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n"),
+            want: Err("0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n1: at line 1, in ManyMN:\nI am not a valid line.\n                      ^\n\n"),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),

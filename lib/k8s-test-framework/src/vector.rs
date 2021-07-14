@@ -10,7 +10,7 @@ pub struct CommandBuilder {
     interface_command: String,
     namespace: String,
     helm_chart: String,
-    custom_helm_values_file: Option<HelmValuesFile>,
+    custom_helm_values_files: Vec<HelmValuesFile>,
     custom_resource_file: Option<ResourceFile>,
     custom_env: Option<Vec<(String, String)>>,
 }
@@ -27,9 +27,14 @@ impl up_down::CommandBuilder for CommandBuilder {
             .arg(&self.helm_chart)
             .stdin(Stdio::null());
 
-        if let Some(ref custom_helm_values_file) = self.custom_helm_values_file {
-            command.env("CUSTOM_HELM_VALUES_FILE", custom_helm_values_file.path());
-        }
+        command.env(
+            "CUSTOM_HELM_VALUES_FILES",
+            self.custom_helm_values_files
+                .iter()
+                .map(|custom_helm_values_file| custom_helm_values_file.path().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
 
         if let Some(ref custom_resource_file) = self.custom_resource_file {
             command.env("CUSTOM_RESOURCE_CONFIGS_FILE", custom_resource_file.path());
@@ -48,7 +53,7 @@ impl up_down::CommandBuilder for CommandBuilder {
 pub struct Config<'a> {
     /// Custom Helm values to set, in the YAML format.
     /// Set to empty to opt-out of passing any custom values.
-    pub custom_helm_values: &'a str,
+    pub custom_helm_values: Vec<&'a str>,
 
     /// Custom Kubernestes resource(s) to deploy together with Vector.
     /// Set to empty to opt-out of deploying custom resources.
@@ -69,11 +74,10 @@ pub fn manager(
         custom_helm_values,
         custom_resource,
     } = config;
-    let custom_helm_values_file = if custom_helm_values.is_empty() {
-        None
-    } else {
-        Some(HelmValuesFile::new(custom_helm_values)?)
-    };
+    let custom_helm_values_files = custom_helm_values
+        .into_iter()
+        .map(HelmValuesFile::new)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     let custom_resource_file = if custom_resource.is_empty() {
         None
     } else {
@@ -83,7 +87,7 @@ pub fn manager(
         interface_command: interface_command.to_owned(),
         namespace: namespace.to_owned(),
         helm_chart: helm_chart.to_owned(),
-        custom_helm_values_file,
+        custom_helm_values_files,
         custom_resource_file,
         custom_env,
     }))

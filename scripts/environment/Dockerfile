@@ -19,6 +19,7 @@ RUN ./git/timberio/vector/scripts/environment/bootstrap-ubuntu-20.04.sh
 WORKDIR /git/timberio/vector
 ADD scripts/environment/prepare.sh /git/timberio/vector/scripts/environment/
 ADD scripts/environment/setup-helm.sh /git/timberio/vector/scripts/environment/
+ADD scripts/environment/release-flags.sh /git/timberio/vector/scripts/environment/
 ADD scripts/Gemfile scripts/Gemfile.lock \
     /git/timberio/vector/scripts/
 ADD rust-toolchain \

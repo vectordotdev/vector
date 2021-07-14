@@ -17,6 +17,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-agent
 automountServiceAccountToken: true
 ---
 # Source: vector/charts/vector-aggregator/templates/serviceaccount.yaml
@@ -30,6 +31,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-aggregator
 automountServiceAccountToken: true
 ---
 # Source: vector/charts/vector-agent/templates/configmap.yaml
@@ -43,6 +45,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-agent
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
@@ -72,6 +75,7 @@ data:
       address = "vector-aggregator:9000"
       inputs = ["kubernetes_logs"]
       type = "vector"
+      version = "2"
     
     # Capture the metrics from the host.
     [sources.host_metrics]
@@ -106,6 +110,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-aggregator
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
@@ -130,6 +135,7 @@ data:
     [sources.vector]
       address = "0.0.0.0:9000"
       type = "vector"
+      version = "2"
     
     
     # Emit internal Vector metrics.
@@ -168,6 +174,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -188,6 +195,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-aggregator
 spec:
   clusterIP: None
   ports:
@@ -197,6 +205,7 @@ spec:
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: aggregator
 ---
 # Source: vector/charts/vector-aggregator/templates/service.yaml
 apiVersion: v1
@@ -209,6 +218,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-aggregator
 spec:
   type: ClusterIP
   ports:
@@ -219,6 +229,7 @@ spec:
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: aggregator
 ---
 # Source: vector/charts/vector-agent/templates/daemonset.yaml
 apiVersion: apps/v1
@@ -231,6 +242,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-agent
 spec:
   selector:
     matchLabels:
@@ -239,11 +251,12 @@ spec:
   minReadySeconds: 1
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   template:
     metadata:
       annotations:
         
-        checksum/config: fa3deb906e02ab211d86aa37249d2f7d73dce9e771d68ed0679c7a0cab9eb54c
         
       labels:
         app.kubernetes.io/name: vector-agent
@@ -262,8 +275,8 @@ spec:
           command:
             []
           args:
-            - --config
-            - /etc/vector/*.toml
+            - --config-dir
+            - /etc/vector/
           env:
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:
@@ -363,23 +376,25 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: vector-aggregator
 spec:
   serviceName: vector-aggregator-headless
   selector:
     matchLabels:
       app.kubernetes.io/name: vector-aggregator
       app.kubernetes.io/instance: vector
+      app.kubernetes.io/component: aggregator
   podManagementPolicy: "Parallel"
   replicas: 1
   template:
     metadata:
       annotations:
         
-        checksum/config: a67c40b917e758700bf0df9b0719a84da8ee3828ec3a5d651baf78dcb02fb68a
         
       labels:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
+        app.kubernetes.io/component: aggregator
         vector.dev/exclude: "true"
     spec:      
       serviceAccountName: vector-aggregator
@@ -392,8 +407,8 @@ spec:
           image: "timberio/vector:latest-debian"
           imagePullPolicy: "IfNotPresent"
           args:
-            - --config
-            - /etc/vector/*.toml
+            - --config-dir
+            - /etc/vector/
           env:
             
             - name: "LOG"

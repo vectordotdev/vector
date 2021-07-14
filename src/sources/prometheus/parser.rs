@@ -3,9 +3,10 @@ use crate::event::{
     Event,
 };
 use chrono::{DateTime, TimeZone, Utc};
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
-pub use prometheus_parser::*;
+use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
 
 fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
     if tags.is_empty() {
@@ -71,8 +72,9 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
                     let mut buckets = metric.buckets;
+                    buckets.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap_or(Ordering::Equal));
                     for i in (1..buckets.len()).rev() {
-                        buckets[i].count -= buckets[i - 1].count;
+                        buckets[i].count = buckets[i].count.saturating_sub(buckets[i - 1].count);
                     }
                     let drop_last = buckets
                         .last()
@@ -161,7 +163,7 @@ mod test {
             "##;
         let result = parse_text(exp).unwrap();
         assert_eq!(result.len(), 1);
-        assert!(result[0].data.timestamp.unwrap() >= now);
+        assert!(result[0].timestamp().unwrap() >= now);
     }
 
     #[test]
@@ -200,7 +202,7 @@ mod test {
             name{labelname="val1",basename="basevalue"} NaN
             "##;
 
-        match parse_text(exp).unwrap()[0].data.value {
+        match parse_text(exp).unwrap()[0].value() {
             MetricValue::Counter { value } => {
                 assert!(value.is_nan());
             }
@@ -705,6 +707,59 @@ mod test {
     }
 
     #[test]
+    fn test_histogram_out_of_order() {
+        let exp = r##"
+            # HELP duration A histogram of the request duration.
+            # TYPE duration histogram
+            duration_bucket{le="+Inf"} 144320 1612411506789
+            duration_bucket{le="1"} 133988 1612411506789
+            duration_sum 53423 1612411506789
+            duration_count 144320 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "duration",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vector_core::buckets![1.0 => 133988],
+                    count: 144320,
+                    sum: 53423.0,
+                },
+            )
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    #[test]
+    fn test_histogram_backward_values() {
+        let exp = r##"
+            # HELP duration A histogram of the request duration.
+            # TYPE duration histogram
+            duration_bucket{le="1"} 2000 1612411506789
+            duration_bucket{le="10"} 1000 1612411506789
+            duration_bucket{le="+Inf"} 2000 1612411506789
+            duration_sum 2000 1612411506789
+            duration_count 2000 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "duration",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vector_core::buckets![1.0 => 2000, 10.0 => 0],
+                    count: 2000,
+                    sum: 2000.0,
+                },
+            )
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    #[test]
     fn test_histogram_with_labels() {
         let exp = r##"
             # HELP gitlab_runner_job_duration_seconds Histogram of job durations
@@ -897,11 +952,15 @@ mod test {
             "##;
 
         let now = Utc::now();
-        let mut result = parse_text(exp).expect("Parsing failed");
-        for metric in &mut result {
-            assert!(metric.data.timestamp.expect("Missing timestamp") >= now);
-            metric.data.timestamp = Some(*TIMESTAMP);
-        }
+        let result = parse_text(exp).expect("Parsing failed");
+        // Reset all the timestamps for comparison
+        let result: Vec<_> = result
+            .into_iter()
+            .map(|metric| {
+                assert!(metric.timestamp().expect("Missing timestamp") >= now);
+                metric.with_timestamp(Some(*TIMESTAMP))
+            })
+            .collect();
 
         assert_event_data_eq!(
             result,

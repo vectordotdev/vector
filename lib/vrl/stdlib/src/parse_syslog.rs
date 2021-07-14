@@ -1,4 +1,5 @@
 use chrono::{DateTime, Datelike, Utc};
+use shared::TimeZone;
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
@@ -57,7 +58,12 @@ impl Expression for ParseSyslogFn {
         let value = self.value.resolve(ctx)?;
         let message = value.try_bytes_utf8_lossy()?;
 
-        let parsed = syslog_loose::parse_message_with_year_exact(&message, resolve_year)?;
+        let timezone = match ctx.timezone() {
+            TimeZone::Local => None,
+            TimeZone::Named(tz) => Some(*tz),
+        };
+        let parsed =
+            syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
 
         Ok(message_to_value(parsed))
     }
@@ -149,7 +155,7 @@ fn type_def() -> BTreeMap<&'static str, TypeDef> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::prelude::*;
+    use chrono::TimeZone;
     use shared::btreemap;
 
     test_function![
@@ -233,6 +239,19 @@ mod tests {
                 "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0)),
                 "version" => 1,
                 "non_empty.x" => "1",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
+
+        non_structured_data_in_message {
+            args: func_args![value: "<131>Jun 8 11:54:08 master apache_error [Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message"],
+            want: Ok(btreemap!{
+                "appname" => "apache_error",
+                "facility" => "local0",
+                "hostname" => "master",
+                "severity" => "err",
+                "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(2021, 6, 8).and_hms_milli(11, 54, 8, 0)),
+                "message" => "[Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message",
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }

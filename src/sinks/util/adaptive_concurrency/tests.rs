@@ -7,7 +7,7 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
+            retries::RetryLogic, sink, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
             TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
@@ -154,6 +154,7 @@ impl SinkConfig for TestConfig {
                 VecBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
             .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
@@ -384,7 +385,7 @@ async fn run_test(params: TestParams) -> TestResults {
     // This is crude and dumb, but it works, and the tests run fast and
     // the results are highly repeatable.
     while stats.lock().expect("Poisoned stats lock").completed < params.requests {
-        time::advance(Duration::from_millis(0)).await;
+        time::sleep(Duration::from_millis(1)).await;
     }
     topology.stop().await;
 
@@ -402,44 +403,36 @@ async fn run_test(params: TestParams) -> TestResults {
         .into_inner()
         .expect("Failed to unwrap controller_stats Mutex");
 
-    let metrics = capture_metrics(&controller)
-        .map(Event::into_metric)
-        .map(|event| (event.name().to_string(), event))
+    let metrics = capture_metrics(controller)
+        .map(|metric| (metric.name().to_string(), metric))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them
     assert!(matches!(
         metrics
             .get("adaptive_concurrency_observed_rtt")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
     assert!(matches!(
         metrics
             .get("adaptive_concurrency_averaged_rtt")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
     if params.concurrency == Concurrency::Adaptive {
         assert!(matches!(
-            metrics
-                .get("adaptive_concurrency_limit")
-                .unwrap()
-                .data
-                .value,
-            MetricValue::AggregatedHistogram { .. }
+            metrics.get("adaptive_concurrency_limit").unwrap().value(),
+            &MetricValue::AggregatedHistogram { .. }
         ));
     }
     assert!(matches!(
         metrics
             .get("adaptive_concurrency_in_flight")
             .unwrap()
-            .data
-            .value,
-        MetricValue::AggregatedHistogram { .. }
+            .value(),
+        &MetricValue::AggregatedHistogram { .. }
     ));
 
     TestResults { stats, cstats }

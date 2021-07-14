@@ -1,6 +1,6 @@
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, heartbeat, list, metrics,
+    config, generate, graph, heartbeat, list, metrics,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -14,8 +14,6 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-#[cfg(feature = "sources-host_metrics")]
-use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
 use crate::tap;
 #[cfg(feature = "api-client")]
@@ -32,7 +30,7 @@ use crate::internal_events::{
 };
 
 pub struct ApplicationConfig {
-    pub config_paths: Vec<(PathBuf, config::FormatHint)>,
+    pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -87,12 +85,15 @@ impl Application {
             LogFormat::Json => true,
         };
 
+        let enable_datadog_tracing = root_opts.enable_datadog_tracing;
+
         metrics::init().expect("metrics initialization failed");
-        trace::init(color, json, &level);
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
-                error!("The `threads` argument must be greater or equal to 1.");
+                // Unforunately we can't `error!` here because we haven't yet called `trace::init`,
+                // and we can't call that without a runtime available.
+                println!("Config error: The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             }
         }
@@ -103,6 +104,16 @@ impl Application {
                 .build()
                 .expect("Unable to create async runtime")
         };
+
+        // We need a runtime to initiate the datadog tracing exporter
+        rt.block_on(async move {
+            trace::init(color, json, &level, enable_datadog_tracing);
+            info!(
+                message = "Log level is enabled.",
+                ?level,
+                ?enable_datadog_tracing
+            );
+        });
 
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
@@ -116,16 +127,17 @@ impl Application {
 
                 if let Some(s) = sub_command {
                     let code = match s {
-                        SubCommand::Validate(v) => validate::validate(&v, color).await,
+                        SubCommand::Generate(g) => generate::cmd(&g),
+                        SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
-                        SubCommand::Generate(g) => generate::cmd(&g),
+                        #[cfg(windows)]
+                        SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "api-client")]
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(feature = "api-client")]
                         SubCommand::Tap(t) => tap::cmd(&t).await,
-                        #[cfg(windows)]
-                        SubCommand::Service(s) => service::cmd(&s),
+                        SubCommand::Validate(v) => validate::validate(&v, color).await,
                         #[cfg(feature = "vrl-cli")]
                         SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),
                     };
@@ -133,16 +145,11 @@ impl Application {
                     return Err(code);
                 };
 
-                info!(message = "Log level is enabled.", level = ?level);
-
-                #[cfg(feature = "sources-host_metrics")]
-                host_metrics::init_roots();
-
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 
                 if watch_config {
                     // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(config_paths.iter().map(|(path, _)| path), None)
+                    config::watcher::spawn_thread(config_paths.iter().map(Into::into), None)
                         .map_err(|error| {
                             error!(message = "Unable to start config watcher.", %error);
                             exitcode::CONFIG
@@ -151,7 +158,7 @@ impl Application {
 
                 info!(
                     message = "Loading configs.",
-                    path = ?config_paths
+                    paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
@@ -341,6 +348,8 @@ impl Application {
                 }
                 _ => unreachable!(),
             }
+
+            opentelemetry::global::shutdown_tracer_provider();
         });
     }
 }

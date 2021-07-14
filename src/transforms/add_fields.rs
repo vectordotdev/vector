@@ -139,6 +139,7 @@ impl FunctionTransform for AddFields {
 mod tests {
     use super::*;
     use crate::event::LogEvent;
+    use crate::transforms::test::transform_one;
     use std::iter::FromIterator;
 
     #[test]
@@ -156,9 +157,8 @@ mod tests {
         fields.insert("some_key".into(), "some_val".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform_one(log.into()).unwrap();
-
-        assert_eq!(new_event, expected.into());
+        let result = transform_one(&mut augment, log.into()).unwrap();
+        assert_eq!(result, expected.into());
     }
 
     #[test]
@@ -171,9 +171,8 @@ mod tests {
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform_one(log.into()).unwrap();
-
-        assert_eq!(new_event, expected.into());
+        let result = transform_one(&mut augment, log.into()).unwrap();
+        assert_eq!(result, expected.into());
     }
 
     #[test]
@@ -187,9 +186,8 @@ mod tests {
 
         let mut augment = AddFields::new(fields, false).unwrap();
 
-        let new_event = augment.transform_one(log.into()).unwrap();
-
-        assert_eq!(new_event, expected.into());
+        let result = transform_one(&mut augment, log.into()).unwrap();
+        assert_eq!(result, expected.into());
     }
 
     #[test]
@@ -219,10 +217,9 @@ mod tests {
 
         fields.insert(String::from("table"), Value::from_iter(map));
 
-        let mut transform = AddFields::new(fields, false).unwrap();
+        let mut augment = AddFields::new(fields, false).unwrap();
 
-        let event = transform.transform_one(log.into()).unwrap().into_log();
-
-        assert_eq!(event, expected);
+        let result = transform_one(&mut augment, log.into()).unwrap();
+        assert_eq!(result, expected.into());
     }
 }

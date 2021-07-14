@@ -119,6 +119,8 @@ impl_generate_config_from_default!(HostMetricsConfig);
 #[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        init_roots();
+
         let mut config = self.clone();
         config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
 
@@ -183,7 +185,7 @@ impl HostMetricsConfig {
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
-                (metric.series.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
+                metric.insert_tag("host".into(), hostname.into());
             }
         }
         emit!(HostMetricsEventReceived {
@@ -709,35 +711,41 @@ async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Op
 
 fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     for metric in &mut metrics {
-        (metric.series.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
+        metric.insert_tag("collector".into(), collector.into());
     }
     metrics
 }
 
-pub fn init_roots() {
+fn init_roots() {
     #[cfg(target_os = "linux")]
     {
-        match std::env::var_os("PROCFS_ROOT") {
-            Some(procfs_root) => {
-                info!(
-                    message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
-                    custom = ?procfs_root
-                );
-                heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
-            }
-            None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
-        };
+        use std::sync::Once;
 
-        match std::env::var_os("SYSFS_ROOT") {
-            Some(sysfs_root) => {
-                info!(
-                    message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
-                    custom = ?sysfs_root
-                );
-                heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
+        static INIT: Once = Once::new();
+
+        INIT.call_once(|| {
+            match std::env::var_os("PROCFS_ROOT") {
+                Some(procfs_root) => {
+                    info!(
+                        message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
+                        custom = ?procfs_root
+                    );
+                    heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
+                }
+                None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
+            };
+
+            match std::env::var_os("SYSFS_ROOT") {
+                Some(sysfs_root) => {
+                    info!(
+                        message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
+                        custom = ?sysfs_root
+                    );
+                    heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
+                }
+                None => info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root."),
             }
-            None => info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root."),
-        }
+        });
     };
 }
 
@@ -1145,13 +1153,13 @@ mod tests {
     fn all_counters(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.data.value, MetricValue::Counter { .. }))
+            .any(|metric| !matches!(metric.value(), &MetricValue::Counter { .. }))
     }
 
     fn all_gauges(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.data.value, MetricValue::Gauge { .. }))
+            .any(|metric| !matches!(metric.value(), &MetricValue::Gauge { .. }))
     }
 
     fn all_tags_match(metrics: &[Metric], tag: &str, matches: impl Fn(&str) -> bool) -> bool {

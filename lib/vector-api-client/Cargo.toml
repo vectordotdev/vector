@@ -13,20 +13,20 @@ serde = { version = "1.0.126", features = ["derive"] }
 serde_json = { version = "1.0.64", features = ["raw_value"] }
 
 # Error handling
-anyhow = "1.0.40"
+anyhow = "1.0.42"
 
 # Tokio / Futures
 async-stream = "0.3.2"
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.5.0", features = ["full"] }
-tokio-stream = { version = "0.1.6", features = ["sync"] }
+tokio = { version = "1.8.1", features = ["full"] }
+tokio-stream = { version = "0.1.7", features = ["sync"] }
 
 # GraphQL
-graphql_client = "0.9.0"
+graphql_client = "0.10.0"
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.3", features = ["json"] }
+reqwest = { version = "0.11.4", features = ["json"] }
 tokio-tungstenite = { version = "0.13.0", features = ["tls"] }
 
 # External libs

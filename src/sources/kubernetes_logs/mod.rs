@@ -5,7 +5,7 @@
 
 #![deny(missing_docs)]
 
-use crate::event::Event;
+use crate::event::{Event, LogEvent};
 use crate::internal_events::{
     FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
     KubernetesLogsEventReceived,
@@ -20,7 +20,10 @@ use crate::{
     transforms::{FunctionTransform, TaskTransform},
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
+use file_source::{
+    Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
+    ReadFrom,
+};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
@@ -49,7 +52,7 @@ const FILE_KEY: &str = "file";
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
     /// Specifies the label selector to filter `Pod`s with, to be used in
@@ -59,7 +62,6 @@ pub struct Config {
     /// The `name` of the Kubernetes `Node` that Vector runs at.
     /// Required to filter the `Pod`s to only include the ones with the log
     /// files accessible locally.
-    #[serde(default = "default_self_node_name_env_template")]
     self_node_name: String,
 
     /// Specifies the field selector to filter `Pod`s with, to be used in
@@ -67,7 +69,6 @@ pub struct Config {
     extra_field_selector: String,
 
     /// Automatically merge partial events.
-    #[serde(default = "crate::serde::default_true")]
     auto_partial_merge: bool,
 
     /// Override global data_dir
@@ -83,13 +84,14 @@ pub struct Config {
     /// to the next file.
     /// This allows distributing the reads more or less evenly accross
     /// the files.
-    #[serde(default = "default_max_read_bytes")]
     max_read_bytes: usize,
 
     /// The maximum number of a bytes a line can contain before being discarded. This protects
     /// against malformed lines or tailing incorrect files.
-    #[serde(default = "default_max_line_bytes")]
     max_line_bytes: usize,
+
+    /// How many first lines in a file are used for fingerprinting.
+    fingerprint_lines: usize,
 
     /// This value specifies not exactly the globbing, but interval
     /// between the polling the files to watch from the `paths_provider`.
@@ -97,7 +99,6 @@ pub struct Config {
     /// file system; in addition, it is currently coupled with chechsum dumping
     /// in the underlying file server, so setting it too low may introduce
     /// a significant overhead.
-    #[serde(default = "default_glob_minimum_cooldown_ms")]
     glob_minimum_cooldown_ms: usize,
 
     /// A field to use to set the timestamp when Vector ingested the event.
@@ -126,6 +127,27 @@ impl GenerateConfig for Config {
             ..Default::default()
         })
         .unwrap()
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            extra_label_selector: "".to_string(),
+            self_node_name: default_self_node_name_env_template(),
+            extra_field_selector: "".to_string(),
+            auto_partial_merge: true,
+            data_dir: None,
+            annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
+            exclude_paths_glob_patterns: default_path_exclusion(),
+            max_read_bytes: default_max_read_bytes(),
+            max_line_bytes: default_max_line_bytes(),
+            fingerprint_lines: default_fingerprint_lines(),
+            glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
+            ingestion_timestamp_field: None,
+            timezone: None,
+            kube_config_file: None,
+        }
     }
 }
 
@@ -163,6 +185,7 @@ struct Source {
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
     max_line_bytes: usize,
+    fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
@@ -182,16 +205,7 @@ impl Source {
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), name)?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
-        let exclude_paths = config
-            .exclude_paths_glob_patterns
-            .iter()
-            .map(|pattern| {
-                let pattern = pattern
-                    .to_str()
-                    .ok_or("glob pattern is not a valid UTF-8 string")?;
-                Ok(glob::Pattern::new(pattern)?)
-            })
-            .collect::<crate::Result<Vec<_>>>()?;
+        let exclude_paths = prepare_exclude_paths(config)?;
 
         let glob_minimum_cooldown =
             Duration::from_millis(config.glob_minimum_cooldown_ms.try_into().expect(
@@ -208,6 +222,7 @@ impl Source {
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
             max_line_bytes: config.max_line_bytes,
+            fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
@@ -229,6 +244,7 @@ impl Source {
             exclude_paths,
             max_read_bytes,
             max_line_bytes,
+            fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             timezone,
@@ -257,6 +273,7 @@ impl Source {
 
         // TODO: maybe more of the parameters have to be configurable.
 
+        let checkpointer = Checkpointer::new(&data_dir);
         let file_server = FileServer {
             // Use our special paths provider.
             paths_provider,
@@ -290,10 +307,11 @@ impl Source {
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
             fingerprinter: Fingerprinter {
-                strategy: FingerprintStrategy::FirstLineChecksum {
+                strategy: FingerprintStrategy::FirstLinesChecksum {
                     // Max line length to expect during fingerprinting, see the
                     // explanation above.
                     ignored_header_bytes: 0,
+                    lines: fingerprint_lines,
                 },
                 max_line_length: max_line_bytes,
                 ignore_not_found: true,
@@ -313,21 +331,25 @@ impl Source {
             handle: tokio::runtime::Handle::current(),
         };
 
-        let (file_source_tx, file_source_rx) =
-            futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
         let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
+        let checkpoints = checkpointer.view();
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
-        let events = events.map(move |(bytes, file)| {
-            let byte_size = bytes.len();
-            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
-            let file_info = annotator.annotate(&mut event, &file);
+        let events = events.map(move |line| {
+            let byte_size = line.text.len();
+            let mut event = create_event(
+                line.text,
+                &line.filename,
+                ingestion_timestamp_field.as_deref(),
+            );
+            let file_info = annotator.annotate(&mut event, &line.filename);
 
             emit!(KubernetesLogsEventReceived {
-                file: &file,
+                file: &line.filename,
                 byte_size,
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
@@ -335,6 +357,7 @@ impl Source {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
 
+            checkpoints.update(line.file_id, line.offset);
             event
         });
         let events = events.flat_map(move |event| {
@@ -362,12 +385,11 @@ impl Source {
         }
         {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
-                match result {
+            let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
+                .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
                     Err(error) => error!(message = "File server exited with an error.", %error),
-                }
-            });
+                });
             slot.bind(Box::pin(fut));
         }
         {
@@ -400,31 +422,33 @@ impl Source {
 }
 
 fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
-    let mut event = Event::from(line);
+    let mut event = LogEvent::from(line);
 
     // Add source type.
-    event.as_mut_log().insert(
+    event.insert(
         crate::config::log_schema().source_type_key(),
         COMPONENT_NAME.to_owned(),
     );
 
     // Add file.
-    event.as_mut_log().insert(FILE_KEY, file.to_owned());
+    event.insert(FILE_KEY, file.to_owned());
 
     // Add ingestion timestamp if requested.
     if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event
-            .as_mut_log()
-            .insert(ingestion_timestamp_field, chrono::Utc::now());
+        event.insert(ingestion_timestamp_field, chrono::Utc::now());
     }
 
-    event
+    event.into()
 }
 
 /// This function returns the default value for `self_node_name` variable
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
     format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
+}
+
+fn default_path_exclusion() -> Vec<PathBuf> {
+    vec![PathBuf::from("**/*.gz"), PathBuf::from("**/*.tmp")]
 }
 
 fn default_max_read_bytes() -> usize {
@@ -448,8 +472,37 @@ fn default_glob_minimum_cooldown_ms() -> usize {
     60000
 }
 
-/// This function construct the effective field selector to use, based on
-/// the specified configuration.
+fn default_fingerprint_lines() -> usize {
+    1
+}
+
+// This function constructs the patterns we exclude from file watching, created
+// from the defaults or user provided configuration.
+fn prepare_exclude_paths(config: &Config) -> crate::Result<Vec<glob::Pattern>> {
+    let exclude_paths = config
+        .exclude_paths_glob_patterns
+        .iter()
+        .map(|pattern| {
+            let pattern = pattern
+                .to_str()
+                .ok_or("glob pattern is not a valid UTF-8 string")?;
+            Ok(glob::Pattern::new(pattern)?)
+        })
+        .collect::<crate::Result<Vec<_>>>()?;
+
+    info!(
+        message = "Excluding matching files.",
+        exclude_paths = ?exclude_paths
+            .iter()
+            .map(glob::Pattern::as_str)
+            .collect::<Vec<_>>()
+    );
+
+    Ok(exclude_paths)
+}
+
+// This function constructs the effective field selector to use, based on
+// the specified configuration.
 fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     let self_node_name = if config.self_node_name.is_empty()
         || config.self_node_name == default_self_node_name_env_template()
@@ -480,8 +533,8 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     ))
 }
 
-/// This function construct the effective label selector to use, based on
-/// the specified configuration.
+// This function constructs the effective label selector to use, based on
+// the specified configuration.
 fn prepare_label_selector(config: &Config) -> String {
     const BUILT_IN: &str = "vector.dev/exclude!=true";
 
@@ -499,6 +552,48 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn prepare_exclude_paths() {
+        let cases = vec![
+            (
+                Config::default(),
+                vec![
+                    glob::Pattern::new("**/*.gz").unwrap(),
+                    glob::Pattern::new("**/*.tmp").unwrap(),
+                ],
+            ),
+            (
+                Config {
+                    exclude_paths_glob_patterns: vec![std::path::PathBuf::from("**/*.tmp")],
+                    ..Default::default()
+                },
+                vec![glob::Pattern::new("**/*.tmp").unwrap()],
+            ),
+            (
+                Config {
+                    exclude_paths_glob_patterns: vec![
+                        std::path::PathBuf::from("**/kube-system_*/**"),
+                        std::path::PathBuf::from("**/*.gz"),
+                        std::path::PathBuf::from("**/*.tmp"),
+                    ],
+                    ..Default::default()
+                },
+                vec![
+                    glob::Pattern::new("**/kube-system_*/**").unwrap(),
+                    glob::Pattern::new("**/*.gz").unwrap(),
+                    glob::Pattern::new("**/*.tmp").unwrap(),
+                ],
+            ),
+        ];
+
+        for (input, mut expected) in cases {
+            let mut output = super::prepare_exclude_paths(&input).unwrap();
+            expected.sort();
+            output.sort();
+            assert_eq!(expected, output, "expected left, actual right");
+        }
     }
 
     #[test]

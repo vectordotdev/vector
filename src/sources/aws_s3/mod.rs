@@ -4,6 +4,8 @@ use crate::{
     line_agg,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
 };
+use async_compression::tokio::bufread;
+use futures::{stream, stream::StreamExt};
 use rusoto_core::Region;
 use rusoto_s3::S3Client;
 use rusoto_sqs::SqsClient;
@@ -145,16 +147,23 @@ enum CreateSqsIngestorError {
     RegionParse { source: rusoto::region::ParseError },
 }
 
-fn s3_object_decoder(
+/// None if body is empty
+async fn s3_object_decoder(
     compression: Compression,
     key: &str,
     content_encoding: Option<&str>,
     content_type: Option<&str>,
-    body: rusoto_s3::StreamingBody,
+    mut body: rusoto_s3::StreamingBody,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    use async_compression::tokio::bufread;
+    let first = if let Some(first) = body.next().await {
+        first
+    } else {
+        return Box::new(tokio::io::empty());
+    };
 
-    let r = tokio::io::BufReader::new(body.into_async_read());
+    let r = tokio::io::BufReader::new(
+        rusoto_s3::StreamingBody::new(stream::iter(Some(first)).chain(body)).into_async_read(),
+    );
 
     let compression = match compression {
         Auto => {
@@ -226,7 +235,11 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
     })
 }
 
+#[cfg(test)]
 mod test {
+    use super::{s3_object_decoder, Compression};
+    use tokio::io::AsyncReadExt;
+
     #[test]
     fn determine_compression() {
         use super::Compression;
@@ -254,6 +267,26 @@ mod test {
             );
         }
     }
+
+    #[tokio::test]
+    async fn decode_empty_message_gzip() {
+        let key = uuid::Uuid::new_v4().to_string();
+
+        let mut data = Vec::new();
+        s3_object_decoder(
+            Compression::Auto,
+            &key,
+            Some("gzip"),
+            None,
+            rusoto_s3::StreamingBody::new(futures::stream::empty()),
+        )
+        .await
+        .read_to_end(&mut data)
+        .await
+        .unwrap();
+
+        assert!(data.is_empty());
+    }
 }
 
 #[cfg(feature = "aws-s3-integration-tests")]
@@ -265,7 +298,9 @@ mod integration_tests {
         line_agg,
         rusoto::RegionOrEndpoint,
         sources::util::MultilineConfig,
-        test_util::{collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines},
+        test_util::{
+            collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
+        },
         Pipeline,
     };
     use pretty_assertions::assert_eq;
@@ -275,6 +310,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_process_message() {
+        trace_init();
+
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
@@ -283,6 +320,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_process_message_special_characters() {
+        trace_init();
+
         let key = format!("special:{}", uuid::Uuid::new_v4().to_string());
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
@@ -292,6 +331,8 @@ mod integration_tests {
     #[tokio::test]
     async fn s3_process_message_gzip() {
         use std::io::Read;
+
+        trace_init();
 
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
@@ -309,6 +350,8 @@ mod integration_tests {
     #[tokio::test]
     async fn s3_process_message_multipart_gzip() {
         use std::io::Read;
+
+        trace_init();
 
         let key = uuid::Uuid::new_v4().to_string();
         let logs = lines_from_gzip_file("tests/data/multipart-gzip.log.gz");
@@ -328,6 +371,8 @@ mod integration_tests {
     async fn s3_process_message_multipart_zstd() {
         use std::io::Read;
 
+        trace_init();
+
         let key = uuid::Uuid::new_v4().to_string();
         let logs = lines_from_zst_file("tests/data/multipart-zst.log.zst");
 
@@ -344,6 +389,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_process_message_multiline() {
+        trace_init();
+
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = vec!["abc", "def", "geh"]
             .into_iter()

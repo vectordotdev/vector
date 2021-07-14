@@ -6,8 +6,44 @@ use k8s_test_framework::{
 };
 use std::collections::HashSet;
 use std::str::FromStr;
+use tracing::{debug, info};
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
+
+const HELM_VALUES_LOWER_GLOB: &str = indoc! {r#"
+    kubernetesLogsSource:
+      rawConfig: |
+        glob_minimum_cooldown_ms = 5000
+"#};
+
+const HELM_VALUES_CUSTOM_CONFIG: &str = indoc! {r#"
+    customConfig:
+      data_dir: "/vector-data-dir"
+      sources:
+        host_metrics:
+          type: host_metrics
+          filesystem:
+            devices:
+              excludes: ["binfmt_misc"]
+            filesystems:
+              excludes: ["binfmt_misc"]
+            mountpoints:
+              excludes: ["*/proc/sys/fs/binfmt_misc"]
+        internal_metrics:
+          type: internal_metrics
+        kubernetes_logs:
+          type: kubernetes_logs
+          glob_minimum_cooldown_ms: 5000
+      sinks:
+        prometheus_sink:
+          type: prometheus_exporter
+          inputs: ["host_metrics", "internal_metrics"]
+          address: 0.0.0.0:9090
+        stdout:
+          type: console
+          inputs: ["kubernetes_logs"]
+          encoding: json
+"#};
 
 const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
     sinks:
@@ -54,17 +90,23 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
 #[tokio::test]
 async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -99,7 +141,109 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the rest of the log lines.
+    let mut got_marker = false;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != pod_namespace.as_str() {
+            // A log from something other than our test pod, pretend we don't
+            // see it.
+            return FlowControlCommand::GoOn;
+        }
+
+        // Ensure we got the marker.
+        assert_eq!(val["message"], "MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+
+    assert!(got_marker);
+
+    drop(test_pod);
+    drop(test_namespace);
+    drop(vector);
+    Ok(())
+}
+
+/// This test validates that vector-agent picks up logs at the simplest case
+/// possible - a new pod is deployed and prints to stdout, and we assert that
+/// vector picks that up - but with the new `customConfig` way of passing the
+/// sink configuration.
+#[tokio::test]
+async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    init();
+
+    let namespace = get_namespace();
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let framework = make_framework();
+    let override_name = get_override_name(&namespace, "vector-agent");
+
+    let vector = framework
+        .vector(
+            &namespace,
+            HELM_CHART_VECTOR_AGENT,
+            VectorConfig {
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_CUSTOM_CONFIG,
+                ],
+                ..Default::default()
+            },
+        )
+        .await?;
+    framework
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let test_namespace = framework.namespace(&pod_namespace).await?;
+
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            &pod_namespace,
+            "test-pod",
+            "echo MARKER",
+            vec![],
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            &pod_namespace,
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -143,20 +287,23 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_STDOUT_SINK_RAW_CONFIG,
-                    &override_name,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -189,7 +336,12 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -231,17 +383,23 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -275,7 +433,12 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -317,10 +480,13 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let framework = make_framework();
 
-    let pod_namespace = get_namespace_appended("test-pod");
-    let override_name = get_override_name("vector-agent");
+    let namespace = get_namespace();
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let override_name = get_override_name(&namespace, "vector-agent");
     let test_namespace = framework.namespace(&pod_namespace).await?;
 
     let test_pod = framework
@@ -344,14 +510,16 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     // Wait for some extra time to ensure pod completes.
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-    let namespace = get_namespace();
-
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -364,7 +532,12 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -406,9 +579,11 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
-    let override_name = get_override_name("vector-agent");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let framework = make_framework();
 
@@ -417,7 +592,11 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -451,7 +630,12 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -494,9 +678,11 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
-    let override_name = get_override_name("vector-agent");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let override_name = get_override_name(&namespace, "vector-agent");
     let framework = make_framework();
 
     let vector = framework
@@ -504,7 +690,11 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -537,10 +727,23 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
     let k8s_version = framework.kubernetes_version().await?;
-    let minor = u8::from_str(&k8s_version.minor()).expect("Couldn't get u8 from String!");
+
+    // Replace all non numeric chars from the version number
+    let numeric_regex = regex::Regex::new(r#"[^\d]"#).unwrap();
+    let minor = k8s_version.minor();
+    let numeric_minor = numeric_regex.replace(&minor, "");
+    let minor = u8::from_str(&numeric_minor).expect(&format!(
+        "Couldn't get u8 from String, received {} instead!",
+        k8s_version.minor()
+    ));
 
     // Read the rest of the log lines.
     let mut got_marker = false;
@@ -611,17 +814,24 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let affinity_label = format!("{}-affinity", pod_namespace);
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -636,15 +846,22 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
 
+    let affinity_ns_name = format!("{}-affinity", pod_namespace);
+    let affinity_ns = framework.namespace(&affinity_ns_name).await?;
+    let affinity_pod = create_affinity_pod(&framework, &affinity_ns_name, &affinity_label).await?;
+
     let excluded_test_pod = framework
-        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+        .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
             &pod_namespace,
             "test-pod-excluded",
             "echo EXCLUDED_MARKER",
             vec![("vector.dev/exclude", "true")],
             vec![],
+            Some((&affinity_label, "yes")),
+            Some(&affinity_ns_name),
         ))?)
         .await?;
+
     framework
         .wait(
             &pod_namespace,
@@ -654,13 +871,17 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    // Create this pod with affinity to the previous one to ensure they are deployed on the same
+    // node.
     let control_test_pod = framework
-        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+        .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
             &pod_namespace,
             "test-pod-control",
             "echo CONTROL_MARKER",
             vec![],
             vec![],
+            Some((&affinity_label, "yes")),
+            Some(&affinity_ns_name),
         ))?)
         .await?;
     framework
@@ -672,7 +893,17 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(
+            &pod_namespace,
+            "test-pod-control",
+            &namespace,
+            &override_name,
+        )
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -694,11 +925,11 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -745,9 +976,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
-            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
-            println!("Stop timer complete");
+            info!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
     }
@@ -759,6 +990,8 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(excluded_test_pod);
     drop(control_test_pod);
+    drop(affinity_pod);
+    drop(affinity_ns);
     drop(test_namespace);
     drop(vector);
     Ok(())
@@ -769,14 +1002,17 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     const CONFIG: &str = indoc! {r#"
         kubernetesLogsSource:
           rawConfig: |
+            glob_minimum_cooldown_ms = 5000
             extra_label_selector = "my_custom_negative_label_selector!=my_val"
             extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
     "#};
@@ -786,10 +1022,11 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
-                    &format!("{}\n{}", CONFIG, HELM_VALUES_STDOUT_SINK),
-                    &override_name,
-                ),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    CONFIG,
+                    HELM_VALUES_STDOUT_SINK,
+                ],
                 ..Default::default()
             },
         )
@@ -858,7 +1095,17 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(
+            &pod_namespace,
+            "test-pod-control",
+            &namespace,
+            &override_name,
+        )
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -880,11 +1127,11 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -931,9 +1178,9 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
-            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
-            println!("Stop timer complete");
+            info!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
     }
@@ -956,17 +1203,23 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -987,6 +1240,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             vec![],
             vec![("vector.dev/exclude-containers", "excluded")],
+            None,
             vec![
                 make_test_container("excluded", "echo EXCLUDED_MARKER"),
                 make_test_container("control", "echo CONTROL_MARKER"),
@@ -1002,7 +1256,12 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -1024,11 +1283,11 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -1079,9 +1338,9 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(30);
-            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
-            println!("Stop timer complete");
+            info!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
     }
@@ -1103,16 +1362,19 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let config: &str = &format!(
         indoc! {r#"
         kubernetesLogsSource:
           rawConfig: |
             exclude_paths_glob_patterns = ["/var/log/pods/{}_test-pod_*/excluded/**"]
+            glob_minimum_cooldown_ms = 5000
     "#},
         pod_namespace
     );
@@ -1122,10 +1384,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
-                    &format!("{}\n{}", config, HELM_VALUES_STDOUT_SINK),
-                    &override_name,
-                ),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    config,
+                    HELM_VALUES_STDOUT_SINK,
+                ],
                 ..Default::default()
             },
         )
@@ -1146,6 +1409,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             vec![],
             vec![],
+            None,
             vec![
                 make_test_container("excluded", "echo EXCLUDED_MARKER"),
                 make_test_container("control", "echo CONTROL_MARKER"),
@@ -1161,7 +1425,12 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -1183,11 +1452,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -1237,9 +1506,9 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(30);
-            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
-            println!("Stop timer complete");
+            info!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
     }
@@ -1260,17 +1529,24 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let affinity_label = format!("{}-affinity", pod_namespace);
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1291,15 +1567,24 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         expected_namespaces.insert(name);
     }
 
+    // Create a pod for our other pods to have an affinity to to ensure they are all deployed on
+    // the same node.
+    let affinity_ns_name = format!("{}-affinity", pod_namespace);
+    let affinity_ns = framework.namespace(&affinity_ns_name).await?;
+    let affinity_pod = create_affinity_pod(&framework, &affinity_ns_name, &affinity_label).await?;
+
     let mut test_pods = vec![];
     for ns in &expected_namespaces {
+        debug!("creating {}", ns);
         let test_pod = framework
-            .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
                 ns,
                 "test-pod",
                 "echo MARKER",
                 vec![],
                 vec![],
+                Some((affinity_label.as_str(), "yes")),
+                Some(&affinity_ns_name),
             ))?)
             .await?;
         framework
@@ -1313,7 +1598,17 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         test_pods.push(test_pod);
     }
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(
+            &affinity_ns_name,
+            "affinity-pod",
+            &namespace,
+            &override_name,
+        )
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1348,6 +1643,8 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure that we have collected messages from all the namespaces.
     assert!(expected_namespaces.is_empty());
 
+    drop(affinity_pod);
+    drop(affinity_ns);
     drop(test_pods);
     drop(test_namespaces);
     drop(vector);
@@ -1360,20 +1657,23 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
                     HELM_VALUES_ADDITIONAL_CONFIGMAP,
-                    &override_name,
-                ),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
             },
         )
@@ -1406,7 +1706,12 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1448,17 +1753,23 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_STDOUT_SINK,
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1498,9 +1809,9 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // the `processed_events` is even defined.
     // We give Vector some reasonable time to perform this initial bootstrap,
     // and capture the `processed_events` value afterwards.
-    println!("Waiting for Vector bootstrap");
+    debug!("Waiting for Vector bootstrap");
     tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-    println!("Done waiting for Vector bootstrap");
+    debug!("Done waiting for Vector bootstrap");
 
     // Capture events processed before deploying the test pod.
     let processed_events_before = metrics::get_processed_events(&vector_metrics_url).await?;
@@ -1525,7 +1836,12 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    // Make sure we read the correct nodes logs.
+    let vector_pod = framework
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1558,9 +1874,9 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 
     // Due to how `internal_metrics` are implemented, we have to wait for it's
     // scraping period to pass before we can observe the updates.
-    println!("Waiting for `internal_metrics` to update");
+    debug!("Waiting for `internal_metrics` to update");
     tokio::time::sleep(std::time::Duration::from_secs(6)).await;
-    println!("Done waiting for `internal_metrics` to update");
+    debug!("Done waiting for `internal_metrics` to update");
 
     // Capture events processed after the test pod has finished.
     let processed_events_after = metrics::get_processed_events(&vector_metrics_url).await?;
@@ -1585,16 +1901,21 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &config_override_name("", &override_name),
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, true),
+                    HELM_VALUES_LOWER_GLOB,
+                ],
                 ..Default::default()
             },
         )
@@ -1630,14 +1951,140 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     // We want to capture the value for the host metrics, but the pipeline for
     // collecting them takes some time to boot (15s roughly).
     // We wait twice as much, so the bootstrap is guaranteed.
-    println!("Waiting for Vector bootstrap");
+    debug!("Waiting for Vector bootstrap");
     tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-    println!("Done waiting for Vector bootstrap");
+    debug!("Done waiting for Vector bootstrap");
 
     // Ensure the host metrics are exposed in the Prometheus endpoint.
     metrics::assert_host_metrics_present(&vector_metrics_url).await?;
 
     drop(vector_metrics_port_forward);
+    drop(vector);
+    Ok(())
+}
+
+#[tokio::test]
+async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework
+        .vector(
+            "test-vector",
+            HELM_CHART_VECTOR_AGENT,
+            VectorConfig {
+                custom_helm_values: vec![HELM_VALUES_STDOUT_SINK, HELM_VALUES_LOWER_GLOB],
+                ..Default::default()
+            },
+        )
+        .await?;
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            // This allows us to read and checkpoint the first log
+            // then ensure we just read the new marker after restarting Vector
+            "echo CHECKED_MARKER; sleep 60; echo MARKER",
+            vec![],
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the rest of the log lines.
+    let mut got_marker = false;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            // A log from something other than our test pod, pretend we don't
+            // see it.
+            return FlowControlCommand::GoOn;
+        }
+
+        // Ensure we got the marker.
+        assert_eq!(val["message"], "CHECKED_MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+    assert!(got_marker);
+
+    // Sleep to ensure checkpoints are written
+    // https://github.com/timberio/vector/issues/7898
+    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+
+    framework
+        .restart_rollout("test-vector", "daemonset/vector-agent", vec![])
+        .await?;
+    // We need to wait for the new pod to start
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+    got_marker = false;
+    // We need to start reading from the newly started pod
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            return FlowControlCommand::GoOn;
+        }
+
+        if val["message"].eq("CHECKED_MARKER") {
+            panic!("Checkpointed marker should not be found");
+        };
+
+        assert_eq!(val["message"], "MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+
+    assert!(got_marker);
+
+    drop(test_pod);
+    drop(test_namespace);
     drop(vector);
     Ok(())
 }

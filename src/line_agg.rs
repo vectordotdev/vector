@@ -7,17 +7,17 @@ use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::Entry, HashMap, VecDeque};
+use std::collections::{hash_map::Entry, HashMap};
 use std::hash::Hash;
 use std::time::Duration;
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio_util::time::DelayQueue;
+use tokio_util::time::delay_queue::{DelayQueue, Key};
 
 /// The mode of operation of the line aggregator.
-#[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
@@ -103,9 +103,6 @@ pub struct LineAgg<T, K, C> {
     /// the inner stream. In this mode we stop polling `inner` for new lines
     /// and just flush all the buffered data.
     draining: Option<Vec<(K, Bytes, C)>>,
-
-    /// A queue of keys with expired timeouts.
-    expired: VecDeque<K>,
 }
 
 /// Core line aggregation logic.
@@ -118,7 +115,7 @@ pub struct Logic<K, C> {
 
     /// Line per key.
     /// Key is usually a filename or other line source identifier.
-    buffers: HashMap<K, Aggregate<C>>,
+    buffers: HashMap<K, (Key, Aggregate<C>)>,
 
     /// A queue of key timeouts.
     timeouts: DelayQueue<K>,
@@ -148,7 +145,6 @@ where
             logic,
             draining: None,
             stashed: None,
-            expired: VecDeque::new(),
         }
     }
 }
@@ -187,11 +183,6 @@ where
                 }
             }
 
-            // Check for keys that have hit their timeout.
-            while let Poll::Ready(Some(Ok(expired_key))) = this.logic.timeouts.poll_expired(cx) {
-                this.expired.push_back(expired_key.into_inner());
-            }
-
             match this.inner.poll_next_unpin(cx) {
                 Poll::Ready(Some((src, line, context))) => {
                     // Handle the incoming line we got from `inner`. If the
@@ -209,7 +200,7 @@ where
                         this.logic
                             .buffers
                             .drain()
-                            .map(|(src, aggregate)| {
+                            .map(|(src, (_, aggregate))| {
                                 let (line, context) = aggregate.merge();
                                 (src, line, context)
                             })
@@ -218,9 +209,12 @@ where
                 }
                 Poll::Pending => {
                     // We didn't get any lines from `inner`, so we just give
-                    // a line from the expired lines queue.
-                    if let Some(key) = this.expired.pop_front() {
-                        if let Some(aggregate) = this.logic.buffers.remove(&key) {
+                    // a line from keys that have hit their timeout.
+                    while let Poll::Ready(Some(Ok(expired_key))) =
+                        this.logic.timeouts.poll_expired(cx)
+                    {
+                        let key = expired_key.into_inner();
+                        if let Some((_, aggregate)) = this.logic.buffers.remove(&key) {
                             let (line, context) = aggregate.merge();
                             return Poll::Ready(Some((key, line, context)));
                         }
@@ -278,6 +272,13 @@ pub enum Emit<T> {
     Two(T, T),
 }
 
+/// A helper enum
+enum Decision {
+    Continue,
+    EndInclude,
+    EndExclude,
+}
+
 impl<K, C> Logic<K, C>
 where
     K: Hash + Eq + Clone,
@@ -293,56 +294,42 @@ where
         match self.buffers.entry(src) {
             Entry::Occupied(mut entry) => {
                 let condition_matched = self.config.condition_pattern.is_match(line.as_ref());
-                match self.config.mode {
+                let decision = match (self.config.mode, condition_matched) {
                     // All consecutive lines matching this pattern are included in
                     // the group.
-                    Mode::ContinueThrough => {
-                        if condition_matched {
-                            let buffered = entry.get_mut();
-                            buffered.add_next_line(line);
-                            None
-                        } else {
-                            let (src, buffered) = entry.remove_entry();
-                            Some((src, Emit::Two(buffered.merge(), (line, context))))
-                        }
-                    }
+                    (Mode::ContinueThrough, true) => Decision::Continue,
+                    (Mode::ContinueThrough, false) => Decision::EndExclude,
                     // All consecutive lines matching this pattern, plus one
                     // additional line, are included in the group.
-                    Mode::ContinuePast => {
-                        if condition_matched {
-                            let buffered = entry.get_mut();
-                            buffered.add_next_line(line);
-                            None
-                        } else {
-                            let (src, mut buffered) = entry.remove_entry();
-                            buffered.add_next_line(line);
-                            Some((src, Emit::One(buffered.merge())))
-                        }
-                    }
+                    (Mode::ContinuePast, true) => Decision::Continue,
+                    (Mode::ContinuePast, false) => Decision::EndInclude,
                     // All consecutive lines not matching this pattern are included
                     // in the group.
-                    Mode::HaltBefore => {
-                        if condition_matched {
-                            let (src, buffered) = entry.remove_entry();
-                            Some((src, Emit::Two(buffered.merge(), (line, context))))
-                        } else {
-                            let buffered = entry.get_mut();
-                            buffered.add_next_line(line);
-                            None
-                        }
-                    }
+                    (Mode::HaltBefore, true) => Decision::EndExclude,
+                    (Mode::HaltBefore, false) => Decision::Continue,
                     // All consecutive lines, up to and including the first line
                     // matching this pattern, are included in the group.
-                    Mode::HaltWith => {
-                        if condition_matched {
-                            let (src, mut buffered) = entry.remove_entry();
-                            buffered.add_next_line(line);
-                            Some((src, Emit::One(buffered.merge())))
-                        } else {
-                            let buffered = entry.get_mut();
-                            buffered.add_next_line(line);
-                            None
-                        }
+                    (Mode::HaltWith, true) => Decision::EndInclude,
+                    (Mode::HaltWith, false) => Decision::Continue,
+                };
+
+                match decision {
+                    Decision::Continue => {
+                        let buffered = entry.get_mut();
+                        self.timeouts.reset(&buffered.0, self.config.timeout);
+                        buffered.1.add_next_line(line);
+                        None
+                    }
+                    Decision::EndInclude => {
+                        let (src, (key, mut buffered)) = entry.remove_entry();
+                        self.timeouts.remove(&key);
+                        buffered.add_next_line(line);
+                        Some((src, Emit::One(buffered.merge())))
+                    }
+                    Decision::EndExclude => {
+                        let (src, (key, buffered)) = entry.remove_entry();
+                        self.timeouts.remove(&key);
+                        Some((src, Emit::Two(buffered.merge(), (line, context))))
                     }
                 }
             }
@@ -351,9 +338,10 @@ where
                 if self.config.start_pattern.is_match(line.as_ref()) {
                     // It was indeed a new line we need to filter.
                     // Set the timeout and buffer this line.
-                    self.timeouts
+                    let key = self
+                        .timeouts
                         .insert(entry.key().clone(), self.config.timeout);
-                    entry.insert(Aggregate::new(line, context));
+                    entry.insert((key, Aggregate::new(line, context)));
                     None
                 } else {
                     // It's just a regular line we don't really care about.
@@ -401,6 +389,7 @@ impl<C> Aggregate<C> {
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use futures::SinkExt;
     use pretty_assertions::assert_eq;
 
     #[tokio::test]
@@ -680,6 +669,53 @@ mod tests {
         assert_results(results, &expected);
     }
 
+    #[tokio::test]
+    async fn timeout_resets_on_new_line() {
+        // Tests if multiline aggregation updates
+        // it's timeout every time it get's a new line.
+        // To test this we are emmiting a single large
+        // multiline but drip feeding it into the aggreagator
+        // with 1ms delay.
+
+        let n: usize = 1000;
+        let mut lines = vec![
+            "START msg 1".to_string(), // will be stashed
+        ];
+        for i in 0..n {
+            lines.push(format!("line {}", i));
+        }
+        let config = Config {
+            start_pattern: Regex::new("").unwrap(),
+            condition_pattern: Regex::new("^START ").unwrap(),
+            mode: Mode::HaltBefore,
+            timeout: Duration::from_millis(10),
+        };
+
+        let mut expected = "START msg 1".to_string();
+        for i in 0..n {
+            expected.push_str(&format!("\nline {}", i));
+        }
+
+        let (mut send, recv) = futures::channel::mpsc::unbounded();
+
+        let logic = Logic::new(config);
+        let line_agg = LineAgg::new(recv, logic);
+        let results = tokio::spawn(line_agg.collect());
+
+        for line in lines {
+            let data = (
+                "test.log".to_owned(),
+                Bytes::copy_from_slice(line.as_bytes()),
+                (),
+            );
+            send.send(data).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        drop(send);
+
+        assert_results(results.await.unwrap(), &[expected.as_str()]);
+    }
+
     // Test helpers.
 
     /// Private type alias to be more expressive in the internal implementation.
@@ -697,13 +733,13 @@ mod tests {
         }))
     }
 
-    fn assert_results(actual: Vec<(Filename, Bytes, ())>, expected: &[&'static str]) {
+    fn assert_results(actual: Vec<(Filename, Bytes, ())>, expected: &[&str]) {
         let expected_mapped: Vec<(Filename, Bytes, ())> = expected
             .iter()
             .map(|line| {
                 (
                     "test.log".to_owned(),
-                    Bytes::from_static(line.as_bytes()),
+                    Bytes::copy_from_slice(line.as_bytes()),
                     (),
                 )
             })

@@ -1,0 +1,5 @@
+{{ if or (ne nil .NextInSection) (ne nil .PrevInSection) }}
+<div class="mb-4 max-w-3xl md:max-w-5xl mx-auto px-6 lg:px-8 w-full">
+  {{ partial "pagination.html" . }}
+</div>
+{{ end }}

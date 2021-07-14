@@ -230,14 +230,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             };
 
             let name = counter.name.as_ref().unwrap_or(&counter.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = counter.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&counter.tags, &event)?;
+            let tags = render_tags(&counter.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -258,14 +258,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })?;
 
             let name = hist.name.as_ref().unwrap_or(&hist.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = hist.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&hist.tags, &event)?;
+            let tags = render_tags(&hist.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -289,14 +289,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })?;
 
             let name = summary.name.as_ref().unwrap_or(&summary.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = summary.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&summary.tags, &event)?;
+            let tags = render_tags(&summary.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -320,14 +320,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })?;
 
             let name = gauge.name.as_ref().unwrap_or(&gauge.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = gauge.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&gauge.tags, &event)?;
+            let tags = render_tags(&gauge.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -343,14 +343,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let value = value.to_string_lossy();
 
             let name = set.name.as_ref().unwrap_or(&set.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = set.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&set.tags, &event)?;
+            let tags = render_tags(&set.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -370,7 +370,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         for config in self.config.metrics.iter() {
-            match to_metric(&config, &event) {
+            match to_metric(config, &event) {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
@@ -404,6 +404,7 @@ impl FunctionTransform for LogToMetric {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transforms::test::transform_one;
     use crate::{
         config::log_schema,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -444,7 +445,7 @@ mod tests {
         let event = create_event("status", "42");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -477,7 +478,7 @@ mod tests {
         let metadata = event.metadata().clone();
 
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -515,7 +516,7 @@ mod tests {
         let event = create_event("backtrace", "message");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -543,7 +544,7 @@ mod tests {
         let event = create_event("success", "42");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform_one(event), None);
+        assert_eq!(transform_one(&mut transform, event), None);
     }
 
     #[test]
@@ -561,7 +562,7 @@ mod tests {
         let event = create_event("amount", "33.99");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -589,7 +590,7 @@ mod tests {
         let event = create_event("memory_rss", "123");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -618,7 +619,7 @@ mod tests {
         let event = create_event("status", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform_one(event), None);
+        assert_eq!(transform_one(&mut transform, event), None);
     }
 
     #[test]
@@ -635,7 +636,7 @@ mod tests {
         let event = create_event("not foo", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform_one(event), None);
+        assert_eq!(transform_one(&mut transform, event), None);
     }
 
     #[test]
@@ -652,7 +653,7 @@ mod tests {
         let event = create_event("status", Value::Null);
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform_one(event), None);
+        assert_eq!(transform_one(&mut transform, event), None);
     }
 
     #[test]
@@ -777,7 +778,7 @@ mod tests {
         let event = create_event("user_ip", "1.2.3.4");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -806,7 +807,7 @@ mod tests {
         let event = create_event("response_time", "2.5");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -836,7 +837,7 @@ mod tests {
         let event = create_event("response_time", "2.5");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),

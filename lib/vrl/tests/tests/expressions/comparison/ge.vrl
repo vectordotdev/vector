@@ -1,4 +1,4 @@
-# result: [false, true, true, false, true, true, false, true, true, false, true, true, "nope"]
+# result: [false, true, true, false, true, true, false, true, true, false, true, true, true, true, false, "nope", "nope", "nope", "nope", "nope"]
 
 [
     1 >= 2,
@@ -17,6 +17,14 @@
     2.0 >= 1.0,
     2.0 >= 2.0,
 
+    "foo" >= "bar",
+    "foo" >= "foo",
+    "bar" >= "foo",
+
     # fallible
     null >= 1 ?? "nope",
+    1 >= "bar" ?? "nope",
+    false >= "bar" ?? "nope",
+    null >= "bar" ?? "nope",
+    to_string([.foo]) >= "bar" ?? "nope",
 ]

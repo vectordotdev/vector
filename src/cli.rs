@@ -1,4 +1,4 @@
-use crate::{config, generate, get_version, list, unit_test, validate};
+use crate::{config, generate, get_version, graph, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
 
@@ -34,6 +34,7 @@ impl Opts {
     pub fn log_level(&self) -> &'static str {
         let (quiet_level, verbose_level) = match self.sub_command {
             Some(SubCommand::Validate(_))
+            | Some(SubCommand::Graph(_))
             | Some(SubCommand::Generate(_))
             | Some(SubCommand::List(_)) => {
                 if self.root.verbose == 0 {
@@ -72,6 +73,19 @@ pub struct RootOpts {
         use_delimiter(true)
     )]
     pub config_paths: Vec<PathBuf>,
+
+    /// Read configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "config-dir",
+        short = "C",
+        long,
+        env = "VECTOR_CONFIG_DIR",
+        use_delimiter(true)
+    )]
+    pub config_dirs: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// TOML file format is expected.
@@ -136,17 +150,29 @@ pub struct RootOpts {
     /// Watch for changes in configuration file, and reload accordingly.
     #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
+
+    /// [experimental] Send internal tracing spans to a local APM-enabled Datadog agent with
+    /// a granularity matching the current log level.
+    #[structopt(long, env = "VECTOR_ENABLE_DATADOG_TRACING", takes_value(false))]
+    pub enable_datadog_tracing: bool,
 }
 
 impl RootOpts {
     /// Return a list of config paths with the associated formats.
-    pub fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
+    pub fn config_paths_with_formats(&self) -> Vec<config::ConfigPath> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
             (&self.config_paths_toml, Some(config::Format::Toml)),
             (&self.config_paths_json, Some(config::Format::Json)),
             (&self.config_paths_yaml, Some(config::Format::Yaml)),
         ])
+        .map(|(path, hint)| config::ConfigPath::File(path, hint))
+        .chain(
+            self.config_dirs
+                .iter()
+                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+        )
+        .collect()
     }
 }
 
@@ -165,6 +191,9 @@ pub enum SubCommand {
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
     /// For guidance on how to write unit tests check out: https://vector.dev/guides/level-up/unit-testing/
     Test(unit_test::Opts),
+
+    /// Output the topology as visual representation using the DOT language which can be rendered by GraphViz
+    Graph(graph::Opts),
 
     /// Display topology and metrics in the console, for a local or remote Vector instance
     #[cfg(feature = "api-client")]

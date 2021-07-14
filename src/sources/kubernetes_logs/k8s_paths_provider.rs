@@ -92,25 +92,25 @@ fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
         metadata.uid.as_ref()?
     };
 
-    Some(build_pod_logs_directory(&namespace, &name, &uid))
+    Some(build_pod_logs_directory(namespace, name, uid))
 }
 
 const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers";
 
 fn extract_excluded_containers_for_pod(pod: &Pod) -> impl Iterator<Item = &str> {
     let metadata = &pod.metadata;
-    metadata.annotations.iter().flat_map(|annotations| {
-        annotations
-            .iter()
-            .filter_map(|(key, value)| {
-                if key != CONTAINER_EXCLUSION_ANNOTATION_KEY {
-                    return None;
-                }
-                Some(value)
-            })
-            .flat_map(|containers| containers.split(','))
-            .map(|container| container.trim())
-    })
+
+    metadata
+        .annotations
+        .iter()
+        .filter_map(|(key, value)| {
+            if key != CONTAINER_EXCLUSION_ANNOTATION_KEY {
+                return None;
+            }
+            Some(value)
+        })
+        .flat_map(|containers| containers.split(','))
+        .map(|container| container.trim())
 }
 
 fn build_container_exclusion_patterns<'a>(
@@ -146,10 +146,10 @@ where
                 // architecture.
                 // In some setups, there will also be paths like
                 // `<pod_logs_dir>/<hash>.log` - those we want to skip.
-                &[dir, "*/*.log"].join("/"),
+                &[dir, "*/*.log*"].join("/"),
             );
 
-            // Extract the containers to exclude, then build patters from them
+            // Extract the containers to exclude, then build patterns from them
             // and cache the results into a Vec.
             let excluded_containers = extract_excluded_containers_for_pod(pod);
             let exclusion_patterns: Vec<_> =
@@ -259,14 +259,12 @@ mod tests {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
-                        annotations: Some(
-                            vec![(
-                                "kubernetes.io/config.mirror".to_owned(),
-                                "sandbox0-config-hashsum".to_owned(),
-                            )]
-                            .into_iter()
-                            .collect(),
-                        ),
+                        annotations: vec![(
+                            "kubernetes.io/config.mirror".to_owned(),
+                            "sandbox0-config-hashsum".to_owned(),
+                        )]
+                        .into_iter()
+                        .collect(),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -292,7 +290,7 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: Some(vec![].into_iter().collect()),
+                        annotations: vec![].into_iter().collect(),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -303,11 +301,12 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: Some(
-                            vec![("some-other-annotation".to_owned(), "some value".to_owned())]
-                                .into_iter()
-                                .collect(),
-                        ),
+                        annotations: vec![(
+                            "some-other-annotation".to_owned(),
+                            "some value".to_owned(),
+                        )]
+                        .into_iter()
+                        .collect(),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -318,14 +317,12 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: Some(
-                            vec![(
-                                super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
-                                "container1,container4".to_owned(),
-                            )]
-                            .into_iter()
-                            .collect(),
-                        ),
+                        annotations: vec![(
+                            super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
+                            "container1,container4".to_owned(),
+                        )]
+                        .into_iter()
+                        .collect(),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -336,14 +333,12 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: Some(
-                            vec![(
-                                super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
-                                "container1, container4".to_owned(),
-                            )]
-                            .into_iter()
-                            .collect(),
-                        ),
+                        annotations: vec![(
+                            super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
+                            "container1, container4".to_owned(),
+                        )]
+                        .into_iter()
+                        .collect(),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -369,14 +364,12 @@ mod tests {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
-                        annotations: Some(
-                            vec![(
-                                super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
-                                "excluded1,excluded2".to_owned(),
-                            )]
-                            .into_iter()
-                            .collect(),
-                        ),
+                        annotations: vec![(
+                            super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
+                            "excluded1,excluded2".to_owned(),
+                        )]
+                        .into_iter()
+                        .collect(),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -384,7 +377,7 @@ mod tests {
                 // Calls to the glob mock.
                 vec![(
                     // The pattern to expect at the mock.
-                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log*",
                     // The paths to return from the mock.
                     vec![
                         "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container1/qwe.log",
@@ -415,7 +408,7 @@ mod tests {
                     ..Pod::default()
                 },
                 vec![(
-                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log*",
                     vec![],
                 )],
                 vec![],
@@ -445,9 +438,19 @@ mod tests {
         let cases = vec![
             // No exclusion pattern allows everything.
             (
-                vec!["/var/log/pods/a.log", "/var/log/pods/b.log"],
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                ],
                 vec![],
-                vec!["/var/log/pods/a.log", "/var/log/pods/b.log"],
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                ],
             ),
             // Test a filter that doesn't apply to anything.
             (

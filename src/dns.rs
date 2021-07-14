@@ -87,8 +87,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn resolve_vector() {
-        assert!(resolve("vector.dev").await);
+    async fn resolve_example() {
+        assert!(resolve("example.com").await);
     }
 
     #[tokio::test]

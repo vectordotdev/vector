@@ -4,9 +4,9 @@ use indexmap::IndexMap;
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
-    expand_wildcards(&mut builder);
-
     let expansions = expand_macros(&mut builder)?;
+
+    expand_globs(&mut builder);
 
     let warnings = validation::warnings(&builder);
 
@@ -85,8 +85,8 @@ pub(super) fn expand_macros(
     }
 }
 
-/// Expand trailing `*` wildcards in input lists
-fn expand_wildcards(config: &mut ConfigBuilder) {
+/// Expand globs in input lists
+fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
         .keys()
@@ -95,26 +95,43 @@ fn expand_wildcards(config: &mut ConfigBuilder) {
         .collect::<Vec<String>>();
 
     for (name, transform) in config.transforms.iter_mut() {
-        expand_wildcards_inner(&mut transform.inputs, name, &candidates);
+        expand_globs_inner(&mut transform.inputs, name, &candidates);
     }
 
     for (name, sink) in config.sinks.iter_mut() {
-        expand_wildcards_inner(&mut sink.inputs, name, &candidates);
+        expand_globs_inner(&mut sink.inputs, name, &candidates);
     }
 }
 
-fn expand_wildcards_inner(inputs: &mut Vec<String>, name: &str, candidates: &[String]) {
+enum InputMatcher {
+    Pattern(glob::Pattern),
+    String(String),
+}
+
+impl InputMatcher {
+    fn matches(&self, candidate: &str) -> bool {
+        use InputMatcher::*;
+
+        match self {
+            Pattern(pattern) => pattern.matches(candidate),
+            String(s) => s == candidate,
+        }
+    }
+}
+
+fn expand_globs_inner(inputs: &mut Vec<String>, name: &str, candidates: &[String]) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
-        if raw_input.ends_with('*') {
-            let prefix = &raw_input[0..raw_input.len() - 1];
-            for input in candidates {
-                if input.starts_with(prefix) && input != name {
-                    inputs.push(input.clone())
-                }
+        let matcher = glob::Pattern::new(&raw_input)
+            .map(InputMatcher::Pattern)
+            .unwrap_or_else(|error| {
+                warn!(message = "Invalid glob pattern for input.", component_name = name, %error);
+                InputMatcher::String(raw_input)
+            });
+        for input in candidates {
+            if matcher.matches(input) && input != name {
+                inputs.push(input.clone())
             }
-        } else {
-            inputs.push(raw_input);
         }
     }
 }
@@ -196,13 +213,14 @@ mod test {
     }
 
     #[test]
-    fn wildcard_expansion() {
+    fn glob_expansion() {
         let mut builder = ConfigBuilder::default();
         builder.add_source("foo1", MockSourceConfig);
         builder.add_source("foo2", MockSourceConfig);
         builder.add_source("bar", MockSourceConfig);
         builder.add_transform("foos", &["foo*"], MockTransformConfig);
         builder.add_sink("baz", &["foos*", "b*"], MockSinkConfig);
+        builder.add_sink("quix", &["*oo*"], MockSinkConfig);
         builder.add_sink("quux", &["*"], MockSinkConfig);
 
         let config = builder.build().expect("build should succeed");
@@ -213,5 +231,6 @@ mod test {
             config.sinks["quux"].inputs,
             vec!["foo1", "foo2", "bar", "foos"]
         );
+        assert_eq!(config.sinks["quix"].inputs, vec!["foo1", "foo2", "foos"]);
     }
 }

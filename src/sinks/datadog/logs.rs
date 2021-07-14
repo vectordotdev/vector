@@ -1,3 +1,4 @@
+use super::ApiKey;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -48,8 +49,6 @@ pub struct DatadogLogsConfig {
     #[serde(default)]
     request: TowerRequestConfig,
 }
-
-type ApiKey = Arc<str>;
 
 #[derive(Clone)]
 struct DatadogLogsJsonService {

@@ -24,20 +24,22 @@ const HELM_VALUES_DUMMY_TOPOLOGY: &str = indoc! {r#"
 /// settings and a dummy topology.
 #[tokio::test]
 async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
+    init();
+
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();
-    let override_name = get_override_name("vector-aggregator");
+    let override_name = get_override_name(&namespace, "vector-aggregator");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGGREGATOR,
             VectorConfig {
-                custom_helm_values: &config_override_name(
+                custom_helm_values: vec![
+                    &config_override_name(&override_name, false),
                     HELM_VALUES_DUMMY_TOPOLOGY,
-                    &override_name,
-                ),
+                ],
                 ..Default::default()
             },
         )
@@ -58,17 +60,19 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
 /// a Prometheus scraping format ot of the box.
 #[tokio::test]
 async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
+    init();
+
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();
-    let override_name = get_override_name("vector-aggregator");
+    let override_name = get_override_name(&namespace, "vector-aggregator");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGGREGATOR,
             VectorConfig {
-                custom_helm_values: &config_override_name("", &override_name),
+                custom_helm_values: vec![&config_override_name(&override_name, false)],
                 ..Default::default()
             },
         )

@@ -1077,7 +1077,7 @@ mod integration_tests {
             // validate namespace
             assert!(metric.namespace() == Some(namespace));
             // validate timestamp
-            let timestamp = metric.data.timestamp.expect("existed timestamp");
+            let timestamp = metric.timestamp().expect("existed timestamp");
             assert!((timestamp - Utc::now()).num_seconds() < 1);
             // validate basic tags
             let tags = metric.tags().expect("existed tags");

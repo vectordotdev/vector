@@ -596,6 +596,30 @@ You can run these tests within a PR as described in the [CI section](#ci).
 
 #### Tips and Tricks
 
+##### Faster Builds With `sccache`
+
+Vector is a large project with a plethora of dependencies.  Changing to a different branch, or
+running `cargo clean`, can sometimes necessitate rebuilding many of those dependencies, which has an
+impact on productivity.  One way to reduce some of this cycle time is to use `sccache`, which caches
+compilation assets to avoid recompiling them over and over.
+
+`sccache` works by being configured to sit in front of `rustc`, taking compilation requests from
+Cargo and checking the cache to see if it already has the cached compilation unit.  It handles
+making sure that different compiler flags, versions of Rust, etc, are taken into consideration
+before using a cached asset.
+
+In order to use `sccache`, you must first [install](https://github.com/mozilla/sccache#installation)
+it.  There are pre-built binaries for all major platforms to get you going quickly. The
+[usage](https://github.com/mozilla/sccache#usage) documentation also explains how to set up your
+environment to actually use it.  We recommend using the `.cargo/config` approach as this can help
+speed up all of your Rust development work, and not just developing on Vector.
+
+While `sccache` was originally designed to cache compilation assets in cloud storage, maximizing
+reusability amongst CI workers, `sccache` actually supports storing assets locally by default.
+Local mode works well for local development as it is much easier to delete the cache directory if
+you ever encounter issues with the cached assets.  It also involves no extra infrastructure or
+spending.
+
 ##### Testing Specific Components
 
 If you are developing a particular component and want to quickly iterate on unit
@@ -825,15 +849,17 @@ E2E (end-to-end) tests.
 Vector release artifacts are prepared for E2E tests, so the ability to do that
 is required too, see Vector [docs](https://vector.dev) for more details.
 
-> Note: `minikube` had a bug in the versions `1.12.x` that affected our test
-> process - see https://github.com/kubernetes/minikube/issues/8799.
-> Use version `1.13.0+` that has this bug fixed.
+Notes:
 
-Also:
-
-> Note: `minikube` has troubles running on ZFS systems. If you're using ZFS, we
-> suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
-> registry.
+> - `minikube` had a bug in the versions `1.12.x` that affected our test
+>   process - see https://github.com/kubernetes/minikube/issues/8799.
+>   Use version `1.13.0+` that has this bug fixed.
+> - `minikube` has troubles running on ZFS systems. If you're using ZFS, we
+>   suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
+>   registry.
+> - E2E tests expect to have enough resources to perform a full Vector build,
+>   usually 8GB of RAM with 2CPUs are sufficient to succesfully complete E2E tests
+>   locally.
 
 ##### Running the E2E tests
 
@@ -877,9 +903,6 @@ You can also pass additional parameters to adjust the behavior of the test:
 
 - `SCOPE` - pass a filter to the `cargo test` command to filter out the tests,
   effectively equivalent to `cargo test -- $SCOPE`.
-
-- `NAMESPACE` - specifies the k8s namespace to run the tests in. Some tests are
-  run in another namespace with this one prepended: `<NAMESPACE>-test-pod`.
 
 Passing additional commands is done like so:
 
@@ -942,7 +965,7 @@ docs at https://vector.dev/docs are built using structured data written in
 [CUE], a language designed for data templating and validation. All of Vector's
 CUE sources are in the `/docs` folder.
 
-> Vector is currently using CUE version **0.3.2**. Be sure to use
+> Vector is currently using CUE version **0.4.0**. Be sure to use
 > precisely this version, as CUE is evolving quickly and you can expect breaking
 > changes in each release.
 
@@ -1078,7 +1101,7 @@ contact us at vector@timber.io.
 
 [urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
-[urls.cue]: https://cuelang.org
+[CUE]: https://cuelang.org
 [urls.existing_issues]: https://github.com/timberio/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
 [urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits

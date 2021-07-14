@@ -23,6 +23,8 @@ pub mod config;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
+#[cfg(feature = "docker")]
+pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "wasm")]
@@ -35,6 +37,7 @@ pub mod app;
 pub mod async_read;
 pub mod buffers;
 pub mod encoding_transcode;
+pub mod graph;
 pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
@@ -48,6 +51,7 @@ pub mod providers;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;
+#[cfg(windows)]
 pub mod service;
 pub mod shutdown;
 pub mod signal;
@@ -97,6 +101,16 @@ pub fn get_version() -> String {
         Some(desc) => format!("{} {}", built_info::TARGET, desc),
         None => built_info::TARGET.into(),
     };
+
+    // We do not add 'debug' to the BUILD_DESC unless the caller has flagged on line
+    // or full debug symbols. See the Cargo Book profiling section for value meaning:
+    // https://doc.rust-lang.org/cargo/reference/profiles.html#debug
+    let build_string = match built_info::DEBUG {
+        "1" => format!("{} debug=line", build_string),
+        "2" | "true" => format!("{} debug=full", build_string),
+        _ => build_string,
+    };
+
     format!("{} ({})", pkg_version, build_string)
 }
 

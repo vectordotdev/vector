@@ -9,7 +9,7 @@
   </strong>
 </p>
 <p align="center">
-  <img src="docs/assets/images/diagram.svg" alt="Vector">
+  <img src="docs/static/img/diagram.svg" alt="Vector">
 </p>
 
 ## What is Vector?
@@ -18,12 +18,13 @@ Vector is a high-performance, end-to-end (agent & aggregator) observability data
 pipeline that puts you in control of your observability data.
 [Collect][docs.sources], [transform][docs.transforms], and [route][docs.sinks]
 all your logs, metrics, and traces to any vendors you want today and any other
-vendors you may want tomorrow. Vector enables dramatic cost reduction, novel data
-enrichment, and data security where you need it, not where is most convenient for
-your vendors. Open source and up to 10x faster than every alternative.
+vendors you may want tomorrow. Vector enables dramatic cost reduction, novel
+data enrichment, and data security where you need it, not where is most
+convenient for your vendors. Additionally, it is open source and up to 10x
+faster than every alternative in the space.
 
-To get started, follow our [**quickstart guide**][docs.quickstart]
-or [**install Vector**][docs.installation].
+To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
+Vector**][docs.installation].
 
 ### Principles
 
@@ -78,7 +79,7 @@ or [**install Vector**][docs.installation].
 
 ### Administration
 
-* [**Process management**][docs.administration.process-management]
+* [**Management**][docs.administration.management]
 * [**Monitoring & observing**][docs.administration.monitoring]
 * [**Upgrading**][docs.administration.upgrading]
 * [**Validating**][docs.administration.validating]
@@ -156,7 +157,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.about.concepts]: https://vector.dev/docs/about/concepts/
 [docs.about.under-the-hood]: https://vector.dev/docs/about/under-the-hood/
 [docs.administration.monitoring]: https://vector.dev/docs/administration/monitoring/
-[docs.administration.process-management]: https://vector.dev/docs/administration/process-management/
+[docs.administration.management]: https://vector.dev/docs/administration/management/
 [docs.administration.upgrading]: https://vector.dev/docs/administration/upgrading/
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.architecture.concurrency-model]: https://vector.dev/docs/about/under-the-hood/architecture/concurrency-model/
@@ -223,3 +224,4 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
+

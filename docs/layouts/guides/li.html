@@ -1,0 +1,42 @@
+{{ $title := .Params.short | default .Title }}
+{{ $section := cond (eq .CurrentSection.Parent.Title "Integrate") "Integrate" .CurrentSection.Title }}
+
+<div class="cursor-pointer">
+  <a href="{{ .RelPermalink }}">
+    <div class="border rounded-md py-4 px-6 hover:border-secondary dark:hover:border-primary dark:border-gray-700">
+      <span class="uppercase text-xs tracking-tight text-gray-500 dark:text-gray-300">
+        {{ $section }}
+      </span>
+
+      <div class="mt-2 text-xl font-semibold text-dark dark:text-gray-200">
+        <span class="leading-tight">
+          {{ with .Weight }}
+          <span class="mr-0.5">
+            {{ . }}.
+          </span>
+          {{ end }}
+          <span>
+            {{ $title }}
+          </span>
+        </span>
+      </div>
+
+      {{ with .Description }}
+      <div class="mt-2 tracking-tight leading-tighter lg:text-md dark:text-gray-300 text-gray-500">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+
+      <div class="mt-3 overflow-x-scroll">
+        {{ partial "guides/badges.html" . }}
+      </div>
+
+      {{ with .Params.logo }}
+      {{ $src := printf "img/logos/%s.svg" . }}
+      <div class="mt-3">
+        {{ partial "svg.html" (dict "src" $src "h" 16 "w" 16) }}
+      </div>
+      {{ end }}
+    </div>
+  </a>
+</div>

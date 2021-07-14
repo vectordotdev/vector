@@ -1,6 +1,7 @@
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use glob::glob;
+use shared::TimeZone;
 use std::str::FromStr;
 use structopt::StructOpt;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
@@ -29,6 +30,19 @@ pub struct Cmd {
     /// during the test run.
     #[structopt(short, long)]
     logging: bool,
+
+    #[structopt(short = "tz", long)]
+    timezone: Option<String>,
+}
+
+impl Cmd {
+    fn timezone(&self) -> TimeZone {
+        if let Some(ref tz) = self.timezone {
+            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {}", tz))
+        } else {
+            TimeZone::default()
+        }
+    }
 }
 
 fn should_run(name: &str, pat: &Option<String>) -> bool {
@@ -113,10 +127,11 @@ fn main() {
         let program = vrl::compile(&test.source, &stdlib::all());
 
         let want = test.result.clone();
+        let timezone = cmd.timezone();
 
         match program {
             Ok(program) => {
-                let result = runtime.resolve(&mut test.object, &program);
+                let result = runtime.resolve(&mut test.object, &program, &timezone);
 
                 match result {
                     Ok(got) => {
@@ -304,17 +319,20 @@ fn print_result(failed_count: usize) {
 
 fn vrl_value_to_json_value(value: Value) -> serde_json::Value {
     use serde_json::Value::*;
-    use std::iter::FromIterator;
 
     match value {
         v @ Value::Bytes(_) => String(v.try_bytes_utf8_lossy().unwrap().into_owned()),
         Value::Integer(v) => v.into(),
         Value::Float(v) => v.into_inner().into(),
         Value::Boolean(v) => v.into(),
-        Value::Object(v) => serde_json::Value::from_iter(
-            v.into_iter().map(|(k, v)| (k, vrl_value_to_json_value(v))),
-        ),
-        Value::Array(v) => serde_json::Value::from_iter(v.into_iter().map(vrl_value_to_json_value)),
+        Value::Object(v) => v
+            .into_iter()
+            .map(|(k, v)| (k, vrl_value_to_json_value(v)))
+            .collect::<serde_json::Value>(),
+        Value::Array(v) => v
+            .into_iter()
+            .map(vrl_value_to_json_value)
+            .collect::<serde_json::Value>(),
         Value::Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
         Value::Regex(v) => v.to_string().into(),
         Value::Null => Null,

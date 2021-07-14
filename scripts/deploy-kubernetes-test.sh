@@ -45,7 +45,7 @@ VECTOR_TEST_HELM="${VECTOR_TEST_HELM:-"helm"}"
 CUSTOM_RESOURCE_CONFIGS_FILE="${CUSTOM_RESOURCE_CONFIGS_FILE:-""}"
 
 # Allow optionally passing custom Helm values.
-CUSTOM_HELM_VALUES_FILE="${CUSTOM_HELM_VALUES_FILE:-""}"
+CUSTOM_HELM_VALUES_FILES="${CUSTOM_HELM_VALUES_FILES:-""}"
 
 split-container-image() {
   local INPUT="$1"
@@ -71,11 +71,11 @@ up() {
     --set "global.vector.commonEnvKV.LOG=info"
   )
 
-  if [[ -n "$CUSTOM_HELM_VALUES_FILE" ]]; then
+  for file in $CUSTOM_HELM_VALUES_FILES ; do
     HELM_VALUES+=(
-      --values "$CUSTOM_HELM_VALUES_FILE"
+      --values "$file"
     )
-  fi
+  done
 
   split-container-image "$CONTAINER_IMAGE"
   HELM_VALUES+=(
@@ -102,7 +102,7 @@ down() {
     $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "vector"
   fi
 
-  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
+  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE" --force=true --grace-period=0 --wait=false
 }
 
 case "$COMMAND" in

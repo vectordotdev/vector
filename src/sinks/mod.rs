@@ -1,7 +1,5 @@
-use crate::event::Event;
-use futures::{future::BoxFuture, Sink, Stream, StreamExt};
+use futures::future::BoxFuture;
 use snafu::Snafu;
-use std::fmt;
 
 pub mod util;
 
@@ -17,6 +15,8 @@ pub mod aws_kinesis_streams;
 pub mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
 pub mod aws_sqs;
+#[cfg(feature = "sinks-azure_blob")]
+pub mod azure_blob;
 #[cfg(feature = "sinks-azure_monitor_logs")]
 pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
@@ -57,6 +57,8 @@ pub mod papertrail;
 pub mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 pub mod pulsar;
+#[cfg(feature = "sinks-redis")]
+pub mod redis;
 #[cfg(feature = "sinks-sematext")]
 pub mod sematext;
 #[cfg(feature = "sinks-socket")]
@@ -68,10 +70,7 @@ pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
 
-pub enum VectorSink {
-    Sink(Box<dyn Sink<Event, Error = ()> + Send + Unpin>),
-    Stream(Box<dyn util::StreamSink + Send>),
-}
+pub use vector_core::sink::VectorSink;
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 
@@ -93,29 +92,4 @@ pub enum BuildError {
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
-}
-
-impl VectorSink {
-    pub async fn run<S>(mut self, input: S) -> Result<(), ()>
-    where
-        S: Stream<Item = Event> + Send,
-    {
-        match self {
-            Self::Sink(sink) => input.map(Ok).forward(sink).await,
-            Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
-        }
-    }
-
-    pub fn into_sink(self) -> Box<dyn Sink<Event, Error = ()> + Send + Unpin> {
-        match self {
-            Self::Sink(sink) => sink,
-            _ => panic!("Failed type coercion, {:?} is not a Sink", self),
-        }
-    }
-}
-
-impl fmt::Debug for VectorSink {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("VectorSink").finish()
-    }
 }

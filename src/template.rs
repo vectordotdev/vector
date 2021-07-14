@@ -17,13 +17,14 @@ use snafu::Snafu;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
+use std::hash::Hash;
 use std::path::PathBuf;
 
 lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
 pub struct Template {
     src: String,
     has_ts: bool,
@@ -177,11 +178,9 @@ fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
     match key {
         "name" => Some(metric.name().into()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => metric
-            .series
-            .tags
-            .as_ref()
-            .and_then(|tags| tags.get(&key[5..]).cloned()),
+        _ if key.starts_with("tags.") => {
+            metric.tags().and_then(|tags| tags.get(&key[5..]).cloned())
+        }
         _ => None,
     }
 }
@@ -190,8 +189,9 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
     let timestamp = match event {
         EventRef::Log(log) => log
             .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp),
-        EventRef::Metric(metric) => metric.data.timestamp.as_ref(),
+            .and_then(Value::as_timestamp)
+            .copied(),
+        EventRef::Metric(metric) => metric.timestamp(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()
@@ -265,26 +265,14 @@ mod tests {
 
     #[test]
     fn is_dynamic() {
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/%F").unwrap().is_dynamic()
-        );
-        assert_eq!(
-            false,
-            Template::try_from("/kube-demo/echo").unwrap().is_dynamic()
-        );
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/{{ foo }}")
-                .unwrap()
-                .is_dynamic()
-        );
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/{{ foo }}/%F")
-                .unwrap()
-                .is_dynamic()
-        );
+        assert!(Template::try_from("/kube-demo/%F").unwrap().is_dynamic());
+        assert!(!Template::try_from("/kube-demo/echo").unwrap().is_dynamic());
+        assert!(Template::try_from("/kube-demo/{{ foo }}")
+            .unwrap()
+            .is_dynamic());
+        assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
+            .unwrap()
+            .is_dynamic());
     }
 
     #[test]
