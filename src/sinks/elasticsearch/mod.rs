@@ -904,7 +904,7 @@ mod tests {
         event.as_mut_log().insert("data_stream", data_stream_body());
         let encoded = es.encode_event(event).unwrap().item;
         let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
-{"data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+{"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
@@ -965,7 +965,6 @@ mod tests {
             encoded_lines.get(0).unwrap(),
             r#"{"create":{"_index":"vector","_type":"_doc"}}"#
         );
-        println!("line: {}", encoded_lines.get(1).unwrap());
         assert!(encoded_lines
             .get(1)
             .unwrap()
@@ -1031,7 +1030,7 @@ mod tests {
         );
         let encoded = es.encode_event(event).unwrap().item;
         let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
-{"data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+{"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
