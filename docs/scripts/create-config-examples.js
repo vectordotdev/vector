@@ -4,6 +4,8 @@ const chalk = require('chalk');
 const TOML = require('@iarna/toml');
 const YAML = require('yaml');
 
+const debug = process.env.DEBUG === "true" || false;
+
 const setExampleValue = (exampleConfig, paramName, param) => {
   Object.keys(param.type).forEach((k) => {
     if (param.type[k].default) {
@@ -72,11 +74,11 @@ try {
 
       const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
-      var common = null,
-        advanced = null;
+      var commonExampleConfig = null,
+        advancedExampleConfig = null;
 
       if (['sinks', 'transforms'].includes(kind)) {
-        common = {
+        commonExampleConfig = {
           [kind]: {
             [keyName]: {
               "type": componentType,
@@ -86,7 +88,7 @@ try {
           }
         };
 
-        advanced = {
+        advancedExampleConfig = {
           [kind]: {
             [keyName]: {
               "type": componentType,
@@ -96,7 +98,7 @@ try {
           }
         };
       } else {
-        common = {
+        commonExampleConfig = {
           [kind]: {
             [keyName]: {
               "type": componentType,
@@ -105,7 +107,7 @@ try {
           }
         };
 
-        advanced = {
+        advancedExampleConfig = {
           [kind]: {
             [keyName]: {
               "type": componentType,
@@ -115,16 +117,29 @@ try {
         };
       }
 
+      // A debugging statement to make sure things are going basically as planned
+      if (debug) {
+        const debugComponent = "aws_ec2_metadata";
+        const debugKind = "transforms";
+
+        if (componentType === debugComponent && kind === debugKind) {
+          console.log(
+            chalk.blue(`Printing debug JSON for the ${debugComponent} ${debugKind.substring(0, debugKind.length - 1)}...`));
+
+          console.log(JSON.stringify(advancedExampleConfig, null, 2));
+        }
+      }
+
       docs['components'][kind][componentType]['example_configs'] = {
         common: {
-          toml: TOML.stringify(common),
-          yaml: `---\n${YAML.stringify(common)}`,
-          json: JSON.stringify(common, null, 2),
+          toml: TOML.stringify(commonExampleConfig),
+          yaml: `---\n${YAML.stringify(commonExampleConfig)}`,
+          json: JSON.stringify(commonExampleConfig, null, 2),
         },
         advanced: {
-          toml: TOML.stringify(advanced),
-          yaml: `---\n${YAML.stringify(advanced)}`,
-          json: JSON.stringify(advanced, null, 2)
+          toml: TOML.stringify(advancedExampleConfig),
+          yaml: `---\n${YAML.stringify(advancedExampleConfig)}`,
+          json: JSON.stringify(advancedExampleConfig, null, 2)
         },
       };
     }
