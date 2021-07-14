@@ -4,7 +4,7 @@ use dashmap::DashMap;
 use glob::glob;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::BTreeSet,
     fs, io,
     path::{Path, PathBuf},
     sync::Arc,
@@ -19,41 +19,16 @@ const STABLE_FILE_NAME: &str = "checkpoints.json";
 /// now there is only one variant, but any incompatible changes will require and
 /// additional variant to be added here and handled anywhere that we transit
 /// this format.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "version", rename_all = "snake_case")]
 enum State {
     #[serde(rename = "1")]
-    V1 { checkpoints: Vec<Checkpoint> },
-}
-
-impl Eq for State {}
-
-impl PartialEq for State {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (State::V1 { checkpoints: a }, State::V1 { checkpoints: b }) if a.len() == b.len() => {
-                let map: HashMap<_, _> = a.iter().map(|c| (c.fingerprint, c)).collect();
-
-                for c in b {
-                    if let Some(entry) = map.get(&c.fingerprint) {
-                        if entry != &c {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-
-                true
-            }
-            (State::V1 { .. }, State::V1 { .. }) => false,
-        }
-    }
+    V1 { checkpoints: BTreeSet<Checkpoint> },
 }
 
 /// A simple JSON-friendly struct of the fingerprint/position pair, since
 /// fingerprints as objects cannot be keys in a plain JSON map.
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 struct Checkpoint {
     fingerprint: FileFingerprint,
@@ -296,14 +271,7 @@ impl Checkpointer {
         let current = self.checkpoints.get_state();
 
         // Fetch last written state.
-        let mut last = match self.last.lock() {
-            Ok(guard) => guard,
-            Err(mut poisoned) => {
-                // Remove possibly invalid state.
-                **poisoned.get_mut() = None;
-                poisoned.into_inner()
-            }
-        };
+        let mut last = self.last.lock().expect("Data poisoned.");
         if last.as_ref() != Some(&current) {
             // Write the new checkpoints to a tmp file and flush it fully to
             // disk. If vector dies anywhere during this section, the existing
