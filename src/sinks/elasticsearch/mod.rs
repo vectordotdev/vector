@@ -2,7 +2,7 @@ mod retry;
 
 use self::retry::{ElasticSearchRetryLogic, ElasticSearchServiceLogic};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
@@ -35,6 +35,9 @@ use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use vector_core::event::{Event, Value};
+
+/// The field name for the timestamp required by data stream mode
+const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -128,8 +131,6 @@ impl NormalConfig {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
-    #[serde(default = "DataStreamConfig::default_timestamp")]
-    timestamp: String,
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     dtype: Template,
     #[serde(default = "DataStreamConfig::default_dataset")]
@@ -145,7 +146,6 @@ pub struct DataStreamConfig {
 impl Default for DataStreamConfig {
     fn default() -> Self {
         Self {
-            timestamp: Self::default_timestamp(),
             dtype: Self::default_type(),
             dataset: Self::default_dataset(),
             namespace: Self::default_namespace(),
@@ -156,10 +156,6 @@ impl Default for DataStreamConfig {
 }
 
 impl DataStreamConfig {
-    fn default_timestamp() -> String {
-        "@timestamp".into()
-    }
-
     fn default_type() -> Template {
         Template::try_from("logs").expect("couldn't build default type template")
     }
@@ -180,14 +176,15 @@ impl DataStreamConfig {
         true
     }
 
-    fn update_timestamp(&self, mut event: Event) -> Event {
+    fn remap_timestamp(&self, mut event: Event) -> Event {
         // we keep it if the timestamp field is @timestamp
-        if self.timestamp == Self::default_timestamp() {
+        let timestamp_key = log_schema().timestamp_key();
+        if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
             return event;
         }
         let log = event.as_mut_log().as_map_mut();
-        if let Some(value) = log.remove(&self.timestamp) {
-            log.insert(Self::default_timestamp(), value);
+        if let Some(value) = log.remove(timestamp_key) {
+            log.insert(DATA_STREAM_TIMESTAMP_KEY.into(), value);
         }
         event
     }
@@ -311,7 +308,7 @@ pub enum ElasticSearchAuth {
     Aws(AwsAuthentication),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticSearchMode {
     Normal,
@@ -502,7 +499,7 @@ impl ElasticSearchCommon {
         let index = self.mode.index(&event)?;
 
         let mut event = if let Some(cfg) = self.mode.as_data_stream_config() {
-            cfg.update_timestamp(cfg.sync_fields(event))
+            cfg.remap_timestamp(cfg.sync_fields(event))
         } else {
             event
         };
@@ -907,7 +904,7 @@ mod tests {
         event.as_mut_log().insert("data_stream", data_stream_body());
         let encoded = es.encode_event(event).unwrap().item;
         let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
-{"data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+{"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
@@ -924,7 +921,6 @@ mod tests {
             data_stream: Some(DataStreamConfig {
                 auto_routing: false,
                 namespace: Template::try_from("something").unwrap(),
-                timestamp: log_schema().timestamp_key().into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -969,7 +965,6 @@ mod tests {
             encoded_lines.get(0).unwrap(),
             r#"{"create":{"_index":"vector","_type":"_doc"}}"#
         );
-        println!("line: {}", encoded_lines.get(1).unwrap());
         assert!(encoded_lines
             .get(1)
             .unwrap()
@@ -1035,7 +1030,7 @@ mod tests {
         );
         let encoded = es.encode_event(event).unwrap().item;
         let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
-{"data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+{"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
@@ -1118,6 +1113,7 @@ mod integration_tests {
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::{self, TlsOptions},
     };
+    use chrono::Utc;
     use futures::{stream, StreamExt};
     use http::{Request, StatusCode};
     use hyper::Body;
@@ -1396,7 +1392,7 @@ mod integration_tests {
             .await
             .expect("Data stream creation error");
 
-        run_insert_tests_with_config(&cfg, true, BatchStatus::Delivered).await;
+        run_insert_tests_with_config(&cfg, false, BatchStatus::Delivered).await;
     }
 
     async fn run_insert_tests(
@@ -1429,7 +1425,14 @@ mod integration_tests {
         batch_status: BatchStatus,
     ) {
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
-        let index = config.index.clone().unwrap();
+        let index = match config.mode {
+            // Data stream mode uses an index name generated from the event.
+            ElasticSearchMode::DataStream => format!(
+                "{}",
+                Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
+            ),
+            ElasticSearchMode::Normal => config.index.clone().unwrap(),
+        };
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
@@ -1464,7 +1467,7 @@ mod integration_tests {
         flush(common).await.expect("Flushing writes failed");
 
         let client = create_http_client();
-        let response = client
+        let mut response = client
             .get(&format!("{}/{}/_search", base_url, index))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
@@ -1488,16 +1491,24 @@ mod integration_tests {
             assert_eq!(input.len() as u64, total);
 
             let hits = response["hits"]["hits"]
-                .as_array()
+                .as_array_mut()
                 .expect("Elasticsearch response does not include hits->hits");
             let input = input
                 .into_iter()
                 .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
                 .collect::<Vec<_>>();
+
             for hit in hits {
                 let hit = hit
-                    .get("_source")
+                    .get_mut("_source")
                     .expect("Elasticsearch hit missing _source");
+                if config.mode == ElasticSearchMode::DataStream {
+                    let obj = hit.as_object_mut().unwrap();
+                    obj.remove("data_stream");
+                    // Un-rewrite the timestamp field
+                    let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
+                    obj.insert(log_schema().timestamp_key().into(), timestamp);
+                }
                 assert!(input.contains(&hit));
             }
         }
