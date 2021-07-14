@@ -115,10 +115,6 @@ try {
         };
       }
 
-      if (componentType === "aws_ecs_metrics") {
-        console.log(JSON.stringify(advanced, null, 2));
-      }
-
       docs['components'][kind][componentType]['example_configs'] = {
         common: {
           toml: TOML.stringify(common),
