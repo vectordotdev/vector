@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        sink::Response,
+        sink::{self, Response},
         BatchConfig, BatchSettings, Compression, EncodedEvent, EncodedLength, TowerRequestConfig,
         VecBuffer,
     },
@@ -161,6 +161,7 @@ impl KinesisFirehoseService {
                 VecBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
             .sink_map_err(|error| error!(message = "Fatal kinesis firehose sink error.", %error))
             .with_flat_map(move |e| stream::iter(Some(encode_event(e, &encoding))).map(Ok));
