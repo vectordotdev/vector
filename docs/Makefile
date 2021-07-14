@@ -1,7 +1,7 @@
 CUE = ./scripts/cue.sh
 
 clean:
-	rm -rf public resources
+	rm -rf public resources data/docs.json
 
 setup:
 	yarn

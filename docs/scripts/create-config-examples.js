@@ -4,6 +4,48 @@ const chalk = require('chalk');
 const TOML = require('@iarna/toml');
 const YAML = require('yaml');
 
+const makeRequiredParams = (configuration) => {
+  var required = {};
+
+  for (const paramName in configuration) {
+    if (paramName != "type") {
+      const param = configuration[paramName];
+      if (param.required) {
+        Object.keys(param.type).forEach((k) => {
+          const examples = param.type[k].examples;
+
+          if (examples != null && examples.length > 0) {
+            required[paramName] = examples[0];
+          }
+        });
+      }
+    }
+  }
+
+  return required;
+}
+
+const makeOptionalParams = (configuration) => {
+  var optional = {};
+
+  for (const paramName in configuration) {
+    if (paramName != "type") {
+      const param = configuration[paramName];
+      if (!param.required) {
+        Object.keys(param.type).forEach((k) => {
+          const examples = param.type[k].examples;
+
+          if (examples != null && examples.length > 0) {
+            optional[paramName] = examples[0];
+          }
+        });
+      }
+    }
+  }
+
+  return optional;
+}
+
 try {
   console.log(chalk.blue("Creating example configurations for all Vector components..."));
 
@@ -22,55 +64,59 @@ try {
       const component = componentsOfKind[componentType];
       const configuration = component.configuration;
 
-      var exampleConfig = {
-        kind: kind,
-        "type": componentType
-      };
-
-      var requiredParams = [];
-      var required = {};
-
-      // Config parameters
-      for (const paramName in configuration) {
-        const param = configuration[paramName];
-
-        if (param.required) {
-          requiredParams.push(paramName);
-        }
-      }
-
-      // Remove the "type" param from required, which is added elsewhere
-      requiredParams = requiredParams.filter(p => p != "type");
-
-      requiredParams.forEach((p) => {
-        const param = configuration[p];
-        Object.keys(param.type).forEach((key) => {
-          const examples = param.type[key].examples;
-
-          if (examples != null && examples.length > 0) {
-            required[p] = examples[0];
-          }
-        });
-      });
+      const required = makeRequiredParams(configuration);
+      const optional = makeOptionalParams(configuration);
 
       const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
-      var example = {
-        [kind]: {
-          [keyName]: {
-            "type": componentType,
-            ...required,
-          }
-        }
-      };
+      var common = null,
+        advanced = null;
 
       if (['sinks', 'transforms'].includes(kind)) {
-        example[kind][keyName]['inputs'] = ['my-source-or-transform-id']
+        common = {
+          [kind]: {
+            [keyName]: {
+              "type": componentType,
+              inputs: ['my-source-or-transform-id'], // Sinks and transforms need this
+              ...required,
+            }
+          }
+        };
+
+        advanced = {
+          [kind]: {
+            [keyName]: {
+              "type": componentType,
+              inputs: ['my-source-or-transform-id'],
+              ...required,
+              ...optional,
+            }
+          }
+        };
+      } else {
+        common = {
+          [kind]: {
+            [keyName]: {
+              "type": componentType,
+              ...required,
+            }
+          }
+        };
+
+        advanced = {
+          [kind]: {
+            [keyName]: {
+              "type": componentType,
+              ...required,
+              ...optional,
+            }
+          }
+        };
       }
 
-      const common = example;
-
-      const advanced = example;
+      if (componentType === "kubernetes_logs") {
+        console.log(common);
+      }
 
       docs['components'][kind][componentType]['example_configs'] = {
         common: {
