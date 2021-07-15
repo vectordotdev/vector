@@ -103,6 +103,17 @@ components: sources: journald: {
 				syntax: "literal"
 			}
 		}
+		journal_files_dir: {
+			common:      false
+			description: "The full path of the journal files directory."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["/run/log/journal"]
+				syntax: "literal"
+			}
+		}
 	}
 
 	output: logs: {
