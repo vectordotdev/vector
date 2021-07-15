@@ -11,17 +11,17 @@ releases: "0.15.0": {
 
 		* [`datadog_events` sink](\(urls.vector_datadog_events_sink)) for sending events to [Datadog's event stream](\(urls.datadog_events)).
 		* [`dnstap` source](\(urls.vector_dnstap_source)) for collecting events from a DNS server via the [dnstap protocol](\(urls.dnstap)).
-		* [`fluent` source](\(urls.vector_fluent_source)) for collecting logs frowarded by [FluentD](\(urls.fluentd)),
+		* [`fluent` source](\(urls.vector_fluent_source)) for collecting logs forwarded by [FluentD](\(urls.fluentd)),
 		  [Fluent Bit](\(urls.fluentbit)), or other services capable of forwarding using the [fluent
 		  protocol](\(urls.fluent)) such as Docker.
-		* [`logstash` source](\(urls.vector_logstash_source)) for collecting logs frowarded by [Logstash](\(urls.logstash)),
+		* [`logstash` source](\(urls.vector_logstash_source)) for collecting logs forwarded by [Logstash](\(urls.logstash)),
 		  [Elastic Beats](\(urls.elastic_beats)), or other services capable of forwarding using the [lumberjack
 		  protocol](\(urls.logstash_protocol)) such as Docker.
 		* [`azure_blob` sink](\(urls.vector_azure_blob_sink)) for forwarding logs to [Azure's Blob Storage](\(urls.azure_blob_storage)).
-		* [`redis` sink]\(urls.vector_redis_sink)) for forwarding logs to [Redis](\(urls.redis)).
-		* [`eventstoredb_metrics` source]\(urls.vector_eventstoredb_metrics_source)) for collecting metrics from [EventStoreDB](\(urls.eventstoredb)).
+		* [`redis` sink](\(urls.vector_redis_sink)) for forwarding logs to [Redis](\(urls.redis)).
+		* [`eventstoredb_metrics` source](\(urls.vector_eventstoredb_metrics_source)) for collecting metrics from [EventStoreDB](\(urls.eventstoredb)).
 
-		It also contains a number of additional enhancements and bug fixes.  Check out the highlights and changelog for more details.
+		It also contains a number of additional enhancements and bug fixes.  Check out the [highlights](#highlights) and [changelog](#changelog) for more details.
 		"""
 
 	commits: [

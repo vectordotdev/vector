@@ -1,7 +1,7 @@
 ---
 date: "2021-07-14"
 title: "0.15 Upgrade Guide"
-description: "An upgrade guide that addresses breaking changes in 0.14.0"
+description: "An upgrade guide that addresses breaking changes in 0.15.0"
 authors: ["jszwedko"]
 pr_numbers: []
 release: "0.15.0"
@@ -12,9 +12,9 @@ badges:
 
 Vector's 0.15.0 release includes a few minor breaking changes:
 
-1.[Dropping support for Kubernetes 1.14.](#first)
-2.[The `sample` transform now takes VRL conditions by default.](#second)
-3.[The `remap` condition type was renamed to `vrl`.](#third)
+1. [Dropping support for Kubernetes 1.14.](#first)
+2. [The `sample` transform now takes VRL conditions by default.](#second)
+3. [The `remap` condition type was renamed to `vrl`.](#third)
 
 We cover each below to help you upgrade quickly:
 
