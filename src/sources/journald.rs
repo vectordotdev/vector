@@ -132,8 +132,15 @@ impl SourceConfig for JournaldConfig {
         let current_boot_only = self.current_boot_only.unwrap_or(true);
         let files_dir = self.journal_files_dir.clone();
 
-        let start: StartJournalctlFn =
-            Box::new(move |cursor| start_journalctl(&journalctl_path, files_dir.as_ref(), current_boot_only, cursor));
+        let start: StartJournalctlFn = Box::new(move |cursor| {
+            let mut command = create_command(
+                &journalctl_path,
+                files_dir.as_ref(),
+                current_boot_only,
+                cursor,
+            );
+            start_journalctl(&mut command)
+        });
 
         Ok(Box::pin(
             JournaldSource {
@@ -339,11 +346,30 @@ type StartJournalctlFn = Box<
 type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
+    command: &mut Command,
+) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
+    let mut child = command.spawn().context(JournalctlSpawn)?;
+
+    let stream = FramedRead::new(
+        child.stdout.take().unwrap(),
+        BytesDelimitedCodec::new(b'\n'),
+    )
+    .boxed();
+
+    let pid = Pid::from_raw(child.id().unwrap() as _);
+    let stop = Box::new(move || {
+        let _ = kill(pid, Signal::SIGTERM);
+    });
+
+    Ok((stream, stop))
+}
+
+fn create_command(
     path: &Path,
     files_dir: Option<&PathBuf>,
     current_boot_only: bool,
     cursor: &Option<String>,
-) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
+) -> Command {
     let mut command = Command::new(path);
     command.stdout(Stdio::piped());
     command.arg("--follow");
@@ -366,20 +392,7 @@ fn start_journalctl(
         command.arg("--since=2000-01-01");
     }
 
-    let mut child = command.spawn().context(JournalctlSpawn)?;
-
-    let stream = FramedRead::new(
-        child.stdout.take().unwrap(),
-        BytesDelimitedCodec::new(b'\n'),
-    )
-    .boxed();
-
-    let pid = Pid::from_raw(child.id().unwrap() as _);
-    let stop = Box::new(move || {
-        let _ = kill(pid, Signal::SIGTERM);
-    });
-
-    Ok((stream, stop))
+    command
 }
 
 fn create_event(record: Record) -> Event {
@@ -795,6 +808,31 @@ mod tests {
         assert!(filter_unit(Some(&two), &includes, &empty));
         assert!(filter_unit(Some(&two), &empty, &excludes));
         assert!(filter_unit(Some(&two), &includes, &excludes));
+    }
+
+    #[test]
+    fn command_options() {
+        let path = PathBuf::from("jornalctl");
+
+        let files_dir = None;
+        let current_boot_only = false;
+        let cursor = None;
+
+        let command = create_command(&path, files_dir, current_boot_only, &cursor);
+        let cmd_line = format!("{:?}", command);
+        assert!(!cmd_line.contains("--directory="));
+        assert!(!cmd_line.contains("--boot"));
+        assert!(cmd_line.contains("--since=2000-01-01"));
+
+        let files_dir = Some(PathBuf::from("/tmp/journal-files-dir"));
+        let current_boot_only = true;
+        let cursor = Some(String::from("2021-01-01"));
+
+        let command = create_command(&path, files_dir.as_ref(), current_boot_only, &cursor);
+        let cmd_line = format!("{:?}", command);
+        assert!(cmd_line.contains("--directory=/tmp/journal-files-dir"));
+        assert!(cmd_line.contains("--boot"));
+        assert!(cmd_line.contains("--after-cursor="));
     }
 
     fn message(event: &Event) -> Value {
