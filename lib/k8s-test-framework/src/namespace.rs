@@ -12,7 +12,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Create a [`Config`] using a structured [`Pod`] object.
+    /// Create a [`Config`] using a structured [`Namespace`] object.
     pub fn from_namespace(namespace: &Namespace) -> Result<Self> {
         Self::from_resource_string(serde_json::to_string(namespace)?.as_str())
     }
