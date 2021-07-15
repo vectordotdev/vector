@@ -923,7 +923,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let affinity_ns = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: affinity_ns_name,
+                name: Some(affinity_ns_name),
                 ..Default()
             },
             spec: None,
@@ -1693,7 +1693,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let affintiy_ns = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: affinity_ns_name,
+                name: Some(affinity_ns_name),
                 ..Default()
             },
             spec: None,
