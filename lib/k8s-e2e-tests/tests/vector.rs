@@ -214,8 +214,8 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -328,8 +328,8 @@ async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,

@@ -124,8 +124,8 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -231,8 +231,8 @@ async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -338,8 +338,8 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -443,8 +443,8 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -527,8 +527,8 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -658,8 +658,8 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -765,8 +765,8 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -911,8 +911,8 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -923,8 +923,8 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let affinity_ns = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(affinity_ns_name),
-                ..Default()
+                name: Some(affinity_ns_name.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -1124,8 +1124,8 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -1326,8 +1326,8 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -1504,8 +1504,8 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -1676,8 +1676,8 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
             framework
                 .namespace(namespace::Config::from_namespace(&Namespace {
                     metadata: ObjectMeta {
-                        name: Some(name),
-                        ..Default()
+                        name: Some(name.clone()),
+                        ..Default::default()
                     },
                     spec: None,
                     status: None,
@@ -1690,11 +1690,11 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     // Create a pod for our other pods to have an affinity to to ensure they are all deployed on
     // the same node.
     let affinity_ns_name = format!("{}-affinity", pod_namespace);
-    let affintiy_ns = framework
+    let affinity_ns = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(affinity_ns_name),
-                ..Default()
+                name: Some(affinity_ns_name.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -1818,8 +1818,8 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -1957,8 +1957,8 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(pod_namespace),
-                ..Default()
+                name: Some(pod_namespace.clone()),
+                ..Default::default()
             },
             spec: None,
             status: None,
@@ -2137,7 +2137,7 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: Some("test-vector-test-pod".to_string()),
-                ..Default()
+                ..Default::default()
             },
             spec: None,
             status: None,
