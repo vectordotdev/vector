@@ -222,7 +222,6 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         })?)
         .await?;
 
-
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
             &pod_namespace,
