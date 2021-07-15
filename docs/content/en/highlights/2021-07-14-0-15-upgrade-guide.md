@@ -12,7 +12,7 @@ badges:
 
 Vector's 0.15.0 release includes a few minor breaking changes:
 
-1. [Dropping support for Kubernetes 1.14.](#first)
+1. [Dropping support for Kubernetes 1.14.X.](#first)
 2. [The `sample` transform now takes VRL conditions by default.](#second)
 3. [The `remap` condition type was renamed to `vrl`.](#third)
 
