@@ -175,15 +175,15 @@ check out:
 * Finally, [deploying Vector][docs.deployment] to launch Vector in your production environment.
 
 [docs.deployment]: /docs/setup/deployment/
-[docs.installation]: /docs/manual/installation/
+[docs.installation]: /docs/setup/installation/
 [docs.setup.configuration]: /docs/setup/configuration/
-[docs.sinks]: /docs/reference/components/sinks/
-[docs.sinks.console]: /docs/reference/components/sinks/console/
-[docs.sources]: /docs/reference/components/sources/
-[docs.sources.generator]: /docs/reference/components/sources/generator/
-[docs.sources.stdin]: /docs/reference/components/sources/stdin/
-[docs.transforms.remap]: /docs/reference/components/transforms/remap/
-[docs.transforms]: /docs/reference/components/transforms/
+[docs.sinks]: /docs/reference/configuration/sinks/
+[docs.sinks.console]: /docs/reference/configuration/sinks/console/
+[docs.sources]: /docs/reference/configuration/sources/
+[docs.sources.generator]: /docs/reference/configuration/sources/generator/
+[docs.sources.stdin]: /docs/reference/configuration/sources/stdin/
+[docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
+[docs.transforms]: /docs/reference/configuration/transforms/
 [docs.vrl]: /docs/reference/vrl/
 [docs.vrl.parse_syslog]: /docs/reference/vrl/functions/#parse_syslog
 [pages.components]: /components/
