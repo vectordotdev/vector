@@ -78,10 +78,16 @@ struct DatadogAgentSource {
     store_api_key: bool,
 }
 
+// https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
 #[derive(Deserialize)]
 struct LogMsg {
-    pub message: String,
-    pub timestamp: i64,
+    pub message: Bytes,
+    pub status: Option<Bytes>,
+    pub timestamp: Option<i64>,
+    pub hostname: Option<Bytes>,
+    pub service: Option<Bytes>,
+    pub source: Option<Bytes>,
+    pub tags: Option<Bytes>,
 }
 
 impl HttpSource for DatadogAgentSource {
@@ -119,7 +125,21 @@ impl HttpSource for DatadogAgentSource {
                 let mut log = LogEvent::default();
                 log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
                 log.insert_flat("message".to_string(), msg.message);
-                log.insert_flat("timestamp".to_string(), msg.timestamp);
+                if let Some(timestamp) = msg.timestamp {
+                    log.insert_flat("timestamp".to_string(), timestamp);
+                }
+                if let Some(hostname) = msg.hostname {
+                    log.insert_flat("hostname".to_string(), hostname);
+                }
+                if let Some(service) = msg.service {
+                    log.insert_flat("service".to_string(), service);
+                }
+                if let Some(source) = msg.source {
+                    log.insert_flat("source".to_string(), source);
+                }
+                if let Some(tags) = msg.tags {
+                    log.insert_flat("tags".to_string(), tags);
+                }
                 let key = log_schema().source_type_key();
                 log.try_insert(key, Bytes::from("datadog_agent"));
                 if let Some(k) = &api_key {
@@ -203,6 +223,43 @@ mod tests {
             .unwrap()
             .status()
             .as_u16()
+    }
+
+    #[tokio::test]
+    async fn full_payload() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"foo", "timestamp": 123, "hostname": "festeburg", "service": "vector", "source": "curl", "tags": "one,two,three"}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["message"], "foo".into());
+            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["source"], "curl".into());
+            assert_eq!(log["tags"], "one,two,three".into());
+            assert!(event.metadata().datadog_api_key().is_none());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+        }
     }
 
     #[tokio::test]
