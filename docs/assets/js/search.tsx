@@ -149,74 +149,71 @@ const Autocomplete = (props) => {
 
 const Search = () => {
   return (
-    <div id="site-search" style={{ width: 700 }}>
-      <Autocomplete
-        openOnFocus={false}
-        detachedMediaQuery=""
-        defaultActiveItemId={0}
-        debug
-        getSources={({ query }) => [
-          {
-            sourceId: 'queryResults',
-            getItems() {
-              const res = getAlgoliaResults({
-                searchClient,
-                queries: [
-                  {
-                    indexName,
-                    query,
-                    params: {
-                      hitsPerPage: 8,
-                    },
+    <Autocomplete
+      openOnFocus={false}
+      detachedMediaQuery=""
+      defaultActiveItemId={0}
+      getSources={({ query }) => [
+        {
+          sourceId: 'queryResults',
+          getItems() {
+            const res = getAlgoliaResults({
+              searchClient,
+              queries: [
+                {
+                  indexName,
+                  query,
+                  params: {
+                    hitsPerPage: 8,
                   },
-                ],
-                transformResponse(res: any) {
-                  // order the hits by page group
-                  const hits = res.hits[0].sort((a, b) => (a < b ? -1 : 1))
-
-                  // add page as category if there are duplicates
-                  const hitsWithCategory = hits.map((h, i) => {
-                    const prev = hits[i - 1] as any
-
-                    // if no previous hit is in this category
-                    if (!prev) {
-                      return { ...h, category: h.pageTitle }
-                    }
-
-                    // skip if there is already one in this category
-                    if (prev && prev.pageTitle === h.pageTitle) {
-                      return h
-                    }
-
-                    // add category if needed
-                    if (prev && prev.pageTitle !== h.pageTitle) {
-                      return { ...h, category: h.pageTitle }
-                    }
-
-                    return h
-                  })
-
-                  return hitsWithCategory
                 },
-              })
+              ],
+              transformResponse(res: any) {
+                // order the hits by page group
+                const hits = res.hits[0].sort((a, b) => (a < b ? -1 : 1))
 
-              return res
-            },
-            getItemUrl({ item }) {
-              return item.itemUrl
-            },
-            onActive({ item, setContext }) {
-              setContext({ preview: item })
-            },
-            templates: {
-              item({ item, components }) {
-                return <Result hit={item} components={components} />
+                // add page as category if there are duplicates
+                const hitsWithCategory = hits.map((h, i) => {
+                  const prev = hits[i - 1] as any
+
+                  // if no previous hit is in this category
+                  if (!prev) {
+                    return { ...h, category: h.pageTitle }
+                  }
+
+                  // skip if there is already one in this category
+                  if (prev && prev.pageTitle === h.pageTitle) {
+                    return h
+                  }
+
+                  // add category if needed
+                  if (prev && prev.pageTitle !== h.pageTitle) {
+                    return { ...h, category: h.pageTitle }
+                  }
+
+                  return h
+                })
+
+                return hitsWithCategory
               },
+            })
+
+            return res
+          },
+          getItemUrl({ item }) {
+            return item.itemUrl
+          },
+          onActive({ item, setContext }) {
+            setContext({ preview: item })
+          },
+          templates: {
+            item({ item, components }) {
+              return <Result hit={item} components={components} />
             },
           },
-        ]}
-      />
-    </div>
+        },
+      ]}
+    />
   )
 }
 
