@@ -1,3 +1,4 @@
+use core::array::IntoIter;
 use futures::{SinkExt, StreamExt};
 use indoc::indoc;
 use k8s_e2e_tests::*;
@@ -5,7 +6,8 @@ use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::O
 use k8s_test_framework::{
     lock, namespace, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+use std::iter::FromIterator;
 use std::str::FromStr;
 use tracing::{debug, info};
 
@@ -729,9 +731,9 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// This test validates that vector-agent properly annotates log events with pod
-/// metadata obtained from the k8s API.
+/// and namespace metadata obtained from the k8s API.
 #[tokio::test]
-async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
+async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     init();
 
@@ -766,6 +768,10 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: Some(pod_namespace.clone()),
+                labels: BTreeMap::from_iter(IntoIter::new([
+                    ("label3".to_string(), "foobar".to_string()),
+                    ("label4".to_string(), "fizzbuzz".to_string()),
+                ])),
                 ..Default::default()
             },
             spec: None,
@@ -837,6 +843,8 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(val["kubernetes"]["pod_uid"].as_str().unwrap().len(), 36); // 36 is a standard UUID string length
         assert_eq!(val["kubernetes"]["pod_labels"]["label1"], "hello");
         assert_eq!(val["kubernetes"]["pod_labels"]["label2"], "world");
+        assert_eq!(val["kubernetes"]["namespace_labels"]["label3"], "foobar");
+        assert_eq!(val["kubernetes"]["namespace_labels"]["label4"], "fizzbuzz");
 
         if minor < 16 {
             assert!(val["kubernetes"]["pod_ip"].is_string());
