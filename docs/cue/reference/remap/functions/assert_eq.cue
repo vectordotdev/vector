@@ -4,9 +4,8 @@ remap: functions: assert_eq: {
 	category: "Debug"
 
 	description: """
-		Asserts that two expressions, `left` and `right`, have the same value. If the values are
-		equivalent, `true` is returned, otherwise `false` is returned. You can specify an optional
-		`message` to append to the error output.
+		Asserts that two expressions, `left` and `right`, have the same value. The program is
+		aborted with the `message` if they are unequal.
 		"""
 
 	arguments: [
