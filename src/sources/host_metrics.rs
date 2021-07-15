@@ -1031,7 +1031,7 @@ mod tests {
     async fn generates_filesystem_metrics() {
         let metrics = HostMetricsConfig::default().filesystem_metrics().await;
         assert!(!metrics.is_empty());
-        assert!(metrics.len() % 3 == 0);
+        assert!(metrics.len() % 4 == 0);
         assert!(all_gauges(&metrics));
 
         // There are exactly three filesystem_* names
@@ -1039,10 +1039,11 @@ mod tests {
             "filesystem_free_bytes",
             "filesystem_total_bytes",
             "filesystem_used_bytes",
+            "filesystem_used_ratio",
         ] {
             assert_eq!(
                 count_name(&metrics, name),
-                metrics.len() / 3,
+                metrics.len() / 4,
                 "name={}",
                 name
             );
