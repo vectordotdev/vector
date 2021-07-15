@@ -542,7 +542,7 @@ urls: {
 	vector_azure_blob_sink:                                   "/docs/reference/configuration/sinks/azure_blob"
 	vector_redis_sink:                                        "/docs/reference/configuration/sinks/redis"
 	vector_dnstap_source:                                     "/docs/reference/configuration/sources/dnstap"
-	vector_eventstoredb_metrics_source:                       "/docs/reference/configuration/sources/eventstordb_metrics"
+	vector_eventstoredb_metrics_source:                       "/docs/reference/configuration/sources/eventstoredb_metrics"
 	vector_fluent_source:                                     "/docs/reference/configuration/sources/fluent"
 	vector_logstash_source:                                   "/docs/reference/configuration/sources/logstash"
 	vector_socket_source:                                     "/docs/reference/configuration/sources/socket"
