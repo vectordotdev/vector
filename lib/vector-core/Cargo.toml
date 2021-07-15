@@ -64,3 +64,7 @@ disk-buffer = ["buffers/disk-buffer"]
 [[bench]]
 name = "lookup"
 harness = false
+
+[[bench]]
+name = "event"
+harness = false

@@ -3,6 +3,20 @@ use std::collections::BTreeMap;
 
 /// Checks whether a field specified by a given path is present.
 pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
+    // Fast path
+    //
+    // In the event that we're able to find the `path` in the passed set of
+    // fields we have a fast bail-out opportunity: we don't need to go through
+    // the work of splitting up the path and iterating it.
+    if fields.contains_key(path) {
+        return true;
+    }
+
+    // Slow path
+    //
+    // If the passed `path` doesn't exist in the top-level of the fields we need
+    // to construct a `PathIter` and then search down through the -- potential
+    // -- tree to find our result.
     let mut path_iter = PathIter::new(path);
 
     match path_iter.next() {
