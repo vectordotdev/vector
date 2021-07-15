@@ -5,7 +5,7 @@ use crate::up_down;
 use k8s_openapi::api::core::v1::Namespace;
 use std::process::{Command, Stdio};
 
-/// A config that holds a test `Pod` resource file.
+/// A config that holds a test `Namespace` resource file.
 #[derive(Debug)]
 pub struct Config {
     test_namespace_resource_file: ResourceFile,
