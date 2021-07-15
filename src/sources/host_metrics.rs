@@ -599,6 +599,12 @@ impl HostMetricsConfig {
                                     "filesystem_used_bytes",
                                     timestamp,
                                     usage.used().get::<byte>() as f64,
+                                    tags.clone(),
+                                ),
+                                self.gauge(
+                                    "filesystem_used_ratio",
+                                    timestamp,
+                                    usage.ratio().get::<ratio>() as f64,
                                     tags,
                                 ),
                             ]
