@@ -41,9 +41,9 @@ checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
 name = "ahash"
-version = "0.7.2"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f200cbb1e856866d9eade941cf3aa0c5d7dd36f74311c4273b494f4ef036957"
+checksum = "43bb833f0bf979d8475d38fbf09ed3b8a55e1885fe93ad3f93239fc6a4f17b98"
 dependencies = [
  "getrandom 0.2.2",
  "once_cell",
@@ -3952,13 +3952,13 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c0a7fa53d812d26e59d2baf7a6f77442041454ab32908eb304447f00f0dd4de"
+checksum = "a00f42f354a2ed4894db863b3a4db47aef2d2e4435b937221749bd37a8a7aaa8"
 dependencies = [
+ "ahash",
  "metrics-macros",
  "proc-macro-hack",
- "t1ha",
 ]
 
 [[package]]
@@ -3977,9 +3977,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2b0900f96236eaa964bb4b94d5cf300b1455ca3a9f28a5c9ba7dbc7deb633a3"
+checksum = "45770271d3b4f04a4b38b593e187d04d41f312694fff10ce1d60c356a082cc50"
 dependencies = [
  "itoa",
  "metrics",
@@ -3991,10 +3991,11 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd2a095cccde5b79bf33556d987688db3d94cb1d75b1f9499a3de3291cb71ebd"
+checksum = "a58e622a425b7308e73e4390c68b8cb3df4443f2a57495e391b978412531638c"
 dependencies = [
+ "ahash",
  "aho-corasick",
  "atomic-shim",
  "crossbeam-epoch 0.9.3",
@@ -4009,7 +4010,6 @@ dependencies = [
  "quanta",
  "radix_trie",
  "sketches-ddsketch",
- "t1ha",
 ]
 
 [[package]]
@@ -7165,18 +7165,6 @@ checksum = "cb6ef7fbec50f39dab5b134b7997e822086429d39920e1bd7db9a17c85f06eeb"
 dependencies = [
  "chrono",
  "nom 6.1.2",
-]
-
-[[package]]
-name = "t1ha"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa44aa51ae1a544e2c35a38831ba54ae40591f21384816f531b84f3e984b9ccc"
-dependencies = [
- "cfg-if 0.1.10",
- "lazy_static",
- "num-traits",
- "rustc_version 0.2.3",
 ]
 
 [[package]]
