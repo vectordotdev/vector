@@ -110,7 +110,7 @@ jobs:
       - run: make slim-builds
       - run: make test
         env:
-          CARGO_BUILD_JOBS: 6
+          CARGO_BUILD_JOBS: 5
       - name: Stop sccache
         run: sccache --stop-server
 
