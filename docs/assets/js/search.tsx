@@ -71,14 +71,16 @@ const Result = ({ hit, components }) => {
           {hit.content && (
             <components.Highlight hit={hit} attribute="content" />
           )}
-          {!hit.content && hit.itemUrl}
+          {!hit.content && (
+            <span style={{ wordBreak: 'break-word' }}>{hit.itemUrl}</span>
+          )}
         </p>
       </div>
     </>
   )
 }
 
-export function Autocomplete(props) {
+const Autocomplete = (props) => {
   const containerRef = useRef(null)
 
   useEffect(() => {
@@ -144,6 +146,7 @@ export function Autocomplete(props) {
   return <div ref={containerRef} />
 }
 
+
 const Search = () => {
   return (
     <div id="site-search" style={{ width: 700 }}>
@@ -192,8 +195,6 @@ const Search = () => {
 
                     return h
                   })
-
-                  console.log(hitsWithCategory)
 
                   return hitsWithCategory
                 },

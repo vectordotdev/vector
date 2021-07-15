@@ -10,10 +10,6 @@
   --secondary: #f44af5;
 }
 
-body {
-  --aa-search-input-height: 36px;
-}
-
 @layer components {
   .code-sample-filename {
     @apply font-semibold font-mono tracking-wide text-gray-200 dark:text-gray-200 bg-dark dark:bg-black py-1.5 px-2 rounded text-sm;
