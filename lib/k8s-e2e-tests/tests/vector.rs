@@ -210,7 +210,17 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(&Namespace {
+            metadata: ObjectMeta {
+                name: Some(pod_namespace),
+                ..Default()
+            },
+            spec: None,
+            status: None,
+        })?)
+        .await?;
+
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
