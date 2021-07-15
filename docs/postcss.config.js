@@ -16,6 +16,7 @@ const safeClasses = {
     // All Algolia-specific classes
     /^ais-/,
     /^aa-/,
+    /^DocSearch/,
     // Search widgets (TODO: improve this by consolidating these into higher classes)
     "pl-2",
     "text-gray-800",
