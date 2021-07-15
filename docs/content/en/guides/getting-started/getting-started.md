@@ -1,6 +1,7 @@
 ---
 title: Getting Started with Vector
 description: Getting Started with Vector, the "Hello World" of Vector tutorials.
+tags: ["getting-started", "guides", "guide"]
 ---
 
 Welcome to Vector!
