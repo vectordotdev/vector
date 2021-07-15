@@ -122,7 +122,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -229,7 +229,7 @@ async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -336,7 +336,7 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -441,7 +441,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -525,7 +525,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let override_name = get_override_name(&namespace, "vector-agent");
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -656,7 +656,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -763,7 +763,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -909,7 +909,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -921,7 +921,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     let affinity_ns_name = format!("{}-affinity", pod_namespace);
     let affinity_ns = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &affinity_ns_name,
                 ..Default()
@@ -1122,7 +1122,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -1324,7 +1324,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -1502,7 +1502,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -1674,7 +1674,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         let name = format!("{}-{}", pod_namespace, i);
         test_namespaces.push(
             framework
-                .namespace(namespace::Config::from_resource_string(&Namespace {
+                .namespace(namespace::Config::from_namespace(&Namespace {
                     metadata: ObjectMeta {
                         name: &name,
                         ..Default()
@@ -1691,7 +1691,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     // the same node.
     let affinity_ns_name = format!("{}-affinity", pod_namespace);
     let affintiy_ns = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &affinity_ns_name,
                 ..Default()
@@ -1816,7 +1816,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -1955,7 +1955,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let processed_events_before = metrics::get_processed_events(&vector_metrics_url).await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: &pod_namespace,
                 ..Default()
@@ -2134,7 +2134,7 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_resource_string(&Namespace {
+        .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
                 name: "test-vector-test-pod",
                 ..Default()
