@@ -44,6 +44,7 @@ tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.19", default-features = false }
 twox-hash = { version = "1.6.0", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
+coz = "0.1"
 
 [build-dependencies]
 prost-build = "0.7.0"
@@ -61,6 +62,14 @@ lua = ["rlua", "tokio-stream"]
 vrl = ["vrl-core"]
 disk-buffer = ["buffers/disk-buffer"]
 
+[[bin]]
+name = "log_event"
+path = "bin/log_event.rs"
+
 [[bench]]
 name = "lookup"
+harness = false
+
+[[bench]]
+name = "event"
 harness = false

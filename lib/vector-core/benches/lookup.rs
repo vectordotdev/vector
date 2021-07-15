@@ -18,8 +18,8 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
     Ok(string)
 }
 
-// This test iterates over the `tests/data/fixtures/lookup` folder and ensures the lookup parsed,
-// then turned into a string again is the same.
+// This test iterates over the `tests/data/fixtures/lookup` folder and ensures
+// the lookup parsed, then turned into a string again is the same.
 fn lookup_to_string(c: &mut Criterion) {
     let mut fixtures = IndexMap::new();
 
