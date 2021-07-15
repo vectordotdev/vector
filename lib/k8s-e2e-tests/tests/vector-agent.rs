@@ -124,7 +124,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -231,7 +231,7 @@ async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -338,7 +338,7 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -443,7 +443,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -527,7 +527,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -658,7 +658,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -765,7 +765,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -911,7 +911,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -1124,7 +1124,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -1326,7 +1326,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -1504,7 +1504,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -1676,7 +1676,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
             framework
                 .namespace(namespace::Config::from_namespace(&Namespace {
                     metadata: ObjectMeta {
-                        name: Some(&name),
+                        name: Some(name),
                         ..Default()
                     },
                     spec: None,
@@ -1818,7 +1818,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -1957,7 +1957,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some(&pod_namespace),
+                name: Some(pod_namespace),
                 ..Default()
             },
             spec: None,
@@ -2136,7 +2136,7 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(&Namespace {
             metadata: ObjectMeta {
-                name: Some("test-vector-test-pod"),
+                name: Some("test-vector-test-pod".to_string()),
                 ..Default()
             },
             spec: None,
