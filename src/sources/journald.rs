@@ -74,6 +74,7 @@ pub struct JournaldConfig {
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
+    pub journal_files_dir: Option<PathBuf>,
     /// Deprecated
     #[serde(default)]
     remap_priority: bool,
@@ -129,9 +130,10 @@ impl SourceConfig for JournaldConfig {
 
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
+        let files_dir = self.journal_files_dir.clone();
 
         let start: StartJournalctlFn =
-            Box::new(move |cursor| start_journalctl(&journalctl_path, current_boot_only, cursor));
+            Box::new(move |cursor| start_journalctl(&journalctl_path, files_dir.as_ref(), current_boot_only, cursor));
 
         Ok(Box::pin(
             JournaldSource {
@@ -338,6 +340,7 @@ type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
     path: &Path,
+    files_dir: Option<&PathBuf>,
     current_boot_only: bool,
     cursor: &Option<String>,
 ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
@@ -347,6 +350,10 @@ fn start_journalctl(
     command.arg("--all");
     command.arg("--show-cursor");
     command.arg("--output=json");
+
+    if let Some(dir) = files_dir {
+        command.arg(format!("--directory={}", dir.display()));
+    }
 
     if current_boot_only {
         command.arg("--boot");
