@@ -20,7 +20,7 @@ We cover each below to help you upgrade quickly:
 
 ## Upgrade Guide
 
-### Dropping support for Kubernetes 1.14<a name="first"></a>
+### Dropping support for Kubernetes 1.14 {#first}
 
 We've dropped support for Kubernetes version 1.14 as it is no longer a supported Kubernetes version nor do major cloud
 providers support it.
@@ -28,14 +28,14 @@ providers support it.
 This version of Kubernetes is likely to still work with Vector, but we will no longer be testing against it and cannot
 guarantee future versions of Vector will be compatible.
 
-In general, we will aim to match [Kuberentes' supported releases][kubernetes_releases] and along with the versions
+In general, we will aim to match [Kubernetes' supported releases][kubernetes_releases] and along with the versions
 supported by major cloud providers.
 
-### The `sample` transform now takes VRL conditions by default<a name="second"></a>
+### The `sample` transform now takes VRL conditions by default {#second}
 
-In version 0.12.0 we switched to using [VRL][vrl] as the default condition type for our transforms that take conditions (like
+In version 0.12.0 we switched to using [VRL] as the default condition type for our transforms that take conditions (like
 `filter` and `route`), but the `sample` transform was not updated even though its documentation was. This release brings
-the `sample` transform in line with the others by making [VRL][vrl] the default condition type.
+the `sample` transform in line with the others by making [VRL] the default condition type.
 
 This means, if you are presently using the deprecated `check_fields` syntax, you will need to add `type
 = "check_fields"` to your condition.
@@ -79,7 +79,7 @@ exclude = """
 We recommend upgrading to the [VRL][VRL] conditions as these are much more powerful than the legacy `check_fields`-style
 conditions.
 
-### The `remap` condition type was renamed to `vrl`<a name="third"></a>
+### The `remap` condition type was renamed to `vrl` {#third}
 
 The `remap` condition type has been renamed `vrl` in this release to better highlight that the syntax for it is
 a [VRL][VRL] program. Most examples of using this condition type have the short-hand condition config of just specifying

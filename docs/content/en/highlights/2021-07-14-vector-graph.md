@@ -12,7 +12,7 @@ badges:
 ---
 
 This release adds a new subcommand `vector graph` to output the topology specified by you Vector configuration as
-a graph in [DOT][DOT] format. This output can then be visualized using [Graphviz][Graphviz] to produce an image.
+a graph in [DOT][DOT] format. This output can then be visualized using [Graphviz] to produce an image.
 
 For example, if you had a config, `vector.toml`, like:
 
@@ -99,9 +99,9 @@ digraph {
 }
 ```
 
-To render this, if you have [Graphviz][Graphviz] installed, you could do:
+To render this, if you have [Graphviz] installed, you could do:
 
-```
+```shell
 vector graph --config vector.toml | dot -Tsvg > graph.png
 ```
 
@@ -109,7 +109,7 @@ To get an image that looks like:
 
 ![Rendered vector graph output](/img/vector-graph.png)
 
-If you don't have [Graphviz][Graphviz] installed, you can also visualize online at [webgraphviz.com](http://www.webgraphviz.com/).
+If you don't have [Graphviz] installed, you can also visualize online at [webgraphviz.com](http://www.webgraphviz.com/).
 
 [DOT]: https://graphviz.org/doc/info/lang.html
 [Graphviz]: https://graphviz.org
