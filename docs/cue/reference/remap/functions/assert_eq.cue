@@ -8,6 +8,14 @@ remap: functions: assert_eq: {
 		aborted with the `message` if they are unequal.
 		"""
 
+	notices: [
+		"""
+		The `assert_eq` function should be used in a standalone fashion and only when you want to
+		abort the program. You should avoid it in logical expressions and other situations in which
+		you want the program to continue if the condition evaluates to `false`.
+		""",
+	]
+
 	arguments: [
 		{
 			name: "left"
