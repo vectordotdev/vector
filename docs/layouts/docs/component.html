@@ -35,7 +35,8 @@
 
         {{ partial "docs/component-under-hero.html" . }}
 
-        <div class="mt-12 prose dark:prose-dark tracking-tight pb-32">          {{ with $config.alias }}
+        <div class="mt-12 prose dark:prose-dark tracking-tight pb-32">
+          {{ with $config.alias }}
           {{ partial "heading.html" (dict "text" "Alias" "level" 2) }}
 
           <p>
