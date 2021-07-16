@@ -6,19 +6,27 @@ const YAML = require('yaml');
 
 const debug = process.env.DEBUG === "true" || false;
 
+// Convert object to TOML string
 const toToml = (obj) => {
   return TOML.stringify(obj);
 }
 
+// Convert object to YAML string
 const toYaml = (obj) => {
   return `---\n${YAML.stringify(obj)}`;
 }
 
+// Convert object to JSON string (indented)
 const toJson = (obj) => {
   return JSON.stringify(obj, null, 2);
 }
 
+// Set the example value for a given config parameter
 const setExampleValue = (exampleConfig, paramName, param) => {
+  // Because the `type` field can have one of several different values
+  // (`string`, `array`, `object`, etc.) you need to use recursion here to
+  // get through to the lower level params, e.g. `type.string.examples`. If
+  // there's a more idiomatic way to do this in JS, please advise.
   Object.keys(param.type).forEach((k) => {
     if (param.type[k].default) {
       exampleConfig[paramName] = param.type[k].default;
@@ -32,6 +40,7 @@ const setExampleValue = (exampleConfig, paramName, param) => {
   });
 }
 
+// Assemble the "common" params for an example config
 const makeCommonParams = (configuration) => {
   var common = {};
 
@@ -49,6 +58,22 @@ const makeCommonParams = (configuration) => {
   return common;
 }
 
+// Assemble the "advanced" params for an example config
+const makeAllParams = (configuration) => {
+  var optional = {};
+
+  for (const paramName in configuration) {
+    if (paramName != "type") {
+      const param = configuration[paramName];
+
+      setExampleValue(optional, paramName, param);
+    }
+  }
+
+  return optional;
+}
+
+// Convert the use case examples (`component.examples`) into multi-format
 const makeUseCaseExamples = (component) => {
   if (component.examples) {
     var useCases = [];
@@ -105,20 +130,6 @@ const makeUseCaseExamples = (component) => {
   }
 }
 
-const makeAllParams = (configuration) => {
-  var optional = {};
-
-  for (const paramName in configuration) {
-    if (paramName != "type") {
-      const param = configuration[paramName];
-
-      setExampleValue(optional, paramName, param);
-    }
-  }
-
-  return optional;
-}
-
 try {
   console.log(chalk.blue("Creating example configurations for all Vector components..."));
 
@@ -143,8 +154,7 @@ try {
 
       const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
-      var commonExampleConfig = null,
-        advancedExampleConfig = null;
+      let commonExampleConfig, advancedExampleConfig;
 
       // Sinks and transforms are treated differently because they need an `inputs` field
       if (['sinks', 'transforms'].includes(kind)) {
