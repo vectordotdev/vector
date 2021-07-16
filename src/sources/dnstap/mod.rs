@@ -264,7 +264,7 @@ mod integration_tests {
                 host_key: Some("key".to_string()),
                 socket_path: socket,
                 raw_data_only: Some(raw_data),
-                multithreaded: Some(true),
+                multithreaded: Some(false),
                 max_frame_handling_tasks: Some(100000),
                 socket_file_mode: Some(511),
                 socket_receive_buffer_size: Some(10485760),
@@ -285,10 +285,16 @@ mod integration_tests {
             .expect("failed to get dnstap source event from a stream");
         let mut events = vec![event];
         loop {
-            match time::timeout(time::Duration::from_millis(10), recv.next()).await {
+            match time::timeout(time::Duration::from_secs(1), recv.next()).await {
                 Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(_) => break,
+                Ok(None) => {
+                    println!("None: No event");
+                    break;
+                }
+                Err(e) => {
+                    println!("Error: {}", e.to_string());
+                    break;
+                }
             }
         }
 
@@ -300,22 +306,19 @@ mod integration_tests {
             let socket = get_socket(raw_data, query_type);
             let dnstap_sock_file = Path::new(&socket);
             let container_tool = get_container_tool();
-            let (rndc_port, nslookup_port) = get_ports(raw_data, query_type);
+            let (bind, port) = get_bind_and_port(raw_data, query_type);
 
             loop {
                 thread::sleep(time::Duration::from_millis(100));
                 if dnstap_sock_file.exists() {
                     thread::sleep(time::Duration::from_millis(100));
-                    rndc_reconfig(&container_tool, rndc_port);
+                    start_bind(&container_tool, bind, port);
+                    thread::sleep(time::Duration::from_millis(100));
                     match query_type {
                         "query" => {
-                            nslookup(&container_tool, nslookup_port);
-                            thread::sleep(time::Duration::from_secs(3));
-                            nslookup(&container_tool, nslookup_port);
+                            nslookup(&container_tool, port);
                         }
                         "update" => {
-                            nsupdate(&container_tool);
-                            thread::sleep(time::Duration::from_secs(3));
                             nsupdate(&container_tool);
                         }
                         _ => (),
@@ -443,28 +446,29 @@ mod integration_tests {
         }
     }
 
-    fn get_ports(raw_data: bool, query_type: &'static str) -> (&str, &str) {
+    fn get_bind_and_port(raw_data: bool, query_type: &'static str) -> (&str, &str) {
         match query_type {
             "query" => {
                 if raw_data {
-                    ("9001", "8001")
+                    ("/bind1", "8001")
                 } else {
-                    ("9002", "8002")
+                    ("/bind2", "8002")
                 }
             }
-            "update" => ("9003", "8003"),
+            "update" => ("/bind3", "8003"),
             _ => ("", ""),
         }
     }
 
-    fn rndc_reconfig(container: &str, port: &'static str) {
+    fn start_bind(container: &str, bind: &'static str, port: &'static str) {
         Command::new(container)
             .arg("exec")
             .arg("vector_dnstap")
-            .arg("rndc")
+            .arg("/usr/sbin/named")
             .arg("-p")
             .arg(port)
-            .arg("reconfig")
+            .arg("-t")
+            .arg(bind)
             .output()
             .expect("Failed to execute command!");
     }

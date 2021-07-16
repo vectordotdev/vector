@@ -224,3 +224,4 @@ scopes:
   - javascript website # Anything related to the JavaScript functionality on vector.dev
   - search website # Anything related to the website's Algolia search indexing/config
   - template website # Anything related to website HTML and other templates
+  - links website # Reserved for PRs devoted only to link fixes
