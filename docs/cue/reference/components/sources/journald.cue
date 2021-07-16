@@ -103,7 +103,7 @@ components: sources: journald: {
 				syntax: "literal"
 			}
 		}
-		journal_files_dir: {
+		journal_directory: {
 			common:      false
 			description: "The full path of the journal directory. If not set, `journalctl` will operate of the default runtime and system journal paths"
 			required:    false
