@@ -78,7 +78,8 @@ pub struct Config {
     data_dir: Option<PathBuf>,
 
     /// Specifies the field names for Pod metadata annotation.
-    annotation_fields: pod_metadata_annotator::FieldsSpec,
+    #[serde(alias = "annotation_fields")]
+    pod_annotation_fields: pod_metadata_annotator::FieldsSpec,
 
     /// Specifies the field names for Namespace metadata annotation.
     namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec,
@@ -144,7 +145,7 @@ impl Default for Config {
             extra_field_selector: "".to_string(),
             auto_partial_merge: true,
             data_dir: None,
-            annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
+            pod_annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
             namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec::default(),
             exclude_paths_glob_patterns: default_path_exclusion(),
             max_read_bytes: default_max_read_bytes(),
@@ -186,7 +187,8 @@ struct Source {
     client: k8s::client::Client,
     data_dir: PathBuf,
     auto_partial_merge: bool,
-    fields_spec: pod_metadata_annotator::FieldsSpec,
+    pod_fields_spec: pod_metadata_annotator::FieldsSpec,
+    namespace_fields_spec: namespace_metadata_annotator::FieldsSpec,
     field_selector: String,
     label_selector: String,
     exclude_paths: Vec<glob::Pattern>,
@@ -223,7 +225,8 @@ impl Source {
             client,
             data_dir,
             auto_partial_merge: config.auto_partial_merge,
-            fields_spec: config.annotation_fields.clone(),
+            pod_fields_spec: config.pod_annotation_fields.clone(),
+            namespace_fields_spec: config.namespace_annotation_fields.clone(),
             field_selector,
             label_selector,
             exclude_paths,
@@ -245,7 +248,8 @@ impl Source {
             client,
             data_dir,
             auto_partial_merge,
-            fields_spec,
+            pod_fields_spec,
+            namespace_fields_spec,
             field_selector,
             label_selector,
             exclude_paths,
@@ -280,7 +284,7 @@ impl Source {
         let reflector_process = reflector.run();
 
         let paths_provider = K8sPathsProvider::new(state_reader.clone(), exclude_paths);
-        let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
+        let annotator = PodMetadataAnnotator::new(state_reader, pod_fields_spec);
 
         // -----------------------------------------------------------------
 
@@ -306,10 +310,7 @@ impl Source {
         );
         let ns_reflector_process = ns_reflector.run();
 
-        let ns_annotator = NamespaceMetadataAnnotator::new(
-            ns_state_reader,
-            namespace_metadata_annotator::FieldsSpec::default(),
-        );
+        let ns_annotator = NamespaceMetadataAnnotator::new(ns_state_reader, namespace_fields_spec);
 
         // TODO: maybe more of the parameters have to be configurable.
 

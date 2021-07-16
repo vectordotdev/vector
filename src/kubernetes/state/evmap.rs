@@ -31,7 +31,7 @@ where
     pub fn new(
         mut inner: WriteHandle<String, Value<T>>,
         flush_debounce_timeout: Option<Duration>,
-        key: HashKey,
+        hash_key: HashKey,
     ) -> Self {
         // Prepare inner.
         inner.purge();
@@ -39,8 +39,6 @@ where
 
         // Prepare flush debounce.
         let debounced_flush = flush_debounce_timeout.map(Debounce::new);
-
-        let hash_key = key;
 
         Self {
             inner,
