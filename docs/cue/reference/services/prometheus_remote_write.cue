@@ -11,6 +11,6 @@ services: prometheus_remote_write: {
 		[`remote_write protocol`](\(urls.prometheus_remote_write_protocol)).
 
 		Prometheus itself can also receive metrics via the `remote_write` protocol if the feature is enabled via
-		`--enable-feature=remote-write-receiver`.
+		`--enable-feature=remote-write-receiver` at runtime.
 	"""
 }
