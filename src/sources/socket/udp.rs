@@ -1,5 +1,6 @@
 use crate::udp;
 use crate::{
+    config::log_schema,
     event::Event,
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
@@ -7,7 +8,6 @@ use crate::{
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};
-use codec::BytesDelimitedCodec;
 use futures::SinkExt;
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
@@ -45,14 +45,19 @@ impl UdpConfig {
     }
 }
 
-pub fn udp(
+pub fn udp<D>(
     address: SocketAddr,
     max_length: usize,
     host_key: String,
     receive_buffer_bytes: Option<usize>,
+    mut decoder: D,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
-) -> Source {
+) -> Source
+where
+    D: Decoder<Item = (Event, usize)> + Send + 'static,
+    D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
+{
     let mut out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
 
     Box::pin(async move {
@@ -88,20 +93,16 @@ pub fn udp(
 
                     let mut payload = buf.split_to(byte_size);
 
-                    // UDP processes messages per payload, where messages are separated by newline
-                    // and stretch to end of payload.
-                    let mut decoder = BytesDelimitedCodec::new(b'\n');
-                    while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
-                        let mut event = Event::from(line);
+                    while let Ok(Some((mut event, byte_size))) = decoder.decode_eof(&mut payload) {
+                        match event {
+                            Event::Log(ref mut log) => {
+                                log.insert(log_schema().source_type_key(), Bytes::from("socket"));
+                                log.insert(host_key.clone(), address.to_string());
+                            },
+                            Event::Metric(_) => {}
+                        }
 
-                        event
-                            .as_mut_log()
-                            .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
-                        event
-                            .as_mut_log()
-                            .insert(host_key.clone(), address.to_string());
-
-                        emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
+                        emit!(SocketEventReceived { byte_size, mode: SocketMode::Udp });
 
                         tokio::select!{
                             result = out.send(event) => {match result {

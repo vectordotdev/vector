@@ -14,6 +14,7 @@ use crate::{
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
+use tokio_util::codec::BytesCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when https://github.com/serde-rs/serde/issues/1358 is addressed
@@ -123,6 +124,7 @@ impl SourceConfig for SocketConfig {
                     config.max_length(),
                     host_key,
                     config.receive_buffer_bytes(),
+                    decoding::Decoder::new(Box::new(BytesCodec::new()), decoding::BytesParser),
                     cx.shutdown,
                     cx.out,
                 ))

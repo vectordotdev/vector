@@ -1,4 +1,8 @@
-use crate::{event::Event, internal_events::DecoderParseFailed};
+use crate::{
+    config::log_schema,
+    event::{Event, LogEvent, Value},
+    internal_events::DecoderParseFailed,
+};
 use bytes::{Bytes, BytesMut};
 
 pub trait Parser {
@@ -67,5 +71,15 @@ where
                 }
             })
         })
+    }
+}
+
+pub struct BytesParser;
+
+impl Parser for BytesParser {
+    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
+        let mut log = LogEvent::default();
+        log.insert(log_schema().message_key(), Value::from(bytes));
+        Ok(log.into())
     }
 }
