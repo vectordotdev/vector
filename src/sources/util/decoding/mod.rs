@@ -83,3 +83,44 @@ impl Parser for BytesParser {
         Ok(log.into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::{assert_event_data_eq, btreemap};
+    use tokio_util::codec::{Decoder, LinesCodec};
+
+    #[tokio::test]
+    async fn basic_decoder() {
+        let mut decoder = super::Decoder::new(Box::new(LinesCodec::new()), BytesParser);
+        let mut input = BytesMut::from("foo\nbar\nbaz");
+
+        let mut events = Vec::new();
+        while let Some(event) = decoder.decode_eof(&mut input).unwrap() {
+            events.push(event);
+        }
+
+        assert_eq!(events.len(), 3);
+        assert_event_data_eq!(
+            events[0].0,
+            Event::from(btreemap! {
+                "message" => "foo",
+            })
+        );
+        assert_eq!(events[0].1, 3);
+        assert_event_data_eq!(
+            events[1].0,
+            Event::from(btreemap! {
+                "message" => "bar",
+            })
+        );
+        assert_eq!(events[1].1, 3);
+        assert_event_data_eq!(
+            events[2].0,
+            Event::from(btreemap! {
+                "message" => "baz",
+            })
+        );
+        assert_eq!(events[2].1, 3);
+    }
+}
