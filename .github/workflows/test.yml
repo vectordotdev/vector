@@ -69,6 +69,8 @@ jobs:
               - '.github/workflows/pr.yml'
               - 'Makefile'
               - 'scripts/cross/**'
+            cue:
+              - 'docs/cue/**'
             internal_events:
               - 'src/internal_events/**'
             helm:
@@ -259,7 +261,7 @@ jobs:
     continue-on-error: true
     runs-on: [self-hosted, linux, x64, general]
     needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' }}
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
       - uses: actions/checkout@v2.3.4
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
