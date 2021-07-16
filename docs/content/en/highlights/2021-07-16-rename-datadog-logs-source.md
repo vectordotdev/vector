@@ -3,7 +3,7 @@ date: "2021-07-16"
 title: "The `datadog_logs` source has been renamed to `datadog_agent`"
 description: "To make the intention of the `datadog_logs` source clearer it has been renamed to `datadog_agent`"
 authors: ["jszweko"]
-pr_numbers: [TODO]
+pr_numbers: [8350]
 release: "0.16.0"
 hide_on_release_notes: false
 badges:
