@@ -39,3 +39,6 @@ Rename an `datadog_logs` source components in your configuration to `datadog_age
 address = "0.0.0.0:8080"
 store_api_key = true
 ```
+
+[datadog_agent]: https://docs.datadoghq.com/agent/
+[datadog_logs_api]: https://docs.datadoghq.com/api/latest/logs/#send-logs
