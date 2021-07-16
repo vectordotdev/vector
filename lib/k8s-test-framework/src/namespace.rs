@@ -69,26 +69,22 @@ pub fn manager(kubectl_command: &str, config: Config) -> up_down::Manager<Comman
 /// Helper to create a Namespace resource during tests
 pub fn make_namespace(name: String, labels: Option<BTreeMap<String, String>>) -> Namespace {
     match labels {
-        None => {
-            Namespace {
-                metadata: ObjectMeta {
-                    name: Some(name),
-                    ..Default::default()
-                },
-                spec: None,
-                status: None,
-            }
+        None => Namespace {
+            metadata: ObjectMeta {
+                name: Some(name),
+                ..Default::default()
+            },
+            spec: None,
+            status: None,
         },
-        Some(labels) => {
-            Namespace {
-                metadata: ObjectMeta {
-                    name: Some(name),
-                    labels,
-                    ..Default::default()
-                },
-                spec: None,
-                status: None,
-            }
+        Some(labels) => Namespace {
+            metadata: ObjectMeta {
+                name: Some(name),
+                labels,
+                ..Default::default()
+            },
+            spec: None,
+            status: None,
         },
     }
 }
