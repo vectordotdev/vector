@@ -54,14 +54,14 @@ remap: functions: assert_eq: {
 		{
 			title: "Unsuccessful assertion"
 			source: "assert_eq!(127, [1, 2, 3])"
-			return: false
+			return: #"function call error for "assert_eq" at (0:26): assertion failed: 127 == [1, 2, 3]"#
 		},
 		{
 			title: "Unsuccessful assertion with custom log message"
 			source: #"""
 				assert_eq!(1, 0, message: "Unequal integers")
 				"""#
-			return: #"function call error for "assert_eq" at (0:78): Unequal integers"#
+			return: #"function call error for "assert_eq" at (0:45): Unequal integers"#
 		}
 	]
 }
