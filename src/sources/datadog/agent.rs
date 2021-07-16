@@ -79,15 +79,53 @@ struct DatadogAgentSource {
 }
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
 struct LogMsg {
     pub message: Bytes,
-    pub status: Option<Bytes>,
-    pub timestamp: Option<i64>,
-    pub hostname: Option<Bytes>,
-    pub service: Option<Bytes>,
-    pub source: Option<Bytes>,
-    pub tags: Option<Bytes>,
+    pub status: Bytes,
+    pub timestamp: i64,
+    pub hostname: Bytes,
+    pub service: Bytes,
+    pub source: Bytes,
+    pub tags: Bytes,
+}
+
+fn decode_body(
+    body: Bytes,
+    api_key: Option<Arc<str>>,
+    events: &mut Vec<Event>,
+) -> Result<(), ErrorMessage> {
+    let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
+        ErrorMessage::new(
+            StatusCode::BAD_REQUEST,
+            format!("Error parsing JSON: {:?}", error),
+        )
+    })?;
+    let timestamp_key = log_schema().timestamp_key();
+    let source_type_key = log_schema().source_type_key();
+    let now = Utc::now();
+    let iter = messages
+        .into_iter()
+        .map(|msg| {
+            let mut log = LogEvent::default();
+            log.insert_flat(timestamp_key, now);
+            log.insert_flat(source_type_key, Bytes::from("datadog_agent"));
+            log.insert_flat("message".to_string(), msg.message);
+            log.insert_flat("status".to_string(), msg.status);
+            log.insert_flat("timestamp".to_string(), msg.timestamp);
+            log.insert_flat("hostname".to_string(), msg.hostname);
+            log.insert_flat("service".to_string(), msg.service);
+            log.insert_flat("source".to_string(), msg.source);
+            log.insert_flat("tags".to_string(), msg.tags);
+            if let Some(k) = &api_key {
+                log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
+            }
+            log
+        })
+        .map(|log| log.into());
+    events.extend(iter);
+    Ok(())
 }
 
 impl HttpSource for DatadogAgentSource {
@@ -113,42 +151,9 @@ impl HttpSource for DatadogAgentSource {
         }
         .map(Arc::from);
 
-        let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
-            ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Error parsing JSON: {:?}", error),
-            )
-        })?;
-        messages
-            .into_iter()
-            .map(|msg| {
-                let mut log = LogEvent::default();
-                log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
-                log.insert_flat("message".to_string(), msg.message);
-                if let Some(timestamp) = msg.timestamp {
-                    log.insert_flat("timestamp".to_string(), timestamp);
-                }
-                if let Some(hostname) = msg.hostname {
-                    log.insert_flat("hostname".to_string(), hostname);
-                }
-                if let Some(service) = msg.service {
-                    log.insert_flat("service".to_string(), service);
-                }
-                if let Some(source) = msg.source {
-                    log.insert_flat("source".to_string(), source);
-                }
-                if let Some(tags) = msg.tags {
-                    log.insert_flat("tags".to_string(), tags);
-                }
-                let key = log_schema().source_type_key();
-                log.try_insert(key, Bytes::from("datadog_agent"));
-                if let Some(k) = &api_key {
-                    log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
-                }
-                log
-            })
-            .map(|log| Ok(log.into()))
-            .collect()
+        let mut events: Vec<Event> = Vec::with_capacity(1024);
+        decode_body(body, api_key, &mut events)?;
+        Ok(events)
     }
 }
 
@@ -164,18 +169,63 @@ fn extract_api_key<'a>(headers: &'a HeaderMap, path: &'a str) -> Option<String> 
 
 #[cfg(test)]
 mod tests {
-    use super::DatadogAgentConfig;
-
+    use super::{decode_body, DatadogAgentConfig, LogMsg};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus},
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
+    use bytes::Bytes;
     use futures::Stream;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
+    use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
     use std::net::SocketAddr;
+
+    impl Arbitrary for LogMsg {
+        fn arbitrary(g: &mut Gen) -> Self {
+            LogMsg {
+                message: Bytes::from(String::arbitrary(g)),
+                status: Bytes::from(String::arbitrary(g)),
+                timestamp: i64::arbitrary(g),
+                hostname: Bytes::from(String::arbitrary(g)),
+                service: Bytes::from(String::arbitrary(g)),
+                source: Bytes::from(String::arbitrary(g)),
+                tags: Bytes::from(String::arbitrary(g)),
+            }
+        }
+    }
+
+    // We want to know that for any json payload that is a `Vec<LogMsg>` we can
+    // correctly decode it into a `Vec<LogEvent>`. For convenience we assume
+    // that order is preserved in the decoding step though this is not
+    // necessarily part of the contract of that function.
+    #[test]
+    fn test_decode_body() {
+        fn inner(msgs: Vec<LogMsg>) -> TestResult {
+            let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
+            let api_key = None;
+
+            let mut events = Vec::with_capacity(msgs.len());
+            decode_body(body, api_key, &mut events).unwrap();
+            assert_eq!(events.len(), msgs.len());
+            for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
+                let log = event.as_log();
+                assert_eq!(log["message"], msg.message.into());
+                assert_eq!(log["status"], msg.status.into());
+                assert_eq!(log["timestamp"], msg.timestamp.into());
+                assert_eq!(log["hostname"], msg.hostname.into());
+                assert_eq!(log["service"], msg.service.into());
+                assert_eq!(log["source"], msg.source.into());
+                assert_eq!(log["tags"], msg.tags.into());
+            }
+
+            TestResult::passed()
+        }
+
+        QuickCheck::new().quickcheck(inner as fn(Vec<LogMsg>) -> TestResult);
+    }
 
     #[test]
     fn generate_config() {
@@ -236,7 +286,16 @@ mod tests {
                     200,
                     send_with_path(
                         addr,
-                        r#"[{"message":"foo", "timestamp": 123, "hostname": "festeburg", "service": "vector", "source": "curl", "tags": "one,two,three"}]"#,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("foo"),
+                            timestamp: 123,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            source: Bytes::from("curl"),
+                            tags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
                         HeaderMap::new(),
                         "/v1/input/"
                     )
@@ -254,11 +313,12 @@ mod tests {
             assert_eq!(log["message"], "foo".into());
             assert_eq!(log["timestamp"], 123.into());
             assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["source"], "curl".into());
             assert_eq!(log["tags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
         }
     }
 
@@ -273,7 +333,16 @@ mod tests {
                     200,
                     send_with_path(
                         addr,
-                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("foo"),
+                            timestamp: 123,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            source: Bytes::from("curl"),
+                            tags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
                         HeaderMap::new(),
                         "/v1/input/"
                     )
@@ -290,6 +359,11 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
             assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["source"], "curl".into());
+            assert_eq!(log["tags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
         }
@@ -306,7 +380,16 @@ mod tests {
                     200,
                     send_with_path(
                         addr,
-                        r#"[{"message":"bar", "timestamp": 456}]"#,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("bar"),
+                            timestamp: 456,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            source: Bytes::from("curl"),
+                            tags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
                         HeaderMap::new(),
                         "/v1/input/12345678abcdefgh12345678abcdefgh"
                     )
@@ -323,6 +406,11 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
             assert_eq!(log["timestamp"], 456.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["source"], "curl".into());
+            assert_eq!(log["tags"], "one,two,three".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -348,7 +436,16 @@ mod tests {
                     200,
                     send_with_path(
                         addr,
-                        r#"[{"message":"baz", "timestamp": 789}]"#,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("baz"),
+                            timestamp: 789,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            source: Bytes::from("curl"),
+                            tags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
                         headers,
                         "/v1/input/"
                     )
@@ -365,6 +462,11 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["source"], "curl".into());
+            assert_eq!(log["tags"], "one,two,three".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -384,7 +486,16 @@ mod tests {
                     400,
                     send_with_path(
                         addr,
-                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("foo"),
+                            timestamp: 123,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            source: Bytes::from("curl"),
+                            tags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
                         HeaderMap::new(),
                         "/v1/input/"
                     )
@@ -408,7 +519,16 @@ mod tests {
                     200,
                     send_with_path(
                         addr,
-                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("foo"),
+                            timestamp: 123,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            source: Bytes::from("curl"),
+                            tags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
                         HeaderMap::new(),
                         "/v1/input/"
                     )
@@ -440,7 +560,16 @@ mod tests {
                     200,
                     send_with_path(
                         addr,
-                        r#"[{"message":"baz", "timestamp": 789}]"#,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("baz"),
+                            timestamp: 789,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            source: Bytes::from("curl"),
+                            tags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
                         headers,
                         "/v1/input/12345678abcdefgh12345678abcdefgh"
                     )
@@ -457,6 +586,11 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["source"], "curl".into());
+            assert_eq!(log["tags"], "one,two,three".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
         }
