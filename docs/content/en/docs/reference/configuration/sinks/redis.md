@@ -1,9 +1,9 @@
 ---
-title: Logstash
-description: Collect logs from a [Logstash](https://www.elastic.co/logstash) agent
-kind: source
+title: Redis
+description: Publish observability data to [Redis](https://redis.io).
+kind: sink
 layout: component
-tags: ["logstash", "elastic", "component", "source", "logs"]
+tags: ["redis", "pubsub", "component", "sink"]
 ---
 
 {{/* This doc is generated using:

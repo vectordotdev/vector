@@ -4,7 +4,7 @@ components: sinks: _datadog: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "stable"
+		development:   string | *"stable"
 		egress_method: "batch"
 		service_providers: ["Datadog"]
 		stateful: false

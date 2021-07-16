@@ -1,6 +1,7 @@
 package metadata
 
 urls: {
+	azure_blob_storage:                                       "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	affine_type_system:                                       "\(wikipedia)/wiki/Substructural_type_system#Affine_type_systems"
 	adaptive_request_concurrency_post:                        "/blog/adaptive-request-concurrency/"
 	amazon_linux:                                             "https://aws.amazon.com/amazon-linux-ami/"
@@ -117,6 +118,7 @@ urls: {
 	datadog_logs:                                             "\(datadog_docs)/logs/"
 	datadog_logs_endpoints:                                   "\(datadog_docs)/logs/log_collection/?tab=http#datadog-logs-endpoints"
 	datadog_metrics:                                          "\(datadog_docs)/metrics/"
+	datadog_events:                                           "\(datadog_docs)/events/"
 	datadog_metrics_endpoints:                                "\(datadog_docs)/api/v1/metrics/"
 	date:                                                     "https://man7.org/linux/man-pages/man1/date.1.html"
 	debian:                                                   "https://www.debian.org/"
@@ -166,6 +168,7 @@ urls: {
 	etsy:                                                     "https://www.etsy.com"
 	event_proto:                                              "\(vector_repo)/blob/master/lib/vector-core/proto/event.proto"
 	eventstoredb_stats_client:                                "https://developers.eventstore.com/server/v21.2/docs/diagnostics/stats.html"
+	eventstoredb:                                             "https://developers.eventstore.com"
 	exit_codes:                                               "https://docs.rs/exitcode/latest/exitcode/#constants"
 	externally_tagged_representation:                         "https://serde.rs/enum-representations.html#externally-tagged"
 	fail_safe:                                                "\(wikipedia)/wiki/Fail-safe"
@@ -538,6 +541,13 @@ urls: {
 	vector_sinks:                                             "/docs/reference/configuration/sinks"
 	vector_sink_http_batch:                                   "/docs/reference/configuration/sinks/http/#batch"
 	vector_sink_kafka_sasl:                                   "/docs/reference/configuration/sources/kafka/#sasl"
+	vector_datadog_events_sink:                               "/docs/reference/configuration/sinks/datadog_events"
+	vector_azure_blob_sink:                                   "/docs/reference/configuration/sinks/azure_blob"
+	vector_redis_sink:                                        "/docs/reference/configuration/sinks/redis"
+	vector_dnstap_source:                                     "/docs/reference/configuration/sources/dnstap"
+	vector_eventstoredb_metrics_source:                       "/docs/reference/configuration/sources/eventstoredb_metrics"
+	vector_fluent_source:                                     "/docs/reference/configuration/sources/fluent"
+	vector_logstash_source:                                   "/docs/reference/configuration/sources/logstash"
 	vector_socket_source:                                     "/docs/reference/configuration/sources/socket"
 	vector_source:                                            "/docs/reference/configuration/sources/vector"
 	vector_sources:                                           "/docs/reference/configuration/sources"
