@@ -1,5 +1,6 @@
-use super::{socket::SocketMode, InternalEvent};
+use super::InternalEvent;
 use metrics::counter;
+use tokio_util::codec::LinesCodecError;
 
 #[derive(Debug)]
 pub struct SyslogEventReceived {
@@ -19,7 +20,7 @@ impl InternalEvent for SyslogEventReceived {
 
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
-    pub error: std::io::Error,
+    pub error: LinesCodecError,
 }
 
 impl InternalEvent for SyslogUdpReadError {
@@ -33,17 +34,16 @@ impl InternalEvent for SyslogUdpReadError {
 }
 
 #[derive(Debug)]
-pub(crate) struct SyslogUtf8Error {
-    pub mode: SocketMode,
+pub(crate) struct SyslogConvertUtf8Error {
     pub error: std::str::Utf8Error,
 }
 
-impl InternalEvent for SyslogUtf8Error {
+impl InternalEvent for SyslogConvertUtf8Error {
     fn emit_logs(&self) {
-        error!(message = "Error converting bytes to UTF8 string.", error = %self.error, mode = self.mode.as_str(), internal_log_rate_secs = 10);
+        error!(message = "Error converting bytes to UTF8 string.", error = %self.error, internal_log_rate_secs = 10);
     }
 
     fn emit_metrics(&self) {
-        counter!("utf8_convert_errors_total", 1, "mode" => self.mode.as_str());
+        counter!("utf8_convert_errors_total", 1);
     }
 }

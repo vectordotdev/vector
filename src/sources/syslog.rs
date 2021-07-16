@@ -1,4 +1,5 @@
 use super::util::{SocketListenAddr, TcpSource};
+use crate::internal_events::SyslogConvertUtf8Error;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::udp;
@@ -8,7 +9,7 @@ use crate::{
         SourceDescription,
     },
     event::{Event, Value},
-    internal_events::{SocketMode, SyslogEventReceived, SyslogUdpReadError, SyslogUtf8Error},
+    internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
     sources::util::decoding,
     tcp::TcpKeepaliveConfig,
@@ -25,7 +26,7 @@ use std::{io, net::SocketAddr, sync::Arc};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use tokio::net::UdpSocket;
 use tokio_util::{
-    codec::{BytesCodec, Decoder, LinesCodec, LinesCodecError},
+    codec::{Decoder, LinesCodec, LinesCodecError},
     udp::UdpFramed,
 };
 
@@ -176,7 +177,10 @@ struct SyslogParser;
 impl decoding::Parser for SyslogParser {
     fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
         let bytes: &[u8] = &bytes;
-        let line = std::str::from_utf8(bytes)?;
+        let line = std::str::from_utf8(bytes).map_err(|error| {
+            emit!(SyslogConvertUtf8Error { error });
+            error
+        })?;
         Ok(event_from_str(line))
     }
 }
@@ -400,7 +404,7 @@ impl Decoder for SyslogDecoder {
 
 pub fn udp(
     addr: SocketAddr,
-    _max_length: usize,
+    max_length: usize,
     host_key: String,
     receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
@@ -425,43 +429,29 @@ pub fn udp(
             r#type = "udp"
         );
 
-        let _ = UdpFramed::new(socket, BytesCodec::new())
-            .take_until(shutdown)
-            .filter_map(|frame| {
-                let host_key = host_key.clone();
-                async move {
-                    match frame {
-                        Ok((bytes, received_from)) => {
-                            let received_from = received_from.ip().to_string().into();
-
-                            std::str::from_utf8(&bytes)
-                                .map_err(|error| {
-                                    emit!(SyslogUtf8Error {
-                                        mode: SocketMode::Udp,
-                                        error
-                                    })
-                                })
-                                .ok()
-                                .map(|s| {
-                                    let mut event = event_from_str(s);
-                                    enrich_syslog_event(
-                                        &mut event,
-                                        &host_key,
-                                        Some(received_from),
-                                        bytes.len(),
-                                    );
-                                    Ok(event)
-                                })
-                        }
-                        Err(error) => {
-                            emit!(SyslogUdpReadError { error });
-                            None
-                        }
+        let _ = UdpFramed::new(
+            socket,
+            decoding::Decoder::new(Box::new(SyslogDecoder::new(max_length)), SyslogParser),
+        )
+        .take_until(shutdown)
+        .filter_map(|result| {
+            let host_key = host_key.clone();
+            async move {
+                match result {
+                    Ok(((mut event, byte_size), received_from)) => {
+                        let received_from = received_from.ip().to_string().into();
+                        enrich_syslog_event(&mut event, &host_key, Some(received_from), byte_size);
+                        Some(Ok(event))
+                    }
+                    Err(error) => {
+                        emit!(SyslogUdpReadError { error });
+                        None
                     }
                 }
-            })
-            .forward(out)
-            .await;
+            }
+        })
+        .forward(out)
+        .await;
 
         info!("Finished sending.");
         Ok(())
