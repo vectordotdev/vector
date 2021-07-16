@@ -86,6 +86,7 @@ source = """
 # example of pulling up the nested field to merge it into the top-level
 . |= .events
 del(.events)
+"""
 ```
 
 Would output the following log events:
