@@ -28,9 +28,13 @@ file2="/bind2/etc/bind/named.conf.options"
 file3="/bind3/etc/bind/named.conf.options"
 file4="/bind4/etc/bind/named.conf.options"
 sed -i "s/dnstap.sock#/dnstap.sock1/" $file1
+sed -i "s/port #/port 9001/" $file1
 sed -i "s/dnstap.sock#/dnstap.sock2/" $file2
+sed -i "s/port #/port 9002/" $file2
 sed -i "s/dnstap.sock#/dnstap.sock3/" $file3
+sed -i "s/port #/port 9003/" $file3
 sed -i "s/dnstap.sock#/dnstap.sock4/" $file4
+sed -i "s/port #/port 9004/" $file4
 
 # Start bind4 instance to keep docker running
 # Will bring up actual bind instances for IT after starting vector
