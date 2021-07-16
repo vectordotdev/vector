@@ -1,12 +1,14 @@
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    event::{BatchNotifier, Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
+    sources::util::decoding,
     Pipeline,
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, SinkExt, StreamExt};
 use rdkafka::{
@@ -19,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use vector_core::event::{BatchNotifier, LogEvent, Value};
+use tokio_util::codec::BytesCodec;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -119,6 +121,7 @@ impl SourceConfig for KafkaSourceConfig {
             self.partition_key.clone(),
             self.offset_key.clone(),
             self.headers_key.clone(),
+            decoding::Decoder::new(Box::new(BytesCodec::new()), decoding::BytesParser),
             cx.shutdown,
             cx.out,
             cx.acknowledgements,
@@ -134,17 +137,22 @@ impl SourceConfig for KafkaSourceConfig {
     }
 }
 
-async fn kafka_source(
+async fn kafka_source<D>(
     consumer: StreamConsumer<KafkaStatisticsContext>,
     key_field: String,
     topic_key: String,
     partition_key: String,
     offset_key: String,
     headers_key: String,
+    mut decoder: D,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
     acknowledgements: bool,
-) -> Result<(), ()> {
+) -> Result<(), ()>
+where
+    D: tokio_util::codec::Decoder<Item = (Event, usize)> + Send + 'static,
+    D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
+{
     let consumer = Arc::new(consumer);
     let shutdown = shutdown.shared();
     let mut finalizer = acknowledgements
@@ -161,16 +169,10 @@ async fn kafka_source(
                     byte_size: msg.payload_len()
                 });
 
-                let payload = match msg.payload() {
+                let mut payload = match msg.payload() {
                     None => continue, // skip messages with empty payload
-                    Some(payload) => payload,
+                    Some(payload) => BytesMut::from(payload),
                 };
-                let mut log = LogEvent::default();
-
-                log.insert(
-                    log_schema().message_key(),
-                    Value::from(Bytes::from(payload.to_owned())),
-                );
 
                 // Extract timestamp from kafka message
                 let timestamp = msg
@@ -178,22 +180,11 @@ async fn kafka_source(
                     .to_millis()
                     .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                     .unwrap_or_else(Utc::now);
-                log.insert(log_schema().timestamp_key(), timestamp);
-
-                // Add source type
-                log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
 
                 let msg_key = msg
                     .key()
                     .map(|key| Value::from(String::from_utf8_lossy(key).to_string()))
                     .unwrap_or(Value::Null);
-                log.insert(&key_field, msg_key);
-
-                log.insert(&topic_key, Value::from(msg.topic().to_string()));
-
-                log.insert(&partition_key, Value::from(msg.partition()));
-
-                log.insert(&offset_key, Value::from(msg.offset()));
 
                 let mut headers_map = BTreeMap::new();
                 if let Some(headers) = msg.headers() {
@@ -208,25 +199,45 @@ async fn kafka_source(
                         }
                     }
                 }
-                log.insert(&headers_key, Value::from(headers_map));
 
-                match &mut finalizer {
-                    Some(finalizer) => {
-                        let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let log = log.with_batch_notifier(&batch);
-                        match out.send(log.into()).await {
-                            Err(error) => error!(message = "Error sending to sink.", %error),
-                            Ok(_) => finalizer.add(msg.into(), receiver),
+                let msg_topic = msg.topic().to_string();
+                let msg_partition = msg.partition();
+                let msg_offset = msg.offset();
+
+                while let Ok(Some((mut event, _))) = decoder.decode_eof(&mut payload) {
+                    match event {
+                        Event::Log(ref mut log) => {
+                            log.insert(log_schema().timestamp_key(), timestamp);
+                            // Add source type
+                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
+                            log.insert(&key_field, msg_key.clone());
+                            log.insert(&topic_key, Value::from(msg_topic.clone()));
+                            log.insert(&partition_key, Value::from(msg_partition));
+                            log.insert(&offset_key, Value::from(msg_offset));
+                            log.insert(&headers_key, Value::from(headers_map.clone()));
                         }
+                        Event::Metric(_) => {}
                     }
-                    None => match out.send(log.into()).await {
-                        Err(error) => error!(message = "Error sending to sink.", %error),
-                        Ok(_) => {
-                            if let Err(error) = consumer.store_offset(&msg) {
-                                emit!(KafkaOffsetUpdateFailed { error });
+
+                    match &mut finalizer {
+                        Some(finalizer) => {
+                            let (batch, receiver) = BatchNotifier::new_with_receiver();
+                            let event = event.with_batch_notifier(&batch);
+
+                            match out.send(event).await {
+                                Err(error) => error!(message = "Error sending to sink.", %error),
+                                Ok(_) => finalizer.add((&msg).into(), receiver),
                             }
                         }
-                    },
+                        None => match out.send(event).await {
+                            Err(error) => error!(message = "Error sending to sink.", %error),
+                            Ok(_) => {
+                                if let Err(error) = consumer.store_offset(&msg) {
+                                    emit!(KafkaOffsetUpdateFailed { error });
+                                }
+                            }
+                        },
+                    }
                 }
             }
         }
@@ -242,8 +253,8 @@ struct FinalizerEntry {
     offset: i64,
 }
 
-impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
-    fn from(msg: BorrowedMessage<'a>) -> Self {
+impl<'a> From<&BorrowedMessage<'a>> for FinalizerEntry {
+    fn from(msg: &BorrowedMessage<'a>) -> Self {
         Self {
             topic: msg.topic().into(),
             partition: msg.partition(),
@@ -370,6 +381,10 @@ mod integration_test {
     use std::time::Duration;
     use vector_core::event::EventStatus;
 
+    fn default_decoder() -> decoding::Decoder<decoding::BytesParser, std::io::Error, BytesMut> {
+        decoding::Decoder::new(Box::new(BytesCodec::new()), decoding::BytesParser)
+    }
+
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
         client.set("bootstrap.servers", BOOTSTRAP_SERVER);
@@ -444,6 +459,7 @@ mod integration_test {
             config.partition_key,
             config.offset_key,
             config.headers_key,
+            default_decoder(),
             shutdown,
             tx,
             acknowledgements,

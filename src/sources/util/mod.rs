@@ -4,7 +4,8 @@ mod body_decoding;
     feature = "sources-socket",
     feature = "sources-statsd",
     feature = "sources-syslog",
-    feature = "sources-vector"
+    feature = "sources-vector",
+    feature = "sources-kafka",
 ))]
 pub mod decoding;
 mod encoding_config;
