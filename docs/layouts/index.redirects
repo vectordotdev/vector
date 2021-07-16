@@ -9,11 +9,11 @@
 {{- end }}
 
 {{/* Multi-component integration guides */}}
-{{- $multi := site.Data.redirects.multi -}}
-{{- range $source, $v := $multi -}}
-{{- range $v.sinks }}
-/guides/integrate/sources/{{ $source }}/{{ . }}  /docs/reference/configuration/sources/{{ $source }}  302
+{{- range $k, $v := site.Data.redirects.multi.platforms }}
+/guides/integrate/platforms/{{ $k }}/*  /docs/reference/configuration/sources/{{ $v.source }}  302
 {{- end -}}
+{{- range site.Data.redirects.sources }}
+/guides/integrate/sources/{{ . }}/*  /docs/reference/configuration/sources/{{ . }}  302
 {{- end -}}
 
 {{/* Other redirects (301 because permanent) */}}

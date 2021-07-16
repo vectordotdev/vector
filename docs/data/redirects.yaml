@@ -64,55 +64,10 @@ sources:
 - stdin
 - syslog
 
+# /guides/integrate/platforms/${key}/*  /docs/reference/configuration/sources/${source}
 multi:
-  apache_metrics:
-    sinks:
-    - aws_cloudwatch_metrics
-    - datadog_metrics
-    - gcp_stackdriver_metrics
-    - humio_metrics
-    - influxdb_metrics
-    - kafka
-    - prometheus_remote_write
-    - sematext_metrics
-    - statsd
-  aws_ecs_metrics:
-    sinks:
-    - aws_cloudwatch_metrics
-    - datadog_metrics
-    - gcp_stackdriver_metrics
-    - humio_metrics
-    - influxdb_metrics
-    - aws_ecs_metrics
-    - prometheus_remote_write
-    - sematext_metrics
-    - statsd
-  aws_kinesis_firehose:
-    sinks:
-    - aws_sqs
-    - aws_cloudwatch_logs
-    - aws_kinesis_streams
-    - aws_kinesis_firehose
-    - aws_s3
-    - azure_monitor_logs
-    - clickhouse
-    - datadog_logs
-    - elasticsearch
-    - file
-    - gcp_cloud_storage
-    - gcp_stackdriver_logs
-    - gcp_pubsub
-    - honeycomb
-    - http
-    - humio_logs
-    - influxdb_logs
-    - kafka
-    - logdna
-    - loki
-    - nats
-    - new_relic_logs
-    - papertrail
-    - pulsar
-    - sematext_logs
-    - socket
-    - splunk_hec
+  platforms:
+    docker: # Differs from source name
+      source: docker_logs
+    kubernetes: # Differs from source name
+      source: kubernetes_logs
