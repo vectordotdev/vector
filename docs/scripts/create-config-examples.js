@@ -28,13 +28,43 @@ const setExampleValue = (exampleConfig, paramName, param) => {
   // get through to the lower level params, e.g. `type.string.examples`. If
   // there's a more idiomatic way to do this in JS, please advise.
   Object.keys(param.type).forEach((k) => {
-    if (param.type[k].default) {
-      exampleConfig[paramName] = param.type[k].default;
-    } else {
-      const examples = param.type[k].examples;
+    const p = param.type[k];
 
-      if ((examples != null) && (examples.length > 0)) {
-        exampleConfig[paramName] = examples[0];
+    if (p.default) {
+      exampleConfig[paramName] = p.default;
+    }
+
+    if (p.examples != null && p.examples.length > 0) {
+      exampleConfig[paramName] = p.examples[0];
+    }
+
+    if (['array', 'object'].includes(k)) {
+      if (p.items) {
+        Object.keys(p.items.type).forEach((t) => {
+          const typeInfo = p.items.type[t];
+
+          if (typeInfo.examples && typeInfo.examples.length > 0) {
+            exampleConfig[paramName] = typeInfo.examples[0];
+          }
+
+          if (typeInfo.options) {
+            Object.keys(typeInfo.options).forEach((k) => {
+              const opt = typeInfo.options[k];
+
+              if (opt.required) {
+                Object.keys(opt.type).forEach((t) => {
+                  const typeInfo = opt.type[t];
+
+                  if (typeInfo.examples && typeInfo.examples.length > 0) {
+                    obj[k] = typeInfo.examples[0];
+                  }
+                });
+              }
+            });
+
+            exampleConfig[paramName] = obj;
+          }
+        });
       }
     }
   });
