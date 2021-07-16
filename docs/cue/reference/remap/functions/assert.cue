@@ -8,10 +8,10 @@ remap: functions: assert: {
 		"""
 	notices: [
 		"""
-		The `assert` function should be used in a standalone fashion and only when you want to abort the program. You
-		should avoid it in logical expressions and other situations in which you want the program to continue if the
-		condition evaluates to `false`.
-		""",
+			The `assert` function should be used in a standalone fashion and only when you want to abort the program. You
+			should avoid it in logical expressions and other situations in which you want the program to continue if the
+			condition evaluates to `false`.
+			""",
 	]
 
 	arguments: [
@@ -44,9 +44,9 @@ remap: functions: assert: {
 		{
 			title: "Assertion (false)"
 			source: #"""
-				ok, err = assert("foo" == "bar", message: "\"foo\" must be \"foo\"!")
+				assert!("foo" == "bar", message: "\"foo\" must be \"foo\"!")
 				"""#
-			return: #"function call error for "assert" at (10:69): "foo" must be "foo"!"#
+			raises: runtime: #"function call error for "assert" at (0:60): "foo" must be "foo"!"#
 		},
 	]
 }
