@@ -142,6 +142,16 @@ impl<L> Controller<L> {
         }
         let current_rtt = inner.current_rtt.average();
 
+        // When the RTT values are all exactly the same, as for the
+        // "constant link" test, the average calculation above produces
+        // results either the exact value or that value plus epsilon,
+        // depending on the number of samples. This ends up throttling
+        // aggressively due to the high side falling outside of the
+        // calculated deviance. Rounding these values forces the
+        // differences to zero.
+        #[cfg(test)]
+        let current_rtt = current_rtt.map(|c| (c * 1000000.0).round() / 1000000.0);
+
         match inner.past_rtt.state() {
             None => {
                 // No past measurements, set up initial values.
