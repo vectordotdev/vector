@@ -285,15 +285,15 @@ pub fn update_config(config: &Config) {
     }
 
     // Get the names of existing components
-    let existing_component_names = state::get_component_names();
-    let new_component_names = new_components
+    let existing_component_ids = state::get_component_ids();
+    let new_component_ids = new_components
         .iter()
         .map(|(name, _)| name.clone())
         .collect::<HashSet<String>>();
 
     // Publish all components that have been removed
-    existing_component_names
-        .difference(&new_component_names)
+    existing_component_ids
+        .difference(&new_component_ids)
         .for_each(|name| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
                 state::component_by_name(name).expect("Couldn't get component by name"),
@@ -301,8 +301,8 @@ pub fn update_config(config: &Config) {
         });
 
     // Publish all components that have been added
-    new_component_names
-        .difference(&existing_component_names)
+    new_component_ids
+        .difference(&existing_component_ids)
         .for_each(|name| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
                 new_components.get(name).unwrap().clone(),

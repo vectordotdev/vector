@@ -596,7 +596,7 @@ impl Config {
         Default::default()
     }
 
-    /// Expand a logical component name (i.e. from the config file) into the names of the
+    /// Expand a logical component id (i.e. from the config file) into the names of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
     pub fn get_inputs(&self, identifier: &str) -> Vec<String> {

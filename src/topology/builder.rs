@@ -238,7 +238,7 @@ pub async fn build_pieces(
         };
         let task = Task::new(name, typetag, sink);
 
-        let component_name = name.clone();
+        let component_id = name.clone();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -254,7 +254,7 @@ pub async fn build_pieces(
                                 %error,
                                 component_kind = "sink",
                                 component_type = typetag,
-                                ?component_name,
+                                ?component_id,
                             );
                             Err(())
                         }
@@ -263,7 +263,7 @@ pub async fn build_pieces(
                                 msg = "Healthcheck: timeout.",
                                 component_kind = "sink",
                                 component_type = typetag,
-                                ?component_name,
+                                ?component_id,
                             );
                             Err(())
                         }

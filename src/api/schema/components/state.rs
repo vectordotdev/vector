@@ -51,8 +51,8 @@ pub fn get_sinks() -> Vec<sink::Sink> {
     })
 }
 
-/// Returns the current component names as a HashSet
-pub fn get_component_names() -> HashSet<String> {
+/// Returns the current component ids as a HashSet
+pub fn get_component_ids() -> HashSet<String> {
     COMPONENTS
         .read()
         .expect(INVARIANT)

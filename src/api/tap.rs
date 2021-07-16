@@ -62,15 +62,15 @@ impl TapPayload {
 /// `Event`s. If these are of type `Event::LogEvent`, they are relayed to the tap client.
 pub struct TapSink {
     tap_tx: TapSender,
-    component_name: String,
+    component_id: String,
     buffer: VecDeque<LogEvent>,
 }
 
 impl TapSink {
-    pub fn new(tap_tx: TapSender, component_name: String) -> Self {
+    pub fn new(tap_tx: TapSender, component_id: String) -> Self {
         Self {
             tap_tx,
-            component_name,
+            component_id,
             // Pre-allocate space of 100 events, which matches the default `limit` typically
             // provided to a tap subscription. If there's a higher log volume, this will block
             // until the upstream event handler has processed the event. Generally, there should
@@ -112,13 +112,13 @@ impl Sink<Event> for TapSink {
             // full, return pending to reattempt later.
             match self
                 .tap_tx
-                .try_send(TapPayload::Log(self.component_name.clone(), ev))
+                .try_send(TapPayload::Log(self.component_id.clone(), ev))
             {
                 Err(tokio_mpsc::error::TrySendError::Closed(payload)) => {
                     debug!(
                         message = "Couldn't send log event.",
                         payload = ?payload,
-                        component_name = ?self.component_name);
+                        component_id = ?self.component_id);
 
                     break;
                 }
@@ -235,7 +235,7 @@ async fn tap_handler(
                         found if !found.is_empty() => {
                             debug!(
                                 message="Component matched.",
-                                component_name = ?name, patterns = ?patterns, matched = ?found
+                                component_id = ?name, patterns = ?patterns, matched = ?found
                             );
 
                             // (Re)connect the sink. This is necessary because a sink may be
@@ -252,7 +252,7 @@ async fn tap_handler(
                                 Ok(_) => {
                                     debug!(
                                         message = "Sink connected.",
-                                        sink_id = ?id, component_name = ?name,
+                                        sink_id = ?id, component_id = ?name,
                                     );
 
                                     // Create a sink shutdown trigger to remove the sink
@@ -264,7 +264,7 @@ async fn tap_handler(
                                     error!(
                                         message = "Couldn't connect sink.",
                                         error = ?err,
-                                        component_name = ?name, id = ?id
+                                        component_id = ?name, id = ?id
                                     );
                                 }
                             }
@@ -274,7 +274,7 @@ async fn tap_handler(
                         _ => {
                             debug!(
                                 message="Component not matched.",
-                                component_name = ?name, patterns = ?patterns
+                                component_id = ?name, patterns = ?patterns
                             );
                         }
                     }
@@ -283,7 +283,7 @@ async fn tap_handler(
                 // Remove components that have gone away.
                 sinks.retain(|name, _| {
                     outputs.contains_key(name) || {
-                        debug!(message = "Removing component.", component_name = ?name);
+                        debug!(message = "Removing component.", component_id = ?name);
                         false
                     }
                 });

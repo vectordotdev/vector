@@ -143,10 +143,10 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     }
 }
 
-/// Return Vec<Metric> based on a component name tag.
-pub fn by_component_name(component_name: &str) -> Vec<Metric> {
+/// Return Vec<Metric> based on a component id tag.
+pub fn by_component_id(component_id: &str) -> Vec<Metric> {
     capture_metrics(&GLOBAL_CONTROLLER)
-        .filter_map(|m| m.tag_matches("component_name", component_name).then(|| m))
+        .filter_map(|m| m.tag_matches("component_id", component_id).then(|| m))
         .collect()
 }
 
@@ -154,7 +154,7 @@ type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
 
 /// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
 /// (e.g. "processed_events_total"), and the value is derived from `MetricValue::Counter`. Uses a
-/// local cache to match against the `component_name` of a metric, to return results only when
+/// local cache to match against the `component_id` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
 /// to be notified as metrics increase without returning 'empty' or identical results.
 pub fn component_counter_metrics(
@@ -166,7 +166,7 @@ pub fn component_counter_metrics(
     get_all_metrics(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
-            .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
+            .filter_map(|m| m.tag_value("component_id").map(|name| (name, m)))
             .fold(BTreeMap::new(), |mut map, (name, m)| {
                 map.entry(name).or_insert_with(Vec::new).push(m);
                 map
@@ -221,7 +221,7 @@ pub fn component_counter_throughputs(
         .map(move |m| {
             m.into_iter()
                 .filter(filter_fn)
-                .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
+                .filter_map(|m| m.tag_value("component_id").map(|name| (name, m)))
                 .fold(BTreeMap::new(), |mut map, (name, m)| {
                     map.entry(name).or_insert_with(Vec::new).push(m);
                     map

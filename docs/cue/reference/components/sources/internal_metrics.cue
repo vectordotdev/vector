@@ -874,7 +874,7 @@ components: sources: internal_metrics: {
 		// Helpful tag groupings
 		_component_tags: {
 			component_kind: _component_kind
-			component_name: _component_name
+			component_id: _component_id
 			component_type: _component_type
 		}
 
@@ -892,7 +892,7 @@ components: sources: internal_metrics: {
 				"transform": "Vector transform components"
 			}
 		}
-		_component_name: {
+		_component_id: {
 			description: "The Vector component ID."
 			required:    true
 			examples: ["file_source", "splunk_sink"]

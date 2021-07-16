@@ -47,10 +47,10 @@ pub struct ComponentProcessedBytesTotal {
 
 impl ComponentProcessedBytesTotal {
     /// Returns a new `ComponentProcessedBytesTotal` struct, which is a GraphQL type. The
-    /// component name is hoisted for clear field resolution in the resulting payload
+    /// component id is hoisted for clear field resolution in the resulting payload
     pub fn new(metric: Metric) -> Self {
-        let name = metric.tag_value("component_name").expect(
-            "Returned a metric without a `component_name`, which shouldn't happen. Please report.",
+        let name = metric.tag_value("component_id").expect(
+            "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
 
         Self { name, metric }

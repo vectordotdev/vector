@@ -561,7 +561,7 @@ impl RunningTopology {
         let span = error_span!(
             "sink",
             component_kind = "sink",
-            component_name = %task.name(),
+            component_id = %task.name(),
             component_type = %task.typetag(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
@@ -576,7 +576,7 @@ impl RunningTopology {
         let span = error_span!(
             "transform",
             component_kind = "transform",
-            component_name = %task.name(),
+            component_id = %task.name(),
             component_type = %task.typetag(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
@@ -591,7 +591,7 @@ impl RunningTopology {
         let span = error_span!(
             "source",
             component_kind = "source",
-            component_name = %task.name(),
+            component_id = %task.name(),
             component_type = %task.typetag(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
