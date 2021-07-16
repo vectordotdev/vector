@@ -33,7 +33,7 @@ type AlgoliaRecord = {
 // Constants
 const targetFile = "./public/search.json";
 
-const DEBUG = process.env.DEBUG === "true" || false;
+const DEBUG = process.env.DEBUG === "true" ?? false;
 const publicPath = path.resolve(__dirname, "..", "public");
 const tagHierarchy = {
   h1: 6,
@@ -74,10 +74,9 @@ async function indexHTMLFiles(
     const html = fs.readFileSync(file, "utf-8");
     const $ = cheerio.load(html);
     const containers = $("#page-content");
-    const pageTitle = $('meta[name="algolia:title"]').attr('content') || "";
+    const pageTitle = $('meta[name="algolia:title"]').attr('content') ?? "";
 
-    const tags = $('meta[name="keywords"]').attr('content');
-    const pageTags: string[] = tags?.split(",") || [];
+    const pageTags = $('meta[name="keywords"]').attr('content')?.split(",") ?? [];
 
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
@@ -214,9 +213,6 @@ async function indexHTMLFiles(
 
 async function buildIndex() {
   var allRecords: AlgoliaRecord[] = [];
-
-  const appId = process.env.ALGOLIA_APP_ID || "";
-  const adminPublicKey = process.env.ALGOLIA_ADMIN_KEY || "";
 
   console.log(`Building Vector search index`);
 
