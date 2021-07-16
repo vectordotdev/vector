@@ -10,23 +10,23 @@ remap: functions: assert_eq: {
 
 	notices: [
 		"""
-		The `assert_eq` function should be used in a standalone fashion and only when you want to
-		abort the program. You should avoid it in logical expressions and other situations in which
-		you want the program to continue if the condition evaluates to `false`.
-		""",
+			The `assert_eq` function should be used in a standalone fashion and only when you want to
+			abort the program. You should avoid it in logical expressions and other situations in which
+			you want the program to continue if the condition evaluates to `false`.
+			""",
 	]
 
 	arguments: [
 		{
-			name: "left"
+			name:        "left"
 			description: "The value to check for equality against `right`."
-			required: true
+			required:    true
 			type: ["any"]
 		},
 		{
-			name: "right"
+			name:        "right"
 			description: "The value to check for equality against `left`."
-			required: true
+			required:    true
 			type: ["any"]
 		},
 		{
@@ -38,7 +38,7 @@ remap: functions: assert_eq: {
 				"""
 			required: false
 			type: ["string"]
-		}
+		},
 	]
 
 	internal_failure_reasons: []
@@ -47,21 +47,21 @@ remap: functions: assert_eq: {
 
 	examples: [
 		{
-			title: "Successful assertion"
+			title:  "Successful assertion"
 			source: "assert_eq!(1, 1)"
 			return: true
 		},
 		{
-			title: "Unsuccessful assertion"
+			title:  "Unsuccessful assertion"
 			source: "assert_eq!(127, [1, 2, 3])"
-			return: #"function call error for "assert_eq" at (0:26): assertion failed: 127 == [1, 2, 3]"#
+			raises: runtime: #"function call error for "assert_eq" at (0:26): assertion failed: 127 == [1, 2, 3]"#
 		},
 		{
 			title: "Unsuccessful assertion with custom log message"
 			source: #"""
-				assert_eq!(1, 0, message: "Unequal integers")
+				 assert_eq!(1, 0, message: "Unequal integers")
 				"""#
-			return: #"function call error for "assert_eq" at (0:45): Unequal integers"#
-		}
+			raises: runtime: #"function call error for "assert_eq" at (1:46): Unequal integers"#
+		},
 	]
 }
