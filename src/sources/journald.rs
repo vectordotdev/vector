@@ -74,7 +74,7 @@ pub struct JournaldConfig {
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
-    pub journal_files_dir: Option<PathBuf>,
+    pub journal_directory: Option<PathBuf>,
     /// Deprecated
     #[serde(default)]
     remap_priority: bool,
@@ -130,12 +130,12 @@ impl SourceConfig for JournaldConfig {
 
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
-        let files_dir = self.journal_files_dir.clone();
+        let journal_dir = self.journal_directory.clone();
 
         let start: StartJournalctlFn = Box::new(move |cursor| {
             let mut command = create_command(
                 &journalctl_path,
-                files_dir.as_ref(),
+                journal_dir.as_ref(),
                 current_boot_only,
                 cursor,
             );
@@ -366,7 +366,7 @@ fn start_journalctl(
 
 fn create_command(
     path: &Path,
-    files_dir: Option<&PathBuf>,
+    journal_dir: Option<&PathBuf>,
     current_boot_only: bool,
     cursor: &Option<String>,
 ) -> Command {
@@ -377,7 +377,7 @@ fn create_command(
     command.arg("--show-cursor");
     command.arg("--output=json");
 
-    if let Some(dir) = files_dir {
+    if let Some(dir) = journal_dir {
         command.arg(format!("--directory={}", dir.display()));
     }
 
@@ -814,23 +814,23 @@ mod tests {
     fn command_options() {
         let path = PathBuf::from("jornalctl");
 
-        let files_dir = None;
+        let journal_dir = None;
         let current_boot_only = false;
         let cursor = None;
 
-        let command = create_command(&path, files_dir, current_boot_only, &cursor);
+        let command = create_command(&path, journal_dir, current_boot_only, &cursor);
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
-        let files_dir = Some(PathBuf::from("/tmp/journal-files-dir"));
+        let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
         let current_boot_only = true;
         let cursor = Some(String::from("2021-01-01"));
 
-        let command = create_command(&path, files_dir.as_ref(), current_boot_only, &cursor);
+        let command = create_command(&path, journal_dir.as_ref(), current_boot_only, &cursor);
         let cmd_line = format!("{:?}", command);
-        assert!(cmd_line.contains("--directory=/tmp/journal-files-dir"));
+        assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--after-cursor="));
     }
