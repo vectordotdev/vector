@@ -893,7 +893,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		_component_name: {
-			description: "The Vector component ID."
+			description: "The Vector component name."
 			required:    true
 			examples: ["file_source", "splunk_sink"]
 		}
