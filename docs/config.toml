@@ -52,9 +52,17 @@ algolia_index_prod = "vector_docs_prod"
 algolia_index_staging = "vector_docs_staging"
 algolia_autocomplete_theme = "classic"
 
+# Generated _redirects file for Netlify
+[mediaTypes."text/netlify"]
+delimiter = ""
+
+[outputFormats.REDIRECTS]
+mediaType = "text/netlify"
+baseName = "_redirects"
+
 # Outputs (including search.json and _redirects files)
 [outputs]
-home = ["HTML", "RSS"]
+home = ["HTML", "RSS", "REDIRECTS"]
 
 # CSS generation
 [[params.css]]
