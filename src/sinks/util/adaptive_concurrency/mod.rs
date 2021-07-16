@@ -32,11 +32,11 @@ pub struct AdaptiveConcurrencySettings {
 
     // This value achieved the best balance between quick response and
     // stability.
-    #[derivative(Default(value = "0.7"))]
+    #[derivative(Default(value = "0.4"))]
     pub(super) ewma_alpha: f64,
 
     // This value avoided changing concurrency too aggressively when
     // there is fluctuation in the RTT measurements.
-    #[derivative(Default(value = "2.0"))]
+    #[derivative(Default(value = "2.5"))]
     pub(super) rtt_deviation_scale: f64,
 }
