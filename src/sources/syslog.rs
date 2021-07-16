@@ -17,7 +17,7 @@ use crate::{
     Pipeline,
 };
 use bytes::{Buf, Bytes, BytesMut};
-use chrono::{Datelike, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
@@ -508,7 +508,7 @@ fn enrich_syslog_event(
 
     let timestamp = log
         .get("timestamp")
-        .and_then(|timestamp| timestamp.as_timestamp().copied())
+        .and_then(|timestamp| timestamp.as_timestamp().cloned())
         .unwrap_or_else(Utc::now);
     log.insert(log_schema().timestamp_key(), timestamp);
 
@@ -523,6 +523,12 @@ fn enrich_syslog_event(
 fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     let log = event.as_mut_log();
 
+    if let Some(timestamp) = parsed.timestamp {
+        log.insert(
+            log_schema().timestamp_key(),
+            DateTime::<Utc>::from(timestamp),
+        );
+    }
     if let Some(host) = parsed.hostname {
         log.insert("hostname", host.to_string());
     }
@@ -562,7 +568,7 @@ mod test {
     use super::*;
     use crate::{config::log_schema, event::Event};
     use bytes::BufMut;
-    use chrono::prelude::*;
+    use chrono::TimeZone;
     use shared::assert_event_data_eq;
 
     #[test]
