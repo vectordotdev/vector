@@ -15,7 +15,7 @@ const HELM_VALUES_DDOG_AGG_TOPOLOGY: &str = indoc! {r#"
           targetPort: 8080
     sources:
       datadog-agent:
-        type: datadog_logs
+        type: datadog_agent
         address: 0.0.0.0:8080
 
     sinks:
@@ -147,7 +147,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
 
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
-        assert_eq!(val["source_type"], "datadog_logs");
+        assert_eq!(val["source_type"], "datadog_agent");
 
         if got_marker {
             // We've already seen one marker! This is not good, we only emitted
