@@ -33,20 +33,20 @@ const setExampleValue = (exampleConfig, paramName, param) => {
 }
 
 const makeCommonParams = (configuration) => {
-  var required = {};
+  var common = {};
 
   for (const paramName in configuration) {
     if (paramName != "type") {
       const param = configuration[paramName];
 
       // Restrict to common params only
-      if (param.common) {
-        setExampleValue(required, paramName, param);
+      if (param.common || param.required) {
+        setExampleValue(common, paramName, param);
       }
     }
   }
 
-  return required;
+  return common;
 }
 
 const makeUseCaseExamples = (component) => {
