@@ -254,6 +254,8 @@
   {{ with .component_examples }}
   {{ $multiple := gt (len . ) 1 }}
   <div class="no-prose">
+
+
     {{ if $multiple }}
     {{ $first := index . 0 }}
     <div x-data="{ selected: '{{ $first.title }}' }">
@@ -1377,6 +1379,9 @@
 {{ end }}
 
 {{ define "example" }}
+{{ $formats := slice "toml" "yaml" "json" }}
+{{ $defaultFormat := index $formats 0 }}
+{{ $configs := .configuration }}
 <span>
   Given this event...
 </span>
@@ -1394,12 +1399,20 @@
   ...and this Vector configuration...
 </span>
 
-<div class="my-2.5">
-  {{ if or (reflect.IsMap .configuration) (reflect.IsSlice .configuration) }}
-  {{ $json := .configuration | jsonify (dict "indent" "  ") }}
-  {{ highlight $json "json" "" }}
-  {{ else }}
-  {{ highlight .configuration "toml" "" }}
+<div x-data="{ format: '{{ $defaultFormat }}' }" class="my-2.5">
+  <div class="flex space-x-2">
+    {{ range $formats }}
+    <button @click="format = '{{ . }}'" :class="{ 'text-secondary dark:text-primary': format === '{{ . }}'}">
+      {{ . | upper }}
+    </button>
+    {{ end }}
+  </div>
+
+  {{ range $formats }}
+  {{ $config := index $configs . }}
+  <div x-show="format === '{{ . }}'">
+    {{ highlight $config . "" }}
+  </div>
   {{ end }}
 </div>
 

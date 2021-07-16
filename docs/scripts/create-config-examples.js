@@ -53,6 +53,7 @@ const makeUseCaseExamples = (component) => {
   if (component.examples) {
     var useCases = [];
     const kind = component.kind;
+    const kindPlural = `${kind}s`;
     const keyName = `my_${kind}_id`;
 
     component.examples.forEach((example) => {
@@ -64,7 +65,7 @@ const makeUseCaseExamples = (component) => {
 
       if (["transform", "sink"].includes(component.kind)) {
         exampleConfig = {
-          [kind]: {
+          [kindPlural]: {
             [keyName]: {
               "type": component.type,
               inputs: ['my-source-or-transform-id'],
@@ -74,7 +75,7 @@ const makeUseCaseExamples = (component) => {
         }
       } else {
         exampleConfig = {
-          [kind]: {
+          [kindPlural]: {
             [keyName]: {
               "type": component.type,
               ...extra
