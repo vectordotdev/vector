@@ -6,15 +6,15 @@ pub trait Parser {
 }
 
 pub struct Decoder<
-    Error: From<std::io::Error>,
     Parser: super::decoding::Parser,
+    Error: From<std::io::Error> = std::io::Error,
     Item: Into<Bytes> = Bytes,
 > {
     framer: Box<dyn tokio_util::codec::Decoder<Item = Item, Error = Error> + Send + Sync>,
     parser: Parser,
 }
 
-impl<Error, Parser, Item> Decoder<Error, Parser, Item>
+impl<Parser, Error, Item> Decoder<Parser, Error, Item>
 where
     Error: From<std::io::Error>,
     Parser: super::decoding::Parser,
@@ -28,7 +28,7 @@ where
     }
 }
 
-impl<Error, Parser, Item> tokio_util::codec::Decoder for Decoder<Error, Parser, Item>
+impl<Parser, Error, Item> tokio_util::codec::Decoder for Decoder<Parser, Error, Item>
 where
     Error: From<std::io::Error>,
     Parser: super::decoding::Parser,

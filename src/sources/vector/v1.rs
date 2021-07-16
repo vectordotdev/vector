@@ -101,7 +101,7 @@ struct VectorSource;
 impl TcpSource for VectorSource {
     type Error = std::io::Error;
     type Item = Event;
-    type Decoder = decoding::Decoder<Self::Error, VectorParser, BytesMut>;
+    type Decoder = decoding::Decoder<VectorParser, Self::Error, BytesMut>;
 
     fn create_decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(Box::new(LengthDelimitedCodec::new()), VectorParser)

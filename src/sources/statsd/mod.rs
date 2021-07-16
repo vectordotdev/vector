@@ -205,7 +205,7 @@ struct StatsdTcpSource;
 impl TcpSource for StatsdTcpSource {
     type Error = std::io::Error;
     type Item = Event;
-    type Decoder = decoding::Decoder<Self::Error, StatsdParser>;
+    type Decoder = decoding::Decoder<StatsdParser>;
 
     fn create_decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(Box::new(BytesDelimitedCodec::new(b'\n')), StatsdParser)

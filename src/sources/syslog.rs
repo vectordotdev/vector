@@ -190,7 +190,7 @@ struct SyslogTcpSource {
 impl TcpSource for SyslogTcpSource {
     type Error = LinesCodecError;
     type Item = Event;
-    type Decoder = decoding::Decoder<Self::Error, SyslogParser>;
+    type Decoder = decoding::Decoder<SyslogParser, Self::Error>;
 
     fn create_decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(Box::new(SyslogDecoder::new(self.max_length)), SyslogParser)
