@@ -8,6 +8,6 @@ options {
 };
 
 controls {
-        inet 127.0.0.1 port #
+        inet 127.0.0.1
         allow { localhost; };
 };

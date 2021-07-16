@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 parser = { package = "vrl-parser", path = "../parser" }
+shared = { path = "../../shared", default-features = false }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
 vrl = { path = "../core" }
 

@@ -8,7 +8,6 @@ use crate::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{
-    executor::block_on,
     future::{select, Either, FutureExt},
     stream, Future, Sink, SinkExt,
 };
@@ -113,21 +112,15 @@ where
                 .unwrap_or_else(|_| Utc::now())
         });
 
-        checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
-
         let checkpoints = checkpointer.view();
 
-        let needs_checksum_upgrade = checkpoints.contains_bytes_checksums();
-
         for (path, file_id) in existing_files {
-            if needs_checksum_upgrade {
-                if let Ok(Some(old_checksum)) = self
-                    .fingerprinter
-                    .get_bytes_checksum(&path, &mut fingerprint_buffer)
-                {
-                    checkpoints.update_key(old_checksum, file_id)
-                }
-            }
+            checkpointer.maybe_upgrade(
+                &path,
+                file_id,
+                &self.fingerprinter,
+                &mut fingerprint_buffer,
+            );
 
             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
         }
@@ -145,12 +138,11 @@ where
         let emitter = self.emitter.clone();
         let checkpointer = Arc::new(checkpointer);
         let sleep_duration = self.glob_minimum_cooldown;
-        self.handle.spawn(async move {
-            let mut done = false;
+        let checkpoint_task_handle = self.handle.spawn(async move {
             loop {
                 let sleep = sleep(sleep_duration);
                 tokio::select! {
-                    _ = &mut shutdown2 => done = true,
+                    _ = &mut shutdown2 => return checkpointer,
                     _ = sleep => {},
                 }
 
@@ -166,10 +158,6 @@ where
                 .instrument(trace_span!("writing checkpoints file"))
                 .await
                 .ok();
-
-                if done {
-                    break;
-                }
             }
         });
 
@@ -353,7 +341,7 @@ where
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
             let mut stream = stream::once(futures::future::ok(to_send));
-            let result = block_on(
+            let result = self.handle.block_on(
                 chans
                     .send_all(&mut stream)
                     .instrument(trace_span!("sending")),
@@ -390,8 +378,17 @@ where
                 }
             };
             futures::pin_mut!(sleep);
-            match block_on(select(shutdown, sleep)) {
-                Either::Left((_, _)) => return Ok(Shutdown),
+            match self.handle.block_on(select(shutdown, sleep)) {
+                Either::Left((_, _)) => {
+                    let checkpointer = self
+                        .handle
+                        .block_on(checkpoint_task_handle)
+                        .expect("checkpoint task has panicked");
+                    if let Err(error) = checkpointer.write_checkpoints() {
+                        error!(?error, "Error writing checkpoints before shutdown");
+                    }
+                    return Ok(Shutdown);
+                }
                 Either::Right((_, future)) => shutdown = future,
             }
             stats.record("sleeping", start.elapsed());

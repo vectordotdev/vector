@@ -83,6 +83,7 @@ pub fn add_fields(criterion: &mut Criterion) {
                         .test_key2 = "test_value2"
                     "#}
                     .to_string(),
+                    timezone: shared::TimeZone::default(),
                     drop_on_error: true,
                     drop_on_abort: true,
                 })

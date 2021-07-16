@@ -21,11 +21,11 @@ impl Variable {
         Self { ident, value }
     }
 
-    pub(crate) fn ident(&self) -> &Ident {
+    pub fn ident(&self) -> &Ident {
         &self.ident
     }
 
-    pub(crate) fn value(&self) -> Option<&Value> {
+    pub fn value(&self) -> Option<&Value> {
         self.value.as_ref()
     }
 }

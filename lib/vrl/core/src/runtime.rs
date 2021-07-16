@@ -1,6 +1,7 @@
 use crate::{state, Context, Program, Target, Value};
 use compiler::ExpressionError;
 use lookup::LookupBuf;
+use shared::TimeZone;
 use std::{error::Error, fmt};
 
 pub type RuntimeResult = Result<Value, Terminate>;
@@ -46,7 +47,12 @@ impl Runtime {
 
     /// Given the provided [`Target`], resolve the provided [`Program`] to
     /// completion.
-    pub fn resolve(&mut self, target: &mut dyn Target, program: &Program) -> RuntimeResult {
+    pub fn resolve(
+        &mut self,
+        target: &mut dyn Target,
+        program: &Program,
+        timezone: &TimeZone,
+    ) -> RuntimeResult {
         // Validate that the path is an object.
         //
         // VRL technically supports any `Value` object as the root, but the
@@ -73,7 +79,7 @@ impl Runtime {
             }
         };
 
-        let mut context = Context::new(target, &mut self.state);
+        let mut context = Context::new(target, &mut self.state, timezone);
 
         let mut values = program
             .iter()

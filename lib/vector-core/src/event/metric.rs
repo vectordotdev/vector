@@ -669,31 +669,6 @@ impl MetricValue {
                 true
             }
 
-            (
-                Self::AggregatedSummary {
-                    ref mut quantiles,
-                    ref mut count,
-                    ref mut sum,
-                },
-                Self::AggregatedSummary {
-                    quantiles: quantiles2,
-                    count: count2,
-                    sum: sum2,
-                },
-            ) if quantiles.len() == quantiles2.len()
-                && quantiles
-                    .iter()
-                    .zip(quantiles2.iter())
-                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit) =>
-            {
-                for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
-                    b1.value += b2.value;
-                }
-                *count += count2;
-                *sum += sum2;
-                true
-            }
-
             _ => false,
         }
     }
@@ -752,30 +727,6 @@ impl MetricValue {
             {
                 for (b1, b2) in buckets.iter_mut().zip(buckets2) {
                     b1.count -= b2.count;
-                }
-                *count -= count2;
-                *sum -= sum2;
-                true
-            }
-            (
-                Self::AggregatedSummary {
-                    ref mut quantiles,
-                    ref mut count,
-                    ref mut sum,
-                },
-                Self::AggregatedSummary {
-                    quantiles: quantiles2,
-                    count: count2,
-                    sum: sum2,
-                },
-            ) if quantiles.len() == quantiles2.len()
-                && quantiles
-                    .iter()
-                    .zip(quantiles2.iter())
-                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit) =>
-            {
-                for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
-                    b1.value -= b2.value;
                 }
                 *count -= count2;
                 *sum -= sum2;
