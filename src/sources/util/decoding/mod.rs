@@ -1,9 +1,12 @@
+mod decoders;
+
 use crate::{
     config::log_schema,
     event::{Event, LogEvent, Value},
     internal_events::DecoderParseFailed,
 };
 use bytes::{Bytes, BytesMut};
+pub use decoders::OctetCountingDecoder;
 
 pub trait Parser {
     fn parse(&self, bytes: Bytes) -> crate::Result<Event>;
