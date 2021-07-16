@@ -46,7 +46,7 @@ remap: functions: assert: {
 			source: #"""
 				assert!("foo" == "bar", message: "\"foo\" must be \"foo\"!")
 				"""#
-			output: #"function call error for "assert" at (10:69): "foo" must be "foo"!"#
+			raises: runtime: #"function call error for "assert" at (0:60): "foo" must be "foo"!"#
 		},
 	]
 }
