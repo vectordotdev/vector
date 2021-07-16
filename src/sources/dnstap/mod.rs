@@ -299,6 +299,8 @@ mod integration_tests {
         }
 
         verify_events(raw_data, query_type, &events);
+
+        cleanup(raw_data, query_type);
     }
 
     fn send_query(raw_data: bool, query_type: &'static str) {
@@ -495,6 +497,43 @@ mod integration_tests {
             .arg("/bind3/etc/bind/nsupdate.txt")
             .output()
             .expect("Failed to execute command!");
+    }
+
+    fn get_rndc_port(raw_data: bool, query_type: &'static str) -> &str {
+        match query_type {
+            "query" => {
+                if raw_data {
+                    "9001"
+                } else {
+                    "9002"
+                }
+            }
+            "update" => "9003",
+            _ => "",
+        }
+    }
+
+    fn stop_bind(container: &str, port: &'static str) {
+        Command::new(container)
+            .arg("exec")
+            .arg("vector_dnstap")
+            .arg("rndc")
+            .arg("-p")
+            .arg(port)
+            .arg("stop")
+            .output()
+            .expect("Failed to execute command!");
+    }
+
+    fn remove_socket(raw_data: bool, query_type: &'static str) {
+        let socket = get_socket(raw_data, query_type);
+        let dnstap_sock_file = Path::new(&socket);
+        let _ = std::fs::remove_file(dnstap_sock_file);
+    }
+
+    fn cleanup(raw_data: bool, query_type: &'static str) {
+        stop_bind(&get_container_tool(), get_rndc_port(raw_data, query_type));
+        remove_socket(raw_data, query_type);
     }
 
     #[tokio::test(flavor = "multi_thread")]
