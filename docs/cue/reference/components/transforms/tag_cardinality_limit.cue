@@ -107,12 +107,12 @@ components: transforms: tag_cardinality_limit: {
 				second metric's `user_id` tag has been removed. That's
 				because it exceeded the `value_limit`.
 				"""
-			configuration: #"""
-				[transforms.tag_cardinality_limit]
-				type = "tag_cardinality_limit"
-				fields.value_limit = 1
-				fields.limit_exceeded_action = "drop_tag"
-				"""#
+			configuration: {
+				fields: {
+					value_limit: 1
+					limit_exceeded_action: "drop_tag"
+				}
+			}
 			input: [
 				{metric: {
 					kind: "incremental"

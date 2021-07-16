@@ -6,6 +6,18 @@ const YAML = require('yaml');
 
 const debug = process.env.DEBUG === "true" || false;
 
+const toToml = (obj) => {
+  return TOML.stringify(obj);
+}
+
+const toYaml = (obj) => {
+  return `---\n${YAML.stringify(obj)}`;
+}
+
+const toJson = (obj) => {
+  return JSON.stringify(obj, null, 2);
+}
+
 const setExampleValue = (exampleConfig, paramName, param) => {
   Object.keys(param.type).forEach((k) => {
     if (param.type[k].default) {
@@ -35,6 +47,61 @@ const makeCommonParams = (configuration) => {
   }
 
   return required;
+}
+
+const makeUseCaseExamples = (component) => {
+  if (component.examples) {
+    var useCases = [];
+    const kind = component.kind;
+    const keyName = `my_${kind}_id`;
+
+    component.examples.forEach((example) => {
+      const config = example.configuration;
+      const extra = Object.fromEntries(Object.entries(config).filter(([_, v]) => v != null));
+
+
+      let exampleConfig;
+
+      if (["transform", "sink"].includes(component.kind)) {
+        exampleConfig = {
+          [kind]: {
+            [keyName]: {
+              "type": component.type,
+              inputs: ['my-source-or-transform-id'],
+              ...extra
+            }
+          }
+        }
+      } else {
+        exampleConfig = {
+          [kind]: {
+            [keyName]: {
+              "type": component.type,
+              ...extra
+            }
+          }
+        }
+      }
+
+      useCase = {
+        title: example.title,
+        description: example.description,
+        configuration: {
+          toml: toToml(exampleConfig),
+          yaml: toYaml(exampleConfig),
+          json: toJson(exampleConfig),
+        },
+        input: example.input,
+        output: example.output,
+      }
+
+      useCases.push(useCase);
+    });
+
+    return useCases;
+  } else {
+    return null;
+  }
 }
 
 const makeAllParams = (configuration) => {
@@ -71,18 +138,20 @@ try {
 
       const commonParams = makeCommonParams(configuration);
       const allParams = makeAllParams(configuration);
+      const useCaseExamples = makeUseCaseExamples(component);
 
       const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
       var commonExampleConfig = null,
         advancedExampleConfig = null;
 
+      // Sinks and transforms are treated differently because they need an `inputs` field
       if (['sinks', 'transforms'].includes(kind)) {
         commonExampleConfig = {
           [kind]: {
             [keyName]: {
               "type": componentType,
-              inputs: ['my-source-or-transform-id'], // Sinks and transforms need this
+              inputs: ['my-source-or-transform-id'],
               ...commonParams,
             }
           }
@@ -130,16 +199,18 @@ try {
         }
       }
 
+      docs['components'][kind][componentType]['examples'] = useCaseExamples;
+
       docs['components'][kind][componentType]['example_configs'] = {
         common: {
-          toml: TOML.stringify(commonExampleConfig),
-          yaml: `---\n${YAML.stringify(commonExampleConfig)}`,
-          json: JSON.stringify(commonExampleConfig, null, 2),
+          toml: toToml(commonExampleConfig),
+          yaml: toYaml(commonExampleConfig),
+          json: toJson(commonExampleConfig),
         },
         advanced: {
-          toml: TOML.stringify(advancedExampleConfig),
-          yaml: `---\n${YAML.stringify(advancedExampleConfig)}`,
-          json: JSON.stringify(advancedExampleConfig, null, 2)
+          toml: toToml(advancedExampleConfig),
+          yaml: toYaml(advancedExampleConfig),
+          json: toJson(advancedExampleConfig),
         },
       };
     }

@@ -28,7 +28,7 @@ config-examples:
 
 structured-data: cue-build config-examples
 
-serve: setup structured-data
+serve: clean setup structured-data
 	hugo server \
 	--buildDrafts \
 	--buildFuture \
