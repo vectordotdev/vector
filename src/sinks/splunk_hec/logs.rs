@@ -3,11 +3,13 @@ use crate::{
     event::{Event, LogEvent, Value},
     http::HttpClient,
     internal_events::{SplunkEventEncodeError, SplunkEventSent, TemplateRenderingFailed},
+    sinks,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
+    sinks::{Healthcheck, UriParseError, VectorSink},
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
@@ -87,10 +89,7 @@ impl GenerateConfig for HecSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         validate_host(&self.endpoint)?;
 
         let batch = BatchSettings::default()
@@ -113,7 +112,7 @@ impl SinkConfig for HecSinkConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -260,8 +259,8 @@ enum HealthcheckError {
 }
 
 pub async fn healthcheck(config: HecSinkConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = build_uri(&config.endpoint, "/services/collector/health/1.0")
-        .context(super::UriParseError)?;
+    let uri =
+        build_uri(&config.endpoint, "/services/collector/health/1.0").context(UriParseError)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", config.token))
@@ -273,12 +272,12 @@ pub async fn healthcheck(config: HecSinkConfig, client: HttpClient) -> crate::Re
         StatusCode::OK => Ok(()),
         StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
         StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
-        other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+        other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 
 pub fn validate_host(host: &str) -> crate::Result<()> {
-    let uri = Uri::try_from(host).context(super::UriParseError)?;
+    let uri = Uri::try_from(host).context(UriParseError)?;
 
     match uri.scheme() {
         Some(_) => Ok(()),
@@ -696,7 +695,7 @@ mod integration_tests {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
             let proxy = ProxyConfig::default();
             let client = HttpClient::new(tls_settings, &proxy).unwrap();
-            sinks::splunk_hec::healthcheck(config, client)
+            super::healthcheck(config, client)
         };
 
         // OK
