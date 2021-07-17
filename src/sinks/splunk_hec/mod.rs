@@ -2,6 +2,7 @@ use crate::{event::EventRef, internal_events::TemplateRenderingFailed, template:
 
 mod conn;
 pub mod logs;
+pub mod metrics;
 
 fn render_template_string<'a>(
     template: &Template,

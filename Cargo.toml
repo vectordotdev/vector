@@ -599,6 +599,7 @@ sinks-metrics = [
   "sinks-sematext",
   "sinks-statsd",
   "sinks-vector",
+  "sinks-splunk_hec"
 ]
 
 sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
