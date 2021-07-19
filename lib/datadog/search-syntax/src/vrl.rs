@@ -243,35 +243,6 @@ fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
 /// in order to accommodate expansion to multiple fields where relevant.
 fn parse_node(node: &QueryNode) -> Vec<ast::Expr> {
     match node {
-        // Equality.
-        QueryNode::AttributeTerm { attr, value }
-        | QueryNode::QuotedAttribute {
-            attr,
-            phrase: value,
-        } => make_queries(attr)
-            .into_iter()
-            .map(|(field, query)| match field {
-                Field::Default(_) => coalesce(make_function_call(
-                    "match",
-                    vec![query, make_word_regex(&value)],
-                )),
-                // Special case for tags, which should be an array.
-                Field::Reserved(f) if f == "tags" => coalesce(make_function_call(
-                    "includes",
-                    vec![query, make_string(value)],
-                )),
-                _ => make_string_comparison(query, ast::Opcode::Eq, &value),
-            })
-            .collect(),
-        // Comparison.
-        QueryNode::AttributeComparison {
-            attr,
-            comparator,
-            value,
-        } => make_queries(attr)
-            .into_iter()
-            .map(|(_, query)| make_op(make_node(query), comparator.into(), value.clone().into()))
-            .collect(),
         // Wildcard suffix.
         QueryNode::AttributePrefix { attr, prefix } => make_queries(attr)
             .into_iter()
