@@ -40,6 +40,8 @@ const setExampleValue = (exampleConfig, paramName, param) => {
 
     if (['array', 'object'].includes(k)) {
       if (p.items) {
+        var obj = {};
+
         Object.keys(p.items.type).forEach((t) => {
           const typeInfo = p.items.type[t];
 
