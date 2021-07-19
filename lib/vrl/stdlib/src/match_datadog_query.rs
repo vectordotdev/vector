@@ -629,6 +629,30 @@ mod test {
             tdef: type_def(),
         }
 
+        range_message_between {
+            args: func_args![value: value!({"message": 500}), query: "[1 TO 6]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_message_between_no_match {
+            args: func_args![value: value!({"message": 70}), query: "[1 TO 6]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_message_between_string {
+            args: func_args![value: value!({"message": "500"}), query: r#"["1" TO "6"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_message_between_no_match_string {
+            args: func_args![value: value!({"message": "70"}), query: r#"["1" TO "6"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_tag_unbounded {
             args: func_args![value: value!({"tags": ["a:1"]}), query: "a:[* TO *]"],
             want: Ok(true),
@@ -683,7 +707,29 @@ mod test {
             tdef: type_def(),
         }
 
+        range_tag_between {
+            args: func_args![value: value!({"tags": ["a:500"]}), query: "a:[1 TO 6]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
 
+        range_tag_between_no_match {
+            args: func_args![value: value!({"tags": ["a:70"]}), query: "a:[1 TO 6]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_tag_between_string {
+            args: func_args![value: value!({"tags": ["a:500"]}), query: r#"a:["1" TO "6"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_tag_between_no_match_string {
+            args: func_args![value: value!({"tags": ["a:70"]}), query: r#"a:["1" TO "6"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
 
         range_facet_unbounded {
             args: func_args![value: value!({"custom": {"a": 1}}), query: "@a:[* TO *]"],
@@ -739,5 +785,28 @@ mod test {
             tdef: type_def(),
         }
 
+        range_facet_between {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "@a:[1 TO 6]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_facet_between_no_match {
+            args: func_args![value: value!({"custom": {"a": 200}}), query: "@a:[1 TO 6]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_facet_between_string {
+            args: func_args![value: value!({"custom": {"a": "500"}}), query: r#"@a:["1" TO "6"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_facet_between_no_match_string {
+            args: func_args![value: value!({"custom": {"a": "7"}}), query: r#"@a:["1" TO "60"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
     ];
 }
