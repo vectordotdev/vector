@@ -6,7 +6,7 @@ use datadog_search_syntax::{
 };
 use lookup::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
-use std::borrow::{Borrow, Cow};
+use std::borrow::Cow;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;
@@ -154,58 +154,50 @@ fn compare(
     comparator: &Comparison,
     comparison_value: &ComparisonValue,
 ) -> bool {
-    // If the field is a default tag, then it must be interpreted as a string
-    // for the purpose of making comparisons. Coerce the `ComparisonValue` to a string.
-    let comparison_value = if matches!(field, Field::Tag(_))
-        && !matches!(comparison_value, ComparisonValue::String(_))
-    {
-        Cow::Owned(ComparisonValue::String(comparison_value.to_string()))
-    } else {
-        Cow::Borrowed(comparison_value)
+    let compare_string = || {
+        let lhs = string_value(value).into_owned();
+        let rhs = comparison_value.to_string();
+
+        match comparator {
+            Comparison::Lt => lhs < rhs,
+            Comparison::Lte => lhs <= rhs,
+            Comparison::Gt => lhs > rhs,
+            Comparison::Gte => lhs >= rhs,
+        }
     };
 
-    match comparison_value.borrow() {
-        ComparisonValue::Float(v) => {
-            let value = match value {
-                Value::Float(value) => value.into_inner(),
-                _ => return false,
-            };
-
-            match comparator {
-                Comparison::Lt => value < *v,
-                Comparison::Lte => value <= *v,
-                Comparison::Gt => value > *v,
-                Comparison::Gte => value >= *v,
+    match field {
+        // Facets are compared numerically if the value is numeric, or as strings otherwise.
+        Field::Facet(_) => match (value, comparison_value) {
+            (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
+                Comparison::Lt => lhs < rhs,
+                Comparison::Lte => lhs <= rhs,
+                Comparison::Gt => lhs > rhs,
+                Comparison::Gte => lhs >= rhs,
+            },
+            (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
+                let lhs = lhs.into_inner();
+                match comparator {
+                    Comparison::Lt => lhs < *rhs,
+                    Comparison::Lte => lhs <= *rhs,
+                    Comparison::Gt => lhs > *rhs,
+                    Comparison::Gte => lhs >= *rhs,
+                }
             }
-        }
+            (_, ComparisonValue::String(rhs)) => {
+                let lhs = string_value(value).into_owned();
 
-        ComparisonValue::Integer(v) => {
-            let value = match value {
-                Value::Integer(value) => value,
-                _ => return false,
-            };
-
-            match comparator {
-                Comparison::Lt => value < v,
-                Comparison::Lte => value <= v,
-                Comparison::Gt => value > v,
-                Comparison::Gte => value >= v,
+                match comparator {
+                    Comparison::Lt => &lhs < rhs,
+                    Comparison::Lte => &lhs <= rhs,
+                    Comparison::Gt => &lhs > rhs,
+                    Comparison::Gte => &lhs >= rhs,
+                }
             }
-        }
-
-        ComparisonValue::String(v) => {
-            let v = Cow::from(v);
-            let value = string_value(value);
-
-            match comparator {
-                Comparison::Lt => value < v,
-                Comparison::Lte => value <= v,
-                Comparison::Gt => value > v,
-                Comparison::Gte => value >= v,
-            }
-        }
-
-        ComparisonValue::Unbounded => false,
+            _ => compare_string(),
+        },
+        // All other tag types are compared by string.
+        _ => compare_string(),
     }
 }
 
@@ -583,25 +575,49 @@ mod test {
         }
 
         range_message_lower_bound {
-            args: func_args![value: value!({"message": 5}), query: "[4 TO *]"],
+            args: func_args![value: value!({"message": "400"}), query: "[4 TO *]"],
             want: Ok(true),
             tdef: type_def(),
         }
 
         range_message_lower_bound_no_match {
-            args: func_args![value: value!({"message": 3}), query: "[4 TO *]"],
+            args: func_args![value: value!({"message": "400"}), query: "[50 TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_message_lower_bound_string {
+            args: func_args![value: value!({"message": "400"}), query: r#"["4" TO *]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_message_lower_bound_string_no_match {
+            args: func_args![value: value!({"message": "400"}), query: r#"["50" TO *]"#],
             want: Ok(false),
             tdef: type_def(),
         }
 
         range_message_upper_bound {
-            args: func_args![value: value!({"message": 5}), query: "[* TO 10]"],
+            args: func_args![value: value!({"message": "300"}), query: "[* TO 4]"],
             want: Ok(true),
             tdef: type_def(),
         }
 
         range_message_upper_bound_no_match {
-            args: func_args![value: value!({"message": 11}), query: "[* TO 10]"],
+            args: func_args![value: value!({"message": "50"}), query: "[* TO 400]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_message_upper_bound_string {
+            args: func_args![value: value!({"message": "300"}), query: r#"[* TO "4"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_message_upper_bound_string_no_match {
+            args: func_args![value: value!({"message": "50"}), query: r#"[* TO "400"]"#],
             want: Ok(false),
             tdef: type_def(),
         }
