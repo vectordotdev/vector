@@ -287,65 +287,6 @@ fn match_wildcard<T: AsRef<str>>(attr: T, obj: Value, wildcard: &str) -> bool {
     })
 }
 
-// fn range<T: AsRef<str>>(
-//     attr: T,
-//     obj: Value,
-//     lower: &ComparisonValue,
-//     lower_inclusive: bool,
-//     upper: &ComparisonValue,
-//     upper_inclusive: bool,
-// ) -> bool {
-//     each_field(attr, obj, |field, value| match (lower, upper) {
-//         // If both bounds are wildcards, it'll match everything; just return true.
-//         (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => true,
-//         // Unbounded lower. Wrapped in a container group for negation compatibility.
-//         (ComparisonValue::Unbounded, _) => {
-//             let op = if *upper_inclusive {
-//                 ast::Opcode::Le
-//             } else {
-//                 ast::Opcode::Lt
-//             };
-//
-//             coalesce(make_field_op(field, query, op, upper.clone()))
-//         }
-//         // Unbounded upper. Wrapped in a container group for negation compatibility.
-//         (_, ComparisonValue::Unbounded) => {
-//             let op = if *lower_inclusive {
-//                 ast::Opcode::Ge
-//             } else {
-//                 ast::Opcode::Gt
-//             };
-//
-//             coalesce(make_field_op(field, query, op, lower.clone()))
-//         }
-//         // Definitive range.
-//         _ => {
-//             let lower_op = if *lower_inclusive {
-//                 ast::Opcode::Ge
-//             } else {
-//                 ast::Opcode::Gt
-//             };
-//
-//             let upper_op = if *upper_inclusive {
-//                 ast::Opcode::Le
-//             } else {
-//                 ast::Opcode::Lt
-//             };
-//
-//             coalesce(make_container_group(make_op(
-//                 make_node(make_field_op(
-//                     field.clone(),
-//                     query.clone(),
-//                     lower_op,
-//                     lower.clone(),
-//                 )),
-//                 ast::Opcode::And,
-//                 make_node(make_field_op(field, query, upper_op, upper.clone())),
-//             )))
-//         }
-//     })
-// }
-
 fn range<T: AsRef<str>>(
     attr: T,
     obj: Value,
@@ -354,8 +295,69 @@ fn range<T: AsRef<str>>(
     upper: &ComparisonValue,
     upper_inclusive: bool,
 ) -> bool {
-    true
+    each_field(attr, obj, |field, value| match (lower, upper) {
+        // If both bounds are wildcards, it'll match everything; just return true.
+        (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => true,
+        // Unbounded lower. Wrapped in a container group for negation compatibility.
+        (ComparisonValue::Unbounded, _) => {
+            let op = if upper_inclusive {
+                Comparison::Lte
+            } else {
+                Comparison::Lt
+            };
+
+            compare(field, value, &op, upper)
+        }
+        // Unbounded upper. Wrapped in a container group for negation compatibility.
+        (_, ComparisonValue::Unbounded) => {
+            let op = if lower_inclusive {
+                Comparison::Gte
+            } else {
+                Comparison::Gt
+            };
+
+            compare(field, value, &op, lower)
+        }
+        // Definitive range.
+        _ => {
+            // let lower_op = if *lower_inclusive {
+            //     ast::Opcode::Ge
+            // } else {
+            //     ast::Opcode::Gt
+            // };
+            //
+            // let upper_op = if *upper_inclusive {
+            //     ast::Opcode::Le
+            // } else {
+            //     ast::Opcode::Lt
+            // };
+            //
+            // coalesce(make_container_group(make_op(
+            //     make_node(make_field_op(
+            //         field.clone(),
+            //         query.clone(),
+            //         lower_op,
+            //         lower.clone(),
+            //     )),
+            //     ast::Opcode::And,
+            //     make_node(make_field_op(field, query, upper_op, upper.clone())),
+            // )))
+
+            true
+        }
+    })
 }
+
+// fn range<T: AsRef<str>>(
+//     attr: T,
+//     obj: Value,
+//     lower: &ComparisonValue,
+//     lower_inclusive: bool,
+//     upper: &ComparisonValue,
+//     upper_inclusive: bool,
+// ) -> bool {
+//     true
+// }
 
 /// Iterator over normalized fields, passing the field look-up and its Value to the
 /// provided `value_fn`.
