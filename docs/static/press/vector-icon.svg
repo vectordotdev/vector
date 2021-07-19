@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="132px" height="132px" viewBox="0 0 132 132" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 61.2 (89653) - https://sketch.com -->
+    <title>Custom Preset</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Custom-Preset" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Logo" transform="translate(0.000000, 0.000000)" fill="#10E7FF">
+            <g transform="translate(16.000000, 37.000000)">
+                <polygon id="Rectangle" points="84.325149 0 99.2018335 8.27473882e-13 63.7726073 58.4602525 56.4219756 46.3626909"></polygon>
+                <polygon id="Triangle-Copy" transform="translate(35.242757, 29.076283) scale(1, -1) translate(-35.242757, -29.076283) " points="35.2427567 9.09494702e-13 70.4855133 58.152567 52.9063923 58.152567 35.6032646 29.7224231 18.2917612 58.152567 0 58.152567"></polygon>
+            </g>
+        </g>
+    </g>
+</svg>
