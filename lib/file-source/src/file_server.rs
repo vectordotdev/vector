@@ -113,21 +113,15 @@ where
                 .unwrap_or_else(|_| Utc::now())
         });
 
-        checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
-
         let checkpoints = checkpointer.view();
 
-        let needs_checksum_upgrade = checkpoints.contains_bytes_checksums();
-
         for (path, file_id) in existing_files {
-            if needs_checksum_upgrade {
-                if let Ok(Some(old_checksum)) = self
-                    .fingerprinter
-                    .get_bytes_checksum(&path, &mut fingerprint_buffer)
-                {
-                    checkpoints.update_key(old_checksum, file_id)
-                }
-            }
+            checkpointer.maybe_upgrade(
+                &path,
+                file_id,
+                &self.fingerprinter,
+                &mut fingerprint_buffer,
+            );
 
             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
         }
