@@ -91,32 +91,34 @@ fn matches_vrl_object(node: &QueryNode, obj: Value) -> bool {
             attr,
             comparator,
             value,
-        } => compare(attr, obj, comparator, value),
+        } => match_compare(attr, obj, comparator, value),
         QueryNode::AttributePrefix { attr, prefix } => {
             match_wildcard_with_prefix(attr, obj, prefix)
         }
         QueryNode::AttributeWildcard { attr, wildcard } => match_wildcard(attr, obj, wildcard),
+        QueryNode::AttributeRange {
+            attr,
+            lower,
+            lower_inclusive,
+            upper,
+            upper_inclusive,
+        } => range(attr, obj, lower, *lower_inclusive, upper, *upper_inclusive),
         _ => false,
     }
 }
 
 /// Returns true if the field exists. Also takes a `Value` to match against tag types.
 fn exists<T: AsRef<str>>(attr: T, obj: Value) -> bool {
-    normalize_fields(attr).into_iter().any(|field| {
-        let path = match lookup_field(&field) {
-            Some(path) => path,
-            None => return false,
-        };
-
-        match field {
-            // Tags exist by element value.
-            Field::Tag(t) => match obj.get_by_path(&path) {
-                Some(Value::Array(v)) => v.contains(&Value::Bytes(t.into())),
-                _ => false,
-            },
-            // Other fields exist by path.
-            _ => obj.get_by_path(&path).is_some(),
-        }
+    each_field(attr, obj, |field, value| match field {
+        // Tags need to check the element value.
+        Field::Tag(tag) => match value {
+            Value::Array(v) => v
+                .iter()
+                .any(|v| string_value(v).starts_with(&format!("{}:", tag))),
+            _ => false,
+        },
+        // Other field types have already resolved at this point, so just return true.
+        _ => true,
     })
 }
 
@@ -145,67 +147,77 @@ fn equals<T: AsRef<str>>(attr: T, obj: Value, to_match: &str) -> bool {
     })
 }
 
+/// Returns true if the
+fn compare(
+    field: Field,
+    value: &Value,
+    comparator: &Comparison,
+    comparison_value: &ComparisonValue,
+) -> bool {
+    // If the field is a default tag, then it must be interpreted as a string
+    // for the purpose of making comparisons. Coerce the `ComparisonValue` to a string.
+    let comparison_value = if matches!(field, Field::Tag(_))
+        && !matches!(comparison_value, ComparisonValue::String(_))
+    {
+        Cow::Owned(ComparisonValue::String(comparison_value.to_string()))
+    } else {
+        Cow::Borrowed(comparison_value)
+    };
+
+    match comparison_value.borrow() {
+        ComparisonValue::Float(v) => {
+            let value = match value {
+                Value::Float(value) => value.into_inner(),
+                _ => return false,
+            };
+
+            match comparator {
+                Comparison::Lt => value < *v,
+                Comparison::Lte => value <= *v,
+                Comparison::Gt => value > *v,
+                Comparison::Gte => value >= *v,
+            }
+        }
+
+        ComparisonValue::Integer(v) => {
+            let value = match value {
+                Value::Integer(value) => value,
+                _ => return false,
+            };
+
+            match comparator {
+                Comparison::Lt => value < v,
+                Comparison::Lte => value <= v,
+                Comparison::Gt => value > v,
+                Comparison::Gte => value >= v,
+            }
+        }
+
+        ComparisonValue::String(v) => {
+            let v = Cow::from(v);
+            let value = string_value(value);
+
+            match comparator {
+                Comparison::Lt => value < v,
+                Comparison::Lte => value <= v,
+                Comparison::Gt => value > v,
+                Comparison::Gte => value >= v,
+            }
+        }
+
+        ComparisonValue::Unbounded => false,
+    }
+}
+
 /// Compares the field path as numeric or string depending on the field type.
-fn compare<T: AsRef<str>>(
+fn match_compare<T: AsRef<str>>(
     attr: T,
     obj: Value,
     comparator: &Comparison,
     comparison_value: &ComparisonValue,
 ) -> bool {
     each_field(attr, obj, |field, value| {
-        // If the field is a default tag, then it must be interpreted as a string
-        // for the purpose of making comparisons. Coerce the `ComparisonValue` to a string.
-        let comparison_value = if matches!(field, Field::Tag(_))
-            && !matches!(comparison_value, ComparisonValue::String(_))
-        {
-            Cow::Owned(ComparisonValue::String(comparison_value.to_string()))
-        } else {
-            Cow::Borrowed(comparison_value)
-        };
-
-        match comparison_value.borrow() {
-            ComparisonValue::Float(v) => {
-                let value = match value {
-                    Value::Float(value) => value.into_inner(),
-                    _ => return false,
-                };
-
-                match comparator {
-                    Comparison::Lt => value < *v,
-                    Comparison::Lte => value <= *v,
-                    Comparison::Gt => value > *v,
-                    Comparison::Gte => value >= *v,
-                }
-            }
-
-            ComparisonValue::Integer(v) => {
-                let value = match value {
-                    Value::Integer(value) => value,
-                    _ => return false,
-                };
-
-                match comparator {
-                    Comparison::Lt => value < v,
-                    Comparison::Lte => value <= v,
-                    Comparison::Gt => value > v,
-                    Comparison::Gte => value >= v,
-                }
-            }
-
-            ComparisonValue::String(v) => {
-                let v = Cow::from(v);
-                let value = string_value(value);
-
-                match comparator {
-                    Comparison::Lt => value < v,
-                    Comparison::Lte => value <= v,
-                    Comparison::Gt => value > v,
-                    Comparison::Gte => value >= v,
-                }
-            }
-
-            ComparisonValue::Unbounded => false,
-        }
+        compare(field, value, comparator, comparison_value)
     })
 }
 
@@ -275,6 +287,76 @@ fn match_wildcard<T: AsRef<str>>(attr: T, obj: Value, wildcard: &str) -> bool {
     })
 }
 
+// fn range<T: AsRef<str>>(
+//     attr: T,
+//     obj: Value,
+//     lower: &ComparisonValue,
+//     lower_inclusive: bool,
+//     upper: &ComparisonValue,
+//     upper_inclusive: bool,
+// ) -> bool {
+//     each_field(attr, obj, |field, value| match (lower, upper) {
+//         // If both bounds are wildcards, it'll match everything; just return true.
+//         (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => true,
+//         // Unbounded lower. Wrapped in a container group for negation compatibility.
+//         (ComparisonValue::Unbounded, _) => {
+//             let op = if *upper_inclusive {
+//                 ast::Opcode::Le
+//             } else {
+//                 ast::Opcode::Lt
+//             };
+//
+//             coalesce(make_field_op(field, query, op, upper.clone()))
+//         }
+//         // Unbounded upper. Wrapped in a container group for negation compatibility.
+//         (_, ComparisonValue::Unbounded) => {
+//             let op = if *lower_inclusive {
+//                 ast::Opcode::Ge
+//             } else {
+//                 ast::Opcode::Gt
+//             };
+//
+//             coalesce(make_field_op(field, query, op, lower.clone()))
+//         }
+//         // Definitive range.
+//         _ => {
+//             let lower_op = if *lower_inclusive {
+//                 ast::Opcode::Ge
+//             } else {
+//                 ast::Opcode::Gt
+//             };
+//
+//             let upper_op = if *upper_inclusive {
+//                 ast::Opcode::Le
+//             } else {
+//                 ast::Opcode::Lt
+//             };
+//
+//             coalesce(make_container_group(make_op(
+//                 make_node(make_field_op(
+//                     field.clone(),
+//                     query.clone(),
+//                     lower_op,
+//                     lower.clone(),
+//                 )),
+//                 ast::Opcode::And,
+//                 make_node(make_field_op(field, query, upper_op, upper.clone())),
+//             )))
+//         }
+//     })
+// }
+
+fn range<T: AsRef<str>>(
+    attr: T,
+    obj: Value,
+    lower: &ComparisonValue,
+    lower_inclusive: bool,
+    upper: &ComparisonValue,
+    upper_inclusive: bool,
+) -> bool {
+    true
+}
+
 /// Iterator over normalized fields, passing the field look-up and its Value to the
 /// provided `value_fn`.
 fn each_field<T: AsRef<str>>(
@@ -284,7 +366,7 @@ fn each_field<T: AsRef<str>>(
 ) -> bool {
     normalize_fields(attr).into_iter().any(|field| {
         // Look up the field. For tags, this will literally be "tags". For all other
-        // types, this will be based on the the string field nane.
+        // types, this will be based on the the string field name.
         let path = match lookup_field(&field) {
             Some(b) => b,
             _ => return false,
@@ -342,7 +424,7 @@ mod test {
         }
 
         tag_exists {
-            args: func_args![value: value!({"tags": ["a","b","c"]}), query: "_exists_:a"],
+            args: func_args![value: value!({"tags": ["a:1","b:2","c:3"]}), query: "_exists_:a"],
             want: Ok(true),
             tdef: type_def(),
         }
@@ -360,7 +442,7 @@ mod test {
         }
 
         tag_missing {
-            args: func_args![value: value!({"tags": ["b","c"]}), query: "_missing_:a"],
+            args: func_args![value: value!({"tags": ["b:1","c:2"]}), query: "_missing_:a"],
             want: Ok(true),
             tdef: type_def(),
         }

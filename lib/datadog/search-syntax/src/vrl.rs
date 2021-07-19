@@ -243,31 +243,6 @@ fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
 /// in order to accommodate expansion to multiple fields where relevant.
 fn parse_node(node: &QueryNode) -> Vec<ast::Expr> {
     match node {
-        // Arbitrary wildcard.
-        QueryNode::AttributeWildcard { attr, wildcard } => make_queries(attr)
-            .into_iter()
-            .map(|(field, query)| {
-                match field {
-                    // Default fields use word boundary matching.
-                    Field::Default(_) => coalesce(make_function_call(
-                        "match",
-                        vec![query, make_word_regex(&wildcard)],
-                    )),
-                    // If there's only one `*` and it's at the beginning, `ends_with` is faster.
-                    _ if wildcard.starts_with('*') && wildcard.matches('*').count() == 1 => {
-                        coalesce(make_function_call(
-                            "ends_with",
-                            vec![query, make_string(wildcard.replace('*', ""))],
-                        ))
-                    }
-                    // Otherwise, default to non word boundary matching.
-                    _ => coalesce(make_function_call(
-                        "match",
-                        vec![query, make_wildcard_regex(&wildcard)],
-                    )),
-                }
-            })
-            .collect(),
         // Range.
         QueryNode::AttributeRange {
             attr,
