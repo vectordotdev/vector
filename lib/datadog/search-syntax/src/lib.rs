@@ -7,5 +7,5 @@ mod node;
 mod parser;
 
 pub use field::{normalize_fields, Field};
-pub use node::{Comparison, ComparisonValue, QueryNode};
+pub use node::{BooleanType, Comparison, ComparisonValue, QueryNode};
 pub use parser::{parse, Error};

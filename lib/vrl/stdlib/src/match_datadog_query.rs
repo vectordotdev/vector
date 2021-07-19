@@ -2,7 +2,7 @@ use vrl::prelude::*;
 
 use cached::{proc_macro::cached, SizedCache};
 use datadog_search_syntax::{
-    normalize_fields, parse, Comparison, ComparisonValue, Field, QueryNode,
+    normalize_fields, parse, BooleanType, Comparison, ComparisonValue, Field, QueryNode,
 };
 use lookup::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
@@ -63,7 +63,7 @@ impl Expression for MatchDatadogQueryFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?.try_object()?;
 
-        Ok(matches_vrl_object(&self.node, Value::Object(value)).into())
+        Ok(matches_vrl_object(&self.node, &Value::Object(value)).into())
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
@@ -76,7 +76,7 @@ fn type_def() -> TypeDef {
 }
 
 /// Match the parsed node against the provided VRL `Value`, per the query type.
-fn matches_vrl_object(node: &QueryNode, obj: Value) -> bool {
+fn matches_vrl_object(node: &QueryNode, obj: &Value) -> bool {
     match node {
         QueryNode::MatchNoDocs => false,
         QueryNode::MatchAllDocs => true,
@@ -104,12 +104,18 @@ fn matches_vrl_object(node: &QueryNode, obj: Value) -> bool {
             upper_inclusive,
         } => range(attr, obj, lower, *lower_inclusive, upper, *upper_inclusive),
         QueryNode::NegatedNode { node } => !matches_vrl_object(node, obj),
-        _ => false,
+        QueryNode::Boolean { oper, nodes } => {
+            if let BooleanType::And = oper {
+                nodes.iter().all(|node| matches_vrl_object(&node, &obj))
+            } else {
+                nodes.iter().any(|node| matches_vrl_object(&node, &obj))
+            }
+        }
     }
 }
 
 /// Returns true if the field exists. Also takes a `Value` to match against tag types.
-fn exists<T: AsRef<str>>(attr: T, obj: Value) -> bool {
+fn exists<T: AsRef<str>>(attr: T, obj: &Value) -> bool {
     each_field(attr, obj, |field, value| match field {
         // Tags need to check the element value.
         Field::Tag(tag) => match value {
@@ -124,7 +130,7 @@ fn exists<T: AsRef<str>>(attr: T, obj: Value) -> bool {
 }
 
 /// Returns true if the provided VRL `Value` matches the `to_match` string.
-fn equals<T: AsRef<str>>(attr: T, obj: Value, to_match: &str) -> bool {
+fn equals<T: AsRef<str>>(attr: T, obj: &Value, to_match: &str) -> bool {
     each_field(attr, obj, |field, value| {
         match field {
             // Tags are compared by element key:value.
@@ -223,7 +229,7 @@ fn compare(
 /// Compares the field path as numeric or string depending on the field type.
 fn match_compare<T: AsRef<str>>(
     attr: T,
-    obj: Value,
+    obj: &Value,
     comparator: &Comparison,
     comparison_value: &ComparisonValue,
 ) -> bool {
@@ -261,7 +267,7 @@ fn wildcard_regex(to_match: &str) -> Regex {
 }
 
 /// Returns true if the provided `Value` matches the prefix.
-fn match_wildcard_with_prefix<T: AsRef<str>>(attr: T, obj: Value, prefix: &str) -> bool {
+fn match_wildcard_with_prefix<T: AsRef<str>>(attr: T, obj: &Value, prefix: &str) -> bool {
     each_field(attr, obj, |field, value| match field {
         Field::Default(_) => {
             let re = word_regex(&format!("{}*", prefix));
@@ -278,7 +284,7 @@ fn match_wildcard_with_prefix<T: AsRef<str>>(attr: T, obj: Value, prefix: &str) 
 }
 
 /// Returns true if the provided `Value` matches the arbitrary wildcard.
-fn match_wildcard<T: AsRef<str>>(attr: T, obj: Value, wildcard: &str) -> bool {
+fn match_wildcard<T: AsRef<str>>(attr: T, obj: &Value, wildcard: &str) -> bool {
     each_field(attr, obj, |field, value| match field {
         Field::Default(_) => {
             let re = word_regex(wildcard);
@@ -300,7 +306,7 @@ fn match_wildcard<T: AsRef<str>>(attr: T, obj: Value, wildcard: &str) -> bool {
 
 fn range<T: AsRef<str>>(
     attr: T,
-    obj: Value,
+    obj: &Value,
     lower: &ComparisonValue,
     lower_inclusive: bool,
     upper: &ComparisonValue,
@@ -348,11 +354,11 @@ fn range<T: AsRef<str>>(
     })
 }
 
-/// Iterator over normalized fields, passing the field look-up and its Value to the
+/// Iterator over normalized fields, passing the field look-up and its `Value` to the
 /// provided `value_fn`.
 fn each_field<T: AsRef<str>>(
     attr: T,
-    obj: Value,
+    obj: &Value,
     value_fn: impl Fn(Field, &Value) -> bool,
 ) -> bool {
     normalize_fields(attr).into_iter().any(|field| {
@@ -1622,6 +1628,114 @@ mod test {
 
         negate_range_facet_between_no_match_string {
             args: func_args![value: value!({"custom": {"a": "7"}}), query: r#"-@a:["1" TO "60"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        exclusive_range_message {
+            args: func_args![value: value!({"message": "100"}), query: "{1 TO 2}"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_exclusive_range_message {
+            args: func_args![value: value!({"message": "100"}), query: "NOT {1 TO 2}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_exclusive_range_message {
+            args: func_args![value: value!({"message": "100"}), query: "-{1 TO 2}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        exclusive_range_message_no_match {
+            args: func_args![value: value!({"message": "1"}), query: "{1 TO 2}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_exclusive_range_message_no_match {
+            args: func_args![value: value!({"message": "1"}), query: "NOT {1 TO 2}"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_exclusive_range_message_no_match {
+            args: func_args![value: value!({"message": "1"}), query: "-{1 TO 2}"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        exclusive_range_message_lower {
+            args: func_args![value: value!({"message": "200"}), query: "{1 TO *}"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_exclusive_range_message_lower {
+            args: func_args![value: value!({"message": "200"}), query: "NOT {1 TO *}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_exclusive_range_message_lower {
+            args: func_args![value: value!({"message": "200"}), query: "-{1 TO *}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        exclusive_range_message_lower_no_match {
+            args: func_args![value: value!({"message": "1"}), query: "{1 TO *}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_exclusive_range_message_lower_no_match {
+            args: func_args![value: value!({"message": "1"}), query: "NOT {1 TO *}"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_exclusive_range_message_lower_no_match {
+            args: func_args![value: value!({"message": "1"}), query: "-{1 TO *}"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        exclusive_range_message_upper {
+            args: func_args![value: value!({"message": "200"}), query: "{* TO 3}"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_exclusive_range_message_upper {
+            args: func_args![value: value!({"message": "200"}), query: "NOT {* TO 3}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_exclusive_range_message_upper {
+            args: func_args![value: value!({"message": "200"}), query: "-{* TO 3}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        exclusive_range_message_upper_no_match {
+            args: func_args![value: value!({"message": "3"}), query: "{* TO 3}"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_exclusive_range_message_upper_no_match {
+            args: func_args![value: value!({"message": "3"}), query: "NOT {* TO 3}"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_exclusive_range_message_upper_no_match {
+            args: func_args![value: value!({"message": "3"}), query: "-{* TO 3}"],
             want: Ok(true),
             tdef: type_def(),
         }
