@@ -1739,5 +1739,89 @@ mod test {
             want: Ok(true),
             tdef: type_def(),
         }
+
+        message_and {
+            args: func_args![value: value!({"message": "this contains that"}), query: "this AND that"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        message_and_not {
+            args: func_args![value: value!({"message": "this contains that"}), query: "this AND NOT that"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        message_or {
+            args: func_args![value: value!({"message": "only contains that"}), query: "this OR that"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        message_or_not {
+            args: func_args![value: value!({"message": "only contains that"}), query: "this OR NOT that"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        message_and_or {
+            args: func_args![value: value!({"message": "this contains that"}), query: "this AND (that OR the_other)"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_message_and_or {
+            args: func_args![value: value!({"message": "this contains that"}), query: "this AND NOT (that OR the_other)"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_message_and_or {
+            args: func_args![value: value!({"message": "this contains that"}), query: "this AND -(that OR the_other)"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        message_and_or_2 {
+            args: func_args![value: value!({"message": "this contains the_other"}), query: "this AND (that OR the_other)"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_message_and_or_2 {
+            args: func_args![value: value!({"message": "this contains the_other"}), query: "this AND NOT (that OR the_other)"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_message_and_or_2 {
+            args: func_args![value: value!({"message": "this contains the_other"}), query: "this AND -(that OR the_other)"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        message_or_and {
+            args: func_args![value: value!({"message": "just this"}), query: "this OR (that AND the_other)"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        message_or_and_no_match {
+            args: func_args![value: value!({"message": "that and nothing else"}), query: "this OR (that AND the_other)"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        message_or_and_2 {
+            args: func_args![value: value!({"message": "that plus the_other"}), query: "this OR (that AND the_other)"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        message_or_and_2_no_match {
+            args: func_args![value: value!({"message": "nothing plus the_other"}), query: "this OR (that AND the_other)"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
     ];
 }
