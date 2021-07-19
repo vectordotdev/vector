@@ -466,5 +466,41 @@ mod test {
             want: Ok(false),
             tdef: type_def(),
         }
+
+        wildcard_multiple_message {
+            args: func_args![value: value!({"message": "vector"}), query: "v*c*r"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        wildcard_multiple_message_no_match {
+            args: func_args![value: value!({"message": "torvec"}), query: "v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        wildcard_multiple_tag {
+            args: func_args![value: value!({"tags": ["a:vector"]}), query: "a:v*c*r"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        wildcard_multiple_tag_no_match {
+            args: func_args![value: value!({"tags": ["b:vector"]}), query: "a:v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        wildcard_multiple_facet {
+            args: func_args![value: value!({"custom": {"a": "vector"}}), query: "@a:v*c*r"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        wildcard_multiple_facet_no_match {
+            args: func_args![value: value!({"custom": {"b": "vector"}}), query: "@a:v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
     ];
 }
