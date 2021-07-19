@@ -243,20 +243,6 @@ fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
 /// in order to accommodate expansion to multiple fields where relevant.
 fn parse_node(node: &QueryNode) -> Vec<ast::Expr> {
     match node {
-        // Wildcard suffix.
-        QueryNode::AttributePrefix { attr, prefix } => make_queries(attr)
-            .into_iter()
-            .map(|(field, query)| match field {
-                Field::Default(_) => coalesce(make_function_call(
-                    "match",
-                    vec![query, make_word_regex(&format!("{}*", &prefix))],
-                )),
-                _ => coalesce(make_function_call(
-                    "starts_with",
-                    vec![query, make_string(prefix)],
-                )),
-            })
-            .collect(),
         // Arbitrary wildcard.
         QueryNode::AttributeWildcard { attr, wildcard } => make_queries(attr)
             .into_iter()

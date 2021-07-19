@@ -92,7 +92,10 @@ fn matches_vrl_object(node: &QueryNode, obj: Value) -> bool {
             comparator,
             value,
         } => compare(attr, obj, comparator, value),
-        QueryNode::AttributePrefix { attr, prefix } => wildcard_match(attr, obj, prefix),
+        QueryNode::AttributePrefix { attr, prefix } => {
+            match_wildcard_with_prefix(attr, obj, prefix)
+        }
+        QueryNode::AttributeWildcard { attr, wildcard } => match_wildcard(attr, obj, wildcard),
         _ => false,
     }
 }
@@ -117,20 +120,6 @@ fn exists<T: AsRef<str>>(attr: T, obj: Value) -> bool {
     })
 }
 
-#[cached(
-    type = "SizedCache<String, Regex>",
-    create = "{ SizedCache::with_size(10) }",
-    convert = r#"{ to_match.to_owned() }"#
-)]
-/// Returns compiled wildcard regex. Cached to avoid recompilation in hot paths.
-fn wildcard_regex(to_match: &str) -> Regex {
-    Regex::new(&format!(
-        r#"\b{}\b"#,
-        regex::escape(to_match).replace("\\*", ".*")
-    ))
-    .expect("invalid wildcard regex")
-}
-
 /// Returns true if the provided VRL `Value` matches the `to_match` string.
 fn equals<T: AsRef<str>>(attr: T, obj: Value, to_match: &str) -> bool {
     each_field(attr, obj, |field, value| {
@@ -145,7 +134,7 @@ fn equals<T: AsRef<str>>(attr: T, obj: Value, to_match: &str) -> bool {
             // Default fields are compared by word boundary.
             Field::Default(_) => match value {
                 Value::Bytes(val) => {
-                    let re = wildcard_regex(to_match);
+                    let re = word_regex(to_match);
                     re.is_match(&String::from_utf8_lossy(val))
                 }
                 _ => false,
@@ -220,11 +209,39 @@ fn compare<T: AsRef<str>>(
     })
 }
 
+#[cached(
+    type = "SizedCache<String, Regex>",
+    create = "{ SizedCache::with_size(10) }",
+    convert = r#"{ to_match.to_owned() }"#
+)]
+/// Returns compiled word boundary regex. Cached to avoid recompilation in hot paths.
+fn word_regex(to_match: &str) -> Regex {
+    Regex::new(&format!(
+        r#"\b{}\b"#,
+        regex::escape(to_match).replace("\\*", ".*")
+    ))
+    .expect("invalid wildcard regex")
+}
+
+#[cached(
+    type = "SizedCache<String, Regex>",
+    create = "{ SizedCache::with_size(10) }",
+    convert = r#"{ to_match.to_owned() }"#
+)]
+/// Returns compiled wildcard regex. Cached to avoid recompilation in hot paths.
+fn wildcard_regex(to_match: &str) -> Regex {
+    Regex::new(&format!(
+        "^{}$",
+        regex::escape(to_match).replace("\\*", ".*")
+    ))
+    .expect("invalid wildcard regex")
+}
+
 /// Returns true if the provided `Value` matches the prefix.
-fn wildcard_match<T: AsRef<str>>(attr: T, obj: Value, prefix: &str) -> bool {
+fn match_wildcard_with_prefix<T: AsRef<str>>(attr: T, obj: Value, prefix: &str) -> bool {
     each_field(attr, obj, |field, value| match field {
         Field::Default(_) => {
-            let re = wildcard_regex(&format!("{}*", prefix));
+            let re = word_regex(&format!("{}*", prefix));
             re.is_match(&string_value(value))
         }
         Field::Tag(tag) => match value {
@@ -234,6 +251,27 @@ fn wildcard_match<T: AsRef<str>>(attr: T, obj: Value, prefix: &str) -> bool {
             _ => false,
         },
         _ => string_value(value).starts_with(prefix),
+    })
+}
+
+/// Returns true if the provided `Value` matches the arbitrary wildcard.
+fn match_wildcard<T: AsRef<str>>(attr: T, obj: Value, wildcard: &str) -> bool {
+    each_field(attr, obj, |field, value| match field {
+        Field::Default(_) => {
+            let re = word_regex(wildcard);
+            re.is_match(&string_value(value))
+        }
+        Field::Tag(tag) => match value {
+            Value::Array(v) => v.iter().any(|v| {
+                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                re.is_match(&string_value(v))
+            }),
+            _ => false,
+        },
+        _ => {
+            let re = wildcard_regex(wildcard);
+            re.is_match(&string_value(value))
+        }
     })
 }
 
@@ -354,6 +392,42 @@ mod test {
         equals_facet {
             args: func_args![value: value!({"custom": {"z": 1}}), query: "@z:1"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        wildcard_prefix_message {
+            args: func_args![value: value!({"message": "vector"}), query: "*tor"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        wildcard_prefix_message_no_match {
+            args: func_args![value: value!({"message": "torvec"}), query: "*tor"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        wildcard_prefix_tag {
+            args: func_args![value: value!({"tags": ["a:vector"]}), query: "a:*tor"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        wildcard_prefix_tag_no_match {
+            args: func_args![value: value!({"tags": ["b:vector"]}), query: "a:*tor"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        wildcard_prefix_facet {
+            args: func_args![value: value!({"custom": {"a": "vector"}}), query: "@a:*tor"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        wildcard_prefix_facet_no_match {
+            args: func_args![value: value!({"custom": {"b": "vector"}}), query: "@a:*tor"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
