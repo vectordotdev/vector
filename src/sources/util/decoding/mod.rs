@@ -1,4 +1,4 @@
-mod decoders;
+mod framing;
 
 use crate::{
     config::log_schema,
@@ -6,7 +6,7 @@ use crate::{
     internal_events::DecoderParseFailed,
 };
 use bytes::{Bytes, BytesMut};
-pub use decoders::OctetCountingDecoder;
+pub use framing::OctetCountingDecoder;
 
 pub trait Parser {
     fn parse(&self, bytes: Bytes) -> crate::Result<Event>;
