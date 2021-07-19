@@ -733,7 +733,7 @@ mod test {
             ),
             (
                 FileFingerprint::FirstLineChecksum(78910),
-                r#"{"version":"1","checkpoints":[{"fingerprint":{"first_lines_checksum":78910},"position":1234}]}"#,
+                r#"{"version":"1","checkpoints":[{"fingerprint":{"first_line_checksum":78910},"position":1234}]}"#,
             ),
             (
                 FileFingerprint::Unknown(1337),
@@ -787,11 +787,6 @@ mod test {
       "modified": "2021-07-12T18:19:11.769003Z"
     },
     {
-      "fingerprint": { "first_lines_checksum": 78910 },
-      "position": 1234,
-      "modified": "2021-07-12T18:19:11.769003Z"
-    },
-    {
       "fingerprint": { "unknown": 1337 },
       "position": 1234,
       "modified": "2021-07-12T18:19:11.769003Z"
@@ -803,7 +798,6 @@ mod test {
             FileFingerprint::DevInode(1, 2),
             FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLineChecksum(1234),
-            FileFingerprint::FirstLineChecksum(78910),
             FileFingerprint::Unknown(1337),
         ];
 
