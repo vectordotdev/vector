@@ -348,17 +348,6 @@ fn range<T: AsRef<str>>(
     })
 }
 
-// fn range<T: AsRef<str>>(
-//     attr: T,
-//     obj: Value,
-//     lower: &ComparisonValue,
-//     lower_inclusive: bool,
-//     upper: &ComparisonValue,
-//     upper_inclusive: bool,
-// ) -> bool {
-//     true
-// }
-
 /// Iterator over normalized fields, passing the field look-up and its Value to the
 /// provided `value_fn`.
 fn each_field<T: AsRef<str>>(
@@ -583,6 +572,36 @@ mod test {
 
         wildcard_multiple_facet_no_match {
             args: func_args![value: value!({"custom": {"b": "vector"}}), query: "@a:v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_message_unbounded {
+            args: func_args![value: value!({"message": "1"}), query: "[* TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_message_lower_bound {
+            args: func_args![value: value!({"message": 5}), query: "[4 TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_message_lower_bound_no_match {
+            args: func_args![value: value!({"message": 3}), query: "[4 TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_message_upper_bound {
+            args: func_args![value: value!({"message": 5}), query: "[* TO 10]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_message_upper_bound_no_match {
+            args: func_args![value: value!({"message": 11}), query: "[* TO 10]"],
             want: Ok(false),
             tdef: type_def(),
         }
