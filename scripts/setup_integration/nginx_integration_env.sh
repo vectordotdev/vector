@@ -21,7 +21,7 @@ ACTION=$1
 start_podman () {
   podman pod create --replace --name vector-test-integration-nginx -p 8010:8000
   podman run -d --pod=vector-test-integration-nginx --name vector_nginx \
-	-v "$(pwd)"tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
+	-v "$(pwd)"/tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
 }
 
 start_docker () {
