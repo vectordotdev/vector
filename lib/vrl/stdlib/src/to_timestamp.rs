@@ -154,6 +154,7 @@ impl Expression for ToTimestampFn {
 #[allow(overflowing_literals)]
 mod tests {
     use super::*;
+    use shared::TimeZone;
     use std::collections::BTreeMap;
     use vrl::prelude::expression::Literal;
 
@@ -161,7 +162,8 @@ mod tests {
     fn out_of_range_integer() {
         let mut object: Value = BTreeMap::new().into();
         let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state);
+        let tz = TimeZone::default();
+        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
             value: Box::new(Literal::Integer(9999999999999)),
         };
@@ -173,7 +175,8 @@ mod tests {
     fn out_of_range_float() {
         let mut object: Value = BTreeMap::new().into();
         let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state);
+        let tz = TimeZone::default();
+        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
             value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),
         };

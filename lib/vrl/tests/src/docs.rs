@@ -58,10 +58,12 @@ pub struct Event {
     metric: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
-pub struct Error {
-    compiletime: String,
+#[derive(Debug, Deserialize)]
+pub enum Error {
+    #[serde(rename = "compiletime")]
+    Compiletime(String),
+    #[serde(rename = "runtime")]
+    Runtime(String),
 }
 
 pub fn tests() -> Vec<Test> {
@@ -73,20 +75,24 @@ pub fn tests() -> Vec<Test> {
         .output()
         .expect("failed to execute process");
 
-    let Reference {
-        examples,
-        functions,
-        expressions,
-    } = serde_json::from_slice(&output.stdout).unwrap();
+    if output.stdout.is_empty() {
+        Vec::new()
+    } else {
+        let Reference {
+            examples,
+            functions,
+            expressions,
+        } = serde_json::from_slice(&output.stdout).unwrap();
 
-    examples_to_tests("reference", {
-        let mut map = HashMap::default();
-        map.insert("program".to_owned(), Examples { examples });
-        map
-    })
-    .chain(examples_to_tests("functions", functions))
-    .chain(examples_to_tests("expressions", expressions))
-    .collect()
+        examples_to_tests("reference", {
+            let mut map = HashMap::default();
+            map.insert("program".to_owned(), Examples { examples });
+            map
+        })
+        .chain(examples_to_tests("functions", functions))
+        .chain(examples_to_tests("expressions", expressions))
+        .collect()
+    }
 }
 
 fn examples_to_tests(
@@ -152,7 +158,7 @@ impl Test {
         }
 
         let result = match raises {
-            Some(error) => error.compiletime,
+            Some(Error::Runtime(error) | Error::Compiletime(error)) => error,
             None => serde_json::to_string(
                 &returns
                     .or_else(|| {

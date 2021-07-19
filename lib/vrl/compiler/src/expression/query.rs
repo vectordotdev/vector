@@ -23,6 +23,10 @@ impl Query {
         &self.path
     }
 
+    pub fn target(&self) -> &Target {
+        &self.target
+    }
+
     pub fn is_external(&self) -> bool {
         matches!(self.target, Target::External)
     }

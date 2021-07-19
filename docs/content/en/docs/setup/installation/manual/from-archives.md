@@ -193,7 +193,7 @@ The Vector configuration file is located at:
 config/vector.toml
 ```
 
-A full spec is located at `config/vector.spec.toml` and examples are located in `config/vector/examples/*`. You can learn more about configuring Vector in the [Configuration] documentation.
+Example configurations are located in `config/vector/examples/*`. You can learn more about configuring Vector in the [Configuration] documentation.
 
 ### Data directory
 
@@ -219,7 +219,7 @@ Vector archives ship with service files in case you need them:
 
 #### Init.d
 
-To install Vector into Init.d, run:
+To install Vector into init.d, run:
 
 ```shell
 cp -av etc/init.d/vector /etc/init.d

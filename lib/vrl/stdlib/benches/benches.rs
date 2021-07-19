@@ -107,6 +107,8 @@ criterion_group!(
               to_timestamp,
               to_unix_timestamp,
               truncate,
+              // TODO: Cannot pass a Path to bench_function
+              //unnest
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
               upcase

@@ -8,6 +8,7 @@ use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
+use shared::TimeZone;
 use std::borrow::Cow::{self, Borrowed, Owned};
 use vrl::{diagnostic::Formatter, state, value, Runtime, RuntimeResult, Target, Terminate, Value};
 
@@ -37,7 +38,7 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<Value>) {
+pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -98,6 +99,7 @@ pub(crate) fn run(mut objects: Vec<Value>) {
                     &mut rt,
                     command,
                     &mut compiler_state,
+                    timezone,
                 );
 
                 let string = match result {
@@ -122,6 +124,7 @@ fn resolve(
     runtime: &mut Runtime,
     program: &str,
     state: &mut state::Compiler,
+    timezone: &TimeZone,
 ) -> RuntimeResult {
     let mut empty = value!({});
     let object = match object {
@@ -138,7 +141,7 @@ fn resolve(
         }
     };
 
-    runtime.resolve(object, &program)
+    runtime.resolve(object, &program, timezone)
 }
 
 struct Repl {
@@ -237,11 +240,12 @@ impl Validator for Repl {
         &self,
         ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<ValidationResult> {
+        let timezone = TimeZone::default();
         let mut compiler_state = state::Compiler::default();
         let mut rt = Runtime::new(state::Runtime::default());
         let target: Option<&mut Value> = None;
 
-        let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state) {
+        let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state, &timezone) {
             Err(error) => {
                 let m = error.to_string();
 
