@@ -402,6 +402,7 @@ mod integration_tests {
             scrape_interval_secs: 1,
             auth: None,
             tls: None,
+            proxy: Default::default(),
         };
 
         let (tx, rx) = Pipeline::new_test();

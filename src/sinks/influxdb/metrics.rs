@@ -899,6 +899,7 @@ mod integration_tests {
             quantiles: default_summary_quantiles(),
             tags: None,
             default_namespace: None,
+            proxy: Default::default(),
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
@@ -990,6 +991,7 @@ mod integration_tests {
             tags: None,
             tls: None,
             default_namespace: None,
+            proxy: Default::default(),
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
@@ -1014,7 +1016,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let client = HttpClient::new(None).unwrap();
+        let client = HttpClient::new(None, Default::default()).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 

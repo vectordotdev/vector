@@ -154,6 +154,7 @@ mod integration_tests {
             endpoint: EVENTSTOREDB_SCRAP_ADDRESS.to_owned(),
             scrape_interval_secs: 1,
             default_namespace: None,
+            proxy: Default::default(),
         };
 
         let (tx, rx) = Pipeline::new_test();

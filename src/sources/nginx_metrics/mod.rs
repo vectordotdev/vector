@@ -267,6 +267,7 @@ mod integration_tests {
                 namespace: "vector_nginx".to_owned(),
                 tls: None,
                 auth,
+                proxy: Default::default(),
             }
             .build(SourceContext::new_test(sender))
             .await

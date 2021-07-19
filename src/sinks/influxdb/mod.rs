@@ -833,7 +833,7 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(None).unwrap();
+        let client = HttpClient::new(None, Default::default()).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -852,7 +852,7 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(None).unwrap();
+        let client = HttpClient::new(None, Default::default()).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -871,7 +871,7 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(None).unwrap();
+        let client = HttpClient::new(None, Default::default()).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -890,7 +890,7 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(None).unwrap();
+        let client = HttpClient::new(None, Default::default()).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()

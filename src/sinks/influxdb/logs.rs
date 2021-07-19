@@ -703,6 +703,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             tls: None,
+            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(cx).await.unwrap();

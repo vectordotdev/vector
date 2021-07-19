@@ -746,7 +746,7 @@ mod integration_tests {
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = HttpClient::new(None)
+        let result = HttpClient::new(None, Default::default())
             .unwrap()
             .send(request)
             .await

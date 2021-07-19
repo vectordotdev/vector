@@ -713,7 +713,7 @@ mod integration_tests {
     async fn splunk_healthcheck() {
         let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
-            let client = HttpClient::new(tls_settings).unwrap();
+            let client = HttpClient::new(tls_settings, Default::default()).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
         };
 
@@ -815,6 +815,7 @@ mod integration_tests {
             },
             request: TowerRequestConfig::default(),
             tls: None,
+            proxy: Default::default(),
         }
     }
 

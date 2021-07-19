@@ -35,6 +35,7 @@ pub struct HumioLogsConfig {
     pub(in crate::sinks::humio) batch: BatchConfig,
 
     pub(in crate::sinks::humio) tls: Option<TlsOptions>,
+    #[serde(default)]
     pub(in crate::sinks::humio) proxy: ProxyConfig,
 }
 
@@ -296,6 +297,7 @@ mod integration_tests {
                 ..Default::default()
             },
             tls: None,
+            proxy: Default::default(),
         }
     }
 

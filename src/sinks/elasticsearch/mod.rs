@@ -1161,7 +1161,7 @@ mod integration_tests {
             }
 
             let request = builder.body(Body::empty())?;
-            let client = HttpClient::new(self.tls_settings.clone())
+            let client = HttpClient::new(self.tls_settings.clone(), Default::default())
                 .expect("Could not build client to flush");
             let response = client.send(request).await?;
 

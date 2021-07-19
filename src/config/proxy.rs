@@ -59,7 +59,7 @@ impl ProxyConfig {
             no_proxy: from_env("NO_PROXY")
                 .map(|value| {
                     value
-                        .split(",")
+                        .split(',')
                         .map(|item| item.trim().to_string())
                         .collect()
                 })
@@ -69,8 +69,8 @@ impl ProxyConfig {
 
     fn merge(self, other: &Self) -> Self {
         Self {
-            http: self.http.or(other.http.clone()),
-            https: self.https.or(other.https.clone()),
+            http: self.http.or_else(|| other.http.clone()),
+            https: self.https.or_else(|| other.https.clone()),
             no_proxy: self
                 .no_proxy
                 .union(&other.no_proxy)
