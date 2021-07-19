@@ -149,7 +149,7 @@ fn equals<T: AsRef<str>>(attr: T, obj: Value, to_match: &str) -> bool {
 
 /// Returns true if the
 fn compare(
-    field: Field,
+    field: &Field,
     value: &Value,
     comparator: &Comparison,
     comparison_value: &ComparisonValue,
@@ -227,7 +227,7 @@ fn match_compare<T: AsRef<str>>(
     comparison_value: &ComparisonValue,
 ) -> bool {
     each_field(attr, obj, |field, value| {
-        compare(field, value, comparator, comparison_value)
+        compare(&field, value, comparator, comparison_value)
     })
 }
 
@@ -316,7 +316,7 @@ fn range<T: AsRef<str>>(
                 Comparison::Lt
             };
 
-            compare(field, value, &op, upper)
+            compare(&field, value, &op, upper)
         }
         // Unbounded upper. Wrapped in a container group for negation compatibility.
         (_, ComparisonValue::Unbounded) => {
@@ -326,34 +326,23 @@ fn range<T: AsRef<str>>(
                 Comparison::Gt
             };
 
-            compare(field, value, &op, lower)
+            compare(&field, value, &op, lower)
         }
         // Definitive range.
         _ => {
-            // let lower_op = if *lower_inclusive {
-            //     ast::Opcode::Ge
-            // } else {
-            //     ast::Opcode::Gt
-            // };
-            //
-            // let upper_op = if *upper_inclusive {
-            //     ast::Opcode::Le
-            // } else {
-            //     ast::Opcode::Lt
-            // };
-            //
-            // coalesce(make_container_group(make_op(
-            //     make_node(make_field_op(
-            //         field.clone(),
-            //         query.clone(),
-            //         lower_op,
-            //         lower.clone(),
-            //     )),
-            //     ast::Opcode::And,
-            //     make_node(make_field_op(field, query, upper_op, upper.clone())),
-            // )))
+            let lower_op = if lower_inclusive {
+                Comparison::Gte
+            } else {
+                Comparison::Gt
+            };
 
-            true
+            let upper_op = if upper_inclusive {
+                Comparison::Lte
+            } else {
+                Comparison::Lt
+            };
+
+            compare(&field, &value, &lower_op, &lower) && compare(&field, &value, &upper_op, &upper)
         }
     })
 }
@@ -640,9 +629,6 @@ mod test {
             tdef: type_def(),
         }
 
-
-
-
         range_tag_unbounded {
             args: func_args![value: value!({"tags": ["a:1"]}), query: "a:[* TO *]"],
             want: Ok(true),
@@ -696,5 +682,62 @@ mod test {
             want: Ok(false),
             tdef: type_def(),
         }
+
+
+
+        range_facet_unbounded {
+            args: func_args![value: value!({"custom": {"a": 1}}), query: "@a:[* TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_facet_lower_bound {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "@a:[4 TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_facet_lower_bound_no_match {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "@a:[50 TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_facet_lower_bound_string {
+            args: func_args![value: value!({"custom": {"a": "5"}}), query: r#"@a:["4" TO *]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_facet_lower_bound_string_no_match {
+            args: func_args![value: value!({"custom": {"a": "400"}}), query: r#"@a:["50" TO *]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_facet_upper_bound {
+            args: func_args![value: value!({"custom": {"a": 1}}), query: "@a:[* TO 4]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_facet_upper_bound_no_match {
+            args: func_args![value: value!({"custom": {"a": 500}}), query: "@a:[* TO 400]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_facet_upper_bound_string {
+            args: func_args![value: value!({"custom": {"a": "3"}}), query: r#"@a:[* TO "4"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_facet_upper_bound_string_no_match {
+            args: func_args![value: value!({"custom": {"a": "5"}}), query: r#"@a:[* TO "400"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
     ];
 }
