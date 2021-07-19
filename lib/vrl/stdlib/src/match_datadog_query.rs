@@ -196,6 +196,24 @@ fn compare(
             }
             _ => compare_string(),
         },
+        // Tag values need extracting to be compared.
+        Field::Tag(_) => match value {
+            Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
+                Some((_, lhs)) => {
+                    let comparison_value = comparison_value.to_string();
+                    let rhs = comparison_value.as_str();
+
+                    match comparator {
+                        Comparison::Lt => lhs < rhs,
+                        Comparison::Lte => lhs <= rhs,
+                        Comparison::Gt => lhs > rhs,
+                        Comparison::Gte => lhs >= rhs,
+                    }
+                }
+                _ => false,
+            }),
+            _ => false,
+        },
         // All other tag types are compared by string.
         _ => compare_string(),
     }
@@ -618,6 +636,63 @@ mod test {
 
         range_message_upper_bound_string_no_match {
             args: func_args![value: value!({"message": "50"}), query: r#"[* TO "400"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+
+
+
+        range_tag_unbounded {
+            args: func_args![value: value!({"tags": ["a:1"]}), query: "a:[* TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_tag_lower_bound {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: "a:[4 TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_tag_lower_bound_no_match {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: "a:[50 TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_tag_lower_bound_string {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: r#"a:["4" TO *]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_tag_lower_bound_string_no_match {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: r#"a:["50" TO *]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_tag_upper_bound {
+            args: func_args![value: value!({"tags": ["a:300"]}), query: "a:[* TO 4]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_tag_upper_bound_no_match {
+            args: func_args![value: value!({"tags": ["a:50"]}), query: "a:[* TO 400]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        range_tag_upper_bound_string {
+            args: func_args![value: value!({"tags": ["a:300"]}), query: r#"a:[* TO "4"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_tag_upper_bound_string_no_match {
+            args: func_args![value: value!({"tags": ["a:50"]}), query: r#"a:[* TO "400"]"#],
             want: Ok(false),
             tdef: type_def(),
         }
