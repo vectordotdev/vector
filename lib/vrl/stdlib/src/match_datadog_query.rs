@@ -204,13 +204,14 @@ fn compare<T: AsRef<str>>(
             }
 
             ComparisonValue::String(v) => {
+                let v = Cow::from(v);
                 let value = string_value(value);
 
                 match comparator {
-                    Comparison::Lt => value < *v,
-                    Comparison::Lte => value <= *v,
-                    Comparison::Gt => value > *v,
-                    Comparison::Gte => value >= *v,
+                    Comparison::Lt => value < v,
+                    Comparison::Lte => value <= v,
+                    Comparison::Gt => value > v,
+                    Comparison::Gte => value >= v,
                 }
             }
 
@@ -276,10 +277,10 @@ fn lookup_field(field: &Field) -> Option<LookupBuf> {
 /// Returns a string value from a VRL `Value`. This differs from the regular `Display`
 /// implementation by treating Bytes values as special-- returning the UTF8 representation
 /// instead of the raw control characters.
-fn string_value(value: &Value) -> String {
+fn string_value(value: &Value) -> Cow<str> {
     match value {
-        Value::Bytes(val) => String::from_utf8_lossy(val).to_string(),
-        _ => value.to_string(),
+        Value::Bytes(val) => String::from_utf8_lossy(val),
+        _ => Cow::from(value.to_string()),
     }
 }
 
