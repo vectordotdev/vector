@@ -3639,6 +3639,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lockfree-object-pool"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8166fbddef141acbea89cf3425ed97d4c22d14a68161977fc01c301175a4fb89"
+
+[[package]]
 name = "log"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3987,13 +3993,15 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45770271d3b4f04a4b38b593e187d04d41f312694fff10ce1d60c356a082cc50"
+checksum = "5ae4119c3866149edb3289413cdec4728420a0245f318457ec85029172c81d8b"
 dependencies = [
  "itoa",
+ "lockfree-object-pool",
  "metrics",
  "metrics-util",
+ "once_cell",
  "tracing 0.1.26",
  "tracing-core 0.1.18",
  "tracing-subscriber",
