@@ -1823,5 +1823,17 @@ mod test {
             want: Ok(false),
             tdef: type_def(),
         }
+
+        kitchen_sink {
+            args: func_args![value: value!({"host": "this"}), query: "host:this OR ((@b:test* AND c:that) AND d:the_other @e:[1 TO 5])"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        kitchen_sink_2 {
+            args: func_args![value: value!({"tags": ["c:that", "d:the_other"], "custom": {"b": "testing", "e": 3}}), query: "host:this OR ((@b:test* AND c:that) AND d:the_other @e:[1 TO 5])"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
     ];
 }
