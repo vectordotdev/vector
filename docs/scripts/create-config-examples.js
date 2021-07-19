@@ -4,7 +4,65 @@ const chalk = require('chalk');
 const TOML = require('@iarna/toml');
 const YAML = require('yaml');
 
-const debug = process.env.DEBUG === "true" || false;
+// Helper functions
+const getExampleValue = (param, deepFilter) => {
+  let value;
+
+  const getValue = (obj) => {
+    const examplesVal = (obj.examples != null && obj.examples.length > 0) ? obj.examples[0] : null;
+
+    return obj.default || examplesVal || null;
+  }
+
+  Object.keys(param.type).forEach(k => {
+    const p = param.type[k];
+
+    if (['array', 'object'].includes(k)) {
+      if (p.items && p.items.type) {
+        const typeInfo = p.items.type;
+
+        Object.keys(typeInfo).forEach(k => {
+          if (['array', 'object'].includes(k)) {
+            const options = typeInfo[k].options;
+
+            var subObj = {};
+
+            Object
+              .keys(options)
+              .filter(k => deepFilter(options[k]))
+              .forEach(k => {
+                Object.keys(options[k].type).forEach(key => {
+                  const deepTypeInfo = options[k].type[key];
+                  subObj[k] = getValue(deepTypeInfo);
+                });
+              });
+
+            value = subObj;
+          } else {
+            value = getValue(typeInfo[k]);
+          }
+        });
+      }
+    } else {
+      value = getValue(p);
+    }
+  });
+
+  return value;
+}
+
+Object.makeExampleParams = (params, filter, deepFilter) => {
+  var obj = {};
+
+  Object
+    .keys(params)
+    .filter(k => filter(params[k]))
+    .forEach(k => {
+      obj[k] = getExampleValue(params[k], deepFilter);
+    });
+
+  return obj;
+}
 
 // Convert object to TOML string
 const toToml = (obj) => {
@@ -117,7 +175,6 @@ const makeUseCaseExamples = (component) => {
       const config = example.configuration;
       const extra = Object.fromEntries(Object.entries(config).filter(([_, v]) => v != null));
 
-
       let exampleConfig;
 
       if (["transform", "sink"].includes(component.kind)) {
@@ -162,109 +219,123 @@ const makeUseCaseExamples = (component) => {
   }
 }
 
-try {
-  console.log(chalk.blue("Creating example configurations for all Vector components..."));
+const main = () => {
+  try {
+    const debug = process.env.DEBUG === "true" || false;
+    const data = fs.readFileSync(cueJsonOutput, 'utf8');
+    const docs = JSON.parse(data);
+    const components = docs.components;
 
-  const data = fs.readFileSync(cueJsonOutput, 'utf8');
-  const docs = JSON.parse(data);
-  const components = docs.components;
 
-  // Sources, transforms, sinks
-  for (const kind in components) {
-    console.log(chalk.blue(`Creating examples for ${kind}...`));
+    console.log(chalk.blue("Creating example configurations for all Vector components..."));
 
-    const componentsOfKind = components[kind];
+    // Sources, transforms, sinks
+    for (const kind in components) {
+      console.log(chalk.blue(`Creating examples for ${kind}...`));
 
-    // Specific components
-    for (const componentType in componentsOfKind) {
-      const component = componentsOfKind[componentType];
-      const configuration = component.configuration;
+      const componentsOfKind = components[kind];
 
-      const commonParams = makeCommonParams(configuration);
-      const allParams = makeAllParams(configuration);
-      const useCaseExamples = makeUseCaseExamples(component);
+      // Specific components
+      for (const componentType in componentsOfKind) {
+        const component = componentsOfKind[componentType];
+        const configuration = component.configuration;
 
-      const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
+        const commonParams = Object.makeExampleParams(
+          configuration,
+          p => p.required || p.common,
+          p => p.required || p.common,
+        );
+        const advancedParams = Object.makeExampleParams(
+          configuration,
+          _ => true,
+          p => p.required || p.common || p.relevant_when,
+        );
+        const useCaseExamples = makeUseCaseExamples(component);
 
-      let commonExampleConfig, advancedExampleConfig;
+        const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
-      // Sinks and transforms are treated differently because they need an `inputs` field
-      if (['sinks', 'transforms'].includes(kind)) {
-        commonExampleConfig = {
-          [kind]: {
-            [keyName]: {
-              "type": componentType,
-              inputs: ['my-source-or-transform-id'],
-              ...commonParams,
+        let commonExampleConfig, advancedExampleConfig;
+
+        // Sinks and transforms are treated differently because they need an `inputs` field
+        if (['sinks', 'transforms'].includes(kind)) {
+          commonExampleConfig = {
+            [kind]: {
+              [keyName]: {
+                "type": componentType,
+                inputs: ['my-source-or-transform-id'],
+                ...commonParams,
+              }
             }
-          }
-        };
+          };
 
-        advancedExampleConfig = {
-          [kind]: {
-            [keyName]: {
-              "type": componentType,
-              inputs: ['my-source-or-transform-id'],
-              ...allParams,
+          advancedExampleConfig = {
+            [kind]: {
+              [keyName]: {
+                "type": componentType,
+                inputs: ['my-source-or-transform-id'],
+                ...advancedParams,
+              }
             }
-          }
-        };
-      } else {
-        commonExampleConfig = {
-          [kind]: {
-            [keyName]: {
-              "type": componentType,
-              ...commonParams,
+          };
+        } else {
+          commonExampleConfig = {
+            [kind]: {
+              [keyName]: {
+                "type": componentType,
+                ...commonParams,
+              }
             }
-          }
-        };
+          };
 
-        advancedExampleConfig = {
-          [kind]: {
-            [keyName]: {
-              "type": componentType,
-              ...allParams,
+          advancedExampleConfig = {
+            [kind]: {
+              [keyName]: {
+                "type": componentType,
+                ...advancedParams,
+              }
             }
-          }
-        };
-      }
-
-      // A debugging statement to make sure things are going basically as planned
-      if (debug) {
-        const debugComponent = "aws_ec2_metadata";
-        const debugKind = "transforms";
-
-        if (componentType === debugComponent && kind === debugKind) {
-          console.log(
-            chalk.blue(`Printing debug JSON for the ${debugComponent} ${debugKind.substring(0, debugKind.length - 1)}...`));
-
-          console.log(JSON.stringify(advancedExampleConfig, null, 2));
+          };
         }
+
+        // A debugging statement to make sure things are going basically as planned
+        if (debug) {
+          const debugComponent = "aws_ec2_metadata";
+          const debugKind = "transforms";
+
+          if (componentType === debugComponent && kind === debugKind) {
+            console.log(
+              chalk.blue(`Printing debug JSON for the ${debugComponent} ${debugKind.substring(0, debugKind.length - 1)}...`));
+
+            console.log(JSON.stringify(advancedExampleConfig, null, 2));
+          }
+        }
+
+        docs['components'][kind][componentType]['examples'] = useCaseExamples;
+
+        docs['components'][kind][componentType]['example_configs'] = {
+          common: {
+            toml: toToml(commonExampleConfig),
+            yaml: toYaml(commonExampleConfig),
+            json: toJson(commonExampleConfig),
+          },
+          advanced: {
+            toml: toToml(advancedExampleConfig),
+            yaml: toYaml(advancedExampleConfig),
+            json: toJson(advancedExampleConfig),
+          },
+        };
       }
-
-      docs['components'][kind][componentType]['examples'] = useCaseExamples;
-
-      docs['components'][kind][componentType]['example_configs'] = {
-        common: {
-          toml: toToml(commonExampleConfig),
-          yaml: toYaml(commonExampleConfig),
-          json: toJson(commonExampleConfig),
-        },
-        advanced: {
-          toml: toToml(advancedExampleConfig),
-          yaml: toYaml(advancedExampleConfig),
-          json: toJson(advancedExampleConfig),
-        },
-      };
     }
+
+    console.log(chalk.green("Success. Finished generating examples for all components."));
+    console.log(chalk.blue(`Writing generated examples as JSON to ${cueJsonOutput}...`));
+
+    fs.writeFileSync(cueJsonOutput, JSON.stringify(docs), 'utf8');
+
+    console.log(chalk.green(`Success. Finished writing example configs to ${cueJsonOutput}.`));
+  } catch (err) {
+    console.error(err);
   }
-
-  console.log(chalk.green("Success. Finished generating examples for all components."));
-  console.log(chalk.blue(`Writing generated examples as JSON to ${cueJsonOutput}...`));
-
-  fs.writeFileSync(cueJsonOutput, JSON.stringify(docs), 'utf8');
-
-  console.log(chalk.green(`Success. Finished writing example configs to ${cueJsonOutput}.`));
-} catch (err) {
-  console.error(err);
 }
+
+main();
