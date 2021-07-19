@@ -23,22 +23,20 @@ pub(self) fn instant_now() -> std::time::Instant {
 // values are the best balances found between competing outcomes.
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
+#[serde(default)]
 pub struct AdaptiveConcurrencySettings {
     // This value maintained high concurrency without holding it too
     // high under adverse conditions.
-    #[serde(default)]
     #[derivative(Default(value = "0.9"))]
     pub(super) decrease_ratio: f64,
 
     // This value achieved the best balance between quick response and
     // stability.
-    #[serde(default)]
     #[derivative(Default(value = "0.7"))]
     pub(super) ewma_alpha: f64,
 
     // This value avoided changing concurrency too aggressively when
     // there is fluctuation in the RTT measurements.
-    #[serde(default)]
     #[derivative(Default(value = "0.05"))]
     pub(super) rtt_threshold_ratio: f64,
 }

@@ -441,7 +441,7 @@ components: sources: kubernetes_logs: {
 				* Built-in [`Pod`](#pod-exclusion) and [`container`](#container-exclusion)
 				  exclusion rules.
 				* The `exclude_paths_glob_patterns` option allows you to exclude
-				  Kuberenetes log files by the file name and path.
+				  Kubernetes log files by the file name and path.
 				* The `extra_field_selector` option specifies the field selector to
 				  filter Pods with, to be used in addition to the built-in `Node` filter.
 				* The `extra_label_selector` option specifies the label selector to

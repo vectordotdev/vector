@@ -218,9 +218,9 @@ configuration: {
 				"""
 		}
 		wildcards: {
-			title: "Wildcards in identifiers"
+			title: "Wildcards in component names"
 			body: """
-				Vector supports wildcard characters (`*`) in component identifiers when building your topology.
+				Vector supports wildcard characters (`*`) in component names when building your topology.
 
 				For example:
 

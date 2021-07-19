@@ -14,6 +14,7 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
+            sink,
             statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig,
         },
@@ -147,6 +148,7 @@ impl InfluxDbSvc {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter(

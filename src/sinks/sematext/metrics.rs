@@ -11,7 +11,7 @@ use crate::{
     sinks::util::{
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         http::{HttpBatchService, HttpRetryLogic},
-        BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig,
+        sink, BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
@@ -155,6 +155,7 @@ impl SematextMetricsService {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter(

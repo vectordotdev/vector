@@ -137,3 +137,36 @@ macro_rules! map {
             .collect::<::std::collections::BTreeMap<_, _>>()
     };
 }
+
+#[macro_export]
+macro_rules! type_def {
+    (unknown) => {
+        TypeDef::new().unknown()
+    };
+
+    (bytes) => {
+        TypeDef::new().bytes()
+    };
+
+    (object { $($key:expr => $value:expr,)+ }) => {
+        TypeDef::new().object::<&'static str, TypeDef>(btreemap! (
+            $($key => $value,)+
+        ))
+    };
+
+    (array [ $($value:expr,)+ ]) => {
+        TypeDef::new().array_mapped::<(), TypeDef>(btreemap! (
+            $(() => $value,)+
+        ))
+    };
+
+    (array { $($idx:expr => $value:expr,)+ }) => {
+        TypeDef::new().array_mapped::<Index, TypeDef>(btreemap! (
+            $($idx => $value,)+
+        ))
+    };
+
+    (array) => {
+        TypeDef::new().array_mapped::<i32, TypeDef>(btreemap! ())
+    };
+}
