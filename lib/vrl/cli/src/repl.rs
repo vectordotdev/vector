@@ -10,7 +10,7 @@ use rustyline::validate::{self, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use shared::TimeZone;
 use std::borrow::Cow::{self, Borrowed, Owned};
-use vrl::{diagnostic::Formatter, state, value, Runtime, RuntimeResult, Target, Terminate, Value};
+use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value};
 
 // Create a list of all possible error values for potential docs lookup
 lazy_static! {
@@ -125,7 +125,7 @@ fn resolve(
     program: &str,
     state: &mut state::Compiler,
     timezone: &TimeZone,
-) -> RuntimeResult {
+) -> Result<Value, String> {
     let mut empty = value!({});
     let object = match object {
         None => &mut empty as &mut dyn Target,
@@ -134,14 +134,12 @@ fn resolve(
 
     let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
         Ok(program) => program,
-        Err(diagnostics) => {
-            return Err(Terminate::Error(
-                Formatter::new(program, diagnostics).colored().to_string(),
-            ))
-        }
+        Err(diagnostics) => return Err(Formatter::new(program, diagnostics).colored().to_string()),
     };
 
-    runtime.resolve(object, &program, timezone)
+    runtime
+        .resolve(object, &program, timezone)
+        .map_err(|err| err.to_string())
 }
 
 struct Repl {
@@ -247,11 +245,9 @@ impl Validator for Repl {
 
         let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state, &timezone) {
             Err(error) => {
-                let m = error.to_string();
-
                 // TODO: Ideally we'd used typed errors for this, but
                 // that requires some more work to the VRL compiler.
-                if m.contains("syntax error") && m.contains("unexpected end of program") {
+                if error.contains("syntax error") && error.contains("unexpected end of program") {
                     ValidationResult::Incomplete
                 } else {
                     ValidationResult::Valid(None)
