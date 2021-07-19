@@ -243,69 +243,6 @@ fn coalesce<T: Into<ast::Expr>>(expr: T) -> ast::Expr {
 /// in order to accommodate expansion to multiple fields where relevant.
 fn parse_node(node: &QueryNode) -> Vec<ast::Expr> {
     match node {
-        // Range.
-        QueryNode::AttributeRange {
-            attr,
-            lower,
-            lower_inclusive,
-            upper,
-            upper_inclusive,
-        } => make_queries(&attr)
-            .into_iter()
-            .map(|(field, query)| {
-                match (lower, upper) {
-                    // If both bounds are wildcards, it'll match everything; just check the field exists.
-                    (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => {
-                        make_function_call("exists", vec![query])
-                    }
-                    // Unbounded lower. Wrapped in a container group for negation compatibility.
-                    (ComparisonValue::Unbounded, _) => {
-                        let op = if *upper_inclusive {
-                            ast::Opcode::Le
-                        } else {
-                            ast::Opcode::Lt
-                        };
-
-                        coalesce(make_field_op(field, query, op, upper.clone()))
-                    }
-                    // Unbounded upper. Wrapped in a container group for negation compatibility.
-                    (_, ComparisonValue::Unbounded) => {
-                        let op = if *lower_inclusive {
-                            ast::Opcode::Ge
-                        } else {
-                            ast::Opcode::Gt
-                        };
-
-                        coalesce(make_field_op(field, query, op, lower.clone()))
-                    }
-                    // Definitive range.
-                    _ => {
-                        let lower_op = if *lower_inclusive {
-                            ast::Opcode::Ge
-                        } else {
-                            ast::Opcode::Gt
-                        };
-
-                        let upper_op = if *upper_inclusive {
-                            ast::Opcode::Le
-                        } else {
-                            ast::Opcode::Lt
-                        };
-
-                        coalesce(make_container_group(make_op(
-                            make_node(make_field_op(
-                                field.clone(),
-                                query.clone(),
-                                lower_op,
-                                lower.clone(),
-                            )),
-                            ast::Opcode::And,
-                            make_node(make_field_op(field, query, upper_op, upper.clone())),
-                        )))
-                    }
-                }
-            })
-            .collect(),
         // Negation. If the node is an operation type, wrap in a container before negating.
         QueryNode::NegatedNode { node } => {
             let expr = recurse(parse_node(node).into_iter());

@@ -103,6 +103,7 @@ fn matches_vrl_object(node: &QueryNode, obj: Value) -> bool {
             upper,
             upper_inclusive,
         } => range(attr, obj, lower, *lower_inclusive, upper, *upper_inclusive),
+        QueryNode::NegatedNode { node } => !matches_vrl_object(node, obj),
         _ => false,
     }
 }
@@ -404,6 +405,18 @@ mod test {
         message_exists {
             args: func_args![value: value!({"message": "test message"}), query: "_exists_:message"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_message_exists {
+            args: func_args![value: value!({"message": "test message"}), query: "NOT _exists_:message"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_message_exists {
+            args: func_args![value: value!({"message": "test message"}), query: "-_exists_:message"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
