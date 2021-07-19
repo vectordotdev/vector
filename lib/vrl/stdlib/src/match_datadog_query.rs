@@ -426,9 +426,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_facet_exists {
+            args: func_args![value: value!({"custom": {"a": "value" }}), query: "NOT _exists_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_facet_exists {
+            args: func_args![value: value!({"custom": {"a": "value" }}), query: "-_exists_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         tag_exists {
             args: func_args![value: value!({"tags": ["a:1","b:2","c:3"]}), query: "_exists_:a"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_tag_exists {
+            args: func_args![value: value!({"tags": ["a:1","b:2","c:3"]}), query: "NOT _exists_:a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_tag_exists {
+            args: func_args![value: value!({"tags": ["a:1","b:2","c:3"]}), query: "-_exists_:a"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -438,9 +462,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_message_missing {
+            args: func_args![value: value!({}), query: "NOT _missing_:message"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_message_missing {
+            args: func_args![value: value!({}), query: "-_missing_:message"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         facet_missing {
             args: func_args![value: value!({"custom": {"b": "value" }}), query: "_missing_:@a"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_facet_missing {
+            args: func_args![value: value!({"custom": {"b": "value" }}), query: "NOT _missing_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_facet_missing {
+            args: func_args![value: value!({"custom": {"b": "value" }}), query: "-_missing_:@a"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -450,9 +498,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_tag_missing {
+            args: func_args![value: value!({"tags": ["b:1","c:2"]}), query: "NOT _missing_:a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_tag_missing {
+            args: func_args![value: value!({"tags": ["b:1","c:2"]}), query: "-_missing_:a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         equals_message {
             args: func_args![value: value!({"message": "match by word boundary"}), query: "match"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_equals_message {
+            args: func_args![value: value!({"message": "match by word boundary"}), query: "NOT match"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_equals_message {
+            args: func_args![value: value!({"message": "match by word boundary"}), query: "-match"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -462,9 +534,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_equals_message_no_match {
+            args: func_args![value: value!({"message": "another value"}), query: "NOT match"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_equals_message_no_match {
+            args: func_args![value: value!({"message": "another value"}), query: "-match"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         equals_tag {
             args: func_args![value: value!({"tags": ["x:1", "y:2", "z:3"]}), query: "y:2"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_equals_tag {
+            args: func_args![value: value!({"tags": ["x:1", "y:2", "z:3"]}), query: "NOT y:2"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_equals_tag {
+            args: func_args![value: value!({"tags": ["x:1", "y:2", "z:3"]}), query: "-y:2"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -474,9 +570,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_equals_tag_no_match {
+            args: func_args![value: value!({"tags": ["x:1", "y:2", "z:3"]}), query: "NOT y:3"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_equals_tag_no_match {
+            args: func_args![value: value!({"tags": ["x:1", "y:2", "z:3"]}), query: "-y:3"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         equals_facet {
             args: func_args![value: value!({"custom": {"z": 1}}), query: "@z:1"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_equals_facet {
+            args: func_args![value: value!({"custom": {"z": 1}}), query: "NOT @z:1"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_equals_facet {
+            args: func_args![value: value!({"custom": {"z": 1}}), query: "-@z:1"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -486,9 +606,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_prefix_message {
+            args: func_args![value: value!({"message": "vector"}), query: "NOT *tor"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_prefix_message {
+            args: func_args![value: value!({"message": "vector"}), query: "-*tor"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_prefix_message_no_match {
             args: func_args![value: value!({"message": "torvec"}), query: "*tor"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_prefix_message_no_match {
+            args: func_args![value: value!({"message": "torvec"}), query: "NOT *tor"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_prefix_message_no_match {
+            args: func_args![value: value!({"message": "torvec"}), query: "-*tor"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -498,9 +642,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_prefix_tag {
+            args: func_args![value: value!({"tags": ["a:vector"]}), query: "NOT a:*tor"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_prefix_tag {
+            args: func_args![value: value!({"tags": ["a:vector"]}), query: "-a:*tor"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_prefix_tag_no_match {
             args: func_args![value: value!({"tags": ["b:vector"]}), query: "a:*tor"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_prefix_tag_no_match {
+            args: func_args![value: value!({"tags": ["b:vector"]}), query: "NOT a:*tor"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_prefix_tag_no_match {
+            args: func_args![value: value!({"tags": ["b:vector"]}), query: "-a:*tor"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -510,9 +678,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_prefix_facet {
+            args: func_args![value: value!({"custom": {"a": "vector"}}), query: "NOT @a:*tor"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_prefix_facet {
+            args: func_args![value: value!({"custom": {"a": "vector"}}), query: "-@a:*tor"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_prefix_facet_no_match {
             args: func_args![value: value!({"custom": {"b": "vector"}}), query: "@a:*tor"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_prefix_facet_no_match {
+            args: func_args![value: value!({"custom": {"b": "vector"}}), query: "NOT @a:*tor"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_prefix_facet_no_match {
+            args: func_args![value: value!({"custom": {"b": "vector"}}), query: "-@a:*tor"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -522,9 +714,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_suffix_message {
+            args: func_args![value: value!({"message": "vector"}), query: "NOT vec*"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_suffix_message {
+            args: func_args![value: value!({"message": "vector"}), query: "-vec*"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_suffix_message_no_match {
             args: func_args![value: value!({"message": "torvec"}), query: "vec*"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_suffix_message_no_match {
+            args: func_args![value: value!({"message": "torvec"}), query: "NOT vec*"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_suffix_message_no_match {
+            args: func_args![value: value!({"message": "torvec"}), query: "-vec*"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -534,9 +750,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_suffix_tag {
+            args: func_args![value: value!({"tags": ["a:vector"]}), query: "NOT a:vec*"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_suffix_tag {
+            args: func_args![value: value!({"tags": ["a:vector"]}), query: "-a:vec*"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_suffix_tag_no_match {
             args: func_args![value: value!({"tags": ["b:vector"]}), query: "a:vec*"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_suffix_tag_no_match {
+            args: func_args![value: value!({"tags": ["b:vector"]}), query: "NOT a:vec*"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_suffix_tag_no_match {
+            args: func_args![value: value!({"tags": ["b:vector"]}), query: "-a:vec*"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -546,9 +786,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_suffix_facet {
+            args: func_args![value: value!({"custom": {"a": "vector"}}), query: "NOT @a:vec*"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_suffix_facet {
+            args: func_args![value: value!({"custom": {"a": "vector"}}), query: "-@a:vec*"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_suffix_facet_no_match {
             args: func_args![value: value!({"custom": {"b": "vector"}}), query: "@a:vec*"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_suffix_facet_no_match {
+            args: func_args![value: value!({"custom": {"b": "vector"}}), query: "NOT @a:vec*"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_suffix_facet_no_match {
+            args: func_args![value: value!({"custom": {"b": "vector"}}), query: "-@a:vec*"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -558,9 +822,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_multiple_message {
+            args: func_args![value: value!({"message": "vector"}), query: "NOT v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_multiple_message {
+            args: func_args![value: value!({"message": "vector"}), query: "-v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_multiple_message_no_match {
             args: func_args![value: value!({"message": "torvec"}), query: "v*c*r"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_multiple_message_no_match {
+            args: func_args![value: value!({"message": "torvec"}), query: "NOT v*c*r"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_multiple_message_no_match {
+            args: func_args![value: value!({"message": "torvec"}), query: "-v*c*r"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -570,9 +858,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_multiple_tag {
+            args: func_args![value: value!({"tags": ["a:vector"]}), query: "NOT a:v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_multiple_tag {
+            args: func_args![value: value!({"tags": ["a:vector"]}), query: "-a:v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_multiple_tag_no_match {
             args: func_args![value: value!({"tags": ["b:vector"]}), query: "a:v*c*r"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_multiple_tag_no_match {
+            args: func_args![value: value!({"tags": ["b:vector"]}), query: "NOT a:v*c*r"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_multiple_tag_no_match {
+            args: func_args![value: value!({"tags": ["b:vector"]}), query: "-a:v*c*r"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -582,9 +894,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_wildcard_multiple_facet {
+            args: func_args![value: value!({"custom": {"a": "vector"}}), query: "NOT @a:v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_multiple_facet {
+            args: func_args![value: value!({"custom": {"a": "vector"}}), query: "-@a:v*c*r"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         wildcard_multiple_facet_no_match {
             args: func_args![value: value!({"custom": {"b": "vector"}}), query: "@a:v*c*r"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_wildcard_multiple_facet_no_match {
+            args: func_args![value: value!({"custom": {"b": "vector"}}), query: "NOT @a:v*c*r"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_wildcard_multiple_facet_no_match {
+            args: func_args![value: value!({"custom": {"b": "vector"}}), query: "-@a:v*c*r"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -594,9 +930,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_message_unbounded {
+            args: func_args![value: value!({"message": "1"}), query: "NOT [* TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_message_unbounded {
+            args: func_args![value: value!({"message": "1"}), query: "-[* TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_message_lower_bound {
             args: func_args![value: value!({"message": "400"}), query: "[4 TO *]"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_message_lower_bound {
+            args: func_args![value: value!({"message": "400"}), query: "NOT [4 TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_message_lower_bound {
+            args: func_args![value: value!({"message": "400"}), query: "-[4 TO *]"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -606,9 +966,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_message_lower_bound_no_match {
+            args: func_args![value: value!({"message": "400"}), query: "NOT [50 TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_message_lower_bound_no_match {
+            args: func_args![value: value!({"message": "400"}), query: "-[50 TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_message_lower_bound_string {
             args: func_args![value: value!({"message": "400"}), query: r#"["4" TO *]"#],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_message_lower_bound_string {
+            args: func_args![value: value!({"message": "400"}), query: r#"NOT ["4" TO *]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_message_lower_bound_string {
+            args: func_args![value: value!({"message": "400"}), query: r#"-["4" TO *]"#],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -618,9 +1002,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_message_lower_bound_string_no_match {
+            args: func_args![value: value!({"message": "400"}), query: r#"NOT ["50" TO *]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_message_lower_bound_string_no_match {
+            args: func_args![value: value!({"message": "400"}), query: r#"-["50" TO *]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_message_upper_bound {
             args: func_args![value: value!({"message": "300"}), query: "[* TO 4]"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_message_upper_bound {
+            args: func_args![value: value!({"message": "300"}), query: "NOT [* TO 4]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_message_upper_bound {
+            args: func_args![value: value!({"message": "300"}), query: "-[* TO 4]"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -630,9 +1038,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_message_upper_bound_no_match {
+            args: func_args![value: value!({"message": "50"}), query: "NOT [* TO 400]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_message_upper_bound_no_match {
+            args: func_args![value: value!({"message": "50"}), query: "-[* TO 400]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_message_upper_bound_string {
             args: func_args![value: value!({"message": "300"}), query: r#"[* TO "4"]"#],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_message_upper_bound_string {
+            args: func_args![value: value!({"message": "300"}), query: r#"NOT [* TO "4"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_message_upper_bound_string {
+            args: func_args![value: value!({"message": "300"}), query: r#"-[* TO "4"]"#],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -642,9 +1074,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_message_upper_bound_string_no_match {
+            args: func_args![value: value!({"message": "50"}), query: r#"NOT [* TO "400"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_message_upper_bound_string_no_match {
+            args: func_args![value: value!({"message": "50"}), query: r#"NOT [* TO "400"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_message_between {
             args: func_args![value: value!({"message": 500}), query: "[1 TO 6]"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_message_between {
+            args: func_args![value: value!({"message": 500}), query: "NOT [1 TO 6]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_message_between {
+            args: func_args![value: value!({"message": 500}), query: "-[1 TO 6]"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -654,9 +1110,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_message_between_no_match {
+            args: func_args![value: value!({"message": 70}), query: "NOT [1 TO 6]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_message_between_no_match {
+            args: func_args![value: value!({"message": 70}), query: "-[1 TO 6]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_message_between_string {
             args: func_args![value: value!({"message": "500"}), query: r#"["1" TO "6"]"#],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_message_between_string {
+            args: func_args![value: value!({"message": "500"}), query: r#"NOT ["1" TO "6"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_message_between_string {
+            args: func_args![value: value!({"message": "500"}), query: r#"-["1" TO "6"]"#],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -666,9 +1146,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_message_between_no_match_string {
+            args: func_args![value: value!({"message": "70"}), query: r#"NOT ["1" TO "6"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_message_between_no_match_string {
+            args: func_args![value: value!({"message": "70"}), query: r#"-["1" TO "6"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_tag_unbounded {
             args: func_args![value: value!({"tags": ["a:1"]}), query: "a:[* TO *]"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_tag_unbounded {
+            args: func_args![value: value!({"tags": ["a:1"]}), query: "NOT a:[* TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_unbounded {
+            args: func_args![value: value!({"tags": ["a:1"]}), query: "-a:[* TO *]"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -678,9 +1182,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_tag_lower_bound {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: "NOT a:[4 TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_lower_bound {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: "-a:[4 TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_tag_lower_bound_no_match {
             args: func_args![value: value!({"tags": ["a:400"]}), query: "a:[50 TO *]"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_range_tag_lower_bound_no_match {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: "NOT a:[50 TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_lower_bound_no_match {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: "-a:[50 TO *]"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -690,9 +1218,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_tag_lower_bound_string {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: r#"NOT a:["4" TO *]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_lower_bound_string {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: r#"-a:["4" TO *]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_tag_lower_bound_string_no_match {
             args: func_args![value: value!({"tags": ["a:400"]}), query: r#"a:["50" TO *]"#],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_range_tag_lower_bound_string_no_match {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: r#"NOT a:["50" TO *]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_lower_bound_string_no_match {
+            args: func_args![value: value!({"tags": ["a:400"]}), query: r#"-a:["50" TO *]"#],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -702,9 +1254,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_tag_upper_bound {
+            args: func_args![value: value!({"tags": ["a:300"]}), query: "NOT a:[* TO 4]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_upper_bound {
+            args: func_args![value: value!({"tags": ["a:300"]}), query: "-a:[* TO 4]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_tag_upper_bound_no_match {
             args: func_args![value: value!({"tags": ["a:50"]}), query: "a:[* TO 400]"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_range_tag_upper_bound_no_match {
+            args: func_args![value: value!({"tags": ["a:50"]}), query: "NOT a:[* TO 400]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_upper_bound_no_match {
+            args: func_args![value: value!({"tags": ["a:50"]}), query: "-a:[* TO 400]"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -714,9 +1290,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_tag_upper_bound_string {
+            args: func_args![value: value!({"tags": ["a:300"]}), query: r#"NOT a:[* TO "4"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_upper_bound_string {
+            args: func_args![value: value!({"tags": ["a:300"]}), query: r#"-a:[* TO "4"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_tag_upper_bound_string_no_match {
             args: func_args![value: value!({"tags": ["a:50"]}), query: r#"a:[* TO "400"]"#],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_range_tag_upper_bound_string_no_match {
+            args: func_args![value: value!({"tags": ["a:50"]}), query: r#"NOT a:[* TO "400"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_upper_bound_string_no_match {
+            args: func_args![value: value!({"tags": ["a:50"]}), query: r#"-a:[* TO "400"]"#],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -726,9 +1326,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_tag_between {
+            args: func_args![value: value!({"tags": ["a:500"]}), query: "NOT a:[1 TO 6]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_between {
+            args: func_args![value: value!({"tags": ["a:500"]}), query: "-a:[1 TO 6]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_tag_between_no_match {
             args: func_args![value: value!({"tags": ["a:70"]}), query: "a:[1 TO 6]"],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_range_tag_between_no_match {
+            args: func_args![value: value!({"tags": ["a:70"]}), query: "NOT a:[1 TO 6]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_between_no_match {
+            args: func_args![value: value!({"tags": ["a:70"]}), query: "-a:[1 TO 6]"],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -738,9 +1362,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_tag_between_string {
+            args: func_args![value: value!({"tags": ["a:500"]}), query: r#"NOT a:["1" TO "6"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_between_string {
+            args: func_args![value: value!({"tags": ["a:500"]}), query: r#"-a:["1" TO "6"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_tag_between_no_match_string {
             args: func_args![value: value!({"tags": ["a:70"]}), query: r#"a:["1" TO "6"]"#],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_range_tag_between_no_match_string {
+            args: func_args![value: value!({"tags": ["a:70"]}), query: r#"NOT a:["1" TO "6"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_tag_between_no_match_string {
+            args: func_args![value: value!({"tags": ["a:70"]}), query: r#"-a:["1" TO "6"]"#],
+            want: Ok(true),
             tdef: type_def(),
         }
 
@@ -750,9 +1398,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_facet_unbounded {
+            args: func_args![value: value!({"custom": {"a": 1}}), query: "NOT @a:[* TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_unbounded {
+            args: func_args![value: value!({"custom": {"a": 1}}), query: "-@a:[* TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_facet_lower_bound {
             args: func_args![value: value!({"custom": {"a": 5}}), query: "@a:[4 TO *]"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_facet_lower_bound {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "NOT @a:[4 TO *]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_lower_bound {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "-@a:[4 TO *]"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -762,9 +1434,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_facet_lower_bound_no_match {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "NOT @a:[50 TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_lower_bound_no_match {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "-@a:[50 TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_facet_lower_bound_string {
             args: func_args![value: value!({"custom": {"a": "5"}}), query: r#"@a:["4" TO *]"#],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_facet_lower_bound_string {
+            args: func_args![value: value!({"custom": {"a": "5"}}), query: r#"NOT @a:["4" TO *]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_lower_bound_string {
+            args: func_args![value: value!({"custom": {"a": "5"}}), query: r#"-@a:["4" TO *]"#],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -774,9 +1470,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_facet_lower_bound_string_no_match {
+            args: func_args![value: value!({"custom": {"a": "400"}}), query: r#"NOT @a:["50" TO *]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_lower_bound_string_no_match {
+            args: func_args![value: value!({"custom": {"a": "400"}}), query: r#"-@a:["50" TO *]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_facet_upper_bound {
             args: func_args![value: value!({"custom": {"a": 1}}), query: "@a:[* TO 4]"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_facet_upper_bound {
+            args: func_args![value: value!({"custom": {"a": 1}}), query: "NOT @a:[* TO 4]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_upper_bound {
+            args: func_args![value: value!({"custom": {"a": 1}}), query: "-@a:[* TO 4]"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -786,9 +1506,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_facet_upper_bound_no_match {
+            args: func_args![value: value!({"custom": {"a": 500}}), query: "NOT @a:[* TO 400]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_upper_bound_no_match {
+            args: func_args![value: value!({"custom": {"a": 500}}), query: "-@a:[* TO 400]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_facet_upper_bound_string {
             args: func_args![value: value!({"custom": {"a": "3"}}), query: r#"@a:[* TO "4"]"#],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_facet_upper_bound_string {
+            args: func_args![value: value!({"custom": {"a": "3"}}), query: r#"NOT @a:[* TO "4"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_upper_bound_string {
+            args: func_args![value: value!({"custom": {"a": "3"}}), query: r#"-@a:[* TO "4"]"#],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -798,9 +1542,33 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_facet_upper_bound_string_no_match {
+            args: func_args![value: value!({"custom": {"a": "5"}}), query: r#"NOT @a:[* TO "400"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_upper_bound_string_no_match {
+            args: func_args![value: value!({"custom": {"a": "5"}}), query: r#"-@a:[* TO "400"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_facet_between {
             args: func_args![value: value!({"custom": {"a": 5}}), query: "@a:[1 TO 6]"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_range_facet_between {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "NOT @a:[1 TO 6]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_between {
+            args: func_args![value: value!({"custom": {"a": 5}}), query: "-@a:[1 TO 6]"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -810,15 +1578,51 @@ mod test {
             tdef: type_def(),
         }
 
+        not_range_facet_between_no_match {
+            args: func_args![value: value!({"custom": {"a": 200}}), query: "NOT @a:[1 TO 6]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_between_no_match {
+            args: func_args![value: value!({"custom": {"a": 200}}), query: "-@a:[1 TO 6]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         range_facet_between_string {
             args: func_args![value: value!({"custom": {"a": "500"}}), query: r#"@a:["1" TO "6"]"#],
             want: Ok(true),
             tdef: type_def(),
         }
 
+        not_range_facet_between_string {
+            args: func_args![value: value!({"custom": {"a": "500"}}), query: r#"NOT @a:["1" TO "6"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_between_string {
+            args: func_args![value: value!({"custom": {"a": "500"}}), query: r#"-@a:["1" TO "6"]"#],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         range_facet_between_no_match_string {
             args: func_args![value: value!({"custom": {"a": "7"}}), query: r#"@a:["1" TO "60"]"#],
             want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_range_facet_between_no_match_string {
+            args: func_args![value: value!({"custom": {"a": "7"}}), query: r#"NOT @a:["1" TO "60"]"#],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_range_facet_between_no_match_string {
+            args: func_args![value: value!({"custom": {"a": "7"}}), query: r#"-@a:["1" TO "60"]"#],
+            want: Ok(true),
             tdef: type_def(),
         }
     ];
