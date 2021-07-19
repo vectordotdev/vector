@@ -245,11 +245,9 @@ impl Validator for Repl {
 
         let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state, &timezone) {
             Err(error) => {
-                let m = error.to_string();
-
                 // TODO: Ideally we'd used typed errors for this, but
                 // that requires some more work to the VRL compiler.
-                if m.contains("syntax error") && m.contains("unexpected end of program") {
+                if error.contains("syntax error") && error.contains("unexpected end of program") {
                     ValidationResult::Incomplete
                 } else {
                     ValidationResult::Valid(None)
