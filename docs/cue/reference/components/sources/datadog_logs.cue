@@ -1,15 +1,18 @@
 package metadata
 
-components: sources: datadog_logs: {
+components: sources: datadog_agent: {
 	_port: 8080
 
-	title: "Datadog Logs"
+	title: "Datadog Agent"
 
 	description: """
-		Receives logs from a Datadog Agent over HTTP or HTTPS. To sent logs from a Datadog Agent to this source,
-		the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated to use `logs_config.dd_url: "<VECTOR_HOST>:<SOURCE_PORT>"`,
-		`logs_config.use_http` should be set to `true` as this source only supports HTTP/HTTPS and `logs_config.logs_no_ssl`
-		must be set to `true` or `false` in accordance to the source SSL configuration.
+		Receives observability data from a Datadog Agent over HTTP or HTTPS. For now, this is limited to logs, but will
+		be expanded in the future to cover metrics and traces.
+
+		To send logs from a Datadog Agent to this source, the [Datadog Agent](\(urls.datadog_agent_doc)) configuration
+		must be updated to use `logs_config.dd_url: "<VECTOR_HOST>:<SOURCE_PORT>"`, `logs_config.use_http` should be set
+		to `true` as this source only supports HTTP/HTTPS and `logs_config.logs_no_ssl` must be set to `true` or `false`
+		in accordance to the source SSL configuration.
 		"""
 
 	classes: {
@@ -25,7 +28,7 @@ components: sources: datadog_logs: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: services.datadog_logs
+				service: services.datadog_agent
 
 				interface: socket: {
 					direction: "incoming"

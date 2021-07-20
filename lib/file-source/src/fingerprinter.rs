@@ -33,7 +33,7 @@ pub enum FingerprintStrategy {
     DevInode,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, Ord, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 pub enum FileFingerprint {
     #[serde(rename = "checksum")]
