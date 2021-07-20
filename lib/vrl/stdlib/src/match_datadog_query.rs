@@ -17,7 +17,28 @@ impl Function for MatchDatadogQuery {
     }
 
     fn examples(&self) -> &'static [Example] {
-        todo!()
+        &[
+            Example {
+                title: "OR query",
+                source: r#"match_datadog_query({"message": "contains this and that"}, "this OR that")"#,
+                result: Ok("true"),
+            },
+            Example {
+                title: "AND query",
+                source: r#"match_datadog_query({"message": "contains only this"}, "this AND that")"#,
+                result: Ok("false"),
+            },
+            Example {
+                title: "facet wildcard",
+                source: r#"match_datadog_query({"custom": {"name": "vector"}}, "@name:vec*")"#,
+                result: Ok("true"),
+            },
+            Example {
+                title: "tag range",
+                source: r#"match_datadog_query({"tags": ["a:x", "b:y", "c:z"]}, s'b:["x" TO "z"]')"#,
+                result: Ok("true"),
+            },
+        ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
