@@ -71,7 +71,7 @@ async fn run(
             if let Ok(hostname) = &hostname {
                 metric.insert_tag(log_schema().host_key().to_owned(), hostname.to_owned());
             }
-            metric.insert_tag(String::from("pid"), std::process::id().clone());
+            metric.insert_tag(String::from("pid"), pid.clone());
             Ok(metric.into())
         }))
         .await?;
