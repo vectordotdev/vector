@@ -175,13 +175,14 @@ fn equals<T: AsRef<str>>(attr: T, obj: &Value, to_match: &str) -> bool {
     })
 }
 
-/// Returns true if the
+/// Returns true if the `Value` matches the `ComparisonValue`, using the `Comparison` operator.
 fn compare(
     field: &Field,
     value: &Value,
     comparator: &Comparison,
     comparison_value: &ComparisonValue,
 ) -> bool {
+    // Helper for comparing string types.
     let compare_string = || {
         let lhs = string_value(value).into_owned();
         let rhs = comparison_value.to_string();
@@ -197,12 +198,14 @@ fn compare(
     match field {
         // Facets are compared numerically if the value is numeric, or as strings otherwise.
         Field::Facet(_) => match (value, comparison_value) {
+            // Integers.
             (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
                 Comparison::Lt => lhs < rhs,
                 Comparison::Lte => lhs <= rhs,
                 Comparison::Gt => lhs > rhs,
                 Comparison::Gte => lhs >= rhs,
             },
+            // Floats.
             (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
                 let lhs = lhs.into_inner();
                 match comparator {
@@ -212,6 +215,7 @@ fn compare(
                     Comparison::Gte => lhs >= *rhs,
                 }
             }
+            // Where the rhs is a string ref, the lhs is coerced into a string.
             (_, ComparisonValue::String(rhs)) => {
                 let lhs = string_value(value).into_owned();
 
@@ -222,9 +226,10 @@ fn compare(
                     Comparison::Gte => &lhs >= rhs,
                 }
             }
+            // Otherwise, compare directly as strings.
             _ => compare_string(),
         },
-        // Tag values need extracting to be compared.
+        // Tag values need extracting by "key:value" to be compared.
         Field::Tag(_) => match value {
             Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
                 Some((_, lhs)) => {
@@ -290,16 +295,19 @@ fn wildcard_regex(to_match: &str) -> Regex {
 /// Returns true if the provided `Value` matches the prefix.
 fn match_wildcard_with_prefix<T: AsRef<str>>(attr: T, obj: &Value, prefix: &str) -> bool {
     each_field(attr, obj, |field, value| match field {
+        // Default fields are matched by word boundary.
         Field::Default(_) => {
             let re = word_regex(&format!("{}*", prefix));
             re.is_match(&string_value(value))
         }
+        // Tags are recursed until a match is found.
         Field::Tag(tag) => match value {
             Value::Array(v) => v
                 .iter()
                 .any(|v| string_value(v).starts_with(&format!("{}:{}", tag, prefix))),
             _ => false,
         },
+        // All other field types are compared by complete value.
         _ => string_value(value).starts_with(prefix),
     })
 }
@@ -325,6 +333,7 @@ fn match_wildcard<T: AsRef<str>>(attr: T, obj: &Value, wildcard: &str) -> bool {
     })
 }
 
+/// Returns true if the provided `Value` matches on the lower and upper bound.
 fn range<T: AsRef<str>>(
     attr: T,
     obj: &Value,
@@ -370,6 +379,7 @@ fn range<T: AsRef<str>>(
                 Comparison::Lt
             };
 
+            // Must match on both lower and upper bound.
             compare(&field, &value, &lower_op, &lower) && compare(&field, &value, &upper_op, &upper)
         }
     })
