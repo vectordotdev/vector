@@ -33,7 +33,7 @@ type AlgoliaRecord = {
 // Constants
 const targetFile = "./public/search.json";
 
-const DEBUG = process.env.DEBUG === "true" ?? false;
+const DEBUG = process.env.DEBUG === "true" || false;
 const publicPath = path.resolve(__dirname, "..", "public");
 const tagHierarchy = {
   h1: 6,
