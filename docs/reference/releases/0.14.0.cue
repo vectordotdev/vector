@@ -5,6 +5,9 @@ releases: "0.14.0": {
 	codename: ""
 
 	description: """
+		Warning: This release contains a bug with the checkpointing for the `file` source. If you are upgrading from
+		`0.13.X` and are using the `file` source, please upgrade to `0.14.1` instead.
+
 		The Vector team is pleased to announce version 0.14.0!
 
 		This release includes a new `exec` source that can be used to execute arbitrary programs and use their output to
