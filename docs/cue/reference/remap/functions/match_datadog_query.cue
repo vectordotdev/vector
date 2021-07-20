@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: match_datadog_query: {
-	category: "Object"
+	category:    "Object"
 	description: """
 		Matches an object against a [Datadog Search Syntax](\(urls.datadog_search_syntax)) query.
 		"""
