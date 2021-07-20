@@ -44,7 +44,7 @@ const Chevron: React.FC = () => {
 }
 
 const Result = ({ hit, components }) => {
-  const isRootPage = hit.tags.length < 1
+  const isRootPage = hit.hierarchy.length < 1
   return (
     <a href={hit.itemUrl}>
       <div className="border-r border-gray-300 py-4 pl-2 h-full leading-relaxed">
@@ -53,12 +53,12 @@ const Result = ({ hit, components }) => {
       <div className="p-2 block">
         <div className="text-gray-800 text-md mb-1 font-medium leading-relaxed ">
           {!isRootPage &&
-            hit.tags.map((t, i) => (
+            hit.hierarchy.map((t, i) => (
               <span key={`${hit.itemUrl}-${t}`}>
                 <span className="w-2 h-2 inline" key={`${t.itemUrl}`}>
                   {t}
                 </span>
-                {i < hit.tags.length - 1 && (
+                {i < hit.hierarchy.length - 1 && (
                   <span className="inline ml-1 mr-1">
                     <Chevron />
                   </span>
