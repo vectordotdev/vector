@@ -149,6 +149,9 @@ impl_valuekind_from_integer!(i64);
 impl_valuekind_from_integer!(i32);
 impl_valuekind_from_integer!(i16);
 impl_valuekind_from_integer!(i8);
+impl_valuekind_from_integer!(u32);
+impl_valuekind_from_integer!(u16);
+impl_valuekind_from_integer!(u8);
 impl_valuekind_from_integer!(isize);
 
 impl From<bool> for Value {

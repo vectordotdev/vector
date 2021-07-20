@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
@@ -68,8 +68,9 @@ async fn run(
 
         out.send_all(&mut stream::iter(metrics.map(|mut metric| {
             if let Ok(hostname) = &hostname {
-                metric.insert_tag("host".into(), hostname.into());
+                metric.insert_tag(log_schema().host_key().to_owned(), hostname.to_owned());
             }
+            metric.insert_tag(String::from("pid"), std::process::id().to_string());
             Ok(metric.into())
         })))
         .await?;
