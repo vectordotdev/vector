@@ -55,7 +55,7 @@ impl ProxyConfig {
     pub fn from_env() -> Self {
         Self {
             http: from_env("HTTP_PROXY"),
-            https: from_env("HTTP_PROXYS"),
+            https: from_env("HTTPS_PROXY"),
             no_proxy: from_env("NO_PROXY")
                 .map(|value| {
                     value
