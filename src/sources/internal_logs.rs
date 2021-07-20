@@ -35,16 +35,18 @@ impl SourceConfig for InternalLogsConfig {
 }
 
 async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
-    let hostname = crate::get_hostname();
     let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
     let subscription = trace::subscribe();
     let mut rx = subscription.receiver;
+
+    let hostname = crate::get_hostname();
+    let pid = std::process::id();
 
     out.send_all(&mut stream::iter(subscription.buffer).map(|mut log| {
         if let Ok(hostname) = &hostname {
             log.insert(log_schema().host_key().to_owned(), hostname.to_owned());
         }
-        log.insert(String::from("pid"), std::process::id());
+        log.insert(String::from("pid"), pid);
         Ok(Event::from(log))
     }))
     .await?;
