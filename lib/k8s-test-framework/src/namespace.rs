@@ -42,7 +42,7 @@ impl up_down::CommandBuilder for CommandBuilder {
                 up_down::CommandToBuild::Up => "create",
                 up_down::CommandToBuild::Down => "delete",
             })
-            .arg("-f")
+            .arg("--values")
             .arg(&self.config.test_namespace_resource_file.path());
 
         if matches!(command_to_build, up_down::CommandToBuild::Down) {

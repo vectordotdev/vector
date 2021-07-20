@@ -56,7 +56,7 @@ components: sources: kubernetes_logs: {
 	}
 
 	configuration: {
-		annotation_fields: {
+		pod_annotation_fields: {
 			common:      false
 			description: "Configuration for how the events are annotated with Pod metadata."
 			required:    false
