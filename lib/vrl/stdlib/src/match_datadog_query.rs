@@ -29,12 +29,12 @@ impl Function for MatchDatadogQuery {
                 result: Ok("false"),
             },
             Example {
-                title: "facet wildcard",
+                title: "Facet wildcard",
                 source: r#"match_datadog_query({"custom": {"name": "vector"}}, "@name:vec*")"#,
                 result: Ok("true"),
             },
             Example {
-                title: "tag range",
+                title: "Tag range",
                 source: r#"match_datadog_query({"tags": ["a:x", "b:y", "c:z"]}, s'b:["x" TO "z"]')"#,
                 result: Ok("true"),
             },
