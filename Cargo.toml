@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.15.0"
+version = "0.16.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -110,7 +110,7 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 # Tokio / Futures
 async-trait = "0.1.50"
 futures = { version = "0.3.15", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.8.1", default-features = false, features = ["full"] }
+tokio = { version = "1.8.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.7", default-features = false, features = ["codec", "time"] }
@@ -128,7 +128,7 @@ opentelemetry-datadog = { version = "0.3.1", default-features = false, features 
 
 # Metrics
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
-metrics-tracing-context = { version = "0.7.0", default-features = false }
+metrics-tracing-context = { version = "0.8.0", default-features = false }
 metrics-util = { version = "0.10.0", default-features = false, features = ["std"] }
 
 # Aws
@@ -250,7 +250,7 @@ pulsar = { version = "3.0.1", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.1", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.20.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.21.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 # make sure to update the external docs when the Lua version changes
 rlua = { version = "0.17.0", default-features = true, optional = true }
@@ -311,7 +311,7 @@ matches = "0.1.8"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.4", features = ["json"] }
 tempfile = "3.2.0"
-tokio = { version = "1.8.1", features = ["test-util"] }
+tokio = { version = "1.8.2", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 walkdir = "2.3.2"

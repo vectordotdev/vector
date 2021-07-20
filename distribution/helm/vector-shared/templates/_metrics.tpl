@@ -113,10 +113,10 @@ spec:
         {{- with .Values.podMonitor.extraRelabelings }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      {{- with .Values.podMonitor.metricRelabelings }}
       metricRelabelings:
-        {{- with .Values.podMonitor.metricRelabelings }}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
 {{- end }}
 {{/* DEPRECATED */}}
 {{- if .Values.prometheusSink -}}
@@ -154,10 +154,10 @@ spec:
         {{- with .Values.prometheusSink.podMonitor.extraRelabelings }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      {{- with .Values.prometheusSink.podMonitor.metricRelabelings }}
       metricRelabelings:
-        {{- with .Values.prometheusSink.podMonitor.metricRelabelings }}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

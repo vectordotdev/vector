@@ -11,7 +11,7 @@
 <div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl mt-8">
   <div class="lg:grid lg:grid-cols-16 lg:gap-8">
     <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 lg:pr-6 md:pr-2">
-      <nav aria-label="Sidebar" class="sticky top-8 pr-0 lg:pr-4 pb-16" x-cloak>
+      <nav aria-label="Sidebar" class="sticky top-8 h-screen overflow-auto pr-0 lg:pr-4 pb-16" x-cloak>
         {{ partial "docs/sidebar.html" . }}
       </nav>
     </div>
@@ -147,7 +147,7 @@
     </main>
 
     <div class="hidden xl:block xl:col-span-3">
-      <aside aria-label="Table of contents" class="sticky top-8">
+      <aside aria-label="Table of contents" class="sticky top-8 h-screen overflow-auto">
         {{ partial "toc.html" . }}
       </aside>
     </div>

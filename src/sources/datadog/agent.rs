@@ -24,7 +24,7 @@ lazy_static! {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct DatadogLogsConfig {
+pub struct DatadogAgentConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
@@ -33,10 +33,10 @@ pub struct DatadogLogsConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new::<DatadogLogsConfig>("datadog_logs")
+    SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
 }
 
-impl GenerateConfig for DatadogLogsConfig {
+impl GenerateConfig for DatadogAgentConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:8080".parse().unwrap(),
@@ -49,10 +49,10 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_logs")]
-impl SourceConfig for DatadogLogsConfig {
+#[typetag::serde(name = "datadog_agent")]
+impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogLogsSource {
+        let source = DatadogAgentSource {
             store_api_key: self.store_api_key,
         };
         // We accept /v1/input & /v1/input/<API_KEY>
@@ -64,7 +64,7 @@ impl SourceConfig for DatadogLogsConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "datadog_logs"
+        "datadog_agent"
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -73,11 +73,11 @@ impl SourceConfig for DatadogLogsConfig {
 }
 
 #[derive(Clone, Default)]
-struct DatadogLogsSource {
+struct DatadogAgentSource {
     store_api_key: bool,
 }
 
-impl HttpSource for DatadogLogsSource {
+impl HttpSource for DatadogAgentSource {
     fn build_events(
         &self,
         body: Bytes,
@@ -105,7 +105,7 @@ impl HttpSource for DatadogLogsSource {
             let key = log_schema().source_type_key();
             for event in &mut events {
                 let log = event.as_mut_log();
-                log.try_insert(key, Bytes::from("datadog_logs"));
+                log.try_insert(key, Bytes::from("datadog_agent"));
                 if let Some(k) = &api_key {
                     log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                 }
@@ -127,7 +127,7 @@ fn extract_api_key<'a>(headers: &'a HeaderMap, path: &'a str) -> Option<String> 
 
 #[cfg(test)]
 mod tests {
-    use super::DatadogLogsConfig;
+    use super::DatadogAgentConfig;
 
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<DatadogLogsConfig>();
+        crate::test_util::test_generate_config::<DatadogAgentConfig>();
     }
 
     async fn source(
@@ -155,7 +155,7 @@ mod tests {
         let mut context = SourceContext::new_test(sender);
         context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
-            DatadogLogsConfig {
+            DatadogAgentConfig {
                 address,
                 tls: None,
                 auth: None,
@@ -217,7 +217,7 @@ mod tests {
             assert_eq!(log["message"], "foo".into());
             assert_eq!(log["timestamp"], 123.into());
             assert!(event.metadata().datadog_api_key().is_none());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
         }
     }
 
@@ -249,7 +249,7 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
             assert_eq!(log["timestamp"], 456.into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -291,7 +291,7 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], 789.into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -383,7 +383,7 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], 789.into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
         }
     }
