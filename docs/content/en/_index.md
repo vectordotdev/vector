@@ -47,48 +47,7 @@ configure:
   description: "A simple, composable format enables you to build flexible pipelines"
   filename: "/etc/vector/vector.toml"
   below: "Configuration examples are in [TOML](https://toml.io) but Vector also supports [YAML](https://yaml.org) and [JSON](https://json.org)"
-  example_configs:
-  - title: Parse NGINX logs
-    config: |
-      [sources.nginx_error_log]
-      type = "file"
-      include = ["/var/log/nginx*.log"]
-      start_at_beginning = false
-      ignore_older = 86400
-
-      [transforms.nginx_error_parser]
-      inputs = ["nginx_error_log"]
-      type = "remap"
-      source = '''
-      # TODO
-      '''
-  - title: Something else
-    config: |
-      [sources.do_something_else]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
-  - title: Other thing entirely
-    config: |
-      [sources.do_other_thing_entirely]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
-  - title: And yet another
-    config: |
-      [sources.and_yet_another]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
+  # Example configs are specified in cue/examples.cue
 
 # Installation section
 installation:

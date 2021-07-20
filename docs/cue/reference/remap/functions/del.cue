@@ -11,7 +11,7 @@ remap: functions: del: {
 			name:        "path"
 			description: "The path of the field to delete."
 			required:    true
-			type: ["string"]
+			type: ["path"]
 		},
 	]
 	internal_failure_reasons: []

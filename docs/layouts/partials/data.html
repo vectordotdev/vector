@@ -69,6 +69,10 @@
               {{ range $k, $v := $v.type }}
               {{ partial "badge.html" (dict "word" $k "color" "gray") }}
 
+              {{ with $v.enum }}
+              {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
+              {{ end }}
+
               {{ with $v.syntax }}
               {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
               {{ end }}
@@ -88,9 +92,21 @@
             </span>
           </div>
           {{ end }}
-
           {{/* Default value */}}
           {{ range $k, $v := $v.type }}
+          {{ with $v.enum }}
+          <div class="mt-4">
+            <span class="font-semibold">
+              Enum options
+            </span>
+
+            <div class="mt-2 prose">
+              {{ template "enum-options-table" . }}
+            </div>
+          </div>
+          {{ end }}
+
+
           {{ if or $v.default (eq $v.default false) }}
           <div class="mt-4">
             {{ template "default" . }}

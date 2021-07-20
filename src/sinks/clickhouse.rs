@@ -6,7 +6,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
-        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+        sink, BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
         UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
@@ -84,7 +84,7 @@ impl SinkConfig for ClickhouseConfig {
             ..self.clone()
         };
 
-        let sink = BatchedHttpSink::with_retry_logic(
+        let sink = BatchedHttpSink::with_logic(
             config.clone(),
             Buffer::new(batch.size, self.compression),
             ClickhouseRetryLogic::default(),
@@ -92,6 +92,7 @@ impl SinkConfig for ClickhouseConfig {
             batch.timeout,
             client.clone(),
             cx.acker(),
+            sink::StdServiceLogic::default(),
         )
         .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 

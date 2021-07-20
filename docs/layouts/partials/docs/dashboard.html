@@ -11,16 +11,8 @@
     </div>
 
     {{ if $hasToc }}
-    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 md:px-0">
-      <div class="lg:pr-8">
-        <div class="pb-8 md:pb-10 lg:pb-12">
-          {{ partial "hero.html" . }}
-        </div>
-
-        <div class="pb-32">
-          {{ partial "content.html" . }}
-        </div>
-      </div>
+    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 md:px-0 pb-32 lg:pr-8">
+      {{ partial "content.html" . }}
     </main>
 
     <div class="hidden xl:block xl:col-span-3">
@@ -29,11 +21,8 @@
       </aside>
     </div>
     {{ else }}
-    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-12 md:px-0">
-      {{ partial "hero.html" . }}
-      <div class="pb-32">
-        {{ partial "content.html" . }}
-      </div>
+    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-12 md:px-0 pb-32">
+      {{ partial "content.html" . }}
     </main>
     {{ end }}
   </div>

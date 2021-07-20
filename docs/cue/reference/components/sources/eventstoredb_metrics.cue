@@ -2,7 +2,6 @@ package metadata
 
 components: sources: eventstoredb_metrics: {
 	title: "EventStoreDB Metrics"
-	alias: "eventstoredb"
 
 	classes: {
 		commonly_used: false

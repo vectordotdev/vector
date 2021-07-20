@@ -1,5 +1,7 @@
 # vector.dev
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/abeaffe6-d38a-4f03-8b6c-c6909e94918e/deploy-status)](https://app.netlify.com/sites/vector-project/deploys)
+
 This directory houses the assets used to build Vector's website and documentation, available at [vector.dev][vector].
 
 ## Prerequisites

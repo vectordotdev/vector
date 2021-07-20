@@ -104,7 +104,7 @@ impl FunctionTransform for Remap {
                     output.push(event)
                 }
             }
-            Err(Terminate::Abort) => {
+            Err(Terminate::Abort(_)) => {
                 emit!(RemapMappingAbort {
                     event_dropped: self.drop_on_abort,
                 });
@@ -115,7 +115,7 @@ impl FunctionTransform for Remap {
             }
             Err(Terminate::Error(error)) => {
                 emit!(RemapMappingError {
-                    error,
+                    error: error.to_string(),
                     event_dropped: self.drop_on_error,
                 });
 

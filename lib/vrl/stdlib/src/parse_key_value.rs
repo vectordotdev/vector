@@ -3,7 +3,7 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_until, take_while1},
     character::complete::{char, satisfy, space0},
-    combinator::{eof, map, opt, peek, rest, verify},
+    combinator::{eof, map, opt, peek, recognize, rest, verify},
     error::{ContextError, ParseError, VerboseError},
     multi::{many1, many_m_n, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
@@ -272,24 +272,18 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
         map(
             |input| match whitespace {
                 Whitespace::Strict => tuple((
-                    alt((
-                        verify(
-                            preceded(space0, parse_key(key_value_delimiter)),
-                            |s: &str| !(standalone_key && s.contains(field_delimiter)),
-                        ),
-                        preceded(space0, parse_key(field_delimiter)),
-                    )),
+                    preceded(
+                        space0,
+                        parse_key(key_value_delimiter, field_delimiter, standalone_key),
+                    ),
                     many_m_n(!standalone_key as usize, 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter),
                 ))(input),
                 Whitespace::Lenient => tuple((
-                    alt((
-                        verify(
-                            preceded(space0, parse_key(key_value_delimiter)),
-                            |s: &str| !(standalone_key && s.contains(field_delimiter)),
-                        ),
-                        preceded(space0, parse_key(field_delimiter)),
-                    )),
+                    preceded(
+                        space0,
+                        parse_key(key_value_delimiter, field_delimiter, standalone_key),
+                    ),
                     many_m_n(
                         !standalone_key as usize,
                         1,
@@ -327,7 +321,14 @@ fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                 char(delimiter),
                 map(
                     opt(escaped(
-                        take_while1(|c: char| c != '\\' && c != delimiter),
+                        recognize(many1(tuple((
+                            take_while1(|c: char| c != '\\' && c != delimiter),
+                            // Consume \something
+                            opt(tuple((
+                                satisfy(|c| c == '\\'),
+                                satisfy(|c| c != '\\' && c != delimiter),
+                            ))),
+                        )))),
                         '\\',
                         satisfy(|c| c == '\\' || c == delimiter),
                     )),
@@ -373,21 +374,50 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 }
 
 /// Parses the key.
-/// Parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
+/// Overall parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
+/// Standalone key are handled here so a quoted standalone key that contains a delimiter will be dealt with correctly.
 fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
-) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
-    move |input| {
-        alt((
-            parse_delimited('"', key_value_delimiter),
-            parse_undelimited(key_value_delimiter),
-        ))(input)
+    field_delimiter: &'a str,
+    standalone_key: bool,
+) -> Box<dyn Fn(&'a str) -> IResult<&'a str, &'a str, E> + 'a> {
+    if standalone_key {
+        Box::new(move |input| {
+            alt((
+                parse_delimited('"', key_value_delimiter),
+                parse_delimited('"', field_delimiter),
+                verify(parse_undelimited(key_value_delimiter), |s: &str| {
+                    !s.contains(field_delimiter)
+                }),
+                parse_undelimited(field_delimiter),
+            ))(input)
+        })
+    } else {
+        Box::new(move |input| {
+            alt((
+                parse_delimited('"', key_value_delimiter),
+                parse_undelimited(key_value_delimiter),
+            ))(input)
+        })
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_quote_and_escape_char() {
+        assert_eq!(
+            Ok(vec![("key".to_string(), r#"a\a"#.into()),]),
+            parse(r#"key="a\a""#, "=", " ", Whitespace::Strict, true,)
+        );
+
+        assert_eq!(
+            Ok(vec![(r#"a\ a"#.to_string(), r#"val"#.into()),]),
+            parse(r#""a\ a"=val"#, "=", " ", Whitespace::Strict, true,)
+        );
+    }
 
     #[test]
     fn test_parse() {
@@ -521,13 +551,37 @@ mod test {
         // delimited
         assert_eq!(
             Ok(("", "noog")),
-            parse_key::<VerboseError<&str>>("=")(r#""noog""#)
+            parse_key::<VerboseError<&str>>("=", " ", false)(r#""noog""#)
         );
 
         // undelimited
         assert_eq!(
             Ok(("", "noog")),
-            parse_key::<VerboseError<&str>>("=")("noog")
+            parse_key::<VerboseError<&str>>("=", " ", false)("noog")
+        );
+
+        // delimited with escaped char (1)
+        assert_eq!(
+            Ok(("=baz", r#"foo \" bar"#)),
+            parse_key::<VerboseError<&str>>("=", " ", false)(r#""foo \" bar"=baz"#)
+        );
+
+        // delimited with escaped char (2)
+        assert_eq!(
+            Ok(("=baz", r#"foo \\ \" \ bar"#)),
+            parse_key::<VerboseError<&str>>("=", " ", false)(r#""foo \\ \" \ bar"=baz"#)
+        );
+
+        // delimited with escaped char (3)
+        assert_eq!(
+            Ok(("=baz", r#"foo \ bar"#)),
+            parse_key::<VerboseError<&str>>("=", " ", false)(r#""foo \ bar"=baz"#)
+        );
+
+        // Standalone key
+        assert_eq!(
+            Ok((" bar=baz", "foo")),
+            parse_key::<VerboseError<&str>>("=", " ", true)(r#"foo bar=baz"#)
         );
     }
 

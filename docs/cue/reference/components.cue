@@ -59,7 +59,7 @@ components: {
 		// undergoes a name change.
 		alias?: !=""
 
-		// `type` is the component identifier. This is set automatically.
+		// `type` is the component type. This is set automatically.
 		type: string
 
 		// `classes` represent the various classifications for this component
