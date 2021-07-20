@@ -30,10 +30,16 @@ type AlgoliaRecord = {
   content: string;
 };
 
-// Constants
-const targetFile = "./public/search.json";
+type Section = {
+  name: string;
+  path: string;
+  displayPath: string;
+  ranking: number;
+};
 
+// Constants
 const DEBUG = process.env.DEBUG === "true" || false;
+const targetFile = "./public/search.json";
 const publicPath = path.resolve(__dirname, "..", "public");
 const tagHierarchy = {
   h1: 6,
@@ -63,10 +69,11 @@ function getItemUrl(file: string, { level, domId }: Payload[0]) {
 }
 
 async function indexHTMLFiles(
+  records: AlgoliaRecord[],
   section: string,
   files: string[],
   ranking: number
-): Promise<AlgoliaRecord[]> {
+): Promise<void> {
   const usedIds = {};
   const algoliaRecords: AlgoliaRecord[] = [];
 
@@ -74,9 +81,9 @@ async function indexHTMLFiles(
     const html = fs.readFileSync(file, "utf-8");
     const $ = cheerio.load(html);
     const containers = $("#page-content");
-    const pageTitle = $('meta[name="algolia:title"]').attr('content') || "";
-
-    const pageTags = $('meta[name="keywords"]').attr('content')?.split(",") || [];
+    const pageTitle = $("meta[name='algolia:title']").attr("content") || "";
+    const pageTagsString = $("meta[name='keywords']").attr('content') || "";
+    const pageTags: string[] = (pageTagsString === "") ? [] : pageTagsString.split(",");
 
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
@@ -148,15 +155,15 @@ async function indexHTMLFiles(
           title: item.content,
           section,
           ranking,
-          hierarchy: [...activeRecord.hierarchy, activeRecord.title],
+          hierarchy: [...activeRecord.tags, activeRecord.title],
           tags: pageTags,
           content: "",
         };
       } else {
         algoliaRecords.push({ ...activeRecord });
-        const tagCount = activeRecord.hierarchy.length;
+        const hierarchySize = activeRecord.hierarchy.length;
         const levelDiff = item.level - activeRecord.level;
-        const lastIndex = tagCount - levelDiff;
+        const lastIndex = hierarchySize - levelDiff;
 
         activeRecord = {
           objectID: itemUrl,
@@ -167,7 +174,7 @@ async function indexHTMLFiles(
           title: item.content,
           section,
           ranking,
-          hierarchy: [...activeRecord.hierarchy.slice(0, lastIndex)],
+          hierarchy: [...activeRecord.tags.slice(0, lastIndex)],
           tags: pageTags,
           content: "",
         };
@@ -176,7 +183,6 @@ async function indexHTMLFiles(
       if (activeRecord) {
         activeRecord.title = activeRecord.title.trim();
         activeRecord.hierarchy.map((item) => item.trim());
-
         algoliaRecords.push({ ...activeRecord });
       }
 
@@ -184,7 +190,6 @@ async function indexHTMLFiles(
         if (usedIds[rec.objectID]) {
           // The objectID is the url of the section of the page that the record covers.
           // If you have a duplicate here somehow two records point to the same thing.
-
           if (DEBUG) {
             console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
             console.log(JSON.stringify(rec, null, 2));
@@ -208,7 +213,7 @@ async function indexHTMLFiles(
     chalk.green(`Success. Updated records for ${files.length} file(s).`)
   );
 
-  return algoliaRecords;
+  records.push(...algoliaRecords);
 }
 
 async function buildIndex() {
@@ -216,40 +221,58 @@ async function buildIndex() {
 
   console.log(`Building Vector search index`);
 
-  let files = await glob(`${publicPath}/docs/about/**/**.html`);
-  console.log(chalk.blue("Indexing docs/about..."));
-  let r1 = await indexHTMLFiles("Docs", files, 50);
-  allRecords.push(...r1);
+  const sections: Section[] = [
+    {
+      name: "Docs",
+      path: `${publicPath}/docs/about/**/**.html`,
+      displayPath: "docs/about",
+      ranking: 50,
+    },
+    {
+      name: "Docs",
+      path: `${publicPath}/docs/administration/**/**.html`,
+      displayPath: "docs/administration",
+      ranking: 50,
+    },
+    {
+      name: "Docs",
+      path: `${publicPath}/docs/reference/**/**.html`,
+      displayPath: "docs/reference",
+      ranking: 50,
+    },
+    {
+      name: "Docs",
+      path: `${publicPath}/docs/setup/**/**.html`,
+      displayPath: "docs/setup",
+      ranking: 50,
+    },
+    {
+      name: "Advanced guides",
+      path: `${publicPath}/guides/advanced/**/**.html`,
+      displayPath: "guides/advanced",
+      ranking: 40,
+    },
+    {
+      name: "Level up guides",
+      path: `${publicPath}/guides/level-up/**/**.html`,
+      displayPath: "guides/level-up",
+      ranking: 40,
+    }
+  ];
 
-  files = await glob(`${publicPath}/docs/administration/**/**.html`);
-  console.log(chalk.blue("Indexing docs/administration..."));
-  let r2 = await indexHTMLFiles("Docs", files, 50);
-  allRecords.push(...r2);
-
-  files = await glob(`${publicPath}/docs/reference/**/**.html`);
-  console.log(chalk.blue("Indexing docs/reference..."));
-  let r3 = await indexHTMLFiles("Docs", files, 50);
-  allRecords.push(...r3);
-
-  files = await glob(`${publicPath}/docs/setup/**/**.html`);
-  console.log(chalk.blue("Indexing docs/setup..."));
-  let r4 = await indexHTMLFiles("Docs", files, 50);
-  allRecords.push(...r4);
-
-  files = await glob(`${publicPath}/guides/advanced/**/**.html`);
-  console.log(chalk.blue("Indexing guides/advanced..."));
-  let r5 = await indexHTMLFiles("Advanced guides", files, 40);
-  allRecords.push(...r5);
-
-  files = await glob(`${publicPath}/guides/level-up/**/**.html`);
-  console.log(chalk.blue("Indexing guides/level-up..."));
-  let r6 = await indexHTMLFiles("Level up guides", files, 40);
-  allRecords.push(...r6);
+  // Recurse through each section and push the resuling records to `allRecords`
+  for (const section of sections) {
+    let files = await glob(section.path);
+    console.log(chalk.blue(`Indexing ${section.displayPath}...`));
+    indexHTMLFiles(allRecords, section.name, files, section.ranking);
+  }
 
   console.log(chalk.green(`Success. ${allRecords.length} records have been successfully indexed.`));
   console.log(chalk.blue(`Writing final index JSON to ${targetFile}...`));
 
-  fs.writeFile(targetFile, JSON.stringify(allRecords), () => {
+  const recordsJson: string = JSON.stringify(allRecords);
+
+  fs.writeFile(targetFile, recordsJson, () => {
     console.log(chalk.green(`Success. Wrote final index JSON to ${targetFile}.`));
   });
 }
