@@ -74,9 +74,9 @@ async function indexHTMLFiles(
     const html = fs.readFileSync(file, "utf-8");
     const $ = cheerio.load(html);
     const containers = $("#page-content");
-    const pageTitle = $('meta[name="algolia:title"]').attr('content') ?? "";
+    const pageTitle = $('meta[name="algolia:title"]').attr('content') || "";
 
-    const pageTags = $('meta[name="keywords"]').attr('content')?.split(",") ?? [];
+    const pageTags = $('meta[name="keywords"]').attr('content')?.split(",") || [];
 
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
