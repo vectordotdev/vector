@@ -984,16 +984,6 @@ components: sources: internal_metrics: {
 			required:    true
 			examples: [_values.local_host]
 		}
-		_instance: {
-			description: "The Vector instance identified by host and port."
-			required:    true
-			examples: [_values.instance]
-		}
-		_job: {
-			description: "The name of the job producing Vector metrics."
-			required:    true
-			default:     "vector"
-		}
 		_mode: {
 			description: "The connection mode used by the component."
 			required:    false
