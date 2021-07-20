@@ -601,6 +601,7 @@ impl HostMetricsConfig {
                                     usage.used().get::<byte>() as f64,
                                     tags.clone(),
                                 ),
+                                #[cfg(not(target_os = "windows"))]
                                 self.gauge(
                                     "filesystem_used_ratio",
                                     timestamp,
