@@ -366,6 +366,68 @@ impl Serialize for LogEvent {
     }
 }
 
+impl From<&tracing::Event<'_>> for LogEvent {
+    fn from(event: &tracing::Event<'_>) -> Self {
+        let now = chrono::Utc::now();
+        let mut maker = MakeLogEvent::default();
+        event.record(&mut maker);
+
+        let mut log = maker.0;
+        log.insert("timestamp", now);
+
+        let meta = event.metadata();
+        log.insert(
+            "metadata.kind",
+            if meta.is_event() {
+                Value::Bytes("event".to_string().into())
+            } else if meta.is_span() {
+                Value::Bytes("span".to_string().into())
+            } else {
+                Value::Null
+            },
+        );
+        log.insert("metadata.level", meta.level().to_string());
+        log.insert(
+            "metadata.module_path",
+            meta.module_path()
+                .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
+        );
+        log.insert("metadata.target", meta.target().to_string());
+
+        log
+    }
+}
+
+#[derive(Debug, Default)]
+struct MakeLogEvent(LogEvent);
+
+impl tracing::field::Visit for MakeLogEvent {
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        self.0.insert(field.name(), value.to_string());
+    }
+
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
+        self.0.insert(field.name(), format!("{:?}", value));
+    }
+
+    fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
+        self.0.insert(field.name(), value);
+    }
+
+    fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
+        let field = field.name();
+        let converted: Result<i64, _> = value.try_into();
+        match converted {
+            Ok(value) => self.0.insert(field, value),
+            Err(_) => self.0.insert(field, value.to_string()),
+        };
+    }
+
+    fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
+        self.0.insert(field.name(), value);
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

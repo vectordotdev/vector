@@ -14,7 +14,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::sync::Arc;
-use tracing::field::{Field, Visit};
 pub use util::log::PathComponent;
 pub use util::log::PathIter;
 pub use value::Value;
@@ -175,68 +174,6 @@ impl EventDataEq for Event {
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
-}
-
-impl From<&tracing::Event<'_>> for Event {
-    fn from(event: &tracing::Event<'_>) -> Self {
-        let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent::default();
-        event.record(&mut maker);
-
-        let mut log = maker.0;
-        log.insert("timestamp", now);
-
-        let meta = event.metadata();
-        log.insert(
-            "metadata.kind",
-            if meta.is_event() {
-                Value::Bytes("event".to_string().into())
-            } else if meta.is_span() {
-                Value::Bytes("span".to_string().into())
-            } else {
-                Value::Null
-            },
-        );
-        log.insert("metadata.level", meta.level().to_string());
-        log.insert(
-            "metadata.module_path",
-            meta.module_path()
-                .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
-        );
-        log.insert("metadata.target", meta.target().to_string());
-
-        log.into()
-    }
-}
-
-#[derive(Debug, Default)]
-struct MakeLogEvent(LogEvent);
-
-impl Visit for MakeLogEvent {
-    fn record_str(&mut self, field: &Field, value: &str) {
-        self.0.insert(field.name(), value.to_string());
-    }
-
-    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.0.insert(field.name(), format!("{:?}", value));
-    }
-
-    fn record_i64(&mut self, field: &Field, value: i64) {
-        self.0.insert(field.name(), value);
-    }
-
-    fn record_u64(&mut self, field: &Field, value: u64) {
-        let field = field.name();
-        let converted: Result<i64, _> = value.try_into();
-        match converted {
-            Ok(value) => self.0.insert(field, value),
-            Err(_) => self.0.insert(field, value.to_string()),
-        };
-    }
-
-    fn record_bool(&mut self, field: &Field, value: bool) {
-        self.0.insert(field.name(), value);
-    }
 }
 
 impl From<BTreeMap<String, Value>> for Event {
