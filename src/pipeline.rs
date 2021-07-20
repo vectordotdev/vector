@@ -39,7 +39,9 @@ impl Pipeline {
         // We batch the updates to "events out" for efficiency, and do it here because
         // it gives us a chance to allow the natural batching of `Pipeline` to kick in.
         if self.events_outstanding > 0 {
-            emit!{EventOut { count: self.events_outstanding }};
+            emit!(EventOut {
+                count: self.events_outstanding
+            });
             self.events_outstanding = 0;
         }
 
