@@ -3,7 +3,7 @@ package metadata
 remap: functions: match_datadog_query: {
 	category: "Object"
 	description: """
-		Matches an object against a Datadog Search Syntax query.
+		Matches an object against a [Datadog Search Syntax](\(urls.datadog_search_syntax)) query.
 		"""
 
 	arguments: [
@@ -36,14 +36,14 @@ remap: functions: match_datadog_query: {
 			source: #"""
 					match_datadog_query({"message": "contains only this"}, "this AND that")
 				"""#
-			return: true
+			return: false
 		},
 		{
 			title: "Facet wildcard"
 			source: #"""
 					match_datadog_query({"custom": {"name": "vector"}}, "@name:vec*")
 				"""#
-			return: false
+			return: true
 		},
 		{
 			title: "Tag range"
