@@ -35,9 +35,9 @@ The pipeline directory should have a flat structure (no sub directories) and onl
 
 ### How vector reads the pipelines and what are the limits
 
-Vector will read each of the pipeline configuration files at start time and create an `id` and a `name` attribute corresponding to the pipeline's filename. A `load-balancer.yml` will have `load-balancer` as `id` and `name`. In the pipeline's configuration file, the `id` can be set manually.
+Vector will read each of the pipeline configuration files at start time and create an `id` attribute corresponding to the pipeline's filename. A `load-balancer.yml` will have `load-balancer` as `id`. In the pipeline's configuration file, the `id` can be set manually.
 In addition, a `version` attribute will be set containing the hash of the pipeline's configuration file to keep track of the file changes.
-In case several files having the same `id` or `name` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector should error.
+In case several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector should error.
 
 Those pipeline's configuration files should only contain transforms or vector will error.
 Each of the defined transforms will be callable by using `pipeline-id.transform-id` outside of the pipeline's configuration file to avoid conflicts.
@@ -55,9 +55,52 @@ id = "load-balancer"
 ...
 ```
 
+Now, if we look deeper at the configuration building process, the configuration compiler will require the pipelines in order to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
+To do so, we'll need to implement a `PipelineBuilder` that would work the same way as the the `ConfigBuilder` and use it in [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4) in order to load the pipeline's components inside the configuration. When building the `Config`, the [transforms](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L34) from the pipelines will have to be injected only when they are being used.
+
 ### What metadatas vector adds to the events going through a pipeline
 
 Each time an event goes through a pipeline, vector will create a field (a tag for metrics) `pipelines.${PIPELINE_ID} = ${PIPELINE_VERSION}` in order to be able to track the path taken by an event.
+This step of adding a field should be done with a dynamically created transform and injected in the configuration by the [compiler](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L34).
+Each time a component calls a transform coming from a pipeline, the inputs should be swapped and a dynamic transform created.
+
+```toml
+# in the pipeline load-balancer
+[transforms.do-something]
+...
+
+# in the config
+[sink.output]
+input = ["load-balancer.do-something"]
+...
+```
+
+should be replaced by this equivalent
+
+```
+# in the pipeline load-balancer
+[transforms.do-something]
+...
+
+# injected transform
+[transforms.pre-output]
+input = ["load-balancer.do-something"]
+type = "remap"
+source = '''
+if is_object(.pipelines) {
+  .pipelines = merge(.pipelines, {"load-balancer":"version"})
+} else {
+  .pipelines = {"load-balancer":"version"}
+}
+'''
+
+[sink.output]
+input = ["pre-output"]
+...
+...
+```
+
+To avoid name conflicts with that dynamic transform, this generated transform name could be made by doing a hash of `pre-${NAME}(${INPUTS})`.
 
 ## Doc-level Proposal
 
@@ -166,7 +209,7 @@ In the future, this will allow us to replicate datadog's pipelines locally.
 
 ## Outstanding Questions
 
-- Should we have some visibility attributes on the transforms in different pipelines in order to make them available to other components?
+- Should we have some visibility attributes on the components in different pipelines in order to make them available to other components?
 - Should we have a main (or default) transform in a pipeline that would allow to use the pipeline's ID as a transform name?
 
 ## Plan Of Attack
@@ -174,5 +217,5 @@ In the future, this will allow us to replicate datadog's pipelines locally.
 1. Update the CLI to take the pipeline directory parameter
 2. Create the Pipeline structure and parse a pipeline's configuration file
 3. Dynamically create transform that add the pipeline's metadata to every events
-4. Register the pipelines' transforms into vector
+4. Register the pipelines' components into vector
 
