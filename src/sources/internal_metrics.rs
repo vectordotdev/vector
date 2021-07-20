@@ -66,13 +66,13 @@ async fn run(
 
         let metrics = capture_metrics(controller);
 
-        out.send_all(&mut stream::iter(metrics.map(|mut metric| {
+        out.send_all(&mut stream::iter(metrics).map(|mut metric| {
             if let Ok(hostname) = &hostname {
                 metric.insert_tag(log_schema().host_key().to_owned(), hostname.to_owned());
             }
             metric.insert_tag(String::from("pid"), std::process::id().to_string());
             Ok(metric.into())
-        })))
+        }))
         .await?;
     }
 
