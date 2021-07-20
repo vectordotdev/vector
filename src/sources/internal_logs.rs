@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     shutdown::ShutdownSignal,
     trace, Pipeline,
 };
@@ -34,12 +34,20 @@ impl SourceConfig for InternalLogsConfig {
 }
 
 async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
+    let hostname = crate::get_hostname();
     let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
     let subscription = trace::subscribe();
     let mut rx = subscription.receiver;
 
-    out.send_all(&mut stream::iter(subscription.buffer).map(Ok))
-        .await?;
+    out.send_all(&mut stream::iter(subscription.buffer).map(|mut event| {
+        let log = event.as_mut_log();
+        if let Ok(hostname) = &hostname {
+            log.insert(log_schema().host_key().to_owned(), hostname.to_owned());
+        }
+        log.insert(String::from("pid"), std::process::id());
+        Ok(event)
+    }))
+    .await?;
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
