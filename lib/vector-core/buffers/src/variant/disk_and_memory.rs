@@ -21,7 +21,7 @@ pub enum Variant {
         max_size: usize,
         when_full: WhenFull,
         data_dir: PathBuf,
-        name: String,
+        id: String,
     },
 }
 

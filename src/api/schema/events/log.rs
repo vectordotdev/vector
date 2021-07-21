@@ -6,14 +6,14 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug)]
 pub struct Log {
-    component_name: String,
+    component_id: String,
     event: event::LogEvent,
 }
 
 impl Log {
-    pub fn new(component_name: &str, event: event::LogEvent) -> Self {
+    pub fn new(component_id: &str, event: event::LogEvent) -> Self {
         Self {
-            component_name: component_name.to_string(),
+            component_id: component_id.to_string(),
             event,
         }
     }
@@ -30,9 +30,9 @@ impl Log {
 #[Object]
 /// Log event with fields for querying log data
 impl Log {
-    /// Name of the component associated with the log event
-    async fn component_name(&self) -> &str {
-        &self.component_name
+    /// Id of the component associated with the log event
+    async fn component_id(&self) -> &str {
+        &self.component_id
     }
 
     /// Log message

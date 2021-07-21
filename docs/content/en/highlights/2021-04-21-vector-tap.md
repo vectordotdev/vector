@@ -20,7 +20,7 @@ a [`console`][console] sink.
 ## Get Started
 
 To use [`vector tap`][tap] you must first enable Vector's [GraphQL API][api].
-Then, you can use `vector tap <component name>` to sample the events flowing out
+Then, you can use `vector tap <component id>` to sample the events flowing out
 of this component.
 
 For example, given the configuration:

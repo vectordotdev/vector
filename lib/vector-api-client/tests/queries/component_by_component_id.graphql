@@ -1,0 +1,6 @@
+query ComponentByComponentIdQuery($componentId: String!) {
+    componentByComponentId(componentId: $componentId) {
+        __typename
+        componentId
+    }
+}

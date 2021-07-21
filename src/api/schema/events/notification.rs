@@ -12,17 +12,17 @@ pub enum EventNotificationType {
 #[derive(Debug, SimpleObject)]
 /// A notification regarding events observation
 pub struct EventNotification {
-    /// Name of the component associated with the notification
-    component_name: String,
+    /// Id of the component associated with the notification
+    component_id: String,
 
     /// Event notification type
     notification: EventNotificationType,
 }
 
 impl EventNotification {
-    pub fn new(component_name: &str, notification: EventNotificationType) -> Self {
+    pub fn new(component_id: &str, notification: EventNotificationType) -> Self {
         Self {
-            component_name: component_name.to_string(),
+            component_id: component_id.to_string(),
             notification,
         }
     }
