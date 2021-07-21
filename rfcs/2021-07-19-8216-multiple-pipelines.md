@@ -8,7 +8,7 @@ This RFC will cover:
 
 - How and where the pipelines are stored
 - How vector reads the pipelines and what are the limits of pipelines
-- What metadatas vector adds to the events going through a pipeline
+- What metadata vector adds to the events going through a pipeline
 
 This RFC will not cover:
 
@@ -257,4 +257,3 @@ In the future, this will allow us to replicate datadog's pipelines locally.
 
 3. Second option: Update the transforms to take the transform name and pipeline info when being built
 4. Second option: Set the events field when in a pipeline
-
