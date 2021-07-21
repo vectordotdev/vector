@@ -40,6 +40,6 @@ This required a couple of breaking changes to Vector's internal metrics:
 * For metrics coming from `internal_metrics`, the `component_name` tag has been updated to be `component_id`. If you
   were grouping by this tag in your metrics queries, or referring to it in a `remap` or `lua` transform, you should
   update it to refer to `component_id`.
-* Within the GraphQL API, all references to `name` for `Component`s has been uptade to be `componentId`. This is used
+* Within the GraphQL API, all references to `name` for `Component`s has been updated to be `componentId`. This is used
   over simply `Id` as `Id` has special semantics within the GraphQL ecosystem and we may add support for this field
   later.
