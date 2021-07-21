@@ -59,7 +59,7 @@ id = "load-balancer"
 Now, if we look deeper at the configuration building process, the configuration compiler will require the pipelines in order to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
 To do so, we'll need to implement a `PipelineBuilder` that would work the same way as the the `ConfigBuilder` and use it in [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4) in order to load the pipeline's components inside the configuration. When building the `Config`, the [transforms](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L34) from the pipelines will have to be injected only when they are being used.
 
-### What metadatas vector adds to the events going through a pipeline
+### What metadata vector adds to the events going through a pipeline
 
 Each time an event goes through a pipeline, vector will create a field (a tag for metrics) `pipelines.${PIPELINE_ID} = ${PIPELINE_VERSION}` in order to be able to track the path taken by an event.
 
