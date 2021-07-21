@@ -64,8 +64,8 @@ Examples of changes that do not require a RFC:
 ### Keep the scope small
 
 Use the "Scope" section to address out of scope concerns, like future improvements. This signals to the team that
-you are aware of these concerns but have explicitly chosen to defer them. This not only helps to keep the discussion
-focused, but it
+you are aware of these concerns but have explicitly chosen to defer them. This not only helps to keep the RFC
+discussion focused, but also the implementation, resultin in a quicker overall delivery time.
 
 ### Be opinionated and propose a single solution
 
