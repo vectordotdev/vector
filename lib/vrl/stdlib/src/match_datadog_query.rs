@@ -154,18 +154,25 @@ fn exists<T: AsRef<str>>(attr: T, obj: &Value) -> bool {
 fn equals<T: AsRef<str>>(attr: T, obj: &Value, to_match: &str) -> bool {
     each_field(attr, obj, |field, value| {
         match field {
-            // Tags are compared by element key:value.
-            Field::Tag(tag) => match value {
-                Value::Array(v) => {
-                    v.contains(&Value::Bytes(format!("{}:{}", tag, to_match).into()))
-                }
-                _ => false,
-            },
             // Default fields are compared by word boundary.
             Field::Default(_) => match value {
                 Value::Bytes(val) => {
                     let re = word_regex(to_match);
                     re.is_match(&String::from_utf8_lossy(val))
+                }
+                _ => false,
+            },
+            // A literal "tags" field should match by key.
+            Field::Reserved(f) if f == "tags" => match value {
+                Value::Array(v) => {
+                    v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
+                }
+                _ => false,
+            },
+            // Individual tags are compared by element key:value.
+            Field::Tag(tag) => match value {
+                Value::Array(v) => {
+                    v.contains(&Value::Bytes(format!("{}:{}", tag, to_match).into()))
                 }
                 _ => false,
             },
@@ -471,6 +478,24 @@ mod test {
 
         negate_facet_exists {
             args: func_args![value: value!({"custom": {"a": "value" }}), query: "-_exists_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        tag_bare {
+            args: func_args![value: value!({"tags": ["a","b","c"]}), query: "tags:a"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_tag_bare {
+            args: func_args![value: value!({"tags": ["a","b","c"]}), query: "NOT tags:a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_tag_bare {
+            args: func_args![value: value!({"tags": ["a","b","c"]}), query: "-tags:a"],
             want: Ok(false),
             tdef: type_def(),
         }
