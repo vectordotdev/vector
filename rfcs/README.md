@@ -71,7 +71,7 @@ discussion focused, but also the implementation, resultin in a quicker overall d
 
 Your job as the RFC author is to navigate the issue at hand and propose an opinionated solution. Ambiguity creates
 unproductive discussion and should be eliminated while drafting the RFC. This does not mean you need to go at it alone.
-You are encouraged to investigate and discuss solutions with your team while your draft the RFC, but the end state of
+You are encouraged to investigate and discuss solutions with your team while you draft the RFC, but the end state of
 the RFC should land on a single recommendation that you are reasonably confident in. Use the "Rationale" section to
 justify your proposal and the "Alternatives" section to note other solutions you considered. See the [FAQ](#f)
 
