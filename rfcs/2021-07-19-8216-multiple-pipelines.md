@@ -30,8 +30,9 @@ This RFC will not cover:
 ### How and where the pipelines are stored
 
 To keep the actual structure and avoid retro compatibility issues, vector should read from the default folder `/etc/vector/pipelines/*` the difference pipeline's configuration files.
-This folder should be configurable through the cli, the same way than for the configuration file, with `--pipelines-dir` or though and environment variable `VECTOR_PIPELINES_DIR`.
 The pipeline directory should have a flat structure (no sub directories) and only `json`, `toml` and `yaml` files will be supported.
+
+To discuss: make this folder should be configurable through the cli, the same way than for the configuration file, with `--pipelines-dir` or though and environment variable `VECTOR_PIPELINES_DIR`.
 
 ### How vector reads the pipelines and what are the limits
 
@@ -195,17 +196,15 @@ type = "console"
 This improves the readability of the `vector.toml` and add the possibility to share pipelines or deploy them with some tools like Terraform or Ansible without modifying the main configuration.
 In the future, this will allow us to replicate datadog's pipelines locally.
 
-## Prior Art
-
-`TODO`
-
 ## Drawbacks
 
 - Not yet able to use a pipeline in another pipeline, but this may come in further work.
+- Create some hidden transforms and modify the existing ones could introduce some bugs.
 
 ## Alternatives
 
-`TODO`
+- Updating the `Topology` to create those transforms at the topology building time in order to avoid modifying the inputs when building the configuration.
+- Add some metadata on every event to track there path and add the `pipelines.${PIPELINE_ID}` field at before sending to the sink.
 
 ## Outstanding Questions
 
