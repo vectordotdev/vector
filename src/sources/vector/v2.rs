@@ -158,19 +158,27 @@ async fn run(
     Ok(())
 }
 
-impl Connected for MaybeTlsIncomingStream<TcpStream> {
-    fn remote_addr(&self) -> Option<SocketAddr> {
-        Some(self.peer_addr())
-    }
+#[derive(Clone)]
+pub struct MaybeTlsConnectInfo {
+    pub remote_addr: SocketAddr,
+    pub peer_certs: Option<Vec<Certificate>>,
+}
 
-    fn peer_certs(&self) -> Option<Vec<Certificate>> {
-        self.ssl_stream()
-            .and_then(|s| s.ssl().peer_cert_chain())
-            .map(|s| {
-                s.into_iter()
-                    .filter_map(|c| c.to_pem().ok())
-                    .map(|b| Certificate::from_pem(b))
-                    .collect()
-            })
+impl Connected for MaybeTlsIncomingStream<TcpStream> {
+    type ConnectInfo = MaybeTlsConnectInfo;
+
+    fn connect_info(&self) -> Self::ConnectInfo {
+        MaybeTlsConnectInfo {
+            remote_addr: self.peer_addr(),
+            peer_certs: self
+                .ssl_stream()
+                .and_then(|s| s.ssl().peer_cert_chain())
+                .map(|s| {
+                    s.into_iter()
+                        .filter_map(|c| c.to_pem().ok())
+                        .map(|b| Certificate::from_pem(b))
+                        .collect()
+                }),
+        }
     }
 }

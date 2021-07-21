@@ -31,8 +31,8 @@ once_cell = { version = "1.8", default-features = false }
 pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.8", default-features = false }
-prost = { version = "0.7.0", default-features = false }
-prost-types = { version = "0.7.0", default-features = false }
+prost = { version = "0.8", default-features = false }
+prost-types = { version = "0.8", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.66", default-features = false }
@@ -50,7 +50,7 @@ twox-hash = { version = "1.6.1", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 
 [build-dependencies]
-prost-build = "0.7.0"
+prost-build = "0.8"
 
 [dev-dependencies]
 criterion = { version = "0.3.5", features = ["html_reports"] }
