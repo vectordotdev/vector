@@ -125,13 +125,10 @@ fn matches_vrl_object(node: &QueryNode, obj: &Value) -> bool {
             upper_inclusive,
         } => range(attr, obj, lower, *lower_inclusive, upper, *upper_inclusive),
         QueryNode::NegatedNode { node } => !matches_vrl_object(node, obj),
-        QueryNode::Boolean { oper, nodes } => {
-            if let BooleanType::And = oper {
-                nodes.iter().all(|node| matches_vrl_object(&node, &obj))
-            } else {
-                nodes.iter().any(|node| matches_vrl_object(&node, &obj))
-            }
-        }
+        QueryNode::Boolean { oper, nodes } => match oper {
+            BooleanType::And => nodes.iter().all(|node| matches_vrl_object(&node, &obj)),
+            BooleanType::Or => nodes.iter().any(|node| matches_vrl_object(&node, &obj)),
+        },
     }
 }
 
@@ -140,9 +137,12 @@ fn exists<T: AsRef<str>>(attr: T, obj: &Value) -> bool {
     each_field(attr, obj, |field, value| match field {
         // Tags need to check the element value.
         Field::Tag(tag) => match value {
-            Value::Array(v) => v
-                .iter()
-                .any(|v| string_value(v).starts_with(&format!("{}:", tag))),
+            Value::Array(v) => v.iter().any(|v| {
+                let str_value = string_value(v);
+
+                // The tag matches using either 'key' or 'key:value' syntax.
+                str_value == tag || str_value.starts_with(&format!("{}:", tag))
+            }),
             _ => false,
         },
         // Other field types have already resolved at this point, so just return true.
@@ -475,6 +475,24 @@ mod test {
             tdef: type_def(),
         }
 
+        tag_exists_bare {
+            args: func_args![value: value!({"tags": ["a","b","c"]}), query: "_exists_:a"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_tag_exists_bare {
+            args: func_args![value: value!({"tags": ["a","b","c"]}), query: "NOT _exists_:a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_tag_exists_bare {
+            args: func_args![value: value!({"tags": ["a","b","c"]}), query: "-_exists_:a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         tag_exists {
             args: func_args![value: value!({"tags": ["a:1","b:2","c:3"]}), query: "_exists_:a"],
             want: Ok(true),
@@ -525,6 +543,24 @@ mod test {
 
         negate_facet_missing {
             args: func_args![value: value!({"custom": {"b": "value" }}), query: "-_missing_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        tag_bare_missing {
+            args: func_args![value: value!({"tags": ["b","c"]}), query: "_missing_:a"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_tag_bare_missing {
+            args: func_args![value: value!({"tags": ["b","c"]}), query: "NOT _missing_:a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_tag_bare_missing {
+            args: func_args![value: value!({"tags": ["b","c"]}), query: "-_missing_:a"],
             want: Ok(false),
             tdef: type_def(),
         }
