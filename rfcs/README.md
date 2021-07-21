@@ -58,7 +58,8 @@ Examples of changes that do not require a RFC:
 2. Use present tense. Instead of "this RFC was created to describe...", say "this RFC describes".
 3. Structure your RFC with headings that address one point at a time. This is necessary to facilitate productive
    discussion via inline comments.
-4. Start with "why". Leading with "how" omits the opportunity to consider alternative approaches.
+4. Start with "why". Lead with one or two sentences describing the higher level intent. Leading with "how" omits the
+   opportunity to consider alternative approaches.
 
 ### Keep the scope small
 
