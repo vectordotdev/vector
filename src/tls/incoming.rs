@@ -139,6 +139,18 @@ impl<S> MaybeTlsIncomingStream<S> {
         }
     }
 
+    pub fn ssl_stream(&self) -> Option<&SslStream<S>> {
+        use super::MaybeTls;
+
+        match &self.state {
+            StreamState::Accepted(stream) => match stream {
+                MaybeTls::Raw(_) => None,
+                MaybeTls::Tls(s) => Some(s),
+            },
+            StreamState::Accepting(_) | StreamState::AcceptError(_) | StreamState::Closed => None,
+        }
+    }
+
     #[cfg(all(
         test,
         feature = "sinks-socket",
