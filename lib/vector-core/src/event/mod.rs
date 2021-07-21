@@ -1,3 +1,4 @@
+use crate::ByteSizeOf;
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -45,6 +46,15 @@ pub const PARTIAL: &str = "_partial";
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
+}
+
+impl ByteSizeOf for Event {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Event::Log(log_event) => log_event.allocated_bytes(),
+            Event::Metric(metric_event) => metric_event.allocated_bytes(),
+        }
+    }
 }
 
 impl Event {
