@@ -1,5 +1,6 @@
 use super::{BatchNotifier, EventFinalizer, EventMetadata};
 use crate::metrics::Handle;
+use crate::ByteSizeOf;
 use chrono::{DateTime, Utc};
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
@@ -28,6 +29,14 @@ pub struct Metric {
     metadata: EventMetadata,
 }
 
+impl ByteSizeOf for Metric {
+    fn allocated_bytes(&self) -> usize {
+        self.series.allocated_bytes()
+            + self.data.allocated_bytes()
+            + self.metadata.allocated_bytes()
+    }
+}
+
 impl AsRef<MetricData> for Metric {
     fn as_ref(&self) -> &MetricData {
         &self.data
@@ -50,11 +59,23 @@ pub struct MetricSeries {
 
 pub type MetricTags = BTreeMap<String, String>;
 
+impl ByteSizeOf for MetricSeries {
+    fn allocated_bytes(&self) -> usize {
+        self.name.allocated_bytes() + self.tags.allocated_bytes()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
 pub struct MetricName {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
+}
+
+impl ByteSizeOf for MetricName {
+    fn allocated_bytes(&self) -> usize {
+        self.name.allocated_bytes() + self.namespace.allocated_bytes()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
@@ -66,6 +87,12 @@ pub struct MetricData {
 
     #[serde(flatten)]
     pub value: MetricValue,
+}
+
+impl ByteSizeOf for MetricData {
+    fn allocated_bytes(&self) -> usize {
+        self.value.allocated_bytes()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
@@ -141,12 +168,30 @@ pub enum MetricValue {
     },
 }
 
+impl ByteSizeOf for MetricValue {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Self::Counter { .. } | Self::Gauge { .. } => 0,
+            Self::Set { values } => values.allocated_bytes(),
+            Self::Distribution { samples, .. } => samples.allocated_bytes(),
+            Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes(),
+            Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes(),
+        }
+    }
+}
+
 /// A single sample from a `MetricValue::Distribution`, containing the
 /// sampled value paired with the rate at which it was observed.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Sample {
     pub value: f64,
     pub rate: u32,
+}
+
+impl ByteSizeOf for Sample {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
 }
 
 /// A single value from a `MetricValue::AggregatedHistogram`. The value
@@ -159,11 +204,23 @@ pub struct Bucket {
     pub count: u32,
 }
 
+impl ByteSizeOf for Bucket {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+}
+
 /// A single value from a `MetricValue::AggregatedSummary`.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Quantile {
     pub upper_limit: f64,
     pub value: f64,
+}
+
+impl ByteSizeOf for Quantile {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
 }
 
 // Constructor helper macros

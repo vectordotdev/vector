@@ -4,7 +4,7 @@ use super::{
     metadata::EventMetadata,
     util, Lookup, PathComponent, Value,
 };
-use crate::config::log_schema;
+use crate::{config::log_schema, ByteSizeOf};
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
@@ -37,6 +37,12 @@ impl Default for LogEvent {
             fields: Value::Map(BTreeMap::new()),
             metadata: EventMetadata::default(),
         }
+    }
+}
+
+impl ByteSizeOf for LogEvent {
+    fn allocated_bytes(&self) -> usize {
+        self.fields.allocated_bytes() + self.metadata.allocated_bytes()
     }
 }
 
