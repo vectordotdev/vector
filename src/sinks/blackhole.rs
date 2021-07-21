@@ -82,11 +82,12 @@ impl BlackholeSink {
 #[async_trait]
 impl StreamSink for BlackholeSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let mut chunks = input.chunks(128);
+        let mut chunks = input.chunks(self.config.print_amount);
         while let Some(events) = chunks.next().await {
             if let Some(rate) = self.config.rate {
-                let until = self.last.unwrap_or_else(Instant::now)
-                    + Duration::from_secs_f32(1.0 / rate as f32);
+                let factor: f32 = 1.0 / rate as f32;
+                let secs: f32 = factor * (events.len() as f32);
+                let until = self.last.unwrap_or_else(Instant::now) + Duration::from_secs_f32(secs);
                 sleep_until(until.into()).await;
                 self.last = Some(until);
             }
@@ -100,14 +101,12 @@ impl StreamSink for BlackholeSink {
                 byte_size: message_len
             });
 
-            if self.total_events % self.config.print_amount == 0 {
-                info!({
-                    events = self.total_events,
-                    raw_bytes_collected = self.total_raw_bytes
-                }, "Total events collected");
-            }
+            info!({
+                events = self.total_events,
+                raw_bytes_collected = self.total_raw_bytes
+            }, "Total events collected");
 
-            self.acker.ack(1);
+            self.acker.ack(events.len());
         }
         Ok(())
     }
