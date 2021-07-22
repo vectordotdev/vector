@@ -1,8 +1,8 @@
 # RFC 8288 - 2021-07-20 - CSV Enrichment
 
 Vector needs to allow users to enrich the events flowing through the topology
-using through the topology using a CSV file. This RFC proposes adding a Vrl
-function that can perform this lookup.
+using a CSV file. This RFC proposes adding a VRL function that can perform 
+this lookup.
 
 ## Scope
 
@@ -22,35 +22,30 @@ provided by a CSV file.
 
 ## Doc-level Proposal
 
-Two remap functions:
+### Resources
 
-### `lookup_csv_row`
+To represent the CSV file we have a new top level configuration option.
 
-This function will look up a single row within the dataset. If a single row is 
-found that data is returned as an object, otherwise this function will error. 
+```
+[resources.csv_file]
+  type = "csv"
+  path = "\path_to_csv"
+  key = "{KEY}"
+  delimeter = ","
+```
 
-### `lookup_csv_rows` 
+The fields available for this section are:
 
-This function returns the results as an array of objects. If no row is found an
-empty array is returned. Multiple results just result in multiple rows in the 
-array.
+*type* 
 
-### Parameters 
+The type of data that the resource represents. Currently only a csv file is 
+supported, but this may expand in future to handle other types of files and
+database connections.
 
-*filename*
+*path*
 
-The filename is the path to the filename of the csv file to lookup. This
-filename has to be a static string (cannot be changed at runtime) so that 
-Vector can:
-
-1. Validate that the file exists.
-2. Load the file into memory.
-
-The filename will be relative to the current working directory that Vector is
-running in.
-
-The CSV file must start with a title row that gives a name to each of the 
-columns provided in the file.
+The path to the csv file, either an absolute path or one relative to the current
+working directory.
 
 *key*
 
@@ -59,6 +54,37 @@ the file.
 
 Is it safe to assume/require the file to be encrypted using AES, or should we
 support other algorithms as well?
+
+*delimeter*
+
+The delimeter used in the csv file to separate fields. Defaults to `","`.
+
+*title_row*
+
+Defaults to true. If set it assumes the first row in the csv file contains 
+column names. If false columns are named according to their numerical index.
+
+### Vrl functions
+
+Two remap functions:
+
+#### `lookup_csv_row`
+
+This function will look up a single row within the dataset. If a single row is 
+found that data is returned as an object, otherwise this function will error. 
+
+#### `lookup_csv_rows` 
+
+This function returns the results as an array of objects. If no row is found an
+empty array is returned. Multiple results just result in multiple rows in the 
+array.
+
+#### Parameters 
+
+*resource*
+
+The name of the resource to lookup. This must point to a resource specified
+in the config file eg `resources.csv_file`.
 
 *criteria*
 
@@ -72,20 +98,21 @@ passing `true` to this parameter.
 
 ## Internal Proposal
 
-- Describe your change as if you were presenting it to the Vector team.
-- Use lists, examples, and code blocks for efficient reading.
-- Be specific!
-
-The majority of the changes will be provided by adding two new functions within
-`vrl/stdlib` and some shared lookup code.
-
-Since the CSV file is loaded at bootime, it is not essential that it is loaded 
-using async. This makes things much simpler as currently the VRL compilation 
-process is entirely synchronous. No code outside of the new function in the
-vrl stdlib should need changing.
+We will need to add a new component type to Vector, call it `Resource`. On 
+loading the Vector config these instances will be created and will load the 
+data that they are pointing to. 
 
 The entire data file will be loaded into memory, so all lookups will be 
-performed in memory.
+performed in memory. A `Resource` will need to provide threadsafe,
+readonly access to the data that it loads.
+
+`Resource` will need to scan for changes to the underlying data. When it finds
+a change it will need to load the new data and swap out the old. This should be
+possible to do without causing any pauses to Vector.
+
+Vector will need to maintain the concept of `Resource`. This can be created as
+an additional element to the `vrl::Value` type. All resources loaded from the 
+config can be added to the compiler variables when it is first invoked.
 
 ### Indexing 
 
@@ -107,6 +134,10 @@ If the type def isn't known we could
 
 The approach we take here should be decided before the first release so we don't
 have to introduce a breaking change further down the line.
+
+Since the resource file is loaded outside of Vrl whilst determining which keys
+need indexing occurs inside Vrl, we will need a way for Vrl to indicate to the 
+resource which indexes need building.
 
 Actual indexing strategies can be decided later.
 
@@ -157,6 +188,7 @@ asynchronously.
 
 - What approach should we taken around determining the indexed fields?
 - Can we assume that if the file is encrypted it will use AES?
+- Should `title_row` default to true or false?
 
 ## Plan Of Attack
 
