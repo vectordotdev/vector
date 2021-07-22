@@ -538,7 +538,15 @@ where
 pub trait ServiceLogic: Clone {
     type Response: Response;
 
-    fn update_finalizers(&self, result: crate::Result<Self::Response>, finalizers: EventFinalizers);
+    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus;
+
+    fn update_finalizers(
+        &self,
+        result: crate::Result<Self::Response>,
+        finalizers: EventFinalizers,
+    ) {
+        finalizers.update_status(self.result_status(result));
+    }
 }
 
 #[derive(Derivative)]
@@ -559,12 +567,8 @@ where
 {
     type Response = R;
 
-    fn update_finalizers(
-        &self,
-        result: crate::Result<Self::Response>,
-        finalizers: EventFinalizers,
-    ) {
-        let status = match result {
+    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus {
+        match result {
             Ok(response) => {
                 if response.is_successful() {
                     trace!(message = "Response successful.", ?response);
@@ -581,8 +585,7 @@ where
                 error!(message = "Request failed.", %error);
                 EventStatus::Errored
             }
-        };
-        finalizers.update_status(status);
+        }
     }
 }
 

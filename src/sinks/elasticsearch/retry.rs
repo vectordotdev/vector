@@ -8,7 +8,7 @@ use crate::{
 use bytes::Bytes;
 use http::StatusCode;
 use serde::Deserialize;
-use vector_core::event::{EventFinalizers, EventStatus};
+use vector_core::event::EventStatus;
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {
@@ -91,12 +91,8 @@ pub(super) struct ElasticSearchServiceLogic;
 
 impl ServiceLogic for ElasticSearchServiceLogic {
     type Response = hyper::Response<Bytes>;
-    fn update_finalizers(
-        &self,
-        result: crate::Result<Self::Response>,
-        finalizers: EventFinalizers,
-    ) {
-        let status = match result {
+    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus {
+        match result {
             Ok(response) => {
                 if response.is_successful() {
                     let body = String::from_utf8_lossy(response.body());
@@ -119,8 +115,7 @@ impl ServiceLogic for ElasticSearchServiceLogic {
                 error!(message = "Request failed.", %error);
                 EventStatus::Errored
             }
-        };
-        finalizers.update_status(status);
+        }
     }
 }
 
