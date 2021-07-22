@@ -58,6 +58,20 @@ components: sources: internal_metrics: {
 	}
 
 	output: metrics: {
+		// Default internal metrics tags
+		_internal_metrics_tags: {
+			pid: {
+				description: "The process ID of the Vector instance."
+				required:    true
+				examples: ["4232"]
+			}
+			host: {
+				description: "The hostname of the system Vector is running on."
+				required:    true
+				examples: [_values.local_host]
+			}
+		}
+
 		// Instance-level "process" metrics
 		aggregate_events_recorded_total: {
 			description:       "The number of events recorded by the aggregate transform."
@@ -81,71 +95,85 @@ components: sources: internal_metrics: {
 			description:       "The number of times the Vector GraphQL API has been started."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		config_load_errors_total: {
 			description:       "The total number of errors loading the Vector configuration."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		connection_errors_total: {
 			description:       "The total number of connection errors for this Vector instance."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		connection_failed_total: {
 			description:       "The total number of times a connection has failed."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		connection_send_errors_total: {
 			description:       "The total number of errors sending data via the connection."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		connection_send_ack_errors_total: {
 			description:       "The total number of protocol acknowledgement errors for this Vector instance for source protocols that support acknowledgements."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		connection_shutdown_total: {
 			description:       "The total number of times the connection has been shut down."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		quit_total: {
 			description:       "The total number of times the Vector instance has quit."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		recover_errors_total: {
 			description:       "The total number of errors caused by Vector failing to recover from a failed reload."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		reload_errors_total: {
 			description:       "The total number of errors encountered when reloading Vector."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		reloaded_total: {
 			description:       "The total number of times the Vector instance has been reloaded."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		started_total: {
 			description:       "The total number of times the Vector instance has been started."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		stopped_total: {
 			description:       "The total number of times the Vector instance has been stopped."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 
 		// Metrics emitted by one or more components
@@ -154,37 +182,43 @@ components: sources: internal_metrics: {
 			description:       "The average round-trip time (RTT) for the current window."
 			type:              "histogram"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		adaptive_concurrency_in_flight: {
 			description:       "The number of outbound requests currently awaiting a response."
 			type:              "histogram"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		adaptive_concurrency_limit: {
 			description:       "The concurrency limit that the adaptive concurrency feature has decided on for this current window."
 			type:              "histogram"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		adaptive_concurrency_observed_rtt: {
 			description:       "The observed round-trip time (RTT) for requests."
 			type:              "histogram"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		checkpoint_write_errors_total: {
 			description:       "The total number of errors writing checkpoints."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		checkpoints_total: {
 			description:       "The total number of files checkpointed."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		checksum_errors_total: {
 			description:       "The total number of errors identifying files via checksum."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				file: _file
 			}
 		}
@@ -192,11 +226,13 @@ components: sources: internal_metrics: {
 			description:       "The total number of metrics collections completed for this component."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		collect_duration_seconds: {
 			description:       "The duration spent collecting of metrics for this component."
 			type:              "histogram"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		command_executed_total: {
 			description:       "The total number of times a command has been executed."
@@ -347,11 +383,13 @@ components: sources: internal_metrics: {
 			description:       "The total number of errors encountered when encoding an event."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		events_discarded_total: {
 			description:       "The total number of events discarded by this component."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		events_failed_total: {
 			description:       "The total number of failures to read a Kafka message."
@@ -475,7 +513,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of failures to delete a file."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				file: _file
 			}
 		}
@@ -483,7 +521,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of errors encountered when watching files."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				file: _file
 			}
 		}
@@ -491,7 +529,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of files Vector has found to watch."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				file: _file
 			}
 		}
@@ -499,7 +537,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of files deleted."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				file: _file
 			}
 		}
@@ -507,7 +545,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of times Vector has resumed watching a file."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				file: _file
 			}
 		}
@@ -515,7 +553,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of times Vector has stopped watching a file."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				file: _file
 			}
 		}
@@ -523,7 +561,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of times Vector failed to read a file for fingerprinting."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				file: _file
 			}
 		}
@@ -531,7 +569,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of errors encountered when globbing paths."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: {
+			tags:              _internal_metrics_tags & {
 				path: _path
 			}
 		}
@@ -539,6 +577,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of HTTP `400 Bad Request` errors encountered."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		http_client_response_rtt_seconds: {
 			description:       "The round-trip time (RTT) of HTTP requests, tagged with the response code."
@@ -566,11 +605,13 @@ components: sources: internal_metrics: {
 			description:       "The total number of HTTP error responses for this component."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		http_request_errors_total: {
 			description:       "The total number of HTTP request errors for this component."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		http_requests_total: {
 			description:       "The total number of HTTP requests issued by this component."
@@ -603,6 +644,7 @@ components: sources: internal_metrics: {
 			description:       "The total memory currently being used by Vector (in bytes)."
 			type:              "gauge"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		metadata_refresh_failed_total: {
 			description:       "The total number of failed efforts to refresh AWS EC2 metadata."
@@ -620,11 +662,13 @@ components: sources: internal_metrics: {
 			description:       "The number of current open connections to Vector."
 			type:              "gauge"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		parse_errors_total: {
 			description:       "The total number of errors parsing metrics for this component."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		processed_bytes_total: {
 			description:       "The number of bytes processed by the component."
@@ -676,11 +720,13 @@ components: sources: internal_metrics: {
 			description:       "The total number of requests errors for this component."
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		request_duration_seconds: {
 			description:       "The total request duration in seconds."
 			type:              "histogram"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		request_read_errors_total: {
 			description:       "The total number of request read errors for this component."
@@ -834,6 +880,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		windows_service_install_total: {
 			description: """
@@ -841,6 +888,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		windows_service_restart_total: {
 			description: """
@@ -848,6 +896,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		windows_service_start_total: {
 			description: """
@@ -855,6 +904,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		windows_service_stop_total: {
 			description: """
@@ -862,6 +912,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 		windows_service_uninstall_total: {
 			description: """
@@ -869,10 +920,11 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
+			tags:              _internal_metrics_tags
 		}
 
 		// Helpful tag groupings
-		_component_tags: {
+		_component_tags: _internal_metrics_tags & {
 			component_kind: _component_kind
 			component_name: _component_name
 			component_type: _component_type

@@ -1,5 +1,6 @@
 #![deny(missing_docs)]
 
+use crate::ByteSizeOf;
 use atomig::{Atom, Atomic, Ordering};
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
@@ -35,6 +36,12 @@ impl PartialOrd for EventFinalizers {
         // `Arc`s. Therefore, partial ordering of `EventFinalizers` is defined
         // only on the length of the finalizers.
         self.0.len().partial_cmp(&other.0.len())
+    }
+}
+
+impl ByteSizeOf for EventFinalizers {
+    fn allocated_bytes(&self) -> usize {
+        self.0.iter().fold(0, |acc, arc| acc + arc.size_of())
     }
 }
 
@@ -110,6 +117,12 @@ impl EventFinalizers {
 pub struct EventFinalizer {
     status: Atomic<EventStatus>,
     batch: Arc<BatchNotifier>,
+}
+
+impl ByteSizeOf for EventFinalizer {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
 }
 
 impl EventFinalizer {
