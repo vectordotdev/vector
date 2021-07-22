@@ -145,6 +145,11 @@ fn exists<T: AsRef<str>>(attr: T, obj: &Value) -> bool {
             }),
             _ => false,
         },
+        // Literal field 'tags' needs to be compared by key.
+        Field::Reserved(f) if f == "tags" => match value {
+            Value::Array(v) => v.iter().any(|v| v == obj),
+            _ => false,
+        },
         // Other field types have already resolved at this point, so just return true.
         _ => true,
     })
@@ -341,7 +346,7 @@ fn match_wildcard<T: AsRef<str>>(attr: T, obj: &Value, wildcard: &str) -> bool {
 }
 
 /// Returns true if the provided `Value` matches on the lower and upper bound.
-fn range<T: AsRef<str>>(
+fn range<T: AsRef<str> + Copy>(
     attr: T,
     obj: &Value,
     lower: &ComparisonValue,
@@ -351,7 +356,7 @@ fn range<T: AsRef<str>>(
 ) -> bool {
     each_field(attr, obj, |field, value| match (lower, upper) {
         // If both bounds are wildcards, it'll match everything; just return true.
-        (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => true,
+        (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => exists(attr, obj),
         // Unbounded lower. Wrapped in a container group for negation compatibility.
         (ComparisonValue::Unbounded, _) => {
             let op = if upper_inclusive {
@@ -485,6 +490,12 @@ mod test {
         tag_bare {
             args: func_args![value: value!({"tags": ["a","b","c"]}), query: "tags:a"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        tag_bare_no_match {
+            args: func_args![value: value!({"tags": ["a","b","c"]}), query: "tags:d"],
+            want: Ok(false),
             tdef: type_def(),
         }
 
@@ -1253,6 +1264,18 @@ mod test {
         negate_range_message_between_no_match_string {
             args: func_args![value: value!({"message": "70"}), query: r#"-["1" TO "6"]"#],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_tag_key {
+            args: func_args![value: value!({"tags": ["a"]}), query: "a:[* TO *]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        range_tag_key_no_match {
+            args: func_args![value: value!({"tags": ["b"]}), query: "a:[* TO *]"],
+            want: Ok(false),
             tdef: type_def(),
         }
 

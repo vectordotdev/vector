@@ -19,7 +19,10 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 impl ConditionConfig for DatadogSearchConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
         let config = VrlConfig {
-            source: format!(r#"match_datadog_query(., "{}")"#, &self.source),
+            source: format!(
+                r#"match_datadog_query(., "{}")"#,
+                self.source.replace(r#"""#, r#"\""#)
+            ),
         };
 
         config.build()
