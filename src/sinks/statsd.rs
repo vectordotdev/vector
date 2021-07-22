@@ -301,7 +301,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame.item).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -317,7 +317,7 @@ mod test {
         let frame = &encode_event(event, None).unwrap();
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
-        assert_eq!("counter:1.5|c\n", from_utf8(&frame.item).unwrap());
+        assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -331,7 +331,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame.item).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -346,7 +346,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame.item).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -364,7 +364,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame.item).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -381,7 +381,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame.item).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
