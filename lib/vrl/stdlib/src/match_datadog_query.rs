@@ -355,9 +355,10 @@ fn range<T: AsRef<str> + Copy>(
     upper_inclusive: bool,
 ) -> bool {
     each_field(attr, obj, |field, value| match (lower, upper) {
-        // If both bounds are wildcards, it'll match everything; just return true.
+        // If both bounds are wildcards, just check that the field exists to catch the
+        // special case for "tags".
         (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => exists(attr, obj),
-        // Unbounded lower. Wrapped in a container group for negation compatibility.
+        // Unbounded lower.
         (ComparisonValue::Unbounded, _) => {
             let op = if upper_inclusive {
                 Comparison::Lte
@@ -367,7 +368,7 @@ fn range<T: AsRef<str> + Copy>(
 
             compare(&field, value, &op, upper)
         }
-        // Unbounded upper. Wrapped in a container group for negation compatibility.
+        // Unbounded upper.
         (_, ComparisonValue::Unbounded) => {
             let op = if lower_inclusive {
                 Comparison::Gte
