@@ -953,16 +953,19 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "linux")] // see #7988
     #[tokio::test]
     async fn file_start_position_server_restart_acknowledged() {
         file_start_position_server_restart(Acks).await
     }
 
+    #[cfg(target_os = "linux")] // see #7988
     #[tokio::test]
     async fn file_start_position_server_restart_nonacknowledged() {
         file_start_position_server_restart(NoAcks).await
     }
 
+    #[cfg(target_os = "linux")] // see #7988
     async fn file_start_position_server_restart(acking: AckingMode) {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
