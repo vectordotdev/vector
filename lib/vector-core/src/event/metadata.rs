@@ -66,9 +66,9 @@ impl EventMetadata {
         self.finalizers.add(finalizer);
     }
 
-    /// Swap this metadata with empty metadata and return the original.
-    pub fn take(&mut self) -> Self {
-        std::mem::take(self)
+    /// Swap the finalizers list with an empty list and return the original.
+    pub fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
     }
 }
 

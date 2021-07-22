@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
-    event::proto::EventWrapper,
+    event::{proto::EventWrapper, Event},
     proto::vector as proto,
     sinks::util::{
         retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
@@ -21,7 +21,6 @@ use tonic::{
     IntoRequest,
 };
 use tower::ServiceBuilder;
-use vector_core::event::{Event, WithMetadata};
 
 type Client = proto::Client<Channel>;
 type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
@@ -211,12 +210,12 @@ impl tower::Service<Vec<EventWrapper>> for Client {
     }
 }
 
-fn encode_event(event: Event) -> EncodedEvent<EventWrapper> {
-    let event: WithMetadata<EventWrapper> = event.into();
+fn encode_event(mut event: Event) -> EncodedEvent<EventWrapper> {
+    let finalizers = event.metadata_mut().take_finalizers();
 
     EncodedEvent {
-        item: event.data,
-        metadata: Some(event.metadata),
+        item: event.into(),
+        finalizers: Some(finalizers),
     }
 }
 

@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::{Event, EventMetadata};
+use crate::event::{Event, EventFinalizers};
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
@@ -46,7 +46,7 @@ enum SinkBuildError {
 #[derive(Debug)]
 pub struct EncodedEvent<I> {
     pub item: I,
-    pub metadata: Option<EventMetadata>,
+    pub finalizers: Option<EventFinalizers>,
 }
 
 impl<I> EncodedEvent<I> {
@@ -55,7 +55,7 @@ impl<I> EncodedEvent<I> {
     pub fn new(item: I) -> Self {
         Self {
             item,
-            metadata: None,
+            finalizers: None,
         }
     }
 
@@ -70,7 +70,7 @@ impl<I> EncodedEvent<I> {
     {
         Self {
             item: I::from(that.item),
-            metadata: that.metadata,
+            finalizers: that.finalizers,
         }
     }
 }

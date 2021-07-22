@@ -137,9 +137,9 @@ impl StreamSink for UnixSink {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
             .map(|mut event| {
-                let metadata = Some(event.metadata_mut().take());
+                let finalizers = Some(event.metadata_mut().take_finalizers());
                 encode_event(event)
-                    .map(|item| EncodedEvent { item, metadata })
+                    .map(|item| EncodedEvent { item, finalizers })
                     .unwrap_or_else(|| EncodedEvent::new(Bytes::new()))
             })
             .peekable();

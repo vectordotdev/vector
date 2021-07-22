@@ -413,7 +413,7 @@ fn encode_event(
 
     encoding.apply_rules(&mut event);
 
-    let log = event.into_log();
+    let mut log = event.into_log();
     let bytes = match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
@@ -431,10 +431,9 @@ fn encode_event(
         }
     };
 
-    let (_fields, metadata) = log.into_parts();
     Some(EncodedEvent {
         item: PartitionInnerBuffer::new(bytes, key.into()),
-        metadata: Some(metadata),
+        finalizers: Some(log.metadata_mut().take_finalizers()),
     })
 }
 
