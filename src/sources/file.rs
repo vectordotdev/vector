@@ -953,11 +953,13 @@ mod tests {
         }
     }
 
+    #[ignore]
     #[tokio::test]
     async fn file_start_position_server_restart_acknowledged() {
         file_start_position_server_restart(Acks).await
     }
 
+    #[ignore]
     #[tokio::test]
     async fn file_start_position_server_restart_nonacknowledged() {
         file_start_position_server_restart(NoAcks).await
