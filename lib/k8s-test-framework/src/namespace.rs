@@ -39,10 +39,10 @@ impl up_down::CommandBuilder for CommandBuilder {
         let mut command = Command::new(&self.kubectl_command);
         command
             .arg(match command_to_build {
-                up_down::CommandToBuild::Up => "create",
+                up_down::CommandToBuild::Up => "apply",
                 up_down::CommandToBuild::Down => "delete",
             })
-            .arg("--values")
+            .arg("--filename")
             .arg(&self.config.test_namespace_resource_file.path());
 
         if matches!(command_to_build, up_down::CommandToBuild::Down) {
