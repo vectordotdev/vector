@@ -64,7 +64,7 @@ events, bytes, and errors processed per component:
 query {
   components {
     __typename
-    componentI
+    componentId
     processedEventsTotal {
       processedEventsTotal
     }

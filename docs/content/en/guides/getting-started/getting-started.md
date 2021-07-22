@@ -50,7 +50,7 @@ Let's create a configuration file:
   encoding.codec = "text"
 ```
 
-Each component has a unique id and is prefixed with the type of component, for example, `sources` for a
+Each component has a unique ID and is prefixed with the type of component, for example, `sources` for a
 source. Our first component, `sources.in`, uses the [`stdin` source][docs.sources.stdin] which tells Vector to receive
 data over stdin and has the ID `in`.
 
