@@ -104,7 +104,7 @@ impl DatadogLogsConfig {
         BatchSettings::default()
             .bytes(bytesize::mib(5_u32))
             .events(1_000)
-            .timeout(15)
+            .timeout(1)
             .parse_config(self.batch)
     }
 
