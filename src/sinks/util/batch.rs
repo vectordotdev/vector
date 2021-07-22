@@ -223,9 +223,7 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
         let EncodedEvent { item, finalizers } = item;
         match self.inner.push(item) {
             PushResult::Ok(full) => {
-                if let Some(finalizers) = finalizers {
-                    self.finalizers.merge(finalizers);
-                }
+                self.finalizers.merge(finalizers);
                 PushResult::Ok(full)
             }
             PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent { item, finalizers }),

@@ -433,7 +433,7 @@ fn encode_event(
 
     Some(EncodedEvent {
         item: PartitionInnerBuffer::new(bytes, key.into()),
-        finalizers: Some(log.metadata_mut().take_finalizers()),
+        finalizers: log.metadata_mut().take_finalizers(),
     })
 }
 

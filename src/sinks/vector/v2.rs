@@ -212,11 +212,9 @@ impl tower::Service<Vec<EventWrapper>> for Client {
 
 fn encode_event(mut event: Event) -> EncodedEvent<EventWrapper> {
     let finalizers = event.metadata_mut().take_finalizers();
+    let item = event.into();
 
-    EncodedEvent {
-        item: event.into(),
-        finalizers: Some(finalizers),
-    }
+    EncodedEvent { item, finalizers }
 }
 
 impl EncodedLength for EventWrapper {

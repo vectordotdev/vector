@@ -46,17 +46,15 @@ enum SinkBuildError {
 #[derive(Debug)]
 pub struct EncodedEvent<I> {
     pub item: I,
-    pub finalizers: Option<EventFinalizers>,
+    pub finalizers: EventFinalizers,
 }
 
 impl<I> EncodedEvent<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
     pub fn new(item: I) -> Self {
-        Self {
-            item,
-            finalizers: None,
-        }
+        let finalizers = Default::default();
+        Self { item, finalizers }
     }
 
     // This should be:

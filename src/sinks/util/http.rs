@@ -174,7 +174,7 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
-        let finalizers = Some(event.metadata_mut().take_finalizers());
+        let finalizers = event.metadata_mut().take_finalizers();
         if let Some(item) = self.sink.encode_event(event) {
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
@@ -321,7 +321,7 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
-        let finalizers = Some(event.metadata_mut().take_finalizers());
+        let finalizers = event.metadata_mut().take_finalizers();
         if let Some(item) = self.sink.encode_event(event) {
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }

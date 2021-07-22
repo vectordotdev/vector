@@ -238,10 +238,8 @@ fn encode_metric(
 ) -> Result<EncodedEvent<PartitionInnerBuffer<Metric, DatadogEndpoint>>, ()> {
     let endpoint = DatadogEndpoint::from_metric(&metric);
     let finalizers = metric.metadata_mut().take_finalizers();
-    Ok(EncodedEvent {
-        item: PartitionInnerBuffer::new(metric, endpoint),
-        finalizers: Some(finalizers),
-    })
+    let item = PartitionInnerBuffer::new(metric, endpoint);
+    Ok(EncodedEvent { item, finalizers })
 }
 
 impl DatadogSink {
