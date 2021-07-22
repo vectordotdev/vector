@@ -1,4 +1,4 @@
-# RFC 8216 - 2021-07-19 - multiple pipelines
+# RFC 8216 - 2021-07-19 - Multiple Pipelines
 
 Large Vector users often require complex Vector topologies to facilitate the collection and processing of data from many different upstream sources. This results in large Vector configuration files that are hard to manage across different teams. This makes Vector a bad candidate for large teams that require autonomy to facilitate sane collaboration.
 
