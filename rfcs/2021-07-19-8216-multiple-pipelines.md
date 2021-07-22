@@ -24,121 +24,91 @@ This RFC will not cover:
 - Helps Vector to grow organically within an organization by allowing teams to adopt Vector at their own pace without heavy administrator involvement.
 - Reduces the management overhead of devops/SREs by enabling teams to manage their own pipelines (spread the management load).
 
-
 ## Internal Proposal
 
 ### How and where the pipelines are stored
 
-To keep the actual structure and avoid retro compatibility issues, vector should read from the default folder `/etc/vector/pipelines/*` the difference pipeline's configuration files.
-The pipeline directory should have a flat structure (no sub directories) and only `json`, `toml` and `yaml` files will be supported.
+To avoid backward incompatibility, pipelines will be loaded from a `pipelines` sub-directory relative to the Vector configuration directory (e.g., `/etc/vector/pipelines`). Therefore, if a user changes the location of the Vector configuration directory they will also change the `pipelines` directory path. They are coupled.
+The `pipelines` directory will contain all pipelines represented as individual files. For simplicity, and to ensure users do not over complicate pipeline management, sub-directories/nesting are not allowed. This is inspired by Terraform's single-level directory nesting, which has been a net positive for simple management of large Terraform projects.
+Each pipeline file is a processing subset of a larger Vector configuration file. Therefore, it follows the same syntax as Vector's configuration (`toml`, `yaml`, and `json`).
 
-To discuss: make this folder should be configurable through the cli, the same way than for the configuration file, with `--pipelines-dir` or though and environment variable `VECTOR_PIPELINES_DIR`.
 
 ### How vector reads the pipelines and what are the limits
 
-Vector will read each of the pipeline configuration files at start time and create an `id` attribute corresponding to the pipeline's filename. A `load-balancer.yml` will have `load-balancer` as `id`. In the pipeline's configuration file, the `id` can be set manually.
+Each time Vector will read its configuration file (on boot and when it live reloads), it will read the pipeline configuration files beforehand and associate an `id` attribute corresponding to the pipeline's filename.
+A `load-balancer.yml` will have `load-balancer` as `id`. In the pipeline's configuration file, the `id` can be set manually to override this behavior.
 In addition, a `version` attribute will be set containing the hash of the pipeline's configuration file to keep track of the file changes.
 In case several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector should error.
 
 Those pipeline's configuration files should only contain transforms or vector will error.
-Each of the defined transforms will be callable by using `pipeline-id.transform-id` outside of the pipeline's configuration file to avoid conflicts.
-A pipeline cannot use a component defined in another pipeline of vector will error.
+Each of the components in the pipeline configuration can be refered to with the `id` of the pipeline and the component `id` (for example, the transform `foo` in the pipeline `bar` should be set as an input with `foo.bar`).
+A pipeline cannot use a component defined in another pipeline or vector will error.
 
-The structure of the pipeline's configuration file should be as follow
+The structure of the pipeline's configuration file should be as follows
 
 ```toml
+# optional
 id = "load-balancer"
 
 [transforms.first]
+inputs = ["source"]
 ...
 
 [transforms.second]
+inputs = ["load-balancer.first"]
+...
+
+# this will error
+[transforms.third]
+inputs = ["other-pipeline.bar"]
 ...
 ```
 
 Now, if we look deeper at the configuration building process, the configuration compiler will require the pipelines in order to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
-To do so, we'll need to implement a `PipelineBuilder` that would work the same way as the the `ConfigBuilder` and use it in [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4) in order to load the pipeline's components inside the configuration. When building the `Config`, the [transforms](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L34) from the pipelines will have to be injected only when they are being used.
 
-### What metadata vector adds to the events going through a pipeline
-
-Each time an event goes through a pipeline, vector will create a field (a tag for metrics) `pipelines.${PIPELINE_ID} = ${PIPELINE_VERSION}` in order to be able to track the path taken by an event.
-
-To do so, here are 2 options.
-
-#### By dynamically creating a transform each time a pipeline is used
-
-This step of adding a field should be done with a dynamically created transform and injected in the configuration by the [compiler](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L34).
-Each time a component calls a transform coming from a pipeline, the inputs should be swapped and a dynamic transform created.
-
-```toml
-# in the pipeline load-balancer
-[transforms.do-something]
-...
-
-# in the config
-[sink.output]
-input = ["load-balancer.do-something"]
-...
-```
-
-should be replaced by this equivalent
-
-```
-# in the pipeline load-balancer
-[transforms.do-something]
-...
-
-# injected transform
-[transforms.pre-output]
-input = ["load-balancer.do-something"]
-type = "remap"
-source = '''
-if is_object(.pipelines) {
-  .pipelines = merge(.pipelines, {"load-balancer":"version"})
-} else {
-  .pipelines = {"load-balancer":"version"}
-}
-'''
-
-[sink.output]
-input = ["pre-output"]
-...
-...
-```
-
-To avoid name conflicts with that dynamic transform, this generated transform name could be made by doing a hash of `pre-${NAME}(${INPUTS})`.
-
-#### By adding the field each time an event goes through a pipeline
-
-Adding the ability to a transform to be aware of its name and if it's part of a pipeline by updating `FunctionTransform` and `TaskTransform`:
+To do so, we'll need to implement a `PipelineBuilder` with the following structure
 
 ```rust
-pub trait FunctionTransform: ... {
-  // returning the name and the version
-  fn pipeline(&self) -> Option<(String, String)>;
-  // name of the transform
-  fn name(&self) -> String;
+struct PipelineBuilder {
+    pub id: String,
+    pub version: String,
+    pub transforms: IndexMap<String, TransformOuter>,
 }
 ```
 
-And then adding a `pre_transform` function that would add the pipeline fields
+then we would update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4)
 
 ```rust
-pub trait FunctionTransform: ... {
-  fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-    self.do_transform(output, self.pre_transform);
-  }
-
-  fn pre_transform(&mut self, event: Event) -> Event {
-    // update the event in order to add the field
-  }
-
-  fn transform(&mut self, output: &mut Vec<Event>, event: Event);
-}
+fn compile(mut builder: ConfigBuilder, pipelines: Vec<PipelineBuilder>)
 ```
 
-This solution would required the core of vector and how it handles transforms but would avoid generatic dynamic transforms.
-It would probably also reduce the performance considering that each transform would have to check if it's part of a pipeline.
+in order to build a `Config` containing the required pipeline components.
+
+The components coming from the pipeline would be cloned inside the final `Config`, in the `transforms` `IndexMap`.
+
+
+### Observing pipelines
+
+Users should be able to observe and monitor individual pipelines.
+This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag refering to the pipeline `id` and a `pipeline_version` tag refering to the pipeline `version`.
+
+In Vector, the `Task` structure is what emits the events for `internal_metrics`.
+After [build the different pieces of the topology](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), we've to update the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L163) in order to accept an `Option<(PipelineId, PipelineVersion)>` so that when it emits the metrics events it can provide the information about the pipeline.
+
+This approach would extend the [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md#collecting-uniform-context-data) by _just_ adding `pipeline_id` and `pipeline_version` to the context.
+
+When [spawning a transform](https://github.com/timberio/vector/blob/v0.15.0/src/topology/mod.rs#L574), adding the optional pipeline information to the span will populate the metrics.
+
+```rust
+let span = error_span!(
+    "transform",
+    component_kind = "transform",
+    component_name = %task.name(),
+    component_type = %task.typetag(),
+    pipeline_id = %task.pipeline_id(),
+    pipeline_version = %task.pipeline_version(),
+);
+```
 
 ## Doc-level Proposal
 
@@ -194,7 +164,7 @@ source = '''
 '''
 
 [transforms.nginx]
-input = ["nginx_filter"]
+input = ["frontend.nginx_filter"]
 type = "remap"
 source = '''
   # do some transformations with the nginx logs
@@ -208,7 +178,7 @@ source = '''
 '''
 
 [transforms.apache]
-input = ["apache_filter"]
+input = ["frontend.apache_filter"]
 type = "remap"
 source = '''
   # do some transformations with the apache logs
@@ -230,30 +200,68 @@ type = "console"
 
 ## Rationale
 
-This improves the readability of the `vector.toml` and add the possibility to share pipelines or deploy them with some tools like Terraform or Ansible without modifying the main configuration.
-In the future, this will allow us to replicate datadog's pipelines locally.
+- This improves the readability of the `vector.toml`.
 
 ## Drawbacks
 
-- Not yet able to use a pipeline in another pipeline, but this may come in further work.
-- First option: creating some hidden transforms and modifying the existing ones could introduce some bugs.
+_TODO_
 
 ## Alternatives
 
-- Updating the `Topology` to create those transforms at the topology building time in order to avoid modifying the inputs when building the configuration.
+- Do nothing: we can already use several configuration files, people could split their existing configuration.
+
+This would imply some duplication if a transform is used in multiple configuration files.
+
+- Evolve vector to use a tag/filter model like our competitors, have a 'pipeline' be a 'tag'.
+
+
+- Run a single vector per-'pipeline' and support metric tagging to distinguish at the telemetry level.
+
 
 ## Outstanding Questions
 
+- Should the `pipelines` directory location be configurable through the cli?
+
+```bash
+vector --pipeline-dir /foo/bar/pipelines
+```
+
 - Should we have some visibility attributes on the components in different pipelines in order to make them available to other components?
+
+```toml
+id = "pipeline-id"
+
+[transforms.name]
+private = true
+```
+
 - Should we have a main (or default) transform in a pipeline that would allow to use the pipeline's ID as a transform name?
+
+```toml
+# in the pipeline
+id = "pipeline-id"
+
+[transforms.default]
+...
+
+# in the configuration file
+[sinks.out]
+inputs = ["pipeline-id"]
+```
+
+- Should we allow to embed a pipeline configuration in a configuration file?
+
+```toml
+# in /etc/vector/vector.toml
+[[pipelines]]
+id = "first"
+
+[[pipelines]]
+id = "second"
+```
 
 ## Plan Of Attack
 
-1. Update the CLI to take the pipeline directory parameter
-2. Create the Pipeline structure and parse a pipeline's configuration file
+- [ ] Create the Pipeline structure and parse a pipeline's configuration file
+- [ ] Update the context for taking pipeline informations
 
-3. First option: Dynamically create transform that add the pipeline's metadata to every events
-4. First option: Register the pipelines' components into vector
-
-3. Second option: Update the transforms to take the transform name and pipeline info when being built
-4. Second option: Set the events field when in a pipeline
