@@ -63,6 +63,15 @@ components: sources: internal_logs: {
 			timestamp: fields._current_timestamp & {
 				description: "The exact time the log or trace was generated."
 			}
+			host: fields._local_host
+			pid: {
+				description: "The process ID of the Vector instance."
+				required:    true
+				type: uint: {
+					examples: [4232]
+					unit: null
+				}
+			}
 			"*": {
 				description: "Each field from the original message is copied into the event."
 				required:    true
