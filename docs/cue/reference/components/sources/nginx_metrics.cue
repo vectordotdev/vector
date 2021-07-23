@@ -96,6 +96,7 @@ components: sources: nginx_metrics: {
 			password_example: "${HTTP_PASSWORD}"
 			username_example: "${HTTP_USERNAME}"
 		}}
+		proxy: configuration._proxy
 	}
 
 	how_it_works: {

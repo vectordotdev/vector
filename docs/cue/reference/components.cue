@@ -683,6 +683,43 @@ components: {
 				}
 			}
 
+			_proxy: {
+				common:	     false
+				description: "Configures the proxy."
+				required:    false
+				type: object: options: {
+					enabled: {
+						description: "If false the proxy will be disabled."
+						required:    false
+						type: bool: default: true
+					}
+					http: {
+						description: "Http proxy url."
+						required:    false
+						type: string: {
+							examples: ["http://foo.bar:3128"]
+							syntax: "literal"
+						}
+					}
+					https: {
+						description: "Https proxy url."
+						required:    false
+						type: string: {
+							examples: ["http://foo.bar:3128"]
+							syntax: "literal"
+						}
+					}
+					no_proxy: {
+						description: "List of url skipping the proxy configuration."
+						required:    false
+						type: string: {
+							examples: ["localhost,.foo.bar", "*"]
+							syntax: "literal"
+						}
+					}
+				}
+			}
+
 			_http_auth: {
 				_args: {
 					password_example: string
