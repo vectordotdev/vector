@@ -48,14 +48,11 @@ impl Query {
 
     pub fn delete_type_def(&self, state: &mut State) {
         if self.is_external() {
-            match state.target().as_mut() {
-                Some(ref mut target) => {
-                    let value = target.value.clone();
-                    let type_def = target.type_def.remove_path(&self.path);
+            if let Some(ref mut target) = state.target().as_mut() {
+                let value = target.value.clone();
+                let type_def = target.type_def.remove_path(&self.path);
 
-                    state.update_target(assignment::Details { type_def, value })
-                }
-                None => (),
+                state.update_target(assignment::Details { type_def, value })
             }
         }
     }

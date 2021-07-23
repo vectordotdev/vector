@@ -1184,12 +1184,12 @@ impl TypeDef {
             }
             KindInfo::Known(kinds) => KindInfo::Known(
                 kinds
-                    .into_iter()
+                    .iter()
                     .map(|kind| match (kind, path.next(), path.peek()) {
                         (TypeKind::Object(object), Some(SegmentBuf::Field(_)), Some(_)) => {
                             TypeKind::Object(
                                 object
-                                    .into_iter()
+                                    .iter()
                                     .map(|(field, kindinfo)| {
                                         (
                                             field.clone(),
@@ -1203,7 +1203,7 @@ impl TypeDef {
                         (TypeKind::Object(object), Some(SegmentBuf::Field(fieldname)), None) => {
                             TypeKind::Object(
                                 object
-                                    .into_iter()
+                                    .iter()
                                     .filter_map(|(field, kindinfo)| match field {
                                         Field::Field(name) if name == fieldname.as_str() => None,
                                         _ => Some((field.clone(), kindinfo.clone())),
@@ -1215,7 +1215,7 @@ impl TypeDef {
                         (TypeKind::Object(object), Some(SegmentBuf::Coalesce(_)), Some(_)) => {
                             TypeKind::Object(
                                 object
-                                    .into_iter()
+                                    .iter()
                                     .map(|(field, kindinfo)| {
                                         (
                                             field.clone(),
@@ -1232,7 +1232,7 @@ impl TypeDef {
                             None,
                         ) => TypeKind::Object(
                             object
-                                .into_iter()
+                                .iter()
                                 .filter_map(|(field, kindinfo)| match field {
                                     Field::Field(name)
                                         if fieldnames
@@ -1251,9 +1251,9 @@ impl TypeDef {
                         (TypeKind::Array(array), Some(SegmentBuf::Index(_)), Some(_)) => {
                             TypeKind::Array(
                                 array
-                                    .into_iter()
+                                    .iter()
                                     .map(|(idx, kindinfo)| {
-                                        (idx.clone(), Self::remove_segment(kindinfo, path.clone()))
+                                        (*idx, Self::remove_segment(kindinfo, path.clone()))
                                     })
                                     .collect(),
                             )
@@ -1262,7 +1262,7 @@ impl TypeDef {
                         (TypeKind::Array(array), Some(SegmentBuf::Index(index)), None) => {
                             TypeKind::Array(
                                 array
-                                    .into_iter()
+                                    .iter()
                                     .filter_map(|(idx, kindinfo)| match idx {
                                         Index::Index(idx)
                                             if *index >= 0 && *idx == *index as usize =>
@@ -1284,7 +1284,7 @@ impl TypeDef {
                                             // until runtime.
                                             None
                                         }
-                                        _ => Some((idx.clone(), kindinfo.clone())),
+                                        _ => Some((*idx, kindinfo.clone())),
                                     })
                                     .collect(),
                             )
@@ -1300,7 +1300,7 @@ impl TypeDef {
     /// Removes the given path from the typedef
     pub fn remove_path(&self, path: &LookupBuf) -> Self {
         let segments = path.as_segments();
-        let peekable = segments.into_iter().peekable();
+        let peekable = segments.iter().peekable();
 
         TypeDef {
             fallible: self.fallible,
