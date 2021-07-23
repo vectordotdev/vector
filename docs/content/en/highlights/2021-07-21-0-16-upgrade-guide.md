@@ -13,7 +13,6 @@ badges:
 Vector's 0.16.0 release includes one breaking change:
 
 1. [Datadog Log sink encoding option removed](#encoding)
-1. [Component name field renamed to ID](#first)
 
 We cover it below to help you upgrade quickly:
 
