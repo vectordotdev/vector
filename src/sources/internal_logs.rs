@@ -139,7 +139,7 @@ mod tests {
     async fn start_source() -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
 
-        let source = InternalLogsConfig {}
+        let source = InternalLogsConfig::default()
             .build(SourceContext::new_test(tx))
             .await
             .unwrap();
