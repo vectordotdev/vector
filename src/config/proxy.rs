@@ -38,14 +38,24 @@ impl NoProxyInterceptor {
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug, PartialEq, Eq)]
 pub struct ProxyConfig {
+    #[serde(
+        default = "ProxyConfig::default_enabled",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub enabled: bool,
     pub http: Option<String>,
     pub https: Option<String>,
     pub no_proxy: NoProxy,
 }
 
 impl ProxyConfig {
+    fn default_enabled() -> bool {
+        true
+    }
+
     pub fn from_env() -> Self {
         Self {
+            enabled: true,
             http: from_env("HTTP_PROXY"),
             https: from_env("HTTP_PROXYS"),
             no_proxy: from_env("NO_PROXY").map(NoProxy::from).unwrap_or_default(),
@@ -57,9 +67,13 @@ impl ProxyConfig {
     }
 
     fn merge(mut self, other: &Self) -> Self {
+        if !other.enabled {
+            return self;
+        }
         self.no_proxy.extend(other.no_proxy.clone());
 
         Self {
+            enabled: self.enabled,
             http: self.http.or_else(|| other.http.clone()),
             https: self.https.or_else(|| other.https.clone()),
             no_proxy: self.no_proxy,
@@ -97,11 +111,13 @@ impl ProxyConfig {
     }
 
     pub fn configure<C>(&self, connector: &mut ProxyConnector<C>) -> Result<(), InvalidUri> {
-        if let Some(proxy) = self.http_proxy()? {
-            connector.add_proxy(proxy);
-        }
-        if let Some(proxy) = self.https_proxy()? {
-            connector.add_proxy(proxy);
+        if self.enabled {
+            if let Some(proxy) = self.http_proxy()? {
+                connector.add_proxy(proxy);
+            }
+            if let Some(proxy) = self.https_proxy()? {
+                connector.add_proxy(proxy);
+            }
         }
         Ok(())
     }
@@ -114,11 +130,13 @@ mod tests {
     #[test]
     fn merge() {
         let first = ProxyConfig {
+            enabled: true,
             http: Some("http://1.2.3.4:5678".into()),
             https: None,
             no_proxy: NoProxy::from("127.0.0.1,google.com"),
         };
         let second = ProxyConfig {
+            enabled: true,
             http: Some("http://1.2.3.5:5678".into()),
             https: Some("https://2.3.4.5:9876".into()),
             no_proxy: NoProxy::from("localhost"),
