@@ -7,6 +7,7 @@ use crate::{
     sinks::{
         util::{
             batch::{Batch, BatchError},
+            buffer::GZIP_FAST,
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpSink, PartitionHttpSink},
@@ -101,8 +102,8 @@ impl DatadogLogsConfig {
 
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
         BatchSettings::default()
-            .bytes(bytesize::kib(100u64))
-            .events(20)
+            .bytes(bytesize::mib(5_u32))
+            .events(1_000)
             .timeout(1)
             .parse_config(self.batch)
     }
@@ -171,9 +172,7 @@ impl DatadogLogsConfig {
         let (request, body) = match compression {
             Compression::None => (request, body),
             Compression::Gzip(level) => {
-                // Default the compression level to 6, which is similar to datadog agent.
-                // https://docs.datadoghq.com/agent/logs/log_transport/?tab=https#log-compression
-                let level = level.unwrap_or(6);
+                let level = level.unwrap_or(GZIP_FAST);
                 let mut encoder =
                     GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
 
