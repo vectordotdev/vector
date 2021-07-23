@@ -85,7 +85,7 @@ impl TcpSource for FluentSource {
     type Item = FluentFrame;
     type Decoder = FluentDecoder;
 
-    fn create_decoder(&self) -> Self::Decoder {
+    fn build_decoder(&self) -> Self::Decoder {
         FluentDecoder::new()
     }
 

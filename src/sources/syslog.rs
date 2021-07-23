@@ -11,7 +11,7 @@ use crate::{
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
     sources::util::{
-        decoding::{self, BytesDecoder, OctetCountingDecoder},
+        decoding::{self, BytesDecoder, Decoder, OctetCountingDecoder},
         SocketListenAddr, TcpSource,
     },
     tcp::TcpKeepaliveConfig,
@@ -136,20 +136,28 @@ impl SourceConfig for SyslogConfig {
                 cx.out,
             )),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(build_unix_stream_source(
-                path,
-                OctetCountingDecoder::new(self.max_length),
-                host_key,
-                cx.shutdown,
-                cx.out,
-                |bytes, host_key, default_host| {
-                    let bytes: &[u8] = &bytes;
-                    let line = std::str::from_utf8(bytes).unwrap(); // Guaranteed to be valid UTF-8 by `LinesCodec`.
-                    let mut event = event_from_str(line);
-                    enrich_syslog_event(&mut event, host_key, default_host, bytes.len());
-                    Some(event)
-                },
-            )),
+            Mode::Unix { path } => {
+                let max_length = self.max_length;
+                let build_decoder = move || {
+                    Decoder::new(
+                        Box::new(BytesDecoder::new(OctetCountingDecoder::new(max_length))),
+                        Box::new(SyslogParser),
+                    )
+                };
+
+                let handle_event =
+                    move |event: &mut Event, host: Option<Bytes>, byte_size: usize| {
+                        enrich_syslog_event(event, &host_key, host, byte_size);
+                    };
+
+                Ok(build_unix_stream_source(
+                    path,
+                    build_decoder,
+                    cx.shutdown,
+                    cx.out,
+                    handle_event,
+                ))
+            }
         }
     }
 
@@ -195,7 +203,7 @@ impl TcpSource for SyslogTcpSource {
     type Item = Event;
     type Decoder = decoding::Decoder;
 
-    fn create_decoder(&self) -> Self::Decoder {
+    fn build_decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(
             Box::new(BytesDecoder::new(OctetCountingDecoder::new(
                 self.max_length,

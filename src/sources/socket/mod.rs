@@ -117,10 +117,12 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder: Decoder = config.decoding.into();
                 Ok(unix::unix_datagram(
                     config.path,
                     config.max_length,
                     host_key,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -130,10 +132,13 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoding = config.decoding;
+                let build_decoder = move || -> Decoder { decoding.into() };
                 Ok(unix::unix_stream(
                     config.path,
                     config.max_length,
                     host_key,
+                    build_decoder,
                     cx.shutdown,
                     cx.out,
                 ))

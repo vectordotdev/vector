@@ -88,7 +88,7 @@ impl TcpSource for LogstashSource {
     type Item = LogstashEventFrame;
     type Decoder = LogstashDecoder;
 
-    fn create_decoder(&self) -> Self::Decoder {
+    fn build_decoder(&self) -> Self::Decoder {
         LogstashDecoder::new()
     }
 

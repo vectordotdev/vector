@@ -106,7 +106,7 @@ impl TcpSource for VectorSource {
     type Item = Event;
     type Decoder = decoding::Decoder;
 
-    fn create_decoder(&self) -> Self::Decoder {
+    fn build_decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(
             Box::new(BytesDecoder::new(LengthDelimitedCodec::new())),
             Box::new(VectorParser),

@@ -79,14 +79,14 @@ impl TcpConfig {
 
 pub struct RawTcpSource<D: tokio_util::codec::Decoder<Item = (Event, usize)>> {
     config: TcpConfig,
-    create_decoder: Box<dyn Fn() -> D + Send + Sync>,
+    build_decoder: Box<dyn Fn() -> D + Send + Sync>,
 }
 
 impl<D: tokio_util::codec::Decoder<Item = (Event, usize)>> RawTcpSource<D> {
-    pub fn new(config: TcpConfig, create_decoder: Box<dyn Fn() -> D + Send + Sync>) -> Self {
+    pub fn new(config: TcpConfig, build_decoder: Box<dyn Fn() -> D + Send + Sync>) -> Self {
         Self {
             config,
-            create_decoder,
+            build_decoder,
         }
     }
 }
@@ -104,8 +104,8 @@ where
     type Item = Event;
     type Decoder = D;
 
-    fn create_decoder(&self) -> Self::Decoder {
-        (self.create_decoder)()
+    fn build_decoder(&self) -> Self::Decoder {
+        (self.build_decoder)()
     }
 
     fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize) {

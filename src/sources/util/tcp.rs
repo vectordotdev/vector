@@ -76,7 +76,7 @@ pub trait TcpSource: Send + Sync + 'static {
     type Item: Into<Event> + Send;
     type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
-    fn create_decoder(&self) -> Self::Decoder;
+    fn build_decoder(&self) -> Self::Decoder;
 
     fn build_event(&self, item: Self::Item) -> Event {
         item.into()
@@ -228,7 +228,7 @@ async fn handle_stream<T: ?Sized>(
         }
     }
 
-    let mut reader = FramedRead::new(socket, source.create_decoder());
+    let mut reader = FramedRead::new(socket, source.build_decoder());
 
     loop {
         tokio::select! {
