@@ -1,5 +1,7 @@
-use itertools::FoldWhile::{Continue, Done};
-use itertools::Itertools;
+use itertools::{
+    FoldWhile::{Continue, Done},
+    Itertools,
+};
 
 use lookup::LookupBuf;
 use parsing::value::Value;

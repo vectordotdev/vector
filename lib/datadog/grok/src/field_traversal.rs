@@ -1,8 +1,7 @@
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use parsing::value::Value;
 use snafu::Snafu;
-use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 
 pub fn get_field<'a>(
     source: &Value,
