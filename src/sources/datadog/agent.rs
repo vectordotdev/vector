@@ -87,8 +87,8 @@ struct LogMsg {
     pub timestamp: i64,
     pub hostname: Bytes,
     pub service: Bytes,
-    pub source: Bytes,
-    pub tags: Bytes,
+    pub ddsource: Bytes,
+    pub ddtags: Bytes,
 }
 
 fn decode_body(
@@ -116,8 +116,8 @@ fn decode_body(
             log.insert_flat("timestamp".to_string(), msg.timestamp);
             log.insert_flat("hostname".to_string(), msg.hostname);
             log.insert_flat("service".to_string(), msg.service);
-            log.insert_flat("source".to_string(), msg.source);
-            log.insert_flat("tags".to_string(), msg.tags);
+            log.insert_flat("ddsource".to_string(), msg.ddsource);
+            log.insert_flat("ddtags".to_string(), msg.ddtags);
             if let Some(k) = &api_key {
                 log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
             }
