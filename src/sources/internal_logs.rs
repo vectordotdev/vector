@@ -30,7 +30,7 @@ impl SourceConfig for InternalLogsConfig {
             .as_deref()
             .unwrap_or_else(|| log_schema().host_key())
             .to_owned();
-        let pid_key = self.pid_key.as_deref().unwrap_or_else(|| "pid").to_owned();
+        let pid_key = self.pid_key.as_deref().unwrap_or(|| "pid").to_owned();
 
         Ok(Box::pin(run(host_key, pid_key, cx.out, cx.shutdown)))
     }
