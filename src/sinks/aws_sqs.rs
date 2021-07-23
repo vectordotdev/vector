@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -65,6 +67,11 @@ pub struct SqsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub proxy: ProxyConfig,
 }
 
 lazy_static! {
@@ -133,7 +140,7 @@ impl SqsSinkConfig {
 
     pub fn create_client(&self) -> crate::Result<SqsClient> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client()?;
+        let client = rusoto::client(&self.proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 

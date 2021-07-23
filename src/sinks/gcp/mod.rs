@@ -81,7 +81,8 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
         .body(hyper::Body::empty())
         .unwrap();
 
-    let res = HttpClient::new(None, ProxyConfig::from_env())
+    let proxy = ProxyConfig::from_env();
+    let res = HttpClient::new(None, &proxy)
         .context(BuildHttpClient)?
         .send(req)
         .await

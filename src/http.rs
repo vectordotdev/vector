@@ -48,7 +48,7 @@ where
 {
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
-        proxy_config: ProxyConfig,
+        proxy_config: &ProxyConfig,
     ) -> Result<HttpClient<B>, HttpError> {
         let mut http = HttpConnector::new();
         http.enforce_http(false);

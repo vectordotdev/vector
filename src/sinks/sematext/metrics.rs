@@ -87,7 +87,7 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let proxy = cx.globals.proxy.build(&self.proxy);
-        let client = HttpClient::new(None, proxy)?;
+        let client = HttpClient::new(None, &proxy)?;
 
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), None) => endpoint.clone(),

@@ -64,11 +64,11 @@ async fn http_request(
     url: &Url,
     tls_options: &Option<TlsOptions>,
     headers: &IndexMap<String, String>,
-    proxy: ProxyConfig,
+    proxy: &ProxyConfig,
 ) -> std::result::Result<bytes::Bytes, &'static str> {
     let tls_settings = TlsSettings::from_options(tls_options).map_err(|_| "Invalid TLS options")?;
     let http_client =
-        HttpClient::<Body>::new(tls_settings, proxy).map_err(|_| "Invalid TLS settings")?;
+        HttpClient::<Body>::new(tls_settings, &proxy).map_err(|_| "Invalid TLS settings")?;
 
     // Build HTTP request.
     let mut builder = http::request::Builder::new().uri(url.to_string());
@@ -117,7 +117,7 @@ async fn http_request_to_config_builder(
     url: &Url,
     tls_options: &Option<TlsOptions>,
     headers: &IndexMap<String, String>,
-    proxy: ProxyConfig,
+    proxy: &ProxyConfig,
 ) -> Result {
     let config_str = http_request(url, tls_options, headers, proxy)
         .await
@@ -147,7 +147,7 @@ fn poll_http(
         loop {
             interval.tick().await;
 
-            match http_request_to_config_builder(&url, &tls_options, &headers, proxy.clone()).await {
+            match http_request_to_config_builder(&url, &tls_options, &headers, &proxy).await {
                 Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
                 Err(_) => return,
             };
@@ -175,8 +175,7 @@ impl ProviderConfig for HttpConfig {
 
         let proxy = ProxyConfig::from_env().build(&self.proxy);
         let config_builder =
-            http_request_to_config_builder(&url, &tls_options, &request.headers, proxy.clone())
-                .await?;
+            http_request_to_config_builder(&url, &tls_options, &request.headers, &proxy).await?;
 
         // Poll for changes to remote configuration.
         signal_handler.add(poll_http(
@@ -184,7 +183,7 @@ impl ProviderConfig for HttpConfig {
             url,
             tls_options,
             request.headers.clone(),
-            proxy,
+            proxy.clone(),
         ));
 
         Ok(config_builder)

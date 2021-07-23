@@ -120,7 +120,7 @@ impl SinkConfig for LokiConfig {
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let proxy = cx.globals.proxy.build(&self.proxy);
-        let client = HttpClient::new(tls, proxy)?;
+        let client = HttpClient::new(tls, &proxy)?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
@@ -416,8 +416,8 @@ mod tests {
         tokio::spawn(server);
 
         let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
-        let client =
-            HttpClient::new(tls, ProxyConfig::default()).expect("could not create HTTP client");
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
         healthcheck(config.clone(), client)
             .await

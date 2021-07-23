@@ -133,7 +133,7 @@ impl SinkConfig for HttpSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let tls = TlsSettings::from_options(&self.tls)?;
         let proxy = cx.globals.proxy.build(&self.proxy);
-        let client = HttpClient::new(tls, proxy)?;
+        let client = HttpClient::new(tls, &proxy)?;
 
         let healthcheck = match cx.healthcheck.uri.clone() {
             Some(healthcheck_uri) => {

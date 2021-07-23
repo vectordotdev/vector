@@ -516,7 +516,8 @@ mod tests {
         let request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = HttpClient::new(client_settings, ProxyConfig::default())
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(client_settings, &proxy)
             .unwrap()
             .send(request)
             .await

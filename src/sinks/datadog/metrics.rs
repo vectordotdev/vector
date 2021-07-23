@@ -188,7 +188,7 @@ impl_generate_config_from_default!(DatadogConfig);
 impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let proxy = cx.globals.proxy.build(&self.proxy);
-        let client = HttpClient::new(None, proxy)?;
+        let client = HttpClient::new(None, &proxy)?;
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.api_key.clone(),

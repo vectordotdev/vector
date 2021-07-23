@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
     line_agg,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
 };
@@ -50,6 +50,11 @@ struct AwsS3Config {
     assume_role: Option<String>,
     #[serde(default)]
     auth: AwsAuthentication,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    proxy: ProxyConfig,
 
     multiline: Option<MultilineConfig>,
 }
@@ -97,7 +102,7 @@ impl AwsS3Config {
 
         let region: Region = (&self.region).try_into().context(RegionParse {})?;
 
-        let client = rusoto::client().with_context(|| Client {})?;
+        let client = rusoto::client(&self.proxy).with_context(|| Client {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())

@@ -1,7 +1,9 @@
 mod request;
 
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::{Event, LogEvent, Value},
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -78,6 +80,11 @@ pub struct CloudwatchLogsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub proxy: ProxyConfig,
 }
 
 inventory::submit! {
@@ -103,6 +110,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         request: Default::default(),
         assume_role: Default::default(),
         auth: Default::default(),
+        proxy: Default::default(),
     }
 }
 
@@ -163,7 +171,7 @@ impl CloudwatchLogsSinkConfig {
     fn create_client(&self) -> crate::Result<CloudWatchLogsClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client()?;
+        let client = rusoto::client(&self.proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

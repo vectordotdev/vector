@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -51,6 +51,11 @@ pub struct CloudWatchMetricsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub proxy: ProxyConfig,
 }
 
 lazy_static! {
@@ -119,7 +124,7 @@ impl CloudWatchMetricsSinkConfig {
             region
         };
 
-        let client = rusoto::client()?;
+        let client = rusoto::client(&self.proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

@@ -102,7 +102,7 @@ impl DatadogEventsConfig {
         )?;
 
         let proxy = cx.globals.proxy.build(&self.proxy);
-        let client = HttpClient::new(tls_settings, proxy)?;
+        let client = HttpClient::new(tls_settings, &proxy)?;
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.default_api_key.clone(),

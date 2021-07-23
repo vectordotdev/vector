@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -63,6 +65,11 @@ pub struct S3SinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    proxy: ProxyConfig,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -152,6 +159,7 @@ impl GenerateConfig for S3SinkConfig {
             request: TowerRequestConfig::default(),
             assume_role: None,
             auth: AwsAuthentication::default(),
+            proxy: Default::default(),
         })
         .unwrap()
     }
@@ -262,7 +270,7 @@ impl S3SinkConfig {
 
     pub fn create_client(&self) -> crate::Result<S3Client> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client()?;
+        let client = rusoto::client(&self.proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 

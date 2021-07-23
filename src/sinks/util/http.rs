@@ -496,7 +496,8 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let client = HttpClient::new(None, ProxyConfig::default()).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
         let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(
                 http::Request::post(&uri).body(body).map_err(Into::into),

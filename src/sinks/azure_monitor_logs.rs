@@ -117,7 +117,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let proxy = cx.globals.proxy.build(&self.proxy);
-        let client = HttpClient::new(Some(tls_settings), proxy)?;
+        let client = HttpClient::new(Some(tls_settings), &proxy)?;
 
         let sink = AzureMonitorLogsSink::new(self)?;
         let request_settings = self.request.unwrap_with(&REQUEST_DEFAULTS);
