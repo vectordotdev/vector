@@ -1,6 +1,9 @@
 package metadata
 
 components: sinks: vector: {
+	_port_v1: 9000
+	_port_v2: 6000
+
 	title: "Vector"
 
 	description: """
@@ -21,8 +24,11 @@ components: sinks: vector: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
-			encoding: enabled: false
-			send_buffer_bytes: enabled: true
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
+			send_buffer_bytes: enabled: false
 			keepalive: enabled:         true
 			request: enabled:           false
 			tls: {
@@ -38,7 +44,7 @@ components: sinks: vector: {
 				interface: {
 					socket: {
 						direction: "outgoing"
-						protocols: ["tcp"]
+						protocols: ["http"]
 						ssl: "optional"
 					}
 				}
@@ -77,10 +83,21 @@ components: sinks: vector: {
 	configuration: {
 		address: {
 			description: "The downstream Vector address to connect to. The address _must_ include a port."
-			required:    true
+			groups: ["v1"]
+			required: true
 			warnings: []
 			type: string: {
-				examples: ["92.12.333.224:5000"]
+				examples: ["92.12.333.224:\(_port_v1)"]
+				syntax: "literal"
+			}
+		}
+		address: {
+			description: "The downstream Vector address to connect to. The address _must_ include a port."
+			groups: ["v2"]
+			required: true
+			warnings: []
+			type: string: {
+				examples: ["92.12.333.224:\(_port_v2)"]
 				syntax: "literal"
 			}
 		}

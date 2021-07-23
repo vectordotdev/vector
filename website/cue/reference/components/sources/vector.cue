@@ -1,12 +1,13 @@
 package metadata
 
 components: sources: vector: {
-	_port: 9000
+	_port_v1: 9000
+	_port_v2: 6000
 
 	title: "Vector"
 
 	description: """
-		Receives data from another upstream Vector instance	using the Vector sink.
+		Receives data from another upstream Vector instance using the Vector sink.
 		"""
 
 	classes: {
@@ -26,12 +27,12 @@ components: sources: vector: {
 
 				interface: socket: {
 					direction: "incoming"
-					port:      _port
-					protocols: ["tcp"]
+					port:      _port_v2
+					protocols: ["http"]
 					ssl: "optional"
 				}
 			}
-			receive_buffer_bytes: enabled: true
+			receive_buffer_bytes: enabled: false
 			keepalive: enabled:            true
 			tls: {
 				enabled:                true
@@ -66,20 +67,34 @@ components: sources: vector: {
 		acknowledgements: configuration._acknowledgements
 		address: {
 			description: """
-				The TCP address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd
-				socket activation. If an address is used it _must_ include a port.
+				The HTTP address to listen for connections on. It _must_ include a port.
 				"""
+			groups: ["v2"]
 			required: true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#1"]
+				examples: ["0.0.0.0:\(_port_v2)"]
+				syntax: "literal"
+			}
+		}
+		address: {
+			description: """
+				The TCP address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd
+				socket activation. If an address is used it _must_ include a port.
+				"""
+			groups: ["v1"]
+			required: true
+			warnings: []
+			type: string: {
+				examples: ["0.0.0.0:\(_port_v1)", "systemd", "systemd#1"]
 				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
 			common:      false
 			description: "The timeout before a connection is forcefully closed during shutdown."
-			required:    false
+			groups: ["v1", "v2"]
+			required: false
 			warnings: []
 			type: uint: {
 				default: 30
