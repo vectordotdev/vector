@@ -33,6 +33,9 @@ pub mod source;
 mod test_util;
 pub mod transform;
 pub use buffers;
+mod byte_size_of;
+
+pub use byte_size_of::ByteSizeOf;
 
 #[macro_use]
 extern crate derivative;

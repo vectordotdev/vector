@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
+use crate::ByteSizeOf;
 use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
@@ -18,6 +19,15 @@ pub struct EventMetadata {
     datadog_api_key: Option<Arc<str>>,
     #[serde(default, skip)]
     finalizers: EventFinalizers,
+}
+
+impl ByteSizeOf for EventMetadata {
+    fn allocated_bytes(&self) -> usize {
+        // NOTE we don't count the `str` here because it's allocated somewhere
+        // else. We're just moving around the pointer, which is already captured
+        // by `ByteSizeOf::size_of`.
+        self.finalizers.allocated_bytes()
+    }
 }
 
 impl EventMetadata {

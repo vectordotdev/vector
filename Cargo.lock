@@ -864,7 +864,7 @@ dependencies = [
  "hyper-rustls",
  "hyperlocal",
  "log",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "rustls 0.19.0",
  "rustls-native-certs",
  "serde",
@@ -930,7 +930,7 @@ dependencies = [
  "futures 0.3.15",
  "leveldb",
  "metrics",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "pretty_assertions",
  "quickcheck",
  "serde",
@@ -995,6 +995,40 @@ name = "cache-padded"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "631ae5198c9be5e753e5cc215e1bd73c2b466a3565173db433f52bb9d3e66dba"
+
+[[package]]
+name = "cached"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e2afe73808fbaac302e39c9754bfc3c4b4d0f99c9c240b9f4e4efc841ad1b74"
+dependencies = [
+ "async-mutex",
+ "async-trait",
+ "cached_proc_macro",
+ "cached_proc_macro_types",
+ "futures 0.3.15",
+ "hashbrown 0.9.1",
+ "once_cell",
+]
+
+[[package]]
+name = "cached_proc_macro"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf857ae42d910aede5c5186e62684b0d7a597ce2fe3bd14448ab8f7ef439848c"
+dependencies = [
+ "async-mutex",
+ "cached_proc_macro_types",
+ "darling 0.10.2",
+ "quote 1.0.9",
+ "syn 1.0.72",
+]
+
+[[package]]
+name = "cached_proc_macro_types"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a4f925191b4367301851c6d99b09890311d74b0d43f274c0b34c86d308a3663"
 
 [[package]]
 name = "cassowary"
@@ -1810,16 +1844,10 @@ version = "0.1.0"
 dependencies = [
  "itertools 0.10.1",
  "lazy_static",
- "lookup",
  "ordered-float",
  "pest",
  "pest_derive",
  "regex",
- "vrl",
- "vrl-compiler",
- "vrl-diagnostic",
- "vrl-parser",
- "vrl-stdlib",
 ]
 
 [[package]]
@@ -2753,6 +2781,12 @@ checksum = "a9be661681f30f8ef0f5bd6a2bff28b16cbcffc0e1b79d18558b74d5e1817fbb"
 
 [[package]]
 name = "hashbrown"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
+
+[[package]]
+name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
@@ -3127,7 +3161,7 @@ dependencies = [
  "futures-util",
  "hex",
  "hyper",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "tokio",
 ]
 
@@ -3155,7 +3189,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc633605454125dec4b66843673f01c7df2b89479b32e0ed634e43a91cff62a5"
 dependencies = [
  "autocfg 1.0.1",
- "hashbrown",
+ "hashbrown 0.11.2",
  "serde",
 ]
 
@@ -3692,6 +3726,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "lua-src"
+version = "543.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "029180f994b9b36f47d905f92569b516acf7d073778e2e781c15ee375b1ca27d"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "luajit-src"
+version = "210.1.4+resty8404d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd98051767391af4fa24b5d3a9b6dace632bf2d92c6a6e0abf566109649aa75b"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "lucet-module"
 version = "0.7.0-dev"
 source = "git+https://github.com/bytecodealliance/lucet.git?rev=b1863dacc8c92c11e5434fc8815d9b9a26cfe3db#b1863dacc8c92c11e5434fc8815d9b9a26cfe3db"
@@ -3910,9 +3962,9 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
 name = "maxminddb"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "835288c768ea07fedcccf84f1c9a463fe7e36856b5868d5ea050f858e20b01b8"
+checksum = "5a2af4902d7569c441449f2315cb83598917b13275209529103e10c238fcf3db"
 dependencies = [
  "log",
  "memchr",
@@ -4019,7 +4071,7 @@ dependencies = [
  "crossbeam-epoch 0.9.3",
  "crossbeam-utils 0.8.5",
  "dashmap",
- "hashbrown",
+ "hashbrown 0.11.2",
  "indexmap",
  "metrics",
  "num_cpus",
@@ -4130,6 +4182,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "mlua"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9da8658821057ea9d9ac349a02960be68e967f8a1e4b2a9d9efaefc4b9f2f47"
+dependencies = [
+ "bstr",
+ "cc",
+ "lua-src",
+ "luajit-src",
+ "num-traits",
+ "once_cell",
+ "pkg-config",
 ]
 
 [[package]]
@@ -4651,7 +4718,7 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "percent-encoding",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "rand 0.8.4",
  "thiserror",
  "tokio",
@@ -4903,11 +4970,11 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.0.7"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7509cc106041c40a4518d2af7a61530e1eed0e6285296a3d8c5472806ccc4a4"
+checksum = "576bc800220cc65dac09e99e97b08b358cfab6e17078de8dc5fee223bd2d0c08"
 dependencies = [
- "pin-project-internal 1.0.7",
+ "pin-project-internal 1.0.8",
 ]
 
 [[package]]
@@ -4923,9 +4990,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-internal"
-version = "1.0.7"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48c950132583b500556b1efd71d45b319029f2b71518d979fcc208e16b42426f"
+checksum = "6e8fe8163d14ce7f0cdac2e040116f22eac817edabff0be91e8aff7e9accf389"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
@@ -5894,19 +5961,6 @@ name = "rle-decode-fast"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cabe4fa914dec5870285fa7f71f602645da47c486e68486d2b4ceb4a343e90ac"
-
-[[package]]
-name = "rlua"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25fa5b2c667bae0b6218361e96d365e414fe4a0fa80f476b9631aa2dea2c6881"
-dependencies = [
- "bitflags",
- "bstr",
- "cc",
- "libc",
- "num-traits",
-]
 
 [[package]]
 name = "rmp"
@@ -6997,7 +7051,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b0a9eb2715209fb8cc0d942fcdff45674bfc9f0090a0d897e85a22955ad159b"
 dependencies = [
  "futures-core",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "tokio",
 ]
 
@@ -7524,7 +7578,7 @@ dependencies = [
  "futures-util",
  "log",
  "native-tls",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "tokio",
  "tokio-native-tls",
  "tungstenite",
@@ -7571,7 +7625,7 @@ dependencies = [
  "http-body",
  "hyper",
  "percent-encoding",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "prost",
  "prost-derive",
  "tokio",
@@ -7605,7 +7659,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "indexmap",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "rand 0.8.4",
  "slab",
  "tokio",
@@ -7635,7 +7689,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4546773ffeab9e4ea02b8872faa49bb616a80a7da66afc2f32688943f97efa7"
 dependencies = [
  "futures-util",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "tokio",
  "tokio-test",
  "tower-layer",
@@ -7711,7 +7765,7 @@ checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
 dependencies = [
  "futures 0.3.15",
  "futures-task",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "tracing 0.1.26",
 ]
 
@@ -8229,6 +8283,7 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
+ "mlua",
  "mongodb",
  "nix 0.22.0",
  "nom 6.1.2",
@@ -8244,7 +8299,7 @@ dependencies = [
  "percent-encoding",
  "pest",
  "pest_derive",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "portpicker",
  "postgres-openssl",
  "pretty_assertions",
@@ -8260,7 +8315,6 @@ dependencies = [
  "redis",
  "regex",
  "reqwest",
- "rlua",
  "rmp-serde",
  "rmpv",
  "rusoto_cloudwatch",
@@ -8387,17 +8441,17 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
+ "mlua",
  "once_cell",
  "pest",
  "pest_derive",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "pretty_assertions",
  "prost",
  "prost-build",
  "prost-types",
  "quickcheck",
  "regex",
- "rlua",
  "serde",
  "serde_json",
  "shared",
@@ -8519,11 +8573,13 @@ dependencies = [
  "anyhow",
  "base64 0.13.0",
  "bytes 1.0.1",
+ "cached",
  "chrono",
  "chrono-tz",
  "cidr-utils",
  "criterion",
  "csv",
+ "datadog-search-syntax",
  "grok",
  "hex",
  "hostname",
@@ -8650,7 +8706,7 @@ dependencies = [
  "mime",
  "mime_guess",
  "percent-encoding",
- "pin-project 1.0.7",
+ "pin-project 1.0.8",
  "scoped-tls",
  "serde",
  "serde_json",

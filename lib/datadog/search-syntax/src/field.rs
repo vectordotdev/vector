@@ -21,8 +21,6 @@ static RESERVED_ATTRIBUTES: &[&str] = &[
     "tags",
 ];
 
-const DATADOG_TAGS_ROOT: &str = ".__datadog_tags";
-
 /// Describes a field to search on.
 #[derive(Clone)]
 pub enum Field {
@@ -62,10 +60,10 @@ pub fn normalize_fields<T: AsRef<str>>(value: T) -> Vec<Field> {
     }
 
     let field = match value.replace("@", "custom.") {
+        v if value.starts_with('@') => Field::Facet(v),
         v if DEFAULT_FIELDS.contains(&v.as_ref()) => Field::Default(v),
         v if RESERVED_ATTRIBUTES.contains(&v.as_ref()) => Field::Reserved(v),
-        v if value.starts_with('@') => Field::Facet(v),
-        v => Field::Tag(format!("{}.{}", DATADOG_TAGS_ROOT, v)),
+        v => Field::Tag(v),
     };
 
     vec![field]
