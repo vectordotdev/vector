@@ -139,7 +139,8 @@ impl<S> MaybeTlsIncomingStream<S> {
         }
     }
 
-    pub fn ssl_stream(&self) -> Option<&SslStream<S>> {
+    #[cfg(feature = "sources-vector")]
+    pub(crate) fn ssl_stream(&self) -> Option<&SslStream<S>> {
         use super::MaybeTls;
 
         match &self.state {

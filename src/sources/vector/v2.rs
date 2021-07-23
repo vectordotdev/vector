@@ -176,7 +176,7 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
                 .map(|s| {
                     s.into_iter()
                         .filter_map(|c| c.to_pem().ok())
-                        .map(|b| Certificate::from_pem(b))
+                        .map(Certificate::from_pem)
                         .collect()
                 }),
         }
