@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::fmt::Write;
-use std::sync::Arc;
+use std::{collections::HashMap, convert::TryFrom, fmt::Write, sync::Arc};
 
 use grok::Grok;
 use lazy_static::lazy_static;

@@ -1,13 +1,10 @@
 use crate::ast::{Function, FunctionArgument};
 use crate::parse_grok::Error as GrokRuntimeError;
 use crate::parse_grok_rules::Error as GrokStaticError;
-use parsing::value::Value;
-use parsing::{query_string, ruby_hash};
+use parsing::{query_string, ruby_hash, value::Value};
 use percent_encoding::percent_decode;
 use regex::Regex;
-use std::convert::TryFrom;
-use std::ops::Deref;
-use std::string::ToString;
+use std::{convert::TryFrom, ops::Deref, string::ToString};
 use strum_macros::Display;
 use tracing::error;
 

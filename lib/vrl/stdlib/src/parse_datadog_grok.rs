@@ -1,6 +1,7 @@
-use datadog_grok::parse_grok_rules::Error as GrokError;
-use datadog_grok::parse_grok_rules::GrokRule;
-use datadog_grok::{parse_grok, parse_grok_rules};
+use datadog_grok::{
+    parse_grok,
+    parse_grok_rules::{self, Error as GrokError, GrokRule},
+};
 use std::fmt;
 use vrl::{
     diagnostic::{Label, Span},

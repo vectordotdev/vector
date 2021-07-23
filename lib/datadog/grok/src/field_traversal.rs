@@ -16,12 +16,12 @@ pub fn get_field<'a>(
         (None, item) => Ok(Some(item)),
         // Descend into a map
         (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => match map.get(name) {
-            Some(inner) => get_field(inner, working_lookup.clone()),
+            Some(inner) => get_field(inner, working_lookup),
             None => Ok(None),
         },
         // Descend into an array
         (Some(Segment::Index(i)), Value::Array(array)) => match array.get(i as usize) {
-            Some(inner) => get_field(inner, working_lookup.clone()),
+            Some(inner) => get_field(inner, working_lookup),
             None => Ok(None),
         },
         // anything else is not allowed
