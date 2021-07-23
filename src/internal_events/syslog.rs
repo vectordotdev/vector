@@ -1,6 +1,6 @@
 use super::InternalEvent;
+use crate::sources::util::decoding;
 use metrics::counter;
-use tokio_util::codec::LinesCodecError;
 
 #[derive(Debug)]
 pub struct SyslogEventReceived {
@@ -20,7 +20,7 @@ impl InternalEvent for SyslogEventReceived {
 
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
-    pub error: LinesCodecError,
+    pub error: decoding::Error,
 }
 
 impl InternalEvent for SyslogUdpReadError {

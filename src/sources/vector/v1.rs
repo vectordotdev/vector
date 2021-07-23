@@ -3,13 +3,16 @@ use crate::{
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
-        util::{decoding, SocketListenAddr, TcpSource},
+        util::{
+            decoding::{self, BytesDecoder},
+            SocketListenAddr, TcpSource,
+        },
         Source,
     },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -99,12 +102,15 @@ impl decoding::Parser for VectorParser {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
-    type Error = std::io::Error;
+    type Error = decoding::Error;
     type Item = Event;
-    type Decoder = decoding::Decoder<VectorParser, Self::Error, BytesMut>;
+    type Decoder = decoding::Decoder;
 
     fn create_decoder(&self) -> Self::Decoder {
-        decoding::Decoder::new(Box::new(LengthDelimitedCodec::new()), VectorParser)
+        decoding::Decoder::new(
+            Box::new(BytesDecoder::new(LengthDelimitedCodec::new())),
+            Box::new(VectorParser),
+        )
     }
 
     fn handle_event(&self, _event: &mut Event, _host: Bytes, byte_size: usize) {

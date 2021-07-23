@@ -1,55 +1,82 @@
+mod config;
 mod framing;
+mod parsers;
 
-use crate::{
-    config::log_schema,
-    event::{Event, LogEvent, Value},
-    internal_events::DecoderParseFailed,
-};
+use crate::{event::Event, internal_events::DecoderParseFailed, sources::util::TcpIsErrorFatal};
 use bytes::{Bytes, BytesMut};
+pub use config::DecodingConfig;
 pub use framing::OctetCountingDecoder;
+pub use parsers::BytesParser;
+use tokio_util::codec::LinesCodecError;
 
 pub trait Parser {
     fn parse(&self, bytes: Bytes) -> crate::Result<Event>;
 }
 
-pub struct Decoder<
-    Parser: super::decoding::Parser,
-    Error: From<std::io::Error> = std::io::Error,
-    Item: Into<Bytes> = Bytes,
-> {
-    framer: Box<dyn tokio_util::codec::Decoder<Item = Item, Error = Error> + Send + Sync>,
-    parser: Parser,
+pub trait DecoderError: std::error::Error + TcpIsErrorFatal + Send + Sync {}
+
+#[derive(Debug)]
+pub struct Error {
+    error: std::sync::Arc<dyn DecoderError>,
 }
 
-impl<Parser, Error, Item> Decoder<Parser, Error, Item>
-where
-    Error: From<std::io::Error>,
-    Parser: super::decoding::Parser,
-    Item: Into<Bytes>,
-{
+impl std::fmt::Display for Error {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}", self.error)
+    }
+}
+
+impl TcpIsErrorFatal for Error {
+    fn is_error_fatal(&self) -> bool {
+        self.error.is_error_fatal()
+    }
+}
+
+impl DecoderError for std::io::Error {}
+
+impl DecoderError for LinesCodecError {}
+
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        Self {
+            error: std::sync::Arc::new(error),
+        }
+    }
+}
+
+impl From<LinesCodecError> for Error {
+    fn from(error: LinesCodecError) -> Self {
+        Self {
+            error: std::sync::Arc::new(error),
+        }
+    }
+}
+
+pub struct Decoder {
+    framer: Box<dyn tokio_util::codec::Decoder<Item = Bytes, Error = Error> + Send + Sync>,
+    parser: Box<dyn Parser + Send + Sync>,
+}
+
+impl Decoder {
     pub fn new(
-        framer: Box<dyn tokio_util::codec::Decoder<Item = Item, Error = Error> + Send + Sync>,
-        parser: Parser,
+        framer: Box<
+            dyn tokio_util::codec::Decoder<Item = Bytes, Error = Error> + Send + Sync + 'static,
+        >,
+        parser: Box<dyn Parser + Send + Sync + 'static>,
     ) -> Self {
         Self { framer, parser }
     }
 }
 
-impl<Parser, Error, Item> tokio_util::codec::Decoder for Decoder<Parser, Error, Item>
-where
-    Error: From<std::io::Error>,
-    Parser: super::decoding::Parser,
-    Item: Into<Bytes>,
-{
+impl tokio_util::codec::Decoder for Decoder {
     type Item = (Event, usize);
-    type Error = Error;
+    type Error = self::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.framer.decode(buf).map(|result| {
             result.and_then(|frame| {
-                let bytes = frame.into();
-                let byte_size = bytes.len();
-                match self.parser.parse(bytes) {
+                let byte_size = frame.len();
+                match self.parser.parse(frame) {
                     Ok(event) => Some((event, byte_size)),
                     Err(error) => {
                         emit!(DecoderParseFailed { error });
@@ -63,9 +90,8 @@ where
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.framer.decode_eof(buf).map(|result| {
             result.and_then(|frame| {
-                let bytes = frame.into();
-                let byte_size = bytes.len();
-                match self.parser.parse(bytes) {
+                let byte_size = frame.len();
+                match self.parser.parse(frame) {
                     Ok(event) => Some((event, byte_size)),
                     Err(error) => {
                         emit!(DecoderParseFailed { error });
@@ -77,13 +103,40 @@ where
     }
 }
 
-pub struct BytesParser;
+pub struct BytesDecoder<Error: From<std::io::Error> + Into<self::Error>, Item: Into<Bytes> = Bytes>
+{
+    decoder:
+        Box<dyn tokio_util::codec::Decoder<Item = Item, Error = Error> + Send + Sync + 'static>,
+}
 
-impl Parser for BytesParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
-        let mut log = LogEvent::default();
-        log.insert(log_schema().message_key(), Value::from(bytes));
-        Ok(log.into())
+impl<Error: From<std::io::Error> + Into<self::Error>, Item: Into<Bytes>> BytesDecoder<Error, Item> {
+    pub fn new(
+        decoder: impl tokio_util::codec::Decoder<Item = Item, Error = Error> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            decoder: Box::new(decoder),
+        }
+    }
+}
+
+impl<Error: From<std::io::Error> + Into<self::Error>, Item: Into<Bytes>> tokio_util::codec::Decoder
+    for BytesDecoder<Error, Item>
+{
+    type Item = Bytes;
+    type Error = self::Error;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        self.decoder
+            .decode(buf)
+            .map(|result| result.map(|frame| frame.into()))
+            .map_err(|error| error.into())
+    }
+
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        self.decoder
+            .decode_eof(buf)
+            .map(|result| result.map(|frame| frame.into()))
+            .map_err(|error| error.into())
     }
 }
 
@@ -95,7 +148,10 @@ mod tests {
 
     #[tokio::test]
     async fn basic_decoder() {
-        let mut decoder = super::Decoder::new(Box::new(LinesCodec::new()), BytesParser);
+        let mut decoder = super::Decoder::new(
+            Box::new(BytesDecoder::new(LinesCodec::new())),
+            Box::new(BytesParser),
+        );
         let mut input = BytesMut::from("foo\nbar\nbaz");
 
         let mut events = Vec::new();

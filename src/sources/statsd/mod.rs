@@ -5,7 +5,7 @@ use crate::{
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{
-        decoding::{self},
+        decoding::{self, BytesDecoder},
         SocketListenAddr, TcpSource,
     },
     tcp::TcpKeepaliveConfig,
@@ -180,7 +180,10 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let codec = decoding::Decoder::new(Box::new(BytesDelimitedCodec::new(b'\n')), StatsdParser);
+    let codec = decoding::Decoder::new(
+        Box::new(BytesDecoder::new(BytesDelimitedCodec::new(b'\n'))),
+        Box::new(StatsdParser),
+    );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
@@ -203,12 +206,15 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = std::io::Error;
+    type Error = decoding::Error;
     type Item = Event;
-    type Decoder = decoding::Decoder<StatsdParser>;
+    type Decoder = decoding::Decoder;
 
     fn create_decoder(&self) -> Self::Decoder {
-        decoding::Decoder::new(Box::new(BytesDelimitedCodec::new(b'\n')), StatsdParser)
+        decoding::Decoder::new(
+            Box::new(BytesDecoder::new(BytesDelimitedCodec::new(b'\n'))),
+            Box::new(StatsdParser),
+        )
     }
 
     fn handle_event(&self, _event: &mut Event, _host: Bytes, byte_size: usize) {

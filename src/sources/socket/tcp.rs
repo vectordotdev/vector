@@ -1,7 +1,7 @@
 use crate::{
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
-    sources::util::{SocketListenAddr, TcpSource},
+    sources::util::{decoding::DecodingConfig, SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -27,6 +27,9 @@ pub struct TcpConfig {
     tls: Option<TlsConfig>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
+    #[serde(flatten)]
+    #[get_copy = "pub"]
+    decoding: DecodingConfig,
 }
 
 fn default_max_length() -> usize {
@@ -46,6 +49,7 @@ impl TcpConfig {
         host_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
+        decoding: Option<DecodingConfig>,
     ) -> Self {
         Self {
             address,
@@ -55,6 +59,7 @@ impl TcpConfig {
             host_key,
             tls,
             receive_buffer_bytes,
+            decoding: decoding.unwrap_or_default(),
         }
     }
 
@@ -67,6 +72,7 @@ impl TcpConfig {
             host_key: None,
             tls: None,
             receive_buffer_bytes: None,
+            decoding: Default::default(),
         }
     }
 }

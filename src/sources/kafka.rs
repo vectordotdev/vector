@@ -1,4 +1,3 @@
-use super::util::finalizer::OrderedFinalizer;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{BatchNotifier, Event, Value},
@@ -6,6 +5,7 @@ use crate::{
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
     sources::util::decoding,
+    sources::util::{decoding::BytesDecoder, finalizer::OrderedFinalizer},
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};
@@ -121,7 +121,10 @@ impl SourceConfig for KafkaSourceConfig {
             self.partition_key.clone(),
             self.offset_key.clone(),
             self.headers_key.clone(),
-            decoding::Decoder::new(Box::new(BytesCodec::new()), decoding::BytesParser),
+            decoding::Decoder::new(
+                Box::new(BytesDecoder::new(BytesCodec::new())),
+                Box::new(decoding::BytesParser),
+            ),
             cx.shutdown,
             cx.out,
             cx.acknowledgements,
@@ -367,6 +370,7 @@ mod integration_test {
     use super::*;
     use crate::{
         shutdown::ShutdownSignal,
+        sources::util::decoding::BytesDecoder,
         test_util::{collect_n, random_string},
         Pipeline,
     };
@@ -381,8 +385,11 @@ mod integration_test {
     use std::time::Duration;
     use vector_core::event::EventStatus;
 
-    fn default_decoder() -> decoding::Decoder<decoding::BytesParser, std::io::Error, BytesMut> {
-        decoding::Decoder::new(Box::new(BytesCodec::new()), decoding::BytesParser)
+    fn default_decoder() -> decoding::Decoder {
+        decoding::Decoder::new(
+            Box::new(BytesDecoder::new(BytesCodec::new())),
+            Box::new(decoding::BytesParser),
+        )
     }
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {

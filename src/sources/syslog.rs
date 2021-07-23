@@ -1,4 +1,3 @@
-use super::util::{SocketListenAddr, TcpSource};
 use crate::internal_events::SyslogConvertUtf8Error;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
@@ -11,7 +10,10 @@ use crate::{
     event::{Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
-    sources::util::decoding::{self, OctetCountingDecoder},
+    sources::util::{
+        decoding::{self, BytesDecoder, OctetCountingDecoder},
+        SocketListenAddr, TcpSource,
+    },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -25,7 +27,7 @@ use std::path::PathBuf;
 use std::{net::SocketAddr, sync::Arc};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use tokio::net::UdpSocket;
-use tokio_util::{codec::LinesCodecError, udp::UdpFramed};
+use tokio_util::udp::UdpFramed;
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -189,14 +191,16 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = LinesCodecError;
+    type Error = decoding::Error;
     type Item = Event;
-    type Decoder = decoding::Decoder<SyslogParser, Self::Error>;
+    type Decoder = decoding::Decoder;
 
     fn create_decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(
-            Box::new(OctetCountingDecoder::new(self.max_length)),
-            SyslogParser,
+            Box::new(BytesDecoder::new(OctetCountingDecoder::new(
+                self.max_length,
+            ))),
+            Box::new(SyslogParser),
         )
     }
 
@@ -235,8 +239,8 @@ pub fn udp(
         let _ = UdpFramed::new(
             socket,
             decoding::Decoder::new(
-                Box::new(OctetCountingDecoder::new(max_length)),
-                SyslogParser,
+                Box::new(BytesDecoder::new(OctetCountingDecoder::new(max_length))),
+                Box::new(SyslogParser),
             ),
         )
         .take_until(shutdown)

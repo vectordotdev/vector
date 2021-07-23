@@ -3,15 +3,14 @@ mod udp;
 #[cfg(unix)]
 mod unix;
 
-use super::util::{decoding, TcpSource};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
+    sources::util::{decoding::Decoder, TcpSource},
     tls::MaybeTlsSettings,
 };
-use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 
@@ -81,26 +80,10 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                // Todo: Select framing and parsing dynamically from configuration.
-                struct BytesParser;
-                impl decoding::Parser for BytesParser {
-                    fn parse(
-                        &self,
-                        bytes: bytes::Bytes,
-                    ) -> crate::Result<vector_core::event::Event> {
-                        Ok(bytes.into())
-                    }
-                }
-
-                let max_length = config.max_length();
+                let decoding = config.decoding();
                 let tcp = Arc::new(tcp::RawTcpSource::new(
                     config.clone(),
-                    Box::new(move || {
-                        decoding::Decoder::new(
-                            Box::new(BytesDelimitedCodec::new_with_max_length(b'\n', max_length)),
-                            BytesParser,
-                        )
-                    }),
+                    Box::new(move || -> Decoder { decoding.into() }),
                 ));
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
@@ -118,15 +101,13 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder: Decoder = config.decoding().into();
                 Ok(udp::udp(
                     config.address(),
                     config.max_length(),
                     host_key,
                     config.receive_buffer_bytes(),
-                    decoding::Decoder::new(
-                        Box::new(BytesDelimitedCodec::new(b'\n')),
-                        decoding::BytesParser,
-                    ),
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))

@@ -1,11 +1,11 @@
-use crate::udp;
 use crate::{
     config::log_schema,
     event::Event,
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
+    sources::util::decoding::DecodingConfig,
     sources::Source,
-    Pipeline,
+    udp, Pipeline,
 };
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
@@ -28,6 +28,9 @@ pub struct UdpConfig {
     host_key: Option<String>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
+    #[serde(flatten)]
+    #[get_copy = "pub"]
+    decoding: DecodingConfig,
 }
 
 fn default_max_length() -> usize {
@@ -41,6 +44,7 @@ impl UdpConfig {
             max_length: default_max_length(),
             host_key: None,
             receive_buffer_bytes: None,
+            decoding: Default::default(),
         }
     }
 }
