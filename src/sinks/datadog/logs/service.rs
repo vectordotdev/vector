@@ -1,5 +1,6 @@
-use super::ApiKey;
 use crate::sinks::datadog::logs::DatadogLogsConfig;
+use crate::sinks::datadog::ApiKey;
+use crate::sinks::util::encoding::EncodingConfiguration;
 use crate::sinks::util::http::HttpSink;
 use crate::sinks::util::{BoxedRawValue, EncodedEvent, PartitionInnerBuffer};
 use crate::{config::log_schema, internal_events::DatadogLogEventProcessed};
@@ -35,6 +36,8 @@ impl HttpSink for DatadogLogsJsonService {
         if let Some(host) = log.remove(log_schema().host_key()) {
             log.insert("host", host);
         }
+
+        self.config.encoding.apply_rules(&mut event);
 
         let (fields, metadata) = event.into_log().into_parts();
         let json_event = json!(fields);

@@ -4,6 +4,7 @@ use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service::DatadogLogsJsonService;
 use crate::sinks::datadog::ApiKey;
 use crate::sinks::datadog::Region;
+use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::{
     batch::{Batch, BatchError},
     buffer::GZIP_FAST,
@@ -30,6 +31,11 @@ pub struct DatadogLogsConfig {
     // Deprecated name
     #[serde(alias = "api_key")]
     default_api_key: String,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub(crate) encoding: EncodingConfigWithDefault<Encoding>,
     tls: Option<TlsConfig>,
 
     #[serde(default)]
@@ -40,6 +46,14 @@ pub struct DatadogLogsConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Json,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
