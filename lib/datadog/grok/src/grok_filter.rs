@@ -33,11 +33,9 @@ impl TryFrom<&Function> for GrokFilter {
 
     fn try_from(f: &Function) -> Result<Self, Self::Error> {
         match f.name.as_str() {
-            "boolean" => {
-                if f.args.is_some() && !f.args.as_ref().unwrap().is_empty() {
-                    if let FunctionArgument::Arg(Value::Bytes(ref bytes)) =
-                        f.args.as_ref().unwrap()[0]
-                    {
+            "boolean" => match f.args.as_ref() {
+                Some(args) if !args.is_empty() => match args[0] {
+                    FunctionArgument::Arg(Value::Bytes(ref bytes)) => {
                         let pattern = String::from_utf8_lossy(bytes);
                         Ok(GrokFilter::Boolean(Some(
                             Regex::new(pattern.deref()).map_err(|error| {
@@ -45,32 +43,33 @@ impl TryFrom<&Function> for GrokFilter {
                                 GrokStaticError::InvalidFunctionArguments(f.name.clone())
                             })?,
                         )))
+                    }
+                    _ => Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
+                },
+                _ => Ok(GrokFilter::Boolean(None)),
+            },
+            "nullIf" => f
+                .args
+                .as_ref()
+                .and_then(|args| {
+                    if let FunctionArgument::Arg(ref null_value) = args[0] {
+                        return Some(GrokFilter::NullIf(null_value.to_string_lossy()));
                     } else {
-                        Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()))
+                        None
                     }
-                } else {
-                    Ok(GrokFilter::Boolean(None))
-                }
-            }
-            "nullIf" => {
-                if f.args.is_some() && !f.args.as_ref().unwrap().is_empty() {
-                    if let FunctionArgument::Arg(ref null_value) = f.args.as_ref().unwrap()[0] {
-                        return Ok(GrokFilter::NullIf(null_value.to_string_lossy()));
-                    }
-                }
-                Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()))
-            }
-            "scale" => {
-                if f.args.is_some() && !f.args.as_ref().unwrap().is_empty() {
-                    let scale_factor = match f.args.as_ref().unwrap()[0] {
+                })
+                .ok_or_else(|| GrokStaticError::InvalidFunctionArguments(f.name.clone())),
+            "scale" => match f.args.as_ref() {
+                Some(args) if !args.is_empty() => {
+                    let scale_factor = match args[0] {
                         FunctionArgument::Arg(Value::Integer(scale_factor)) => scale_factor as f64,
                         FunctionArgument::Arg(Value::Float(scale_factor)) => scale_factor,
                         _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
                     };
-                    return Ok(GrokFilter::Scale(scale_factor));
+                    Ok(GrokFilter::Scale(scale_factor))
                 }
-                Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()))
-            }
+                _ => Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
+            },
             "integer" => Ok(GrokFilter::Integer),
             "integerExt" => Ok(GrokFilter::IntegerExt),
             "number" => Ok(GrokFilter::Number),
