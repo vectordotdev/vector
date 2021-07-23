@@ -80,7 +80,7 @@
       </g>
       <g id="App-Text" transform="translate(281.920904, 0.000000)" fill="#000000" fill-rule="nonzero">
         <foreignObject x="10" y="0" width="350" height="200">
-          <div xmlns="http://www.w3.org/1999/xhtml" align="left" style={{fontSize: '0.9em'}}>
+          <div xmlns="http://www.w3.org/1999/xhtml" align="left" style="font-size: 0.9em;">
             <div><strong>1. Your service logs to STDOUT</strong></div>
             <div>STDOUT follows the 12-factor principles</div>
           </div>
@@ -89,7 +89,7 @@
       </g>
       <g id="Docker-Text" transform="translate(0.000000, 210.734463)" fill="#000000" fill-rule="nonzero">
         <foreignObject x="-145" y="45" width="350" height="200">
-          <div xmlns="http://www.w3.org/1999/xhtml" align="right" style={{fontSize: '0.9em'}}>
+          <div xmlns="http://www.w3.org/1999/xhtml" align="right" style="font-size: 0.9em;">
             <div><strong>2. STDOUT is captured</strong></div>
             <div>STDOUT is captured by your platform</div>
           </div>
@@ -98,7 +98,7 @@
       </g>
       <g id="Forward-Text" transform="translate(355.367232, 190.960452)" fill="#000000" fill-rule="nonzero">
         <foreignObject x="10" y="65" width="350" height="200">
-          <div xmlns="http://www.w3.org/1999/xhtml" align="left" style={{fontSize: '0.9em'}}>
+          <div xmlns="http://www.w3.org/1999/xhtml" align="left" style="font-size: 0.9em;">
             <div><strong>3. Vector collects and fans out data</strong></div>
             <div>Vector collects data from your platform</div>
           </div>

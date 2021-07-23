@@ -117,7 +117,7 @@
         <g id="App-Text" transform="translate(378.109589, 0.000000)" fill="#000000">
           <polygon id="Line-5" fill-rule="nonzero" points="1.72089041 110.136986 1.72089041 4.01541096 0 4.01541096 0 110.136986"></polygon>
           <foreignObject x="10" y="0" width="350" height="200">
-            <div xmlns="http://www.w3.org/1999/xhtml" align="left" style={{fontSize: '0.9em'}}>
+            <div xmlns="http://www.w3.org/1999/xhtml" align="left" style="font-size: 0.9em;">
               <div><strong>1. Your service logs to a shared resource</strong></div>
               <div>Such as a file on a shared volume or anything Vector can access</div>
             </div>
@@ -126,7 +126,7 @@
         <g id="Sidecar-Text" transform="translate(0.000000, 220.911455)" fill="#000000">
           <polygon id="Line-5" fill-rule="nonzero" points="304.728191 106.121575 304.728191 0 303.336162 0 303.336162 106.121575"></polygon>
           <foreignObject x="-55" y="45" width="350" height="200">
-            <div xmlns="http://www.w3.org/1999/xhtml" align="right" style={{fontSize: '0.9em'}}>
+            <div xmlns="http://www.w3.org/1999/xhtml" align="right" style="font-size: 0.9em;">
               <div><strong>2. Vector ingests the data</strong></div>
               <div>Such as tailing a file on a shared volume</div>
             </div>
@@ -135,7 +135,7 @@
         <g id="Forward-Text" transform="translate(452.107877, 223.289384)" fill="#000000">
           <polygon id="Line-5" fill-rule="nonzero" points="2.89212329 106.710616 2.89212329 0.710616438 0.892123288 0.710616438 0.892123288 106.710616"></polygon>
           <foreignObject x="10" y="40" width="350" height="200">
-            <div xmlns="http://www.w3.org/1999/xhtml" align="left" style={{fontSize: '0.9em'}}>
+            <div xmlns="http://www.w3.org/1999/xhtml" align="left" style="font-size: 0.9em;">
               <div><strong>3. Vector forwards the data</strong></div>
               <div>Vector forwards the data to one or more downstream services</div>
             </div>

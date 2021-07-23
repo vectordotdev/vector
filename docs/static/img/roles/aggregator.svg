@@ -75,7 +75,7 @@
             </g>
             <g id="Receive-Text" transform="translate(329.000000, 0.000000)" fill="#000000">
                 <foreignObject x="10" y="0" width="350" height="200">
-                    <div xmlns="http://www.w3.org/1999/xhtml" align="left" style={{fontSize: '0.9em'}}>
+                    <div xmlns="http://www.w3.org/1999/xhtml" align="left" style="font-size: 0.9em;">
                       <div><strong>1. Vector receives the data</strong></div>
                       <div>Vector receives data from another upstream Vector instance</div>
                     </div>
@@ -84,7 +84,7 @@
             </g>
             <g id="Transform-Text" transform="translate(364.000000, 232.000000)" fill="#000000">
                 <foreignObject x="-110" y="40" width="350" height="200">
-                  <div xmlns="http://www.w3.org/1999/xhtml" align="right" style={{fontSize: '0.9em'}}>
+                  <div xmlns="http://www.w3.org/1999/xhtml" align="right" style="font-size: 0.9em;">
                     <div><strong>2. Vector processes data</strong></div>
                     <div>Vector parses, transforms, and enriches data</div>
                   </div>
@@ -93,7 +93,7 @@
             </g>
             <g id="Forward-Text" transform="translate(721.000000, 177.000000)" fill="#000000">
                 <foreignObject x="-20" y="17" width="250" height="200">
-                  <div xmlns="http://www.w3.org/1999/xhtml" align="right" style={{fontSize: '0.9em'}}>
+                  <div xmlns="http://www.w3.org/1999/xhtml" align="right" style="font-size: 0.9em;">
                     <div><strong>3. Vector fans out data</strong></div>
                     <div>Vector receives data from another upstream Vector instance</div>
                   </div>
