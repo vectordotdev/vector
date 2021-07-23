@@ -17,11 +17,6 @@ use std::sync::Arc;
 use vector_core::event::Event;
 use vector_core::event::{BatchNotifier, BatchStatus};
 
-#[test]
-fn generate_config() {
-    crate::test_util::test_generate_config::<DatadogLogsConfig>();
-}
-
 fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::from(msg);
     e.as_mut_log()

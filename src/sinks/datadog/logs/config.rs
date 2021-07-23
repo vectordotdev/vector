@@ -208,3 +208,13 @@ impl SinkConfig for DatadogLogsConfig {
         "datadog_logs"
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::sinks::datadog::logs::DatadogLogsConfig;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DatadogLogsConfig>();
+    }
+}
