@@ -1,81 +1,68 @@
-use http::uri::{InvalidUri, Uri};
+use http::uri::InvalidUri;
 use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
-use std::collections::HashSet;
+use no_proxy::NoProxy;
 
 fn from_env(key: &str) -> Option<String> {
-    std::env::var(key.to_string())
+    // use lowercase first and the uppercase
+    std::env::var(key.to_string().to_lowercase())
         .ok()
-        .or_else(|| std::env::var(key.to_lowercase()).ok())
+        .or_else(|| std::env::var(key.to_uppercase()).ok())
 }
 
-struct NoProxyCache(HashSet<Uri>);
+#[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug, PartialEq, Eq)]
+pub struct NoProxyInterceptor(NoProxy);
 
-impl From<&HashSet<String>> for NoProxyCache {
-    fn from(hashset: &HashSet<String>) -> Self {
-        Self(
-            hashset
-                .iter()
-                .filter_map(|uri| uri.parse::<Uri>().ok())
-                .collect(),
-        )
-    }
-}
-
-impl NoProxyCache {
-    fn matches(&self, scheme: Option<&str>, host: Option<&str>, port: Option<u16>) -> bool {
-        for uri in self.0.iter() {
-            if uri.scheme_str() == scheme && uri.host() == host && uri.port_u16() == port {
-                return true;
-            }
-        }
-        false
-    }
-
+impl NoProxyInterceptor {
     fn intercept(self, expected_scheme: &'static str) -> Intercept {
         Intercept::Custom(Custom::from(
             move |scheme: Option<&str>, host: Option<&str>, port: Option<u16>| {
                 if scheme != Some(expected_scheme) {
                     return false;
                 }
+                let matches = if let Some(host) = host {
+                    if let Some(port) = port {
+                        let url = format!("{}:{}", host, port);
+                        !&self.0.matches(&url)
+                    } else {
+                        self.0.matches(&host)
+                    }
+                } else {
+                    false
+                };
                 // only intercapt those that don't match
-                !self.matches(scheme, host, port)
+                !matches
             },
         ))
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug, PartialEq)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug, PartialEq, Eq)]
 pub struct ProxyConfig {
     pub http: Option<String>,
     pub https: Option<String>,
-    pub no_proxy: HashSet<String>,
+    pub no_proxy: NoProxy,
 }
 
 impl ProxyConfig {
     pub fn from_env() -> Self {
         Self {
             http: from_env("HTTP_PROXY"),
-            https: from_env("HTTPS_PROXY"),
-            no_proxy: from_env("NO_PROXY")
-                .map(|value| {
-                    value
-                        .split(',')
-                        .map(|item| item.trim().to_string())
-                        .collect()
-                })
-                .unwrap_or_default(),
+            https: from_env("HTTP_PROXYS"),
+            no_proxy: from_env("NO_PROXY").map(NoProxy::from).unwrap_or_default(),
         }
     }
 
-    fn merge(self, other: &Self) -> Self {
+    fn interceptor(&self) -> NoProxyInterceptor {
+        NoProxyInterceptor(self.no_proxy.clone())
+    }
+
+    fn merge(mut self, other: &Self) -> Self {
+        self.no_proxy.extend(other.no_proxy.clone());
+
         Self {
             http: self.http.or_else(|| other.http.clone()),
             https: self.https.or_else(|| other.https.clone()),
-            no_proxy: self
-                .no_proxy
-                .union(&other.no_proxy)
-                .map(ToString::to_string)
-                .collect(),
+            no_proxy: self.no_proxy,
         }
     }
 
@@ -86,7 +73,7 @@ impl ProxyConfig {
     }
 
     fn http_intercept(&self) -> Intercept {
-        NoProxyCache::from(&self.no_proxy).intercept("http")
+        self.interceptor().intercept("http")
     }
 
     fn http_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
@@ -98,7 +85,7 @@ impl ProxyConfig {
     }
 
     fn https_intercept(&self) -> Intercept {
-        NoProxyCache::from(&self.no_proxy).intercept("https")
+        self.interceptor().intercept("https")
     }
 
     fn https_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
@@ -125,45 +112,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn no_proxy_cache() {
-        let cache = NoProxyCache::from(&{
-            let mut set = HashSet::new();
-            set.insert("127.0.0.1".into());
-            set.insert("https://www.google.com".into());
-            set.insert("http://rick.sanchez:8080".into());
-            set
-        });
-        assert!(cache.matches(None, Some("127.0.0.1"), None));
-        assert!(!cache.matches(None, Some("www.google.com"), None));
-        assert!(!cache.matches(Some("http"), Some("localhost"), None));
-        assert!(cache.matches(Some("http"), Some("rick.sanchez"), Some(8080)));
-    }
-
-    #[test]
     fn merge() {
         let first = ProxyConfig {
             http: Some("http://1.2.3.4:5678".into()),
             https: None,
-            no_proxy: {
-                let mut set = HashSet::new();
-                set.insert("127.0.0.1".into());
-                set.insert("http://google.com".into());
-                set
-            },
+            no_proxy: NoProxy::from("127.0.0.1,google.com"),
         };
         let second = ProxyConfig {
             http: Some("http://1.2.3.5:5678".into()),
             https: Some("https://2.3.4.5:9876".into()),
-            no_proxy: {
-                let mut set = HashSet::new();
-                set.insert("localhost".into());
-                set
-            },
+            no_proxy: NoProxy::from("localhost"),
         };
         let result = first.merge(&second);
         assert_eq!(result.http, Some("http://1.2.3.4:5678".into()));
         assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
-        assert!(result.no_proxy.contains(&"127.0.0.1".to_string()));
-        assert!(result.no_proxy.contains(&"localhost".to_string()));
+        assert!(result.no_proxy.matches(&"127.0.0.1".to_string()));
+        assert!(result.no_proxy.matches(&"localhost".to_string()));
     }
 }

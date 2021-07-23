@@ -350,12 +350,12 @@ mod tests {
         [proxy]
         http = "somewhere:1234"
         https = "nowhere:2345"
-        no_proxy = ["foo.bar"]
+        no_proxy = "foo.bar"
         "#;
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
         assert_eq!(config.proxy.http, Some("somewhere:1234".into()));
         assert_eq!(config.proxy.https, Some("nowhere:2345".into()));
-        assert_eq!(config.proxy.no_proxy.len(), 1);
+        assert!(config.proxy.no_proxy.matches("foo.bar"));
     }
 
     #[test]

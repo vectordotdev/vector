@@ -4418,6 +4418,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "no-proxy"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c067b47460f5f84b9bd791ec0832c9c4e6836faed4b2972b65830dacd18aa0d5"
+dependencies = [
+ "cidr-utils",
+ "serde",
+]
+
+[[package]]
 name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8304,6 +8314,7 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.22.0",
+ "no-proxy",
  "nom 6.1.2",
  "notify",
  "num-format",
