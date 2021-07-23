@@ -307,7 +307,8 @@ impl Source {
         );
         let ns_reflector_process = ns_reflector.run();
 
-        let paths_provider = K8sPathsProvider::new(state_reader.clone(), ns_state_reader.clone(), exclude_paths);
+        let paths_provider =
+            K8sPathsProvider::new(state_reader.clone(), ns_state_reader.clone(), exclude_paths);
         let annotator = PodMetadataAnnotator::new(state_reader, pod_fields_spec);
         let ns_annotator = NamespaceMetadataAnnotator::new(ns_state_reader, namespace_fields_spec);
 
