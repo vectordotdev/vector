@@ -74,7 +74,7 @@ components: sources: internal_logs: {
 			required: false
 			warnings: []
 			type: string: {
-				default: "host"
+				default: "pid"
 				syntax:  "literal"
 			}
 		}
