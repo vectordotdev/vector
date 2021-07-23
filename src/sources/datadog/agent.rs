@@ -191,8 +191,8 @@ mod tests {
                 timestamp: i64::arbitrary(g),
                 hostname: Bytes::from(String::arbitrary(g)),
                 service: Bytes::from(String::arbitrary(g)),
-                source: Bytes::from(String::arbitrary(g)),
-                tags: Bytes::from(String::arbitrary(g)),
+                ddsource: Bytes::from(String::arbitrary(g)),
+                ddtags: Bytes::from(String::arbitrary(g)),
             }
         }
     }
@@ -217,8 +217,8 @@ mod tests {
                 assert_eq!(log["timestamp"], msg.timestamp.into());
                 assert_eq!(log["hostname"], msg.hostname.into());
                 assert_eq!(log["service"], msg.service.into());
-                assert_eq!(log["source"], msg.source.into());
-                assert_eq!(log["tags"], msg.tags.into());
+                assert_eq!(log["ddsource"], msg.ddsource.into());
+                assert_eq!(log["ddtags"], msg.ddtags.into());
             }
 
             TestResult::passed()
@@ -292,8 +292,8 @@ mod tests {
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
-                            source: Bytes::from("curl"),
-                            tags: Bytes::from("one,two,three"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
                         }])
                         .unwrap(),
                         HeaderMap::new(),
@@ -315,8 +315,8 @@ mod tests {
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
-            assert_eq!(log["source"], "curl".into());
-            assert_eq!(log["tags"], "one,two,three".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
         }
@@ -339,8 +339,8 @@ mod tests {
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
-                            source: Bytes::from("curl"),
-                            tags: Bytes::from("one,two,three"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
                         }])
                         .unwrap(),
                         HeaderMap::new(),
@@ -362,8 +362,8 @@ mod tests {
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
-            assert_eq!(log["source"], "curl".into());
-            assert_eq!(log["tags"], "one,two,three".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
         }
@@ -386,8 +386,8 @@ mod tests {
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
-                            source: Bytes::from("curl"),
-                            tags: Bytes::from("one,two,three"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
                         }])
                         .unwrap(),
                         HeaderMap::new(),
@@ -409,8 +409,8 @@ mod tests {
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
-            assert_eq!(log["source"], "curl".into());
-            assert_eq!(log["tags"], "one,two,three".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -442,8 +442,8 @@ mod tests {
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
-                            source: Bytes::from("curl"),
-                            tags: Bytes::from("one,two,three"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
                         }])
                         .unwrap(),
                         headers,
@@ -465,8 +465,8 @@ mod tests {
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
-            assert_eq!(log["source"], "curl".into());
-            assert_eq!(log["tags"], "one,two,three".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -492,8 +492,8 @@ mod tests {
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
-                            source: Bytes::from("curl"),
-                            tags: Bytes::from("one,two,three"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
                         }])
                         .unwrap(),
                         HeaderMap::new(),
@@ -525,8 +525,8 @@ mod tests {
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
-                            source: Bytes::from("curl"),
-                            tags: Bytes::from("one,two,three"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
                         }])
                         .unwrap(),
                         HeaderMap::new(),
@@ -566,8 +566,8 @@ mod tests {
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
-                            source: Bytes::from("curl"),
-                            tags: Bytes::from("one,two,three"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
                         }])
                         .unwrap(),
                         headers,
@@ -589,8 +589,8 @@ mod tests {
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
-            assert_eq!(log["source"], "curl".into());
-            assert_eq!(log["tags"], "one,two,three".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
         }
