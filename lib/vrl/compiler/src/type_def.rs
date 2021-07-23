@@ -1186,18 +1186,19 @@ impl TypeDef {
                 kinds
                     .into_iter()
                     .map(|kind| match (kind, path.next(), path.peek()) {
-                        (
-                            TypeKind::Object(object),
-                            Some(SegmentBuf::Field(_fieldname)),
-                            Some(_),
-                        ) => TypeKind::Object(
-                            object
-                                .into_iter()
-                                .map(|(field, kindinfo)| {
-                                    (field.clone(), Self::remove_segment(kindinfo, path.clone()))
-                                })
-                                .collect(),
-                        ),
+                        (TypeKind::Object(object), Some(SegmentBuf::Field(_)), Some(_)) => {
+                            TypeKind::Object(
+                                object
+                                    .into_iter()
+                                    .map(|(field, kindinfo)| {
+                                        (
+                                            field.clone(),
+                                            Self::remove_segment(kindinfo, path.clone()),
+                                        )
+                                    })
+                                    .collect(),
+                            )
+                        }
 
                         (TypeKind::Object(object), Some(SegmentBuf::Field(fieldname)), None) => {
                             TypeKind::Object(
@@ -1211,18 +1212,19 @@ impl TypeDef {
                             )
                         }
 
-                        (
-                            TypeKind::Object(object),
-                            Some(SegmentBuf::Coalesce(_fieldnames)),
-                            Some(_),
-                        ) => TypeKind::Object(
-                            object
-                                .into_iter()
-                                .map(|(field, kindinfo)| {
-                                    (field.clone(), Self::remove_segment(kindinfo, path.clone()))
-                                })
-                                .collect(),
-                        ),
+                        (TypeKind::Object(object), Some(SegmentBuf::Coalesce(_)), Some(_)) => {
+                            TypeKind::Object(
+                                object
+                                    .into_iter()
+                                    .map(|(field, kindinfo)| {
+                                        (
+                                            field.clone(),
+                                            Self::remove_segment(kindinfo, path.clone()),
+                                        )
+                                    })
+                                    .collect(),
+                            )
+                        }
 
                         (
                             TypeKind::Object(object),
@@ -1246,7 +1248,7 @@ impl TypeDef {
                                 .collect(),
                         ),
 
-                        (TypeKind::Array(array), Some(SegmentBuf::Index(_index)), Some(_)) => {
+                        (TypeKind::Array(array), Some(SegmentBuf::Index(_)), Some(_)) => {
                             TypeKind::Array(
                                 array
                                     .into_iter()
