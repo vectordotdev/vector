@@ -29,7 +29,7 @@ Vector uses the RFC process to formalize discussion around _substantial_ changes
 * Obtain consensus upfront, before implementation time is invested
 * Incorporate project-wide context and leverage our shared brain
 * Share responsibility for the outcome of the change
-* Benefit posterity and facilitate new team member onboarding
+* Benefit posterity and facilitate new Vector team member onboarding
 
 ## Logical boundary
 
@@ -63,16 +63,16 @@ Examples of changes that do not require a RFC:
 
 ### Keep the scope small
 
-Use the "Scope" section to address out of scope concerns, like future improvements. This signals to the team that
-you are aware of these concerns but have explicitly chosen to defer them. This not only helps to keep the RFC
+Use the "Scope" section to address out of scope concerns, like future improvements. This signals to the Vector team
+that you are aware of these concerns but have explicitly chosen to defer them. This not only helps to keep the RFC
 discussion focused, but also the implementation, resultin in a quicker overall delivery time.
 
 ### Be opinionated and propose a single solution
 
 Your job as the RFC author is to navigate the issue at hand and propose an opinionated solution. Ambiguity creates
 unproductive discussion and should be eliminated while drafting the RFC. This does not mean you need to go at it alone.
-You are encouraged to investigate and discuss solutions with your team while you draft the RFC, but the end state of
-the RFC should land on a single recommendation that you are reasonably confident in. Use the "Rationale" section to
+You are encouraged to investigate and discuss solutions with the Vector team while you draft the RFC, but the end state
+of the RFC should land on a single recommendation that you are reasonably confident in. Use the "Rationale" section to
 justify your proposal and the "Alternatives" section to note other solutions you considered. See the [FAQ](#faq) for
 more info navigating your solution.
 
@@ -94,12 +94,12 @@ more info navigating your solution.
 1. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
    name. Be sure to use the issue number you created above. (e.g., `rfcs/2020-02-10-445-internal-observability.md`)
 1. Fill in your RFC, pay attention the bullets and guidelines. Do not ommit any sections.
-1. Work with your team to land on a confident solution. Allocate time for code-level spikes if necessary.
+1. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
 1. Submit your RFC as a pull request and tag reviewers for approval.
 
 ### Accepting an RFC
 
-1. At least 3 team members must approve your RFC in the form of pull request approvals.
+1. At least 3 Vector team members must approve your RFC in the form of pull request approvals.
 1. Once approved, self-merge your RFC.
 
 ### Implementing an RFC
@@ -112,12 +112,12 @@ more info navigating your solution.
 ### What if I'm unsure about the solution?
 
 Your project should be assigned 1 or more "reviewers" (AKA domain experts). Leverage these people to navigate the
-appropriate path forward; don't be afraid to involve other team members if necessary. Generally, real-time
+appropriate path forward; don't be afraid to involve other Vector team members if necessary. Generally, real-time
 chats are the most productive way to identify a path forward, and code-level spikes are much more effective at
 demonstrating intent over conceptual discussions.
 
 ### What if I need to investigate and feel out solutions?
 
-This is expected. RFCs are the time to discuss with your team and experiement with code-level spikes. It is not
+This is expected. RFCs are the time to discuss with the Vector team and experiement with code-level spikes. It is not
 uncommon for RFCs to span one or two sprints, but they should not take longer than two sprints. Generally, if an RFC
 takes two sprints it involves many cross cutting concerns that result in incremental RFCs.
