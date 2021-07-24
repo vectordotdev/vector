@@ -100,7 +100,7 @@ more info navigating your solution.
 ### Accepting an RFC
 
 1. At least 3 Vector team members must approve your RFC in the form of pull request approvals.
-1. Once approved, self-merge your RFC.
+1. Once approved, self-merge your RFC, or ask a Vector team member to do it for you.
 
 ### Implementing an RFC
 
