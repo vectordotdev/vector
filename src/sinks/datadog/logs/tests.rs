@@ -78,11 +78,11 @@ async fn start_test(
     http_status: StatusCode,
     batch_status: BatchStatus,
 ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
-    let config = format!(indoc! {r#"
+    let config = indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
             batch.max_events = 1
-        "#},);
+        "#};
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(&config).unwrap();
 
     let addr = next_addr();
