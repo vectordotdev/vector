@@ -12,7 +12,7 @@ badges:
   domains: ["vrl", "filter transform"]
 ---
 
-This release adds support for [Datadog Search Syntax](datadog_seach_syntax), a
+This release adds support for [Datadog Search Syntax][datadog_seach_syntax], a
 query language based loosely on [Lucene][] and designed for parsing
 Datadog log lines.
 
