@@ -2083,6 +2083,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "env-test-util"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62a61b2faff777e62dbccd7f82541d873f96264d050c5dd7e95194f79fc4de29"
+
+[[package]]
 name = "env_logger"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8270,6 +8276,7 @@ dependencies = [
  "dnsmsg-parser",
  "dyn-clone",
  "encoding_rs",
+ "env-test-util",
  "evmap",
  "exitcode",
  "fakedata",

@@ -800,6 +800,42 @@ mod test {
             ])
         );
     }
+
+    #[test]
+    fn config_proxy() {
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [proxy]
+                http = "http://global.proxy"
+                no_proxy = "localhost"
+
+                [sources.with-http]
+                type = "http"
+                address = "127.0.0.1:80"
+                encoding = "text"
+                proxy.http = "http://http.proxy"
+
+                [sources.with-https]
+                type = "http"
+                address = "127.0.0.1:80"
+                encoding = "text"
+                proxy.https = "http://https.proxy"
+
+                [sources.with-noproxy]
+                type = "http"
+                address = "127.0.0.1:80"
+                encoding = "text"
+                proxy.no_proxy = "somewhere"
+            "#},
+            Some(Format::Toml),
+        )
+        .unwrap();
+
+        assert!(config.global.proxy.no_proxy.matches("localhost"));
+        assert!(config.sources.contains_key("with-http"));
+        assert!(config.sources.contains_key("with-https"));
+        assert!(config.sources.contains_key("with-noproxy"));
+    }
 }
 
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]

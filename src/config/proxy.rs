@@ -36,7 +36,7 @@ impl NoProxyInterceptor {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProxyConfig {
     #[serde(
         default = "ProxyConfig::default_enabled",
@@ -52,9 +52,27 @@ pub struct ProxyConfig {
     pub no_proxy: NoProxy,
 }
 
+impl Default for ProxyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: Self::default_enabled(),
+            http: None,
+            https: None,
+            no_proxy: NoProxy::default(),
+        }
+    }
+}
+
 impl ProxyConfig {
     fn default_enabled() -> bool {
         true
+    }
+
+    fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Default::default()
+        }
     }
 
     pub fn from_env() -> Self {
@@ -70,24 +88,27 @@ impl ProxyConfig {
         NoProxyInterceptor(self.no_proxy.clone())
     }
 
-    fn merge(mut self, other: &Self) -> Self {
+    fn merge(&self, other: &Self) -> Self {
         if !other.enabled {
-            return self;
+            return Self::disabled();
         }
-        self.no_proxy.extend(other.no_proxy.clone());
+        let mut no_proxy = other.no_proxy.clone();
+        no_proxy.extend(self.no_proxy.clone());
 
         Self {
             enabled: self.enabled,
-            http: self.http.or_else(|| other.http.clone()),
-            https: self.https.or_else(|| other.https.clone()),
-            no_proxy: self.no_proxy,
+            http: other.http.clone().or_else(|| self.http.clone()),
+            https: other.https.clone().or_else(|| self.https.clone()),
+            no_proxy,
         }
     }
 
     pub fn build(&self, other: &Self) -> Self {
         // in order, we take first the environment variable,
         // the the global variables and then the service config
-        Self::from_env().merge(&self).merge(other)
+        let res = Self::from_env();
+        let res = res.merge(&self);
+        res.merge(other)
     }
 
     fn http_intercept(&self) -> Intercept {
@@ -130,25 +151,105 @@ impl ProxyConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use env_test_util::TempEnvVar;
 
     #[test]
-    fn merge() {
+    fn merge_simple() {
+        let first = ProxyConfig::default();
+        let second = ProxyConfig {
+            https: Some("https://2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+        let result = first.merge(&second);
+        assert_eq!(result.http, None);
+        assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
+    }
+
+    #[test]
+    fn merge_fill() {
+        // coming from env
         let first = ProxyConfig {
-            enabled: true,
             http: Some("http://1.2.3.4:5678".into()),
-            https: None,
+            ..Default::default()
+        };
+        // global config
+        let second = ProxyConfig {
+            https: Some("https://2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+        // component config
+        let third = ProxyConfig {
+            no_proxy: NoProxy::from("localhost"),
+            ..Default::default()
+        };
+        let result = first.merge(&second).merge(&third);
+        assert_eq!(result.http, Some("http://1.2.3.4:5678".into()));
+        assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
+        assert!(result.no_proxy.matches(&"localhost".to_string()));
+    }
+
+    #[test]
+    fn merge_override() {
+        let first = ProxyConfig {
+            http: Some("http://1.2.3.4:5678".into()),
             no_proxy: NoProxy::from("127.0.0.1,google.com"),
+            ..Default::default()
         };
         let second = ProxyConfig {
-            enabled: true,
-            http: Some("http://1.2.3.5:5678".into()),
+            http: Some("http://1.2.3.4:5678".into()),
             https: Some("https://2.3.4.5:9876".into()),
             no_proxy: NoProxy::from("localhost"),
+            ..Default::default()
         };
         let result = first.merge(&second);
         assert_eq!(result.http, Some("http://1.2.3.4:5678".into()));
         assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
         assert!(result.no_proxy.matches(&"127.0.0.1".to_string()));
         assert!(result.no_proxy.matches(&"localhost".to_string()));
+    }
+
+    #[test]
+    fn with_environment_variables() {
+        let global_proxy = ProxyConfig {
+            http: Some("http://1.2.3.4:5678".into()),
+            ..Default::default()
+        };
+        let component_proxy = ProxyConfig {
+            https: Some("https://2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+        let _http = TempEnvVar::new("HTTP_PROXY").with("http://remote.proxy");
+        let _https = TempEnvVar::new("HTTPS_PROXY");
+        let result = global_proxy.build(&component_proxy);
+
+        assert_eq!(result.http, Some("http://1.2.3.4:5678".into()));
+        assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
+
+        // with the global proxy disabled
+        let global_proxy = ProxyConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        let component_proxy = ProxyConfig {
+            https: Some("https://2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+        let result = global_proxy.build(&component_proxy);
+
+        assert!(result.http.is_none());
+        assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
+
+        // with the component proxy disabled
+        let global_proxy = ProxyConfig {
+            http: Some("http://1.2.3.4:5678".into()),
+            ..Default::default()
+        };
+        let component_proxy = ProxyConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        let result = global_proxy.build(&component_proxy);
+
+        assert_eq!(result, ProxyConfig::disabled());
     }
 }
