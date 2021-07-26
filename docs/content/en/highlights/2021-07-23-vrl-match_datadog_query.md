@@ -127,7 +127,7 @@ query language.
 
 Watch future release notes for more details.
 
-[lucene]: https://lucene.apache.org/ [datadog_search_syntax]:
-https://docs.datadoghq.com/logs/explorer/search_syntax/ [datadog_live_tailing]:
-https://docs.datadoghq.com/logs/explorer/live_tail/ [match_datadog_query]:
-/docs/reference/vrl/functions/#match_datadog_query
+[lucene]: https://lucene.apache.org/
+[datadog_search_syntax]: https://docs.datadoghq.com/logs/explorer/search_syntax/
+[datadog_live_tailing]: https://docs.datadoghq.com/logs/explorer/live_tail/
+[match_datadog_query]: /docs/reference/vrl/functions/#match_datadog_query
