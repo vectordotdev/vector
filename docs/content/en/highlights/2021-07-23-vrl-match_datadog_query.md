@@ -7,14 +7,17 @@ pr_numbers: [7837, 8370],
 release: "0.16.0"
 hide_on_release_notes: false
 badges:
-    type: new feature
-    providers: ["datadog"]
-    domains: ["vrl", "filter transform"]
+  type: new feature
+  providers: ["datadog"]
+  domains: ["vrl", "filter transform"]
 ---
 
-This release adds support for [Datadog Search Syntax](datadog_seach_syntax), a query language based loosely on [Lucene](lucene) and designed for parsing Datadog log lines.
+This release adds support for [Datadog Search Syntax](datadog_seach_syntax), a
+query language based loosely on [Lucene](lucene) and designed for parsing
+Datadog log lines.
 
-This allows you to filter log lines  akin to the experience offered by [Datadog Live Tailing](datadog_live_tailing).
+This allows you to filter log lines  akin to the experience offered by [Datadog
+Live Tailing](datadog_live_tailing).
 
 There's two ways you can incorporate Search Syntax into your Vector workflow:
 
@@ -60,7 +63,8 @@ condition.source = "<Datadog Search Syntax query goes here>"
 
 ## 2. In VRL, using `match_datadog_query`
 
-The new [match_datadog_query](match_datadog_query) function returns `true` if a Search Syntax query is found in the provided object.
+The new [match_datadog_query](match_datadog_query) function returns `true` if a
+Search Syntax query is found in the provided object.
 
 Examples:
 
@@ -74,37 +78,56 @@ match_datadog_query({"tags": ["a:x", "b:y", "c:z"]}, s'b:["x" TO "z"]')
 
 ## Use-case
 
-The purpose of this function is to support Datadog log lines, which are encoded to support Datadog-specific concepts such as reserved fields, facets and tags.
+The purpose of this function is to support Datadog log lines, which are encoded
+to support Datadog-specific concepts such as reserved fields, facets and tags.
 
-Because of this, `match_datadog_query` is not intended as a general purpose Lucene-like syntax, but rather as a specialist function for  use alongside Datadog log payloads.
+Because of this, `match_datadog_query` is not intended as a general purpose
+Lucene-like syntax, but rather as a specialist function for  use alongside
+Datadog log payloads.
 
 Here are a few common ways this distinction manifests:
 
-* Bare search terms such as `"find me"` will search for the default fields in the following order: `message`, `custom.error.message`, `custom.error.stack`, `custom.title`, `_default_`.
+* Bare search terms such as `"find me"` will search for the default fields in
+  the following order: `message`, `custom.error.message`, `custom.error.stack`,
+  `custom.title`, `_default_`.
 
-* Default search fields perform 'full text' / word boundary searches. e.g. `hello` will match a log line containing `{"message": "say hello"}`.
+* Default search fields perform 'full text' / word boundary searches. e.g.
+  `hello` will match a log line containing `{"message": "say hello"}`.
 
-* All other fields will perform full-field searches. e.g. `say:hello` will match `{"tags": ["say:hello"]}` but not `{"tags": ["say:hello there"]}`.
+* All other fields will perform full-field searches. e.g. `say:hello` will match
+  `{"tags": ["say:hello"]}` but not `{"tags": ["say:hello there"]}`.
 
-* Tag searches are prefixed with either `tags` or the tag name - e.g. `host:"google.com"` or `tags:host`.
+* Tag searches are prefixed with either `tags` or the tag name - e.g.
+  `host:"google.com"` or `tags:host`.
 
-* Facets can be searched by prefixing with `@` - e.g. `@name:John`. This would return true with a payload containing `{"custom": {"name": "John"}}`.
+* Facets can be searched by prefixing with `@` - e.g. `@name:John`. This would
+  return true with a payload containing `{"custom": {"name": "John"}}`.
 
-* Range searches can be performed inclusively using `[1 TO 10]` (e.g. 1-10, inclusive) or exclusively on the upper/lower bounds with `{1 TO 10}` (e.g. 2-9).
+* Range searches can be performed inclusively using `[1 TO 10]` (e.g. 1-10,
+  inclusive) or exclusively on the upper/lower bounds with `{1 TO 10}` (e.g.
+  2-9).
 
-* Facets are compared numerically when either operand is a numeral or treated as a string otherwise. All other fields are treated as strings. This can lead to surprising behavior - e.g. `@value:>10` will find `{"custom": {"value": 15}}`, but `value:>15` would be the tag `value` and searched by UTF-8 order - e.g. "100" would match, but not "2".
+* Facets are compared numerically when either operand is a numeral or treated as
+  a string otherwise. All other fields are treated as strings. This can lead to
+  surprising behavior - e.g. `@value:>10` will find `{"custom": {"value": 15}}`,
+  but `value:>15` would be the tag `value` and searched by UTF-8 order - e.g.
+  "100" would match, but not "2".
 
-See the [Datadog Search Syntax docs page](datadog_search_syntax) for an introductory overview of how this syntax is used in practice at Datadog.
+See the [Datadog Search Syntax docs page](datadog_search_syntax) for an
+introductory overview of how this syntax is used in practice at Datadog.
 
 ## Future work
 
-As the integration between Vector and Datadog deepens, we will be introducing new ways to interact with Datadog payloads. Search Syntax is likely to be used in more places.
+As the integration between Vector and Datadog deepens, we will be introducing
+new ways to interact with Datadog payloads. Search Syntax is likely to be used
+in more places.
 
-This is our first step to introducing cross-platform support using a shared query language.
+This is our first step to introducing cross-platform support using a shared
+query language.
 
 Watch future release notes for more details.
 
-[lucene]: https://lucene.apache.org/
-[datadog_search_syntax]: https://docs.datadoghq.com/logs/explorer/search_syntax/
-[datadog_live_tailing]: https://docs.datadoghq.com/logs/explorer/live_tail/
-[match_datadog_query]: /docs/reference/vrl/functions/#match_datadog_query
+[lucene]: https://lucene.apache.org/ [datadog_search_syntax]:
+https://docs.datadoghq.com/logs/explorer/search_syntax/ [datadog_live_tailing]:
+https://docs.datadoghq.com/logs/explorer/live_tail/ [match_datadog_query]:
+/docs/reference/vrl/functions/#match_datadog_query
