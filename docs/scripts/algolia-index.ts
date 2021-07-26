@@ -38,21 +38,9 @@ type Section = {
 };
 
 function sanitizeRecord(record: AlgoliaRecord): AlgoliaRecord {
-  const sanitizedRecord: AlgoliaRecord = {
-    title: record.title.trim(),
-    hierarchy: record.hierarchy.map((item) => item.trim()),
-    objectID: record.objectID,
-    pageTitle: record.pageTitle,
-    pageUrl: record.pageUrl,
-    itemUrl: record.itemUrl,
-    level: record.level,
-    tags: record.tags,
-    ranking: record.ranking,
-    section: record.section,
-    content: record.content,
-  };
-
-  return sanitizedRecord;
+  record.title = record.title.trim();
+  record.hierarchy = record.hierarchy.map((item) => item.trim());
+  return record;
 }
 
 // Constants
