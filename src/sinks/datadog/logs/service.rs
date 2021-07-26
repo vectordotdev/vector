@@ -1,43 +1,119 @@
-use crate::sinks::datadog::logs::DatadogLogsConfig;
+use crate::sinks::datadog::logs::config::Encoding;
 use crate::sinks::datadog::ApiKey;
+use crate::sinks::util::buffer::GZIP_FAST;
+use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::encoding::EncodingConfiguration;
 use crate::sinks::util::http::HttpSink;
+use crate::sinks::util::Compression;
 use crate::sinks::util::{BoxedRawValue, EncodedEvent, PartitionInnerBuffer};
 use crate::{config::log_schema, internal_events::DatadogLogEventProcessed};
+use flate2::write::GzEncoder;
 use http::Request;
+use http::Uri;
 use serde_json::json;
+use std::io::Write;
 use std::sync::Arc;
+use vector_core::config::LogSchema;
 use vector_core::event::Event;
 
+#[derive(Debug, Default)]
+pub(crate) struct ServiceBuilder {
+    uri: Option<Uri>,
+    default_api_key: Option<ApiKey>,
+    compression: Compression,
+    encoding: Option<EncodingConfigWithDefault<Encoding>>,
+    log_schema_message_key: Option<&'static str>,
+    log_schema_timestamp_key: Option<&'static str>,
+    log_schema_host_key: Option<&'static str>,
+}
+
+impl ServiceBuilder {
+    pub(crate) fn uri(mut self, uri: Uri) -> Self {
+        self.uri = Some(uri);
+        self
+    }
+
+    pub(crate) fn default_api_key(mut self, api_key: ApiKey) -> Self {
+        self.default_api_key = Some(api_key);
+        self
+    }
+
+    pub(crate) fn compression(mut self, compression: Compression) -> Self {
+        self.compression = compression;
+        self
+    }
+
+    pub(crate) fn encoding(mut self, encoding: EncodingConfigWithDefault<Encoding>) -> Self {
+        self.encoding = Some(encoding);
+        self
+    }
+
+    pub(crate) fn log_schema(mut self, log_schema: &'static LogSchema) -> Self {
+        self.log_schema_host_key = Some(log_schema.host_key());
+        self.log_schema_message_key = Some(log_schema.message_key());
+        self.log_schema_timestamp_key = Some(log_schema.timestamp_key());
+        self
+    }
+
+    pub(crate) fn build(self) -> Service {
+        Service {
+            uri: self.uri.expect("must set URI"),
+            default_api_key: self
+                .default_api_key
+                .expect("must set a default Datadog API key"),
+            compression: self.compression,
+            encoding: self.encoding.expect("must set an encoding"),
+            log_schema_host_key: self
+                .log_schema_host_key
+                .unwrap_or_else(|| log_schema().host_key()),
+            log_schema_message_key: self
+                .log_schema_message_key
+                .unwrap_or_else(|| log_schema().message_key()),
+            log_schema_timestamp_key: self
+                .log_schema_timestamp_key
+                .unwrap_or_else(|| log_schema().timestamp_key()),
+        }
+    }
+}
+
 #[derive(Clone)]
-pub(crate) struct DatadogLogsJsonService {
-    pub(crate) config: DatadogLogsConfig,
-    // Used to store the complete URI and avoid calling `get_uri` for each request
-    pub(crate) uri: String,
-    pub(crate) default_api_key: ApiKey,
+pub(crate) struct Service {
+    uri: Uri,
+    default_api_key: ApiKey,
+    compression: Compression,
+    encoding: EncodingConfigWithDefault<Encoding>,
+    log_schema_message_key: &'static str,
+    log_schema_timestamp_key: &'static str,
+    log_schema_host_key: &'static str,
+}
+
+impl Service {
+    pub(crate) fn builder() -> ServiceBuilder {
+        ServiceBuilder::default()
+    }
 }
 
 #[async_trait::async_trait]
-impl HttpSink for DatadogLogsJsonService {
+impl HttpSink for Service {
     type Input = PartitionInnerBuffer<serde_json::Value, ApiKey>;
     type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, ApiKey>;
 
     fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let log = event.as_mut_log();
 
-        if let Some(message) = log.remove(log_schema().message_key()) {
-            log.insert("message", message);
+        if let Some(message) = log.remove(self.log_schema_message_key) {
+            log.insert_flat("message", message);
         }
 
-        if let Some(timestamp) = log.remove(log_schema().timestamp_key()) {
-            log.insert("date", timestamp);
+        if let Some(timestamp) = log.remove(self.log_schema_timestamp_key) {
+            log.insert_flat("date", timestamp);
         }
 
-        if let Some(host) = log.remove(log_schema().host_key()) {
-            log.insert("host", host);
+        if let Some(host) = log.remove(self.log_schema_host_key) {
+            log.insert_flat("host", host);
         }
 
-        self.config.encoding.apply_rules(&mut event);
+        self.encoding.apply_rules(&mut event);
 
         let (fields, metadata) = event.into_log().into_parts();
         let json_event = json!(fields);
@@ -63,7 +139,29 @@ impl HttpSink for DatadogLogsJsonService {
                 count: events.len(),
             });
         }
-        self.config
-            .build_request(self.uri.as_str(), &api_key[..], "application/json", body)
+
+        let request = Request::post(self.uri.clone())
+            .header("Content-Type", "application/json")
+            .header("DD-API-KEY", &api_key[..]);
+
+        let (request, body) = match self.compression {
+            Compression::None => (request, body),
+            Compression::Gzip(level) => {
+                let level = level.unwrap_or(GZIP_FAST);
+                let mut encoder =
+                    GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
+
+                encoder.write_all(&body)?;
+                (
+                    request.header("Content-Encoding", "gzip"),
+                    encoder.finish()?,
+                )
+            }
+        };
+
+        request
+            .header("Content-Length", body.len())
+            .body(body)
+            .map_err(Into::into)
     }
 }

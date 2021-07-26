@@ -1,25 +1,23 @@
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
 use crate::sinks::datadog::logs::healthcheck::healthcheck;
-use crate::sinks::datadog::logs::service::DatadogLogsJsonService;
+use crate::sinks::datadog::logs::service;
 use crate::sinks::datadog::ApiKey;
 use crate::sinks::datadog::Region;
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::{
     batch::{Batch, BatchError},
-    buffer::GZIP_FAST,
     http::{HttpSink, PartitionHttpSink},
     BatchConfig, BatchSettings, Compression, JsonArrayBuffer, PartitionBuffer,
     PartitionInnerBuffer, TowerRequestConfig,
 };
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
-use flate2::write::GzEncoder;
 use futures::{FutureExt, SinkExt};
-use http::Request;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
-use std::{io::Write, sync::Arc, time::Duration};
+use std::convert::TryFrom;
+use std::{sync::Arc, time::Duration};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -66,8 +64,9 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
-    fn get_uri(&self) -> String {
-        self.endpoint
+    fn get_uri(&self) -> http::Uri {
+        let endpoint = self
+            .endpoint
             .clone()
             .or_else(|| {
                 self.site
@@ -79,7 +78,8 @@ impl DatadogLogsConfig {
                 None | Some(Region::Us) => {
                     "https://http-intake.logs.datadoghq.com/v1/input".to_string()
                 }
-            })
+            });
+        http::Uri::try_from(endpoint).expect("URI not valid")
     }
 
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
@@ -137,41 +137,6 @@ impl DatadogLogsConfig {
 
         Ok((sink, healthcheck))
     }
-
-    /// Build the request, GZipping the contents if the config specifies.
-    pub(crate) fn build_request(
-        &self,
-        uri: &str,
-        api_key: &str,
-        content_type: &str,
-        body: Vec<u8>,
-    ) -> crate::Result<http::Request<Vec<u8>>> {
-        let request = Request::post(uri)
-            .header("Content-Type", content_type)
-            .header("DD-API-KEY", api_key);
-
-        let compression = self.compression.unwrap_or(Compression::Gzip(None));
-
-        let (request, body) = match compression {
-            Compression::None => (request, body),
-            Compression::Gzip(level) => {
-                let level = level.unwrap_or(GZIP_FAST);
-                let mut encoder =
-                    GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
-
-                encoder.write_all(&body)?;
-                (
-                    request.header("Content-Encoding", "gzip"),
-                    encoder.finish()?,
-                )
-            }
-        };
-
-        request
-            .header("Content-Length", body.len())
-            .body(body)
-            .map_err(Into::into)
-    }
 }
 
 #[async_trait::async_trait]
@@ -179,13 +144,16 @@ impl DatadogLogsConfig {
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self.batch_settings()?;
+        let service = service::Service::builder()
+            .encoding(self.encoding.clone())
+            .compression(self.compression.unwrap_or_default())
+            .uri(self.get_uri())
+            .default_api_key(Arc::from(self.default_api_key.clone()))
+            .log_schema(vector_core::config::log_schema())
+            .build();
         self.build_sink(
             cx,
-            DatadogLogsJsonService {
-                config: self.clone(),
-                uri: self.get_uri(),
-                default_api_key: Arc::from(self.default_api_key.clone()),
-            },
+            service,
             JsonArrayBuffer::new(batch_settings.size),
             batch_settings.timeout,
         )
