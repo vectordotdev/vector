@@ -109,7 +109,7 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 
 # Tokio / Futures
 async-trait = "0.1.50"
-futures = { version = "0.3.15", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+futures = { version = "0.3.16", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.8.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }

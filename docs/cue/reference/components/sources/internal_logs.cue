@@ -47,6 +47,37 @@ components: sources: internal_logs: {
 	}
 
 	configuration: {
+		host_key: {
+			category:    "Context"
+			common:      false
+			description: """
+				The key name added to each event representing the current host. This can also be globally set via the
+				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
+
+				Set to "" to suppress this key.
+				"""
+			required:    false
+			warnings: []
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
+		}
+		pid_key: {
+			category: "Context"
+			common:   false
+			description: """
+				The key name added to each event representing the current process ID.
+
+				Set to "" to suppress this key.
+				"""
+			required: false
+			warnings: []
+			type: string: {
+				default: "pid"
+				syntax:  "literal"
+			}
+		}
 	}
 
 	output: logs: line: {
