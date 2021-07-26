@@ -9,9 +9,11 @@ const getExampleValue = (param, deepFilter) => {
   let value;
 
   const getValue = (obj) => {
+    const enumVal = (obj.enum != null) ? Object.keys(obj.enum)[0] : null;
+
     const examplesVal = (obj.examples != null && obj.examples.length > 0) ? obj.examples[0] : null;
 
-    return obj.default || examplesVal || null;
+    return obj.default || examplesVal || enumVal || null;
   }
 
   Object.keys(param.type).forEach(k => {
