@@ -63,13 +63,15 @@ impl ServiceBuilder {
                 .expect("must set a default Datadog API key"),
             compression: self.compression,
             encoding: self.encoding.expect("must set an encoding"),
-            log_schema_host_key: self.log_schema_host_key.unwrap_or(log_schema().host_key()),
+            log_schema_host_key: self
+                .log_schema_host_key
+                .unwrap_or_else(|| log_schema().host_key()),
             log_schema_message_key: self
                 .log_schema_message_key
-                .unwrap_or(log_schema().message_key()),
+                .unwrap_or_else(|| log_schema().message_key()),
             log_schema_timestamp_key: self
                 .log_schema_timestamp_key
-                .unwrap_or(log_schema().timestamp_key()),
+                .unwrap_or_else(|| log_schema().timestamp_key()),
         }
     }
 }
