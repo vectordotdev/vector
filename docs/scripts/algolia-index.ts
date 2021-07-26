@@ -37,6 +37,24 @@ type Section = {
   ranking: number;
 };
 
+function sanitizeRecord(record: AlgoliaRecord): AlgoliaRecord {
+  const sanitizedRecord: AlgoliaRecord = {
+    title: record.title.trim(),
+    hierarchy: record.hierarchy.map((item) => item.trim()),
+    objectID: record.objectID,
+    pageTitle: record.pageTitle,
+    pageUrl: record.pageUrl,
+    itemUrl: record.itemUrl,
+    level: record.level,
+    tags: record.tags,
+    ranking: record.ranking,
+    section: record.section,
+    content: record.content,
+  };
+
+  return sanitizedRecord;
+}
+
 // Constants
 const DEBUG = process.env.DEBUG === "true" || false;
 const targetFile = "./public/search.json";
@@ -144,7 +162,8 @@ async function indexHTMLFiles(
 
         activeRecord.content += item.content;
       } else if (item.level < activeRecord.level) {
-        algoliaRecords.push({ ...activeRecord });
+        const sanitizedRecord = sanitizeRecord(activeRecord);
+        algoliaRecords.push({ ...sanitizedRecord });
 
         activeRecord = {
           objectID: itemUrl,
@@ -160,10 +179,10 @@ async function indexHTMLFiles(
           content: "",
         };
       } else { // h2-h6 logic
-        algoliaRecords.push({ ...activeRecord });
+        const sanitizedRecord = sanitizeRecord(activeRecord);
+        algoliaRecords.push({ ...sanitizedRecord });
 
-        const levelDiff = item.level - activeRecord.level;
-        const lastIndex = activeRecord.hierarchy.length - levelDiff;
+        const lastIndex = activeRecord.hierarchy.length - 1;
 
         activeRecord = {
           objectID: itemUrl,
@@ -181,9 +200,8 @@ async function indexHTMLFiles(
       }
 
       if (activeRecord) {
-        activeRecord.title = activeRecord.title.trim();
-        activeRecord.hierarchy.map((item) => item.trim());
-        algoliaRecords.push({ ...activeRecord });
+        const sanitizedRecord = sanitizeRecord(activeRecord);
+        algoliaRecords.push({ ...sanitizedRecord });
       }
 
       for (const rec of algoliaRecords) {
