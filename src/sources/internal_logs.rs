@@ -1,5 +1,6 @@
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
     shutdown::ShutdownSignal,
     trace, Pipeline,
 };
@@ -38,8 +39,17 @@ async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
     let subscription = trace::subscribe();
     let mut rx = subscription.receiver;
 
-    out.send_all(&mut stream::iter(subscription.buffer).map(Ok))
-        .await?;
+    let hostname = crate::get_hostname();
+    let pid = std::process::id();
+
+    out.send_all(&mut stream::iter(subscription.buffer).map(|mut log| {
+        if let Ok(hostname) = &hostname {
+            log.insert(log_schema().host_key().to_owned(), hostname.to_owned());
+        }
+        log.insert(String::from("pid"), pid);
+        Ok(Event::from(log))
+    }))
+    .await?;
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
@@ -48,7 +58,7 @@ async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
         tokio::select! {
             receive = rx.recv() => {
                 match receive {
-                    Ok(event) => out.send(event).await?,
+                    Ok(event) => out.send(Event::from(event)).await?,
                     Err(RecvError::Lagged(_)) => (),
                     Err(RecvError::Closed) => break,
                 }

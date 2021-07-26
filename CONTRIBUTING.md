@@ -46,6 +46,7 @@ expanding into more specifics.
       1. [Integration Tests](#integration-tests)
       1. [Blackbox Tests](#blackbox-tests)
       1. [Tips and Tricks](#tips-and-tricks)
+         1. [Faster Builds With `sccache`](#faster-builds-with-sccache)
          1. [Testing Specific Components](#testing-specific-components)
          1. [Generating Sample Logs](#generating-sample-logs)
    1. [Benchmarking](#benchmarking)

@@ -1,10 +1,8 @@
-use super::vrl::Vrl;
+use super::vrl::VrlConfig;
 use crate::conditions::{Condition, ConditionConfig, ConditionDescription};
 
 #[cfg(feature = "transforms-filter")]
-use datadog_search_syntax::{build, compile, parse};
 use serde::{Deserialize, Serialize};
-use vrl::diagnostic::Formatter;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct DatadogSearchConfig {
@@ -20,18 +18,14 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 #[typetag::serde(name = "datadog_search")]
 impl ConditionConfig for DatadogSearchConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let query_node = parse(&self.source)?;
+        let config = VrlConfig {
+            source: format!(
+                r#"match_datadog_query(., "{}")"#,
+                self.source.replace(r#"""#, r#"\""#)
+            ),
+        };
 
-        let program = compile(build(&query_node)).map_err(|diagnostics| {
-            Formatter::new(&self.source, diagnostics)
-                .colored()
-                .to_string()
-        })?;
-
-        Ok(Box::new(Vrl {
-            program,
-            source: self.source.clone(),
-        }))
+        config.build()
     }
 }
 

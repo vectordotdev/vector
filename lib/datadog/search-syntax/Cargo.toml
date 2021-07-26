@@ -11,28 +11,3 @@ ordered-float = "2"
 regex = "1"
 itertools = "0.10.0"
 lazy_static = { version = "1.4.0", default-features = false }
-
-# Workspace
-lookup = { path = "../../lookup" }
-
-vrl = { path = "../../vrl/core" }
-vrl-parser = { path = "../../vrl/parser" }
-vrl-compiler = { path = "../../vrl/compiler" }
-vrl-diagnostic = { path = "../../vrl/diagnostic" }
-
-[dependencies.vrl-stdlib]
-path = "../../vrl/stdlib"
-default-features = false
-features = [
-    "encode_base64",
-    "ends_with",
-    "exists",
-    "includes",
-    "is_float",
-    "is_integer",
-    "join",
-    "match",
-    "parse_key_value",
-    "parse_regex",
-    "starts_with",
-]

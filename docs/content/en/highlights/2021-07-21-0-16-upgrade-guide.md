@@ -10,15 +10,16 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.16.0 release includes one breaking change:
+Vector's 0.16.0 release includes two breaking changes:
 
-1. [Component name field renamed to ID](#first)
+1. [Component name field renamed to ID](#name-to-id)
+2. [Datadog Log sink encoding option removed](#encoding)
 
-We cover it below to help you upgrade quickly:
+We cover them below to help you upgrade quickly:
 
 [##](##) Upgrade Guide
 
-### Component name field renamed to ID {#first}
+### Component name field renamed to ID {#name-to-id}
 
 Historically we've referred to the component ID field as `name` in some places, `id` in others. We've decided to
 standardize on `ID` as we feel this is more closer to the intention of the field: an unchanging identifier for
@@ -43,3 +44,30 @@ This required a couple of breaking changes to Vector's internal metrics:
 * Within the GraphQL API, all references to `name` for `Component`s has been updated to be `componentId`. This is used
   over simply `Id` as `Id` has special semantics within the GraphQL ecosystem and we may add support for this field
   later.
+
+### Datadog Log sink encoding option removed {#encoding}
+
+In previous versions of vector it was possible to configure the Datadog logs
+sink to send in 'text' or 'json' encoding. While the logs ingest API does accept
+text format the native format for that API is json. Sending text comes with
+limitations and is only useful for backward compatability with older clients.
+
+We no longer allow you to set the encoding of the payloads in the Datadog logs
+sink. For instance, if your configuration looks like so:
+
+```toml
+[sinks.dd_logs_egress]
+type = "datadog_logs"
+inputs = ["datadog_agent"]
+encoding.codec = "json"
+```
+
+You should remove `encoding.codec` entirely, leaving you with:
+
+```toml
+[sinks.dd_logs_egress]
+type = "datadog_logs"
+inputs = ["datadog_agent"]
+```
+
+Encoding fields other than `codec` are still valid.
