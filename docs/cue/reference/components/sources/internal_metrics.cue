@@ -56,35 +56,45 @@ components: sources: internal_metrics: {
 			}
 		}
 		tags: {
-			host_key: {
-				category:    "Context"
-				common:      false
-				description: """
+			common:      false
+			description: "Metric tag options."
+			required:    false
+
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					host_key: {
+						category:    "Context"
+						common:      false
+						description: """
 				The key name added to each event representing the current host. This can also be globally set via the
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 
 				Set to "" to suppress this key.
 				"""
-				required:    false
-				warnings: []
-				type: string: {
-					default: "host"
-					syntax:  "literal"
-				}
-			}
-			pid_key: {
-				category: "Context"
-				common:   false
-				description: """
+						required:    false
+						warnings: []
+						type: string: {
+							default: "host"
+							syntax:  "literal"
+						}
+					}
+					pid_key: {
+						category: "Context"
+						common:   false
+						description: """
 					The key name added to each event representing the current process ID.
 
 					Set to "" to suppress this key.
 					"""
-				required: false
-				warnings: []
-				type: string: {
-					default: "pid"
-					syntax:  "literal"
+						required: false
+						warnings: []
+						type: string: {
+							default: "pid"
+							syntax:  "literal"
+						}
+					}
 				}
 			}
 		}
