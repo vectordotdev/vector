@@ -558,6 +558,8 @@ impl RunningTopology {
             component_kind = "sink",
             component_id = %task.id(),
             component_type = %task.typetag(),
+            // maintained for compatibility
+            component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
@@ -573,6 +575,8 @@ impl RunningTopology {
             component_kind = "transform",
             component_id = %task.id(),
             component_type = %task.typetag(),
+            // maintained for compatibility
+            component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
@@ -588,6 +592,8 @@ impl RunningTopology {
             component_kind = "source",
             component_id = %task.id(),
             component_type = %task.typetag(),
+            // maintained for compatibility
+            component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task);

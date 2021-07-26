@@ -254,7 +254,9 @@ pub async fn build_pieces(
                                 %error,
                                 component_kind = "sink",
                                 component_type = typetag,
-                                ?component_id,
+                                %component_id,
+                                // maintained for compatibility
+                                component_name = %component_id,
                             );
                             Err(())
                         }
@@ -263,7 +265,9 @@ pub async fn build_pieces(
                                 msg = "Healthcheck: timeout.",
                                 component_kind = "sink",
                                 component_type = typetag,
-                                ?component_id,
+                                %component_id,
+                                // maintained for compatibility
+                                component_name = %component_id,
                             );
                             Err(())
                         }

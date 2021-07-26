@@ -34,16 +34,15 @@ inputs = []
 source = ""
 ```
 
-The `parse_nginx` part of the config is now only referred to as `ID`.
+The `parse_nginx` part of the config is now only referred to as `ID` in the documentation.
 
-This required a couple of breaking changes to Vector's internal metrics:
+We have preserved compatibility with existing usages of `component_name` for the `internal_metrics` sources by keeping
+`component_name` and adding `component_id` as a new tag. Howover, wwe recommend switching usages over to `component_id`
+as we will be removing `component_name` in the future: if you were grouping by this tag in your metrics queries, or
+referring to it in a `remap` or `lua` transform, you should update it to refer to `component_id`.
 
-* For metrics coming from `internal_metrics`, the `component_name` tag has been updated to be `component_id`. If you
-  were grouping by this tag in your metrics queries, or referring to it in a `remap` or `lua` transform, you should
-  update it to refer to `component_id`.
-* Within the GraphQL API, all references to `name` for `Component`s has been updated to be `componentId`. This is used
-  over simply `Id` as `Id` has special semantics within the GraphQL ecosystem and we may add support for this field
-  later.
+Within the GraphQL API, all references to `name` for `Component`s has been updated to be `componentId`. This is used
+over simply `Id` as `Id` has special semantics within the GraphQL ecosystem and we may add support for this field later.
 
 ### Datadog Log sink encoding option removed {#encoding}
 
