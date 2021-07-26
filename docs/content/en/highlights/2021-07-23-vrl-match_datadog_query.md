@@ -12,8 +12,8 @@ badges:
   domains: ["vrl", "filter transform"]
 ---
 
-This release adds support for [Datadog Search Syntax](datadog_seach_syntax), a
-query language based loosely on [Lucene](lucene) and designed for parsing
+This release adds support for [Datadog Search Syntax][datadog_seach_syntax], a
+query language based loosely on [Lucene][] and designed for parsing
 Datadog log lines.
 
 This allows you to filter log lines akin to the experience offered by [Datadog
@@ -63,7 +63,7 @@ condition.source = "<Datadog Search Syntax query goes here>"
 
 ## 2. In VRL, using `match_datadog_query`
 
-The new [match_datadog_query](match_datadog_query) function returns `true` if a
+The new [match_datadog_query][] function returns `true` if a
 Search Syntax query is found in the provided object.
 
 Examples:
