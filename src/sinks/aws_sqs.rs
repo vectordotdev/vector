@@ -353,6 +353,7 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         config.clone().healthcheck(client.clone()).await.unwrap();

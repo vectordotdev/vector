@@ -900,6 +900,7 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -947,6 +948,7 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1013,6 +1015,7 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1085,6 +1088,7 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1137,6 +1141,7 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1185,6 +1190,7 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1271,6 +1277,7 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         let client = config.create_client().unwrap();
@@ -1283,7 +1290,8 @@ mod integration_tests {
             endpoint: "http://localhost:6000".into(),
         };
 
-        let client = rusoto::client().unwrap();
+        let proxy = ProxyConfig::default();
+        let client = rusoto::client(&proxy).unwrap();
         let creds = rusoto::AwsCredentialsProvider::new(&region, None).unwrap();
         CloudWatchLogsClient::new_with(client, creds, region)
     }

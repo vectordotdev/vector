@@ -842,7 +842,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
         http::HttpClient,
@@ -1016,7 +1016,8 @@ mod integration_tests {
             events.push(event);
         }
 
-        let client = HttpClient::new(None, Default::default()).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 

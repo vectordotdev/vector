@@ -847,6 +847,7 @@ mod integration_tests {
             request: TowerRequestConfig::default(),
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         }
     }
 

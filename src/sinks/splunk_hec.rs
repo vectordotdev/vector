@@ -713,7 +713,8 @@ mod integration_tests {
     async fn splunk_healthcheck() {
         let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
-            let client = HttpClient::new(tls_settings, Default::default()).unwrap();
+            let proxy = ProxyConfig::default();
+            let client = HttpClient::new(tls_settings, &proxy).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
         };
 

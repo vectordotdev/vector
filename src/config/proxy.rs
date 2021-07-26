@@ -22,7 +22,7 @@ impl NoProxyInterceptor {
                 let matches = if let Some(host) = host {
                     if let Some(port) = port {
                         let url = format!("{}:{}", host, port);
-                        !&self.0.matches(&url)
+                        self.0.matches(&url) || self.0.matches(&host)
                     } else {
                         self.0.matches(&host)
                     }
@@ -45,6 +45,10 @@ pub struct ProxyConfig {
     pub enabled: bool,
     pub http: Option<String>,
     pub https: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub no_proxy: NoProxy,
 }
 

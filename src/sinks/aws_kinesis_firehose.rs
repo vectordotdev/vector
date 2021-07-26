@@ -344,6 +344,7 @@ mod integration_tests {
             },
             assume_role: None,
             auth: Default::default(),
+            proxy: Default::default(),
         };
 
         let cx = SinkContext::new_test();

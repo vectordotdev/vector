@@ -1161,7 +1161,8 @@ mod integration_tests {
             }
 
             let request = builder.body(Body::empty())?;
-            let client = HttpClient::new(self.tls_settings.clone(), Default::default())
+            let proxy = ProxyConfig::default();
+            let client = HttpClient::new(self.tls_settings.clone(), &proxy)
                 .expect("Could not build client to flush");
             let response = client.send(request).await?;
 

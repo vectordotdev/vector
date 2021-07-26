@@ -637,7 +637,7 @@ mod tests {
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{http::HttpClient, test_util::trace_init};
+    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
@@ -747,7 +747,8 @@ mod integration_tests {
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = HttpClient::new(None, Default::default())
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(None, &proxy)
             .unwrap()
             .send(request)
             .await
