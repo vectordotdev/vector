@@ -2,6 +2,7 @@ use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
 use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service::DatadogLogsJsonService;
+use crate::sinks::datadog::logs::sink::LogSink;
 use crate::sinks::datadog::ApiKey;
 use crate::sinks::datadog::Region;
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
@@ -124,16 +125,17 @@ impl DatadogLogsConfig {
             self.default_api_key.clone(),
         )
         .boxed();
-        let sink = PartitionHttpSink::new(
-            service,
-            PartitionBuffer::new(batch),
-            request_settings,
-            timeout,
-            client,
-            cx.acker(),
-        )
-        .sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
-        let sink = VectorSink::Sink(Box::new(sink));
+        // let sink = PartitionHttpSink::new(
+        //     service,
+        //     PartitionBuffer::new(batch),
+        //     request_settings,
+        //     timeout,
+        //     client,
+        //     cx.acker(),
+        // )
+        // .sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
+        // let sink = VectorSink::Sink(Box::new(sink));
+        let sink = VectorSink::Sink(Box::new(LogSink::new()));
 
         Ok((sink, healthcheck))
     }
