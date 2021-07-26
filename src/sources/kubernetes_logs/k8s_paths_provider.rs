@@ -60,9 +60,7 @@ impl PathsProvider for K8sPathsProvider {
                     .as_ref();
                 trace!(message = "Verifying Namespace metadata for pod.", uid = ?uid);
                 if let Some(namespace) = pod.metadata.namespace.as_ref() {
-                    self.namespace_state_reader
-                        .get(namespace)
-                        .is_some()
+                    self.namespace_state_reader.get(namespace).is_some()
                 } else {
                     false
                 }
