@@ -63,7 +63,7 @@ condition.source = "<Datadog Search Syntax query goes here>"
 
 ## 2. In VRL, using `match_datadog_query`
 
-The new [match_datadog_query](match_datadog_query) function returns `true` if a
+The new [match_datadog_query][] function returns `true` if a
 Search Syntax query is found in the provided object.
 
 Examples:
