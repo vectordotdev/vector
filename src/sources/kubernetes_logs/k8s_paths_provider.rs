@@ -51,6 +51,8 @@ impl PathsProvider for K8sPathsProvider {
 
         read_ref
             .into_iter()
+            // filter out pods where we haven't fetched the namespace metadata yet
+            // they will be picked up on a later run
             .filter(|(uid, values)| {
                 let pod: &Pod = values
                     .get_one()
