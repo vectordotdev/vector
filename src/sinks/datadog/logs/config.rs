@@ -1,16 +1,16 @@
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
 use crate::sinks::datadog::logs::healthcheck::healthcheck;
-use crate::sinks::datadog::logs::service::{DatadogLogsJsonService, DatadogLogsTextService};
+use crate::sinks::datadog::logs::service::DatadogLogsJsonService;
 use crate::sinks::datadog::ApiKey;
 use crate::sinks::datadog::Region;
+use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::{
     batch::{Batch, BatchError},
     buffer::GZIP_FAST,
-    encoding::EncodingConfig,
     http::{HttpSink, PartitionHttpSink},
-    BatchConfig, BatchSettings, Compression, Encoding, JsonArrayBuffer, PartitionBuffer,
-    PartitionInnerBuffer, TowerRequestConfig, VecBuffer,
+    BatchConfig, BatchSettings, Compression, JsonArrayBuffer, PartitionBuffer,
+    PartitionInnerBuffer, TowerRequestConfig,
 };
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
@@ -31,7 +31,11 @@ pub struct DatadogLogsConfig {
     // Deprecated name
     #[serde(alias = "api_key")]
     default_api_key: String,
-    pub(crate) encoding: EncodingConfig<Encoding>,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub(crate) encoding: EncodingConfigWithDefault<Encoding>,
     tls: Option<TlsConfig>,
 
     #[serde(default)]
@@ -44,11 +48,18 @@ pub struct DatadogLogsConfig {
     request: TowerRequestConfig,
 }
 
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Json,
+}
+
 impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
             default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
-            encoding.codec = "json"
         "#})
         .unwrap()
     }
@@ -167,37 +178,17 @@ impl DatadogLogsConfig {
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // Create a different sink depending on which encoding we have chosen.
-        // Json and Text have different batching strategies and so each needs to be
-        // handled differently.
-        match self.encoding.codec {
-            Encoding::Json => {
-                let batch_settings = self.batch_settings()?;
-                self.build_sink(
-                    cx,
-                    DatadogLogsJsonService {
-                        config: self.clone(),
-                        uri: self.get_uri(),
-                        default_api_key: Arc::from(self.default_api_key.clone()),
-                    },
-                    JsonArrayBuffer::new(batch_settings.size),
-                    batch_settings.timeout,
-                )
-            }
-            Encoding::Text => {
-                let batch_settings = self.batch_settings()?;
-                self.build_sink(
-                    cx,
-                    DatadogLogsTextService {
-                        config: self.clone(),
-                        uri: self.get_uri(),
-                        default_api_key: Arc::from(self.default_api_key.clone()),
-                    },
-                    VecBuffer::new(batch_settings.size),
-                    batch_settings.timeout,
-                )
-            }
-        }
+        let batch_settings = self.batch_settings()?;
+        self.build_sink(
+            cx,
+            DatadogLogsJsonService {
+                config: self.clone(),
+                uri: self.get_uri(),
+                default_api_key: Arc::from(self.default_api_key.clone()),
+            },
+            JsonArrayBuffer::new(batch_settings.size),
+            batch_settings.timeout,
+        )
     }
 
     fn input_type(&self) -> DataType {

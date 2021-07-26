@@ -26,18 +26,8 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
 }
 
 #[tokio::test]
-async fn smoke_text() {
-    let (expected, output) = smoke_test("text").await;
-
-    for (i, val) in output.iter().enumerate() {
-        assert_eq!(val.0.headers.get("Content-Type").unwrap(), "text/plain");
-        assert_eq!(val.1, format!("{}\n", expected[i]));
-    }
-}
-
-#[tokio::test]
 async fn smoke_json() {
-    let (expected, output) = smoke_test("json").await;
+    let (expected, output) = smoke_test().await;
 
     for (i, val) in output.iter().enumerate() {
         assert_eq!(
@@ -65,8 +55,8 @@ async fn smoke_json() {
     }
 }
 
-async fn smoke_test(encoding: &str) -> (Vec<String>, Vec<(http::request::Parts, Bytes)>) {
-    let (expected, rx) = start_test(encoding, StatusCode::OK, BatchStatus::Delivered).await;
+async fn smoke_test() -> (Vec<String>, Vec<(http::request::Parts, Bytes)>) {
+    let (expected, rx) = start_test(StatusCode::OK, BatchStatus::Delivered).await;
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
@@ -74,36 +64,25 @@ async fn smoke_test(encoding: &str) -> (Vec<String>, Vec<(http::request::Parts, 
 }
 
 #[tokio::test]
-async fn handles_failure_text() {
-    handles_failure("text").await;
-}
-
-#[tokio::test]
 async fn handles_failure_json() {
-    handles_failure("json").await;
+    handles_failure().await;
 }
 
-async fn handles_failure(encoding: &str) {
-    let (_expected, mut rx) =
-        start_test(encoding, StatusCode::FORBIDDEN, BatchStatus::Failed).await;
+async fn handles_failure() {
+    let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Failed).await;
 
     assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
 }
 
 async fn start_test(
-    encoding: &str,
     http_status: StatusCode,
     batch_status: BatchStatus,
 ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
-    let config = format!(
-        indoc! {r#"
+    let config = indoc! {r#"
             default_api_key = "atoken"
-            encoding = "{}"
             compression = "none"
             batch.max_events = 1
-        "#},
-        encoding
-    );
+        "#};
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(&config).unwrap();
 
     let addr = next_addr();
@@ -131,7 +110,6 @@ async fn start_test(
 async fn api_key_in_metadata() {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
-            encoding = "json"
             compression = "none"
             batch.max_events = 1
         "#})
@@ -192,7 +170,6 @@ async fn api_key_in_metadata() {
 async fn multiple_api_keys() {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
-            encoding = "json"
             compression = "none"
             batch.max_events = 1
         "#})
