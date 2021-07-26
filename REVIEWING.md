@@ -31,13 +31,6 @@ development time.
 If you have not, please review Vector's [Code of Conduct](CODE_OF_CONDUCT.md)
 to ensure reviews are welcoming, open, and respectful.
 
-## Code Owners
-
-Code owners should be involved in reviews that touch their code. This is
-defined in the [`.github/CODEOWNERS`](.github/CODEOWNERS) file. Involving code
-owners ensures all context is applied to reviews since they have intimate
-knowledge of the code.
-
 ## Dependencies
 
 Dependencies should be _carefully_ selected. Before adding a dependency, we
