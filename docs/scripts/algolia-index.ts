@@ -137,7 +137,7 @@ async function indexHTMLFiles(
           tags: pageTags,
           content: "",
         };
-      } else if (item.level === 1) {
+      } else if (item.level === 1) { // h1 logic
         if (activeRecord.content) {
           activeRecord.content += " ";
         }
@@ -155,15 +155,15 @@ async function indexHTMLFiles(
           title: item.content,
           section,
           ranking,
-          hierarchy: [...activeRecord.tags, activeRecord.title],
+          hierarchy: [...activeRecord.hierarchy, activeRecord.title],
           tags: pageTags,
           content: "",
         };
-      } else {
+      } else { // h2-h6 logic
         algoliaRecords.push({ ...activeRecord });
-        const hierarchySize = activeRecord.hierarchy.length;
+
         const levelDiff = item.level - activeRecord.level;
-        const lastIndex = hierarchySize - levelDiff;
+        const lastIndex = activeRecord.hierarchy.length - levelDiff;
 
         activeRecord = {
           objectID: itemUrl,
@@ -174,7 +174,7 @@ async function indexHTMLFiles(
           title: item.content,
           section,
           ranking,
-          hierarchy: [...activeRecord.tags.slice(0, lastIndex)],
+          hierarchy: [...activeRecord.hierarchy.slice(0, lastIndex)],
           tags: pageTags,
           content: "",
         };
