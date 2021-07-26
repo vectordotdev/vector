@@ -3,7 +3,7 @@ date: "2021-07-23"
 title: "Datadog Search Syntax support"
 description: "Use Datadog Search Syntax in `filter` transforms and VRL"
 authors: ["leebenson"]
-pr_numbers: [7837, 8370],
+pr_numbers: [7837, 8370]
 release: "0.16.0"
 hide_on_release_notes: false
 badges:
@@ -16,7 +16,7 @@ This release adds support for [Datadog Search Syntax](datadog_seach_syntax), a
 query language based loosely on [Lucene](lucene) and designed for parsing
 Datadog log lines.
 
-This allows you to filter log lines  akin to the experience offered by [Datadog
+This allows you to filter log lines akin to the experience offered by [Datadog
 Live Tailing](datadog_live_tailing).
 
 There's two ways you can incorporate Search Syntax into your Vector workflow:
@@ -82,32 +82,32 @@ The purpose of this function is to support Datadog log lines, which are encoded
 to support Datadog-specific concepts such as reserved fields, facets and tags.
 
 Because of this, `match_datadog_query` is not intended as a general purpose
-Lucene-like syntax, but rather as a specialist function for  use alongside
+Lucene-like syntax, but rather as a specialist function for use alongside
 Datadog log payloads.
 
 Here are a few common ways this distinction manifests:
 
-* Bare search terms such as `"find me"` will search for the default fields in
+- Bare search terms such as `"find me"` will search for the default fields in
   the following order: `message`, `custom.error.message`, `custom.error.stack`,
   `custom.title`, `_default_`.
 
-* Default search fields perform 'full text' / word boundary searches. e.g.
+- Default search fields perform 'full text' / word boundary searches. e.g.
   `hello` will match a log line containing `{"message": "say hello"}`.
 
-* All other fields will perform full-field searches. e.g. `say:hello` will match
+- All other fields will perform full-field searches. e.g. `say:hello` will match
   `{"tags": ["say:hello"]}` but not `{"tags": ["say:hello there"]}`.
 
-* Tag searches are prefixed with either `tags` or the tag name - e.g.
+- Tag searches are prefixed with either `tags` or the tag name - e.g.
   `host:"google.com"` or `tags:host`.
 
-* Facets can be searched by prefixing with `@` - e.g. `@name:John`. This would
+- Facets can be searched by prefixing with `@` - e.g. `@name:John`. This would
   return true with a payload containing `{"custom": {"name": "John"}}`.
 
-* Range searches can be performed inclusively using `[1 TO 10]` (e.g. 1-10,
+- Range searches can be performed inclusively using `[1 TO 10]` (e.g. 1-10,
   inclusive) or exclusively on the upper/lower bounds with `{1 TO 10}` (e.g.
   2-9).
 
-* Facets are compared numerically when either operand is a numeral or treated as
+- Facets are compared numerically when either operand is a numeral or treated as
   a string otherwise. All other fields are treated as strings. This can lead to
   surprising behavior - e.g. `@value:>10` will find `{"custom": {"value": 15}}`,
   but `value:>15` would be the tag `value` and searched by UTF-8 order - e.g.
