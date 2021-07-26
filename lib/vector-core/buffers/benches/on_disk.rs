@@ -93,7 +93,7 @@ macro_rules! experiment {
                                 max_size,
                                 when_full: WhenFull::DropNewest,
                                 data_dir: guard.inner.clone(),
-                                name: format!("{}", $width),
+                                id: format!("{}", $width),
                             };
                             let buf = crate::common::setup::<$width>(*max_events, variant);
                             (buf, guard)
