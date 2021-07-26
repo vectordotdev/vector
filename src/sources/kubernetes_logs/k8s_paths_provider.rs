@@ -57,9 +57,9 @@ impl PathsProvider for K8sPathsProvider {
                     .expect("we are supposed to be working with single-item values only")
                     .as_ref();
                 trace!(message = "Verifying Namespace metadata for pod.", uid = ?uid);
-                if let Some(namespace) = pod.metadata.namespace.clone() {
+                if let Some(namespace) = pod.metadata.namespace.as_ref() {
                     self.namespace_state_reader
-                        .get(namespace.as_str())
+                        .get(namespace)
                         .is_some()
                 } else {
                     false
