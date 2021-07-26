@@ -119,14 +119,9 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     let _test_namespace = framework
-        .namespace(namespace::Config::from_namespace(&Namespace {
-            metadata: ObjectMeta {
-                name: Some(pod_namespace.clone()),
-                ..Default::default()
-            },
-            spec: None,
-            status: None,
-        })?)
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
         .await?;
 
     let _test_pod = framework

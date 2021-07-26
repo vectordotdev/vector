@@ -212,14 +212,9 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_namespace(&Namespace {
-            metadata: ObjectMeta {
-                name: Some(pod_namespace.clone()),
-                ..Default::default()
-            },
-            spec: None,
-            status: None,
-        })?)
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
         .await?;
 
     let test_pod = framework
@@ -325,14 +320,9 @@ async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let test_namespace = framework
-        .namespace(namespace::Config::from_namespace(&Namespace {
-            metadata: ObjectMeta {
-                name: Some(pod_namespace.clone()),
-                ..Default::default()
-            },
-            spec: None,
-            status: None,
-        })?)
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
         .await?;
 
     let test_pod = framework
