@@ -27,12 +27,12 @@ pub enum Variant {
 
 #[cfg(test)]
 #[derive(Debug, Clone)]
-struct Name {
+struct Id {
     inner: String,
 }
 
 #[cfg(test)]
-impl Arbitrary for Name {
+impl Arbitrary for Id {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut name = String::with_capacity(MAX_STR_SIZE);
         for _ in 0..(g.size() % MAX_STR_SIZE) {
@@ -40,7 +40,7 @@ impl Arbitrary for Name {
             name.push_str(ALPHABET[idx]);
         }
 
-        Name { inner: name }
+        Id { inner: name }
     }
 }
 
@@ -56,7 +56,7 @@ impl Arbitrary for Variant {
             Variant::Disk {
                 max_size: u16::arbitrary(g) as usize, // u16 avoids allocation failures
                 when_full: WhenFull::arbitrary(g),
-                name: Name::arbitrary(g).inner,
+                id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
             }
         }
