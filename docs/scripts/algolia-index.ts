@@ -130,7 +130,7 @@ async function indexHTMLFiles(
           pageUrl,
           itemUrl,
           level: item.level,
-          title: item.content,
+          title: item.content.trim(),
           section,
           ranking,
           hierarchy: [],
@@ -138,10 +138,6 @@ async function indexHTMLFiles(
           content: "",
         };
       } else if (item.level === 1) { // h1 logic
-        if (activeRecord.content) {
-          activeRecord.content += " ";
-        }
-
         activeRecord.content += item.content;
       } else if (item.level < activeRecord.level) {
         algoliaRecords.push({ ...activeRecord });
@@ -152,18 +148,19 @@ async function indexHTMLFiles(
           pageUrl,
           itemUrl,
           level: item.level,
-          title: item.content,
+          title: item.content.trim(),
           section,
           ranking,
-          hierarchy: [...activeRecord.hierarchy, activeRecord.title],
+          hierarchy: [...activeRecord.hierarchy, activeRecord.title.trim()],
           tags: pageTags,
           content: "",
         };
       } else { // h2-h6 logic
         algoliaRecords.push({ ...activeRecord });
 
+        const hierarchySize = activeRecord.hierarchy.length;
         const levelDiff = item.level - activeRecord.level;
-        const lastIndex = activeRecord.hierarchy.length - levelDiff;
+        const lastIndex = hierarchySize - levelDiff;
 
         activeRecord = {
           objectID: itemUrl,
@@ -171,7 +168,7 @@ async function indexHTMLFiles(
           pageUrl,
           itemUrl,
           level: item.level,
-          title: item.content,
+          title: item.content.trim(),
           section,
           ranking,
           hierarchy: [...activeRecord.hierarchy.slice(0, lastIndex)],
@@ -181,29 +178,23 @@ async function indexHTMLFiles(
       }
 
       if (activeRecord) {
-        activeRecord.title = activeRecord.title.trim();
-        activeRecord.hierarchy.map((item) => item.trim());
         algoliaRecords.push({ ...activeRecord });
       }
 
       for (const rec of algoliaRecords) {
-        if (usedIds[rec.objectID]) {
-          // The objectID is the url of the section of the page that the record covers.
-          // If you have a duplicate here somehow two records point to the same thing.
-          if (DEBUG) {
-            console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
-            console.log(JSON.stringify(rec, null, 2));
-          }
+        // The objectID is the url of the section of the page that the record covers.
+        // If you have a duplicate here somehow two records point to the same thing.
+        if (DEBUG && usedIds[rec.objectID]) {
+          console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
+          console.log(JSON.stringify(rec, null, 2));
         }
 
         usedIds[rec.objectID] = true;
 
-        if (rec.level > 1 && rec.level < 6 && rec.hierarchy.length == 0) {
-          // The h2 -> h5 should have a set of tags that are the "path" within the file.
-          if (DEBUG) {
-            console.log(chalk.yellow("Found h2 -> h5 with no tags."));
-            console.log(JSON.stringify(rec, null, 2));
-          }
+        // The h2 -> h5 should have a set of tags that are the "path" within the file.
+        if (DEBUG && rec.level > 1 && rec.level < 6 && rec.hierarchy.length == 0) {
+          console.log(chalk.yellow("Found h2 -> h5 with no tags."));
+          console.log(JSON.stringify(rec, null, 2));
         }
       }
     }
