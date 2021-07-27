@@ -32,6 +32,7 @@ components: sinks: loki: {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                1

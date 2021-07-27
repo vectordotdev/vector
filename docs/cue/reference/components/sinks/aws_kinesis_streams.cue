@@ -15,6 +15,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 	features: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
+		proxy: enabled:       true
 		send: {
 			batch: {
 				enabled:      true

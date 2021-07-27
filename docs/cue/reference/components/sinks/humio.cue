@@ -50,6 +50,7 @@ components: sinks: _humio: {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                10

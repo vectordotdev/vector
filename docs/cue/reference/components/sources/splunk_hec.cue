@@ -32,6 +32,8 @@ components: sources: splunk_hec: {
 				}
 			}
 
+			proxy: enabled: true
+
 			tls: {
 				enabled:                true
 				can_enable:             true

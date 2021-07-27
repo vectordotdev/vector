@@ -279,6 +279,10 @@ components: {
 		runtime: #Runtime
 	}
 
+	#FeaturesProxy: {
+		enabled: bool
+	}
+
 	#FeaturesReceive: {
 		from?: {
 			service:    #Service
@@ -685,7 +689,7 @@ components: {
 
 			_proxy: {
 				common:	     false
-				description: "Configures the proxy."
+				description: "Configures an HTTP(S) proxy for Vector to use."
 				required:    false
 				type: object: options: {
 					enabled: {
@@ -694,7 +698,7 @@ components: {
 						type: bool: default: true
 					}
 					http: {
-						description: "Http proxy url."
+						description: "The URL to proxy HTTP requests through."
 						required:    false
 						type: string: {
 							examples: ["http://foo.bar:3128"]
@@ -702,7 +706,7 @@ components: {
 						}
 					}
 					https: {
-						description: "Https proxy url."
+						description: "The URL to proxy HTTPS requests through."
 						required:    false
 						type: string: {
 							examples: ["http://foo.bar:3128"]

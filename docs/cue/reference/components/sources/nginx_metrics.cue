@@ -30,6 +30,7 @@ components: sources: nginx_metrics: {
 					}
 				}
 			}
+			proxy: enabled: true
 		}
 		multiline: enabled: false
 	}
@@ -96,7 +97,6 @@ components: sources: nginx_metrics: {
 			password_example: "${HTTP_PASSWORD}"
 			username_example: "${HTTP_USERNAME}"
 		}}
-		proxy: configuration._proxy
 	}
 
 	how_it_works: {

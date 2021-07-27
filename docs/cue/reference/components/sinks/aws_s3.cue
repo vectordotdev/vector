@@ -36,6 +36,7 @@ components: sinks: aws_s3: components._aws & {
 					enum: ["ndjson", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                50

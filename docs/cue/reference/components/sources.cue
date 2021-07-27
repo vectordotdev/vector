@@ -94,6 +94,12 @@ components: sources: [Name=string]: {
 		}
 
 		if features.collect != _|_ {
+			if features.collect.proxy != _|_ {
+				if features.collect.proxy.enabled {
+					proxy: configuration._proxy
+				}
+			}
+
 			if features.collect.tls != _|_ {
 				if features.collect.tls.enabled {
 					tls: configuration._tls_connect & {_args: {
@@ -107,6 +113,12 @@ components: sources: [Name=string]: {
 		}
 
 		if features.receive != _|_ {
+			if features.receive.proxy != _|_ {
+				if features.receive.proxy.enabled {
+					proxy: configuration._proxy
+				}
+			}
+
 			if features.receive.receive_buffer_size != _|_ {
 				send_buffer_bytes: {
 					common:      false
