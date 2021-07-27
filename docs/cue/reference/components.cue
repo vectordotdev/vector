@@ -362,8 +362,8 @@ components: {
 			if enabled {
 				adaptive_concurrency:       bool | *false
 				concurrency:                uint64
-				rate_limit_duration_secs:   uint64 | *1
-				rate_limit_num:             uint64 | *5
+				rate_limit_duration_secs:   uint64 | *86400
+				rate_limit_num:             uint64 | *9223372036854775807
 				retry_initial_backoff_secs: uint64 | *1
 				retry_max_duration_secs:    uint64 | *3600
 				timeout_secs:               uint64 | *60
