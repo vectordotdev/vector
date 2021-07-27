@@ -23,3 +23,6 @@ indent_size = 4
 [*.cue]
 indent_style = tab
 indent_size = 4
+
+[*.svg]
+insert_final_newline = false

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
@@ -16,6 +16,15 @@ use tokio_stream::wrappers::IntervalStream;
 pub struct InternalMetricsConfig {
     #[derivative(Default(value = "2"))]
     scrape_interval_secs: u64,
+    tags: TagsConfig,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+#[derivative(Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct TagsConfig {
+    host_key: Option<String>,
+    pid_key: Option<String>,
 }
 
 inventory::submit! {
@@ -34,7 +43,21 @@ impl SourceConfig for InternalMetricsConfig {
             );
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
+        let host_key = self.tags.host_key.as_deref().and_then(|tag| {
+            if tag.is_empty() {
+                None
+            } else {
+                Some(log_schema().host_key())
+            }
+        });
+        let pid_key =
+            self.tags
+                .pid_key
+                .as_deref()
+                .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
         Ok(Box::pin(run(
+            host_key,
+            pid_key,
             get_controller()?,
             interval,
             cx.out,
@@ -52,6 +75,8 @@ impl SourceConfig for InternalMetricsConfig {
 }
 
 async fn run(
+    host_key: Option<&str>,
+    pid_key: Option<&str>,
     controller: &Controller,
     interval: time::Duration,
     out: Pipeline,
@@ -63,15 +88,21 @@ async fn run(
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
         let hostname = crate::get_hostname();
+        let pid = std::process::id().to_string();
 
         let metrics = capture_metrics(controller);
 
-        out.send_all(&mut stream::iter(metrics.map(|mut metric| {
-            if let Ok(hostname) = &hostname {
-                metric.insert_tag("host".into(), hostname.into());
+        out.send_all(&mut stream::iter(metrics).map(|mut metric| {
+            if let Some(host_key) = host_key {
+                if let Ok(hostname) = &hostname {
+                    metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                }
+            }
+            if let Some(pid_key) = pid_key {
+                metric.insert_tag(pid_key.to_owned(), pid.clone());
             }
             Ok(metric.into())
-        })))
+        }))
         .await?;
     }
 

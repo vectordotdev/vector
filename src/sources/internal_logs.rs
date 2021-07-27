@@ -1,5 +1,6 @@
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
     shutdown::ShutdownSignal,
     trace, Pipeline,
 };
@@ -9,7 +10,10 @@ use tokio::sync::broadcast::error::RecvError;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct InternalLogsConfig {}
+pub struct InternalLogsConfig {
+    host_key: Option<String>,
+    pid_key: Option<String>,
+}
 
 inventory::submit! {
     SourceDescription::new::<InternalLogsConfig>("internal_logs")
@@ -21,7 +25,14 @@ impl_generate_config_from_default!(InternalLogsConfig);
 #[typetag::serde(name = "internal_logs")]
 impl SourceConfig for InternalLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        Ok(Box::pin(run(cx.out, cx.shutdown)))
+        let host_key = self
+            .host_key
+            .as_deref()
+            .unwrap_or_else(|| log_schema().host_key())
+            .to_owned();
+        let pid_key = self.pid_key.as_deref().unwrap_or("pid").to_owned();
+
+        Ok(Box::pin(run(host_key, pid_key, cx.out, cx.shutdown)))
     }
 
     fn output_type(&self) -> DataType {
@@ -33,13 +44,27 @@ impl SourceConfig for InternalLogsConfig {
     }
 }
 
-async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
+async fn run(
+    host_key: String,
+    pid_key: String,
+    out: Pipeline,
+    mut shutdown: ShutdownSignal,
+) -> Result<(), ()> {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
     let subscription = trace::subscribe();
     let mut rx = subscription.receiver;
 
-    out.send_all(&mut stream::iter(subscription.buffer).map(Ok))
-        .await?;
+    let hostname = crate::get_hostname();
+    let pid = std::process::id();
+
+    out.send_all(&mut stream::iter(subscription.buffer).map(|mut log| {
+        if let Ok(hostname) = &hostname {
+            log.insert(host_key.clone(), hostname.to_owned());
+        }
+        log.insert(pid_key.clone(), pid);
+        Ok(Event::from(log))
+    }))
+    .await?;
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
@@ -48,7 +73,7 @@ async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
         tokio::select! {
             receive = rx.recv() => {
                 match receive {
-                    Ok(event) => out.send(event).await?,
+                    Ok(event) => out.send(Event::from(event)).await?,
                     Err(RecvError::Lagged(_)) => (),
                     Err(RecvError::Closed) => break,
                 }
@@ -114,7 +139,7 @@ mod tests {
     async fn start_source() -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
 
-        let source = InternalLogsConfig {}
+        let source = InternalLogsConfig::default()
             .build(SourceContext::new_test(tx))
             .await
             .unwrap();

@@ -72,7 +72,7 @@ mod json_parser;
 mod kafka;
 #[cfg(feature = "transforms-key_value_parser")]
 mod key_value_parser;
-#[cfg(feature = "sources-kubernetes-logs")]
+#[cfg(feature = "sources-kubernetes_logs")]
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
@@ -184,7 +184,7 @@ pub use self::eventstoredb_metrics::*;
 pub use self::exec::*;
 #[cfg(any(
     feature = "sources-file",
-    feature = "sources-kubernetes-logs",
+    feature = "sources-kubernetes_logs",
     feature = "sinks-file",
 ))]
 pub use self::file::*;
@@ -211,7 +211,7 @@ pub(crate) use self::json_parser::*;
 pub use self::kafka::*;
 #[cfg(feature = "transforms-key_value_parser")]
 pub(crate) use self::key_value_parser::*;
-#[cfg(feature = "sources-kubernetes-logs")]
+#[cfg(feature = "sources-kubernetes_logs")]
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
@@ -296,7 +296,7 @@ macro_rules! emit {
 // Modules that require emit! macro so they need to be defined after the macro.
 #[cfg(any(
     feature = "sources-file",
-    feature = "sources-kubernetes-logs",
+    feature = "sources-kubernetes_logs",
     feature = "sinks-file",
 ))]
 mod file;

@@ -101,6 +101,7 @@ impl Application {
         let rt = {
             runtime::Builder::new_multi_thread()
                 .enable_all()
+                .thread_name("vector-worker")
                 .build()
                 .expect("Unable to create async runtime")
         };
