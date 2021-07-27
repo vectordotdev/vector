@@ -172,7 +172,8 @@ _TODO_
 
 ## Drawbacks
 
-_TODO_
+- Why should we not do this?
+- What kind on ongoing burden does this place on the team?
 
 ## Alternatives
 
@@ -196,6 +197,8 @@ vector --pipeline-dir /foo/bar/pipelines
 
 ## Plan Of Attack
 
+- [ ] Add pipeline resource structure
 - [ ] Create the Pipeline structure and parse a pipeline's configuration file
+- [ ] Update topology with pipeline's components
 - [ ] Update the context for taking pipeline informations
 
