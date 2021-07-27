@@ -37,13 +37,16 @@ impl NoProxyInterceptor {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(default)]
 pub struct ProxyConfig {
     #[serde(
         default = "ProxyConfig::default_enabled",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub enabled: bool,
+    #[serde(default)]
     pub http: Option<String>,
+    #[serde(default)]
     pub https: Option<String>,
     #[serde(
         default,
