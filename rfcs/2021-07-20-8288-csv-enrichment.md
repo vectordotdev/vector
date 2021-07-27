@@ -60,8 +60,8 @@ The delimeter used in the csv file to separate fields. Defaults to `","`.
 
 *title_row*
 
-Defaults to true. If set, it assumes the first row in the csv file contains 
-column names. If false, columns are named according to their numerical index.
+If true, it assumes the first row in the csv file contains column names. If
+false, columns are named according to their numerical index.
 
 Note, this is likely to be where any encryption parameters such as the key are 
 specified when it comes time to implementing encryption.
@@ -76,6 +76,9 @@ from some sort of shared company "resource" that end users will likely not have
 access to. Admin will likely want to restrict access to resources to approved 
 pipelines, especially if sensitive information is contained.
 
+The resources will need to be integrated with `vector validate`, which would
+ensure the resource exists and is correctly formatted.
+
 ### Vrl functions
 
 Two remap functions:
@@ -85,11 +88,15 @@ Two remap functions:
 This function will look up a single row within the dataset. If a single row is 
 found that data is returned as an object, otherwise this function will error. 
 
+A metric will be emitted to indicate the lookup time.
+
 #### `search_rows` 
 
 This function returns the results as an array of objects. If no row is found an
 empty array is returned. Multiple results just result in multiple rows in the 
 array.
+
+A metric will be emitted to indicate the lookup time.
 
 #### Parameters 
 
