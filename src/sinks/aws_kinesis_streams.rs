@@ -13,7 +13,6 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
 use rand::random;
 use rusoto_core::RusotoError;
 use rusoto_kinesis::{
@@ -54,13 +53,6 @@ pub struct KinesisSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        timeout_secs: Some(30),
-        ..Default::default()
-    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -152,7 +144,11 @@ impl KinesisService {
             .events(500)
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            timeout_secs: Some(30),
+            ..Default::default()
+        });
+
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
 

@@ -20,7 +20,6 @@ use crate::{
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -55,13 +54,6 @@ struct InfluxDbLogsSink {
     namespace: String,
     tags: HashSet<String>,
     encoding: EncodingConfig<Encoding>,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        retry_attempts: Some(5),
-        ..Default::default()
-    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -106,7 +98,10 @@ impl SinkConfig for InfluxDbLogsConfig {
             .bytes(bytesize::mib(1u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            retry_attempts: Some(5),
+            ..Default::default()
+        });
 
         let settings = influxdb_settings(
             self.influxdb1_settings.clone(),

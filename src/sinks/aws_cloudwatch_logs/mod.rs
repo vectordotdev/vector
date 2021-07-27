@@ -16,7 +16,6 @@ use crate::{
 };
 use chrono::{Duration, Utc};
 use futures::{future::BoxFuture, ready, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
@@ -106,12 +105,6 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
     }
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig<Option<usize>> = TowerRequestConfig {
-        ..Default::default()
-    };
-}
-
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,
     stream_name: String,
@@ -183,7 +176,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             .events(10_000)
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
@@ -220,7 +213,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
 impl CloudwatchLogsPartitionSvc {
     pub fn new(config: CloudwatchLogsSinkConfig, client: CloudWatchLogsClient) -> Self {
-        let request_settings = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request_settings = config.request.unwrap_with(&TowerRequestConfig::default());
 
         Self {
             config,

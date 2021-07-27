@@ -12,7 +12,6 @@ use crate::{
     template::{Template, TemplateParseError},
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
     GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
@@ -65,13 +64,6 @@ pub struct SqsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        timeout_secs: Some(30),
-        ..Default::default()
-    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -152,7 +144,10 @@ impl SqsSink {
         // Up to 10 events, not more than 256KB as total size.
         let batch = BatchSettings::default().events(1).bytes(262_144);
 
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            timeout_secs: Some(30),
+            ..Default::default()
+        });
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
         let message_group_id = match (config.message_group_id, fifo) {
