@@ -37,8 +37,6 @@ impl TransformConfig for CompoundConfig {
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         if !self.nested.is_empty() {
-            // Expand transform into a sequence of transforms
-            debug!("{:?}", self.nested);
             Ok(Some((self.nested.clone(), ExpandType::Serial)))
         } else {
             Err("must specify at least one transform".into())
@@ -57,3 +55,60 @@ impl TransformConfig for CompoundConfig {
         "compound"
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::CompoundConfig>();
+    }
+
+  /*  #[test]
+    fn alias_works() {
+        toml::from_str::<RouteConfig>(
+            r#"
+            lanes.first.type = "check_fields"
+            lanes.first."message.eq" = "foo"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn can_serialize_remap() {
+        // We need to serialize the config to check if a config has
+        // changed when reloading.
+        let config = LaneConfig {
+            condition: AnyCondition::String("foo".to_string()),
+        };
+
+        assert_eq!(
+            serde_json::to_string(&config).unwrap(),
+            r#"{"condition":"foo"}"#
+        );
+    }
+
+    #[test]
+    fn can_serialize_check_fields() {
+        // We need to serialize the config to check if a config has
+        // changed when reloading.
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            lanes.first.type = "check_fields"
+            lanes.first."message.eq" = "foo"
+        "#,
+        )
+        .unwrap()
+        .expand()
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            serde_json::to_string(&config).unwrap(),
+            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},"Parallel"]"#
+        );
+    }*/
+}
+
