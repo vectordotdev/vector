@@ -82,7 +82,7 @@ pub(super) fn expand_macros(
                         expanded_transforms.insert(
                             full_name.clone(),
                             TransformOuter {
-                                inputs: inputs,
+                                inputs,
                                 inner: child,
                             },
                         );
