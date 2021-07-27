@@ -71,7 +71,7 @@ pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
     #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
     pub in_flight_limit: T, // 1024
     pub timeout_secs: Option<u64>,             // 60
-    pub rate_limit_duration_secs: Option<u64>, // 1 day
+    pub rate_limit_duration_secs: Option<u64>, // 1 minute
     pub rate_limit_num: Option<u64>,           // i64::MAX
     pub retry_attempts: Option<usize>,         // isize::MAX
     pub retry_max_duration_secs: Option<u64>,
@@ -80,7 +80,7 @@ pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
-pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 86_400; // one day, combined with RATE_LIMIT_NUM_DEFAULT means 2*10^13 requests per day
+pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 60; // one minute
 pub const RATE_LIMIT_NUM_DEFAULT: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
 pub const RETRY_ATTEMPTS_DEFAULT: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
 pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600; // one hour
