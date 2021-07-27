@@ -16,7 +16,7 @@ impl ConcurrencyOption for Option<usize> {
             None => *default,
             Some(x) => Some(*x),
         };
-        limit.or(Some(5))
+        limit.or(Some(1024))
     }
 
     fn is_none(&self) -> bool {
