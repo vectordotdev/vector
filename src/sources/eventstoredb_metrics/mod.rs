@@ -49,11 +49,12 @@ impl_generate_config_from_default!(EventStoreDbConfig);
 #[typetag::serde(name = "eventstoredb_metrics")]
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         eventstoredb(
             self.endpoint.as_str(),
             self.scrape_interval_secs,
             self.default_namespace.clone(),
-            cx.globals.proxy.build(&self.proxy),
+            proxy,
             cx,
         )
     }

@@ -126,7 +126,7 @@ impl GenerateConfig for HttpSinkConfig {
 
 impl HttpSinkConfig {
     fn build_proxy_config(&self, cx: &SinkContext) -> ProxyConfig {
-        cx.globals.proxy.build(&self.proxy)
+        ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy)
     }
 
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {

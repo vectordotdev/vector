@@ -79,11 +79,12 @@ impl SourceConfig for PrometheusScrapeConfig {
             .map(|s| s.parse::<http::Uri>().context(sources::UriParseError))
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         Ok(prometheus(
             urls,
             tls,
             self.auth.clone(),
-            cx.globals.proxy.build(&self.proxy),
+            proxy,
             self.scrape_interval_secs,
             cx.shutdown,
             cx.out,

@@ -76,6 +76,7 @@ impl SourceConfig for ApacheMetricsConfig {
             .context(super::UriParseError)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
 
         Ok(apache_metrics(
             urls,
@@ -83,7 +84,7 @@ impl SourceConfig for ApacheMetricsConfig {
             namespace,
             cx.shutdown,
             cx.out,
-            cx.globals.proxy.build(&self.proxy),
+            proxy,
         ))
     }
 

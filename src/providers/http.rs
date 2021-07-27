@@ -173,7 +173,7 @@ impl ProviderConfig for HttpConfig {
         let poll_interval_secs = self.poll_interval_secs;
         let request = self.request.clone();
 
-        let proxy = ProxyConfig::from_env().build(&self.proxy);
+        let proxy = ProxyConfig::from_env().merge(&self.proxy);
         let config_builder =
             http_request_to_config_builder(&url, &tls_options, &request.headers, &proxy).await?;
 

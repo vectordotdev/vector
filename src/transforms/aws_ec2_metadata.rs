@@ -115,7 +115,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -145,7 +145,8 @@ impl TransformConfig for Ec2Metadata {
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let http_client = HttpClient::new(None, &self.proxy)?;
+        let proxy = ProxyConfig::merge_with_env(&globals.proxy, &self.proxy);
+        let http_client = HttpClient::new(None, &proxy)?;
 
         let mut client =
             MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);

@@ -66,7 +66,7 @@ impl SinkConfig for HoneycombConfig {
             .timeout(1)
             .parse_config(self.batch)?;
 
-        let proxy = cx.globals.proxy.build(&self.proxy);
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         let client = HttpClient::new(None, &proxy)?;
 
         let sink = BatchedHttpSink::new(

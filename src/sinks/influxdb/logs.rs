@@ -106,7 +106,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         tags.insert(log_schema().source_type_key().to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let proxy = cx.globals.proxy.build(&self.proxy);
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         let client = HttpClient::new(tls_settings, &proxy)?;
         let healthcheck = self.healthcheck(client.clone())?;
 

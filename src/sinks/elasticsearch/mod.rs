@@ -376,7 +376,7 @@ impl SinkConfig for ElasticSearchConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(self)?;
-        let proxy = cx.globals.proxy.build(&self.proxy);
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         let client = HttpClient::new(common.tls_settings.clone(), &proxy)?;
 
         let healthcheck = common.healthcheck(client.clone()).boxed();

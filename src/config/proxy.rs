@@ -68,13 +68,6 @@ impl ProxyConfig {
         true
     }
 
-    fn disabled() -> Self {
-        Self {
-            enabled: false,
-            ..Default::default()
-        }
-    }
-
     pub fn from_env() -> Self {
         Self {
             enabled: true,
@@ -84,31 +77,27 @@ impl ProxyConfig {
         }
     }
 
+    pub fn merge_with_env(global: &Self, component: &Self) -> Self {
+        Self::from_env().merge(&global.merge(component))
+    }
+
     fn interceptor(&self) -> NoProxyInterceptor {
         NoProxyInterceptor(self.no_proxy.clone())
     }
 
-    fn merge(&self, other: &Self) -> Self {
-        if !other.enabled {
-            return Self::disabled();
-        }
+    // overrides current proxy configuration with other configuration
+    // if `self` is the global config and `other` the component config,
+    // if both have the `http` proxy set, the one from `other` should be kept
+    pub fn merge(&self, other: &Self) -> Self {
         let mut no_proxy = other.no_proxy.clone();
         no_proxy.extend(self.no_proxy.clone());
 
         Self {
-            enabled: self.enabled,
+            enabled: self.enabled && other.enabled,
             http: other.http.clone().or_else(|| self.http.clone()),
             https: other.https.clone().or_else(|| self.https.clone()),
             no_proxy,
         }
-    }
-
-    pub fn build(&self, other: &Self) -> Self {
-        // in order, we take first the environment variable,
-        // the the global variables and then the service config
-        let res = Self::from_env();
-        let res = res.merge(&self);
-        res.merge(other)
     }
 
     fn http_intercept(&self) -> Intercept {
@@ -220,36 +209,24 @@ mod tests {
         };
         let _http = TempEnvVar::new("HTTP_PROXY").with("http://remote.proxy");
         let _https = TempEnvVar::new("HTTPS_PROXY");
-        let result = global_proxy.build(&component_proxy);
+        let result = ProxyConfig::merge_with_env(&global_proxy, &component_proxy);
 
         assert_eq!(result.http, Some("http://1.2.3.4:5678".into()));
         assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
 
-        // with the global proxy disabled
+        // with the component proxy disabled
         let global_proxy = ProxyConfig {
-            enabled: false,
-            ..Default::default()
-        };
-        let component_proxy = ProxyConfig {
             https: Some("https://2.3.4.5:9876".into()),
             ..Default::default()
         };
-        let result = global_proxy.build(&component_proxy);
-
-        assert!(result.http.is_none());
-        assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
-
-        // with the component proxy disabled
-        let global_proxy = ProxyConfig {
-            http: Some("http://1.2.3.4:5678".into()),
-            ..Default::default()
-        };
         let component_proxy = ProxyConfig {
             enabled: false,
             ..Default::default()
         };
-        let result = global_proxy.build(&component_proxy);
+        let result = ProxyConfig::merge_with_env(&global_proxy, &component_proxy);
 
-        assert_eq!(result, ProxyConfig::disabled());
+        assert!(!result.enabled);
+        assert_eq!(result.http, Some("http://remote.proxy".into()));
+        assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
     }
 }

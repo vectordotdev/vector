@@ -90,7 +90,7 @@ impl SinkConfig for LogdnaConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let proxy = cx.globals.proxy.build(&self.proxy);
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         let client = HttpClient::new(None, &proxy)?;
 
         let sink = PartitionHttpSink::new(

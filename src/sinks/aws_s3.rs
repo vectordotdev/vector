@@ -172,7 +172,7 @@ impl SinkConfig for S3SinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client()?;
+        let client = self.create_client(&cx.globals.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
@@ -268,9 +268,10 @@ impl S3SinkConfig {
         }
     }
 
-    pub fn create_client(&self) -> crate::Result<S3Client> {
+    pub fn create_client(&self, global_proxy: &ProxyConfig) -> crate::Result<S3Client> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client(&self.proxy)?;
+        let proxy = ProxyConfig::merge_with_env(&global_proxy, &self.proxy);
+        let client = rusoto::client(&proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
@@ -608,7 +609,7 @@ mod integration_tests {
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 10);
@@ -643,7 +644,7 @@ mod integration_tests {
             ..config(&bucket, 1010)
         };
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
@@ -693,7 +694,7 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 500);
@@ -747,7 +748,7 @@ mod integration_tests {
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 10);
@@ -779,7 +780,7 @@ mod integration_tests {
         // Break the bucket name
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (_lines, events, mut receiver) = make_events_batch(1, 1);
@@ -797,7 +798,7 @@ mod integration_tests {
         create_bucket(&bucket, false).await;
 
         let config = config(&bucket, 1);
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
         config.healthcheck(client).await.unwrap();
     }
 
@@ -805,7 +806,7 @@ mod integration_tests {
     async fn s3_healthchecks_invalid_bucket() {
         let config = config("s3_healthchecks_invalid_bucket", 1);
 
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
         assert_downcast_matches!(
             config.healthcheck(client).await.unwrap_err(),
             HealthcheckError,

@@ -87,7 +87,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
-        let proxy = cx.globals.proxy.build(&self.proxy);
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(tls, &proxy)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());

@@ -119,7 +119,7 @@ impl SinkConfig for LokiConfig {
             .timeout(1)
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let proxy = cx.globals.proxy.build(&self.proxy);
+        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         let client = HttpClient::new(tls, &proxy)?;
 
         let config = LokiConfig {
