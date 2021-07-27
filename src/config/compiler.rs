@@ -60,36 +60,22 @@ pub(super) fn expand_macros(
             }
         } {
             let mut children = Vec::new();
+            let mut inputs = t.inputs.clone();
 
-            match expand_type {
-                ExpandType::Parallel => {
-                    for (name, child) in expanded {
-                        let full_name = format!("{}.{}", k, name);
-                        expanded_transforms.insert(
-                            full_name.clone(),
-                            TransformOuter {
-                                inputs: t.inputs.clone(),
-                                inner: child,
-                            },
-                        );
-                        children.push(full_name);
-                    }
-                }
-                ExpandType::Serial => {
-                    let mut inputs = t.inputs.clone();
-                    for (name, child) in expanded {
-                        let full_name = format!("{}.{}", k, name);
-                        expanded_transforms.insert(
-                            full_name.clone(),
-                            TransformOuter {
-                                inputs,
-                                inner: child,
-                            },
-                        );
-                        children.push(full_name.clone());
-                        // next tranforms will read from this one
-                        inputs = vec![full_name]
-                    }
+            for (name, child) in expanded {
+                let full_name = format!("{}.{}", k, name);
+
+                expanded_transforms.insert(
+                    full_name.clone(),
+                    TransformOuter {
+                        inputs,
+                        inner: child,
+                    },
+                );
+                children.push(full_name.clone());
+                inputs = match expand_type {
+                    ExpandType::Parallel => t.inputs.clone(),
+                    ExpandType::Serial => vec![full_name],
                 }
             }
             expansions.insert(k.clone(), children);
