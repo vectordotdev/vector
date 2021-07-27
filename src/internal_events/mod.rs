@@ -278,6 +278,7 @@ macro_rules! emit {
     feature = "sinks-file",
 ))]
 mod file;
+pub mod moogsoft_provider;
 mod windows;
 
 const ELLIPSIS: &str = "[...]";
