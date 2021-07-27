@@ -19,12 +19,24 @@ This RFC will not cover:
 - Pipeline quotas - The ability to limit how much data a pipeline can send to a sink.
 
 
+## Pain
+
+- The only possibility to reuse the same set of transform between multiple configuration file is by duplicating them.
+- If an admin wants to split responsibilities between `ops` and `devs` by only allowing the `ops` to deal with `sources/sinks` and the `devs`, it's currently not possible.
+
+## User Experience
+
+```c
+// Explain your change as if you were describing it to a Vector user. We should be able to share this section with a Vector user to solicit feedback.
+```
+
+
 ## Motivation
 
 - Helps Vector to grow organically within an organization by allowing teams to adopt Vector at their own pace without heavy administrator involvement.
 - Reduces the management overhead of devops/SREs by enabling teams to manage their own pipelines (spread the management load).
 
-## Internal Proposal
+## Implementation
 
 ### How and where the pipelines are stored
 
@@ -32,19 +44,35 @@ To avoid backward incompatibility, pipelines will be loaded from a `pipelines` s
 The `pipelines` directory will contain all pipelines represented as individual files. For simplicity, and to ensure users do not over complicate pipeline management, sub-directories/nesting are not allowed. This is inspired by Terraform's single-level directory nesting, which has been a net positive for simple management of large Terraform projects.
 Each pipeline file is a processing subset of a larger Vector configuration file. Therefore, it follows the same syntax as Vector's configuration (`toml`, `yaml`, and `json`).
 
+### Configuration
 
-### How vector reads the pipelines and what are the limits
+Each time Vector will read its configuration file (on boot and when it live reloads), it will read the referring pipeline configuration files and associate an `id` attribute corresponding to the pipeline's filename.
 
-Each time Vector will read its configuration file (on boot and when it live reloads), it will read the pipeline configuration files beforehand and associate an `id` attribute corresponding to the pipeline's filename.
-A `load-balancer.yml` will have `load-balancer` as `id`. In the pipeline's configuration file, the `id` can be set manually to override this behavior.
+A pipeline can be referenced in a configuration file as follows
+
+```toml
+# vector.toml
+[resources.pipeline_id]
+type = "pipeline"
+filename = "pipeline_id.toml"
+# allow-list of sources/sinks
+allowed = ["in", "out", "blackhole"]
+```
+
+The filename is used to point out the pipeline configuration file in the `pipelines` folder.
+In the pipeline's configuration file, the `id` can be set manually.
+A `load-balancer.yml` will, by default, have `load-balancer` as `id`.
+If the `id` matches the name of the file, the `filename` field can be omitted in the pipeline's declaration.
+
 In addition, a `version` attribute will be set containing the hash of the pipeline's configuration file to keep track of the file changes.
-In case several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector should error.
+If several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector should error.
 
-Those pipeline's configuration files should only contain transforms or vector will error.
-Each of the components in the pipeline configuration can be refered to with the `id` of the pipeline and the component `id` (for example, the transform `foo` in the pipeline `bar` should be set as an input with `foo.bar`).
-A pipeline cannot use a component defined in another pipeline or vector will error.
+The pipeline's configuration files should only contain transforms or vector will error.
+A pipeline cannot use another pipeline or vector will error.
 
-The structure of the pipeline's configuration file should be as follows
+A pipeline has access to all the components from the configuration file but can be restricted by setting the allow-list `allowed`.
+
+The structure of the pipeline's configuration file is as follows
 
 ```toml
 # optional
@@ -62,17 +90,35 @@ inputs = ["load-balancer.first"]
 [transforms.third]
 inputs = ["other-pipeline.bar"]
 ...
+
+[forwards.in-house]
+inputs = ["second"]
+target = "sink-name"
+
+[forwards.outside]
+inputs = ["second"]
+target = "other-name"
 ```
+
+In order to allow the user to specify the targeted sinks by a pipeline, the `forward` component creates a forwarding to the real sinks from the configuration files.
+It also allows the user to use is own aliases and just refer the external sinks in a single place.
 
 Now, if we look deeper at the configuration building process, the configuration compiler will require the pipelines in order to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
 
-To do so, we'll need to implement a `PipelineBuilder` with the following structure
+To do so, we'll need to implement the `Forward` component and a `PipelineBuilder` with the following structures
 
 ```rust
+struct Forward {
+    pub id: String,
+    pub inputs: Vec<String>,
+    pub target: String,
+}
+
 struct PipelineBuilder {
     pub id: String,
     pub version: String,
     pub transforms: IndexMap<String, TransformOuter>,
+    pub forwards: IndexMap<String, Forward>
 }
 ```
 
@@ -84,13 +130,12 @@ fn compile(mut builder: ConfigBuilder, pipelines: Vec<PipelineBuilder>)
 
 in order to build a `Config` containing the required pipeline components.
 
-The components coming from the pipeline would be cloned inside the final `Config`, in the `transforms` `IndexMap`.
-
+The components coming from the pipeline would be cloned inside the final `Config`, in the `transforms` `IndexMap` and the `inputs` from the `Forward` elements will be added to the referring `Sink` input.
 
 ### Observing pipelines
 
 Users should be able to observe and monitor individual pipelines.
-This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag refering to the pipeline `id` and a `pipeline_version` tag refering to the pipeline `version`.
+This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline `id` and a `pipeline_version` tag referring to the pipeline `version`.
 
 In Vector, the `Task` structure is what emits the events for `internal_metrics`.
 After [build the different pieces of the topology](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), we've to update the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L163) in order to accept an `Option<(PipelineId, PipelineVersion)>` so that when it emits the metrics events it can provide the information about the pipeline.
@@ -110,97 +155,15 @@ let span = error_span!(
 );
 ```
 
-## Doc-level Proposal
-
-With this pipeline definition, the following `vector.toml`
-
-```toml
-[sources.docker]
-type = "docker_logs"
-...
-
-[transforms.nginx_filter]
-input = ["docker"]
-type = "remap"
-source = '''
-  # do something that filter nginx logs from docker logs
-'''
-
-[transforms.nginx]
-input = ["nginx_filter"]
-type = "remap"
-source = '''
-  # do some transformations with the nginx logs
-'''
-
-[transforms.apache_filter]
-input = ["docker"]
-type = "remap"
-source = '''
-  # do something that filter apache logs from docker logs
-'''
-
-[transforms.apache]
-input = ["apache_filter"]
-type = "remap"
-source = '''
-  # do some transformations with the apache logs
-'''
-
-[sinks.ouput]
-inputs = ["apache", "nginx"]
-type = "console"
-...
-```
-
-can be split into the following `pipelines/frontend.toml`
-
-```toml
-[transforms.nginx_filter]
-input = ["docker"]
-type = "remap"
-source = '''
-  # do something that filter nginx logs from docker logs
-'''
-
-[transforms.nginx]
-input = ["frontend.nginx_filter"]
-type = "remap"
-source = '''
-  # do some transformations with the nginx logs
-'''
-
-[transforms.apache_filter]
-input = ["docker"]
-type = "remap"
-source = '''
-  # do something that filter apache logs from docker logs
-'''
-
-[transforms.apache]
-input = ["frontend.apache_filter"]
-type = "remap"
-source = '''
-  # do some transformations with the apache logs
-'''
-```
-
-and `vector.toml`
-
-```toml
-[sources.docker]
-type = "docker_logs"
-...
-
-[sinks.ouput]
-inputs = ["frontend.apache", "frontend.nginx"]
-type = "console"
-...
-```
-
 ## Rationale
 
 - This improves the readability of the `vector.toml`.
+- Improves the collaboration between `ops` and `devs` by splitting responsibilities.
+
+
+## Prior Art
+
+_TODO_
 
 ## Drawbacks
 
@@ -224,40 +187,6 @@ This would imply some duplication if a transform is used in multiple configurati
 
 ```bash
 vector --pipeline-dir /foo/bar/pipelines
-```
-
-- Should we have some visibility attributes on the components in different pipelines in order to make them available to other components?
-
-```toml
-id = "pipeline-id"
-
-[transforms.name]
-private = true
-```
-
-- Should we have a main (or default) transform in a pipeline that would allow to use the pipeline's ID as a transform name?
-
-```toml
-# in the pipeline
-id = "pipeline-id"
-
-[transforms.default]
-...
-
-# in the configuration file
-[sinks.out]
-inputs = ["pipeline-id"]
-```
-
-- Should we allow to embed a pipeline configuration in a configuration file?
-
-```toml
-# in /etc/vector/vector.toml
-[[pipelines]]
-id = "first"
-
-[[pipelines]]
-id = "second"
 ```
 
 ## Plan Of Attack
