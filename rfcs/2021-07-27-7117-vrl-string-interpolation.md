@@ -27,7 +27,14 @@ with `{{..}}`. VRL will evaluate the expressions and will call `to_string` on
 that expression to return the text representation.
 
 ```
-l'The message is {{ .message }} created at {{ .timestamp }}'
+i'The message is {{ .message }} created at {{ .timestamp }}'
+```
+
+If you wish to actually insert a `{{` into a string, these characters will need
+to be escaped with a `\`. A single `{` will not need escaping. For example:
+
+```
+i'Here is a curly brace -> { and here are some more -> \{{'
 ```
 
 Since this is a new string type there are no backward compatibility issues.
