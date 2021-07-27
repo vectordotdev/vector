@@ -265,10 +265,12 @@ jobs:
           path: target/artifacts
       - name: First install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
+          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          ./scripts/verify-install.sh
       - name: Second install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
+          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          ./scripts/verify-install.sh
 
   rpm-verify:
     needs:
@@ -298,10 +300,12 @@ jobs:
           path: target/artifacts
       - name: First install of RPM package.
         run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          ./scripts/verify-install.sh
       - name: Second install of RPM package.
         run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          ./scripts/verify-install.sh
 
   osx-verify:
     runs-on: macos-10.15
