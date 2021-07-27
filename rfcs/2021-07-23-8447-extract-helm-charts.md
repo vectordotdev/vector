@@ -68,6 +68,9 @@ The `k8s-test-framework` already contains an `external_chart` method, used for d
 This allows us to update tests that expect Vector's charts to be located in the same repository to instead reference our hosted charts
 at https://packages.timber.io/helm.
 
+Issues directly related to Vector's Helm charts (or the resources generated from them) will be maintained in the `timberio/helm-charts`
+repository. Existing issues will be migrated as needed.
+
 ## Rationale
 
 This change aligns us with standard tooling and practices in the Helm community, not to mention DataDog's existing workflows. The
@@ -117,3 +120,4 @@ shouldn't block any such migration it also doesn't inherently support it.
 - [ ] Create `timberio/helm-charts` repository, copying charts from `distribution/helm` and configuring CI for testing and release
 - [ ] PR `timberio/vector` to no longer require our charts to be local and remove `distribution/helm` directory
 - [ ] Migrate any integration tests that are _only_ testing configuration into the new `timberio/helm-charts` repository
+- [ ] Review existing issues related to the Helm charts, migrate what's still needed and close what isn't
