@@ -40,7 +40,7 @@ favicon = "favicon.ico"
 # state persisted in localStorage. You should do that whenever there's some change in the front-end logic that requires
 # wiping out the user's localStorage, for example a new news banner that we want to show. Think of it as cache
 # invalidation that we control.
-site_generation = 1
+site_generation = 2
 
 # Search
 [params.search]
