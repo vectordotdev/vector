@@ -102,7 +102,7 @@ digraph {
 To render this, if you have [Graphviz] installed, you could do:
 
 ```shell
-vector graph --config vector.toml | dot -Tsvg > graph.png
+vector graph --config vector.toml | dot -Tpng > graph.png
 ```
 
 To get an image that looks like:
