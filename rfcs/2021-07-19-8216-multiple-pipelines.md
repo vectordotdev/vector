@@ -18,7 +18,6 @@ This RFC will not cover:
 - Component reuse - The ability to define boilerplate for reuse across many different pipelines. This will likely align with Datadog’s “pipeline catalogue”.
 - Pipeline quotas - The ability to limit how much data a pipeline can send to a sink.
 
-
 ## Pain
 
 - The only possibility to reuse the same set of transform between multiple configuration file is by duplicating them.
@@ -29,7 +28,6 @@ This RFC will not cover:
 ```c
 // Explain your change as if you were describing it to a Vector user. We should be able to share this section with a Vector user to solicit feedback.
 ```
-
 
 ## Motivation
 
@@ -157,8 +155,15 @@ let span = error_span!(
 
 ## Rationale
 
-- This improves the readability of the `vector.toml`.
-- Improves the collaboration between `ops` and `devs` by splitting responsibilities.
+- Why is this change worth it?
+
+This split improves the readability of the configuration files and allows the users to collaborate, which makes using Vector more user friendly.
+
+- What is the impact of not doing this?
+
+This would force the users to keep having complex configuration files and/or to duplicate components configuration between their configuration files.
+
+- How does this position us for success in the future?
 
 
 ## Prior Art
