@@ -2,11 +2,18 @@
 
 One paragraph description of the change.
 
+## Context
+
+- Link to any previous RFCs for additional context (do not repeat here).
+- Link to any ongoing or future changes that'll be affected by this change (cross cutting concerns).
+
 ## Scope
 
-- Address both *in* and *out* of scope.
-- Use out of scope to acknowledge future changes, cut scope, keep your change minimal, and keep the discussion focused.
-- Link to any previous RFCs for additional context.
+### In scope
+
+### Out of scope
+
+- Acknowledge future changes, cut scope, keep your change minimal, and keep the discussion focused.
 
 ## Pain
 
