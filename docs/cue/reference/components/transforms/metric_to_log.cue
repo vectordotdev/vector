@@ -65,11 +65,11 @@ components: transforms: metric_to_log: {
 	examples: [
 		{
 			title: "Metric To Log"
-			configuration: #"""
-				[transforms.metric_to_log]
-				type = "metric_to_log"
-				host_tag = "host"
-				"""#
+
+			configuration: {
+				host_tag: "host"
+			}
+
 			input: metric: {
 				kind:      "absolute"
 				name:      "histogram"
