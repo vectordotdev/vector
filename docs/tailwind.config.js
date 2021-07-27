@@ -8,8 +8,6 @@ module.exports = {
     // Non-default theming
     extend: {
       backgroundImage: {
-        // Custom
-        'home-hero': "url('/img/hero-hex.svg')",
         // Built in
         none: 'none',
         'gradient-to-t': 'linear-gradient(to top, var(--tw-gradient-stops))',

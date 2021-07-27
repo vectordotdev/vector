@@ -206,13 +206,15 @@ components: transforms: reduce: {
 					}
 				},
 			]
-			configuration: #"""
-				[transforms.reduce]
-				type = "reduce"
-				group_by = ["host", "pid", "tid"]
-				marge_strategies.message = "concat_newline"
-				starts_when = 'match(.message, /^[^\s]/)'
-				"""#
+
+			configuration: {
+				group_by: ["host", "pid", "tid"]
+				merge_strategies: {
+					message: "concat_newline"
+				}
+				starts_when: #"match(.message, /^[^\s]/)"#
+			}
+
 			output: [
 				{
 					log: {
@@ -241,10 +243,9 @@ components: transforms: reduce: {
 		},
 		{
 			title: "Reduce Rails logs into a single transaction"
-			configuration: #"""
-				[transforms.reduce]
-				type = "reduce"
-				"""#
+
+			configuration: {}
+
 			input: [
 				{log: {timestamp: "2020-10-07T12:33:21.223543Z", message: "Received GET /path", request_id:                     "abcd1234", request_path:    "/path", request_params: {"key":          "val"}}},
 				{log: {timestamp: "2020-10-07T12:33:21.832345Z", message: "Executed query in 5.2ms", request_id:                "abcd1234", query:           "SELECT * FROM table", query_duration_ms: 5.2}},
