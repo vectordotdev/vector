@@ -1,7 +1,7 @@
 package metadata
 
 administration: {
-	downloads:         _
-	roles:             _
-	topologies:        _
+	downloads:  _
+	roles:      _
+	topologies: _
 }

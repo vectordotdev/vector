@@ -85,8 +85,8 @@ components: transforms: route: {
 			configuration: {
 				route: {
 					debug: #".level == "debug""#
-					info: #".level == "info""#
-					warn: #".level == "warn""#
+					info:  #".level == "info""#
+					warn:  #".level == "warn""#
 					error: #".level == "error""#
 				}
 			}
@@ -103,7 +103,7 @@ components: transforms: route: {
 
 			configuration: {
 				route: {
-					app: #".namespace == "app""#
+					app:  #".namespace == "app""#
 					host: #".namespace == "host""#
 				}
 			}
