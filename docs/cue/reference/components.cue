@@ -716,9 +716,12 @@ components: {
 					no_proxy: {
 						description: "List of url skipping the proxy configuration."
 						required:    false
-						type: string: {
-							examples: ["localhost,.foo.bar", "*"]
-							syntax: "literal"
+						type: array: {
+							default: null
+							items: type: string: {
+								examples: ["localhost", ".foo.bar", "*"]
+								syntax: "literal"
+							}
 						}
 					}
 				}

@@ -14,7 +14,8 @@ use crate::kubernetes as k8s;
 use crate::kubernetes::hash_value::HashKey;
 use crate::{
     config::{
-        DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext, SourceDescription,
+        DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig, SourceContext,
+        SourceDescription,
     },
     shutdown::ShutdownSignal,
     sources,
@@ -205,10 +206,11 @@ impl Source {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);
 
-        let k8s_config = match &config.kube_config_file {
+        let mut k8s_config = match &config.kube_config_file {
             Some(kc) => k8s::client::config::Config::kubeconfig(kc)?,
             None => k8s::client::config::Config::in_cluster()?,
         };
+        k8s_config.proxy = ProxyConfig::merge_with_env(&globals.proxy, &k8s_config.proxy);
         let client = k8s::client::Client::new(k8s_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), name)?;

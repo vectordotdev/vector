@@ -32,8 +32,6 @@ components: sources: aws_kinesis_firehose: {
 				}
 			}
 
-			proxy: enabled: true
-
 			tls: {
 				enabled:                true
 				can_enable:             true

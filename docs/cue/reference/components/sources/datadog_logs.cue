@@ -38,8 +38,6 @@ components: sources: datadog_agent: {
 				}
 			}
 
-			proxy: enabled: true
-
 			tls: {
 				enabled:                true
 				can_enable:             true

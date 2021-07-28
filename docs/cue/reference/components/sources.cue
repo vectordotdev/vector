@@ -113,12 +113,6 @@ components: sources: [Name=string]: {
 		}
 
 		if features.receive != _|_ {
-			if features.receive.proxy != _|_ {
-				if features.receive.proxy.enabled {
-					proxy: configuration._proxy
-				}
-			}
-
 			if features.receive.receive_buffer_size != _|_ {
 				send_buffer_bytes: {
 					common:      false

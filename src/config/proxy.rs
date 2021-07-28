@@ -29,7 +29,7 @@ impl NoProxyInterceptor {
                 } else {
                     false
                 };
-                // only intercapt those that don't match
+                // only intercept those that don't match
                 !matches
             },
         ))

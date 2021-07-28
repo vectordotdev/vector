@@ -168,10 +168,11 @@ pub enum CloudwatchError {
 }
 
 impl CloudwatchLogsSinkConfig {
-    fn create_client(&self) -> crate::Result<CloudWatchLogsClient> {
+    fn create_client(&self, global_proxy: &ProxyConfig) -> crate::Result<CloudWatchLogsClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(&self.proxy)?;
+        let proxy = ProxyConfig::merge_with_env(&global_proxy, &self.proxy);
+        let client = rusoto::client(&proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -196,7 +197,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
-        let client = self.create_client()?;
+        let client = self.create_client(&cx.globals.proxy)?;
         let svc = ServiceBuilder::new()
             .concurrency_limit(request.concurrency.unwrap())
             .service(CloudwatchLogsPartitionSvc::new(
@@ -803,7 +804,7 @@ mod tests {
             stream: "stream".into(),
             group: "group".into(),
         };
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
         CloudwatchLogsSvc::new(&config, &key, client)
     }
 
@@ -1280,7 +1281,7 @@ mod integration_tests {
             proxy: Default::default(),
         };
 
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&ProxyConfig::default()).unwrap();
         healthcheck(config, client).await.unwrap();
     }
 
