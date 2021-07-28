@@ -36,7 +36,8 @@ To represent the CSV file we have a new top level configuration option.
 
 ```
 [tables.csv_file]
-  type = "csv"
+  type = "file"
+  encoding = "csv"
   path = "\path_to_csv"
   delimiter = ","
 ```
@@ -58,7 +59,7 @@ working directory.
 
 The delimiter used in the csv file to separate fields. Defaults to `","`.
 
-*title_row*
+*header_row*
 
 If true, it assumes the first row in the csv file contains column names. If
 false, columns are named according to their numerical index.
@@ -104,14 +105,6 @@ Two remap functions:
 This function will look up a single row within the table dataset. If a single
 row is found that data is returned as an object, otherwise this function will
 error.
-
-A metric will be emitted to indicate the lookup time.
-
-#### `search_table_rows`
-
-This function returns the results as an array of objects. If no row is found an
-empty array is returned. Multiple results just result in multiple rows in the
-array.
 
 A metric will be emitted to indicate the lookup time.
 
@@ -258,7 +251,7 @@ key.
 
 Because of these, it is felt the Join transform dosn't fit the exact problem of
 enrichment we are currently solving, however there are many other scenarios
-where this could be useful. In future, we can create a new Resource type that
+where this could be useful. In future, we can create a new Table type that
 can accept an input from a Vector source which would provide all the benefits of
 the Join transform.
 
@@ -279,9 +272,9 @@ hard use indexes to ensure the lookup remains performant.
 
 There is nothing that would prevent us from providing both options.
 
-### Specify the file directly in VRL without using Resorce
+### Specify the file directly in VRL without using Table
 
-Instead of using a separate section to specify the Resource, we could require
+Instead of using a separate section to specify the Table, we could require
 the filename te be specified within VRL.
 
 ```
@@ -318,4 +311,3 @@ asynchronously.
       into the program. VRL needs the tables at compile time to ensure the named
       table is availailble and at run time to access the data.
 - [ ] Implement `find_table_row` VRL function.
-- [ ] Implement `search_table_rows` VRL function.
