@@ -150,7 +150,7 @@ impl HttpSink for Service {
             .header("Content-Type", "application/json")
             .header("DD-API-KEY", &api_key[..]);
 
-        let (request, body) = match self.compression {
+        let (request, encoded_body) = match self.compression {
             Compression::None => (request, body),
             Compression::Gzip(level) => {
                 let level = level.unwrap_or(GZIP_FAST);
@@ -168,8 +168,8 @@ impl HttpSink for Service {
         };
 
         request
-            .header("Content-Length", body.len())
-            .body(body)
+            .header("Content-Length", encoded_body.len())
+            .body(encoded_body)
             .map_err(Into::into)
     }
 }
