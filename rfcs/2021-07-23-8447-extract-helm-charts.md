@@ -1,7 +1,7 @@
 # RFC 8447 - 2021-07-23 - Extract Helm charts out of `timberio/vector` repository
 
 Our Helm charts should be extracted from our application repository and housed in a standalone git repository to better
-enabled standardized tooling and processes for Helm. This extraction will resolve a number of issues with out existing
+enables standardized tooling and processes for Helm. This extraction will resolve a number of issues with our existing
 system and better align our workflows with community expectations.
 
 ## Scope
@@ -15,19 +15,19 @@ system and better align our workflows with community expectations.
 
 ### Out
 
-- Incompatible changes to the raw and kustomize resources
+- Changes to the current raw and kustomize resources
 - Functional changes to existing `test-e2e-kubernetes` suite
 
 ## Pain
 
-Introducing standard tooling like [`ct`](https://github.com/helm/chart-testing) is troublesome at best, and unfeasible
-at worst with Vector's chart management today. No commit in our git repository has a "functional" chart configuration, version
-are set to `0.0.0` (including the image tag version), thus any usage of `ct` would involve a custom configuration that would
-need to be updated for each release (and duplicated for any test config).
+Introducing standard tooling like [`ct`](https://github.com/helm/chart-testing) is complicated with Vector's chart management
+today. No commit in our git repository has a "functional" chart configuration, version are set to `0.0.0` (including the image
+tag version), thus any usage of Helm's testing CLI `ct` would involve a custom configuration that would need to be updated for
+each release (and duplicated for any test config).
 
 Today our `test-e2e-kubernetes` suite does double duty (arguably triple) by both running smoke/integration tests and verifying
 that our charts are designed and configured properly. This isn't efficient as we need to compile Vector and build an image to
-test any changes to our charts which turns a process that could be a couple minutes into half an hour (based on our CI dashboard).
+test any changes to our charts which turns a process that could be a couple minutes into half an hour ([based on our CI dashboard](https://app.datadoghq.com/metric/explorer?from_ts=1627251689494&to_ts=1627445043208&live=false&tile_size=l&exp_metric=gh.actions.workflow_job.execution_secs.99percentile&exp_scope=conclusion%3Asuccess%2Cworkflow%3Ak8s_e2e_suite&exp_group=workflow&exp_agg=max&exp_row_type=metric#workflow:test_suite)).
 
 The final issue is that today we have coupled chart releases directly to Vector releases, we publish chart versions in lockstep
 which causes either delays in chart improvements (or fixes) or unnecessary Vector releases to address chart updates.
@@ -44,7 +44,7 @@ helm repo update && helm upgrade --namespace vector vector datadog/vector-agent 
 ```
 
 Users that have installed charts through cloning our repository and installing via their filesystem would need to clone and track
-the new repository, but this method is not advised, documented, or advised.
+the new repository, but this method is not documented, or advised.
 
 We can maintain backward compatibility for users referencing our raw or kustomize resources.
 
