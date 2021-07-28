@@ -13,7 +13,6 @@ use crate::{
     template::{Template, TemplateParseError},
 };
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
-use lazy_static::lazy_static;
 use redis::{aio::ConnectionManager, RedisError, RedisResult};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -73,14 +72,6 @@ pub enum Method {
 pub enum Encoding {
     Text,
     Json,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        concurrency: Concurrency::Fixed(1),
-        rate_limit_num: Some(u64::MAX),
-        ..Default::default()
-    };
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -146,7 +137,10 @@ impl RedisSinkConfig {
         conn: ConnectionManager,
         cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(1),
+            ..Default::default()
+        });
 
         let key = Template::try_from(self.key.clone()).context(KeyTemplate)?;
         let encoding = self.encoding.clone();

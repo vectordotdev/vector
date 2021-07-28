@@ -12,7 +12,6 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
-use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_firehose::{
     DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
@@ -51,13 +50,6 @@ pub struct KinesisFirehoseSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        timeout_secs: Some(30),
-        ..Default::default()
-    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -149,7 +141,11 @@ impl KinesisFirehoseService {
             .events(500)
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            timeout_secs: Some(30),
+            ..Default::default()
+        });
+
         let encoding = config.encoding.clone();
 
         let kinesis = KinesisFirehoseService { client, config };

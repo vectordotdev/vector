@@ -15,7 +15,6 @@ use crate::{
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
@@ -49,14 +48,6 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        concurrency: Concurrency::Fixed(10),
-        rate_limit_num: Some(10),
-        ..Default::default()
-    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Derivative)]
@@ -107,7 +98,11 @@ impl SinkConfig for HecSinkConfig {
             .bytes(bytesize::mib(1u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(10),
+            rate_limit_num: Some(10),
+            ..Default::default()
+        });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
 

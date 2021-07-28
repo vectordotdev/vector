@@ -20,7 +20,6 @@ use crate::{
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
@@ -63,6 +62,7 @@ struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
     severity_key: Option<String>,
+    uri: Uri,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -101,16 +101,7 @@ inventory::submit! {
 
 impl_generate_config_from_default!(StackdriverConfig);
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        rate_limit_num: Some(1000),
-        rate_limit_duration_secs: Some(1),
-        ..Default::default()
-    };
-    static ref URI: Uri = "https://logging.googleapis.com/v2/entries:write"
-        .parse()
-        .unwrap();
-}
+const ENDPOINT_URI: &str = "https://logging.googleapis.com/v2/entries:write";
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
@@ -122,7 +113,11 @@ impl SinkConfig for StackdriverConfig {
             .bytes(bytesize::kib(5000u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            rate_limit_num: Some(1000),
+            rate_limit_duration_secs: Some(1),
+            ..Default::default()
+        });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
 
@@ -130,6 +125,7 @@ impl SinkConfig for StackdriverConfig {
             config: self.clone(),
             creds,
             severity_key: self.severity_key.clone(),
+            uri: ENDPOINT_URI.parse().unwrap(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
@@ -226,7 +222,7 @@ impl HttpSink for StackdriverSink {
 
         let body = serde_json::to_vec(&events).unwrap();
 
-        let mut request = Request::post(URI.clone())
+        let mut request = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
@@ -330,6 +326,7 @@ mod tests {
             config,
             creds: None,
             severity_key: Some("anumber".into()),
+            uri: ENDPOINT_URI.parse().unwrap(),
         };
 
         let log = [
@@ -370,6 +367,7 @@ mod tests {
             config,
             creds: None,
             severity_key: Some("anumber".into()),
+            uri: ENDPOINT_URI.parse().unwrap(),
         };
 
         let mut log = LogEvent::default();
@@ -437,6 +435,7 @@ mod tests {
             config,
             creds: None,
             severity_key: None,
+            uri: ENDPOINT_URI.parse().unwrap(),
         };
 
         let log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
