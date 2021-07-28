@@ -30,12 +30,12 @@ provided by a CSV file.
 
 ## User Experience
 
-### Tables
+### EnrichmentTables
 
 To represent the CSV file we have a new top level configuration option.
 
 ```
-[tables.csv_file]
+[enrichment_tables.csv_file]
   type = "file"
   encoding = "csv"
   path = "\path_to_csv"
@@ -71,23 +71,23 @@ The initial implementation will only be supporting CSV files as a resource. It
 is anticipated that future work will expand the available resources to include
 other file types as well as databases.
 
-Like the services that sources and sinks integrate with, enrichment "tables"
-will likely need administrator approval and setup. Typically data is enriched
-from some sort of shared company "resource" that end users will likely not have
+Like the services that sources and sinks integrate with, enrichment tables will
+likely need administrator approval and setup. Typically data is enriched from
+some sort of shared company "resource" that end users will likely not have
 access to. Admin will likely want to restrict access to resources to approved
 pipelines, especially if sensitive information is contained.
 
-The tables will need to be integrated with `vector validate`, which would
-ensure the resource exists and is correctly formatted.
+The enrichment tables will need to be integrated with `vector validate`, which
+would ensure the resource exists and is correctly formatted.
 
 ### Schema
 
-For the CSV Table all columns will be considered to be Strings. Since Tables are
-loaded before VRL compilation it will be possible to ensure that Vrl doesn't
-search on columns that do not exist within the datafile. Searching on a column
-that doesn't exist can prevent Vector from loading.
+For the CSV table all columns will be considered to be Strings. Since enrichment
+tables are loaded before VRL compilation it will be possible to ensure that Vrl
+doesn't search on columns that do not exist within the datafile. Searching on a
+column that doesn't exist can prevent Vector from loading.
 
-If (when these features are implemented) the user attempts to reload a Table
+If (when these features are implemented) the user attempts to reload a table
 and a column that has been Indexed no longer exists, this should prevent the
 file from being loaded. Vector will continue to use the currently loaded data.
 
@@ -98,7 +98,7 @@ that VRL works with paths into Objects.
 
 ### Vrl functions
 
-Two remap functions:
+A remap function:
 
 #### `find_table_row`
 
@@ -112,9 +112,9 @@ A metric will be emitted to indicate the lookup time.
 
 *table*
 
-The name of the table to lookup. This must point to a table specified in the
-config file eg `tables.csv_file`. Both functions are generic over all Table
-types.
+The name of the enrichment table to lookup. This must point to a table specified
+in the config file eg `enrichment_tables.csv_file`. Both functions are generic
+over all table types.
 
 *condition*
 
@@ -129,7 +129,7 @@ passing `true` to this parameter.
 ### Example config
 
 ```toml
-[tables.csv_file]
+[enrichment_tables.csv_file]
     type = "csv"
     file = "/path/to/csv.csv"
     delimiter = ","
@@ -145,7 +145,7 @@ passing `true` to this parameter.
         . = parse_json!(.message)
 
         result, err = find_table_row(
-            tables.csv_file,
+            enrichment_tables.csv_file,
             { "license_plate": .license }
         )
 
@@ -158,24 +158,24 @@ passing `true` to this parameter.
 
 ## Implementation
 
-We will need to add a new component type to Vector, call it `Table`. On
-loading the Vector config these instances will be created and will load the
+We will need to add a new component type to Vector, call it `EnrichmentTable`.
+On loading the Vector config these instances will be created and will load the
 data that they are pointing to.
 
 The entire data file will be loaded into memory upon starting Vector, so all
-lookups will be performed in memory. A `Table` will need to provide threadsafe,
-readonly access to the data that it loads.
+lookups will be performed in memory. An `EnrichmentTable` will need to provide
+threadsafe, readonly access to the data that it loads.
 
-VRL will need to maintain the concept of `Table`. This can be created as
-an additional element to the `vrl::Value` type. On compilation, the available
+VRL will need to maintain the concept of `EnrichmentTable`. This can be created
+as an additional element to the `vrl::Value` type. On compilation, the available
 tables can be added to the Variable type definitions. This ensures that
 during compilation the functions will access valid tables.
 
 ### Indexing
 
-Although the first version is not going to be doing any indexing into the data
-it is worth bearing it in mind as we will most likely need to add this in due
-course.
+Although the initial MVP version is not going to be doing any indexing into the
+data it is worth bearing it in mind as we will most likely need to add this in
+due course.
 
 In order to perform the indexing VRL needs to know which fields to index. The
 criteria is being passed in as an object. If the type def for that object is
@@ -193,15 +193,16 @@ Actual indexing strategies can be decided later.
 
 There is significant customer demand for this feature.
 
-Since Tables are likely to contain sensitive information, creating Table as a
-separate section in the config will allow administrators to configure Tables
-separately and thus restrict access to approved pipelines only.
+Since enrichment tables are likely to contain sensitive information, creating
+enrichment table as a separate section in the config will allow administrators
+to configure enrichment tables separately and thus restrict access to approved
+pipelines only.
 
 Being a top level configuration option allows the data to be loaded separately
 from VRL, this provides cleaner opportunities to provide for encryption and
 reloading. Since the data source becomes an orthogonal concept to VRL we can
-add features and new data sources to Tables without any impact on VRL. VRL can
-transparently swap datasources in and out.
+add features and new data sources to enrichment tables without any impact on
+VRL. VRL can transparently swap datasources in and out.
 
 Multiple transforms can share a single table, providing faster load time and
 more efficient memory usage.
@@ -251,9 +252,9 @@ key.
 
 Because of these, it is felt the Join transform dosn't fit the exact problem of
 enrichment we are currently solving, however there are many other scenarios
-where this could be useful. In future, we can create a new Table type that
-can accept an input from a Vector source which would provide all the benefits of
-the Join transform.
+where this could be useful. In future, we can create a new enrichment table type
+that can accept an input from a Vector source which would provide all the
+benefits of the Join transform.
 
 ### Use a predicate for the search
 
@@ -272,10 +273,10 @@ hard use indexes to ensure the lookup remains performant.
 
 There is nothing that would prevent us from providing both options.
 
-### Specify the file directly in VRL without using Table
+### Specify the file directly in VRL without using EnrichmentTable
 
-Instead of using a separate section to specify the Table, we could require
-the filename te be specified within VRL.
+Instead of using a separate section to specify the enrichment table, we could
+require the filename te be specified within VRL.
 
 ```
 find_table_row("/path/to/file.csv", criteria)
@@ -303,10 +304,10 @@ asynchronously.
 
 ## Plan Of Attack
 
-- [ ] Add support for tables. Any table sections will load the data at
-      boot time and will prevent Vector from starting up if the source file
+- [ ] Add support for enrichmetn tables. Any table sections will load the data
+      at boot time and will prevent Vector from starting up if the source file
       cannot be found or is incorrectly formatted.
-- [ ] Wire up the topology so Transforms have access to the tables.
+- [ ] Wire up the topology so Transforms have access to the enrichment tables.
 - [ ] Update VRL to allow the Remap Transform and Conditions to pass any tables
       into the program. VRL needs the tables at compile time to ensure the named
       table is availailble and at run time to access the data.
