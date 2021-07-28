@@ -28,14 +28,14 @@ require Vector to be restarted.
 Users would like to enrich events flowing through Vector with extra data
 provided by a CSV file.
 
-## Doc-level Proposal
+## User Experience
 
-### Resources
+### Tables
 
 To represent the CSV file we have a new top level configuration option.
 
 ```
-[resources.csv_file]
+[tables.csv_file]
   type = "csv"
   path = "\path_to_csv"
   delimiter = ","
@@ -70,23 +70,23 @@ The initial implementation will only be supporting CSV files as a resource. It
 is anticipated that future work will expand the available resources to include
 other file types as well as databases.
 
-Like the services that sources and sinks integrate with, enrichment "resources"
+Like the services that sources and sinks integrate with, enrichment "tables"
 will likely need administrator approval and setup. Typically data is enriched
 from some sort of shared company "resource" that end users will likely not have
 access to. Admin will likely want to restrict access to resources to approved
 pipelines, especially if sensitive information is contained.
 
-The resources will need to be integrated with `vector validate`, which would
+The tables will need to be integrated with `vector validate`, which would
 ensure the resource exists and is correctly formatted.
 
 ### Schema
 
-For the CSV Resource all columns will be considered to be Strings. Since
-Resources are loaded before VRL compilation it will be possible to ensure that
-Vrl doesn't search on columns that do not exist within the datafile. Searching
-on a column that doesn't exist can prevent Vector from loading.
+For the CSV Table all columns will be considered to be Strings. Since Tables are
+loaded before VRL compilation it will be possible to ensure that Vrl doesn't
+search on columns that do not exist within the datafile. Searching on a column
+that doesn't exist can prevent Vector from loading.
 
-If (when these features are implemented) the user attempts to reload a Resource
+If (when these features are implemented) the user attempts to reload a Table
 and a column that has been Indexed no longer exists, this should prevent the
 file from being loaded. Vector will continue to use the currently loaded data.
 
@@ -99,14 +99,15 @@ that VRL works with paths into Objects.
 
 Two remap functions:
 
-#### `find_row`
+#### `find_table_row`
 
-This function will look up a single row within the dataset. If a single row is
-found that data is returned as an object, otherwise this function will error.
+This function will look up a single row within the table dataset. If a single
+row is found that data is returned as an object, otherwise this function will
+error.
 
 A metric will be emitted to indicate the lookup time.
 
-#### `search_rows`
+#### `search_table_rows`
 
 This function returns the results as an array of objects. If no row is found an
 empty array is returned. Multiple results just result in multiple rows in the
@@ -116,10 +117,11 @@ A metric will be emitted to indicate the lookup time.
 
 #### Parameters
 
-*resource*
+*table*
 
-The name of the resource to lookup. This must point to a resource specified
-in the config file eg `resources.csv_file`.
+The name of the table to lookup. This must point to a table specified in the
+config file eg `tables.csv_file`. Both functions are generic over all Table
+types.
 
 *condition*
 
@@ -134,7 +136,7 @@ passing `true` to this parameter.
 ### Example config
 
 ```toml
-[resources.csv]
+[tables.csv_file]
     type = "csv"
     file = "/path/to/csv.csv"
     delimiter = ","
@@ -149,8 +151,8 @@ passing `true` to this parameter.
     source = '''
         . = parse_json!(.message)
 
-        result, err = find_row(
-            resources.csv,
+        result, err = find_table_row(
+            tables.csv_file,
             { "license_plate": .license }
         )
 
@@ -161,20 +163,20 @@ passing `true` to this parameter.
    '''
 ```
 
-## Internal Proposal
+## Implementation
 
-We will need to add a new component type to Vector, call it `Resource`. On
+We will need to add a new component type to Vector, call it `Table`. On
 loading the Vector config these instances will be created and will load the
 data that they are pointing to.
 
-The entire data file will be loaded into memory, so all lookups will be
-performed in memory. A `Resource` will need to provide threadsafe,
+The entire data file will be loaded into memory upon starting Vector, so all
+lookups will be performed in memory. A `Table` will need to provide threadsafe,
 readonly access to the data that it loads.
 
-VRL will need to maintain the concept of `Resource`. This can be created as
+VRL will need to maintain the concept of `Table`. This can be created as
 an additional element to the `vrl::Value` type. On compilation, the available
-resources can be added to the Variable type definitions. This ensures that
-during compilation the functions will access valid resources.
+tables can be added to the Variable type definitions. This ensures that
+during compilation the functions will access valid tables.
 
 ### Indexing
 
@@ -186,20 +188,11 @@ In order to perform the indexing VRL needs to know which fields to index. The
 criteria is being passed in as an object. If the type def for that object is
 known at runtime, we can extract the fields from this.
 
-If the type def isn't known we could
+If the type def isn't known the VRL compiler will raise an error.
 
-- raise an error
-- perform the search unindexed
-- create the index at runtime - generally the shape of this object will not
-  change over time, so most likely the cost of creating the index would only
-  need to be paid on the first event.
-
-The approach we take here should be decided before the first release so we don't
-have to introduce a breaking change further down the line.
-
-Since the resource file is loaded outside of VRL whilst determining which keys
-need indexing occurs inside VRL, we will need a way for VRL to indicate to the
-resource which indexes need building.
+Since the table is loaded outside of VRL whilst determining which keys need
+indexing occurs inside VRL, we will need a way for VRL to indicate to the table
+which indexes need building.
 
 Actual indexing strategies can be decided later.
 
@@ -207,10 +200,24 @@ Actual indexing strategies can be decided later.
 
 There is significant customer demand for this feature.
 
+Since Tables are likely to contain sensitive information, creating Table as a
+separate section in the config will allow administrators to configure Tables
+separately and thus restrict access to approved pipelines only.
+
+Being a top level configuration option allows the data to be loaded separately
+from VRL, this provides cleaner opportunities to provide for encryption and
+reloading. Since the data source becomes an orthogonal concept to VRL we can
+add features and new data sources to Tables without any impact on VRL. VRL can
+transparently swap datasources in and out.
+
+Multiple transforms can share a single table, providing faster load time and
+more efficient memory usage.
+
 ## Drawbacks
 
 1. There are a number of issues with parsing CSV files in particular around
-   handling delimiters and separators.
+   handling delimiters and separators. CSV is a less precise format compared to
+   JSON and others.
 2. Performance. Whilst we can ensure all the IO is performed at boot time,
    searching through that data could still be quite expensive.
 3. Memory use. Since the data file is loaded into memory, the data will use up
@@ -261,7 +268,7 @@ Instead of using an object to specify the search criteria we could allow the
 user to specify a predicate to determine the row to use for enrichment.
 
 ```
-find_row(resource.csv, |row| row.some_key == .some_field)
+find_table_row(table.csv, |row| row.some_key == .some_field)
 ```
 
 Note the ability to specify closures this is not yet available in VRL.
@@ -278,20 +285,20 @@ Instead of using a separate section to specify the Resource, we could require
 the filename te be specified within VRL.
 
 ```
-find_row("/path/to/file.csv", criteria)
+find_table_row("/path/to/file.csv", criteria)
 ```
 
 This reduces the complexity for the configuration and makes the initial change
 simpler since the entire functionality can be implemented by providing an
 additional VRL function.
 
-However, we lose the advantages of allowing the Admin to keep the resource
-separate from the main configuration. Future changes to allow different resource
+However, we lose the advantages of allowing the Admin to keep the table
+separate from the main configuration. Future changes to allow different table
 types, enable encryption and reloading also become more complicated.
 
 ### Provide other data sources
 
-This RFC proposes using a CSV file as a datasource. It time we may also need to
+This RFC proposes using a CSV file as a datasource. In time we may also need to
 source the data from a JSON file, SQL database or Http source.
 
 Using SQL and Http in such a way that would require VRL to perform a lookup
@@ -303,13 +310,12 @@ asynchronously.
 
 ## Plan Of Attack
 
-- [ ] Add support for resources. Any resource sections will load the data at
-      boot time and will prevent Vector from starting up if the resource file
+- [ ] Add support for tables. Any table sections will load the data at
+      boot time and will prevent Vector from starting up if the source file
       cannot be found or is incorrectly formatted.
-- [ ] Wire up the topology so Transforms have access to the resources.
-- [ ] Update VRL to allow the Remap Transform and Conditions to pass any
-      resources into the program. VRL needs the resources at compile time to
-      ensure the named resource is availailble and at run time to access the
-      data.
-- [ ] Implement `find_row` VRL function.
-- [ ] Implement `search_rows` VRL function.
+- [ ] Wire up the topology so Transforms have access to the tables.
+- [ ] Update VRL to allow the Remap Transform and Conditions to pass any tables
+      into the program. VRL needs the tables at compile time to ensure the named
+      table is availailble and at run time to access the data.
+- [ ] Implement `find_table_row` VRL function.
+- [ ] Implement `search_table_rows` VRL function.
