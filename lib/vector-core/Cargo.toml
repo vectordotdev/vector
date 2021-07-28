@@ -15,7 +15,7 @@ chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
-futures = { version = "0.3.15", default-features = false, features = ["std"] }
+futures = { version = "0.3.16", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
 indexmap = { version = "1.7.0", default-features = false, features = ["serde"] }
 lazy_static = { version = "1.4.0", default-features = false }
@@ -49,7 +49,7 @@ vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 prost-build = "0.7.0"
 
 [dev-dependencies]
-criterion = { version = "0.3.4", features = ["html_reports"] }
+criterion = { version = "0.3.5", features = ["html_reports"] }
 quickcheck = "1.0.3"
 pretty_assertions = "0.7.2"
 tokio-test = "0.4.2"

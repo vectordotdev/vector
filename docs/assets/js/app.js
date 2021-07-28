@@ -38,9 +38,18 @@ const manageState = () => {
     versionBackup: '{{ $latest }}',
     // Release version
     release: 'stable',
-
     // Home page platform tab
     platformTab: '{{ $defaultPlatformTab }}',
+    // Config format
+    format: 'toml',
+
+    setFormat(f) {
+      this.format = f;
+    },
+
+    isFormat(f) {
+      return this.format === f;
+    },
 
     isDark() {
       return this.dark;

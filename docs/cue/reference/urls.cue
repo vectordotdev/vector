@@ -120,6 +120,7 @@ urls: {
 	datadog_metrics:                                          "\(datadog_docs)/metrics/"
 	datadog_events:                                           "\(datadog_docs)/events/"
 	datadog_metrics_endpoints:                                "\(datadog_docs)/api/v1/metrics/"
+	datadog_search_syntax:                                    "\(datadog_docs)/logs/explorer/search_syntax/"
 	date:                                                     "https://man7.org/linux/man-pages/man1/date.1.html"
 	debian:                                                   "https://www.debian.org/"
 	debian_system_groups:                                     "https://wiki.debian.org/SystemGroups"

@@ -1417,6 +1417,8 @@ mod tests {
         );
     }
 
+    // Ignoring on mac: https://github.com/timberio/vector/issues/8373
+    #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn test_split_reads() {
         let dir = tempdir().unwrap();

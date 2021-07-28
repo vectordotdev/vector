@@ -15,7 +15,6 @@ use crate::{
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
-use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
@@ -51,14 +50,6 @@ pub struct CloudWatchMetricsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        timeout_secs: Some(30),
-        rate_limit_num: Some(150),
-        ..Default::default()
-    };
 }
 
 inventory::submit! {
@@ -138,7 +129,11 @@ impl CloudWatchMetricsSvc {
             .events(20)
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            timeout_secs: Some(30),
+            rate_limit_num: Some(150),
+            ..Default::default()
+        });
 
         let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
 

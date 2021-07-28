@@ -25,7 +25,6 @@ use http::{
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use lazy_static::lazy_static;
 use rusoto_core::Region;
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
@@ -287,12 +286,6 @@ impl DataStreamConfig {
     }
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        ..Default::default()
-    };
-}
-
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
@@ -381,7 +374,10 @@ impl SinkConfig for ElasticSearchConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.tower.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
 
         let sink = BatchedHttpSink::with_logic(
             common,
@@ -640,7 +636,10 @@ impl ElasticSearchCommon {
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
 
-        let tower_request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
+        let tower_request = config
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert(

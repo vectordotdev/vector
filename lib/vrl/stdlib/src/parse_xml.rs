@@ -1,11 +1,11 @@
-use std::{
-    borrow::Cow,
-    collections::{btree_map::Entry, BTreeMap},
-};
 use vrl::prelude::*;
 
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
+use std::{
+    borrow::Cow,
+    collections::{btree_map::Entry, BTreeMap},
+};
 
 struct ParseXmlConfig<'a> {
     /// Include XML attributes. Default: true,
@@ -284,14 +284,29 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                 (true, true) => Value::Object(recurse(node)),
                 // Otherwise, check the node count to determine what to do.
                 _ => match node.children().count() {
-                    // For a single node, 'flatten' the object.
-                    1 => process_node(
-                        node.children()
+                    // For a single node, 'flatten' the object if necessary.
+                    1 => {
+                        // Expect a single element.
+                        let node = node
+                            .children()
                             .into_iter()
                             .next()
-                            .expect("expected 1 XML node"),
-                        config,
-                    ),
+                            .expect("expected 1 XML node");
+
+                        // If the node is an element, treat it as an object.
+                        if node.is_element() {
+                            let mut map = BTreeMap::new();
+                            map.insert(
+                                node.tag_name().name().to_string(),
+                                Value::Object(recurse(node)),
+                            );
+
+                            Value::Object(map)
+                        } else {
+                            // Otherwise, 'flatten' the object by continuing processing.
+                            process_node(node, config)
+                        }
+                    }
                     // For 2+ nodes, expand.
                     _ => Value::Object(recurse(node)),
                 },
@@ -498,6 +513,96 @@ mod tests {
         invalid_token {
             args: func_args![ value: "true" ],
             want: Err("unable to parse xml: unknown token at 1:1"),
+            tdef: type_def(),
+        }
+
+        flat_parent_property {
+            args: func_args![ value: indoc!{r#"
+                <?xml version="1.0" encoding="UTF-8"?>
+                <MY_XML>
+                  <property1>
+                    <property1_a>a</property1_a>
+                    <property1_b>b</property1_b>
+                    <property1_c>c</property1_c>
+                  </property1>
+                  <property2>
+                    <property2_object>
+                      <property2a_a>a</property2a_a>
+                      <property2a_b>b</property2a_b>
+                      <property2a_c>c</property2a_c>
+                    </property2_object>
+                  </property2>
+                </MY_XML>
+            "#}],
+            want: Ok(value!(
+                {
+                  "MY_XML": {
+                    "property1": {
+                      "property1_a": "a",
+                      "property1_b": "b",
+                      "property1_c": "c"
+                    },
+                    "property2": {
+                      "property2_object": {
+                        "property2a_a": "a",
+                        "property2a_b": "b",
+                        "property2a_c": "c"
+                      }
+                    }
+                  }
+                }
+            )),
+            tdef: type_def(),
+        }
+
+        nested_parent_property {
+            args: func_args![ value: indoc!{r#"
+                <?xml version="1.0" encoding="UTF-8"?>
+                <MY_XML>
+                  <property1>
+                    <property1_a>a</property1_a>
+                    <property1_b>b</property1_b>
+                    <property1_c>c</property1_c>
+                  </property1>
+                  <property2>
+                    <property2_object>
+                      <property2a_a>a</property2a_a>
+                      <property2a_b>b</property2a_b>
+                      <property2a_c>c</property2a_c>
+                    </property2_object>
+                    <property2_object>
+                      <property2a_a>a</property2a_a>
+                      <property2a_b>b</property2a_b>
+                      <property2a_c>c</property2a_c>
+                    </property2_object>
+                  </property2>
+                </MY_XML>
+            "#}],
+            want: Ok(value!(
+                {
+                  "MY_XML": {
+                    "property1": {
+                      "property1_a": "a",
+                      "property1_b": "b",
+                      "property1_c": "c"
+                    },
+                    "property2": {
+                      "property2_object": [
+                        {
+                          "property2a_a": "a",
+                          "property2a_b": "b",
+                          "property2a_c": "c"
+                        },
+                        {
+                          "property2a_a": "a",
+                          "property2a_b": "b",
+                          "property2a_c": "c"
+                        }
+                      ]
+                    }
+                  }
+                }
+            )),
             tdef: type_def(),
         }
     ];

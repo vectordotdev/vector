@@ -56,7 +56,7 @@ components: sources: kubernetes_logs: {
 	}
 
 	configuration: {
-		annotation_fields: {
+		pod_annotation_fields: {
 			common:      false
 			description: "Configuration for how the events are annotated with Pod metadata."
 			required:    false
@@ -141,6 +141,25 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_uid"
+							syntax:  "literal"
+						}
+					}
+				}
+			}
+		}
+		namespace_annotation_fields: {
+			common:      false
+			description: "Configuration for how the events are annotated with Namespace metadata."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					namespace_labels: {
+						common:      false
+						description: "Event field for Namespace labels."
+						required:    false
+						type: string: {
+							default: "kubernetes.namespace_labels"
 							syntax:  "literal"
 						}
 					}
@@ -288,6 +307,15 @@ components: sources: kubernetes_logs: {
 					syntax:  "literal"
 				}
 			}
+			"kubernetes.namespace_labels": {
+				description: "Set of labels attached to the Namespace."
+				required:    false
+				common:      true
+				type: object: {
+					examples: [{"mylabel": "myvalue"}]
+					options: {}
+				}
+			}
 			"kubernetes.pod_ip": {
 				description: "Pod IPv4 address."
 				required:    false
@@ -400,6 +428,9 @@ components: sources: kubernetes_logs: {
 				"file":                       "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log"
 				"kubernetes.container_image": "gcr.io/k8s-minikube/storage-provisioner:v3"
 				"kubernetes.container_name":  "storage-provisioner"
+				"kubernetes.namespace_labels": {
+					"kubernetes.io/metadata.name": "kube-system"
+				}
 				"kubernetes.pod_ip":          "192.168.1.1"
 				"kubernetes.pod_ips": ["192.168.1.1", "::1"]
 				"kubernetes.pod_labels": {

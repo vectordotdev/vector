@@ -147,10 +147,9 @@ components: sources: socket: {
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
 				"""
 			title: "Socket line"
-			configuration: #"""
-				[sources.socket]
-				type = "socket"
-				"""#
+
+			configuration: {}
+
 			input: "\( _line )"
 			output: log: {
 				timestamp: _values.current_timestamp

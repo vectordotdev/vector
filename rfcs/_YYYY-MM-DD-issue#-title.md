@@ -2,27 +2,37 @@
 
 One paragraph description of the change.
 
+## Context
+
+- Link to any previous RFCs for additional context (do not repeat here).
+- Link to any ongoing or future changes that'll be affected by this change (cross cutting concerns).
+
 ## Scope
 
-- What will this RFC cover, and what will it not cover?
-- Link to any previous RFCs for additional context.
+### In scope
 
-## Motivation
+### Out of scope
 
-- What is the problem?
-- What pain motivated this change?
-- Do not cover benefits of your change, that should be covered in the "Rationale" section.
+- Acknowledge future changes, cut scope, keep your change minimal, and keep the discussion focused.
 
-## Internal Proposal
+## Pain
 
-- Describe your change as if you were presenting it to the Vector team.
-- Use lists, examples, and code blocks for efficient reading.
-- Be specific!
+- What internal or external *pain* are we solving?
+- Do not cover benefits of your change, this is covered in the "Rationale" section.
 
-## Doc-level Proposal
+## User Experience
 
-- Optional. Only do this if your change is public facing.
-- Demonstrate how your change will look in the form of Vector's public docs.
+- If your change *does not* affect the user experience, please note that here.
+- If your change *does* affect the user experience:
+  - Explain your change as if you were describing it to a Vector user. We should be able to share this section with a
+    Vector user to solicit feedback.
+  - Does this change break backward compatibility? If so, what should users do to upgrade?
+
+## Implementation
+
+- Explain your change as if you were presenting it to the Vector team.
+- Demonstrate with psuedo code not text.
+- Be specific. Be opinionated. Avoid ambiguity and open-ended questions.
 
 ## Rationale
 
@@ -48,11 +58,11 @@ One paragraph description of the change.
 ## Outstanding Questions
 
 - List any remaining questions that you have.
-- These must be resolved before the RFC can be merged.
+- *These must be resolved before the RFC can be merged.*
 
 ## Plan Of Attack
 
-Incremental steps that execute this change. Generally this is in the form of:
+Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
 - [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
 - [ ] Incremental change #1

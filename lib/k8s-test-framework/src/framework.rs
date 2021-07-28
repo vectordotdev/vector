@@ -60,9 +60,9 @@ impl Framework {
     /// Create a new namespace.
     pub async fn namespace(
         &self,
-        namespace: &str,
+        config: namespace::Config,
     ) -> Result<up_down::Manager<namespace::CommandBuilder>> {
-        let mut manager = namespace::manager(&self.interface.kubectl_command, namespace);
+        let mut manager = namespace::manager(&self.interface.kubectl_command, config);
         manager.up().await?;
         Ok(manager)
     }

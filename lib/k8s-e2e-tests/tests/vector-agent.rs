@@ -1,10 +1,12 @@
+use core::array::IntoIter;
 use futures::{SinkExt, StreamExt};
 use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
-    lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
+    lock, namespace, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+use std::iter::FromIterator;
 use std::str::FromStr;
 use tracing::{debug, info};
 
@@ -120,7 +122,11 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -218,7 +224,11 @@ async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -316,7 +326,11 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -412,7 +426,11 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_message = generate_long_string(8, 8 * 1024); // 64 KiB
     let test_pod = framework
@@ -487,7 +505,11 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let override_name = get_override_name(&namespace, "vector-agent");
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -609,7 +631,11 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_messages = vec!["MARKER1", "MARKER2", "MARKER3", "MARKER4", "MARKER5"];
     let test_pod = framework
@@ -674,9 +700,9 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// This test validates that vector-agent properly annotates log events with pod
-/// metadata obtained from the k8s API.
+/// and namespace metadata obtained from the k8s API.
 #[tokio::test]
-async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
+async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     init();
 
@@ -707,7 +733,17 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(
+                pod_namespace.clone(),
+                Some(BTreeMap::from_iter(IntoIter::new([
+                    ("label3".to_string(), "foobar".to_string()),
+                    ("label4".to_string(), "fizzbuzz".to_string()),
+                ]))),
+            ),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -773,6 +809,8 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(val["kubernetes"]["pod_uid"].as_str().unwrap().len(), 36); // 36 is a standard UUID string length
         assert_eq!(val["kubernetes"]["pod_labels"]["label1"], "hello");
         assert_eq!(val["kubernetes"]["pod_labels"]["label2"], "world");
+        assert_eq!(val["kubernetes"]["namespace_labels"]["label3"], "foobar");
+        assert_eq!(val["kubernetes"]["namespace_labels"]["label4"], "fizzbuzz");
 
         if minor < 16 {
             assert!(val["kubernetes"]["pod_ip"].is_string());
@@ -844,10 +882,18 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let affinity_ns_name = format!("{}-affinity", pod_namespace);
-    let affinity_ns = framework.namespace(&affinity_ns_name).await?;
+    let affinity_ns = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(affinity_ns_name.clone(), None),
+        )?)
+        .await?;
     let affinity_pod = create_affinity_pod(&framework, &affinity_ns_name, &affinity_label).await?;
 
     let excluded_test_pod = framework
@@ -1039,7 +1085,11 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let label_sets = vec![
         ("test-pod-excluded-1", vec![("vector.dev/exclude", "true")]),
@@ -1232,7 +1282,11 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod_with_containers(
@@ -1401,7 +1455,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod_with_containers(
@@ -1563,14 +1621,24 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let mut expected_namespaces = HashSet::new();
     for i in 0..10 {
         let name = format!("{}-{}", pod_namespace, i);
-        test_namespaces.push(framework.namespace(&name).await?);
+        test_namespaces.push(
+            framework
+                .namespace(namespace::Config::from_namespace(
+                    &namespace::make_namespace(name.clone(), None),
+                )?)
+                .await?,
+        );
         expected_namespaces.insert(name);
     }
 
     // Create a pod for our other pods to have an affinity to to ensure they are all deployed on
     // the same node.
     let affinity_ns_name = format!("{}-affinity", pod_namespace);
-    let affinity_ns = framework.namespace(&affinity_ns_name).await?;
+    let affinity_ns = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(affinity_ns_name.clone(), None),
+        )?)
+        .await?;
     let affinity_pod = create_affinity_pod(&framework, &affinity_ns_name, &affinity_label).await?;
 
     let mut test_pods = vec![];
@@ -1686,7 +1754,11 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -1816,7 +1888,11 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // Capture events processed before deploying the test pod.
     let processed_events_before = metrics::get_processed_events(&vector_metrics_url).await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -1986,7 +2062,11 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace("test-vector-test-pod".to_string(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
