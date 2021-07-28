@@ -58,10 +58,12 @@ pub struct Event {
     metric: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
-pub struct Error {
-    compiletime: String,
+#[derive(Debug, Deserialize)]
+pub enum Error {
+    #[serde(rename = "compiletime")]
+    Compiletime(String),
+    #[serde(rename = "runtime")]
+    Runtime(String),
 }
 
 pub fn tests() -> Vec<Test> {
@@ -156,7 +158,7 @@ impl Test {
         }
 
         let result = match raises {
-            Some(error) => error.compiletime,
+            Some(Error::Runtime(error) | Error::Compiletime(error)) => error,
             None => serde_json::to_string(
                 &returns
                     .or_else(|| {
