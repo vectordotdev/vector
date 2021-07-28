@@ -2,15 +2,20 @@
 
 Large Vector users often require complex Vector topologies to facilitate the collection and processing of data from many different upstream sources. This results in large Vector configuration files that are hard to manage across different teams. This makes Vector a bad candidate for large teams that require autonomy to facilitate sane collaboration.
 
+## Context
+
+- [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md) Event drive observability.
+- [RFC 8288 (PR)](https://github.com/timberio/vector/pull/8400) Adding the `resources` component.
+
 ## Scope
 
-This RFC will cover:
+### In the scope
 
 - How and where the pipelines are stored
 - How vector reads the pipelines and what are the limits of pipelines
 - What metadata vector adds to the events going through a pipeline
 
-This RFC will not cover:
+### Out of scope
 
 - How the pipelines should be synchronized between vector instances
 - Pre/post processing of data - The ability to prepare and normalize data.
@@ -25,9 +30,12 @@ This RFC will not cover:
 
 ## User Experience
 
-```c
-// Explain your change as if you were describing it to a Vector user. We should be able to share this section with a Vector user to solicit feedback.
-```
+These changes are providing a way for vector users to split their configuration in a way that improves the collaboration between ops and devs.
+This split will take be made by creating a pipeline configuration file, in which the devs will be able to configure their components.
+The ops will now configure their `sources` and `sinks`, and expose them to be used by the devs.
+The ops will be able to only given access to some of the common components when configuring the pipeline.
+The devs will have the ability to consume the provided components without being able to change the common configuration.
+The users will be able to monitor their pipelines through the `internal_metrics` source.
 
 ## Motivation
 
@@ -53,8 +61,9 @@ A pipeline can be referenced in a configuration file as follows
 [resources.pipeline_id]
 type = "pipeline"
 filename = "pipeline_id.toml"
-# allow-list of sources/sinks
-allowed = ["in", "out", "blackhole"]
+[resources.pipeline_id.forwards]
+source_alias = ["nginx", "apache", "transform_name"]
+sink_alias = ["elastic", "blackhole"]
 ```
 
 The filename is used to point out the pipeline configuration file in the `pipelines` folder.
@@ -68,7 +77,56 @@ If several files having the same `id` in that folder (for example `load-balancer
 The pipeline's configuration files should only contain transforms or vector will error.
 A pipeline cannot use another pipeline or vector will error.
 
-A pipeline has access to all the components from the configuration file but can be restricted by setting the allow-list `allowed`.
+A pipeline has access to the components configured in the `forwards` section.
+The forwards section in the pipeline declaration allows to create an alias for the resources that will be accessible to avoid name conflicts when using multiple vector configuration files.
+
+The following wouldn't be possible, because the `generate` name would conflict.
+
+```toml
+# /etc/vector/first.toml
+[sources.generate]
+...
+[resources.my-pipeline]
+...
+# /etc/vector/second.toml
+[sources.generate]
+...
+[resources.my-pipeline]
+...
+# /etc/vector/pipelines/my-pipeline.yml
+[transforms.something]
+type = "remap"
+inputs = ["generate"]
+```
+
+But it becomes possible with
+
+```toml
+# /etc/vector/first.toml
+[sources.generate-first]
+...
+[resources.my-pipeline]
+generate = ["generate-first"]
+# /etc/vector/second.toml
+[sources.generate-second]
+...
+[resources.my-pipeline]
+generate = ["generate-second"]
+# /etc/vector/pipelines/my-pipeline.yml
+[transforms.something]
+type = "remap"
+inputs = ["generate"]
+```
+
+The pipeline resource would have the following structure
+
+```rust
+struct PipelineResource {
+  filename: String,
+  aliases: Map<String, Set<String>>,
+  config: PipelineConfig,
+}
+```
 
 The structure of the pipeline's configuration file is as follows
 
@@ -81,21 +139,15 @@ inputs = ["source"]
 ...
 
 [transforms.second]
-inputs = ["load-balancer.first"]
+inputs = ["first"]
+outputs = ["exposed-sink"]
 ...
 
 # this will error
 [transforms.third]
 inputs = ["other-pipeline.bar"]
+outputs = ["exposed-sink"]
 ...
-
-[forwards.in-house]
-inputs = ["second"]
-target = "sink-name"
-
-[forwards.outside]
-inputs = ["second"]
-target = "other-name"
 ```
 
 In order to allow the user to specify the targeted sinks by a pipeline, the `forward` component creates a forwarding to the real sinks from the configuration files.
@@ -103,32 +155,24 @@ It also allows the user to use is own aliases and just refer the external sinks 
 
 Now, if we look deeper at the configuration building process, the configuration compiler will require the pipelines in order to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
 
-To do so, we'll need to implement the `Forward` component and a `PipelineBuilder` with the following structures
+To do so, we'll need to implement a `PipelineConfigBuilder` with the following structures
 
 ```rust
-struct Forward {
-    pub id: String,
-    pub inputs: Vec<String>,
-    pub target: String,
+struct PipelineTransformOuter {
+    #[serde(flatten)]
+    content: TransformOuter,
+    outputs: Set<String>,
 }
-
-struct PipelineBuilder {
+struct PipelineConfigBuilder {
     pub id: String,
     pub version: String,
-    pub transforms: IndexMap<String, TransformOuter>,
-    pub forwards: IndexMap<String, Forward>
+    pub transforms: Map<String, PipelineTransformOuter>,
 }
 ```
 
-then we would update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4)
+then we'll update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4), in order to build a `Config` containing the required pipeline components, the compiler will load the pipeline's configurations, load the transforms and substitute the aliases.
 
-```rust
-fn compile(mut builder: ConfigBuilder, pipelines: Vec<PipelineBuilder>)
-```
-
-in order to build a `Config` containing the required pipeline components.
-
-The components coming from the pipeline would be cloned inside the final `Config`, in the `transforms` `IndexMap` and the `inputs` from the `Forward` elements will be added to the referring `Sink` input.
+The components coming from the pipeline would be cloned inside the final `Config`, in the `transforms` `IndexMap` and the `outputs` from the pipeline components will be added to the referring `Sink` input field.
 
 ### Observing pipelines
 
