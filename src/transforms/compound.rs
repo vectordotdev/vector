@@ -65,39 +65,19 @@ mod test {
         crate::test_util::test_generate_config::<super::CompoundConfig>();
     }
 
-  /*  #[test]
-    fn alias_works() {
-        toml::from_str::<RouteConfig>(
-            r#"
-            lanes.first.type = "check_fields"
-            lanes.first."message.eq" = "foo"
-        "#,
-        )
-        .unwrap();
-    }
-
     #[test]
-    fn can_serialize_remap() {
+    fn can_serialize_nested_transforms() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
-        let config = LaneConfig {
-            condition: AnyCondition::String("foo".to_string()),
-        };
-
-        assert_eq!(
-            serde_json::to_string(&config).unwrap(),
-            r#"{"condition":"foo"}"#
-        );
-    }
-
-    #[test]
-    fn can_serialize_check_fields() {
-        // We need to serialize the config to check if a config has
-        // changed when reloading.
-        let config = toml::from_str::<RouteConfig>(
+        let config = toml::from_str::<CompoundConfig>(
             r#"
-            lanes.first.type = "check_fields"
-            lanes.first."message.eq" = "foo"
+            [nested.step1]
+            type = "mock"
+            suffix = "step1"
+
+            [nested.step2]
+            type = "mock"
+            suffix = "step1"
         "#,
         )
         .unwrap()
@@ -107,8 +87,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},"Parallel"]"#
+            r#"[{"step1":{"type":"mock"},"step2":{"type":"mock"}},"Serial"]"#
         );
-    }*/
+    }
 }
-
