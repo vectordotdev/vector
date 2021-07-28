@@ -15,9 +15,7 @@ components: transforms: compound: {
 		stateful:      false
 	}
 
-	features: {
-		compound: {}
-	}
+	features: {}
 
 	support: {
 		targets: {
@@ -48,21 +46,12 @@ components: transforms: compound: {
 				options: {
 					"*": {
 						description: """
-							The condition to be matched against every input event. Only messages that pass the
-							condition will be included in this route.
+							Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
+							for the list of available transforms and their configuration.
 							"""
 						required: true
 						warnings: []
-						type: object: {
-							examples: [
-								"""
-									type = "filter"
-								    condition = '.level == "debug"'
-								""",
-
-							]
-							syntax: "literal"
-						}
+						type: object: {}
 					}
 				}
 			}
@@ -84,7 +73,7 @@ components: transforms: compound: {
 	examples: [
 		{
 			title: "Filter by log level and reformat"
-			configuration: #"""
+			configuration: """
 				[transforms.chain]
 				type = "compound"
 
@@ -97,7 +86,7 @@ components: transforms: compound: {
 				source = '''
 					.message, _ = "[" + del(.level) + "] " +  .message
 				'''
-				"""#
+				"""
 			input: [
 				{
 					log: {
