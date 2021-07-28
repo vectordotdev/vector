@@ -255,7 +255,7 @@ mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
 
-    async fn test_nginx(endpoint: &'static str, auth: Option<Auth>) {
+    async fn test_nginx(endpoint: &'static str, auth: Option<Auth>, proxy: ProxyConfig) {
         trace_init();
 
         let (sender, mut recv) = Pipeline::new_test();
@@ -267,7 +267,7 @@ mod integration_tests {
                 namespace: "vector_nginx".to_owned(),
                 tls: None,
                 auth,
-                proxy: Default::default(),
+                proxy,
             }
             .build(SourceContext::new_test(sender))
             .await
@@ -294,7 +294,12 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_stub_status() {
-        test_nginx("http://localhost:8010/basic_status", None).await
+        test_nginx(
+            "http://localhost:8010/basic_status",
+            None,
+            ProxyConfig::default(),
+        )
+        .await
     }
 
     #[tokio::test]
@@ -305,6 +310,20 @@ mod integration_tests {
                 user: "vector".to_owned(),
                 password: "vector".to_owned(),
             }),
+            ProxyConfig::default(),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn test_stub_status_with_proxy() {
+        test_nginx(
+            "http://vector_nginx:8000/basic_status",
+            None,
+            ProxyConfig {
+                http: Some("http://localhost:3128".into()),
+                ..Default::default()
+            },
         )
         .await
     }
