@@ -688,7 +688,7 @@ components: {
 			}
 
 			_proxy: {
-				common:	     false
+				common:      false
 				description: "Configures an HTTP(S) proxy for Vector to use."
 				required:    false
 				type: object: options: {
