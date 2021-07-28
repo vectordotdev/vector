@@ -725,7 +725,7 @@ components: {
 					}
 					no_proxy: {
 						common:      false
-						description: "List of url skipping the proxy configuration."
+						description: "List of hosts to avoid proxying."
 						required:    false
 						type: array: {
 							default: null
@@ -929,6 +929,45 @@ components: {
 					enum: #Enum | *{
 						"\(Name)": "The type of this component."
 					}
+					syntax: "literal"
+				}
+			}
+		}
+
+		env_vars: {
+			HTTP_PROXY: {
+				description: """
+					The global URL to proxy HTTP requests through.
+					If another HTTP proxy is set in the configuration file or at a component level,
+					this one will be overriden.
+					"""
+				type: string: {
+					default: null
+					examples: ["http://foo.bar:3128"]
+					syntax: "literal"
+				}
+			}
+			HTTPS_PROXY: {
+				description: """
+					The global URL to proxy HTTPS requests through.
+					If another HTTPS proxy is set in the configuration file or at a component level,
+					this one will be overriden.
+					"""
+				type: string: {
+					default: null
+					examples: ["http://foo.bar:3128"]
+					syntax: "literal"
+				}
+			}
+			NO_PROXY: {
+				description: """
+						List of hosts to avoid proxying globally.
+						If another no_proxy value is set in the configuration file or at a component level,
+						this one will be overriden.
+					"""
+				type: string: {
+					default: null
+					examples: ["localhost,.foo.bar", "*"]
 					syntax: "literal"
 				}
 			}

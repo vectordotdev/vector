@@ -92,8 +92,11 @@ impl ProxyConfig {
     // if `self` is the global config and `other` the component config,
     // if both have the `http` proxy set, the one from `other` should be kept
     pub fn merge(&self, other: &Self) -> Self {
-        let mut no_proxy = other.no_proxy.clone();
-        no_proxy.extend(self.no_proxy.clone());
+        let no_proxy = if other.no_proxy.is_empty() {
+            self.no_proxy.clone()
+        } else {
+            other.no_proxy.clone()
+        };
 
         Self {
             enabled: self.enabled && other.enabled,
@@ -196,7 +199,7 @@ mod tests {
         let result = first.merge(&second);
         assert_eq!(result.http, Some("http://1.2.3.4:5678".into()));
         assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
-        assert!(result.no_proxy.matches(&"127.0.0.1".to_string()));
+        assert!(!result.no_proxy.matches(&"127.0.0.1".to_string()));
         assert!(result.no_proxy.matches(&"localhost".to_string()));
     }
 

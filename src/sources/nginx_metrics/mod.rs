@@ -315,6 +315,8 @@ mod integration_tests {
         .await
     }
 
+    // This integration test verifies that proxy support is wired up correctly in Vector
+    // It is the only test of its kind
     #[tokio::test]
     async fn test_stub_status_with_proxy() {
         test_nginx(
