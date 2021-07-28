@@ -5,7 +5,7 @@ components: sinks: new_relic_logs: {
 
 	classes: {
 		commonly_used: false
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["New Relic"]

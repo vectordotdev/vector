@@ -3,9 +3,7 @@ package metadata
 components: sinks: humio_metrics: {
 	title: "Humio Metrics"
 
-	classes: sinks._humio.classes & {
-		delivery: "best_effort"
-	}
+	classes:       sinks._humio.classes
 	features:      sinks._humio.features
 	support:       sinks._humio.support
 	configuration: sinks._humio.configuration

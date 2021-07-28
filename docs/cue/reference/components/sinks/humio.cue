@@ -3,6 +3,7 @@ package metadata
 components: sinks: _humio: {
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Humio"]

@@ -7,7 +7,7 @@ components: sources: file: {
 
 	classes: {
 		commonly_used: true
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"

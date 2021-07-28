@@ -5,7 +5,7 @@ components: sinks: sematext_logs: {
 
 	classes: {
 		commonly_used: false
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Sematext"]

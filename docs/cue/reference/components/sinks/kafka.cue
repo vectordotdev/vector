@@ -5,7 +5,7 @@ components: sinks: kafka: {
 
 	classes: {
 		commonly_used: true
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "dynamic"
 		service_providers: ["AWS", "Confluent"]
