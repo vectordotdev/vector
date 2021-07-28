@@ -7,8 +7,8 @@ use crate::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
-        TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+        UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
