@@ -101,16 +101,22 @@ impl HttpSink for Service {
     fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let log = event.as_mut_log();
 
-        if let Some(message) = log.remove(self.log_schema_message_key) {
-            log.insert_flat("message", message);
+        if self.log_schema_message_key != "message" {
+            if let Some(message) = log.remove(self.log_schema_message_key) {
+                log.insert_flat("message", message);
+            }
         }
 
-        if let Some(timestamp) = log.remove(self.log_schema_timestamp_key) {
-            log.insert_flat("date", timestamp);
+        if self.log_schema_timestamp_key != "date" {
+            if let Some(timestamp) = log.remove(self.log_schema_timestamp_key) {
+                log.insert_flat("date", timestamp);
+            }
         }
 
-        if let Some(host) = log.remove(self.log_schema_host_key) {
-            log.insert_flat("host", host);
+        if self.log_schema_host_key != "host" {
+            if let Some(host) = log.remove(self.log_schema_host_key) {
+                log.insert_flat("host", host);
+            }
         }
 
         self.encoding.apply_rules(&mut event);
@@ -131,7 +137,7 @@ impl HttpSink for Service {
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let (events, api_key) = events.into_parts();
 
-        let body = serde_json::to_vec(&events)?;
+        let body: Vec<u8> = serde_json::to_vec(&events)?;
         // check the number of events to ignore health-check requests
         if !events.is_empty() {
             emit!(DatadogLogEventProcessed {
@@ -144,12 +150,14 @@ impl HttpSink for Service {
             .header("Content-Type", "application/json")
             .header("DD-API-KEY", &api_key[..]);
 
-        let (request, body) = match self.compression {
+        let (request, encoded_body) = match self.compression {
             Compression::None => (request, body),
             Compression::Gzip(level) => {
                 let level = level.unwrap_or(GZIP_FAST);
-                let mut encoder =
-                    GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
+                let mut encoder = GzEncoder::new(
+                    Vec::with_capacity(body.len()),
+                    flate2::Compression::new(level as u32),
+                );
 
                 encoder.write_all(&body)?;
                 (
@@ -160,8 +168,8 @@ impl HttpSink for Service {
         };
 
         request
-            .header("Content-Length", body.len())
-            .body(body)
+            .header("Content-Length", encoded_body.len())
+            .body(encoded_body)
             .map_err(Into::into)
     }
 }
