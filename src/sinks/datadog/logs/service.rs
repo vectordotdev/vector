@@ -131,7 +131,7 @@ impl HttpSink for Service {
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let (events, api_key) = events.into_parts();
 
-        let body = serde_json::to_vec(&events)?;
+        let body: Vec<u8> = serde_json::to_vec(&events)?;
         // check the number of events to ignore health-check requests
         if !events.is_empty() {
             emit!(DatadogLogEventProcessed {
@@ -148,8 +148,10 @@ impl HttpSink for Service {
             Compression::None => (request, body),
             Compression::Gzip(level) => {
                 let level = level.unwrap_or(GZIP_FAST);
-                let mut encoder =
-                    GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
+                let mut encoder = GzEncoder::new(
+                    Vec::with_capacity(body.len()),
+                    flate2::Compression::new(level as u32),
+                );
 
                 encoder.write_all(&body)?;
                 (
