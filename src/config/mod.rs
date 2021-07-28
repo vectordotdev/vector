@@ -797,6 +797,32 @@ mod test {
             ])
         );
     }
+
+    #[test]
+    fn with_proxy() {
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [proxy]
+                  http = "http://server:3128"
+                  https = "http://other:3128"
+                  no_proxy = ["localhost", "127.0.0.1"]
+
+                [sources.in]
+                  type = "file"
+                  include = ["/var/log/messages"]
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["in"]
+                  encoding = "json"
+            "#},
+            Some(Format::Toml),
+        )
+        .unwrap();
+        assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
+        assert!(config.global.proxy.no_proxy.matches("localhost"));
+    }
 }
 
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
