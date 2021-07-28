@@ -79,6 +79,22 @@ pipelines, especially if sensitive information is contained.
 The resources will need to be integrated with `vector validate`, which would
 ensure the resource exists and is correctly formatted.
 
+### Schema
+
+For the CSV Resource all columns will be considered to be Strings. Since
+Resources are loaded before VRL compilation it will be possible to ensure that
+Vrl doesn't search on columns that do not exist within the datafile. Searching
+on a column that doesn't exist can prevent Vector from loading.
+
+If (when these features are implemented) the user attempts to reload a Resource
+and a column that has been Indexed no longer exists, this should prevent the
+file from being loaded. Vector will continue to use the currently loaded data.
+
+These restrictions apply only to columns that VRL is searching on. If the user
+attempts to use a field that has not been returned from the enrichment, this
+will be possible, but the value will be Null. This is largely due to the way
+that VRL works with paths into Objects.
+
 ### Vrl functions
 
 Two remap functions:
@@ -110,10 +126,40 @@ in the config file eg `resources.csv_file`.
 `condition` is a single level, key/value object that specifies the fields and
 values to lookup. The fields must all match (AND) for the row to be returned.
 
-*case_insensitive*
+*case_sensitive*
 
-By default the search will be case sensitive, but this can be changed by
+By default the search will be case insensitive, but this can be changed by
 passing `true` to this parameter.
+
+### Example config
+
+```toml
+[resources.csv]
+    type = "csv"
+    file = "/path/to/csv.csv"
+    delimiter = ","
+
+[sources.datadog_logs]
+    type = "datadog_logs"
+    address = "0.0.0.0:80"
+
+[transforms.simple_enrich]
+    type = "remap"
+    inputs = ["datadog_logs"]
+    source = '''
+        . = parse_json!(.message)
+
+        result, err = find_row(
+            resources.csv,
+            { "license_plate": .license }
+        )
+
+        if is_null(err) {
+            .first_name = result.first_name
+            .last_name = result.last_name
+        }
+   '''
+```
 
 ## Internal Proposal
 
@@ -170,7 +216,8 @@ There is significant customer demand for this feature.
 3. Memory use. Since the data file is loaded into memory, the data will use up
    some memory. If the file is large enough that could have an impact should
    Vector be running in a constrained environment.
-4. Adding a new top level config option creates additional complexity.
+4. Adding a new top level config option creates additional complexity and will
+   require some work to the topology.
 
 ## Alternatives
 
@@ -202,11 +249,11 @@ New records could simply be streamed in by appending to the file, but modified
 data could only be updated if we ensured the data also had some form of primary
 key.
 
-Because of these, it is felt Join transforms don't fit the exact problem of
+Because of these, it is felt the Join transform dosn't fit the exact problem of
 enrichment we are currently solving, however there are many other scenarios
-where this could be useful. In future we can create a new Resource type to be
-able to accept an input from a Vector source which would provide all the
-benefits of the Join transform.
+where this could be useful. In future, we can create a new Resource type that
+can accept an input from a Vector source which would provide all the benefits of
+the Join transform.
 
 ### Use a predicate for the search
 
@@ -254,12 +301,6 @@ asynchronously.
 
 ## Outstanding Questions
 
-- What approach should we taken around determining the indexed fields?
-- Can we assume that if the file is encrypted it will use AES?
-- Should `title_row` default to true or false?
-- Does the parameter `case_insensitive` indicate that perhaps does a simple
-  key/value search is not sufficient.
-
 ## Plan Of Attack
 
 - [ ] Add support for resources. Any resource sections will load the data at
@@ -272,4 +313,3 @@ asynchronously.
       data.
 - [ ] Implement `find_row` VRL function.
 - [ ] Implement `search_rows` VRL function.
-
