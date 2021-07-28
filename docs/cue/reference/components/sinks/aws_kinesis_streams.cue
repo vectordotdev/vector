@@ -15,7 +15,6 @@ components: sinks: aws_kinesis_streams: components._aws & {
 	features: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
-		proxy: enabled:       true
 		send: {
 			batch: {
 				enabled:      true
@@ -38,6 +37,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                5

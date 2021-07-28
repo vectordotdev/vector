@@ -179,6 +179,7 @@ components: {
 			filter?:    #FeaturesFilter
 			parse?:     #FeaturesParse
 			program?:   #FeaturesProgram
+			proxy?:     #FeaturesProxy
 			reduce?:    #FeaturesReduce
 			route?:     #FeaturesRoute
 			sanitize?:  #FeaturesSanitize
@@ -215,6 +216,8 @@ components: {
 			service:    #Service
 			interface?: #Interface
 		}
+
+		proxy?: #FeaturesProxy
 
 		tls?: #FeaturesTLS & {_args: {mode: "connect"}}
 	}
@@ -357,6 +360,8 @@ components: {
 		send_buffer_bytes?: #FeaturesSendBufferBytes
 
 		keepalive?: #FeaturesKeepalive
+
+		proxy?: #FeaturesProxy
 
 		// `request` describes how the component issues and manages external
 		// requests.
@@ -693,27 +698,33 @@ components: {
 				required:    false
 				type: object: options: {
 					enabled: {
+						common:      false
 						description: "If false the proxy will be disabled."
 						required:    false
 						type: bool: default: true
 					}
 					http: {
+						common:      false
 						description: "The URL to proxy HTTP requests through."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["http://foo.bar:3128"]
 							syntax: "literal"
 						}
 					}
 					https: {
+						common:      false
 						description: "The URL to proxy HTTPS requests through."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["http://foo.bar:3128"]
 							syntax: "literal"
 						}
 					}
 					no_proxy: {
+						common:      false
 						description: "List of url skipping the proxy configuration."
 						required:    false
 						type: array: {
