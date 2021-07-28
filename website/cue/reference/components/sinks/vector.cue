@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: vector: {
-	_port_v1: 9000
-	_port_v2: 6000
+	_port: 9000
 
 	title: "Vector"
 
@@ -83,21 +82,10 @@ components: sinks: vector: {
 	configuration: {
 		address: {
 			description: "The downstream Vector address to connect to. The address _must_ include a port."
-			groups: ["v1"]
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
-				examples: ["92.12.333.224:\(_port_v1)"]
-				syntax: "literal"
-			}
-		}
-		address: {
-			description: "The downstream Vector address to connect to. The address _must_ include a port."
-			groups: ["v2"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["92.12.333.224:\(_port_v2)"]
+				examples: ["92.12.333.224:\(_port)"]
 				syntax: "literal"
 			}
 		}

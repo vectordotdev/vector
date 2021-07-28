@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: vector: {
-	_port_v1: 9000
-	_port_v2: 6000
+	_port: 9000
 
 	title: "Vector"
 
@@ -27,7 +26,7 @@ components: sources: vector: {
 
 				interface: socket: {
 					direction: "incoming"
-					port:      _port_v2
+					port:      _port
 					protocols: ["http"]
 					ssl: "optional"
 				}
@@ -69,32 +68,17 @@ components: sources: vector: {
 			description: """
 				The HTTP address to listen for connections on. It _must_ include a port.
 				"""
-			groups: ["v2"]
 			required: true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:\(_port_v2)"]
-				syntax: "literal"
-			}
-		}
-		address: {
-			description: """
-				The TCP address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd
-				socket activation. If an address is used it _must_ include a port.
-				"""
-			groups: ["v1"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["0.0.0.0:\(_port_v1)", "systemd", "systemd#1"]
+				examples: ["0.0.0.0:\(_port)"]
 				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
 			common:      false
 			description: "The timeout before a connection is forcefully closed during shutdown."
-			groups: ["v1", "v2"]
-			required: false
+			required:    false
 			warnings: []
 			type: uint: {
 				default: 30
