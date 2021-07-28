@@ -139,9 +139,7 @@ impl SinkConfig for HttpSinkConfig {
             .timeout(1)
             .parse_config(config.batch)?;
         let request = config.request.tower.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(10),
             timeout_secs: Some(30),
-            rate_limit_num: Some(u64::max_value()),
             ..Default::default()
         });
 
