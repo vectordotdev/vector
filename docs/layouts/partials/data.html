@@ -1500,6 +1500,10 @@
           {{ end }}
           {{ else }}
           {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+
+          {{ with $v.syntax }}
+          {{ partial "badge.html" (dict "word" . "color" "gray") }}
+          {{ end }}
           {{ end }}
           {{ end }}
         </span>
@@ -1509,6 +1513,22 @@
       <div class="mt-2 prose dark:prose-dark">
         {{ . | markdownify }}
       </div>
+      {{ end }}
+
+      {{ range $k, $v := $v.type }}
+      {{ with $v.examples }}
+      <div class="mt-2">
+        <span>
+          Examples
+        </span>
+
+        <div class="mt-1.5 flex flex-col space-y-1 text-sm">
+          {{ range . }}
+          {{ template "code" . }}
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
       {{ end }}
     </div>
     {{ end }}
@@ -1520,7 +1540,7 @@
 
 {{ define "telemetry" }}
 {{ range $k, $v := . }}
-<div class="py-4 px-6">
+<div class="py-3 px-5">
   <span class="flex justify-between items-center">
     <span class="font-mono font-bold text-dark dark:text-gray-200">
       {{ partial "heading.html" (dict "text" $k "level" 4) }}
@@ -1539,7 +1559,7 @@
   <div class="mt-3 border rounded dark:border-gray-700">
     <div class="flex flex-col divide-y dark:divide-gray-700">
       {{ range $k, $v := . }}
-      <div class="py-3 px-4">
+      <div class="py-2.5 px-4">
         <span class="flex justify-between items-center">
           <span class="font-mono font-semibold">
             {{ $k }}
