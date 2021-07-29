@@ -273,11 +273,7 @@ components: sources: file: {
 			configuration: {
 				include: ["\(_directory)/**/*.log"]
 			}
-			input: """
-				```text filename="\(_file)"
-				\(_line)
-				```
-				"""
+			input: _line
 			output: log: {
 				file:      _file
 				host:      _values.local_host
