@@ -104,7 +104,7 @@ components: transforms: compound: {
 			output: [
 				{
 					log: {
-						message: "[info] I'm a normal info log"
+						message: "[debug] I'm a noisy debug log"
 					}
 				},
 			]
