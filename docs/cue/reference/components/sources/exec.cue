@@ -191,11 +191,7 @@ components: sources: exec: {
 			_timestamp: "2020-03-13T20:45:38.119Z"
 			title:      "Exec line"
 			configuration: {}
-			input: """
-				```text
-				(_message)
-				```
-				"""
+			input: _line
 			output: log: {
 				data_stream: "stdout"
 				pid:         5678
