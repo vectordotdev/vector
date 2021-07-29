@@ -11,9 +11,9 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 ### In the scope
 
-- How and where the pipelines are stored
-- How vector reads the pipelines and what are the limits of pipelines
-- What metadata vector adds to the events going through a pipeline
+- How and where the pipelines are defined
+- How vector reads the pipelines and what are the limitations of pipelines
+- How do we monitor pipelines components
 
 ### Out of scope
 
@@ -22,10 +22,10 @@ Large Vector users often require complex Vector topologies to facilitate the col
 - Connecting pipelines together - The ability to take input from another pipeline.
 - Component reuse - The ability to define boilerplate for reuse across many different pipelines. This will likely align with Datadog’s “pipeline catalogue”.
 - Pipeline quotas - The ability to limit how much data a pipeline can send to a sink.
+- Visibility of the components - The ability to give access to any components within the system.
 
 ## Pain
 
-- The only possibility to reuse the same set of transform between multiple configuration file is by duplicating them.
 - If an admin wants to split responsibilities between `ops` and `devs` by only allowing the `ops` to deal with `sources/sinks` and the `devs`, it's currently not possible.
 
 ## User Experience
@@ -224,12 +224,21 @@ _TODO_
 - Do nothing: we can already use several configuration files, people could split their existing configuration.
 
 This would imply some duplication if a transform is used in multiple configuration files.
+Anybody could add a sink or source even if they don't have permission.
+
+- Do nothing: write a tool that would write a big configuration file where each pipeline would start with a dummy filter that we could monitor in the `internal_metrics`.
+
+
 
 - Evolve vector to use a tag/filter model like our competitors, have a 'pipeline' be a 'tag'.
 
+Not able to add internal metrics to specific transforms and monitor them.
+Doesn't block to create other sources/sinks.
 
 - Run a single vector per-'pipeline' and support metric tagging to distinguish at the telemetry level.
 
+Adds lot of complexity and would add some constraints regarding resources that can only been used once.
+Doesn't block to create other sources/sinks.
 
 ## Outstanding Questions
 
@@ -238,6 +247,10 @@ This would imply some duplication if a transform is used in multiple configurati
 ```bash
 vector --pipeline-dir /foo/bar/pipelines
 ```
+
+- Should `pipelines` enable reuse? Should we be able to use it several times across a configuration?
+- Should the `ops` have to do anything for a pipeline to load? Should we reference a pipeline in the configuration?
+- Should the `devs` write a sort of function or a snippet (as a pipeline) that the `ops` would use?
 
 ## Plan Of Attack
 
