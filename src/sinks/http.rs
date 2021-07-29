@@ -407,7 +407,7 @@ mod tests {
         user = "user"
         password = "password"
         "#;
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         let cx = SinkContext::new_test();
 
