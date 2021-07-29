@@ -348,7 +348,7 @@ mod test {
             let target = VrlTarget::new(Event::Log(LogEvent::from(value)));
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(vrl_core::Target::get(&target, &path), expect)
+            assert_eq!(vrl_core::Target::get(&target, &path), expect);
         }
     }
 
@@ -554,7 +554,7 @@ mod test {
             assert_eq!(
                 vrl_core::Target::get(&target, &LookupBuf::root()),
                 Ok(expect)
-            )
+            );
         }
     }
 
@@ -605,7 +605,7 @@ mod test {
                     .into_iter()
                     .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))
                     .collect::<Vec<_>>()
-            )
+            );
         }
     }
 

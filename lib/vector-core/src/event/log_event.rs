@@ -151,7 +151,7 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
         match &self.fields {
-            Value::Map(map) => util::log::keys(&map),
+            Value::Map(map) => util::log::keys(map),
             _ => unreachable!(),
         }
     }
@@ -169,7 +169,7 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
         match &self.fields {
-            Value::Map(map) => &map,
+            Value::Map(map) => map,
             _ => unreachable!(),
         }
     }

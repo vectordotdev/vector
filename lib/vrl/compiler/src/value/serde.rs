@@ -15,7 +15,7 @@ impl Serialize for Value {
         use Value::*;
 
         match &self {
-            Bytes(v) => serializer.serialize_str(&String::from_utf8_lossy(&v)),
+            Bytes(v) => serializer.serialize_str(&String::from_utf8_lossy(v)),
             Integer(v) => serializer.serialize_i64(*v),
             Float(v) => serializer.serialize_f64(v.into_inner()),
             Boolean(v) => serializer.serialize_bool(*v),

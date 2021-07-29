@@ -123,7 +123,7 @@ fn parse_time(
 ) -> std::result::Result<DateTime<Utc>, String> {
     timezone
         .datetime_from_str(time, format)
-        .or_else(|_| DateTime::parse_from_str(time, &format).map(Into::into))
+        .or_else(|_| DateTime::parse_from_str(time, format).map(Into::into))
         .map_err(|err| {
             format!(
                 "failed parsing timestamp {} using format {}: {}",
@@ -142,7 +142,7 @@ fn capture_value(
     timezone: &TimeZone,
 ) -> std::result::Result<Value, String> {
     Ok(match name {
-        "timestamp" => Value::Timestamp(parse_time(&value, &timestamp_format, timezone)?),
+        "timestamp" => Value::Timestamp(parse_time(value, timestamp_format, timezone)?),
         "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
             value
                 .parse()
@@ -166,7 +166,7 @@ pub fn log_fields(
                 captures.name(name).map(|value| {
                     Ok((
                         name.to_string(),
-                        capture_value(&name, &value.as_str(), &timestamp_format, timezone)?,
+                        capture_value(name, value.as_str(), timestamp_format, timezone)?,
                     ))
                 })
             })

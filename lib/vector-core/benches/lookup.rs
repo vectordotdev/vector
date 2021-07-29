@@ -40,8 +40,8 @@ fn lookup_to_string(c: &mut Criterion) {
         group_from_elem.bench_with_input(
             BenchmarkId::from_parameter(&fixture),
             &fixture.clone(),
-            move |b, ref param| {
-                let input = &(*param).clone();
+            move |b, param| {
+                let input = param.clone();
                 b.iter_batched(
                     || input.clone(),
                     |input| Lookup::try_from(input).unwrap(),
@@ -58,8 +58,8 @@ fn lookup_to_string(c: &mut Criterion) {
         group_to_string.bench_with_input(
             BenchmarkId::from_parameter(&fixture),
             &fixture.clone(),
-            move |b, ref param| {
-                let input = &(*param).clone();
+            move |b, param| {
+                let input = param.clone();
                 b.iter_batched(
                     || Lookup::try_from(input.clone()).unwrap(),
                     |input| input.to_string(),
@@ -76,8 +76,8 @@ fn lookup_to_string(c: &mut Criterion) {
         group_serialize.bench_with_input(
             BenchmarkId::from_parameter(&fixture),
             &fixture.clone(),
-            move |b, ref param| {
-                let input = &(*param).clone();
+            move |b, param| {
+                let input = param.clone();
                 b.iter_batched(
                     || Lookup::try_from(input.clone()).unwrap(),
                     |input| serde_json::to_string(&input),
@@ -94,8 +94,8 @@ fn lookup_to_string(c: &mut Criterion) {
         group_deserialize.bench_with_input(
             BenchmarkId::from_parameter(&fixture),
             &fixture.clone(),
-            move |b, ref param| {
-                let input = &(*param).clone();
+            move |b, param| {
+                let input = param.clone();
                 b.iter_batched(
                     || serde_json::to_string(&Lookup::try_from(input.clone()).unwrap()).unwrap(),
                     |input| serde_json::from_str::<Lookup>(&input).unwrap(),

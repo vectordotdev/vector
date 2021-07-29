@@ -43,7 +43,7 @@ async fn start_test(
             compression = "none"
             batch.max_events = 1
         "#};
-    let (mut config, cx) = load_sink::<DatadogLogsConfig>(&config).unwrap();
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(config).unwrap();
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it

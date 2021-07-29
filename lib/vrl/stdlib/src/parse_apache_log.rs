@@ -105,7 +105,7 @@ impl Expression for ParseApacheLogFn {
             .captures(&message)
             .ok_or("failed parsing common log line")?;
 
-        log_util::log_fields(&regex, &captures, &timestamp_format, ctx.timezone())
+        log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
             .map_err(Into::into)
     }
 

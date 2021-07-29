@@ -332,7 +332,7 @@ mod test {
             "metric.distribution.sample_rates[1] == 10",
             "metric.distribution.sample_rates[2] == 20",
         ];
-        assert_metric(metric, assertions)
+        assert_metric(metric, assertions);
     }
 
     #[test]
@@ -357,7 +357,7 @@ mod test {
             "metric.aggregated_histogram.count == 87",
             "metric.aggregated_histogram.sum == 975.2",
         ];
-        assert_metric(metric, assertions)
+        assert_metric(metric, assertions);
     }
 
     #[test]
@@ -382,7 +382,7 @@ mod test {
             "metric.aggregated_summary.count == 197",
             "metric.aggregated_summary.sum == 975.2",
         ];
-        assert_metric(metric, assertions)
+        assert_metric(metric, assertions);
     }
 
     #[test]

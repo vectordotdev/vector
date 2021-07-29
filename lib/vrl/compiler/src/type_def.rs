@@ -1117,7 +1117,7 @@ impl TypeDef {
     pub fn update_path(&self, path: &LookupBuf, kind: &KindInfo) -> Self {
         let segments = path.as_segments();
         let peekable = segments.iter().peekable();
-        let kind = Self::update_segment(&self.kind, peekable, &kind);
+        let kind = Self::update_segment(&self.kind, peekable, kind);
 
         TypeDef {
             fallible: self.fallible,

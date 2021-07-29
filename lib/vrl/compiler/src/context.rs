@@ -29,7 +29,7 @@ impl<'a> Context<'a> {
 
     /// Get a reference to the [`runtime state`](Runtime).
     pub fn state(&self) -> &Runtime {
-        &self.state
+        self.state
     }
 
     /// Get a mutable reference to the [`runtime state`](Runtime).
@@ -39,6 +39,6 @@ impl<'a> Context<'a> {
 
     /// Get a reference to the [`TimeZone`]
     pub fn timezone(&self) -> &TimeZone {
-        &self.timezone
+        self.timezone
     }
 }
