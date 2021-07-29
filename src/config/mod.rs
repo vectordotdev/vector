@@ -227,6 +227,11 @@ pub struct SourceOuter {
     pub acknowledgements: bool,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub proxy: ProxyConfig,
 }
 
 fn default_acknowledgements() -> bool {
@@ -238,6 +243,7 @@ impl SourceOuter {
         Self {
             acknowledgements: default_acknowledgements(),
             inner: Box::new(source),
+            proxy: Default::default(),
         }
     }
 }
@@ -263,6 +269,7 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
     pub acknowledgements: bool,
+    pub proxy: ProxyConfig,
 }
 
 impl SourceContext {
@@ -280,6 +287,7 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 acknowledgements: default_acknowledgements(),
+                proxy: Default::default(),
             },
             shutdown,
         )
@@ -293,6 +301,7 @@ impl SourceContext {
             shutdown: ShutdownSignal::noop(),
             out,
             acknowledgements: default_acknowledgements(),
+            proxy: Default::default(),
         }
     }
 }
@@ -318,6 +327,12 @@ pub struct SinkOuter {
 
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
+
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    proxy: ProxyConfig,
 }
 
 impl SinkOuter {
@@ -328,6 +343,7 @@ impl SinkOuter {
             healthcheck_uri: None,
             inner,
             inputs,
+            proxy: Default::default(),
         }
     }
 
@@ -351,6 +367,10 @@ impl SinkOuter {
                 .or_else(|| self.healthcheck_uri.clone()),
             ..self.healthcheck.clone()
         }
+    }
+
+    pub fn proxy(&self) -> &ProxyConfig {
+        &self.proxy
     }
 }
 
@@ -408,6 +428,7 @@ pub struct SinkContext {
     pub(super) acker: Acker,
     pub(super) healthcheck: SinkHealthcheckOptions,
     pub(super) globals: GlobalOptions,
+    pub(super) proxy: ProxyConfig,
 }
 
 impl SinkContext {
@@ -417,6 +438,7 @@ impl SinkContext {
             acker: Acker::Null,
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
+            proxy: ProxyConfig::default(),
         }
     }
 
@@ -426,6 +448,10 @@ impl SinkContext {
 
     pub fn globals(&self) -> &GlobalOptions {
         &self.globals
+    }
+
+    pub fn proxy(&self) -> &ProxyConfig {
+        &self.proxy
     }
 }
 
@@ -808,8 +834,11 @@ mod test {
                   no_proxy = ["localhost", "127.0.0.1"]
 
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                  type = "nginx_metrics"
+                  endpoints = ["http://localhost:8000/basic_status"]
+                  proxy.http = "http://server:3128"
+                  proxy.https = "http://other:3128"
+                  proxy.no_proxy = ["localhost", "127.0.0.1"]
 
                 [sinks.out]
                   type = "console"
@@ -822,6 +851,10 @@ mod test {
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
         assert!(config.global.proxy.no_proxy.matches("localhost"));
+        let source = config.sources.get("in").unwrap();
+        assert_eq!(source.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(source.proxy.https, Some("http://other:3128".into()));
+        assert!(source.proxy.no_proxy.matches("localhost"));
     }
 }
 

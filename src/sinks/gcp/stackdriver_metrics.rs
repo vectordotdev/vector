@@ -1,4 +1,4 @@
-use crate::config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription};
+use crate::config::{DataType, SinkConfig, SinkContext, SinkDescription};
 use crate::event::{Event, Metric, MetricValue};
 use crate::http::HttpClient;
 use crate::sinks::gcp;
@@ -27,11 +27,6 @@ pub struct StackdriverConfig {
     #[serde(default)]
     pub batch: BatchConfig,
     pub tls: Option<TlsOptions>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -63,8 +58,7 @@ impl SinkConfig for StackdriverConfig {
         let started = chrono::Utc::now();
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(tls_settings, &proxy)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy())?;
         let batch = BatchSettings::default()
             .events(1)
             .parse_config(self.batch)?;

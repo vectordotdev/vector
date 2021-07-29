@@ -51,11 +51,6 @@ pub struct CloudWatchMetricsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 lazy_static! {
@@ -79,7 +74,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(&cx.globals.proxy)?;
+        let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
         Ok((sink, healthcheck))
@@ -109,7 +104,7 @@ impl CloudWatchMetricsSinkConfig {
         client.put_metric_data(request).await.map_err(Into::into)
     }
 
-    fn create_client(&self, global_proxy: &ProxyConfig) -> crate::Result<CloudWatchClient> {
+    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudWatchClient> {
         let region = (&self.region).try_into()?;
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
@@ -124,7 +119,6 @@ impl CloudWatchMetricsSinkConfig {
             region
         };
 
-        let proxy = ProxyConfig::merge_with_env(&global_proxy, &self.proxy);
         let client = rusoto::client(&proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 

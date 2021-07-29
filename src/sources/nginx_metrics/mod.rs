@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     event::Event,
     http::{Auth, HttpClient},
@@ -61,11 +61,6 @@ struct NginxMetricsConfig {
     namespace: String,
     tls: Option<TlsOptions>,
     auth: Option<Auth>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -87,8 +82,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let http_client = HttpClient::new(tls, &proxy)?;
+        let http_client = HttpClient::new(tls, &cx.proxy)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
         let mut sources = Vec::with_capacity(self.endpoints.len());
@@ -253,12 +247,15 @@ mod tests {
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util::trace_init, Pipeline};
+    use crate::{config::ProxyConfig, test_util::trace_init, Pipeline};
 
     async fn test_nginx(endpoint: &'static str, auth: Option<Auth>, proxy: ProxyConfig) {
         trace_init();
 
         let (sender, mut recv) = Pipeline::new_test();
+
+        let mut ctx = SourceContext::new_test(sender);
+        ctx.proxy = proxy;
 
         tokio::spawn(async move {
             NginxMetricsConfig {
@@ -267,9 +264,8 @@ mod integration_tests {
                 namespace: "vector_nginx".to_owned(),
                 tls: None,
                 auth,
-                proxy,
             }
-            .build(SourceContext::new_test(sender))
+            .build(ctx)
             .await
             .unwrap()
             .await

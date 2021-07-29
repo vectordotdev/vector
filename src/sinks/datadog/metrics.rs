@@ -1,6 +1,6 @@
 use super::healthcheck;
 use crate::{
-    config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, Sample, StatisticKind},
     event::Event,
     http::HttpClient,
@@ -56,11 +56,6 @@ pub struct DatadogConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 struct DatadogSink {
@@ -187,8 +182,7 @@ impl_generate_config_from_default!(DatadogConfig);
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(None, &proxy)?;
+        let client = HttpClient::new(None, &cx.proxy())?;
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.api_key.clone(),

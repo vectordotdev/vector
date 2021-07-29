@@ -1,6 +1,6 @@
 use super::Region;
 use crate::{
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -41,11 +41,6 @@ struct SematextMetricsConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 inventory::submit! {
@@ -86,8 +81,7 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(None, &proxy)?;
+        let client = HttpClient::new(None, cx.proxy())?;
 
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), None) => endpoint.clone(),

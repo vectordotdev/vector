@@ -33,11 +33,6 @@ struct ApacheMetricsConfig {
     scrape_interval_secs: u64,
     #[serde(default = "default_namespace")]
     namespace: String,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -58,7 +53,6 @@ impl GenerateConfig for ApacheMetricsConfig {
             endpoints: vec!["http://localhost:8080/server-status/?auto".to_owned()],
             scrape_interval_secs: default_scrape_interval_secs(),
             namespace: default_namespace(),
-            proxy: Default::default(),
         })
         .unwrap()
     }
@@ -76,7 +70,6 @@ impl SourceConfig for ApacheMetricsConfig {
             .context(super::UriParseError)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
 
         Ok(apache_metrics(
             urls,
@@ -84,7 +77,7 @@ impl SourceConfig for ApacheMetricsConfig {
             namespace,
             cx.shutdown,
             cx.out,
-            proxy,
+            cx.proxy,
         ))
     }
 
@@ -352,7 +345,6 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             endpoints: vec![format!("http://foo:bar@{}/metrics", in_addr)],
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
-            proxy: Default::default(),
         }
         .build(SourceContext::new_test(tx))
         .await
@@ -414,7 +406,6 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             endpoints: vec![format!("http://{}", in_addr)],
             scrape_interval_secs: 1,
             namespace: "apache".to_string(),
-            proxy: Default::default(),
         }
         .build(SourceContext::new_test(tx))
         .await
@@ -449,7 +440,6 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             endpoints: vec![format!("http://{}", in_addr)],
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
-            proxy: Default::default(),
         }
         .build(SourceContext::new_test(tx))
         .await

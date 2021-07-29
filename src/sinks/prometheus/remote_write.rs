@@ -1,6 +1,6 @@
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    config::{self, ProxyConfig, SinkConfig, SinkDescription},
+    config::{self, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::{Auth, HttpClient},
     internal_events::TemplateRenderingFailed,
@@ -55,11 +55,6 @@ pub(crate) struct RemoteWriteConfig {
     pub tls: Option<TlsOptions>,
 
     pub auth: Option<Auth>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 inventory::submit! {
@@ -89,8 +84,7 @@ impl SinkConfig for RemoteWriteConfig {
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
 
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(tls_settings, &proxy)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let tenant_id = self.tenant_id.clone();
         let auth = self.auth.clone();
 

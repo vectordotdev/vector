@@ -80,11 +80,6 @@ pub struct CloudwatchLogsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 inventory::submit! {
@@ -110,7 +105,6 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         request: Default::default(),
         assume_role: Default::default(),
         auth: Default::default(),
-        proxy: Default::default(),
     }
 }
 
@@ -168,10 +162,9 @@ pub enum CloudwatchError {
 }
 
 impl CloudwatchLogsSinkConfig {
-    fn create_client(&self, global_proxy: &ProxyConfig) -> crate::Result<CloudWatchLogsClient> {
+    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudWatchLogsClient> {
         let region = (&self.region).try_into()?;
 
-        let proxy = ProxyConfig::merge_with_env(&global_proxy, &self.proxy);
         let client = rusoto::client(&proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
@@ -197,7 +190,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
-        let client = self.create_client(&cx.globals.proxy)?;
+        let client = self.create_client(&cx.proxy())?;
         let svc = ServiceBuilder::new()
             .concurrency_limit(request.concurrency.unwrap())
             .service(CloudwatchLogsPartitionSvc::new(
@@ -870,7 +863,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
@@ -901,7 +894,6 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
-            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -949,7 +941,6 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
-            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1016,7 +1007,6 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
-            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1089,7 +1079,6 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
-            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1142,7 +1131,6 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
-            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1191,7 +1179,6 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
-            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1278,7 +1265,6 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
-            proxy: Default::default(),
         };
 
         let client = config.create_client(&ProxyConfig::default()).unwrap();

@@ -13,9 +13,7 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
@@ -58,11 +56,6 @@ pub struct LokiConfig {
     batch: BatchConfig,
 
     tls: Option<TlsOptions>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -119,8 +112,7 @@ impl SinkConfig for LokiConfig {
             .timeout(1)
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(tls, &proxy)?;
+        let client = HttpClient::new(tls, &cx.proxy())?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
@@ -310,6 +302,7 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ProxyConfig;
     use crate::event::Event;
     use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::{build_test_server, load_sink};

@@ -1,6 +1,6 @@
 use self::types::Stats;
 use crate::{
-    config::{self, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{self, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     http::HttpClient,
     internal_events::{
@@ -24,11 +24,6 @@ struct EventStoreDbConfig {
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     default_namespace: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -49,12 +44,10 @@ impl_generate_config_from_default!(EventStoreDbConfig);
 #[typetag::serde(name = "eventstoredb_metrics")]
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         eventstoredb(
             self.endpoint.as_str(),
             self.scrape_interval_secs,
             self.default_namespace.clone(),
-            proxy,
             cx,
         )
     }
@@ -72,7 +65,6 @@ fn eventstoredb(
     endpoint: &str,
     interval: u64,
     namespace: Option<String>,
-    proxy: ProxyConfig,
     cx: SourceContext,
 ) -> crate::Result<super::Source> {
     let mut out = cx
@@ -81,7 +73,7 @@ fn eventstoredb(
     let mut ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
-    let client = HttpClient::new(tls_settings, &proxy)?;
+    let client = HttpClient::new(tls_settings, &cx.proxy)?;
     let url: Uri = endpoint.parse()?;
 
     Ok(Box::pin(
@@ -155,7 +147,6 @@ mod integration_tests {
             endpoint: EVENTSTOREDB_SCRAP_ADDRESS.to_owned(),
             scrape_interval_secs: 1,
             default_namespace: None,
-            proxy: Default::default(),
         };
 
         let (tx, rx) = Pipeline::new_test();

@@ -51,11 +51,6 @@ pub struct KinesisFirehoseSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 lazy_static! {
@@ -94,7 +89,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(&cx.globals.proxy)?;
+        let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
@@ -132,10 +127,9 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
-    fn create_client(&self, global_proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
+    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
         let region = (&self.region).try_into()?;
 
-        let proxy = ProxyConfig::merge_with_env(&global_proxy, &self.proxy);
         let client = rusoto::client(&proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
@@ -345,12 +339,11 @@ mod integration_tests {
             },
             assume_role: None,
             auth: Default::default(),
-            proxy: Default::default(),
         };
 
         let cx = SinkContext::new_test();
 
-        let client = config.create_client(&cx.globals.proxy).unwrap();
+        let client = config.create_client(&cx.proxy).unwrap();
         let mut sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
         let (input, events) = random_events_with_stream(100, 100, None);

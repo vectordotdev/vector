@@ -50,11 +50,6 @@ struct AwsS3Config {
     assume_role: Option<String>,
     #[serde(default)]
     auth: AwsAuthentication,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 
     multiline: Option<MultilineConfig>,
 }
@@ -77,7 +72,7 @@ impl SourceConfig for AwsS3Config {
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
-                self.create_sqs_ingestor(multiline_config, &cx.globals.proxy)
+                self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
                     .run(cx.out, cx.shutdown),
             )),
@@ -97,13 +92,12 @@ impl AwsS3Config {
     async fn create_sqs_ingestor(
         &self,
         multiline: Option<line_agg::Config>,
-        global_proxy: &ProxyConfig,
+        proxy: &ProxyConfig,
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         use std::sync::Arc;
 
         let region: Region = (&self.region).try_into().context(RegionParse {})?;
 
-        let proxy = ProxyConfig::merge_with_env(&global_proxy, &self.proxy);
         let client = rusoto::client(&proxy).with_context(|| Client {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth

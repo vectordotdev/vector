@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{HttpClient, HttpClientFuture, HttpError},
     internal_events::TemplateRenderingFailed,
@@ -73,11 +73,6 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     auth: GcpAuthConfig,
     tls: Option<TlsOptions>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 }
 
 #[cfg(test)]
@@ -97,7 +92,6 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
         request: Default::default(),
         auth: Default::default(),
         tls: Default::default(),
-        proxy: Default::default(),
     }
 }
 
@@ -202,8 +196,7 @@ impl GcsSink {
             .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &config.proxy);
-        let client = HttpClient::new(tls, &proxy)?;
+        let client = HttpClient::new(tls, &cx.proxy())?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {

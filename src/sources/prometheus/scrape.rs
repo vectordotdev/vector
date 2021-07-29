@@ -37,11 +37,6 @@ struct PrometheusScrapeConfig {
     scrape_interval_secs: u64,
     tls: Option<TlsOptions>,
     auth: Option<Auth>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -63,7 +58,6 @@ impl GenerateConfig for PrometheusScrapeConfig {
             scrape_interval_secs: default_scrape_interval_secs(),
             tls: None,
             auth: None,
-            proxy: Default::default(),
         })
         .unwrap()
     }
@@ -79,12 +73,11 @@ impl SourceConfig for PrometheusScrapeConfig {
             .map(|s| s.parse::<http::Uri>().context(sources::UriParseError))
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
         Ok(prometheus(
             urls,
             tls,
             self.auth.clone(),
-            proxy,
+            cx.proxy.clone(),
             self.scrape_interval_secs,
             cx.shutdown,
             cx.out,
@@ -112,11 +105,6 @@ struct PrometheusCompatConfig {
     scrape_interval_secs: u64,
     tls: Option<TlsOptions>,
     auth: Option<Auth>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 }
 
 #[async_trait::async_trait]
@@ -130,7 +118,6 @@ impl SourceConfig for PrometheusCompatConfig {
             scrape_interval_secs: self.scrape_interval_secs,
             tls: self.tls.clone(),
             auth: self.auth.clone(),
-            proxy: self.proxy.clone(),
         };
         config.build(cx).await
     }
@@ -321,7 +308,6 @@ mod test {
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
-                proxy: Default::default(),
             },
         );
         config.add_sink(
@@ -403,7 +389,6 @@ mod integration_tests {
             scrape_interval_secs: 1,
             auth: None,
             tls: None,
-            proxy: Default::default(),
         };
 
         let (tx, rx) = Pipeline::new_test();

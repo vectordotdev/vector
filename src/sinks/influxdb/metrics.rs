@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
@@ -56,11 +56,6 @@ pub struct InfluxDbConfig {
     pub request: TowerRequestConfig,
     pub tags: Option<HashMap<String, String>>,
     pub tls: Option<TlsOptions>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 }
@@ -93,8 +88,7 @@ impl_generate_config_from_default!(InfluxDbConfig);
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(tls_settings, &proxy)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
@@ -842,7 +836,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use crate::{
-        config::{ProxyConfig, SinkConfig, SinkContext},
+        config::{SinkConfig, SinkContext},
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
         http::HttpClient,
@@ -899,7 +893,6 @@ mod integration_tests {
             quantiles: default_summary_quantiles(),
             tags: None,
             default_namespace: None,
-            proxy: Default::default(),
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
@@ -991,7 +984,6 @@ mod integration_tests {
             tags: None,
             tls: None,
             default_namespace: None,
-            proxy: Default::default(),
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
@@ -1016,8 +1008,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(None, cx.proxy()).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 

@@ -1,9 +1,6 @@
 use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
-    config::{
-        DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-        TransformConfig,
-    },
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
@@ -41,12 +38,6 @@ pub struct HumioMetricsConfig {
     batch: BatchConfig,
 
     tls: Option<TlsOptions>,
-
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
     // The obove settings are copied from HumioLogsConfig. In theory we should do below:
     //
     // #[serde(flatten)]
@@ -88,7 +79,6 @@ impl SinkConfig for HumioMetricsConfig {
             request: self.request,
             batch: self.batch,
             tls: self.tls.clone(),
-            proxy: self.proxy.clone(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;

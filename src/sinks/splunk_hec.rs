@@ -1,7 +1,5 @@
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
     http::HttpClient,
     internal_events::{SplunkEventEncodeError, SplunkEventSent, TemplateRenderingFailed},
@@ -51,11 +49,6 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 lazy_static! {
@@ -96,7 +89,6 @@ impl GenerateConfig for HecSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            proxy: Default::default(),
         })
         .unwrap()
     }
@@ -117,8 +109,7 @@ impl SinkConfig for HecSinkConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(tls_settings, &proxy)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -459,7 +450,7 @@ mod integration_tests {
     use crate::test_util::retry_until;
     use crate::{
         assert_downcast_matches,
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         sinks,
         test_util::{random_lines_with_stream, random_string},
     };
@@ -816,7 +807,6 @@ mod integration_tests {
             },
             request: TowerRequestConfig::default(),
             tls: None,
-            proxy: Default::default(),
         }
     }
 

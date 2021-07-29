@@ -1,7 +1,5 @@
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -47,11 +45,6 @@ pub struct InfluxDbLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 #[derive(Debug)]
@@ -106,8 +99,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         tags.insert(log_schema().source_type_key().to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(tls_settings, &proxy)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()
@@ -703,7 +695,6 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             tls: None,
-            proxy: Default::default(),
         };
 
         let (sink, _) = config.build(cx).await.unwrap();

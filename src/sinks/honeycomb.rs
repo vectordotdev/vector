@@ -1,7 +1,5 @@
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -32,11 +30,6 @@ pub struct HoneycombConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
 }
 
 inventory::submit! {
@@ -66,8 +59,7 @@ impl SinkConfig for HoneycombConfig {
             .timeout(1)
             .parse_config(self.batch)?;
 
-        let proxy = ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy);
-        let client = HttpClient::new(None, &proxy)?;
+        let client = HttpClient::new(None, &cx.proxy())?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),

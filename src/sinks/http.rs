@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HttpEventEncoded, HttpEventMissingMessage},
@@ -55,11 +55,6 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
 }
 
 #[cfg(test)]
@@ -74,7 +69,6 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
         encoding: e.into(),
         request: Default::default(),
         tls: Default::default(),
-        proxy: Default::default(),
     }
 }
 
@@ -125,14 +119,9 @@ impl GenerateConfig for HttpSinkConfig {
 }
 
 impl HttpSinkConfig {
-    fn build_proxy_config(&self, cx: &SinkContext) -> ProxyConfig {
-        ProxyConfig::merge_with_env(&cx.globals.proxy, &self.proxy)
-    }
-
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(&self.tls)?;
-        let proxy = self.build_proxy_config(cx);
-        Ok(HttpClient::new(tls, &proxy)?)
+        Ok(HttpClient::new(tls, &cx.proxy())?)
     }
 }
 
@@ -350,44 +339,6 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<HttpSinkConfig>();
-    }
-
-    #[test]
-    fn http_proxy_config() {
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        encoding = "text"
-        [proxy]
-        http = "somewhere:1234"
-        https = "nowhere:2345"
-        no_proxy = "foo.bar"
-        "#;
-        let config: HttpSinkConfig = toml::from_str(config).unwrap();
-        assert_eq!(config.proxy.http, Some("somewhere:1234".into()));
-        assert_eq!(config.proxy.https, Some("nowhere:2345".into()));
-        assert!(config.proxy.no_proxy.matches("foo.bar"));
-    }
-
-    #[tokio::test]
-    async fn with_global_proxy() {
-        let mut ctx = SinkContext::new_test();
-        ctx.globals.proxy = ProxyConfig {
-            http: Some("http://proxy.server".into()),
-            ..Default::default()
-        };
-        let config = r#"
-        uri = "http://127.0.0.1/frames"
-        encoding = "text"
-        [proxy]
-        https = "https://foo.bar:2345"
-        no_proxy = "localhost"
-        "#;
-
-        let config: HttpSinkConfig = toml::from_str(config).unwrap();
-        let proxy = config.build_proxy_config(&ctx);
-
-        assert_eq!(proxy.http, Some("http://proxy.server".into()));
-        assert_eq!(proxy.https, Some("https://foo.bar:2345".into()));
     }
 
     #[test]
