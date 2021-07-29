@@ -310,6 +310,6 @@ impl<'de> Visitor<'de> for LookupVisitor<'de> {
 
 impl<'a> AsRef<Lookup<'a>> for Lookup<'a> {
     fn as_ref(&self) -> &Lookup<'a> {
-        &self
+        self
     }
 }

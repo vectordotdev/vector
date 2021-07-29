@@ -34,7 +34,7 @@ impl Recorder for VectorRecorder {
         _description: Option<&'static str>,
     ) {
         self.registry
-            .op(MetricKind::Histogram, key, |_| {}, Handle::histogram)
+            .op(MetricKind::Histogram, key, |_| {}, Handle::histogram);
     }
 
     fn increment_counter(&self, key: &Key, value: u64) {

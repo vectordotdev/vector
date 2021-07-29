@@ -389,7 +389,7 @@ mod integration_tests {
             let hit = hit
                 .get("_source")
                 .expect("Elasticsearch hit missing _source");
-            assert!(input.contains(&hit));
+            assert!(input.contains(hit));
         }
     }
 

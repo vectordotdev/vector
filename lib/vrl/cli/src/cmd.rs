@@ -39,7 +39,7 @@ pub struct Opts {
 impl Opts {
     fn timezone(&self) -> Result<TimeZone, Error> {
         if let Some(ref tz) = self.timezone {
-            TimeZone::parse(&tz)
+            TimeZone::parse(tz)
                 .ok_or_else(|| Error::Parse(format!("unable to parse timezone: {}", tz)))
         } else {
             Ok(TimeZone::default())
@@ -66,7 +66,7 @@ impl Opts {
             "" => Ok(vec![Value::Object(BTreeMap::default())]),
             _ => input
                 .lines()
-                .map(|line| Ok(serde_to_vrl(serde_json::from_str(&line)?)))
+                .map(|line| Ok(serde_to_vrl(serde_json::from_str(line)?)))
                 .collect::<Result<Vec<Value>, Error>>(),
         }
     }

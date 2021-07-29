@@ -126,8 +126,8 @@ fn matches_vrl_object(node: &QueryNode, obj: &Value) -> bool {
         } => range(attr, obj, lower, *lower_inclusive, upper, *upper_inclusive),
         QueryNode::NegatedNode { node } => !matches_vrl_object(node, obj),
         QueryNode::Boolean { oper, nodes } => match oper {
-            BooleanType::And => nodes.iter().all(|node| matches_vrl_object(&node, &obj)),
-            BooleanType::Or => nodes.iter().any(|node| matches_vrl_object(&node, &obj)),
+            BooleanType::And => nodes.iter().all(|node| matches_vrl_object(node, obj)),
+            BooleanType::Or => nodes.iter().any(|node| matches_vrl_object(node, obj)),
         },
     }
 }
@@ -393,7 +393,7 @@ fn range<T: AsRef<str> + Copy>(
             };
 
             // Must match on both lower and upper bound.
-            compare(&field, &value, &lower_op, &lower) && compare(&field, &value, &upper_op, &upper)
+            compare(&field, value, &lower_op, lower) && compare(&field, value, &upper_op, upper)
         }
     })
 }

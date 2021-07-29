@@ -122,7 +122,7 @@ fn log_operation_maintains_size() {
                     current_size += new_value_sz;
                 }
                 Action::SizeOf => {
-                    assert_eq!(current_size, log_event.size_of())
+                    assert_eq!(current_size, log_event.size_of());
                 }
                 Action::Contains { key } => {
                     log_event.contains(key);

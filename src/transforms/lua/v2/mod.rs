@@ -169,7 +169,7 @@ impl Lua {
 
         let hook_shutdown_code = config.hooks.shutdown.as_ref();
         let hook_shutdown = hook_shutdown_code
-            .map(|code| make_registry_value(&lua, &code))
+            .map(|code| make_registry_value(&lua, code))
             .transpose()
             .context(InvalidHooksShutdown)?;
 

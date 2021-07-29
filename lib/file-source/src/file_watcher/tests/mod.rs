@@ -151,7 +151,7 @@ impl Arbitrary for FileWatcherAction {
                     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
                 let ln_sz = *g.choose(&(1..32).collect::<Vec<_>>()).unwrap();
                 FileWatcherAction::WriteLine(
-                    std::iter::repeat_with(|| *g.choose(&GEN_ASCII_STR_CHARSET).unwrap())
+                    std::iter::repeat_with(|| *g.choose(GEN_ASCII_STR_CHARSET).unwrap())
                         .take(ln_sz)
                         .map(|v| -> char { v.into() })
                         .collect(),

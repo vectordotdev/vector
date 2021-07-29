@@ -1138,7 +1138,7 @@ mod integration_tests {
                     request.add_header(header, value);
                 }
 
-                builder = finish_signer(&mut request, &credentials_provider, builder).await?;
+                builder = finish_signer(&mut request, credentials_provider, builder).await?;
             } else {
                 if let Some(ce) = self.compression.content_encoding() {
                     builder = builder.header("Content-Encoding", ce);
@@ -1423,7 +1423,7 @@ mod integration_tests {
         break_events: bool,
         batch_status: BatchStatus,
     ) {
-        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let common = ElasticSearchCommon::parse_config(config).expect("Config error");
         let index = match config.mode {
             // Data stream mode uses an index name generated from the event.
             ElasticSearchMode::DataStream => format!(
@@ -1508,7 +1508,7 @@ mod integration_tests {
                     let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
                     obj.insert(log_schema().timestamp_key().into(), timestamp);
                 }
-                assert!(input.contains(&hit));
+                assert!(input.contains(hit));
             }
         }
     }
