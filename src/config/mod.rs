@@ -225,13 +225,13 @@ macro_rules! impl_generate_config_from_default {
 pub struct SourceOuter {
     #[serde(default = "default_acknowledgements")]
     pub acknowledgements: bool,
-    #[serde(flatten)]
-    pub(super) inner: Box<dyn SourceConfig>,
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub proxy: ProxyConfig,
+    #[serde(flatten)]
+    pub(super) inner: Box<dyn SourceConfig>,
 }
 
 fn default_acknowledgements() -> bool {
@@ -325,14 +325,14 @@ pub struct SinkOuter {
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
 
-    #[serde(flatten)]
-    pub inner: Box<dyn SinkConfig>,
-
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+
+    #[serde(flatten)]
+    pub inner: Box<dyn SinkConfig>,
 }
 
 impl SinkOuter {
