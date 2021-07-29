@@ -8,6 +8,14 @@ const YAML = require('yaml');
 const getExampleValue = (param, deepFilter) => {
   let value;
 
+  const getArrayValue = (obj) => {
+    const enumVal = (obj.enum != null) ? [Object.keys(obj.enum)[0]] : null;
+
+    const examplesVal = (obj.examples != null && obj.examples.length > 0) ? [obj.examples[0]] : null;
+
+    return obj.default || examplesVal || enumVal || null;
+  }
+
   const getValue = (obj) => {
     const enumVal = (obj.enum != null) ? Object.keys(obj.enum)[0] : null;
 
@@ -20,11 +28,14 @@ const getExampleValue = (param, deepFilter) => {
     const p = param.type[k];
 
     if (['array', 'object'].includes(k)) {
+      const topType = k;
+
       if (p.items && p.items.type) {
         const typeInfo = p.items.type;
 
         Object.keys(typeInfo).forEach(k => {
           if (['array', 'object'].includes(k)) {
+            const subType = k;
             const options = typeInfo[k].options;
 
             var subObj = {};
@@ -35,13 +46,23 @@ const getExampleValue = (param, deepFilter) => {
               .forEach(k => {
                 Object.keys(options[k].type).forEach(key => {
                   const deepTypeInfo = options[k].type[key];
-                  subObj[k] = getValue(deepTypeInfo);
+
+                  if (subType === 'array') {
+                    subObj[k] = getArrayValue(deepTypeInfo);
+                  } else {
+                    subObj[k] = getValue(deepTypeInfo);
+                  }
+
                 });
               });
 
             value = subObj;
           } else {
-            value = getValue(typeInfo[k]);
+            if (topType === 'array') {
+              value = getArrayValue(typeInfo[k]);
+            } else {
+              value = getValue(typeInfo[k]);
+            }
           }
         });
       }
