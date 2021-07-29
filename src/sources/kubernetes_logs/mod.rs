@@ -8,9 +8,10 @@
 use crate::event::{Event, LogEvent};
 use crate::internal_events::{
     FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
-    KubernetesLogsEventReceived,
+    KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventReceived,
 };
 use crate::kubernetes as k8s;
+use crate::kubernetes::hash_value::HashKey;
 use crate::{
     config::{
         DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext, SourceDescription,
@@ -24,7 +25,7 @@ use file_source::{
     Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
     ReadFrom,
 };
-use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::api::core::v1::{Namespace, Pod};
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use std::convert::TryInto;
@@ -33,6 +34,7 @@ use std::time::Duration;
 
 mod k8s_paths_provider;
 mod lifecycle;
+mod namespace_metadata_annotator;
 mod parser;
 mod partial_events_merger;
 mod path_helpers;
@@ -43,6 +45,7 @@ mod util;
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
+use namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use pod_metadata_annotator::PodMetadataAnnotator;
 
 /// The key we use for `file` field.
@@ -74,8 +77,12 @@ pub struct Config {
     /// Override global data_dir
     data_dir: Option<PathBuf>,
 
-    /// Specifies the field names for metadata annotation.
-    annotation_fields: pod_metadata_annotator::FieldsSpec,
+    /// Specifies the field names for Pod metadata annotation.
+    #[serde(alias = "annotation_fields")]
+    pod_annotation_fields: pod_metadata_annotator::FieldsSpec,
+
+    /// Specifies the field names for Namespace metadata annotation.
+    namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to exclude from reading the files.
     exclude_paths_glob_patterns: Vec<PathBuf>,
@@ -138,7 +145,8 @@ impl Default for Config {
             extra_field_selector: "".to_string(),
             auto_partial_merge: true,
             data_dir: None,
-            annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
+            pod_annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
+            namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec::default(),
             exclude_paths_glob_patterns: default_path_exclusion(),
             max_read_bytes: default_max_read_bytes(),
             max_line_bytes: default_max_line_bytes(),
@@ -179,7 +187,8 @@ struct Source {
     client: k8s::client::Client,
     data_dir: PathBuf,
     auto_partial_merge: bool,
-    fields_spec: pod_metadata_annotator::FieldsSpec,
+    pod_fields_spec: pod_metadata_annotator::FieldsSpec,
+    namespace_fields_spec: namespace_metadata_annotator::FieldsSpec,
     field_selector: String,
     label_selector: String,
     exclude_paths: Vec<glob::Pattern>,
@@ -216,7 +225,8 @@ impl Source {
             client,
             data_dir,
             auto_partial_merge: config.auto_partial_merge,
-            fields_spec: config.annotation_fields.clone(),
+            pod_fields_spec: config.pod_annotation_fields.clone(),
+            namespace_fields_spec: config.namespace_annotation_fields.clone(),
             field_selector,
             label_selector,
             exclude_paths,
@@ -238,7 +248,8 @@ impl Source {
             client,
             data_dir,
             auto_partial_merge,
-            fields_spec,
+            pod_fields_spec,
+            namespace_fields_spec,
             field_selector,
             label_selector,
             exclude_paths,
@@ -250,11 +261,15 @@ impl Source {
             timezone,
         } = self;
 
-        let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
+        let watcher =
+            k8s::api_watcher::ApiWatcher::new(client.clone(), Pod::watch_pod_for_all_namespaces);
         let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
         let (state_reader, state_writer) = evmap::new();
-        let state_writer =
-            k8s::state::evmap::Writer::new(state_writer, Some(Duration::from_millis(10)));
+        let state_writer = k8s::state::evmap::Writer::new(
+            state_writer,
+            Some(Duration::from_millis(10)),
+            HashKey::Uid,
+        );
         let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
         let state_writer =
             k8s::state::delayed_delete::Writer::new(state_writer, Duration::from_secs(60));
@@ -268,8 +283,34 @@ impl Source {
         );
         let reflector_process = reflector.run();
 
-        let paths_provider = K8sPathsProvider::new(state_reader.clone(), exclude_paths);
-        let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
+        // -----------------------------------------------------------------
+
+        let ns_watcher =
+            k8s::api_watcher::ApiWatcher::new(client.clone(), Namespace::watch_namespace);
+        let ns_watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(ns_watcher);
+        let (ns_state_reader, ns_state_writer) = evmap::new();
+        let ns_state_writer = k8s::state::evmap::Writer::new(
+            ns_state_writer,
+            Some(Duration::from_millis(10)),
+            HashKey::Name,
+        );
+        let ns_state_writer = k8s::state::instrumenting::Writer::new(ns_state_writer);
+        let ns_state_writer =
+            k8s::state::delayed_delete::Writer::new(ns_state_writer, Duration::from_secs(60));
+
+        let mut ns_reflector = k8s::reflector::Reflector::new(
+            ns_watcher,
+            ns_state_writer,
+            None,
+            None,
+            Duration::from_secs(1),
+        );
+        let ns_reflector_process = ns_reflector.run();
+
+        let paths_provider =
+            K8sPathsProvider::new(state_reader.clone(), ns_state_reader.clone(), exclude_paths);
+        let annotator = PodMetadataAnnotator::new(state_reader, pod_fields_spec);
+        let ns_annotator = NamespaceMetadataAnnotator::new(ns_state_reader, namespace_fields_spec);
 
         // TODO: maybe more of the parameters have to be configurable.
 
@@ -353,8 +394,19 @@ impl Source {
                 byte_size,
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
+
             if file_info.is_none() {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
+            } else {
+                let namespace = file_info.as_ref().map(|info| info.pod_namespace);
+
+                if let Some(name) = namespace {
+                    let ns_info = ns_annotator.annotate(&mut event, name);
+
+                    if ns_info.is_none() {
+                        emit!(KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
+                    }
+                }
             }
 
             checkpoints.update(line.file_id, line.offset);
@@ -379,6 +431,17 @@ impl Source {
                     Ok(()) => info!(message = "Reflector process completed gracefully."),
                     Err(error) => {
                         error!(message = "Reflector process exited with an error.", %error)
+                    }
+                });
+            slot.bind(Box::pin(fut));
+        }
+        {
+            let (slot, shutdown) = lifecycle.add();
+            let fut =
+                util::cancel_on_signal(ns_reflector_process, shutdown).map(|result| match result {
+                    Ok(()) => info!(message = "Namespace reflector process completed gracefully."),
+                    Err(error) => {
+                        error!(message = "Namespace reflector process exited with an error.", %error)
                     }
                 });
             slot.bind(Box::pin(fut));

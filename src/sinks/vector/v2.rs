@@ -10,7 +10,6 @@ use crate::{
 };
 use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
-use lazy_static::lazy_static;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -60,12 +59,6 @@ fn default_config(address: &str) -> VectorConfig {
         request: TowerRequestConfig::default(),
         tls: None,
     }
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        ..Default::default()
-    };
 }
 
 /// grpc doesn't like an address without a scheme, so we default to http if one isn't specified in
@@ -124,7 +117,7 @@ impl VectorConfig {
 
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck.clone());
 
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch = BatchSettings::default()
             .events(1000)
             .timeout(1)

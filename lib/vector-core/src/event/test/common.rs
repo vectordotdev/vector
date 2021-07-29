@@ -8,6 +8,7 @@ use quickcheck::{empty_shrinker, Arbitrary, Gen};
 use std::collections::{BTreeMap, BTreeSet};
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;
+const MAX_ARRAY_SIZE: usize = 4;
 const MAX_MAP_SIZE: usize = 4;
 const MAX_STR_SIZE: usize = 16;
 const ALPHABET: [&str; 27] = [
@@ -16,7 +17,7 @@ const ALPHABET: [&str; 27] = [
 ];
 
 #[derive(Debug, Clone)]
-struct Name {
+pub struct Name {
     inner: String,
 }
 
@@ -554,7 +555,10 @@ impl Arbitrary for Value {
                 let mut gen = Gen::new(MAX_MAP_SIZE);
                 Value::Map(BTreeMap::arbitrary(&mut gen))
             }
-            6 => Value::Array(Vec::arbitrary(g)),
+            6 => {
+                let mut gen = Gen::new(MAX_ARRAY_SIZE);
+                Value::Array(Vec::arbitrary(&mut gen))
+            }
             7 => Value::Null,
             _ => unreachable!(),
         }

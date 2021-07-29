@@ -177,10 +177,9 @@ components: sinks: gcp_stackdriver_logs: {
 			type: object: {
 				examples: [
 					{
-						type:       "global"
-						projectId:  "vector-123456"
-						instanceId: "Twilight"
-						zone:       "us-central1-a"
+						type:        "gce_instance"
+						instance_id: "Twilight"
+						zone:        "us-central1-a"
 					},
 				]
 				options: {
@@ -204,14 +203,13 @@ components: sinks: gcp_stackdriver_logs: {
 						description: """
 							Values for all of the labels listed in the associated monitored resource descriptor.
 
-							For example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and
-							`zone`.
+							For example, Compute Engine VM instances use the labels `instance_id` and `zone`.
 							"""
 						required: false
 						warnings: []
 						type: string: {
 							default: null
-							examples: ["vector-123456", "Twilight", "{{ container_name }}"]
+							examples: ["Twilight", "{{ zone }}"]
 							syntax: "template"
 						}
 					}

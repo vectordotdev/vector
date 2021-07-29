@@ -15,7 +15,6 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
@@ -44,12 +43,6 @@ pub struct ClickhouseConfig {
     pub tls: Option<TlsOptions>,
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        ..Default::default()
-    };
-}
-
 inventory::submit! {
     SinkDescription::new::<ClickhouseConfig>("clickhouse")
 }
@@ -75,7 +68,7 @@ impl SinkConfig for ClickhouseConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
 

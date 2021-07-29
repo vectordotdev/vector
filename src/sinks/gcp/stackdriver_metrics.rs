@@ -11,7 +11,6 @@ use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
 use http::header::AUTHORIZATION;
 use http::{HeaderValue, Uri};
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -56,7 +55,11 @@ impl SinkConfig for StackdriverConfig {
         let token = token.build()?;
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            rate_limit_num: Some(1000),
+            rate_limit_duration_secs: Some(1),
+            ..Default::default()
+        });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
         let batch = BatchSettings::default()
@@ -199,14 +202,6 @@ impl HttpSink for HttpEventSink {
 
         Ok(request)
     }
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        rate_limit_num: Some(1000),
-        rate_limit_duration_secs: Some(1),
-        ..Default::default()
-    };
 }
 
 async fn healthcheck() -> crate::Result<()> {

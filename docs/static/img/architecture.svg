@@ -1,67 +1,55 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="840px" height="293px" viewBox="0 0 840 293" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>architecture</title>
-    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="architecture" transform="translate(0.000000, 1.000000)">
-            <g id="Group" transform="translate(12.000000, 192.000000)">
-                <path d="M11.27239,2.91043 C11.67424,1.30305 13.34314,0 15,0 L801,0 C802.65685,0 804.32576,1.30304 804.72761,2.91043 L815.2724,45.08957 C815.67425,46.69695 814.65686,48 813.00001,48 L3.00001,48 C1.34316,48 0.32577,46.69696 0.72762,45.08957 L11.27239,2.91043 Z" id="Path" fill-opacity="0.25" fill="#45DEF3" fill-rule="nonzero"></path>
-                <path d="M11.27239,2.91043 C11.67424,1.30305 13.34314,0 15,0 L801,0 C802.65685,0 804.32576,1.30304 804.72761,2.91043 L815.2724,45.08957 C815.67425,46.69695 814.65686,48 813.00001,48 L3.00001,48 C1.34316,48 0.32577,46.69696 0.72762,45.08957 L11.27239,2.91043 Z" id="Path" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                <text id="Concurrency-Model" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
-                    <tspan x="329.5" y="30">Concurrency Model</tspan>
-                </text>
-            </g>
-            <g id="Group" transform="translate(24.000000, 140.000000)">
-                <path d="M11.27239,2.91043 C11.67424,1.30305 13.34314,0 15,0 L777,0 C778.65685,0 780.32576,1.30304 780.72761,2.91043 L791.2724,45.08957 C791.67425,46.69695 790.65686,48 789.00001,48 L3.00001,48 C1.34316,48 0.32577,46.69696 0.72762,45.08957 L11.27239,2.91043 Z" id="Path" fill-opacity="0.25" fill="#3084FF" fill-rule="nonzero"></path>
-                <path d="M11.27239,2.91043 C11.67424,1.30305 13.34314,0 15,0 L777,0 C778.65685,0 780.32576,1.30304 780.72761,2.91043 L791.2724,45.08957 C791.67425,46.69695 790.65686,48 789.00001,48 L3.00001,48 C1.34316,48 0.32577,46.69696 0.72762,45.08957 L11.27239,2.91043 Z" id="Path" stroke="#3084FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                <text id="Topology-Model" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
-                    <tspan x="332.5" y="30">Topology Model</tspan>
-                </text>
-            </g>
-            <g id="Group" transform="translate(36.000000, 88.000000)">
-                <path d="M11.27239,2.91043 C11.67424,1.30305 13.34314,0 15,0 L753,0 C754.65685,0 756.32576,1.30304 756.72761,2.91043 L767.2724,45.08957 C767.67425,46.69695 766.65686,48 765.00001,48 L3.00001,48 C1.34316,48 0.32577,46.69696 0.72762,45.08957 L11.27239,2.91043 Z" id="Path" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero"></path>
-                <path d="M11.27239,2.91043 C11.67424,1.30305 13.34314,0 15,0 L753,0 C754.65685,0 756.32576,1.30304 756.72761,2.91043 L767.2724,45.08957 C767.67425,46.69695 766.65686,48 765.00001,48 L3.00001,48 C1.34316,48 0.32577,46.69696 0.72762,45.08957 L11.27239,2.91043 Z" id="Path" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                <text id="Data-Model" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
-                    <tspan x="337.5" y="30">Data Model</tspan>
-                </text>
-            </g>
-            <g id="Group" transform="translate(0.000000, 244.000000)" fill-rule="nonzero">
-                <path d="M11.27239,2.91043 C11.67424,1.30305 13.34314,0 15,0 L825,0 C826.65685,0 828.32576,1.30304 828.72761,2.91043 L839.2724,45.08957 C839.67425,46.69695 838.65686,48 837.00001,48 L3.00001,48 C1.34316,48 0.32577,46.69696 0.72762,45.08957 L11.27239,2.91043 Z" id="Path" fill="#000000"></path>
-                <text id="Runtime-Model" fill="#FFFFFF" font-family="Helvetica" font-size="18" font-weight="normal">
-                    <tspan x="359" y="30">Runtime Model</tspan>
-                </text>
-            </g>
-            <g id="Group" transform="translate(48.000000, 0.000000)">
-                <g>
-                    <path d="M23.17584,2.88457 C23.63101,1.29147 25.34315,0 27,0 L717,0 C718.65685,0 720.36899,1.29147 720.82416,2.88457 L743.17583,81.11543 C743.631,82.70853 742.65685,84 740.99999,84 L2.99999,84 C1.34314,84 0.36898,82.70853 0.82415,81.11543 L23.17584,2.88457 Z" id="Path" fill-opacity="0" fill="#000000" fill-rule="nonzero"></path>
-                    <path d="M23.17584,2.88457 C23.63101,1.29147 25.34315,0 27,0 L717,0 C718.65685,0 720.36899,1.29147 720.82416,2.88457 L743.17583,81.11543 C743.631,82.70853 742.65685,84 740.99999,84 L2.99999,84 C1.34314,84 0.36898,82.70853 0.82415,81.11543 L23.17584,2.88457 Z" id="Path" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                    <text id="Components" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
-                        <tspan x="320.5" y="30">Components</tspan>
-                    </text>
-                </g>
-                <g transform="translate(15.000000, 51.000000)">
-                    <g>
-                        <path d="M9.65836,2.68328 C10.39933,1.20135 12.34315,0 14,0 L211,0 C212.65685,0 214.60067,1.20135 215.34164,2.68328 L224.65836,21.31672 C225.39933,22.79865 224.65685,24 223,24 L2,24 C0.34315,24 -0.39933,22.79865 0.34164,21.31672 L9.65836,2.68328 Z" id="Path" fill-opacity="0" fill="#000000" fill-rule="nonzero"></path>
-                        <path d="M9.65836,2.68328 C10.39933,1.20135 12.34315,0 14,0 L211,0 C212.65685,0 214.60067,1.20135 215.34164,2.68328 L224.65836,21.31672 C225.39933,22.79865 224.65685,24 223,24 L2,24 C0.34315,24 -0.39933,22.79865 0.34164,21.31672 L9.65836,2.68328 Z" id="Path" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,8"></path>
-                        <text id="Sources" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
-                            <tspan x="84.5" y="17">Sources</tspan>
-                        </text>
-                    </g>
-                    <g transform="translate(244.000000, 0.000000)">
-                        <path d="M9.65836,2.68328 C10.39933,1.20135 12.34315,0 14,0 L211,0 C212.65685,0 214.60067,1.20135 215.34164,2.68328 L224.65836,21.31672 C225.39933,22.79865 224.65685,24 223,24 L2,24 C0.34315,24 -0.39933,22.79865 0.34164,21.31672 L9.65836,2.68328 Z" id="Path" fill-opacity="0" fill="#000000" fill-rule="nonzero"></path>
-                        <path d="M9.65836,2.68328 C10.39933,1.20135 12.34315,0 14,0 L211,0 C212.65685,0 214.60067,1.20135 215.34164,2.68328 L224.65836,21.31672 C225.39933,22.79865 224.65685,24 223,24 L2,24 C0.34315,24 -0.39933,22.79865 0.34164,21.31672 L9.65836,2.68328 Z" id="Path" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,8"></path>
-                        <text id="Transforms" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
-                            <tspan x="74.5" y="17">Transforms</tspan>
-                        </text>
-                    </g>
-                    <g transform="translate(486.000000, 0.000000)">
-                        <path d="M9.65836,2.68328 C10.39933,1.20135 12.34315,0 14,0 L211,0 C212.65685,0 214.60067,1.20135 215.34164,2.68328 L224.65836,21.31672 C225.39933,22.79865 224.65685,24 223,24 L2,24 C0.34315,24 -0.39933,22.79865 0.34164,21.31672 L9.65836,2.68328 Z" id="Path" fill-opacity="0" fill="#000000" fill-rule="nonzero"></path>
-                        <path d="M9.65836,2.68328 C10.39933,1.20135 12.34315,0 14,0 L211,0 C212.65685,0 214.60067,1.20135 215.34164,2.68328 L224.65836,21.31672 C225.39933,22.79865 224.65685,24 223,24 L2,24 C0.34315,24 -0.39933,22.79865 0.34164,21.31672 L9.65836,2.68328 Z" id="Path" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,8"></path>
-                        <text id="Sinks" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
-                            <tspan x="94" y="17">Sinks</tspan>
-                        </text>
-                    </g>
-                </g>
-            </g>
-        </g>
+<svg width="840" height="293" viewBox="0 0 840 293" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" fill-rule="evenodd">
+    <path d="M23.272 195.91c.402-1.607 2.071-2.91 3.728-2.91h786c1.657 0 3.326 1.303 3.728 2.91l10.544 42.18c.402 1.607-.615 2.91-2.272 2.91H15c-1.657 0-2.674-1.303-2.272-2.91l10.544-42.18z" fill-opacity=".25" fill="#45DEF3" fill-rule="nonzero"/>
+    <path d="M23.272 195.91c.402-1.607 2.071-2.91 3.728-2.91h786c1.657 0 3.326 1.303 3.728 2.91l10.544 42.18c.402 1.607-.615 2.91-2.272 2.91H15c-1.657 0-2.674-1.303-2.272-2.91l10.544-42.18z" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" transform="translate(12 193)">
+      <tspan x="329.5" y="30">Concurrency Model</tspan>
+    </text>
+    <path d="M35.272 143.91c.402-1.607 2.071-2.91 3.728-2.91h762c1.657 0 3.326 1.303 3.728 2.91l10.544 42.18c.402 1.607-.615 2.91-2.272 2.91H27c-1.657 0-2.674-1.303-2.272-2.91l10.544-42.18z" fill-opacity=".25" fill="#3084FF" fill-rule="nonzero"/>
+    <path d="M35.272 143.91c.402-1.607 2.071-2.91 3.728-2.91h762c1.657 0 3.326 1.303 3.728 2.91l10.544 42.18c.402 1.607-.615 2.91-2.272 2.91H27c-1.657 0-2.674-1.303-2.272-2.91l10.544-42.18z" stroke="#3084FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" transform="translate(24 141)">
+      <tspan x="332.5" y="30">Topology Model</tspan>
+    </text>
+    <g>
+      <path d="M47.272 91.91C47.674 90.303 49.343 89 51 89h738c1.657 0 3.326 1.303 3.728 2.91l10.544 42.18c.402 1.607-.615 2.91-2.272 2.91H39c-1.657 0-2.674-1.303-2.272-2.91l10.544-42.18z" fill-opacity=".25" fill="#F44AF5" fill-rule="nonzero"/>
+      <path d="M47.272 91.91C47.674 90.303 49.343 89 51 89h738c1.657 0 3.326 1.303 3.728 2.91l10.544 42.18c.402 1.607-.615 2.91-2.272 2.91H39c-1.657 0-2.674-1.303-2.272-2.91l10.544-42.18z" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" transform="translate(36 89)">
+        <tspan x="337.5" y="30">Data Model</tspan>
+      </text>
     </g>
+    <g fill-rule="nonzero">
+      <path d="M11.272 247.91c.402-1.607 2.071-2.91 3.728-2.91h810c1.657 0 3.326 1.303 3.728 2.91l10.544 42.18c.402 1.607-.615 2.91-2.272 2.91H3c-1.657 0-2.674-1.303-2.272-2.91l10.544-42.18z" fill="#000000"/>
+      <text fill="#FFFFFF" font-family="Helvetica" font-size="18" transform="translate(0 245)">
+        <tspan x="359" y="30">Runtime Model</tspan>
+      </text>
+    </g>
+    <g>
+      <path d="M71.176 3.885C71.63 2.29 73.343 1 75 1h690c1.657 0 3.369 1.291 3.824 2.885l22.352 78.23C791.63 83.71 790.656 85 789 85H51c-1.657 0-2.631-1.291-2.176-2.885l22.352-78.23z" fill="none"/>
+      <path d="M71.176 3.885C71.63 2.29 73.343 1 75 1h690c1.657 0 3.369 1.291 3.824 2.885l22.352 78.23C791.63 83.71 790.656 85 789 85H51c-1.657 0-2.631-1.291-2.176-2.885l22.352-78.23z" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" transform="translate(48 1)">
+        <tspan x="320.5" y="30">Components</tspan>
+      </text>
+      <g>
+        <path d="M72.658 54.683C73.4 53.201 75.343 52 77 52h197c1.657 0 3.6 1.201 4.342 2.683l9.316 18.634C288.4 74.799 287.657 76 286 76H65c-1.657 0-2.4-1.201-1.658-2.683l9.316-18.634z" fill="none"/>
+        <path d="M72.658 54.683C73.4 53.201 75.343 52 77 52h197c1.657 0 3.6 1.201 4.342 2.683l9.316 18.634C288.4 74.799 287.657 76 286 76H65c-1.657 0-2.4-1.201-1.658-2.683l9.316-18.634z" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,8"/>
+        <text fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" transform="translate(63 52)">
+          <tspan x="84.5" y="17">Sources</tspan>
+        </text>
+        <g>
+          <path d="M316.658 54.683C317.4 53.201 319.343 52 321 52h197c1.657 0 3.6 1.201 4.342 2.683l9.316 18.634C532.4 74.799 531.657 76 530 76H309c-1.657 0-2.4-1.201-1.658-2.683l9.316-18.634z" fill="none"/>
+          <path d="M316.658 54.683C317.4 53.201 319.343 52 321 52h197c1.657 0 3.6 1.201 4.342 2.683l9.316 18.634C532.4 74.799 531.657 76 530 76H309c-1.657 0-2.4-1.201-1.658-2.683l9.316-18.634z" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,8"/>
+          <text fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" transform="translate(307 52)">
+            <tspan x="74.5" y="17">Transforms</tspan>
+          </text>
+        </g>
+        <g>
+          <path d="M558.658 54.683C559.4 53.201 561.343 52 563 52h197c1.657 0 3.6 1.201 4.342 2.683l9.316 18.634C774.4 74.799 773.657 76 772 76H551c-1.657 0-2.4-1.201-1.658-2.683l9.316-18.634z" fill="none"/>
+          <path d="M558.658 54.683C559.4 53.201 561.343 52 563 52h197c1.657 0 3.6 1.201 4.342 2.683l9.316 18.634C774.4 74.799 773.657 76 772 76H551c-1.657 0-2.4-1.201-1.658-2.683l9.316-18.634z" stroke="#C3CFD9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,8"/>
+          <text fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" transform="translate(549 52)">
+            <tspan x="94" y="17">Sinks</tspan>
+          </text>
+        </g>
+      </g>
+    </g>
+  </g>
 </svg>

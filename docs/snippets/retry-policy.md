@@ -1,1 +1,0 @@
-Vector retries failed requests (status == 429, >= 500, and != 501); no other responses are retried. You can control the number of retry attempts and backoff rate with the `request.retry_attempts` and `request.retry_backoff_secs` options.

@@ -27,7 +27,6 @@ use hyper::{
     Body, Request, Response,
 };
 use indoc::indoc;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, convert::TryFrom, task::Poll};
@@ -119,14 +118,6 @@ enum GcsStorageClass {
     Archive,
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        concurrency: Concurrency::Fixed(25),
-        rate_limit_num: Some(1000),
-        ..Default::default()
-    };
-}
-
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 enum Encoding {
@@ -209,7 +200,11 @@ impl GcsSink {
     }
 
     fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(25),
+            rate_limit_num: Some(1000),
+            ..Default::default()
+        });
         let encoding = config.encoding.clone();
 
         let batch = BatchSettings::default()

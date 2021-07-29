@@ -18,7 +18,6 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use http::StatusCode;
-use lazy_static::lazy_static;
 use md5::Digest;
 use rusoto_core::RusotoError;
 use rusoto_s3::{
@@ -117,14 +116,6 @@ enum S3StorageClass {
     DeepArchive,
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        concurrency: Concurrency::Fixed(50),
-        rate_limit_num: Some(250),
-        ..Default::default()
-    };
-}
-
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
@@ -191,7 +182,12 @@ enum HealthcheckError {
 
 impl S3SinkConfig {
     pub fn new(&self, client: S3Client, cx: SinkContext) -> crate::Result<super::VectorSink> {
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(50),
+            rate_limit_num: Some(250),
+            ..Default::default()
+        });
+
         let encoding = self.encoding.clone();
 
         let compression = self.compression;

@@ -7,8 +7,8 @@ use crate::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
-        TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+        UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -20,7 +20,6 @@ use http::{
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::io::Write;
@@ -70,15 +69,6 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
         request: Default::default(),
         tls: Default::default(),
     }
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        concurrency: Concurrency::Fixed(10),
-        timeout_secs: Some(30),
-        rate_limit_num: Some(u64::max_value()),
-        ..Default::default()
-    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -148,7 +138,10 @@ impl SinkConfig for HttpSinkConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.tower.unwrap_with(&TowerRequestConfig {
+            timeout_secs: Some(30),
+            ..Default::default()
+        });
 
         let sink = BatchedHttpSink::new(
             config,
