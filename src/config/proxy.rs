@@ -2,9 +2,10 @@ use http::uri::InvalidUri;
 use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
 use no_proxy::NoProxy;
 
+// suggestion of standardization coming from https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/
 fn from_env(key: &str) -> Option<String> {
     // use lowercase first and the uppercase
-    std::env::var(key.to_string().to_lowercase())
+    std::env::var(key.to_lowercase())
         .ok()
         .or_else(|| std::env::var(key.to_uppercase()).ok())
 }
@@ -16,19 +17,20 @@ impl NoProxyInterceptor {
     fn intercept(self, expected_scheme: &'static str) -> Intercept {
         Intercept::Custom(Custom::from(
             move |scheme: Option<&str>, host: Option<&str>, port: Option<u16>| {
-                if scheme != Some(expected_scheme) {
+                if scheme.is_some() && scheme != Some(expected_scheme) {
                     return false;
                 }
-                let matches = if let Some(host) = host {
-                    if let Some(port) = port {
-                        let url = format!("{}:{}", host, port);
-                        self.0.matches(&url) || self.0.matches(&host)
-                    } else {
+                let matches = host
+                    .map(|host| {
                         self.0.matches(&host)
-                    }
-                } else {
-                    false
-                };
+                            || port
+                                .map(|port| {
+                                    let url = format!("{}:{}", host, port);
+                                    self.0.matches(&url)
+                                })
+                                .unwrap_or(false)
+                    })
+                    .unwrap_or(false);
                 // only intercept those that don't match
                 !matches
             },
@@ -75,7 +77,7 @@ impl ProxyConfig {
         Self {
             enabled: true,
             http: from_env("HTTP_PROXY"),
-            https: from_env("HTTP_PROXYS"),
+            https: from_env("HTTPS_PROXY"),
             no_proxy: from_env("NO_PROXY").map(NoProxy::from).unwrap_or_default(),
         }
     }
@@ -111,11 +113,13 @@ impl ProxyConfig {
     }
 
     fn http_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        if let Some(ref url) = self.http {
-            Ok(Some(Proxy::new(self.http_intercept(), url.parse()?)))
-        } else {
-            Ok(None)
-        }
+        self.http
+            .as_ref()
+            .map(|url| {
+                url.parse()
+                    .map(|parsed| Proxy::new(self.http_intercept(), parsed))
+            })
+            .transpose()
     }
 
     fn https_intercept(&self) -> Intercept {
@@ -123,11 +127,13 @@ impl ProxyConfig {
     }
 
     fn https_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        if let Some(ref url) = self.https {
-            Ok(Some(Proxy::new(self.https_intercept(), url.parse()?)))
-        } else {
-            Ok(None)
-        }
+        self.https
+            .as_ref()
+            .map(|url| {
+                url.parse()
+                    .map(|parsed| Proxy::new(self.https_intercept(), parsed))
+            })
+            .transpose()
     }
 
     pub fn configure<C>(&self, connector: &mut ProxyConnector<C>) -> Result<(), InvalidUri> {

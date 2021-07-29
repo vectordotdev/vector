@@ -935,11 +935,12 @@ components: {
 		}
 
 		env_vars: {
-			HTTP_PROXY: {
+			_http_proxy: {
 				description: """
 					The global URL to proxy HTTP requests through.
 					If another HTTP proxy is set in the configuration file or at a component level,
 					this one will be overriden.
+					The lowercase variant has priority over the uppercase one.
 					"""
 				type: string: {
 					default: null
@@ -947,11 +948,12 @@ components: {
 					syntax: "literal"
 				}
 			}
-			HTTPS_PROXY: {
+			_https_proxy: {
 				description: """
 					The global URL to proxy HTTPS requests through.
 					If another HTTPS proxy is set in the configuration file or at a component level,
 					this one will be overriden.
+					The lowercase variant has priority over the uppercase one.
 					"""
 				type: string: {
 					default: null
@@ -959,16 +961,39 @@ components: {
 					syntax: "literal"
 				}
 			}
-			NO_PROXY: {
+			_no_proxy: {
 				description: """
-						List of hosts to avoid proxying globally.
-						If another no_proxy value is set in the configuration file or at a component level,
-						this one will be overriden.
-					"""
+					List of hosts to avoid proxying globally.
+					If another no_proxy value is set in the configuration file or at a component level,
+					this one will be overriden.
+					The lowercase variant has priority over the uppercase one.
+				"""
 				type: string: {
 					default: null
 					examples: ["localhost,.foo.bar", "*"]
 					syntax: "literal"
+				}
+			}
+			if features.collect != _|_ {
+				if features.collect.proxy != _|_ {
+					if features.collect.proxy.enabled {
+						http_proxy: env_vars._http_proxy
+						HTTP_PROXY: env_vars._http_proxy
+						https_proxy: env_vars._https_proxy
+						HTTPS_PROXY: env_vars._https_proxy
+						no_proxy: env_vars._no_proxy
+						NO_PROXY: env_vars._no_proxy
+					}
+				}
+				if features.send.proxy != _|_ {
+					if features.send.proxy.enabled {
+						http_proxy: env_vars._http_proxy
+						HTTP_PROXY: env_vars._http_proxy
+						https_proxy: env_vars._https_proxy
+						HTTPS_PROXY: env_vars._https_proxy
+						no_proxy: env_vars._no_proxy
+						NO_PROXY: env_vars._no_proxy
+					}
 				}
 			}
 		}

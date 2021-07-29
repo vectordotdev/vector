@@ -95,6 +95,15 @@ components: transforms: aws_ec2_metadata: {
 		}
 	}
 
+	env_vars: {
+		http_proxy: env_vars._http_proxy
+		HTTP_PROXY: env_vars._http_proxy
+		https_proxy: env_vars._https_proxy
+		HTTPS_PROXY: env_vars._https_proxy
+		no_proxy: env_vars._no_proxy
+		NO_PROXY: env_vars._no_proxy
+	}
+
 	input: {
 		logs:    true
 		metrics: {
