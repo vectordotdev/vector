@@ -6,7 +6,6 @@ cargo-timing*.html
 .idea/
 .vscode/
 checkpoints/*
-logs*/
 miniodat
 bench_output.txt
 sample.log

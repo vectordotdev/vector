@@ -24,7 +24,6 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, SinkExt};
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -62,13 +61,6 @@ pub struct InfluxDbConfig {
 
 pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        retry_attempts: Some(5),
-        ..Default::default()
-    };
 }
 
 // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
@@ -128,7 +120,10 @@ impl InfluxDbSvc {
             .events(20)
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            retry_attempts: Some(5),
+            ..Default::default()
+        });
 
         let uri = settings.write_uri(endpoint)?;
 

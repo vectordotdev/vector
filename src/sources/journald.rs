@@ -74,6 +74,7 @@ pub struct JournaldConfig {
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
+    pub journal_directory: Option<PathBuf>,
     /// Deprecated
     #[serde(default)]
     remap_priority: bool,
@@ -129,9 +130,17 @@ impl SourceConfig for JournaldConfig {
 
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
+        let journal_dir = self.journal_directory.clone();
 
-        let start: StartJournalctlFn =
-            Box::new(move |cursor| start_journalctl(&journalctl_path, current_boot_only, cursor));
+        let start: StartJournalctlFn = Box::new(move |cursor| {
+            let mut command = create_command(
+                &journalctl_path,
+                journal_dir.as_ref(),
+                current_boot_only,
+                cursor,
+            );
+            start_journalctl(&mut command)
+        });
 
         Ok(Box::pin(
             JournaldSource {
@@ -337,28 +346,8 @@ type StartJournalctlFn = Box<
 type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
-    path: &Path,
-    current_boot_only: bool,
-    cursor: &Option<String>,
+    command: &mut Command,
 ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
-    let mut command = Command::new(path);
-    command.stdout(Stdio::piped());
-    command.arg("--follow");
-    command.arg("--all");
-    command.arg("--show-cursor");
-    command.arg("--output=json");
-
-    if current_boot_only {
-        command.arg("--boot");
-    }
-
-    if let Some(cursor) = cursor {
-        command.arg(format!("--after-cursor={}", cursor));
-    } else {
-        // journalctl --follow only outputs a few lines without a starting point
-        command.arg("--since=2000-01-01");
-    }
-
     let mut child = command.spawn().context(JournalctlSpawn)?;
 
     let stream = FramedRead::new(
@@ -373,6 +362,37 @@ fn start_journalctl(
     });
 
     Ok((stream, stop))
+}
+
+fn create_command(
+    path: &Path,
+    journal_dir: Option<&PathBuf>,
+    current_boot_only: bool,
+    cursor: &Option<String>,
+) -> Command {
+    let mut command = Command::new(path);
+    command.stdout(Stdio::piped());
+    command.arg("--follow");
+    command.arg("--all");
+    command.arg("--show-cursor");
+    command.arg("--output=json");
+
+    if let Some(dir) = journal_dir {
+        command.arg(format!("--directory={}", dir.display()));
+    }
+
+    if current_boot_only {
+        command.arg("--boot");
+    }
+
+    if let Some(cursor) = cursor {
+        command.arg(format!("--after-cursor={}", cursor));
+    } else {
+        // journalctl --follow only outputs a few lines without a starting point
+        command.arg("--since=2000-01-01");
+    }
+
+    command
 }
 
 fn create_event(record: Record) -> Event {
@@ -788,6 +808,31 @@ mod tests {
         assert!(filter_unit(Some(&two), &includes, &empty));
         assert!(filter_unit(Some(&two), &empty, &excludes));
         assert!(filter_unit(Some(&two), &includes, &excludes));
+    }
+
+    #[test]
+    fn command_options() {
+        let path = PathBuf::from("jornalctl");
+
+        let journal_dir = None;
+        let current_boot_only = false;
+        let cursor = None;
+
+        let command = create_command(&path, journal_dir, current_boot_only, &cursor);
+        let cmd_line = format!("{:?}", command);
+        assert!(!cmd_line.contains("--directory="));
+        assert!(!cmd_line.contains("--boot"));
+        assert!(cmd_line.contains("--since=2000-01-01"));
+
+        let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
+        let current_boot_only = true;
+        let cursor = Some(String::from("2021-01-01"));
+
+        let command = create_command(&path, journal_dir.as_ref(), current_boot_only, &cursor);
+        let cmd_line = format!("{:?}", command);
+        assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
+        assert!(cmd_line.contains("--boot"));
+        assert!(cmd_line.contains("--after-cursor="));
     }
 
     fn message(event: &Event) -> Value {

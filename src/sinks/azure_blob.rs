@@ -28,7 +28,6 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use http::StatusCode;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -92,14 +91,6 @@ enum HealthcheckError {
     Unknown { status: StatusCode },
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        concurrency: Concurrency::Fixed(50),
-        rate_limit_num: Some(250),
-        ..Default::default()
-    };
-}
-
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -138,7 +129,11 @@ impl SinkConfig for AzureBlobSinkConfig {
 
 impl AzureBlobSinkConfig {
     pub fn new(&self, client: Arc<ContainerClient>, cx: SinkContext) -> Result<VectorSink> {
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(50),
+            rate_limit_num: Some(250),
+            ..Default::default()
+        });
         let batch = BatchSettings::default()
             .bytes(10 * 1024 * 1024)
             .timeout(300)

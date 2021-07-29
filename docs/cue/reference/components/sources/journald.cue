@@ -103,6 +103,17 @@ components: sources: journald: {
 				syntax: "literal"
 			}
 		}
+		journal_directory: {
+			common:      false
+			description: "The full path of the journal directory. If not set, `journalctl` will use the default system journal paths"
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["/run/log/journal"]
+				syntax: "literal"
+			}
+		}
 	}
 
 	output: logs: {

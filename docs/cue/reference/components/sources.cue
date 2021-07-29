@@ -161,7 +161,7 @@ components: sources: [Name=string]: {
 				}
 
 				_local_host: {
-					description: "The local hostname, equivalent to the `gethostname` command."
+					description: string | *"The local hostname, equivalent to the `gethostname` command."
 					required:    true
 					type: string: {
 						examples: [_values.local_host]

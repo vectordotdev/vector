@@ -61,10 +61,6 @@ inventory::submit! {
     SinkDescription::new::<RemoteWriteConfig>("prometheus_remote_write")
 }
 
-lazy_static::lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = Default::default();
-}
-
 impl_generate_config_from_default!(RemoteWriteConfig);
 
 #[async_trait::async_trait]
@@ -80,7 +76,7 @@ impl SinkConfig for RemoteWriteConfig {
             .events(1_000)
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
 

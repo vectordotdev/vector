@@ -20,7 +20,6 @@ use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, future::ready, task::Poll};
 use tower::Service;
@@ -110,13 +109,6 @@ impl SinkConfig for SematextMetricsConfig {
     }
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        retry_attempts: Some(5),
-        ..Default::default()
-    };
-}
-
 fn write_uri(endpoint: &str) -> Result<Uri> {
     encode_uri(
         endpoint,
@@ -140,7 +132,10 @@ impl SematextMetricsService {
             .events(20)
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            retry_attempts: Some(5),
+            ..Default::default()
+        });
         let http_service = HttpBatchService::new(client, create_build_request(endpoint));
         let sematext_service = SematextMetricsService {
             config,

@@ -599,6 +599,13 @@ impl HostMetricsConfig {
                                     "filesystem_used_bytes",
                                     timestamp,
                                     usage.used().get::<byte>() as f64,
+                                    tags.clone(),
+                                ),
+                                #[cfg(not(target_os = "windows"))]
+                                self.gauge(
+                                    "filesystem_used_ratio",
+                                    timestamp,
+                                    usage.ratio().get::<ratio>() as f64,
                                     tags,
                                 ),
                             ]
@@ -1021,6 +1028,35 @@ mod tests {
         .await;
     }
 
+    #[cfg(not(target_os = "windows"))]
+    #[tokio::test]
+    async fn generates_filesystem_metrics() {
+        let metrics = HostMetricsConfig::default().filesystem_metrics().await;
+        assert!(!metrics.is_empty());
+        assert!(metrics.len() % 4 == 0);
+        assert!(all_gauges(&metrics));
+
+        // There are exactly three filesystem_* names
+        for name in &[
+            "filesystem_free_bytes",
+            "filesystem_total_bytes",
+            "filesystem_used_bytes",
+            "filesystem_used_ratio",
+        ] {
+            assert_eq!(
+                count_name(&metrics, name),
+                metrics.len() / 4,
+                "name={}",
+                name
+            );
+        }
+
+        // They should all have "filesystem" and "mountpoint" tags
+        assert_eq!(count_tag(&metrics, "filesystem"), metrics.len());
+        assert_eq!(count_tag(&metrics, "mountpoint"), metrics.len());
+    }
+
+    #[cfg(target_os = "windows")]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
         let metrics = HostMetricsConfig::default().filesystem_metrics().await;

@@ -120,7 +120,6 @@ impl NewRelicLogsConfig {
 
     fn create_config(&self) -> crate::Result<HttpSinkConfig> {
         let mut headers: IndexMap<String, String> = IndexMap::new();
-
         if let Some(license_key) = &self.license_key {
             headers.insert("X-License-Key".to_owned(), license_key.clone());
         } else if let Some(insert_key) = &self.insert_key {
@@ -149,7 +148,6 @@ impl NewRelicLogsConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
             concurrency: (self.request.concurrency).if_none(Concurrency::Fixed(100)),
-            rate_limit_num: Some(self.request.rate_limit_num.unwrap_or(100)),
             ..self.request
         };
 
@@ -176,7 +174,10 @@ mod tests {
     use crate::{
         config::SinkConfig,
         event::Event,
-        sinks::util::{encoding::EncodingConfiguration, test::build_test_server, Concurrency},
+        sinks::util::{
+            encoding::EncodingConfiguration, service::RATE_LIMIT_NUM_DEFAULT,
+            test::build_test_server, Concurrency,
+        },
         test_util::next_addr,
     };
     use bytes::Buf;
@@ -221,7 +222,10 @@ mod tests {
             http_config.request.tower.concurrency,
             Concurrency::Fixed(100)
         );
-        assert_eq!(http_config.request.tower.rate_limit_num, Some(100));
+        assert_eq!(
+            http_config.request.tower.rate_limit_num,
+            Some(RATE_LIMIT_NUM_DEFAULT)
+        );
         assert_eq!(
             http_config.request.headers["X-License-Key"],
             "foo".to_owned()

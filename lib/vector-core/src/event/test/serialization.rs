@@ -5,6 +5,32 @@ use pretty_assertions::assert_eq;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 
+// Ser/De the Event never loses bytes
+#[test]
+fn serde_no_size_loss() {
+    fn inner(event: Event) -> TestResult {
+        let expected = event.clone();
+
+        let mut buffer = BytesMut::with_capacity(64);
+        {
+            let res = Event::encode(event, &mut buffer);
+            assert!(res.is_ok());
+        }
+        {
+            let res = Event::decode(buffer);
+            let actual: Event = res.unwrap();
+
+            assert_eq!(actual.size_of(), expected.size_of());
+        }
+        TestResult::passed()
+    }
+
+    QuickCheck::new()
+        .tests(1_000)
+        .max_tests(10_000)
+        .quickcheck(inner as fn(Event) -> TestResult);
+}
+
 // Ser/De the Event type through EncodeBytes -> DecodeBytes
 #[test]
 #[allow(clippy::neg_cmp_op_on_partial_ord)] // satisfying clippy leads to less
