@@ -203,6 +203,7 @@ pub mod stream {
 #[cfg(test)]
 mod tests {
     use crate::{
+        config::ProxyConfig,
         kubernetes::{api_watcher, client},
         tls::TlsOptions,
     };
@@ -229,6 +230,7 @@ mod tests {
     /// Test that it can handle invocation errors.
     #[tokio::test]
     async fn test_invocation_errors() {
+        let proxy = ProxyConfig::default();
         let cases: Vec<(Box<dyn FnOnce(When, Then)>, _, _)> = vec![
             // Desync.
             (
@@ -263,7 +265,7 @@ mod tests {
                 token: Some("SOMEGARBAGETOKEN".to_string()),
                 tls_options: TlsOptions::default(),
             };
-            let client = Client::new(config).unwrap();
+            let client = Client::new(config, &proxy).unwrap();
             let mut api_watcher = ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
             let error = api_watcher
                 .watch(WatchOptional {
@@ -308,6 +310,7 @@ mod tests {
     /// Test that it can handle stream errors.
     #[tokio::test]
     async fn test_stream_errors() {
+        let proxy = ProxyConfig::default();
         let cases: Vec<(
             Box<dyn FnOnce(When, Then)>,
             Vec<Box<dyn FnOnce(Result<WatchEvent<Pod>, watcher::stream::Error<stream::Error>>)>>,
@@ -657,7 +660,7 @@ mod tests {
                 token: Some("SOMEGARBAGETOKEN".to_string()),
                 tls_options: TlsOptions::default(),
             };
-            let client = Client::new(config).unwrap();
+            let client = Client::new(config, &proxy).unwrap();
             let mut api_watcher = ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
             let mut stream = api_watcher
                 .watch(WatchOptional {

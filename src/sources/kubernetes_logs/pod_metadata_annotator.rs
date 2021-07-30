@@ -275,10 +275,10 @@ mod tests {
                     log.insert("kubernetes.pod_name", "sandbox0-name");
                     log.insert("kubernetes.pod_namespace", "sandbox0-ns");
                     log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert("kubernetes.pod_labels.nested0\\.label0", "val0");
-                    log.insert("kubernetes.pod_labels.nested0\\.label1", "val1");
-                    log.insert("kubernetes.pod_labels.nested1\\.label0", "val2");
-                    log.insert("kubernetes.pod_labels.nested2\\.label0\\.deep0", "val3");
+                    log.insert(r#"kubernetes.pod_labels.nested0\.label0"#, "val0");
+                    log.insert(r#"kubernetes.pod_labels.nested0\.label1"#, "val1");
+                    log.insert(r#"kubernetes.pod_labels.nested1\.label0"#, "val2");
+                    log.insert(r#"kubernetes.pod_labels.nested2\.label0\.deep0"#, "val3");
                     log
                 },
             ),

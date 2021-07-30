@@ -31,6 +31,7 @@ components: sources: apache_metrics: {
 					}
 				}
 			}
+			proxy: enabled: true
 		}
 	}
 

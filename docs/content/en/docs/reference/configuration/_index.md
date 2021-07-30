@@ -243,9 +243,9 @@ Or using a [globbing syntax][glob]:
 vector --config /etc/vector/*.toml
 ```
 
-#### Wilcards in identifiers
+#### Wilcards in component names
 
-Vector supports wildcards (`*`) in component identifiers when building your topology, but only supports them as the last character. For example:
+Vector supports wildcards (`*`) in component names when building your topology, but only supports them as the last character. For example:
 
 ```toml
 [sources.app1_logs]

@@ -1,10 +1,14 @@
 use crate::{
     http::HttpError,
-    sinks::util::retries::{RetryAction, RetryLogic},
+    sinks::util::{
+        retries::{RetryAction, RetryLogic},
+        sink::{Response, ServiceLogic},
+    },
 };
 use bytes::Bytes;
 use http::StatusCode;
 use serde::Deserialize;
+use vector_core::event::{EventMetadata, EventStatus};
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {
@@ -78,6 +82,42 @@ impl RetryLogic for ElasticSearchRetryLogic {
                 }
             }
             _ => RetryAction::DontRetry(format!("response status: {}", status)),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct ElasticSearchServiceLogic;
+
+impl ServiceLogic for ElasticSearchServiceLogic {
+    type Response = hyper::Response<Bytes>;
+    fn update_metadata(&self, result: crate::Result<Self::Response>, metadata: Vec<EventMetadata>) {
+        let status = match result {
+            Ok(response) => {
+                if response.is_successful() {
+                    let body = String::from_utf8_lossy(response.body());
+                    if body.contains("\"errors\":true") {
+                        error!(message = "Response contained errors.", ?response);
+                        EventStatus::Failed
+                    } else {
+                        trace!(message = "Response successful.", ?response);
+                        EventStatus::Delivered
+                    }
+                } else if response.is_transient() {
+                    error!(message = "Response wasn't successful.", ?response);
+                    EventStatus::Errored
+                } else {
+                    error!(message = "Response failed.", ?response);
+                    EventStatus::Failed
+                }
+            }
+            Err(error) => {
+                error!(message = "Request failed.", %error);
+                EventStatus::Errored
+            }
+        };
+        for metadata in metadata {
+            metadata.update_status(status);
         }
     }
 }

@@ -12,8 +12,36 @@ const safeClasses = {
     "search-results-list",
     "search-result",
     "code-sample-filename",
-    /^ais-/, // All Algolia-specific classes
-    "type"
+    "type",
+    // All Algolia-specific classes
+    /^ais-/,
+    /^aa-/,
+    /^DocSearch/,
+    // Search widgets (TODO: improve this by consolidating these into higher classes)
+    "block",
+    "border-gray-200",
+    "border-gray-300",
+    "border-r",
+    "border-t",
+    "font-medium",
+    "h-2",
+    "h-3",
+    "h-full",
+    "inline",
+    "leading-relaxed",
+    "mb-1",
+    "ml-1",
+    "mr-1",
+    "p-2",
+    "p-4",
+    "pl-2",
+    "py-4",
+    "text-gray-600",
+    "text-gray-800",
+    "text-md",
+    "text-sm",
+    "w-2",
+    "w-3",
   ]
 };
 

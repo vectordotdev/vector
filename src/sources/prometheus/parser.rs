@@ -72,7 +72,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
                     let mut buckets = metric.buckets;
-                    buckets.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap_or(Ordering::Equal));
+                    buckets.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
                     for i in (1..buckets.len()).rev() {
                         buckets[i].count = buckets[i].count.saturating_sub(buckets[i - 1].count);
                     }

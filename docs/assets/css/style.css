@@ -7,23 +7,7 @@
   --secondary: #f44af5;
 }
 
-body {
-  --aa-search-input-height: 36px;
-}
-
 @layer components {
-  .search-input {
-    @apply bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md sm:text-sm text-gray-800 dark:text-gray-400 placeholder-gray-400 leading-5 block w-full pl-10 pr-3 focus:outline-none focus:bg-white focus:text-gray-900;
-  }
-
-  .search-results-list {
-    @apply grid grid-cols-2 md:grid-cols-3;
-  }
-
-  .search-results-list .search-result {
-    @apply text-dark dark:text-gray-200 py-2 hover:text-secondary dark:hover:text-primary cursor-pointer;
-  }
-
   .code-sample-filename {
     @apply font-semibold font-mono tracking-wide text-gray-200 dark:text-gray-200 bg-dark dark:bg-black py-1.5 px-2 rounded text-sm;
   }
@@ -43,21 +27,56 @@ body {
   height: auto;
 }
 
-// Algolia search stuff
-.aa-Grid {
-  display: grid;
-  column-gap: calc(var(--aa-spacing-half) / 2);
-  /* grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); */
-  grid-template-columns: 1fr;
+// Algolia search
+:root {
+  --docsearch-key-shadow: inset 0 -2px 0 0 rgb(205, 205, 230),
+    inset 0 0 1px 1px #fff, 0 1px 2px 1px rgba(30, 35, 90, 0.4);
 }
 
-.aa-Panel {
-  width: 30% !important;
+.aa-Column {
+  padding: calc(var(--aa-spacing-half) / 2) 0;
+  padding-top: 0;
 }
 
 .aa-PanelLayout {
   padding: 0;
   overflow-x: hidden;
+}
+
+.aa-Detached .aa-DetachedContainer {
+  background: none;
+}
+
+.aa-DetachedContainer .aa-DetachedFormContainer {
+  background: rgba(
+    var(--aa-background-color-rgb),
+    var(--aa-background-color-alpha)
+  );
+  padding: calc(var(--aa-spacing-half) * 1.5);
+}
+
+.aa-DetachedContainer .aa-Preview {
+  display: none;
+}
+
+.aa-DetachedContainer--modal .aa-Preview {
+  display: block;
+}
+
+.aa-PreviewImage {
+  display: flex;
+  justify-content: center;
+  height: 150px;
+  margin-bottom: var(--aa-spacing-half);
+  padding: var(--aa-spacing-half);
+  background: var(--aa-background-color);
+  border: 1px solid var(--aa-selected-color);
+  border-radius: 3px;
+}
+
+.aa-PreviewImage img {
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .aa-PreviewTitle {
@@ -73,6 +92,7 @@ body {
 
 .aa-PreviewDescription {
   max-width: 100%;
+  padding: 0.3em 0;
   font-size: 0.85em;
   color: var(--aa-content-text-color);
   overflow-x: hidden;
@@ -99,6 +119,17 @@ body {
   background: none;
 }
 
+.aa-Item {
+  padding-top: 0;
+  padding-bottom: 0;
+  display: block;
+}
+
+.aa-Item > a {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+}
+
 .aa-QuerySuggestion {
   display: inline-block;
   margin: calc(calc(var(--aa-spacing-half) / 2) / 2);
@@ -120,6 +151,11 @@ body {
   color: currentColor;
 }
 
+.aa-Footer {
+  padding: 15px;
+  box-shadow: 0 -1px 0 0 #e0e3e8,0 -3px 6px 0 rgba(69,98,155,0.12);
+}
+
 [data-autocomplete-source-id='suggestions']
   .aa-Item[aria-selected='true']
   .aa-QuerySuggestion {
@@ -128,4 +164,34 @@ body {
     var(--aa-selected-color-alpha)
   );
   border-color: transparent;
+}
+
+.DocSearch-Commands {
+  color: var(--docsearch-muted-color);
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.DocSearch-Commands li {
+  align-items: center;
+  display: flex;
+}
+
+.DocSearch-Commands li:not(:last-of-type) {
+  margin-right: 0.8em;
+}
+
+.DocSearch-Commands-Key {
+  align-items: center;
+  background: var(--docsearch-key-gradient);
+  border-radius: 2px;
+  box-shadow: var(--docsearch-key-shadow);
+  display: flex;
+  height: 18px;
+  justify-content: center;
+  margin-right: 0.4em;
+  padding-bottom: 1px;
+  width: 20px;
 }

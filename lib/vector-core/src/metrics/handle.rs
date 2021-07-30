@@ -110,7 +110,7 @@ impl Histogram {
             (8.0, AtomicU32::new(0)),
             (16.0, AtomicU32::new(0)),
             (32.0, AtomicU32::new(0)),
-            (32.0, AtomicU32::new(0)),
+            (64.0, AtomicU32::new(0)),
             (128.0, AtomicU32::new(0)),
             (256.0, AtomicU32::new(0)),
             (512.0, AtomicU32::new(0)),

@@ -1,11 +1,9 @@
-import algoliasearch, { SearchIndex } from "algoliasearch";
 import chalk from "chalk";
 import cheerio from "cheerio";
 import { Element } from "domhandler";
 import dotEnv from "dotenv-defaults";
 import fs from "fs";
 import glob from "glob-promise";
-import chunk from "lodash.chunk";
 import path from "path";
 
 dotEnv.config();
@@ -20,23 +18,28 @@ type Payload = {
 
 type AlgoliaRecord = {
   objectID: string;
+  pageTitle: string;
   pageUrl: string;
   itemUrl: string;
   level: number;
   title: string;
+  hierarchy: string[];
   tags: string[];
   ranking: number;
   section: string;
   content: string;
 };
 
+type Section = {
+  name: string;
+  path: string;
+  displayPath: string;
+  ranking: number;
+};
+
 // Constants
-
-// @ts-ignore
-const algoliaIndexName = process.env.ALGOLIA_INDEX_NAME || "";
-
 const DEBUG = process.env.DEBUG === "true" || false;
-const algoliaBatchSize = 100;
+const targetFile = "./public/search.json";
 const publicPath = path.resolve(__dirname, "..", "public");
 const tagHierarchy = {
   h1: 6,
@@ -66,17 +69,22 @@ function getItemUrl(file: string, { level, domId }: Payload[0]) {
 }
 
 async function indexHTMLFiles(
-  index: SearchIndex | null,
+  records: AlgoliaRecord[],
   section: string,
   files: string[],
   ranking: number
-) {
+): Promise<void> {
   const usedIds = {};
+  const algoliaRecords: AlgoliaRecord[] = [];
 
   for (const file of files) {
     const html = fs.readFileSync(file, "utf-8");
     const $ = cheerio.load(html);
-    const containers = $(".algolia-container");
+    const containers = $("#page-content");
+    const pageTitle = $("meta[name='algolia:title']").attr("content") || "";
+    const pageTagsString = $("meta[name='keywords']").attr('content') || "";
+    const pageTags: string[] = (pageTagsString === "") ? [] : pageTagsString.split(",");
+
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
     // @ts-ignore
@@ -109,8 +117,6 @@ async function indexHTMLFiles(
       traverse(containers.get(i) as Element);
     }
 
-    const algoliaRecords: AlgoliaRecord[] = [];
-
     let activeRecord: AlgoliaRecord | null = null;
 
     for (const item of payload) {
@@ -120,50 +126,53 @@ async function indexHTMLFiles(
       if (!activeRecord) {
         activeRecord = {
           objectID: itemUrl,
+          pageTitle,
           pageUrl,
           itemUrl,
           level: item.level,
-          title: item.content,
+          title: item.content.trim(),
           section,
           ranking,
-          tags: [],
+          hierarchy: [],
+          tags: pageTags,
           content: "",
         };
-      } else if (item.level === 1) {
-        if (activeRecord.content) {
-          activeRecord.content += " ";
-        }
-
+      } else if (item.level === 1) { // h1 logic
         activeRecord.content += item.content;
       } else if (item.level < activeRecord.level) {
         algoliaRecords.push({ ...activeRecord });
 
         activeRecord = {
           objectID: itemUrl,
+          pageTitle,
           pageUrl,
           itemUrl,
           level: item.level,
-          title: item.content,
+          title: item.content.trim(),
           section,
           ranking,
-          tags: [...activeRecord.tags, activeRecord.title],
+          hierarchy: [...activeRecord.hierarchy, activeRecord.title.trim()],
+          tags: pageTags,
           content: "",
         };
-      } else {
+      } else { // h2-h6 logic
         algoliaRecords.push({ ...activeRecord });
-        const tagCount = activeRecord.tags.length;
+
+        const hierarchySize = activeRecord.hierarchy.length;
         const levelDiff = item.level - activeRecord.level;
-        const lastIndex = tagCount - levelDiff;
+        const lastIndex = hierarchySize - levelDiff;
 
         activeRecord = {
           objectID: itemUrl,
+          pageTitle,
           pageUrl,
           itemUrl,
           level: item.level,
-          title: item.content,
+          title: item.content.trim(),
           section,
           ranking,
-          tags: [...activeRecord.tags.slice(0, lastIndex)],
+          hierarchy: [...activeRecord.hierarchy.slice(0, lastIndex)],
+          tags: pageTags,
           content: "",
         };
       }
@@ -173,45 +182,19 @@ async function indexHTMLFiles(
       }
 
       for (const rec of algoliaRecords) {
-        if (usedIds[rec.objectID]) {
-          // The objectID is the url of the section of the page that the record covers.
-          // If you have a duplicate here somehow two records point to the same thing.
-
-          if (DEBUG) {
-            console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
-            console.log(JSON.stringify(rec, null, 2));
-          }
+        // The objectID is the url of the section of the page that the record covers.
+        // If you have a duplicate here somehow two records point to the same thing.
+        if (DEBUG && usedIds[rec.objectID]) {
+          console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
+          console.log(JSON.stringify(rec, null, 2));
         }
 
         usedIds[rec.objectID] = true;
 
-        if (rec.level > 1 && rec.level < 6 && rec.tags.length == 0) {
-          // The h2 -> h5 should have a set of tags that are the "path" within the file.
-          if (DEBUG) {
-            console.log(chalk.yellow("Found h2 -> h5 with no tags."));
-            console.log(JSON.stringify(rec, null, 2));
-          }
-        }
-      }
-
-      if (index === null) {
-        if (DEBUG) {
-          console.log(chalk.magenta("\nRecords for:"));
-          console.log(chalk.cyan(file));
-          console.log(JSON.stringify(algoliaRecords, null, 2));
-        }
-      } else {
-        for (const chnk of chunk(algoliaRecords, algoliaBatchSize)) {
-          try {
-            await index.saveObjects(chnk);
-
-            if (DEBUG) {
-              console.log(chalk.cyan(file));
-            }
-          } catch (err) {
-            console.trace(err);
-            process.exit(1);
-          }
+        // The h2 -> h5 should have a set of tags that are the "path" within the file.
+        if (DEBUG && rec.level > 1 && rec.level < 6 && rec.hierarchy.length == 0) {
+          console.log(chalk.yellow("Found h2 -> h5 with no tags."));
+          console.log(JSON.stringify(rec, null, 2));
         }
       }
     }
@@ -220,44 +203,69 @@ async function indexHTMLFiles(
   console.log(
     chalk.green(`Success. Updated records for ${files.length} file(s).`)
   );
+
+  records.push(...algoliaRecords);
 }
 
 async function buildIndex() {
-  const appId = process.env.ALGOLIA_APP_ID || "";
-  const adminPublicKey = process.env.ALGOLIA_ADMIN_KEY || "";
+  var allRecords: AlgoliaRecord[] = [];
 
   console.log(`Building Vector search index`);
 
-  const algolia = algoliasearch(appId, adminPublicKey);
+  const sections: Section[] = [
+    {
+      name: "Docs",
+      path: `${publicPath}/docs/about/**/**.html`,
+      displayPath: "docs/about",
+      ranking: 50,
+    },
+    {
+      name: "Docs",
+      path: `${publicPath}/docs/administration/**/**.html`,
+      displayPath: "docs/administration",
+      ranking: 50,
+    },
+    {
+      name: "Docs",
+      path: `${publicPath}/docs/reference/**/**.html`,
+      displayPath: "docs/reference",
+      ranking: 50,
+    },
+    {
+      name: "Docs",
+      path: `${publicPath}/docs/setup/**/**.html`,
+      displayPath: "docs/setup",
+      ranking: 50,
+    },
+    {
+      name: "Advanced guides",
+      path: `${publicPath}/guides/advanced/**/**.html`,
+      displayPath: "guides/advanced",
+      ranking: 40,
+    },
+    {
+      name: "Level up guides",
+      path: `${publicPath}/guides/level-up/**/**.html`,
+      displayPath: "guides/level-up",
+      ranking: 40,
+    }
+  ];
 
-  let algoliaIndex: SearchIndex | null = null;
+  // Recurse through each section and push the resuling records to `allRecords`
+  for (const section of sections) {
+    let files = await glob(section.path);
+    console.log(chalk.blue(`Indexing ${section.displayPath}...`));
+    indexHTMLFiles(allRecords, section.name, files, section.ranking);
+  }
 
-  console.log(`Initializing index ${algoliaIndexName}`);
-  algoliaIndex = algolia.initIndex(algoliaIndexName);
+  console.log(chalk.green(`Success. ${allRecords.length} records have been successfully indexed.`));
+  console.log(chalk.blue(`Writing final index JSON to ${targetFile}...`));
 
-  let files = await glob(`${publicPath}/docs/about/**/**.html`);
-  console.log(chalk.blue("Indexing docs/about..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
+  const recordsJson: string = JSON.stringify(allRecords);
 
-  files = await glob(`${publicPath}/docs/administration/**/**.html`);
-  console.log(chalk.blue("Indexing docs/administration..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
-
-  files = await glob(`${publicPath}/docs/reference/**/**.html`);
-  console.log(chalk.blue("Indexing docs/reference..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
-
-  files = await glob(`${publicPath}/docs/setup/**/**.html`);
-  console.log(chalk.blue("Indexing docs/setup..."));
-  await indexHTMLFiles(algoliaIndex, "Docs", files, 50);
-
-  files = await glob(`${publicPath}/guides/advanced/**/**.html`);
-  console.log(chalk.blue("Indexing guides/advanced..."));
-  await indexHTMLFiles(algoliaIndex, "Advanced guides", files, 40);
-
-  files = await glob(`${publicPath}/guides/level-up/**/**.html`);
-  console.log(chalk.blue("Indexing guides/level-up..."));
-  await indexHTMLFiles(algoliaIndex, "Level up guides", files, 40);
+  fs.writeFile(targetFile, recordsJson, () => {
+    console.log(chalk.green(`Success. Wrote final index JSON to ${targetFile}.`));
+  });
 }
 
 buildIndex().catch((err) => {

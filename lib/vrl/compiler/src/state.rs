@@ -1,5 +1,5 @@
 use crate::expression::assignment;
-use crate::{parser::ast::Ident, Value};
+use crate::{parser::ast::Ident, TypeDef, Value};
 use std::collections::HashMap;
 
 /// The state held by the compiler.
@@ -28,6 +28,18 @@ pub struct Compiler {
 }
 
 impl Compiler {
+    /// Creates a new compiler that starts with an initial given typedef.
+    pub fn new_with_type_def(type_def: TypeDef) -> Self {
+        Self {
+            target: Some(assignment::Details {
+                type_def,
+                value: None,
+            }),
+            variables: HashMap::new(),
+            snapshot: None,
+        }
+    }
+
     pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
         self.variables.get(ident)
     }
@@ -66,6 +78,11 @@ impl Compiler {
             *self = *snapshot;
         }
     }
+
+    /// Returns the root typedef for the paths (not the variables) of the object.
+    pub fn target_type_def(&self) -> Option<&TypeDef> {
+        self.target.as_ref().map(|assignment| &assignment.type_def)
+    }
 }
 
 /// The state used at runtime to track changes as they happen.
@@ -77,11 +94,11 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn variable(&self, ident: &Ident) -> Option<&Value> {
-        self.variables.get(&ident)
+        self.variables.get(ident)
     }
 
     pub fn variable_mut(&mut self, ident: &Ident) -> Option<&mut Value> {
-        self.variables.get_mut(&ident)
+        self.variables.get_mut(ident)
     }
 
     pub(crate) fn insert_variable(&mut self, ident: Ident, value: Value) {

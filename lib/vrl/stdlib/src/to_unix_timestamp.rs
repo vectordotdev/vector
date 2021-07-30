@@ -48,7 +48,7 @@ impl Function for ToUnixTimestamp {
         let value = arguments.required("value");
 
         let unit = arguments
-            .optional_enum("unit", &Unit::all_value().as_slice())?
+            .optional_enum("unit", Unit::all_value().as_slice())?
             .map(|s| {
                 Unit::from_str(&s.try_bytes_utf8_lossy().expect("unit not bytes"))
                     .expect("validated enum")

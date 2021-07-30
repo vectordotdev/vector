@@ -85,7 +85,7 @@ impl SinkConfig for LogdnaConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let client = HttpClient::new(None)?;
+        let client = HttpClient::new(None, cx.proxy())?;
 
         let sink = PartitionHttpSink::new(
             self.clone(),

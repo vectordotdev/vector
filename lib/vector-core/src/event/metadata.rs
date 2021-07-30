@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
+use crate::ByteSizeOf;
 use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
@@ -20,6 +21,15 @@ pub struct EventMetadata {
     finalizers: EventFinalizers,
 }
 
+impl ByteSizeOf for EventMetadata {
+    fn allocated_bytes(&self) -> usize {
+        // NOTE we don't count the `str` here because it's allocated somewhere
+        // else. We're just moving around the pointer, which is already captured
+        // by `ByteSizeOf::size_of`.
+        self.finalizers.allocated_bytes()
+    }
+}
+
 impl EventMetadata {
     /// Replace the finalizers array with the given one.
     pub fn with_finalizer(mut self, finalizer: EventFinalizer) -> Self {
@@ -37,7 +47,7 @@ impl EventMetadata {
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
         if self.datadog_api_key.is_none() {
-            self.datadog_api_key = other.datadog_api_key
+            self.datadog_api_key = other.datadog_api_key;
         }
     }
 

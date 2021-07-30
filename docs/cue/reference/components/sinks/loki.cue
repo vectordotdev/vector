@@ -19,6 +19,7 @@ components: sinks: loki: {
 			batch: {
 				enabled:      true
 				common:       false
+				max_bytes:    102400
 				max_events:   100000
 				timeout_secs: 1
 			}
@@ -31,6 +32,7 @@ components: sinks: loki: {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                1

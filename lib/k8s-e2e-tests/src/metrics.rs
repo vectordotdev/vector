@@ -22,7 +22,7 @@ fn metrics_regex() -> regex::Regex {
 /// across all labels.
 pub fn extract_processed_events_sum(metrics: &str) -> Result<u64, Box<dyn std::error::Error>> {
     metrics_regex()
-        .captures_iter(&metrics)
+        .captures_iter(metrics)
         .filter_map(|captures| {
             let metric_name = &captures["name"];
             let value = &captures["value"];
@@ -40,7 +40,7 @@ pub fn extract_processed_events_sum(metrics: &str) -> Result<u64, Box<dyn std::e
 
 /// This helper function validates the presence of `vector_started`-ish metric.
 pub fn extract_vector_started(metrics: &str) -> bool {
-    metrics_regex().captures_iter(&metrics).any(|captures| {
+    metrics_regex().captures_iter(metrics).any(|captures| {
         let metric_name = &captures["name"];
         let value = &captures["value"];
         metric_name.contains("vector_started") && value == "1"

@@ -233,6 +233,7 @@ mod test {
                 shutdown,
                 out: tx,
                 acknowledgements: true,
+                proxy: Default::default(),
             })
             .await
             .unwrap();
@@ -270,6 +271,7 @@ mod test {
                 shutdown,
                 out: tx,
                 acknowledgements: true,
+                proxy: Default::default(),
             })
             .await
             .unwrap();

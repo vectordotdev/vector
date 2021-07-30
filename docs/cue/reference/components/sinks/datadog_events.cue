@@ -3,7 +3,9 @@ package metadata
 components: sinks: datadog_events: {
 	title: "Datadog Events"
 
-	classes: sinks._datadog.classes
+	classes: sinks._datadog.classes & {
+		development: "beta"
+	}
 
 	features: {
 		buffer: enabled:      true
@@ -16,6 +18,7 @@ components: sinks: datadog_events: {
 			}
 			compression: enabled: false
 			encoding: enabled:    false
+			proxy: enabled:       true
 			request: {
 				enabled:                    true
 				adaptive_concurrency:       true
