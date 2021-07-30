@@ -5,7 +5,6 @@
 {{ define "main" }}
 {{ $tag := .File.BaseFileName }}
 {{ $kind := .CurrentSection.Params.component_type }}
-{{ $kindSingular := $kind | singularize }}
 {{ $config := index (index site.Data.docs.components $kind) $tag }}
 {{ $exampleConfigs := $config.example_configs }}
 <div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl mt-8">
@@ -41,17 +40,8 @@
           </div>
           {{ end }}
 
-          {{ with $config.alias }}
-          {{ partial "heading.html" (dict "text" "Alias" "level" 2) }}
-
-          <p>
-            This component was previously called the <code>{{ . }}</code> {{ $kindSingular }}. Make sure to update your
-            Vector configuration to accommodate the name change:
-          </p>
-
-          {{ $diff := printf "[%s.%s]\n+type = \"%s\"\n-type = \"%s\"" $kind $tag $tag . }}
-
-          {{ highlight $diff "diff" "" }}
+          {{ if $config.alias }}
+          {{ partial "docs/component-alias.html" (dict "kind" $kind "alias" $config.alias "current" $tag) }}
           {{ end }}
 
           {{/* Component requirements */}}
