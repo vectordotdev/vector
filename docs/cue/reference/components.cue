@@ -946,9 +946,9 @@ components: {
 		env_vars: {
 			_http_proxy: {
 				description: """
-					The global URL to proxy HTTPS requests through.
+					The global URL to proxy HTTP requests through.
 
-					If another HTTPS proxy is set in the configuration file or at a component level,
+					If another HTTP proxy is set in the configuration file or at a component level,
 					this one will be overridden.
 
 					The lowercase variant has priority over the uppercase one.
@@ -991,7 +991,7 @@ components: {
 					"""
 				type: string: {
 					default: null
-					examples: ["localhost,.foo.bar", "*"]
+					examples: ["localhost,.exampl.com,192.168.0.0./16", "*"]
 					syntax: "literal"
 				}
 			}
