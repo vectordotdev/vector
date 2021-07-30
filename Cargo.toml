@@ -483,6 +483,7 @@ transforms-logs = [
   "transforms-aws_cloudwatch_logs_subscription_parser",
   "transforms-aws_ec2_metadata",
   "transforms-coercer",
+  "transforms-compound",
   "transforms-concat",
   "transforms-dedupe",
   "transforms-field_filter",
@@ -509,6 +510,7 @@ transforms-logs = [
 transforms-metrics = [
   "transforms-add_tags",
   "transforms-aggregate",
+  "transforms-compound",
   "transforms-filter",
   "transforms-log_to_metric",
   "transforms-lua",
@@ -525,6 +527,7 @@ transforms-ansi_stripper = []
 transforms-aws_cloudwatch_logs_subscription_parser= []
 transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
+transforms-compound = []
 transforms-concat = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
