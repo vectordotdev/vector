@@ -28,6 +28,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         #[cfg(feature = "api")]
         api: builder.api,
         healthchecks: builder.healthchecks,
+        enrichment_tables: builder.enrichment_tables,
         sources: builder.sources,
         sinks: builder.sinks,
         transforms: builder.transforms,
@@ -132,7 +133,7 @@ fn walk(
                 // TODO: This is a hack.
                 // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
                 transforms.insert(key, UnitTestTransform {
-                    transform:  futures::executor::block_on(target.config.clone().build(globals))
+                    transform:  futures::executor::block_on(target.config.clone().build(Default::default(), globals))
                         .expect("Failed to build a known valid transform config. Things may have changed during runtime."),
                     config: target.config,
                     next: target.next
@@ -455,7 +456,11 @@ async fn build_unit_test(
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config.inner.build(&config.global).await {
+            match transform_config
+                .inner
+                .build(Default::default(), &config.global)
+                .await
+            {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),

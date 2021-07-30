@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
@@ -46,7 +46,11 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         RegexParser::build(self, globals.timezone)
     }
 

@@ -1,5 +1,8 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{
+        log_schema, DataType, EnrichmentTableList, GlobalOptions, TransformConfig,
+        TransformDescription,
+    },
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
     transforms::{FunctionTransform, Transform},
@@ -40,7 +43,11 @@ impl_generate_config_from_default!(GrokParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()

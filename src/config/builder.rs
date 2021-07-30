@@ -1,8 +1,9 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, default_data_dir, provider, Config, GlobalOptions, HealthcheckOptions, SinkConfig,
-    SinkOuter, SourceConfig, SourceOuter, TestDefinition, TransformConfig, TransformOuter,
+    compiler, default_data_dir, provider, Config, EnrichmentTableConfig, EnrichmentTableOuter,
+    GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    TestDefinition, TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,8 @@ pub struct ConfigBuilder {
     pub api: api::Options,
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
+    #[serde(default)]
+    pub enrichment_tables: IndexMap<String, EnrichmentTableOuter>,
     #[serde(default)]
     pub sources: IndexMap<String, SourceOuter>,
     #[serde(default)]
@@ -47,6 +50,7 @@ impl From<Config> for ConfigBuilder {
             #[cfg(feature = "api")]
             api: c.api,
             healthchecks: c.healthchecks,
+            enrichment_tables: c.enrichment_tables,
             sources: c.sources,
             sinks: c.sinks,
             transforms: c.transforms,
@@ -69,6 +73,17 @@ impl ConfigBuilder {
 
     pub fn build_with_warnings(self) -> Result<(Config, Vec<String>), Vec<String>> {
         compiler::compile(self)
+    }
+
+    pub fn add_enrichment_table<E: EnrichmentTableConfig + 'static, T: Into<String>>(
+        &mut self,
+        name: T,
+        enrichment_table: E,
+    ) {
+        self.enrichment_tables.insert(
+            name.into(),
+            EnrichmentTableOuter::new(Box::new(enrichment_table)),
+        );
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, name: T, source: S) {
@@ -130,6 +145,11 @@ impl ConfigBuilder {
 
         self.healthchecks.merge(with.healthchecks);
 
+        with.enrichment_tables.keys().for_each(|k| {
+            if self.enrichment_tables.contains_key(k) {
+                errors.push(format!("duplicate enrichment_table name found: {}", k));
+            }
+        });
         with.sources.keys().for_each(|k| {
             if self.sources.contains_key(k) {
                 errors.push(format!("duplicate source name found: {}", k));
@@ -154,6 +174,7 @@ impl ConfigBuilder {
             return Err(errors);
         }
 
+        self.enrichment_tables.extend(with.enrichment_tables);
         self.sources.extend(with.sources);
         self.sinks.extend(with.sinks);
         self.transforms.extend(with.transforms);

@@ -1,5 +1,8 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{
+        log_schema, DataType, EnrichmentTableList, GlobalOptions, TransformConfig,
+        TransformDescription,
+    },
     event::Event,
     internal_events::{JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
@@ -28,7 +31,11 @@ impl_generate_config_from_default!(JsonParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        _globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         Ok(Transform::function(JsonParser::from(self.clone())))
     }
 

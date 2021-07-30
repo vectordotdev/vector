@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    conditions,
+    conditions, enrichment_tables,
     event::Metric,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
@@ -12,12 +12,15 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display, Formatter};
 use std::fs::DirBuilder;
 use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, RwLock},
+};
 
 pub mod api;
 mod builder;
@@ -83,6 +86,7 @@ pub struct Config {
     pub sources: IndexMap<String, SourceOuter>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
+    pub enrichment_tables: IndexMap<String, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,
 }
@@ -466,10 +470,17 @@ pub struct TransformOuter {
     pub inner: Box<dyn TransformConfig>,
 }
 
+pub type EnrichmentTableList =
+    Arc<RwLock<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>;
+
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<transforms::Transform>;
+    async fn build(
+        &self,
+        enrichment_tables: EnrichmentTableList,
+        globals: &GlobalOptions,
+    ) -> crate::Result<transforms::Transform>;
 
     fn input_type(&self) -> DataType;
 
@@ -490,6 +501,31 @@ dyn_clone::clone_trait_object!(TransformConfig);
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct EnrichmentTableOuter {
+    #[serde(flatten)]
+    pub inner: Box<dyn EnrichmentTableConfig>,
+}
+
+impl EnrichmentTableOuter {
+    pub fn new(inner: Box<dyn EnrichmentTableConfig>) -> Self {
+        EnrichmentTableOuter { inner }
+    }
+}
+
+#[async_trait]
+#[typetag::serde(tag = "type")]
+pub trait EnrichmentTableConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+    async fn build(
+        &self,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>;
+}
+
+pub type EnrichmentTableDescription = ComponentDescription<Box<dyn EnrichmentTableConfig>>;
+
+inventory::collect!(EnrichmentTableDescription);
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]

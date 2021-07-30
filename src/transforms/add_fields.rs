@@ -1,6 +1,9 @@
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{
+        DataType, EnrichmentTableList, GenerateConfig, GlobalOptions, TransformConfig,
+        TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{
         AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingFailed,
@@ -58,7 +61,11 @@ impl GenerateConfig for AddFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        _globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {

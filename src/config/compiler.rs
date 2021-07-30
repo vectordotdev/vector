@@ -29,6 +29,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
                 #[cfg(feature = "api")]
                 api: builder.api,
                 healthchecks: builder.healthchecks,
+                enrichment_tables: builder.enrichment_tables,
                 sources: builder.sources,
                 sinks: builder.sinks,
                 transforms: builder.transforms,

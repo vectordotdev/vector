@@ -1,5 +1,8 @@
 use crate::{
-    config::{DataType, GlobalOptions, ProxyConfig, TransformConfig, TransformDescription},
+    config::{
+        DataType, EnrichmentTableList, GlobalOptions, ProxyConfig, TransformConfig,
+        TransformDescription,
+    },
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
@@ -115,7 +118,11 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do

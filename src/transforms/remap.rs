@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
@@ -31,8 +31,12 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
-        Remap::new(self.clone()).map(Transform::function)
+    async fn build(
+        &self,
+        enrichment_tables: EnrichmentTableList,
+        _globals: &GlobalOptions,
+    ) -> Result<Transform> {
+        Remap::new(self.clone(), enrichment_tables.clone()).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -48,16 +52,17 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Remap {
     program: Program,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
+    enrichment_tables: EnrichmentTableList,
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig) -> crate::Result<Self> {
+    pub fn new(config: RemapConfig, enrichment_tables: EnrichmentTableList) -> crate::Result<Self> {
         let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
             Formatter::new(&config.source, diagnostics)
                 .colored()
@@ -69,12 +74,22 @@ impl Remap {
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
+            enrichment_tables,
         })
     }
 }
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+        let table = self.enrichment_tables.read().unwrap();
+        for (key, table) in table.iter() {
+            trace!(
+                "Testing we have {} {:?}",
+                key,
+                table.find_table_row(std::collections::BTreeMap::new())
+            );
+        }
+
         // If a program can fail or abort at runtime, we need to clone the
         // original event and keep it around, to allow us to discard any
         // mutations made to the event while the VRL program runs, before it

@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, EnrichmentTableList, GenerateConfig, GlobalOptions, TransformConfig,
+        TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogFailedSerialize,
@@ -36,7 +37,11 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
             self.host_tag.clone(),
             self.timezone.unwrap_or(globals.timezone),

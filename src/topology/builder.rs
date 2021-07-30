@@ -17,7 +17,7 @@ use std::pin::Pin;
 use std::{
     collections::HashMap,
     future::ready,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
@@ -41,12 +41,31 @@ pub async fn build_pieces(
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
+    let mut enrichment_tables = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
     let mut shutdown_coordinator = SourceShutdownCoordinator::default();
     let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
+
+    // Build enrichment tables
+    for (name, table) in config
+        .enrichment_tables
+        .iter()
+        .filter(|(name, _)| diff.enrichment_tables.contains_new(name))
+    {
+        let table = match table.inner.build(&config.global).await {
+            Ok(table) => table,
+            Err(_) => {
+                errors.push("ohno".to_string());
+                continue;
+            }
+        };
+        enrichment_tables.insert(name.clone(), table);
+    }
+
+    let enrichment_tables = Arc::new(RwLock::new(enrichment_tables));
 
     // Build sources
     for (name, source) in config
@@ -114,7 +133,11 @@ pub async fn build_pieces(
         let typetag = transform.inner.transform_type();
 
         let input_type = transform.inner.input_type();
-        let transform = match transform.inner.build(&config.global).await {
+        let transform = match transform
+            .inner
+            .build(enrichment_tables.clone(), &config.global)
+            .await
+        {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;

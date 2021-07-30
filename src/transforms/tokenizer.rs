@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -30,7 +30,11 @@ impl_generate_config_from_default!(TokenizerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()

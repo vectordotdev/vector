@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     transforms::{TaskTransform, Transform},
@@ -34,7 +34,11 @@ impl_generate_config_from_default!(AggregateConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        _globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         Aggregate::new(self).map(Transform::task)
     }
 

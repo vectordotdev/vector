@@ -1,6 +1,9 @@
 use crate::transforms::TaskTransform;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{
+        DataType, EnrichmentTableList, GenerateConfig, GlobalOptions, TransformConfig,
+        TransformDescription,
+    },
     event::Event,
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
@@ -89,7 +92,11 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        _globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
     }
 

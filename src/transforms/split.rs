@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -31,7 +31,11 @@ impl_generate_config_from_default!(SplitConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(
+        &self,
+        _enrichment_tables: EnrichmentTableList,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
