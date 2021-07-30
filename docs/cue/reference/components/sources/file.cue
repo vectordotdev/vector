@@ -284,7 +284,7 @@ components: sources: file: {
 	]
 
 	how_it_works: {
-		autodiscover: {
+		autodiscovery: {
 			title: "Autodiscovery"
 			body: """
 				Vector will continually look for new files matching any of your
