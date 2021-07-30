@@ -17,7 +17,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 ### Out of scope
 
 - How the pipelines should be synchronized between vector instances
-- Pre/post processing of data - The ability to prepare and normalize data.
+- Pre/post-processing of data - The ability to prepare and normalize data.
 - Connecting pipelines together - The ability to take input from another pipeline.
 - Component reuse - The ability to define boilerplate for reuse across many different pipelines. This will likely align with Datadog’s “pipeline catalogue”.
 - Pipeline quotas - The ability to limit how much data a pipeline can send to a sink.
@@ -34,8 +34,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 - These changes are providing a way for vector users to split their configuration in a way that improves the collaboration between ops and devs.
 - This split will be made by allowing the creation of individual pipeline configuration files, intended to align with services and teams, enabling autonomous management.
-- The ops will now configure their `sources` and `sinks`, and expose them to be used by the devs.
-- The ops will be able to only given access to some of the common components when configuring the pipeline.
+- The ops will now configure their `sources`, `sinks` and `transforms`, and expose them to be used by the devs.
 - The devs will have the ability to consume the provided components without being able to change the common configuration.
 - The users will be able to monitor their pipelines through the `internal_metrics` source.
 
@@ -49,127 +48,148 @@ Large Vector users often require complex Vector topologies to facilitate the col
 ### How and where the pipelines are stored
 
 To avoid backward incompatibility, pipelines will be loaded from a `pipelines` sub-directory relative to the Vector configuration directory (e.g., `/etc/vector/pipelines`). Therefore, if a user changes the location of the Vector configuration directory they will also change the `pipelines` directory path. They are coupled.
-The `pipelines` directory will contain all pipelines represented as individual files. For simplicity, and to ensure users do not over complicate pipeline management, sub-directories/nesting are not allowed. This is inspired by Terraform's single-level directory nesting, which has been a net positive for simple management of large Terraform projects.
+
+The `pipelines` directory will contain all pipelines represented as individual files. For simplicity, and to ensure users do not overcomplicate pipeline management, sub-directories/nesting are not allowed. This is inspired by Terraform's single-level directory nesting, which has been a net positive for simple management of large Terraform projects.
+
 Each pipeline file is a processing subset of a larger Vector configuration file. Therefore, it follows the same syntax as Vector's configuration (`toml`, `yaml`, and `json`).
 
-### Configuration
+### What is a pipeline
 
-Each time Vector will read its configuration file (on boot and when it live reloads), it will first read the pipeline configuration files and associate an `id` attribute corresponding to the pipeline's filename.
+- A pipeline is a collection of transforms that only have access to the component declared in the root configuration and their own pipeline's transforms.
+- A pipeline has an `id` being the name of the file without the extension. The pipeline `load-balancer.yml` will have `load-balancer` as `id`.
+- Pipelines have access to any components from the root configuration. If the transform `foo` is defined in `/etc/vector/bar.toml`, it will be accessible by the pipeline `/etc/vector/pipelines/pipeline.toml`.
+- If no pipeline is defined, Vector behaves as if the feature didn't exist. This way, a configuration from a version without the `pipeline` feature will keep working.
+- If a pipeline file is left empty, Vector behaves like if it didn't exist.
 
-The filename is used to point out the pipeline configuration file in the `pipelines` folder.
-In the pipeline's configuration file, the `id` can be set manually.
-A `load-balancer.yml` will, by default, have `load-balancer` as `id`.
-If several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector will error on boot. If this occurs during a reload, an error will be triggered and handled in the same fashion as other reload errors.
+If any of the following constraints are not valid, Vector will error on boot. If this occurs during a reload, an error will be triggered and handled in the same fashion as other reload errors.
 
-If several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector should error.
+- There cannot be several pipelines with the same id (for example `load-balancer.yml` and `load-balancer.json`).
+- The pipeline's configuration files should only contain transforms.
+- A pipeline's transform cannot have the same name as any component from the root configuration.
+- A pipeline cannot use another pipeline's component.
 
-The pipeline's configuration files should only contain transforms or vector will error.
-A pipeline cannot use another pipeline or vector will error.
+### Representation
 
-The following wouldn't be possible, because the `generate` name would conflict.
+Like said in the previous section, a pipeline is _just_ a set of transforms.
 
-```toml
-# /etc/vector/first.toml
-[sources.generate]
-...
-[resources.my-pipeline]
-...
-# /etc/vector/second.toml
-[sources.generate]
-...
-[resources.my-pipeline]
-...
-# /etc/vector/pipelines/my-pipeline.yml
-[transforms.something]
-type = "remap"
-inputs = ["generate"]
-```
+To be able to forward the events going through the pipeline to a `sink`, we need add a new concept of `route`.
 
-But it becomes possible with
+Those `route` components are only used to build the topology and only represent an interface between the topology and the external sinks.
 
-```toml
-# /etc/vector/first.toml
-[sources.generate-first]
-...
-[resources.my-pipeline]
-generate = ["generate-first"]
-# /etc/vector/second.toml
-[sources.generate-second]
-...
-[resources.my-pipeline]
-generate = ["generate-second"]
-# /etc/vector/pipelines/my-pipeline.yml
-[transforms.something]
-type = "remap"
-inputs = ["generate"]
-```
-
-The pipeline resource would have the following structure
+A pipeline will have the following internal representation before building the topology.
 
 ```rust
-struct PipelineResource {
-  filename: String,
-  aliases: Map<String, Set<String>>,
-  config: PipelineConfig,
-}
-```
-
-The structure of the pipeline's configuration file is as follows
-
-```toml
-# optional
-id = "load-balancer"
-
-[transforms.first]
-inputs = ["source"]
-...
-
-[transforms.second]
-inputs = ["first"]
-outputs = ["exposed-sink"]
-...
-
-# this will error
-[transforms.third]
-inputs = ["other-pipeline.bar"]
-outputs = ["exposed-sink"]
-...
-```
-
-In order to allow the user to specify the targeted sinks by a pipeline, the `forward` component creates a forwarding to the real sinks from the configuration files.
-It also allows the user to use is own aliases and just refer the external sinks in a single place.
-
-Now, if we look deeper at the configuration building process, the configuration compiler will require the pipelines in order to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
-
-To do so, we'll need to implement a `PipelineConfigBuilder` with the following structures
-
-```rust
-struct PipelineTransformOuter {
-    #[serde(flatten)]
-    content: TransformOuter,
-    outputs: Set<String>,
+struct Route {
+  inputs: Vec<String>,
+  outputs: Vec<String>,
 }
 struct PipelineConfigBuilder {
-    pub id: String,
-    pub transforms: Map<String, PipelineTransformOuter>,
+  id: String,
+  transforms: Map<String, TransformOuter>,
+  routes: Map<String, Route>,
 }
 ```
 
-then we'll update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4), in order to build a `Config` containing the required pipeline components, the compiler will load the pipeline's configurations, load the transforms and substitute the aliases.
+Which will create the following configuration file.
 
-The components coming from the pipeline would be cloned inside the final `Config`, in the `transforms` `IndexMap` and the `outputs` from the pipeline components will be added to the referring `Sink` input field.
+```toml
+# /etc/vector/pipelines/pipeline.toml
+[transforms.foo]
+type = "remap"
+inputs = ["from-root"]
+...
+
+[transforms.bar]
+type = "remap"
+inputs = ["foo"]
+...
+
+[routes.hot-storage]
+inputs = ["foo"]
+outputs = ["dc1", "dc2"]
+
+[routes.cold-storage]
+inputs = ["bar"]
+outputs = ["dc-us", "dc-eu"]
+```
+
+The `Route` structure is made to forward the events from inside the pipeline to an external component.
+
+### From configuration to topology
+
+If we look deeper at the configuration building process, the configuration compiler will require the pipelines to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
+
+To do so, we'll need to implement a `PipelineConfigBuilder` from the previous section, then we'll update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4), to build a `Config` containing the required pipeline components, the compiler will load the pipeline's configurations, load the transforms and substitute the aliases.
+
+The components coming from the pipeline will be cloned inside the final `Config`, in the `transforms` `IndexMap` and the `Routes` from the pipeline components will be added to the referring components input field.
+
+For example, the following configuration and pipeline, and its **equivalent** once built.
+
+```toml
+# /etc/vector/vector.toml
+[sources.in]
+...
+
+[sinks.out]
+...
+
+# /etc/vector/pipelines/foo.toml
+[transforms.bar]
+inputs = ["in"]
+...
+
+[routes.baz]
+inputs = ["bar"]
+outputs = ["out"]
+
+# equivalent once compiled
+[sources.in]
+...
+
+[transforms.foo#baz]
+inputs = ["in"]
+
+[sinks.out]
+inputs = ["foo#baz"]
+...
+```
 
 ### Observing pipelines
 
 Users should be able to observe and monitor individual pipelines.
 This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline's `id`.
-
-In Vector, the `Task` structure is what emits the events for `internal_metrics`.
-After [build the different pieces of the topology](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), we've to update the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L163) in order to accept an `Option<PipelineId>` so that when it emits the metrics events it can provide the information about the pipeline.
-
 This approach would extend the [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md#collecting-uniform-context-data) by _just_ adding `pipeline_id` to the context.
 
-When [spawning a transform](https://github.com/timberio/vector/blob/v0.15.0/src/topology/mod.rs#L574), adding the optional pipeline information to the span will populate the metrics.
+In Vector, once [the topology is built from the configuration](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), every component is encapsulated in a `Task`, that intercept any incoming event and does why it has to do. This task also keeps track of its internal metrics and finally emits those `internal_metrics` events.
+
+To add the pipeline information to the task, we need to add a new optional parameter to the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/task.rs#L29) method.
+
+```rust
+pub struct Task {
+    #[pin]
+    inner: BoxFuture<'static, Result<TaskOutput, ()>>,
+    name: String,
+    typetag: String,
+    pipeline: Option<String>,
+}
+impl Task {
+    pub fn new<S1, S2, Fut>(name: S1, typetag: S2, pipeline: Option<String>, inner: Fut) -> Self
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+        Fut: Future<Output = Result<TaskOutput, ()>> + Send + 'static,
+    {
+        Self {
+            inner: inner.boxed(),
+            name: name.into(),
+            typetag: typetag.into(),
+            pipeline,
+        }
+    }
+}
+````
+
+That way, when vector [spawns a new transform task](https://github.com/timberio/vector/blob/v0.15.0/src/topology/mod.rs#L574), it will be able to add the optional pipeline information to the span.
 
 ```rust
 let span = error_span!(
@@ -181,11 +201,13 @@ let span = error_span!(
 );
 ```
 
+Doing so, each time the task will emit an internal event, it will be populated by the optional `pipeline_id`.
+
 ## Rationale
 
 - Why is this change worth it?
 
-This split improves the readability of the configuration files and allows the users to collaborate, which makes using Vector more user friendly.
+This split improves the readability of the configuration files and allows the users to collaborate, which makes using Vector more user-friendly.
 
 - What is the impact of not doing this?
 
@@ -193,6 +215,7 @@ This would force the users to keep having complex configuration files and/or to 
 
 - How does this position us for success in the future?
 
+With this representation, we'll be able add access control by, for example, declaring the pipelines inside the configuration files to limit the reachable components. We would also be able to specify a quota for each pipeline.
 
 ## Prior Art
 
@@ -201,7 +224,7 @@ _TODO_
 ## Drawbacks
 
 - Why should we not do this?
-- What kind on ongoing burden does this place on the team?
+- What kind of ongoing burden does this place on the team?
 
 ## Alternatives
 
@@ -221,25 +244,18 @@ Doesn't block to create other sources/sinks.
 
 - Run a single vector per-'pipeline' and support metric tagging to distinguish at the telemetry level.
 
-Adds lot of complexity and would add some constraints regarding resources that can only been used once.
+Adds a lot of complexity and would add some constraints regarding resources that can only be used once.
 Doesn't block to create other sources/sinks.
 
 ## Outstanding Questions
 
-- Should the `pipelines` directory location be configurable through the cli?
-
-```bash
-vector --pipeline-dir /foo/bar/pipelines
-```
-
-- Should `pipelines` enable reuse? Should we be able to use it several times across a configuration?
 - Should the `ops` have to do anything for a pipeline to load? Should we reference a pipeline in the configuration?
-- Should the `devs` write a sort of function or a snippet (as a pipeline) that the `ops` would use?
+
 
 ## Plan Of Attack
 
 - [ ] Add pipeline resource structure
 - [ ] Create the Pipeline structure and parse a pipeline's configuration file
 - [ ] Update topology with pipeline's components
-- [ ] Update the context for taking pipeline informations
+- [ ] Update the context for taking pipeline information
 
