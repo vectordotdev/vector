@@ -5,7 +5,6 @@ Large Vector users often require complex Vector topologies to facilitate the col
 ## Context
 
 - [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md) Event drive observability.
-- [RFC 8288 (PR)](https://github.com/timberio/vector/pull/8400) Adding the `resources` component.
 
 ## Scope
 
@@ -22,20 +21,23 @@ Large Vector users often require complex Vector topologies to facilitate the col
 - Connecting pipelines together - The ability to take input from another pipeline.
 - Component reuse - The ability to define boilerplate for reuse across many different pipelines. This will likely align with Datadog’s “pipeline catalogue”.
 - Pipeline quotas - The ability to limit how much data a pipeline can send to a sink.
-- Visibility of the components - The ability to give access to any components within the system.
+- Access control - The ability to control access of global resources (sources and sinks) within pipelines.
 
 ## Pain
 
-- If an admin wants to split responsibilities between `ops` and `devs` by only allowing the `ops` to deal with `sources/sinks` and the `devs`, it's currently not possible.
+- It is not possible to delegate the management of pipelines across a matrix of teams and services.
+- It is not possible to observe individual pipelines (paths on the graph).
+- It is not possible to restrict what pipelines can do (which data they can access, how much data they can send, etc).
+- Managing a large graph is cumbersome and usually results in a very large Vector configuration file that is hard to navigate. Splitting the vector config into multiple files is a creative exercise for the user without any guidance.
 
 ## User Experience
 
-These changes are providing a way for vector users to split their configuration in a way that improves the collaboration between ops and devs.
-This split will take be made by creating a pipeline configuration file, in which the devs will be able to configure their components.
-The ops will now configure their `sources` and `sinks`, and expose them to be used by the devs.
-The ops will be able to only given access to some of the common components when configuring the pipeline.
-The devs will have the ability to consume the provided components without being able to change the common configuration.
-The users will be able to monitor their pipelines through the `internal_metrics` source.
+- These changes are providing a way for vector users to split their configuration in a way that improves the collaboration between ops and devs.
+- This split will be made by allowing the creation of individual pipeline configuration files, intended to align with services and teams, enabling autonomous management.
+- The ops will now configure their `sources` and `sinks`, and expose them to be used by the devs.
+- The ops will be able to only given access to some of the common components when configuring the pipeline.
+- The devs will have the ability to consume the provided components without being able to change the common configuration.
+- The users will be able to monitor their pipelines through the `internal_metrics` source.
 
 ## Motivation
 
@@ -54,30 +56,15 @@ Each pipeline file is a processing subset of a larger Vector configuration file.
 
 Each time Vector will read its configuration file (on boot and when it live reloads), it will first read the pipeline configuration files and associate an `id` attribute corresponding to the pipeline's filename.
 
-A pipeline can be referenced in a configuration file as follows
-
-```toml
-# vector.toml
-[resources.pipeline_id]
-type = "pipeline"
-filename = "pipeline_id.toml"
-[resources.pipeline_id.forwards]
-source_alias = ["nginx", "apache", "transform_name"]
-sink_alias = ["elastic", "blackhole"]
-```
-
 The filename is used to point out the pipeline configuration file in the `pipelines` folder.
 In the pipeline's configuration file, the `id` can be set manually.
 A `load-balancer.yml` will, by default, have `load-balancer` as `id`.
-If the `id` matches the name of the file, the `filename` field can be omitted in the pipeline's declaration.
+If several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector will error on boot. If this occurs during a reload, an error will be triggered and handled in the same fashion as other reload errors.
 
 If several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector should error.
 
 The pipeline's configuration files should only contain transforms or vector will error.
 A pipeline cannot use another pipeline or vector will error.
-
-A pipeline has access to the components configured in the `forwards` section.
-The forwards section in the pipeline declaration allows to create an alias for the resources that will be accessible to avoid name conflicts when using multiple vector configuration files.
 
 The following wouldn't be possible, because the `generate` name would conflict.
 
@@ -175,7 +162,7 @@ The components coming from the pipeline would be cloned inside the final `Config
 ### Observing pipelines
 
 Users should be able to observe and monitor individual pipelines.
-This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline `id`.
+This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline's `id`.
 
 In Vector, the `Task` structure is what emits the events for `internal_metrics`.
 After [build the different pieces of the topology](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), we've to update the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L163) in order to accept an `Option<PipelineId>` so that when it emits the metrics events it can provide the information about the pipeline.
