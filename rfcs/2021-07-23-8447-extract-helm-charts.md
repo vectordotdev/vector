@@ -100,13 +100,10 @@ doing nothing continues this inefficiency as we expand our testing requirements 
 We could create unique tags for chart versions, `chart-agent-1.0.0` for example, and keep all charts in the application
 repository. This feels _hacky_ but likely would resolve the pain points with minimal adjustments to our existing workflows.
 
-## Outstanding Questions
-
-- Do we need to migrate old chart releases to the new Helm repository, or direct users to the old repository for old releases?
-
 ## Plan Of Attack
 
 - [ ] Copying charts from `distribution/helm` to `timberio/helm-charts` and ensure CI/CD is properly configured
 - [ ] PR `timberio/vector` to no longer require our charts to be local and remove `distribution/helm` directory
 - [ ] Migrate any integration tests that are _only_ testing configuration into the `timberio/helm-charts` repository
 - [ ] Review existing issues related to the Helm charts, migrate what's still needed and close what isn't
+- [ ] Migrate stable releases to new helm repository, redirect existing repo to the new repository
