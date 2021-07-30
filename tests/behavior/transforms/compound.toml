@@ -1,0 +1,36 @@
+[transforms.start]
+type = "add_fields"
+inputs = []
+    [transforms.start.fields]
+    add = "a random field"
+
+[transforms.simple_compound]
+type = "compound"
+inputs = ["start"]
+    [transforms.simple_compound.nested.step1]
+    type = "add_fields"
+    [transforms.simple_compound.nested.step1.fields]
+        foo = "bar"
+        foobar = "baz"
+    [transforms.simple_compound.nested.step2]
+    type = "add_fields"
+    [transforms.simple_compound.nested.step2.fields]
+        foo = "barbaz"
+        foobarbaz = "qux"
+
+[[tests]]
+    name = "successful test"
+
+    [tests.input]
+    insert_at = "start"
+    value = "message"
+
+    [[tests.outputs]]
+    extract_from = "simple_compound.step2"
+    [[tests.outputs.conditions]]
+        type = "check_fields"
+        "foo.equals" = "barbaz"
+        "foobar.equals" = "baz"
+        "foobarbaz.equals" = "qux"
+        "message.equals" = "message"
+
