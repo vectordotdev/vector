@@ -8,8 +8,8 @@ system and better align our workflows with community expectations.
 
 ### In
 
-- Extracting the relevant contents from `distribution/helm/` into the `DataDog/helm-charts` git repository
-- Migrating _chart_ related CI to the existing workflows in `DataDog/helm-charts`
+- Extracting the relevant contents from `distribution/helm/` into a new git repository
+- Migrating _chart_ related CI to the industry standard workflows (reference `DataDog/helm-charts`)
 - Continuing to support running `test-e2e-kubernetes` suite from application repository
 - Cross repository syncing (updating `appVersion` and raw resources)
 
@@ -34,14 +34,9 @@ which causes either delays in chart improvements (or fixes) or unnecessary Vecto
 
 ## User Experience
 
-Moving our charts into the `DataDog/helm-charts` repository would require users to add Datadog's Helm repository address
-(`https://helm.datadoghq.com`) to use our charts. This would not be breaking for charts installed from the old `timberio` repository,
-they would be able to seamlessly upgrade to new charts from the new Helm repository. As an example, the [upgrade instructions for Helm](https://vector.dev/docs/setup/installation/package-managers/helm/#management)
-would be changed like so (merely changing the repository name from `timberio` to `datadog`):
-
-```shell
-helm repo update && helm upgrade --namespace vector vector datadog/vector-agent --reuse-values
-```
+If we republish our stable chart releases to the new [chart-releaser](https://github.com/helm/chart-releaser) based Helm repository
+we would be able to redirect https://packages.timber.io/helm/latest to the new GitHub Pages based index. This would allow for a
+transition that requires no changes on the user end.
 
 Users that have installed charts through cloning our repository and installing via their filesystem would need to clone and track
 the new repository, but this method is not documented, or advised.
@@ -50,7 +45,7 @@ We can maintain backward compatibility for users referencing our raw or kustomiz
 
 ## Implementation
 
-The extraction is straightforward. Migrate the contents of `distribution/helm` into the existing `DataDog/helm-charts` git repository.
+The extraction is straightforward. Migrate the contents of `distribution/helm` into a new `timberio/helm-charts` git repository.
 
 Existing CI jobs for our charts can be transfered to the new repository with minor changes, or replaced with the tooling available
 with `ct`. Our existing lint job calls a make target that lints all charts in the `distribution/helm` directory and could be replaced
@@ -61,8 +56,7 @@ existing scripts to keep the raw and kustomize resources in sync with changes to
 automated "dependabot" style by [triggering a workflow](https://docs.github.com/en/actions/reference/events-that-trigger-workflows#manual-events)
 when changes are merged in the `timberio/helm-charts` repository. Similarly, we can trigger workflows to update our charts' `appVersion`
 whenever releases are created in the `timberio/vector` repository to ensure our charts are always tracking the latest application version.
-It's not a requirement to automate these steps and scripts/make targets can be used instead if we decide to reduce scope and automate
-these tasks at a later time.
+It's not a requirement to automate these steps and scripts/make targets will be used until the need to automate them arises.
 
 The `k8s-test-framework` already contains an `external_chart` method, used for deploying DataDog's agent chart during integration tests.
 This allows us to update tests that expect Vector's charts to be located in the same repository to instead reference our hosted charts
@@ -108,12 +102,11 @@ repository. This feels _hacky_ but likely would resolve the pain points with min
 
 ## Outstanding Questions
 
-- Do we need to automate the cross-repository management or just document the steps with the initial work?
-- Do we need to migrate old chart releases to the `DataDog/helm-charts` repository, or direct users to the old repository for old releases?
+- Do we need to migrate old chart releases to the new Helm repository, or direct users to the old repository for old releases?
 
 ## Plan Of Attack
 
-- [ ] Copying charts from `distribution/helm` to `DataDog/helm-charts` and ensure CI/CD and CODEOWNERS are properly configured
+- [ ] Copying charts from `distribution/helm` to `timberio/helm-charts` and ensure CI/CD is properly configured
 - [ ] PR `timberio/vector` to no longer require our charts to be local and remove `distribution/helm` directory
-- [ ] Migrate any integration tests that are _only_ testing configuration into the `DataDog/helm-charts` repository
+- [ ] Migrate any integration tests that are _only_ testing configuration into the `timberio/helm-charts` repository
 - [ ] Review existing issues related to the Helm charts, migrate what's still needed and close what isn't
