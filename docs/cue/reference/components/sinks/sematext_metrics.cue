@@ -27,6 +27,7 @@ components: sinks: sematext_metrics: {
 				enabled: true
 				codec: enabled: false
 			}
+			proxy: enabled:   true
 			request: enabled: false
 			tls: enabled:     false
 			to: sinks._sematext.features.send.to

@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -95,7 +97,7 @@ impl SinkConfig for SqsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client()?;
+        let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone());
         let sink = SqsSink::new(self.clone(), cx, client)?;
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck.boxed()))
@@ -123,9 +125,9 @@ impl SqsSinkConfig {
             .map_err(Into::into)
     }
 
-    pub fn create_client(&self) -> crate::Result<SqsClient> {
+    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client()?;
+        let client = rusoto::client(proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 

@@ -61,7 +61,7 @@ impl SinkConfig for StackdriverConfig {
             ..Default::default()
         });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let batch = BatchSettings::default()
             .events(1)
             .parse_config(self.batch)?;

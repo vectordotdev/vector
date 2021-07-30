@@ -91,7 +91,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         tags.insert(log_schema().source_type_key().to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()

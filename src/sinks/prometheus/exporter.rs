@@ -433,6 +433,7 @@ impl PartialEq for MetricEntry {
 mod tests {
     use super::*;
     use crate::{
+        config::ProxyConfig,
         event::metric::{Metric, MetricValue},
         http::HttpClient,
         test_util::{next_addr, random_string, trace_init},
@@ -515,7 +516,8 @@ mod tests {
         let request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = HttpClient::new(client_settings)
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(client_settings, &proxy)
             .unwrap()
             .send(request)
             .await
@@ -635,7 +637,7 @@ mod tests {
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{http::HttpClient, test_util::trace_init};
+    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
@@ -745,7 +747,8 @@ mod integration_tests {
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = HttpClient::new(None)
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(None, &proxy)
             .unwrap()
             .send(request)
             .await

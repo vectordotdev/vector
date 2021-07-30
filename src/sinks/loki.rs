@@ -112,7 +112,7 @@ impl SinkConfig for LokiConfig {
             .timeout(1)
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls)?;
+        let client = HttpClient::new(tls, cx.proxy())?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
@@ -302,6 +302,7 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ProxyConfig;
     use crate::event::Event;
     use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::{build_test_server, load_sink};
@@ -408,7 +409,8 @@ mod tests {
         tokio::spawn(server);
 
         let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
-        let client = HttpClient::new(tls).expect("could not create HTTP client");
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
         healthcheck(config.clone(), client)
             .await

@@ -108,6 +108,13 @@ impl GenerateConfig for HttpSinkConfig {
     }
 }
 
+impl HttpSinkConfig {
+    fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
+        let tls = TlsSettings::from_options(&self.tls)?;
+        Ok(HttpClient::new(tls, cx.proxy())?)
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
@@ -115,8 +122,7 @@ impl SinkConfig for HttpSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls)?;
+        let client = self.build_http_client(&cx)?;
 
         let healthcheck = match cx.healthcheck.uri.clone() {
             Some(healthcheck_uri) => {

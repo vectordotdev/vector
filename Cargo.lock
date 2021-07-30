@@ -2083,6 +2083,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "env-test-util"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62a61b2faff777e62dbccd7f82541d873f96264d050c5dd7e95194f79fc4de29"
+
+[[package]]
 name = "env_logger"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3120,6 +3126,23 @@ dependencies = [
  "tokio",
  "tokio-openssl",
  "tower-layer",
+]
+
+[[package]]
+name = "hyper-proxy"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca815a891b24fdfb243fa3239c86154392b0953ee584aa1a2a1f66d20cbe75cc"
+dependencies = [
+ "bytes 1.0.1",
+ "futures 0.3.16",
+ "headers",
+ "http",
+ "hyper",
+ "openssl",
+ "tokio",
+ "tokio-openssl",
+ "tower-service",
 ]
 
 [[package]]
@@ -4398,6 +4421,16 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "signatory",
+]
+
+[[package]]
+name = "no-proxy"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db4c3a61ec8139dcc17f22de70de6bc5c51507654cc515b75165bed9cfff1651"
+dependencies = [
+ "cidr-utils",
+ "serde",
 ]
 
 [[package]]
@@ -8243,6 +8276,7 @@ dependencies = [
  "dnsmsg-parser",
  "dyn-clone",
  "encoding_rs",
+ "env-test-util",
  "evmap",
  "exitcode",
  "fakedata",
@@ -8261,6 +8295,7 @@ dependencies = [
  "httpmock",
  "hyper",
  "hyper-openssl",
+ "hyper-proxy",
  "indexmap",
  "indoc",
  "infer",
@@ -8286,6 +8321,7 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.22.0",
+ "no-proxy",
  "nom 6.1.2",
  "notify",
  "num-format",

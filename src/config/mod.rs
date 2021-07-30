@@ -27,6 +27,7 @@ mod diff;
 pub mod format;
 mod loading;
 pub mod provider;
+pub mod proxy;
 mod unit_test;
 mod validation;
 mod vars;
@@ -39,6 +40,7 @@ pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
 };
+pub use proxy::ProxyConfig;
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, LogSchema};
@@ -94,6 +96,8 @@ pub struct GlobalOptions {
     pub log_schema: LogSchema,
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub timezone: TimeZone,
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    pub proxy: ProxyConfig,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -221,6 +225,11 @@ macro_rules! impl_generate_config_from_default {
 pub struct SourceOuter {
     #[serde(default = "default_acknowledgements")]
     pub acknowledgements: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub proxy: ProxyConfig,
     #[serde(flatten)]
     pub(super) inner: Box<dyn SourceConfig>,
 }
@@ -234,6 +243,7 @@ impl SourceOuter {
         Self {
             acknowledgements: default_acknowledgements(),
             inner: Box::new(source),
+            proxy: Default::default(),
         }
     }
 }
@@ -259,6 +269,7 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
     pub acknowledgements: bool,
+    pub proxy: ProxyConfig,
 }
 
 impl SourceContext {
@@ -276,6 +287,7 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 acknowledgements: default_acknowledgements(),
+                proxy: Default::default(),
             },
             shutdown,
         )
@@ -289,6 +301,7 @@ impl SourceContext {
             shutdown: ShutdownSignal::noop(),
             out,
             acknowledgements: default_acknowledgements(),
+            proxy: Default::default(),
         }
     }
 }
@@ -312,6 +325,12 @@ pub struct SinkOuter {
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
 
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    proxy: ProxyConfig,
+
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
 }
@@ -324,6 +343,7 @@ impl SinkOuter {
             healthcheck_uri: None,
             inner,
             inputs,
+            proxy: Default::default(),
         }
     }
 
@@ -347,6 +367,10 @@ impl SinkOuter {
                 .or_else(|| self.healthcheck_uri.clone()),
             ..self.healthcheck.clone()
         }
+    }
+
+    pub fn proxy(&self) -> &ProxyConfig {
+        &self.proxy
     }
 }
 
@@ -404,6 +428,7 @@ pub struct SinkContext {
     pub(super) acker: Acker,
     pub(super) healthcheck: SinkHealthcheckOptions,
     pub(super) globals: GlobalOptions,
+    pub(super) proxy: ProxyConfig,
 }
 
 impl SinkContext {
@@ -413,6 +438,7 @@ impl SinkContext {
             acker: Acker::Null,
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
+            proxy: ProxyConfig::default(),
         }
     }
 
@@ -422,6 +448,10 @@ impl SinkContext {
 
     pub fn globals(&self) -> &GlobalOptions {
         &self.globals
+    }
+
+    pub fn proxy(&self) -> &ProxyConfig {
+        &self.proxy
     }
 }
 
@@ -792,6 +822,39 @@ mod test {
                 "duplicate sink name found: out".into(),
             ])
         );
+    }
+
+    #[test]
+    fn with_proxy() {
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [proxy]
+                  http = "http://server:3128"
+                  https = "http://other:3128"
+                  no_proxy = ["localhost", "127.0.0.1"]
+
+                [sources.in]
+                  type = "nginx_metrics"
+                  endpoints = ["http://localhost:8000/basic_status"]
+                  proxy.http = "http://server:3128"
+                  proxy.https = "http://other:3128"
+                  proxy.no_proxy = ["localhost", "127.0.0.1"]
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["in"]
+                  encoding = "json"
+            "#},
+            Some(Format::Toml),
+        )
+        .unwrap();
+        assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
+        assert!(config.global.proxy.no_proxy.matches("localhost"));
+        let source = config.sources.get("in").unwrap();
+        assert_eq!(source.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(source.proxy.https, Some("http://other:3128".into()));
+        assert!(source.proxy.no_proxy.matches("localhost"));
     }
 }
 

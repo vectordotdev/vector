@@ -70,7 +70,7 @@ impl SinkConfig for ClickhouseConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let config = ClickhouseConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,

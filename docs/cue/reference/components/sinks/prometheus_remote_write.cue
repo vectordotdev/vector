@@ -25,6 +25,7 @@ components: sinks: prometheus_remote_write: {
 			// TODO Snappy is always enabled
 			compression: enabled: false
 			encoding: enabled:    false
+			proxy: enabled:       true
 			request: {
 				enabled:                    true
 				concurrency:                5

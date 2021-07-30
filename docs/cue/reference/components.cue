@@ -179,6 +179,7 @@ components: {
 			filter?:    #FeaturesFilter
 			parse?:     #FeaturesParse
 			program?:   #FeaturesProgram
+			proxy?:     #FeaturesProxy
 			reduce?:    #FeaturesReduce
 			route?:     #FeaturesRoute
 			sanitize?:  #FeaturesSanitize
@@ -215,6 +216,8 @@ components: {
 			service:    #Service
 			interface?: #Interface
 		}
+
+		proxy?: #FeaturesProxy
 
 		tls?: #FeaturesTLS & {_args: {mode: "connect"}}
 	}
@@ -277,6 +280,10 @@ components: {
 
 	#FeaturesProgram: {
 		runtime: #Runtime
+	}
+
+	#FeaturesProxy: {
+		enabled: bool
 	}
 
 	#FeaturesReceive: {
@@ -353,6 +360,8 @@ components: {
 		send_buffer_bytes?: #FeaturesSendBufferBytes
 
 		keepalive?: #FeaturesKeepalive
+
+		proxy?: #FeaturesProxy
 
 		// `request` describes how the component issues and manages external
 		// requests.
@@ -683,6 +692,61 @@ components: {
 				}
 			}
 
+			_proxy: {
+				common:      false
+				description: "Configures an HTTP(S) proxy for Vector to use."
+				required:    false
+				type: object: options: {
+					enabled: {
+						common:      false
+						description: "If false the proxy will be disabled."
+						required:    false
+						type: bool: default: true
+					}
+					http: {
+						common:      false
+						description: "The URL to proxy HTTP requests through."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["http://foo.bar:3128"]
+							syntax: "literal"
+						}
+					}
+					https: {
+						common:      false
+						description: "The URL to proxy HTTPS requests through."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["http://foo.bar:3128"]
+							syntax: "literal"
+						}
+					}
+					no_proxy: {
+						common:      false
+						description: """
+							List of hosts to avoid proxying globally.
+
+							Allowed patterns here include:
+								- Domain names. For example, `example.com` will match requests to to `example.com`
+								- Wildcard domains. For example, `.example.com` will match requests to `example.com` and its subdomains
+								- IP addresses. For example, `127.0.0.1` will match requests to 127.0.0.1
+								- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
+								- `*` will match all hosts
+							"""
+						required:    false
+						type: array: {
+							default: null
+							items: type: string: {
+								examples: ["localhost", ".foo.bar", "*"]
+								syntax: "literal"
+							}
+						}
+					}
+				}
+			}
+
 			_http_auth: {
 				_args: {
 					password_example: string
@@ -875,6 +939,82 @@ components: {
 						"\(Name)": "The type of this component."
 					}
 					syntax: "literal"
+				}
+			}
+		}
+
+		env_vars: {
+			_http_proxy: {
+				description: """
+					The global URL to proxy HTTP requests through.
+
+					If another HTTP proxy is set in the configuration file or at a component level,
+					this one will be overridden.
+
+					The lowercase variant has priority over the uppercase one.
+					"""
+				type: string: {
+					default: null
+					examples: ["http://foo.bar:3128"]
+					syntax: "literal"
+				}
+			}
+			_https_proxy: {
+				description: """
+					The global URL to proxy HTTPS requests through.
+
+					If another HTTPS proxy is set in the configuration file or at a component level,
+					this one will be overriden.
+
+					The lowercase variant has priority over the uppercase one.
+					"""
+				type: string: {
+					default: null
+					examples: ["http://foo.bar:3128"]
+					syntax: "literal"
+				}
+			}
+			_no_proxy: {
+				description: """
+					List of hosts to avoid proxying globally.
+
+					Allowed patterns here include:
+						- Domain names. For example, `example.com` will match requests to to `example.com`
+						- Wildcard domains. For example, `.example.com` will match requests to `example.com` and its subdomains
+						- IP addresses. For example, `127.0.0.1` will match requests to 127.0.0.1
+						- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
+						- `*` will match all hosts
+
+					If another no_proxy value is set in the configuration file or at a component level, this one will be overridden.
+
+					The lowercase variant has priority over the uppercase one.
+					"""
+				type: string: {
+					default: null
+					examples: ["localhost,.exampl.com,192.168.0.0./16", "*"]
+					syntax: "literal"
+				}
+			}
+			if features.collect != _|_ {
+				if features.collect.proxy != _|_ {
+					if features.collect.proxy.enabled {
+						http_proxy:  env_vars._http_proxy
+						HTTP_PROXY:  env_vars._http_proxy
+						https_proxy: env_vars._https_proxy
+						HTTPS_PROXY: env_vars._https_proxy
+						no_proxy:    env_vars._no_proxy
+						NO_PROXY:    env_vars._no_proxy
+					}
+				}
+				if features.send.proxy != _|_ {
+					if features.send.proxy.enabled {
+						http_proxy:  env_vars._http_proxy
+						HTTP_PROXY:  env_vars._http_proxy
+						https_proxy: env_vars._https_proxy
+						HTTPS_PROXY: env_vars._https_proxy
+						no_proxy:    env_vars._no_proxy
+						NO_PROXY:    env_vars._no_proxy
+					}
 				}
 			}
 		}

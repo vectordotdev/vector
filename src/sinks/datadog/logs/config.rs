@@ -117,7 +117,7 @@ impl DatadogLogsConfig {
             false,
         )?;
 
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(
             service.clone(),
             client.clone(),

@@ -180,14 +180,14 @@ enum HealthcheckError {
 }
 
 impl GcsSink {
-    async fn new(config: &GcsSinkConfig, _cx: &SinkContext) -> crate::Result<Self> {
+    async fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
         let creds = config
             .auth
             .make_credentials(Scope::DevStorageReadWrite)
             .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = HttpClient::new(tls)?;
+        let client = HttpClient::new(tls, cx.proxy())?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {

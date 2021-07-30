@@ -104,7 +104,7 @@ impl SinkConfig for HecSinkConfig {
             ..Default::default()
         });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -445,7 +445,7 @@ mod integration_tests {
     use crate::test_util::retry_until;
     use crate::{
         assert_downcast_matches,
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         sinks,
         test_util::{random_lines_with_stream, random_string},
     };
@@ -699,7 +699,8 @@ mod integration_tests {
     async fn splunk_healthcheck() {
         let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
-            let client = HttpClient::new(tls_settings).unwrap();
+            let proxy = ProxyConfig::default();
+            let client = HttpClient::new(tls_settings, &proxy).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
         };
 

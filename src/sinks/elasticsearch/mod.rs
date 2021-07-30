@@ -364,7 +364,7 @@ impl SinkConfig for ElasticSearchConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(self)?;
-        let client = HttpClient::new(common.tls_settings.clone())?;
+        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
         let healthcheck = common.healthcheck(client.clone()).boxed();
 
@@ -1106,7 +1106,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         http::HttpClient,
         sinks::HealthcheckError,
         test_util::{random_events_with_stream, random_string, trace_init},
@@ -1154,7 +1154,8 @@ mod integration_tests {
             }
 
             let request = builder.body(Body::empty())?;
-            let client = HttpClient::new(self.tls_settings.clone())
+            let proxy = ProxyConfig::default();
+            let client = HttpClient::new(self.tls_settings.clone(), &proxy)
                 .expect("Could not build client to flush");
             let response = client.send(request).await?;
 

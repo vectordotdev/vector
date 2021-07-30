@@ -174,7 +174,7 @@ impl_generate_config_from_default!(DatadogConfig);
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(None)?;
+        let client = HttpClient::new(None, cx.proxy())?;
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.api_key.clone(),
