@@ -215,7 +215,7 @@ impl Source {
             Some(kc) => k8s::client::config::Config::kubeconfig(kc)?,
             None => k8s::client::config::Config::in_cluster()?,
         };
-        let client = k8s::client::Client::new(k8s_config, &proxy)?;
+        let client = k8s::client::Client::new(k8s_config, proxy)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), name)?;
         let timezone = config.timezone.unwrap_or(globals.timezone);

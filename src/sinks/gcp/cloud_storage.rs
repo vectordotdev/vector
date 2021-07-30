@@ -196,7 +196,7 @@ impl GcsSink {
             .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = HttpClient::new(tls, &cx.proxy())?;
+        let client = HttpClient::new(tls, cx.proxy())?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {

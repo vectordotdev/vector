@@ -22,7 +22,7 @@ impl NoProxyInterceptor {
                 }
                 let matches = host
                     .map(|host| {
-                        self.0.matches(&host)
+                        self.0.matches(host)
                             || port
                                 .map(|port| {
                                     let url = format!("{}:{}", host, port);

@@ -38,7 +38,7 @@ pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
 
 pub fn client(proxy: &ProxyConfig) -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = super::http::HttpClient::new(settings, &proxy)?;
+    let client = super::http::HttpClient::new(settings, proxy)?;
     Ok(HttpClient { client })
 }
 

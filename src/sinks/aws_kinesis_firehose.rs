@@ -130,7 +130,7 @@ impl KinesisFirehoseSinkConfig {
     fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(&proxy)?;
+        let client = rusoto::client(proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

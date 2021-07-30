@@ -264,7 +264,7 @@ impl S3SinkConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<S3Client> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client(&proxy)?;
+        let client = rusoto::client(proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
