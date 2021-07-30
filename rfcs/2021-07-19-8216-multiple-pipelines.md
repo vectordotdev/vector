@@ -52,7 +52,7 @@ Each pipeline file is a processing subset of a larger Vector configuration file.
 
 ### Configuration
 
-Each time Vector will read its configuration file (on boot and when it live reloads), it will read the referring pipeline configuration files and associate an `id` attribute corresponding to the pipeline's filename.
+Each time Vector will read its configuration file (on boot and when it live reloads), it will first read the pipeline configuration files and associate an `id` attribute corresponding to the pipeline's filename.
 
 A pipeline can be referenced in a configuration file as follows
 
@@ -71,7 +71,6 @@ In the pipeline's configuration file, the `id` can be set manually.
 A `load-balancer.yml` will, by default, have `load-balancer` as `id`.
 If the `id` matches the name of the file, the `filename` field can be omitted in the pipeline's declaration.
 
-In addition, a `version` attribute will be set containing the hash of the pipeline's configuration file to keep track of the file changes.
 If several files having the same `id` in that folder (for example `load-balancer.yml` and `load-balancer.json`), vector should error.
 
 The pipeline's configuration files should only contain transforms or vector will error.
@@ -165,7 +164,6 @@ struct PipelineTransformOuter {
 }
 struct PipelineConfigBuilder {
     pub id: String,
-    pub version: String,
     pub transforms: Map<String, PipelineTransformOuter>,
 }
 ```
@@ -177,12 +175,12 @@ The components coming from the pipeline would be cloned inside the final `Config
 ### Observing pipelines
 
 Users should be able to observe and monitor individual pipelines.
-This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline `id` and a `pipeline_version` tag referring to the pipeline `version`.
+This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline `id`.
 
 In Vector, the `Task` structure is what emits the events for `internal_metrics`.
-After [build the different pieces of the topology](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), we've to update the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L163) in order to accept an `Option<(PipelineId, PipelineVersion)>` so that when it emits the metrics events it can provide the information about the pipeline.
+After [build the different pieces of the topology](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), we've to update the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L163) in order to accept an `Option<PipelineId>` so that when it emits the metrics events it can provide the information about the pipeline.
 
-This approach would extend the [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md#collecting-uniform-context-data) by _just_ adding `pipeline_id` and `pipeline_version` to the context.
+This approach would extend the [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md#collecting-uniform-context-data) by _just_ adding `pipeline_id` to the context.
 
 When [spawning a transform](https://github.com/timberio/vector/blob/v0.15.0/src/topology/mod.rs#L574), adding the optional pipeline information to the span will populate the metrics.
 
@@ -193,7 +191,6 @@ let span = error_span!(
     component_name = %task.name(),
     component_type = %task.typetag(),
     pipeline_id = %task.pipeline_id(),
-    pipeline_version = %task.pipeline_version(),
 );
 ```
 
