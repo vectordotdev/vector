@@ -249,8 +249,6 @@ Doesn't block to create other sources/sinks.
 
 ## Outstanding Questions
 
-- Should the `ops` have to do anything for a pipeline to load? Should we reference a pipeline in the configuration?
-
 
 ## Plan Of Attack
 
