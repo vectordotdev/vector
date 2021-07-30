@@ -38,7 +38,8 @@ components: transforms: compound: {
 			description: """
 				A table of transforms configurations' representing the chain of transforms to be applied on incoming
 				events. All transforms in the chain can then be referenced as an input by other components with the name
-				`<transform_name>.<nested_transform_name>`.
+				`<transform_name>.<nested_transform_name>`. All transforms in the chain also generate internal metrics
+				as if they were configured separately.
 				"""
 			required: true
 			warnings: []
