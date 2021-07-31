@@ -126,11 +126,9 @@ impl RunningTopology {
                 });
                 let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
 
-                // TODO: replace with checked_duration_since once it's stable
-                let time_remaining = if deadline > Instant::now() {
-                    format!("{} seconds left", (deadline - Instant::now()).as_secs())
-                } else {
-                    "overdue".to_string()
+                let time_remaining = match deadline.checked_duration_since(Instant::now()) {
+                    Some(remaining) => format!("{} seconds left", remaining.as_secs()),
+                    None => "overdue".to_string(),
                 };
 
                 info!(
