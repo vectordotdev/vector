@@ -473,6 +473,12 @@ pub struct TransformOuter {
 pub type EnrichmentTableList =
     Arc<RwLock<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>;
 
+#[derive(Deserialize, Serialize, Debug)]
+pub enum ExpandType {
+    Parallel,
+    Serial,
+}
+
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
@@ -491,7 +497,9 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     /// Allows a transform configuration to expand itself into multiple "child"
     /// transformations to replace it. This allows a transform to act as a macro
     /// for various patterns.
-    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+    fn expand(
+        &mut self,
+    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         Ok(None)
     }
 }

@@ -8,19 +8,18 @@ the release process is dependent on the version change.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-- [Releasing](#releasing)
-  - [How to track releases](#how-to-track-releases)
-  - [Release cadence](#release-cadence)
-    - [Stable releases](#stable-releases)
-    - [Patch releases](#patch-releases)
-    - [Nightly releases](#nightly-releases)
-  - [Compatibility guarantees](#compatibility-guarantees)
-  - [Which version should I be using?](#which-version-should-i-be-using)
-  - [How to release Vector](#how-to-release-vector)
-    - [Quick Start](#quick-start)
-      - [Patch Releases](#patch-releases)
-      - [Major/Minor Releases](#majorminor-releases)
-    - [Fixing Up a Release](#fixing-up-a-release)
+1. [How to track releases](#how-to-track-releases)
+1. [Release cadence](#release-cadence)
+   1. [Stable releases](#stable-releases)
+   1. [Patch releases](#patch-releases)
+   1. [Nightly releases](#nightly-releases)
+1. [Compatibility guarantees](#compatibility-guarantees)
+1. [Which version should I be using?](#which-version-should-i-be-using)
+1. [How to release Vector](#how-to-release-vector)
+   1. [Quick Start](#quick-start)
+      1. [Patch Releases](#patch-releases-1)
+      1. [Major/Minor Releases](#majorminor-releases)
+   1. [Fixing Up a Release](#fixing-up-a-release)
 
 <!-- /MarkdownTOC -->
 

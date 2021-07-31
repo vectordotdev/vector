@@ -1,7 +1,7 @@
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, EnrichmentTableList, GenerateConfig, GlobalOptions, TransformConfig,
+        DataType, EnrichmentTableList, ExpandType, GenerateConfig, GlobalOptions, TransformConfig,
         TransformDescription,
     },
     event::Event,
@@ -104,7 +104,9 @@ impl TransformConfig for RouteConfig {
         Err("this transform must be expanded".into())
     }
 
-    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+    fn expand(
+        &mut self,
+    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
         while let Some((k, v)) = self.route.pop() {
@@ -112,7 +114,7 @@ impl TransformConfig for RouteConfig {
         }
 
         if !map.is_empty() {
-            Ok(Some(map))
+            Ok(Some((map, ExpandType::Parallel)))
         } else {
             Err("must specify at least one lane".into())
         }
@@ -146,7 +148,9 @@ impl TransformConfig for RouteCompatConfig {
         self.0.build(enrichment_tables, globals).await
     }
 
-    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+    fn expand(
+        &mut self,
+    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         self.0.expand()
     }
 
@@ -216,7 +220,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}}"#
+            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},"Parallel"]"#
         );
     }
 }
