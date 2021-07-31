@@ -3,7 +3,8 @@
 First, thank you for contributing to Vector! The goal of this document is to
 provide everything you need to start contributing to Vector. The
 following TOC is sorted progressively, starting with the basics and
-expanding into more specifics.
+expanding into more specifics. Everyone from a first time contributor to a
+Vector team member will find this document useful.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
@@ -100,7 +101,7 @@ expanding into more specifics.
    - This is where you can get a feel if the change will be accepted or not.
      Changes that are questionable will have a `needs: approval` label.
 2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
-   Github account.
+   Github account (only applicable to outside contributors).
 3. [Create a new Git branch][urls.create_branch].
 4. Review the Vector [change control](#change-control) and [development](#development) workflows.
 5. Make your changes.
