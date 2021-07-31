@@ -13,10 +13,32 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 pub use self::regex::Regex;
 pub use error::Error;
 pub use kind::Kind;
+
+pub trait EnrichmentTable {}
+
+#[derive(Clone)]
+pub struct EnrichmentTableW {
+    name: String,
+    table: Arc<RwLock<Box<dyn EnrichmentTable + Sync + Send>>>,
+}
+
+impl PartialEq for EnrichmentTableW {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl std::fmt::Debug for EnrichmentTableW {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -28,6 +50,7 @@ pub enum Value {
     Array(Vec<Value>),
     Timestamp(DateTime<Utc>),
     Regex(Regex),
+    EnrichmentTable(EnrichmentTableW),
     Null,
 }
 
@@ -67,6 +90,7 @@ impl fmt::Display for Value {
                 write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
             Value::Regex(regex) => write!(f, "r'{}'", regex.to_string()),
+            Value::EnrichmentTable(_) => write!(f, "<enrichment_table>"),
             Value::Null => write!(f, "null"),
         }
     }
