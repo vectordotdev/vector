@@ -29,7 +29,7 @@ enum BuildError {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NatsSinkConfig {
     encoding: EncodingConfig<Encoding>,
-    #[serde(default = "default_name")]
+    #[serde(default = "default_name", alias = "name")]
     connection_name: String,
     subject: String,
     url: String,

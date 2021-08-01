@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
+    },
     event::{Event, Value},
     internal_events::NatsEventReceived,
     shutdown::ShutdownSignal,
@@ -23,6 +25,7 @@ enum BuildError {
 #[serde(deny_unknown_fields)]
 pub struct NatsSourceConfig {
     url: String,
+    #[serde(alias = "name")]
     connection_name: String,
     subject: String,
     queue: Option<String>,
@@ -32,7 +35,17 @@ inventory::submit! {
     SourceDescription::new::<NatsSourceConfig>("nats")
 }
 
-impl_generate_config_from_default!(NatsSourceConfig);
+impl GenerateConfig for NatsSourceConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"
+            connection_name = "vector"
+            subject = "from.vector"
+            url = "nats://127.0.0.1:4222""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "nats")]
