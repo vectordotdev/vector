@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.15.0"
+version = "0.16.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -108,11 +108,11 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 
 # Tokio / Futures
-async-trait = "0.1.50"
-futures = { version = "0.3.15", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.8.1", default-features = false, features = ["full"] }
+async-trait = "0.1.51"
+futures = { version = "0.3.16", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+tokio = { version = "1.9.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
-tokio-stream = { version = "0.1.6", default-features = false, features = ["net", "sync"] }
+tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.7", default-features = false, features = ["codec", "time"] }
 
 # Tracing
@@ -122,14 +122,14 @@ tracing-futures = { version = "0.2.5", default-features = false, features = ["fu
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.19", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
-tracing-opentelemetry = { version = "0.13.0", default-features = false }
-opentelemetry = { version = "0.14.0", default-features = false, features = ["trace", "rt-tokio"] }
-opentelemetry-datadog = { version = "0.2.0", default-features = false, features = ["reqwest-client"] }
+tracing-opentelemetry = { version = "0.14.0", default-features = false }
+opentelemetry = { version = "0.15.0", default-features = false, features = ["trace", "rt-tokio"] }
+opentelemetry-datadog = { version = "0.3.1", default-features = false, features = ["reqwest-client"] }
 
 # Metrics
-metrics = { version = "0.16.0", default-features = false, features = ["std"] }
-metrics-tracing-context = { version = "0.6.0", default-features = false }
-metrics-util = { version = "0.9.1", default-features = false, features = ["std"] }
+metrics = { version = "0.17.0", default-features = false, features = ["std"] }
+metrics-tracing-context = { version = "0.8.0", default-features = false }
+metrics-util = { version = "0.10.0", default-features = false, features = ["std"] }
 
 # Aws
 rusoto_cloudwatch = { version = "0.47.0", optional = true }
@@ -156,7 +156,7 @@ tower-layer = { version = "0.3.1", default-features = false }
 # Serde
 serde = { version = "1.0.126", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.64", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.66", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.17", default-features = false }
 rmp-serde = { version = "0.15.5", default-features = false, optional = true }
 
@@ -194,7 +194,7 @@ vrl-compiler = { path = "lib/vrl/compiler", optional = true }
 lookup = { path = "lib/lookup" }
 
 # External libs
-anyhow = { version = "1.0.41", default-features = false }
+anyhow = { version = "1.0.42", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
@@ -220,21 +220,25 @@ headers = { version = "0.3.4", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
-hyper = { version = "0.14.9", default-features = false, features = ["stream"] }
+hyper = { version = "0.14.11", default-features = false, features = ["stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
+hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 infer = { version = "0.5.0", default-features = false, optional = true}
 indexmap = { version = "1.7.0", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.12.0", default-features = true, features = ["api", "v1_16"], optional = true }
 lazy_static = { version = "1.4.0", default-features = false }
-listenfd = { version = "0.3.3", default-features = false, optional = true }
+listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.6.5", default-features = false, optional = true }
-maxminddb = { version = "0.19.0", default-features = false, optional = true }
+lru = { version = "0.6.6", default-features = false, optional = true }
+maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.9", optional = true }
+# make sure to update the external docs when the Lua version changes
+mlua = { version = "0.6.2", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.0.0-beta.2", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.9.18", default-features = false, optional = true }
+no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
 nom = { version = "6.1.2", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
@@ -244,26 +248,24 @@ openssl-probe = { version = "0.1.4", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
-pin-project = { version = "1.0.7", default-features = false }
+pin-project = { version = "1.0.8", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "3.0.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.1", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.20.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.21.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-# make sure to update the external docs when the Lua version changes
-rlua = { version = "0.17.0", default-features = true, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.3", default-features = false, features = ["serde", "std"], optional = true }
 snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
-socket2 = { version = "0.4.0", default-features = false }
+socket2 = { version = "0.4.1", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.0", default-features = false }
 structopt = { version = "0.3.22", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
-syslog_loose = { version = "0.12.0", default-features = false, optional = true }
+syslog_loose = { version = "0.14.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.2", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
@@ -293,7 +295,7 @@ security-framework = "2.3.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2.14"
-nix = "0.21.0"
+nix = "0.22.0"
 
 [build-dependencies]
 prost-build = { version = "0.7.0", optional = true }
@@ -303,15 +305,16 @@ tonic-build = { version = "0.4", default-features = false, features = ["transpor
 approx = "0.5.0"
 assert_cmd = "1.0.7"
 base64 = "0.13.0"
-criterion = { version = "0.3.4", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
+env-test-util = "1.0.1"
 httpmock = { version = "0.5.8", default-features = false }
-libc = "0.2.97"
+libc = "0.2.98"
 libz-sys = "1.1.3"
 matches = "0.1.8"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.4", features = ["json"] }
 tempfile = "3.2.0"
-tokio = { version = "1.8.1", features = ["test-util"] }
+tokio = { version = "1.9.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
@@ -412,7 +415,7 @@ sources-logs = [
   "sources-internal_logs",
   "sources-journald",
   "sources-kafka",
-  "sources-kubernetes-logs",
+  "sources-kubernetes_logs",
   "sources-logstash",
   "sources-socket",
   "sources-splunk_hec",
@@ -456,7 +459,7 @@ sources-journald = []
 sources-kafka = ["rdkafka"]
 sources-nats = ["async-nats"]
 sources-logstash = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
-sources-kubernetes-logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
+sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = ["nom"]
 sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
@@ -482,6 +485,7 @@ transforms-logs = [
   "transforms-aws_cloudwatch_logs_subscription_parser",
   "transforms-aws_ec2_metadata",
   "transforms-coercer",
+  "transforms-compound",
   "transforms-concat",
   "transforms-dedupe",
   "transforms-field_filter",
@@ -508,6 +512,7 @@ transforms-logs = [
 transforms-metrics = [
   "transforms-add_tags",
   "transforms-aggregate",
+  "transforms-compound",
   "transforms-filter",
   "transforms-log_to_metric",
   "transforms-lua",
@@ -524,6 +529,7 @@ transforms-ansi_stripper = []
 transforms-aws_cloudwatch_logs_subscription_parser= []
 transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
+transforms-compound = []
 transforms-concat = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
@@ -534,7 +540,7 @@ transforms-json_parser = []
 transforms-key_value_parser = []
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
-transforms-lua = ["rlua", "vector_core/lua"]
+transforms-lua = ["mlua", "vector_core/lua"]
 transforms-merge = []
 transforms-metric_to_log = []
 transforms-reduce = []

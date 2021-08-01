@@ -1,3 +1,4 @@
+use crate::ByteSizeOf;
 use crate::{event::error::EventError, event::timestamp_to_string, Result};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
@@ -19,6 +20,19 @@ pub enum Value {
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     Null,
+}
+
+impl ByteSizeOf for Value {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Value::Bytes(bytes) => bytes.len(),
+            Value::Map(map) => map
+                .iter()
+                .fold(0, |acc, (k, v)| acc + k.len() + v.size_of()),
+            Value::Array(arr) => arr.iter().fold(0, |acc, v| acc + v.size_of()),
+            _ => 0,
+        }
+    }
 }
 
 impl Serialize for Value {
@@ -149,6 +163,9 @@ impl_valuekind_from_integer!(i64);
 impl_valuekind_from_integer!(i32);
 impl_valuekind_from_integer!(i16);
 impl_valuekind_from_integer!(i8);
+impl_valuekind_from_integer!(u32);
+impl_valuekind_from_integer!(u16);
+impl_valuekind_from_integer!(u8);
 impl_valuekind_from_integer!(isize);
 
 impl From<bool> for Value {
@@ -242,7 +259,7 @@ impl Value {
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
         match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
@@ -449,7 +466,7 @@ impl Value {
         };
 
         map.entry(name.to_string())
-            .and_modify(|entry| Value::correct_type(entry, &next_segment))
+            .and_modify(|entry| Value::correct_type(entry, next_segment))
             .or_insert_with(|| {
                 // The entry this segment is referring to doesn't exist, so we must push the appropriate type
                 // into the value.
@@ -777,12 +794,12 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
+            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => {
                 if working_lookup.is_empty() {
-                    Ok(map.remove(*name))
+                    Ok(map.remove(name))
                 } else {
                     let mut inner_is_empty = false;
-                    let retval = match map.get_mut(*name) {
+                    let retval = match map.get_mut(name) {
                         Some(inner) => {
                             let ret = inner.remove(working_lookup.clone(), prune);
                             if inner.is_empty() {
@@ -793,7 +810,7 @@ impl Value {
                         None => Ok(None),
                     };
                     if inner_is_empty && prune {
-                        map.remove(*name);
+                        map.remove(name);
                     }
                     retval
                 }
@@ -826,7 +843,7 @@ impl Value {
                         Some(inner) => {
                             let ret = inner.remove(working_lookup.clone(), prune);
                             if inner.is_empty() {
-                                inner_is_empty = true
+                                inner_is_empty = true;
                             }
                             ret
                         }
@@ -894,12 +911,10 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
-                match map.get(*name) {
-                    Some(inner) => inner.get(working_lookup.clone()),
-                    None => Ok(None),
-                }
-            }
+            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => match map.get(name) {
+                Some(inner) => inner.get(working_lookup.clone()),
+                None => Ok(None),
+            },
             (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
@@ -998,8 +1013,8 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
-                match map.get_mut(*name) {
+            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => {
+                match map.get_mut(name) {
                     Some(inner) => inner.get_mut(working_lookup.clone()),
                     None => Ok(None),
                 }
@@ -1639,6 +1654,6 @@ mod test {
                         });
                 }
                 _ => panic!("This test should never read Err'ing type folders."),
-            })
+            });
     }
 }

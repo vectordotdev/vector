@@ -25,7 +25,7 @@ enum CaptureMode {
 impl Test {
     pub fn from_path(path: &Path) -> Self {
         let name = test_name(path);
-        let category = test_category(&path);
+        let category = test_category(path);
         let content = fs::read_to_string(path).expect("content");
 
         let mut source = String::new();

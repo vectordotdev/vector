@@ -4,7 +4,7 @@ components: transforms: aws_ec2_metadata: {
 	title: "AWS EC2 Metadata"
 
 	description: """
-		Enriches log events with AWS EC2 environment metadata.
+		Enriches events with AWS EC2 environment metadata.
 		"""
 
 	classes: {
@@ -82,6 +82,7 @@ components: transforms: aws_ec2_metadata: {
 				syntax: "literal"
 			}
 		}
+		proxy: configuration._proxy
 		refresh_interval_secs: {
 			common:      true
 			description: "The interval in seconds at which the EC2 Metadata api will be called."
@@ -94,9 +95,25 @@ components: transforms: aws_ec2_metadata: {
 		}
 	}
 
+	env_vars: {
+		http_proxy: env_vars._http_proxy
+		HTTP_PROXY: env_vars._http_proxy
+		https_proxy: env_vars._https_proxy
+		HTTPS_PROXY: env_vars._https_proxy
+		no_proxy: env_vars._no_proxy
+		NO_PROXY: env_vars._no_proxy
+	}
+
 	input: {
 		logs:    true
-		metrics: null
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
 	}
 
 	output: logs: log: {

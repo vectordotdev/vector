@@ -1447,4 +1447,46 @@ mod tests {
                     ]);
                 */
     }
+
+    #[tokio::test]
+    async fn type_inconsistency_while_expanding_transform() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [sources.input]
+              type = "generator"
+              format = "shuffle"
+              lines = ["one", "two"]
+              count = 5
+
+            [transforms.foo]
+              inputs = ["input"]
+              type = "compound"
+              [transforms.foo.nested.step1]
+                type = "log_to_metric"
+                [[transforms.foo.nested.step1.metrics]]
+                  type = "counter"
+                  field = "c"
+                  name = "sum"
+                  namespace = "ns"
+              [transforms.foo.nested.step2]
+                type = "log_to_metric"
+                [[transforms.foo.nested.step2.metrics]]
+                  type = "counter"
+                  field = "c"
+                  name = "sum"
+                  namespace = "ns"
+
+            [sinks.output]
+              type = "console"
+              inputs = [ "foo.step2" ]
+              encoding = "json"
+              target = "stdout"
+        "#})
+        .unwrap();
+
+        let err = crate::config::compiler::compile(config).err().unwrap();
+        assert_eq!(
+            err,
+            vec!["Data type mismatch between foo.step1 (Metric) and foo.step2 (Log)".to_owned()]
+        );
+    }
 }

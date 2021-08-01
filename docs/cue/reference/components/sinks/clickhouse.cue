@@ -32,6 +32,7 @@ components: sinks: clickhouse: {
 				enabled: true
 				codec: enabled: false
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                5

@@ -32,6 +32,20 @@
       </div>
       {{ end }}
 
+      {{ with $highlights }}
+      <div class="mt-8">
+        <div class="prose dark:prose-dark">
+          {{ partial "heading.html" (dict "text" "Highlights" "level" 2) }}
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {{ range . }}
+          {{ .Render "li" }}
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
       {{ with $release.whats_next }}
       <div class="mt-8 prose dark:prose-dark">
         {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
@@ -47,20 +61,6 @@
               {{ .description | markdownify }}
             </div>
           </div>
-          {{ end }}
-        </div>
-      </div>
-      {{ end }}
-
-      {{ with $highlights }}
-      <div class="mt-8">
-        <div class="prose dark:prose-dark">
-          {{ partial "heading.html" (dict "text" "Highlights" "level" 2) }}
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {{ range . }}
-          {{ .Render "li" }}
           {{ end }}
         </div>
       </div>

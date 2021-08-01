@@ -52,7 +52,7 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
         match segment.as_rule() {
             Rule::path_segment => segments.push(segment.as_str().to_string()),
             Rule::quoted_path_segment => {
-                segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."))
+                segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."));
             }
             Rule::target_path => return target_path_from_pair(segment),
             _ => unexpected_parser_sytax!(segment),

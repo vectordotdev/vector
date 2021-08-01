@@ -1,7 +1,7 @@
 use super::InternalEvent;
 use metrics::gauge;
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub(crate) use self::source::*;
 
 #[derive(Debug)]
@@ -15,7 +15,7 @@ impl InternalEvent for FileOpen {
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 mod source {
     use super::{FileOpen, InternalEvent};
     use file_source::FileSourceInternalEvents;

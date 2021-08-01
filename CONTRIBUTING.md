@@ -3,7 +3,8 @@
 First, thank you for contributing to Vector! The goal of this document is to
 provide everything you need to start contributing to Vector. The
 following TOC is sorted progressively, starting with the basics and
-expanding into more specifics.
+expanding into more specifics. Everyone from a first time contributor to a
+Vector team member will find this document useful.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
@@ -46,6 +47,7 @@ expanding into more specifics.
       1. [Integration Tests](#integration-tests)
       1. [Blackbox Tests](#blackbox-tests)
       1. [Tips and Tricks](#tips-and-tricks)
+         1. [Faster Builds With `sccache`](#faster-builds-with-sccache)
          1. [Testing Specific Components](#testing-specific-components)
          1. [Generating Sample Logs](#generating-sample-logs)
    1. [Benchmarking](#benchmarking)
@@ -62,15 +64,17 @@ expanding into more specifics.
       1. [Kubernetes Architecture](#kubernetes-architecture)
          1. [The operation logic](#the-operation-logic)
          1. [Where to find things](#where-to-find-things)
-1. [Humans](#humans)
+1. [User experience \(UX\)](#user-experience-ux)
+   1. [UX responsibilities](#ux-responsibilities)
    1. [Documentation](#documentation)
-      1. [How the docs work](#how-the-docs-work)
-      1. [Formatting](#formatting)
-      1. [Validation](#validation)
-      1. [Development flow](#development-flow)
-   1. [Changelog](#changelog)
-      1. [What makes a highlight noteworthy?](#what-makes-a-highlight-noteworthy)
-      1. [How is a highlight different from a blog post?](#how-is-a-highlight-different-from-a-blog-post)
+      1. [Formatting docs](#formatting-docs)
+      1. [Validating docs](#validating-docs)
+      1. [Docs development workflow](#docs-development-workflow)
+   1. [Changes](#changes)
+      1. [Changelog](#changelog)
+      1. [Highlights](#highlights)
+         1. [What makes a highlight noteworthy?](#what-makes-a-highlight-noteworthy)
+         1. [How is a highlight different from a blog post?](#how-is-a-highlight-different-from-a-blog-post)
 1. [Security](#security)
 1. [Legal](#legal)
    1. [DCO](#dco)
@@ -99,7 +103,7 @@ expanding into more specifics.
    - This is where you can get a feel if the change will be accepted or not.
      Changes that are questionable will have a `needs: approval` label.
 2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
-   Github account.
+   Github account (only applicable to outside contributors).
 3. [Create a new Git branch][urls.create_branch].
 4. Review the Vector [change control](#change-control) and [development](#development) workflows.
 5. Make your changes.
@@ -952,31 +956,32 @@ There are also snapshot tests for Helm at `tests/helm-snapshots`.
 The development assistance resources are located at `skaffold.yaml`
 and `skaffold` dir.
 
-## Humans
+## User experience (UX)
 
-After making your change, you'll want to prepare it for Vector's users
-(mostly humans). This usually entails updating documentation and announcing
-your feature.
+After making your change, you'll want to prepare it for Vector's users. This
+includes documentation, release notes, and more.
+
+### UX responsibilities
+
+As a Vector contributor you _are_ responsible for coupling the following user
+experience related changes with your code:
+
+* Reference docs changes located in the [`docs/cue` folder](docs/cue) (generally configuration changes)
+* Existing guide changes located in the [`docs/content` folder](docs/content)
+* If relevant, [highlighting] your change for future release notes
+
+You are _not_ responsible for:
+
+* Writing new guides related to your change
 
 ### Documentation
 
 Documentation is very important to the Vector project! The official
-docs at https://vector.dev/docs are built using structured data written in
-[CUE], a language designed for data templating and validation. All of Vector's
-CUE sources are in the `/docs` folder.
+docs live at https://vector.dev/docs which is powered by the
+[`/docs` folder](docs). The `/docs` folder [README](docs/README.md)
+covers how the docs work and building them locally.
 
-> Vector is currently using CUE version **0.3.2**. Be sure to use
-> precisely this version, as CUE is evolving quickly and you can expect breaking
-> changes in each release.
-
-#### How the docs work
-
-When the HTML output for the Vector docs is built, the `vector` repo is cloned
-(in another repo) and these CUE sources are converted into one big JSON object
-using the `cue export` command. That JSON is then used as an input to the site
-build.
-
-#### Formatting
+#### Formatting docs
 
 Vector has some CUE-related CI checks that are run whenever changes are made to
 the `docs` directory. This includes checks to make sure that the CUE sources are
@@ -990,7 +995,7 @@ cue fmt ./docs/**/*.cue
 If that rewrites any files, make sure to commit your changes or else you'll see
 CI failures.
 
-#### Validation
+#### Validating docs
 
 In addition to proper formatting, the CUE sources need to be *valid*, that is,
 the provided data needs to conform to various CUE schemas. To check the validity
@@ -1000,7 +1005,7 @@ of the CUE sources:
 make check-docs
 ```
 
-#### Development flow
+#### Docs development workflow
 
 A good practice for writing CUE is to make small, incremental changes and to
 frequently check to ensure that those changes are valid. If you introduce larger
@@ -1014,20 +1019,30 @@ change:
 watchexec "make check-docs"
 ```
 
-### Changelog
+### Changes
 
-Developers do not need to maintain the [`Changelog`](/CHANGELOG.md). This is
-automatically generated via the `make release` command. This is made possible
-by the use of [conventional commit](#title) titles.
+#### Changelog
 
-#### What makes a highlight noteworthy?
+Contributors do not need to maintain a changelog. This is automatically generated
+via the `make release` command, made possible by the use of
+[conventional commit](#title) titles.
+
+#### Highlights
+
+Because Vector releases often contain many different changes, we use highlights
+to surface high-value, meaningful changes. Highlights are markdown files located
+in the [`docs/content/en/highlights` folder](docs/content/en/highlights) that
+thoughtfully describe a feature. Each highlight is prominently displayed in the
+relevant [release notes](https://vector.dev/releases/).
+
+##### What makes a highlight noteworthy?
 
 It should offer meaningful value to users. This is inherently subjective and
 it is impossible to define exact rules for this distinction. But we should be
 cautious not to dilute the meaning of a highlight by producing low values
-highlights.
+highlights. Typically, a release contains no more than 6 highlights.
 
-#### How is a highlight different from a blog post?
+##### How is a highlight different from a blog post?
 
 Highlights are not blog posts. They are short one, maybe two, paragraph
 announcements. Highlights should allude to, or link to, a blog post if
@@ -1101,7 +1116,7 @@ contact us at vector@timber.io.
 
 [urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
-[CUE]: https://cuelang.org
+[urls.cue]: https://cuelang.org
 [urls.existing_issues]: https://github.com/timberio/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
 [urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits

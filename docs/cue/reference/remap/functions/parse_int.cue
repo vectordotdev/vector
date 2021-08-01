@@ -16,11 +16,11 @@ remap: functions: parse_int: {
 		{
 			name: "base"
 			description: """
-					The base the number is in. Must be between 2 and 36 (inclusive).
+				The base the number is in. Must be between 2 and 36 (inclusive).
 
-					If unspecified, will use the string prefix to try to
-					determine the base: "0b", 8 for "0" or "0o", 16 for "0x",
-					and 10 otherwise
+				If unspecified, will use the string prefix to try to
+				determine the base: "0b", 8 for "0" or "0o", 16 for "0x",
+				and 10 otherwise
 				"""
 			required: false
 			type: ["integer"]

@@ -108,6 +108,8 @@ mod r#match;
 mod match_any;
 #[cfg(feature = "match_array")]
 mod match_array;
+#[cfg(feature = "match_datadog_query")]
+mod match_datadog_query;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -220,6 +222,8 @@ mod to_timestamp;
 mod to_unix_timestamp;
 #[cfg(feature = "truncate")]
 mod truncate;
+#[cfg(feature = "unnest")]
+mod unnest;
 #[cfg(feature = "upcase")]
 mod upcase;
 #[cfg(feature = "uuid_v4")]
@@ -331,6 +335,8 @@ pub use log::Log;
 pub use match_any::MatchAny;
 #[cfg(feature = "match_array")]
 pub use match_array::MatchArray;
+#[cfg(feature = "match_datadog_query")]
+pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -441,6 +447,8 @@ pub use to_timestamp::ToTimestamp;
 pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
+#[cfg(feature = "unnest")]
+pub use unnest::Unnest;
 #[cfg(feature = "upcase")]
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
@@ -550,6 +558,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(MatchAny),
         #[cfg(feature = "match_array")]
         Box::new(MatchArray),
+        #[cfg(feature = "match_datadog_query")]
+        Box::new(MatchDatadogQuery),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -670,6 +680,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToUnixTimestamp),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
+        #[cfg(feature = "unnest")]
+        Box::new(Unnest),
         #[cfg(feature = "upcase")]
         Box::new(Upcase),
         #[cfg(feature = "uuid_v4")]

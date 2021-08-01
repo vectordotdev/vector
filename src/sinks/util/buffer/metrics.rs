@@ -761,8 +761,8 @@ mod test {
 
     fn rebuffer_aggregated_summaries<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
-        for factor in 0..10 {
-            for num in 2..5 {
+        for factor in 0..2 {
+            for num in 2..4 {
                 events.push(sample_aggregated_summary(
                     num,
                     Absolute,
@@ -781,9 +781,8 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_aggregated_summary(2, Absolute, 11.0),
-                sample_aggregated_summary(3, Absolute, 12.0),
-                sample_aggregated_summary(4, Absolute, 13.0),
+                sample_aggregated_summary(2, Absolute, 3.0),
+                sample_aggregated_summary(3, Absolute, 4.0),
             ]
         );
 
@@ -794,16 +793,9 @@ mod test {
     fn inc_buffer_aggregated_summaries() {
         let buffer = rebuffer_aggregated_summaries::<IncrementalMetricNormalize>();
 
-        assert_eq!(
-            buffer[0],
-            [
-                sample_aggregated_summary(2, Incremental, 9.0),
-                sample_aggregated_summary(3, Incremental, 9.0),
-                sample_aggregated_summary(4, Incremental, 9.0),
-            ]
-        );
-
-        assert_eq!(buffer.len(), 1);
+        // Since aggregated summaries cannot be added, they don't work
+        // as incremental metrics and this results in an empty buffer.
+        assert_eq!(buffer.len(), 0);
     }
 
     fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {

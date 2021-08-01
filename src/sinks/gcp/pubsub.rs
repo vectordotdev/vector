@@ -69,13 +69,6 @@ inventory::submit! {
 
 impl_generate_config_from_default!(PubsubConfig);
 
-lazy_static::lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        rate_limit_num: Some(100),
-        ..Default::default()
-    };
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
@@ -88,7 +81,7 @@ impl SinkConfig for PubsubConfig {
             .parse_config(self.batch)?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
 

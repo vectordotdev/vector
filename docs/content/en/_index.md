@@ -10,22 +10,22 @@ what:
 # Items listed in the "Why Vector?" section. Markdown is supported in the descriptions.
 why:
 - title: "Ultra fast and reliable"
-  description: "Built in [Rust](https://rust-lang.org), Vector is blistering fast, memory efficient, and designed to handle the most demanding environments."
+  description: "Built in [Rust](https://rust-lang.org), Vector is blistering fast, memory efficient, and designed to handle the most demanding workloads."
   icon: "clock.svg"
 - title: "End to end"
-  description: "Vector strives to be the only tool you need to get observability data from A to B, [deploying](/docs/setup/deployment) as an [daemon](/docs/setup/deployment/roles/#daemon)), [sidecar](/docs/setup/deployment/roles/#sidecar), or [aggregator](/docs/setup/deployment/roles/#aggregator)."
+  description: "Vector strives to be the only tool you need to get observability data from A to B, [deploying](/docs/setup/deployment) as a [daemon](/docs/setup/deployment/roles/#daemon), [sidecar](/docs/setup/deployment/roles/#sidecar), or [aggregator](/docs/setup/deployment/roles/#aggregator)."
   icon: "chart.svg"
 -  title: "Unified"
    description: "Vector supports [logs](/docs/about/under-the-hood/architecture/data-model/log) and [metrics](/docs/about/under-the-hood/architecture/data-model/metric), making it easy to collect and process all your observability data."
    icon: "hex.svg"
 - title: "Vendor neutral"
-  description: "Vector doesn't favor any storage and fosters a fair, open ecosystem with your best interest in mind. Lock-in free and future proof."
+  description: "Vector doesn't favor any specific vendor platforms and fosters a fair, open ecosystem with your best interests in mind. Lock-in free and future proof."
   icon: "lock.svg"
 - title: "Programmable transforms"
-  description: "[Programmable transforms](/docs/reference/configuration/transforms) give you the full power of programmable runtimes. Handle complex use cases without limitation."
+  description: "Vector's highly configurable [transforms](/docs/reference/configuration/transforms) give you the full power of programmable runtimes. Handle complex use cases without limitation."
   icon: "code.svg"
 - title: "Clear guarantees"
-  description: "Guarantees matter, and Vector is [clear on its guarantees](/docs/about/under-the-hood/guarantees), helping you to make the appropriate trade offs for your use case."
+  description: "Guarantees matter, and Vector is clear on [which guarantees](/docs/about/under-the-hood/guarantees) it provides, helping you make the appropriate trade-offs for your use case."
   icon: "laptop.svg"
 
 # Platform section
@@ -47,48 +47,7 @@ configure:
   description: "A simple, composable format enables you to build flexible pipelines"
   filename: "/etc/vector/vector.toml"
   below: "Configuration examples are in [TOML](https://toml.io) but Vector also supports [YAML](https://yaml.org) and [JSON](https://json.org)"
-  example_configs:
-  - title: Parse NGINX logs
-    config: |
-      [sources.nginx_error_log]
-      type = "file"
-      include = ["/var/log/nginx*.log"]
-      start_at_beginning = false
-      ignore_older = 86400
-
-      [transforms.nginx_error_parser]
-      inputs = ["nginx_error_log"]
-      type = "remap"
-      source = '''
-      # TODO
-      '''
-  - title: Something else
-    config: |
-      [sources.do_something_else]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
-  - title: Other thing entirely
-    config: |
-      [sources.do_other_thing_entirely]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
-  - title: And yet another
-    config: |
-      [sources.and_yet_another]
-      type = "other"
-
-      [sinks.out]
-      inputs = ["in"]
-      type = "console"
-      encoding.codec = "text"
+  # Example configs are specified in cue/examples.cue
 
 # Installation section
 installation:

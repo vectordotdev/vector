@@ -59,7 +59,7 @@ impl SinkConfig for HoneycombConfig {
             .timeout(1)
             .parse_config(self.batch)?;
 
-        let client = HttpClient::new(None)?;
+        let client = HttpClient::new(None, cx.proxy())?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),

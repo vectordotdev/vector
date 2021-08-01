@@ -1,7 +1,7 @@
 CUE = ./scripts/cue.sh
 
 clean:
-	rm -rf public resources
+	rm -rf public resources data/docs.json
 
 setup:
 	yarn
@@ -23,26 +23,34 @@ cue-list:
 cue-vet:
 	${CUE} vet
 
-serve: setup cue-build
+config-examples:
+	yarn run config-examples
+
+structured-data: cue-build config-examples
+
+serve: clean setup structured-data
 	hugo server \
 	--buildDrafts \
-	--buildFuture
+	--buildFuture \
+	--environment "development"
 
 # Live site
 production-build:
 	hugo \
+	--environment "production" \
 	--minify
 
-ci-production-build: setup cue-build production-build run-link-checker algolia
+ci-production-build: setup structured-data production-build run-link-checker algolia
 
 # Preview site
 preview-build:
 	hugo \
 	--baseURL $(DEPLOY_PRIME_URL) \
 	--buildFuture \
+	--environment "preview" \
 	--minify
 
-ci-preview-build: setup cue-build preview-build algolia
+ci-preview-build: setup structured-data preview-build algolia
 
 run-link-checker:
 	htmltest
@@ -57,6 +65,7 @@ check-links: production-build run-link-checker
 algolia:
 	yarn run algolia-config
 	yarn run algolia-index
+	yarn run algolia-upload
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
@@ -64,6 +73,6 @@ run-production-site-locally:
 	python -m http.server 8000 --directory ./public --bind 127.0.0.1
 
 # Full local builds without Algolia updates (for debugging, link checking, etc.)
-local-production-build: clean setup cue-build production-build run-link-checker
+local-production-build: clean setup structured-data production-build run-link-checker
 
-local-preview-build: clean setup cue-build preview-build run-link-checker
+local-preview-build: clean setup structured-data preview-build run-link-checker

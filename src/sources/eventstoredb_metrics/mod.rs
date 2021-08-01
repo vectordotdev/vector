@@ -1,11 +1,11 @@
 use self::types::Stats;
-use crate::internal_events::{
-    EventStoreDbMetricsHttpError, EventStoreDbMetricsReceived, EventStoreDbStatsParsingError,
-};
 use crate::{
     config::{self, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     http::HttpClient,
+    internal_events::{
+        EventStoreDbMetricsHttpError, EventStoreDbMetricsReceived, EventStoreDbStatsParsingError,
+    },
     tls::TlsSettings,
 };
 use futures::{stream, FutureExt, SinkExt, StreamExt};
@@ -73,7 +73,7 @@ fn eventstoredb(
     let mut ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
-    let client = HttpClient::new(tls_settings)?;
+    let client = HttpClient::new(tls_settings, &cx.proxy)?;
     let url: Uri = endpoint.parse()?;
 
     Ok(Box::pin(

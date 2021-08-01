@@ -5,10 +5,8 @@
   "maxValuesPerFacet": 100,
   "searchableAttributes": [
     "title",
-    "description",
     "content",
-    "section",
-    "summary",
+    "unordered(hierarchy)",
     "unordered(tags)"
   ],
   "numericAttributesToIndex": null,

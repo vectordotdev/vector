@@ -36,6 +36,7 @@ components: sinks: http: {
 					enum: ["json", "ndjson", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                10
