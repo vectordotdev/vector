@@ -1,6 +1,8 @@
 use crate::internal_events::SyslogConvertUtf8Error;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
+#[cfg(unix)]
+use crate::sources::util::decoding::Decoder;
 use crate::udp;
 use crate::{
     config::{
@@ -11,7 +13,7 @@ use crate::{
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
     sources::util::{
-        decoding::{self, BytesDecoder, Decoder, OctetCountingDecoder},
+        decoding::{self, BytesDecoder, OctetCountingDecoder},
         SocketListenAddr, TcpSource,
     },
     tcp::TcpKeepaliveConfig,

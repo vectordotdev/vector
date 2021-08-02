@@ -85,7 +85,7 @@ impl<D> TcpSource for RawTcpSource<D>
 where
     D: tokio_util::codec::Decoder<Item = (Event, usize)> + Send + Sync + 'static,
     D::Error: From<std::io::Error>
-        + crate::sources::util::TcpIsErrorFatal
+        + crate::sources::util::TcpError
         + std::fmt::Debug
         + std::fmt::Display
         + Send,

@@ -18,6 +18,11 @@ mod http;
 pub mod multiline_config;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 mod tcp;
+#[cfg(any(
+    all(feature = "sources-utils-tls", feature = "listenfd"),
+    feature = "sources-kafka"
+))]
+mod tcp_error;
 #[cfg(all(unix, feature = "sources-socket"))]
 mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
@@ -34,7 +39,12 @@ pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
-pub use tcp::{IsErrorFatal as TcpIsErrorFatal, SocketListenAddr, TcpSource};
+pub use tcp::{SocketListenAddr, TcpSource};
+#[cfg(any(
+    all(feature = "sources-utils-tls", feature = "listenfd"),
+    feature = "sources-kafka"
+))]
+pub use tcp_error::TcpError;
 #[cfg(all(unix, feature = "sources-socket",))]
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-unix",))]

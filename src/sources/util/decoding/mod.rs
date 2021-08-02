@@ -2,7 +2,7 @@ mod config;
 mod framing;
 mod parsers;
 
-use crate::{event::Event, internal_events::DecoderParseFailed, sources::util::TcpIsErrorFatal};
+use crate::{event::Event, internal_events::DecoderParseFailed, sources::util::TcpError};
 use bytes::{Bytes, BytesMut};
 pub use config::{DecodingConfig, FramingConfig};
 pub use framing::OctetCountingDecoder;
@@ -13,7 +13,7 @@ pub trait Parser {
     fn parse(&self, bytes: Bytes) -> crate::Result<Event>;
 }
 
-pub trait DecoderError: std::error::Error + TcpIsErrorFatal + Send + Sync {}
+pub trait DecoderError: std::error::Error + TcpError + Send + Sync {}
 
 #[derive(Debug)]
 pub struct Error {
@@ -26,9 +26,9 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl TcpIsErrorFatal for Error {
-    fn is_error_fatal(&self) -> bool {
-        self.error.is_error_fatal()
+impl TcpError for Error {
+    fn is_fatal(&self) -> bool {
+        self.error.is_fatal()
     }
 }
 
