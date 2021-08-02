@@ -103,7 +103,7 @@ struct RestartOpts {
 
     /// How long to wait for the service to stop before starting it back, in seconds.
     #[structopt(default_value = "60", long)]
-    stop_timeout: u32
+    stop_timeout: u32,
 }
 
 impl RestartOpts {
@@ -121,7 +121,7 @@ impl RestartOpts {
 struct StandardOpts {
     /// The name of the service.
     #[structopt(long)]
-    name: Option<String>
+    name: Option<String>,
 }
 
 impl StandardOpts {
@@ -178,9 +178,7 @@ enum ControlAction {
     Uninstall,
     Start,
     Stop,
-    Restart {
-        stop_timeout: Duration
-    }
+    Restart { stop_timeout: Duration },
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -197,9 +195,10 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             SubCommand::Stop(opts) => control_service(&opts.service_info(), ControlAction::Stop),
             SubCommand::Restart(opts) => {
                 let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
-                control_service(&opts.service_info(), ControlAction::Restart {
-                    stop_timeout
-                })
+                control_service(
+                    &opts.service_info(),
+                    ControlAction::Restart { stop_timeout },
+                )
             }
         },
         None => {
@@ -239,9 +238,7 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
         ),
         ControlAction::Restart { stop_timeout } => vector_windows::service_control::control(
             &service_definition,
-            vector_windows::service_control::ControlAction::Restart {
-                stop_timeout
-            }
+            vector_windows::service_control::ControlAction::Restart { stop_timeout },
         ),
     };
 

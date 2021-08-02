@@ -79,9 +79,7 @@ pub mod service_control {
         Uninstall,
         Start,
         Stop,
-        Restart {
-            stop_timeout: Duration
-        }
+        Restart { stop_timeout: Duration },
     }
 
     #[derive(Debug, Clone, PartialEq)]
@@ -175,7 +173,10 @@ pub mod service_control {
         Ok(())
     }
 
-    fn restart_service(service_def: &ServiceDefinition, stop_timeout: Duration) -> crate::Result<()> {
+    fn restart_service(
+        service_def: &ServiceDefinition,
+        stop_timeout: Duration,
+    ) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP;
         let service = open_service(&service_def, service_access)?;
