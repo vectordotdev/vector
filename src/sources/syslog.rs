@@ -659,8 +659,8 @@ mod test {
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
         assert_event_data_eq!(
-            enriched_syslog(&raw, &"host".to_string(), None, raw.len()),
-            enriched_syslog(&cleaned, &"host".to_string(), None, cleaned.len())
+            enriched_syslog(raw, &"host".to_string(), None, raw.len()),
+            enriched_syslog(cleaned, &"host".to_string(), None, cleaned.len())
         );
     }
 
