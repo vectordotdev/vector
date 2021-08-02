@@ -119,7 +119,7 @@ The `Route` structure is made to forward the events from inside the pipeline to 
 
 If we look deeper at the configuration building process, the configuration compiler will require the pipelines to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
 
-To do so, we'll need to implement a `PipelineConfigBuilder` from the previous section, then we'll update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4), to build a `Config` containing the required pipeline components, the compiler will load the pipeline's configurations, load the transforms and substitute the aliases.
+To do so, we'll need to implement a `PipelineConfigBuilder` from the previous section, then we'll update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4), to build a `Config` containing the required pipeline components. The compiler will load the pipeline's transforms and add the routes `ouputs` to the corresponding `sinks`.
 
 The components coming from the pipeline will be cloned inside the final `Config`, in the `transforms` `IndexMap` and the `Routes` from the pipeline components will be added to the referring components input field.
 
@@ -153,6 +153,9 @@ inputs = ["in"]
 inputs = ["foo#baz"]
 ...
 ```
+
+In order to avoid internal conflicts with the pipeline components `id`s, the components `id`s will be internally prefixed with the pipeline `id` (`pipeline_id#component_id`) but the user can still reference the components with their `id` inside the pipeline configuration.
+That way, if a transform `foo` is defined in the pipeline `bar` and in the pipeline `baz`, they will not conflict.
 
 ### Observing pipelines
 
@@ -252,8 +255,7 @@ Doesn't block to create other sources/sinks.
 
 ## Plan Of Attack
 
-- [ ] Add pipeline resource structure
 - [ ] Create the Pipeline structure and parse a pipeline's configuration file
+- [ ] Update compiler to add pipelines as a parameter
 - [ ] Update topology with pipeline's components
 - [ ] Update the context for taking pipeline information
-
