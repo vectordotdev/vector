@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
+use std::hash::{Hash,  Hasher};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
@@ -20,6 +21,43 @@ pub enum Value {
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     Null,
+}
+
+impl Eq for Value {
+
+}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Value::Array(v) => {
+                v.hash(state);
+            }
+            Value::Boolean(v) => {
+                v.hash(state);
+            }
+            Value::Bytes(v) => {
+                v.hash(state);
+            }
+            Value::Float(v) => {
+                if v.is_finite() {
+                    format!("{}", v).hash(state);
+                } else {
+                    "NaN".hash(state)
+                }
+            }
+            Value::Integer(v) => {
+                v.hash(state);
+            }
+            Value::Map(v) => {
+                v.hash(state);
+            }
+            Value::Null => {}
+            Value::Timestamp(v) => {
+                v.hash(state);
+            }
+        }
+    }
 }
 
 impl ByteSizeOf for Value {
