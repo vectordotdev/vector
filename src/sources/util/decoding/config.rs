@@ -45,6 +45,12 @@ pub struct DecodingConfig {
     parser: Option<ParserConfig>,
 }
 
+impl DecodingConfig {
+    pub fn new(framing: Option<FramingConfig>, parser: Option<ParserConfig>) -> Self {
+        Self { framing, parser }
+    }
+}
+
 impl From<DecodingConfig> for Decoder {
     fn from(config: DecodingConfig) -> Self {
         let framer: Box<

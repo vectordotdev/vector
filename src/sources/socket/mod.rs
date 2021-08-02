@@ -174,6 +174,7 @@ mod test {
         event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::{tcp::TcpSinkConfig, EncodedEvent},
+        sources::util::decoding::{DecodingConfig, FramingConfig},
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
@@ -263,7 +264,13 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
+        config.set_decoding(DecodingConfig::new(
+            Some(FramingConfig::BytesDelimited {
+                delimiter: b'\n',
+                max_length: Some(10),
+            }),
+            None,
+        ));
 
         let server = SocketConfig::from(config)
             .build(SourceContext::new_test(tx))
@@ -296,7 +303,6 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
         config.set_tls(Some(TlsConfig::test_config()));
 
         let server = SocketConfig::from(config)
@@ -305,11 +311,7 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let lines = vec![
-            "short".to_owned(),
-            "this is too long".to_owned(),
-            "more short".to_owned(),
-        ];
+        let lines = vec!["one line".to_owned(), "another line".to_owned()];
 
         wait_for_tcp(addr).await;
         send_lines_tls(addr, "localhost".into(), lines.into_iter(), None)
@@ -317,12 +319,15 @@ mod test {
             .unwrap();
 
         let event = rx.next().await.unwrap();
-        assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            "one line".into()
+        );
 
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
-            "more short".into()
+            "another line".into()
         );
     }
 
@@ -332,7 +337,6 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
         config.set_tls(Some(TlsConfig {
             enabled: Some(true),
             options: TlsOptions {
@@ -348,11 +352,7 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let lines = vec![
-            "short".to_owned(),
-            "this is too long".to_owned(),
-            "more short".to_owned(),
-        ];
+        let lines = vec!["one line".to_owned(), "another line".to_owned()];
 
         wait_for_tcp(addr).await;
         send_lines_tls(
@@ -367,13 +367,13 @@ mod test {
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
-            "short".into()
+            "one line".into()
         );
 
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
-            "more short".into()
+            "another line".into()
         );
     }
 
