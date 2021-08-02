@@ -4,7 +4,7 @@ mod parsers;
 
 use crate::{event::Event, internal_events::DecoderParseFailed, sources::util::TcpIsErrorFatal};
 use bytes::{Bytes, BytesMut};
-pub use config::DecodingConfig;
+pub use config::{DecodingConfig, FramingConfig};
 pub use framing::OctetCountingDecoder;
 pub use parsers::BytesParser;
 use tokio_util::codec::LinesCodecError;
@@ -143,7 +143,7 @@ impl<Error: From<std::io::Error> + Into<self::Error>, Item: Into<Bytes>> tokio_u
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::{assert_event_data_eq, btreemap};
+    use crate::config::log_schema;
     use tokio_util::codec::{Decoder, LinesCodec};
 
     #[tokio::test]
@@ -160,26 +160,35 @@ mod tests {
         }
 
         assert_eq!(events.len(), 3);
-        assert_event_data_eq!(
-            events[0].0,
-            Event::from(btreemap! {
-                "message" => "foo",
-            })
+        assert_eq!(
+            events[0].0.as_log()[log_schema().message_key()],
+            "foo".into()
         );
+        assert!(events[0]
+            .0
+            .as_log()
+            .get(log_schema().timestamp_key())
+            .is_some());
         assert_eq!(events[0].1, 3);
-        assert_event_data_eq!(
-            events[1].0,
-            Event::from(btreemap! {
-                "message" => "bar",
-            })
+        assert_eq!(
+            events[1].0.as_log()[log_schema().message_key()],
+            "bar".into()
         );
+        assert!(events[1]
+            .0
+            .as_log()
+            .get(log_schema().timestamp_key())
+            .is_some());
         assert_eq!(events[1].1, 3);
-        assert_event_data_eq!(
-            events[2].0,
-            Event::from(btreemap! {
-                "message" => "baz",
-            })
+        assert_eq!(
+            events[2].0.as_log()[log_schema().message_key()],
+            "baz".into()
         );
+        assert!(events[2]
+            .0
+            .as_log()
+            .get(log_schema().timestamp_key())
+            .is_some());
         assert_eq!(events[2].1, 3);
     }
 }
