@@ -234,16 +234,18 @@ _TODO_
 - Do nothing: we can already use several configuration files, people could split their existing configuration.
 
 This would imply some duplication if a transform is used in multiple configuration files.
-Anybody could add a sink or source even if they don't have permission.
+Anybody that has write access to Vector's configuration folder could add a sink or source.
+Adding a different folder would allow to separate concerns between a `root` config and a `pipeline`.
 
 - Do nothing: write a tool that would write a big configuration file where each pipeline would start with a dummy filter that we could monitor in the `internal_metrics`.
 
+Writing a different tool would increase the difficulty of using this feature.
+Doesn't add access control regarding who can edit the `root` config.
 
+- Evolve vector to use a tag/filter model like our competitors; have a 'pipeline' be a 'tag'.
 
-- Evolve vector to use a tag/filter model like our competitors, have a 'pipeline' be a 'tag'.
-
-Not able to add internal metrics to specific transforms and monitor them.
-Doesn't block to create other sources/sinks.
+This doesn't allow to add internal metrics to specific transforms and monitor them, other than by adding a dummy filter that we could monitor.
+Doesn't add access control regarding who can edit the `root` config.
 
 - Run a single vector per-'pipeline' and support metric tagging to distinguish at the telemetry level.
 
