@@ -119,7 +119,7 @@ The `Route` structure is made to forward the events from inside the pipeline to 
 
 If we look deeper at the configuration building process, the configuration compiler will require the pipelines to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
 
-To do so, we'll need to implement a `PipelineConfigBuilder` from the previous section, then we'll update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4), to build a `Config` containing the required pipeline components. The compiler will load the pipeline's transforms and add the routes `ouputs` to the corresponding `sinks`.
+To do so, we'll need to implement a `PipelineConfigBuilder` from the previous section. We'll then update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4) to build a `Config` containing the required pipeline components. The compiler will load the pipeline's transforms and add the route `outputs` to the corresponding `sinks`.
 
 The components coming from the pipeline will be cloned inside the final `Config`, in the `transforms` `IndexMap` and the `Routes` from the pipeline components will be added to the referring components input field.
 
