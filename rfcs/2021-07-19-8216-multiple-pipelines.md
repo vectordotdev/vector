@@ -136,7 +136,7 @@ For example, the following configuration and pipeline, and its **equivalent** on
 # /etc/vector/pipelines/foo.toml
 [transforms.bar]
 inputs = ["in"]
-...
+# ...
 
 [routes.baz]
 inputs = ["bar"]
