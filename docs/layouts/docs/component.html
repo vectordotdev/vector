@@ -7,7 +7,7 @@
 {{ $kind := .CurrentSection.Params.component_type }}
 {{ $config := index (index site.Data.docs.components $kind) $tag }}
 {{ $exampleConfigs := $config.example_configs }}
-<div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl mt-8">
+<div class="relative mx-auto px-4 sm:px-6 lg:px-10 mt-8">
   <div class="lg:grid lg:grid-cols-16 lg:gap-8">
     <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 md:pr-6 lg:pr-12">
       <nav aria-label="Sidebar" class="sticky top-8 h-screen overflow-auto pb-16" x-cloak>
