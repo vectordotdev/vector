@@ -12,7 +12,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 - How and where pipelines are defined.
 - How Vector reads pipelines and what the limitations of pipelines are.
-- How we monitor pipelines components.
+- How pipelines are monitored.
 
 ### Out of scope
 
