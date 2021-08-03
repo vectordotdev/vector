@@ -6,16 +6,17 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct PipelineTransform {
     #[serde(flatten)]
     pub inner: TransformOuter,
+    #[serde(default)]
     pub outputs: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Pipeline {
+    #[serde(default)]
     pub transforms: IndexMap<String, PipelineTransform>,
 }
 
