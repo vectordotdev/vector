@@ -4,35 +4,39 @@ One paragraph description of the change.
 
 ## Context
 
-- Link to any previous RFCs for additional context (do not repeat here).
-- Link to any ongoing or future changes that'll be affected by this change (cross cutting concerns).
+- Link to any previous issues, RFCs, or briefs (do not repeat that context in this RFC).
+
+## Cross cutting concerns
+
+- Link to any ongoing or future work relevant to this change.
 
 ## Scope
 
 ### In scope
 
+- List work being directly addressed with this RFC.
+
 ### Out of scope
 
-- Acknowledge future changes, cut scope, keep your change minimal, and keep the discussion focused.
+- List work that is completely out of scope. Use this to keep discussions focused. Please note the "future changes" section at the bottom.
 
 ## Pain
 
 - What internal or external *pain* are we solving?
 - Do not cover benefits of your change, this is covered in the "Rationale" section.
 
-## User Experience
+## Proposal
 
-- If your change *does not* affect the user experience, please note that here.
-- If your change *does* affect the user experience:
-  - Explain your change as if you were describing it to a Vector user. We should be able to share this section with a
-    Vector user to solicit feedback.
-  - Does this change break backward compatibility? If so, what should users do to upgrade?
+### User Experience
 
-## Implementation
+- Explain your change as if you were describing it to a Vector user. We should be able to share this section with a Vector user to solicit feedback.
+- Does this change break backward compatibility? If so, what should users do to upgrade?
+
+### Implementation
 
 - Explain your change as if you were presenting it to the Vector team.
-- Demonstrate with psuedo code not text.
-- Be specific. Be opinionated. Avoid ambiguity and open-ended questions.
+- When possible, demonstrate with psuedo code not text.
+- Be specific. Be opinionated. Avoid ambiguity.
 
 ## Rationale
 
@@ -40,15 +44,15 @@ One paragraph description of the change.
 - What is the impact of not doing this?
 - How does this position us for success in the future?
 
-## Prior Art
-
-- List prior art, the good and bad.
-- Why can't we simply use or copy them?
-
 ## Drawbacks
 
 - Why should we not do this?
 - What kind on ongoing burden does this place on the team?
+
+## Prior Art
+
+- List prior art, the good and bad.
+- Why can't we simply use or copy them?
 
 ## Alternatives
 
@@ -57,7 +61,8 @@ One paragraph description of the change.
 
 ## Outstanding Questions
 
-- List any remaining questions that you have.
+- List any remaining questions.
+- Use this to resolve ambiguity and collaborate with your team during the RFC process.
 - *These must be resolved before the RFC can be merged.*
 
 ## Plan Of Attack
@@ -70,3 +75,7 @@ Incremental steps to execute this change. These will be converted to issues afte
 - [ ] ...
 
 Note: This can be filled out during the review process.
+
+## Future Improvements
+
+- List any future improvements. Use this to keep your "plan of attack" scope small and project a sound design.
