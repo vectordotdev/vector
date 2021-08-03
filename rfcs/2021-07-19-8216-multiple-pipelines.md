@@ -144,7 +144,7 @@ outputs = ["out"]
 
 # equivalent once compiled
 [sources.in]
-...
+# ...
 
 [transforms.foo#baz]
 inputs = ["in"]
