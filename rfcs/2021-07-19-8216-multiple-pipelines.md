@@ -97,7 +97,7 @@ Which will create the following configuration file.
 [transforms.foo]
 type = "remap"
 inputs = ["from-root"]
-...
+# ...
 
 [transforms.bar]
 type = "remap"
