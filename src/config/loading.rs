@@ -1,6 +1,6 @@
 use super::{
     builder::ConfigBuilder, format, pipeline::Pipeline, validation, vars, Config, ConfigPath,
-    Format, FormatHint,
+    Format, FormatHint, Pipelines,
 };
 use crate::signal;
 use glob::glob;
@@ -136,9 +136,7 @@ pub async fn load_from_paths_with_provider(
     Ok(new_config)
 }
 
-pub fn load_pipelines_from_paths(
-    config_paths: &[ConfigPath],
-) -> Result<IndexMap<String, Pipeline>, Vec<String>> {
+pub fn load_pipelines_from_paths(config_paths: &[ConfigPath]) -> Result<Pipelines, Vec<String>> {
     let folders = config_paths.iter().filter_map(|path| path.as_dir());
     let mut index: IndexMap<String, Pipeline> = IndexMap::new();
     let mut errors: Vec<String> = Vec::new();
@@ -157,7 +155,7 @@ pub fn load_pipelines_from_paths(
         }
     }
     if errors.is_empty() {
-        Ok(index)
+        Ok(Pipelines::from(index))
     } else {
         Err(errors)
     }
@@ -216,7 +214,7 @@ pub fn load_builder_from_paths(
 pub fn load_from_str(
     input: &str,
     format: FormatHint,
-    pipelines: IndexMap<String, Pipeline>,
+    pipelines: Pipelines,
 ) -> Result<Config, Vec<String>> {
     let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
     let (config, build_warnings) = builder.build_with_warnings(pipelines)?;

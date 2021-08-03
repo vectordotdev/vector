@@ -39,12 +39,11 @@ pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     load_pipelines_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
+pub use pipeline::Pipelines;
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
 pub use vector_core::config::proxy::ProxyConfig;
 pub use vector_core::config::{log_schema, LogSchema};
-
-pub type Pipelines = IndexMap<String, pipeline::Pipeline>;
 
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using
@@ -93,7 +92,7 @@ pub struct Config {
     pub sources: IndexMap<String, SourceOuter>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
-    pub pipelines: IndexMap<String, pipeline::Pipeline>,
+    pub pipelines: Pipelines,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,
 }
@@ -233,6 +232,7 @@ inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
+    #[serde(default)]
     pub inputs: Vec<String>,
 
     // We are accepting this option for backward compatibility.
@@ -382,6 +382,7 @@ inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
+    #[serde(default)]
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Box<dyn TransformConfig>,

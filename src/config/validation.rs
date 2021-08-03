@@ -1,5 +1,5 @@
-use super::{builder::ConfigBuilder, DataType, Resource};
-use std::collections::HashMap;
+use super::{builder::ConfigBuilder, DataType, Pipelines, Resource};
+use std::collections::{HashMap, HashSet};
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -14,7 +14,7 @@ pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+pub fn check_shape(config: &ConfigBuilder, pipelines: &Pipelines) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
     if config.sources.is_empty() {
@@ -25,31 +25,28 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         errors.push("No sinks defined in the config.".to_owned());
     }
 
-    // Helper for below
-    fn tagged<'a>(
-        tag: &'static str,
-        iter: impl Iterator<Item = &'a String>,
-    ) -> impl Iterator<Item = (&'static str, &'a String)> {
-        iter.map(move |x| (tag, x))
-    }
-
     // Check for non-unique names across sources, sinks, and transforms
-    let mut name_uses = HashMap::<&str, Vec<&'static str>>::new();
-    for (ctype, name) in tagged("source", config.sources.keys())
-        .chain(tagged("transform", config.transforms.keys()))
-        .chain(tagged("sink", config.sinks.keys()))
-    {
-        let uses = name_uses.entry(name).or_default();
-        uses.push(ctype);
-    }
-
-    for (name, uses) in name_uses.into_iter().filter(|(_name, uses)| uses.len() > 1) {
+    let name_uses = config.component_names();
+    for (name, uses) in name_uses.iter().filter(|(_name, uses)| uses.len() > 1) {
         errors.push(format!(
-            "More than one component with name \"{}\" ({}).",
+            "More than one component with name {:?} ({}).",
             name,
             uses.join(", ")
         ));
     }
+
+    // Check that pipelines transforms are not using a pre-defined name
+    for (pipeline_id, transform_name) in pipelines.transform_keys() {
+        if let Some(used) = name_uses.get(transform_name.as_str()) {
+            errors.push(format!(
+                    "The component name {:?} from the pipeline {:?} is conflicting with an existing one ({})",
+                    transform_name, pipeline_id, used.join(", ")
+                    ));
+        }
+    }
+
+    // Check that pipelines have matching inputs and outputs
+    pipelines.check_shape(&config, &mut errors);
 
     // Warnings and errors
     let sink_inputs = config
@@ -60,8 +57,9 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         .transforms
         .iter()
         .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
+    let pipeline_outputs: HashSet<_> = pipelines.outputs().collect();
     for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
-        if inputs.is_empty() {
+        if inputs.is_empty() && !pipeline_outputs.contains(&name) {
             errors.push(format!(
                 "{} {:?} has no inputs",
                 capitalize(output_type),
@@ -70,7 +68,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         }
 
         for input in inputs {
-            if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
+            if !config.has_input(&input) {
                 errors.push(format!(
                     "Input {:?} for {} {:?} doesn't exist.",
                     input, output_type, name
@@ -337,7 +335,52 @@ fn capitalize(s: &str) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::format::{deserialize, Format};
+    use crate::config::pipeline::{Pipeline, Pipelines};
+    use indexmap::IndexMap;
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn check_shape_with_pipelines() {
+        let root: ConfigBuilder = deserialize(
+            r#"
+        [sources.in]
+        type = "generator"
+        format = "json"
+        [sources.foo]
+        type = "generator"
+        format = "json"
+        [sinks.out]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+            Some(Format::Toml),
+        )
+        .unwrap();
+        let pipeline: Pipeline = deserialize(
+            r#"
+        [transforms.foo]
+        type = "remap"
+        inputs = ["in", "bar"]
+        outputs = ["out", "nope"]
+        source = ""
+        "#,
+            Some(Format::Toml),
+        )
+        .unwrap();
+        let mut pipelines = IndexMap::new();
+        pipelines.insert("baz".to_string(), pipeline);
+        let pipelines = Pipelines::from(pipelines);
+        //
+        let errors = check_shape(&root, &pipelines).unwrap_err();
+        assert!(errors.contains(&"The component name \"foo\" from the pipeline \"baz\" is conflicting with an existing one (source)".to_string()));
+        assert!(errors.contains(
+            &"Input \"bar\" for transform \"foo\" in pipeline \"baz\" doesn't exist.".to_string()
+        ));
+        assert!(errors.contains(
+            &"Output \"nope\" for transform \"foo\" in pipeline \"baz\" doesn't exist.".to_string()
+        ));
+    }
 
     #[test]
     fn paths_detects_cycles() {
