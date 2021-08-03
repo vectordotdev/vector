@@ -74,7 +74,7 @@ Like said in the previous section, a pipeline is _just_ a set of transforms.
 
 To be able to forward the events going through the pipeline to a `sink`, we need add a new concept of `route`.
 
-Those `route` components are only used to build the topology and only represent an interface between the topology and the external sinks.
+`route` components are used solely to build the topology and represent an interface between the topology and the external sinks.
 
 A pipeline will have the following internal representation before building the topology.
 
