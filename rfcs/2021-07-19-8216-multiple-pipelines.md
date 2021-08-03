@@ -71,7 +71,7 @@ If any of the following constraints are not valid, Vector will error on boot. If
 - A pipeline's transform cannot have the same name as any component from the root configuration.
 - A pipeline cannot use another pipeline's component.
 
-### Representation
+### Internal representation
 
 As mentioned in the previous section, a pipeline is _just_ a set of transforms.
 
