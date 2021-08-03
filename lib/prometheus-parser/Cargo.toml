@@ -11,7 +11,7 @@ license = "MPL-2.0"
 [dependencies]
 indexmap = "1.7.0"
 nom = "6.0.1"
-num_enum = "0.5.2"
+num_enum = "0.5.3"
 prost = "0.7.0"
 prost-types = "0.7.0"
 shared = { path = "../shared", features = ["btreemap"] }
