@@ -1,5 +1,6 @@
 #[cfg(feature = "api")]
 use super::api;
+use super::Pipelines;
 use super::{
     compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
     SourceOuter, TestDefinition, TransformOuter,
@@ -60,8 +61,8 @@ impl From<Config> for ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    pub fn build(self) -> Result<Config, Vec<String>> {
-        let (config, warnings) = self.build_with_warnings()?;
+    pub fn build(self, pipelines: Pipelines) -> Result<Config, Vec<String>> {
+        let (config, warnings) = self.build_with_warnings(pipelines)?;
 
         for warning in warnings {
             warn!("{}", warning);
@@ -70,8 +71,11 @@ impl ConfigBuilder {
         Ok(config)
     }
 
-    pub fn build_with_warnings(self) -> Result<(Config, Vec<String>), Vec<String>> {
-        compiler::compile(self)
+    pub fn build_with_warnings(
+        self,
+        pipelines: Pipelines,
+    ) -> Result<(Config, Vec<String>), Vec<String>> {
+        compiler::compile(self, pipelines)
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, name: T, source: S) {

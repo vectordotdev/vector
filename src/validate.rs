@@ -136,13 +136,16 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     config::init_log_schema(&paths, true)
         .map_err(&mut report_error)
         .ok()?;
+    let pipelines = config::load_pipelines_from_paths(&paths)
+        .map_err(&mut report_error)
+        .ok()?;
     let (builder, load_warnings) = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
 
     // Build
     let (config, build_warnings) = builder
-        .build_with_warnings()
+        .build_with_warnings(pipelines)
         .map_err(&mut report_error)
         .ok()?;
 

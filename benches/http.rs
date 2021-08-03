@@ -61,7 +61,8 @@ fn benchmark_http(c: &mut Criterion) {
                         let rt = runtime();
                         let topology = rt.block_on(async move {
                             let (topology, _crash) =
-                                start_topology(config.build().unwrap(), false).await;
+                                start_topology(config.build(Default::default()).unwrap(), false)
+                                    .await;
                             wait_for_tcp(in_addr).await;
                             topology
                         });
