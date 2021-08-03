@@ -13,7 +13,7 @@ pub fn compile(
 
     let warnings = validation::warnings(&builder);
 
-    if let Err(type_errors) = validation::check_shape(&builder) {
+    if let Err(type_errors) = validation::check_shape(&builder, &pipelines) {
         errors.extend(type_errors);
     }
 

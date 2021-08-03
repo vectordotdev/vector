@@ -7,6 +7,7 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use vector_core::config::GlobalOptions;
 use vector_core::default_data_dir;
 use vector_core::transform::TransformConfig;
@@ -168,4 +169,31 @@ impl ConfigBuilder {
 
         Ok(())
     }
+
+    pub(crate) fn component_names(&self) -> HashMap<&str, Vec<&'static str>> {
+        let mut name_uses = HashMap::<&str, Vec<&'static str>>::new();
+        for (ctype, name) in tagged("source", self.sources.keys())
+            .chain(tagged("transform", self.transforms.keys()))
+            .chain(tagged("sink", self.sinks.keys()))
+        {
+            let uses = name_uses.entry(name).or_default();
+            uses.push(ctype);
+        }
+        name_uses
+    }
+
+    pub(crate) fn has_input(&self, name: &str) -> bool {
+        self.sources.contains_key(name) || self.transforms.contains_key(name)
+    }
+
+    pub(crate) fn has_output(&self, name: &str) -> bool {
+        self.transforms.contains_key(name) || self.sinks.contains_key(name)
+    }
+}
+
+fn tagged<'a>(
+    tag: &'static str,
+    iter: impl Iterator<Item = &'a String>,
+) -> impl Iterator<Item = (&'static str, &'a String)> {
+    iter.map(move |x| (tag, x))
 }
