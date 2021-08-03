@@ -258,6 +258,6 @@ Doesn't block to create other sources/sinks.
 ## Plan Of Attack
 
 - [ ] Create the Pipeline structure and parse a pipeline's configuration file
-- [ ] Update compiler to add pipelines as a parameter
+- [ ] Update compiler to take the pipelines into consideration during validation
 - [ ] Update topology with pipeline's components
 - [ ] Update the context for taking pipeline information
