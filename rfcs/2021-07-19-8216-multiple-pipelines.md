@@ -102,7 +102,7 @@ inputs = ["from-root"]
 [transforms.bar]
 type = "remap"
 inputs = ["foo"]
-...
+# ...
 
 [routes.hot-storage]
 inputs = ["foo"]
