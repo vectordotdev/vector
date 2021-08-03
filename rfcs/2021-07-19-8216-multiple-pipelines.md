@@ -58,7 +58,7 @@ Each pipeline file is a processing subset of a larger Vector configuration file.
 
 - A pipeline is a collection of transforms, sources and sinks cannot be defined within pipelines.
 - A pipeline has an `id` being the name of the file without the extension. The pipeline `load-balancer.yml` will have `load-balancer` as its `id`.
-- Pipelines have access to any components from the root configuration. If the transform `foo` is defined in `/etc/vector/bar.toml`, it will be accessible by the pipeline `/etc/vector/pipelines/pipeline.toml`.
+- Pipelines have access to any components defined in the root configuration directory. For example, if the transform `foo` is defined in `/etc/vector/bar.toml`, it will be accessible by the pipeline `/etc/vector/pipelines/pipeline.toml`, but if a transform `bar` is defined in `/etc/vector/pipelines/another-pipeline.toml`, it will _not_ be accessible by other pipelines.
 - If no pipeline is defined, Vector behaves as if the feature didn't exist. This way, a configuration from a version without the `pipeline` feature will keep working.
 - If a pipeline file is left empty, Vector behaves as if it doesn't exist.
 
