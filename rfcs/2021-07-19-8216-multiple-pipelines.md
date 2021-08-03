@@ -8,7 +8,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 ## Scope
 
-### In the scope
+### In scope
 
 - How and where the pipelines are defined
 - How vector reads the pipelines and what are the limitations of pipelines
