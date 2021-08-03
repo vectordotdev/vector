@@ -1,7 +1,7 @@
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
@@ -58,7 +58,7 @@ pub mod ser_de {
     impl<'de> de::Visitor<'de> for TimeZoneVisitor {
         type Value = TimeZone;
 
-        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "a time zone name")
         }
 
