@@ -317,7 +317,8 @@ mod test {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _crash) =
+            start_topology(config.build(Default::default()).unwrap(), false).await;
 
         // Give some time for the topology to start
         sleep(Duration::from_millis(100)).await;

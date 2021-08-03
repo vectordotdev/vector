@@ -47,7 +47,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
                         let (topology, _crash) =
-                            start_topology(config.build().unwrap(), false).await;
+                            start_topology(config.build(Default::default()).unwrap(), false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
@@ -121,7 +121,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
                 let (output_lines1, output_lines2, topology) = rt.block_on(async move {
                     let output_lines1 = CountReceiver::receive_lines(out_addr1);
                     let output_lines2 = CountReceiver::receive_lines(out_addr2);
-                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+                    let (topology, _crash) =
+                        start_topology(config.build(Default::default()).unwrap(), false).await;
                     wait_for_tcp(in_addr1).await;
                     wait_for_tcp(in_addr2).await;
                     (output_lines1, output_lines2, topology)
@@ -200,7 +201,8 @@ fn benchmark_transforms(c: &mut Criterion) {
                 let rt = runtime();
                 let (output_lines, topology) = rt.block_on(async move {
                     let output_lines = CountReceiver::receive_lines(out_addr);
-                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+                    let (topology, _crash) =
+                        start_topology(config.build(Default::default()).unwrap(), false).await;
                     wait_for_tcp(in_addr).await;
                     (output_lines, topology)
                 });
@@ -349,7 +351,8 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_200 = CountReceiver::receive_lines(out_addr_200);
                     let output_lines_404 = CountReceiver::receive_lines(out_addr_404);
                     let output_lines_500 = CountReceiver::receive_lines(out_addr_500);
-                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+                    let (topology, _crash) =
+                        start_topology(config.build(Default::default()).unwrap(), false).await;
                     wait_for_tcp(in_addr1).await;
                     wait_for_tcp(in_addr2).await;
                     (
@@ -723,7 +726,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                         CountReceiver::receive_lines(out_addr_company_unfurler);
                     let output_lines_audit = CountReceiver::receive_lines(out_addr_audit);
 
-                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+                    let (topology, _crash) = start_topology(config.build(Default::default()).unwrap(), false).await;
                     wait_for_tcp(in_addr).await;
                     (
                         output_lines_company_api,

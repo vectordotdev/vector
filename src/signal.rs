@@ -1,4 +1,4 @@
-use super::config::ConfigBuilder;
+use super::config::{ConfigBuilder, Pipelines};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::{Stream, StreamExt};
 
@@ -10,7 +10,7 @@ pub type SignalRx = mpsc::Receiver<SignalTo>;
 /// Control messages used by Vector to drive topology and shutdown events.
 pub enum SignalTo {
     /// Signal to reload config from a string.
-    ReloadFromConfigBuilder(ConfigBuilder),
+    ReloadFromConfigBuilder(ConfigBuilder, Pipelines),
     /// Signal to reload config from the filesystem.
     ReloadFromDisk,
     /// Signal to shutdown process.

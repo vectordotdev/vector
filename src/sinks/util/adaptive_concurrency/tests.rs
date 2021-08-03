@@ -408,7 +408,7 @@ async fn run_test(params: TestParams) -> TestResults {
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _crash) = start_topology(config.build(Default::default()).unwrap(), false).await;
 
     let controller = get_controller().unwrap();
 

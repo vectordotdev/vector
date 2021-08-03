@@ -34,7 +34,7 @@ async fn pipe() {
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _crash) = start_topology(config.build(Default::default()).unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 
@@ -81,7 +81,7 @@ async fn sample() {
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _crash) = start_topology(config.build(Default::default()).unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 
@@ -135,7 +135,7 @@ async fn fork() {
     let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
     let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _crash) = start_topology(config.build(Default::default()).unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 
@@ -197,7 +197,7 @@ async fn merge_and_fork() {
     let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
     let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _crash) = start_topology(config.build(Default::default()).unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1).await;
     wait_for_tcp(in_addr2).await;
@@ -260,7 +260,7 @@ async fn reconnect() {
 
     let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, _crash) = start_topology(config.build(Default::default()).unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 

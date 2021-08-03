@@ -20,7 +20,8 @@ async fn sources_finished() {
         },
     );
 
-    let (topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    let (topology, _crash) =
+        start_topology(old_config.build(Default::default()).unwrap(), false).await;
 
     timeout(Duration::from_secs(2), topology.sources_finished())
         .await
