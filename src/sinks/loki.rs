@@ -20,7 +20,6 @@ use crate::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
-        service::ConcurrencyOption,
         BatchConfig, BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig, UriSerde,
     },
@@ -100,11 +99,8 @@ impl SinkConfig for LokiConfig {
             return Err("`labels` must include at least one label.".into());
         }
 
-        if self.request.concurrency.is_some() {
-            warn!("Option `request.concurrency` is not supported.");
-        }
         let mut request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        request_settings.concurrency = Some(1);
+        request_settings.concurrency = Some(5);
 
         let batch_settings = BatchSettings::default()
             .bytes(102_400)
@@ -133,6 +129,7 @@ impl SinkConfig for LokiConfig {
             client.clone(),
             cx.acker(),
         )
+        .ordered()
         .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
         let healthcheck = healthcheck(config, client).boxed();
