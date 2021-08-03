@@ -8494,6 +8494,8 @@ dependencies = [
  "dyn-clone",
  "futures 0.3.16",
  "getset",
+ "http",
+ "hyper-proxy",
  "indexmap",
  "lazy_static",
  "lookup",
@@ -8501,6 +8503,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "mlua",
+ "no-proxy",
  "once_cell",
  "pest",
  "pest_derive",
@@ -8524,6 +8527,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
+ "typetag",
  "vrl",
 ]
 
