@@ -6,10 +6,11 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct PipelineTransform {
     #[serde(flatten)]
     pub inner: TransformOuter,
-    #[serde(default)]
+    #[serde(flatten)]
     pub outputs: Vec<String>,
 }
 
