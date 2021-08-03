@@ -144,7 +144,7 @@ async fn create_subscription(
 
     let subscription = match &config.queue {
         None => nc.subscribe(&config.subject).await,
-        Some(queue) => nc.queue_subscribe(&config.subject, &queue).await,
+        Some(queue) => nc.queue_subscribe(&config.subject, queue).await,
     };
 
     let subscription = subscription?;
