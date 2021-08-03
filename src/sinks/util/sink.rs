@@ -197,6 +197,11 @@ where
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
+///
+/// # Ordering
+/// Per partition ordering can be achived by holding onto future of a request
+/// until it finishes. Until then all further requests in that partition are
+/// delayed.
 #[pin_project]
 pub struct PartitionBatchSink<S, B, K, SL>
 where
@@ -209,6 +214,7 @@ where
     partitions: HashMap<K, StatefulBatch<MetadataBatch<B>>>,
     timeout: Duration,
     lingers: HashMap<K, Pin<Box<Sleep>>>,
+    in_flight: Option<HashMap<K, BoxFuture<'static, ()>>>,
     closing: bool,
 }
 
@@ -254,8 +260,14 @@ where
             partitions: HashMap::new(),
             timeout,
             lingers: HashMap::new(),
+            in_flight: None,
             closing: false,
         }
+    }
+
+    /// Enforces per partition ordering of request.
+    pub fn ordered(&mut self) {
+        self.in_flight = Some(HashMap::new());
     }
 }
 
@@ -335,12 +347,20 @@ where
                         Poll::Ready(())
                     )
                 {
-                    partitions_ready.push(partition.clone());
+                    if this
+                        .in_flight
+                        .as_mut()
+                        .and_then(|map| map.get_mut(partition))
+                        .map(|req| matches!(req.poll_unpin(cx), Poll::Ready(())))
+                        .unwrap_or(true)
+                    {
+                        partitions_ready.push(partition.clone());
+                    }
                 }
             }
             let mut batch_consumed = false;
             for partition in partitions_ready.iter() {
-                let service_ready = match self.service.poll_ready(cx) {
+                let service_ready = match this.service.poll_ready(cx) {
                     Poll::Ready(Ok(())) => true,
                     Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                     Poll::Pending => false,
@@ -348,12 +368,16 @@ where
                 if service_ready {
                     trace!("Service ready; Sending batch.");
 
-                    let batch = self.partitions.remove(partition).unwrap();
-                    self.lingers.remove(partition);
+                    let batch = this.partitions.remove(partition).unwrap();
+                    this.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
                     let (batch, metadata) = batch.finish();
-                    tokio::spawn(self.service.call(batch, batch_size, metadata));
+                    let future = tokio::spawn(this.service.call(batch, batch_size, metadata));
+
+                    this.in_flight.as_mut().map(|map| {
+                        map.insert(partition.clone(), future.map(|_| ()).fuse().boxed())
+                    });
 
                     batch_consumed = true;
                 } else {
@@ -362,6 +386,26 @@ where
             }
             if batch_consumed {
                 continue;
+            }
+
+            // Cleanup of in flight futures
+            if let Some(in_flight) = this.in_flight.as_mut() {
+                if in_flight.len() > this.partitions.len() {
+                    // There is at least one in flight future without a partition to check it
+                    // so we will do it here.
+                    let mut remove = Vec::new();
+                    for (partition, req) in in_flight.iter_mut() {
+                        if !this.partitions.contains_key(partition)
+                            && matches!(req.poll_unpin(cx), Poll::Ready(()))
+                        {
+                            remove.push(partition.clone());
+                        }
+                    }
+
+                    for partition in remove {
+                        in_flight.remove(&partition);
+                    }
+                }
             }
 
             // Try move item from buffer to batch.
