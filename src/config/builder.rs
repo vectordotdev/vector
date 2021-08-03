@@ -169,11 +169,8 @@ impl ConfigBuilder {
 
         Ok(())
     }
-}
 
-// Related to validation
-impl ConfigBuilder {
-    pub(super) fn component_names(&self) -> HashMap<&str, Vec<&'static str>> {
+    pub(crate) fn component_names(&self) -> HashMap<&str, Vec<&'static str>> {
         let mut name_uses = HashMap::<&str, Vec<&'static str>>::new();
         for (ctype, name) in tagged("source", self.sources.keys())
             .chain(tagged("transform", self.transforms.keys()))
@@ -185,6 +182,17 @@ impl ConfigBuilder {
         name_uses
     }
 
+    pub(crate) fn has_input(&self, name: &str) -> bool {
+        self.sources.contains_key(name) || self.transforms.contains_key(name)
+    }
+
+    pub(crate) fn has_output(&self, name: &str) -> bool {
+        self.transforms.contains_key(name) || self.sinks.contains_key(name)
+    }
+}
+
+// Related to validation
+impl ConfigBuilder {
     // Check for non-unique names across sources, sinks, and transforms
     fn check_conflicts(&self, pipelines: &Pipelines, errors: &mut Vec<String>) {
         let name_uses = self.component_names();
@@ -333,14 +341,6 @@ impl ConfigBuilder {
         pipelines.warnings(&mut warnings);
 
         warnings
-    }
-
-    pub(super) fn has_input(&self, name: &str) -> bool {
-        self.sources.contains_key(name) || self.transforms.contains_key(name)
-    }
-
-    pub(super) fn has_output(&self, name: &str) -> bool {
-        self.transforms.contains_key(name) || self.sinks.contains_key(name)
     }
 }
 

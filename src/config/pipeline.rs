@@ -27,18 +27,13 @@ impl Pipelines {
             .flatten()
     }
 
-    pub(crate) fn outputs(&self) -> impl Iterator<Item = &String> {
+    pub(crate) fn outputs<'a>(&'a self) -> impl Iterator<Item = &'a String> {
         self.0
-            .values()
-            .map(|pipeline| pipeline.transforms.values())
+            .iter()
+            .map(|(_id, pipeline)| pipeline.transforms.values())
             .flatten()
             .map(|transform| transform.outputs.iter())
             .flatten()
-    }
-
-    pub(crate) fn check_shape(&self, config: &ConfigBuilder, errors: &mut Vec<String>) {
-        self.check_inputs(config, errors);
-        self.check_outputs(config, errors);
     }
 
     fn transform_names(&self) -> impl Iterator<Item = (&String, &String)> {
@@ -68,6 +63,11 @@ impl Pipelines {
                     name, pipeline_id, used
                 ))
             });
+    }
+
+    pub(crate) fn check_shape(&self, config: &ConfigBuilder, errors: &mut Vec<String>) {
+        self.check_inputs(config, errors);
+        self.check_outputs(config, errors);
     }
 
     fn check_outputs(&self, config: &ConfigBuilder, errors: &mut Vec<String>) {

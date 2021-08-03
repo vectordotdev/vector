@@ -1,6 +1,6 @@
 use super::{
-    builder::ConfigBuilder, format, pipeline::Pipeline, vars, Config, ConfigPath, Format,
-    FormatHint, Pipelines,
+    builder::ConfigBuilder, format, pipeline::Pipeline, vars, Config, ConfigPath,
+    Format, FormatHint, Pipelines,
 };
 use crate::signal;
 use glob::glob;
