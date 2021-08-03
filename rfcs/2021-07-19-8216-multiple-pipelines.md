@@ -32,7 +32,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 ## User Experience
 
-- These changes are providing a way for vector users to split their configuration in a way that improves the collaboration between ops and devs.
+- These changes provide a way for Vector users to split their configuration in a way that improves the collaboration between ops and devs.
 - This split will be made by allowing the creation of individual pipeline configuration files, intended to align with services and teams, enabling autonomous management.
 - The ops will now configure their `sources`, `sinks` and `transforms`, and expose them to be used by the devs.
 - The devs will have the ability to consume the provided components without being able to change the common configuration.
