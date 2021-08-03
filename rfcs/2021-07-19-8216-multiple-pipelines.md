@@ -214,7 +214,7 @@ This split improves the readability of the configuration files and allows users 
 
 - What is the impact of not doing this?
 
-This would force the users to keep having complex configuration files and/or to duplicate components configuration between their configuration files.
+This would force users to maintain complex configuration files and/or to duplicate component configuration across configuration files.
 
 - How does this position us for success in the future?
 
