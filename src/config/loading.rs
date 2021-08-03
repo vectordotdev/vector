@@ -286,3 +286,18 @@ pub fn load(
 
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::load_pipelines_from_paths;
+    use crate::config::ConfigPath;
+    use std::path::PathBuf;
+
+    #[test]
+    fn load_pipelines_from_tests() {
+        let path = PathBuf::from("tests/behavior/pipelines/pipelines");
+        let path = ConfigPath::Dir(path);
+        let paths = vec![path];
+        load_pipelines_from_paths(&paths).unwrap();
+    }
+}
