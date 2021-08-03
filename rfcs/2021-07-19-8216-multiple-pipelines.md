@@ -45,7 +45,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 ## Implementation
 
-### How and where the pipelines are stored
+### How and where pipelines are stored
 
 To avoid backward incompatibility, pipelines will be loaded from a `pipelines` sub-directory relative to the Vector configuration directory (e.g., `/etc/vector/pipelines`). Therefore, if a user changes the location of the Vector configuration directory they will also change the `pipelines` directory path. They are coupled.
 
