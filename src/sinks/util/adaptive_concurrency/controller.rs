@@ -82,10 +82,6 @@ impl<L> Controller<L> {
     }
 
     pub(super) fn acquire(&self) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
-        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
-        if inner.in_flight >= inner.current_limit {
-            inner.reached_limit = true;
-        }
         Arc::clone(&self.semaphore).acquire()
     }
 
@@ -99,6 +95,10 @@ impl<L> Controller<L> {
         }
 
         inner.in_flight += 1;
+        if inner.in_flight >= inner.current_limit {
+            inner.reached_limit = true;
+        }
+
         emit!(AdaptiveConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
