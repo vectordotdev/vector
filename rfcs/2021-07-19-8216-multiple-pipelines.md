@@ -4,7 +4,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 ## Context
 
-- [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md) Event drive observability.
+- [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md) Event driven observability.
 
 ## Scope
 
