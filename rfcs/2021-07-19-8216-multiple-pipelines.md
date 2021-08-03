@@ -70,7 +70,7 @@ If any of the following constraints are not valid, Vector will error on boot. If
 
 ### Representation
 
-Like said in the previous section, a pipeline is _just_ a set of transforms.
+As mentioned in the previous section, a pipeline is _just_ a set of transforms.
 
 To be able to forward the events going through the pipeline to a `sink`, we need add a new concept of `route`.
 
