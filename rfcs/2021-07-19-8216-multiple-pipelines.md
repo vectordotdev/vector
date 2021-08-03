@@ -62,6 +62,8 @@ Each pipeline file is a processing subset of a larger Vector configuration file.
 - If no pipeline is defined, Vector behaves as if the feature didn't exist. This way, a configuration from a version without the `pipeline` feature will keep working.
 - If a pipeline file is left empty, Vector behaves as if it doesn't exist.
 
+### Pipeline constraints
+
 If any of the following constraints are not valid, Vector will error on boot. If this occurs during a reload, an error will be triggered and handled in the same fashion as other reload errors.
 
 - There cannot be several pipelines with the same id (for example `load-balancer.yml` and `load-balancer.json`).
