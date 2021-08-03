@@ -1,12 +1,12 @@
 package metadata
 
 #ConfigExample: {
-	title: !=""
+	title:   !=""
 	example: !=""
 }
 
 config_examples: [#ConfigExample, ...#ConfigExample] & [
-	{
+			{
 		title: "Redacted Datadog Agent logs to Datadog"
 		example: #"""
 			[sources.datadog_agent]
@@ -81,5 +81,5 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			inputs = ["splunk_hec_in"]
 			default_api_key = "${DATADOG_API_KEY}"
 			"""#
-	}
+	},
 ]
