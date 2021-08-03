@@ -5,9 +5,7 @@
 {{ define "main" }}
 {{ $tag := .File.BaseFileName }}
 {{ $kind := .CurrentSection.Params.component_type }}
-{{ $kindSingular := $kind | singularize }}
 {{ $config := index (index site.Data.docs.components $kind) $tag }}
-{{ $desc := .Description | default $config.description }}
 {{ $exampleConfigs := $config.example_configs }}
 <div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl mt-8">
   <div class="lg:grid lg:grid-cols-16 lg:gap-8">
@@ -36,17 +34,14 @@
         {{ partial "docs/component-under-hero.html" . }}
 
         <div class="mt-12 prose dark:prose-dark tracking-tight pb-32">
-          {{ with $config.alias }}
-          {{ partial "heading.html" (dict "text" "Alias" "level" 2) }}
+          {{ with $config.description }}
+          <div class="prose dark:prose-dark">
+            {{ . | markdownify }}
+          </div>
+          {{ end }}
 
-          <p>
-            This component was previously called the <code>{{ . }}</code> {{ $kindSingular }}. Make sure to update your
-            Vector configuration to accommodate the name change:
-          </p>
-
-          {{ $diff := printf "[%s.%s]\n+type = \"%s\"\n-type = \"%s\"" $kind $tag $tag . }}
-
-          {{ highlight $diff "diff" "" }}
+          {{ if $config.alias }}
+          {{ partial "docs/component-alias.html" (dict "kind" $kind "alias" $config.alias "current" $tag) }}
           {{ end }}
 
           {{/* Component requirements */}}
