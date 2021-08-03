@@ -210,7 +210,7 @@ Doing so, each time the task will emit an internal event, it will be populated b
 
 - Why is this change worth it?
 
-This split improves the readability of the configuration files and allows the users to collaborate, which makes using Vector more user-friendly.
+This split improves the readability of the configuration files and allows users to collaborate (including across teams), which makes using Vector more user and team friendly.
 
 - What is the impact of not doing this?
 
