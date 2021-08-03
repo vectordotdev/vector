@@ -11,7 +11,8 @@ Large Vector users often require complex Vector topologies to facilitate the col
 ### In scope
 
 - How and where pipelines are defined.
-- How Vector reads pipelines and what the limitations of pipelines are.
+- How Vector loads pipelines
+- Fundamental limitations of pipelines.
 - How pipelines are monitored.
 
 ### Out of scope
