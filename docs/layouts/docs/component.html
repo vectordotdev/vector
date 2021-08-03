@@ -9,13 +9,13 @@
 {{ $exampleConfigs := $config.example_configs }}
 <div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl mt-8">
   <div class="lg:grid lg:grid-cols-16 lg:gap-8">
-    <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 lg:pr-6 md:pr-2">
-      <nav aria-label="Sidebar" class="sticky top-8 h-screen overflow-auto pr-0 lg:pr-4 pb-16" x-cloak>
+    <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 md:pr-6 lg:pr-12">
+      <nav aria-label="Sidebar" class="sticky top-8 h-screen overflow-auto pb-16" x-cloak>
         {{ partial "docs/sidebar.html" . }}
       </nav>
     </div>
 
-    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 md:px-0 lg:pr-8">
+    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 pr-0 lg:pr-24">
       <div id="page-content">
         <div class="mb-4 md:mb-6">
           {{ partial "breadcrumb.html" . }}
@@ -26,7 +26,7 @@
         </h1>
 
         {{ with .Description }}
-        <p class="dark:text-gray-200 mt-5 md:text-lg text-gray-500 prose dark:prose-dark">
+        <p class="dark:text-gray-200 mt-5 md:text-lg text-gray-500 prose dark:prose-dark max-w-none">
           {{ . | markdownify }}
         </p>
         {{ end }}
