@@ -32,6 +32,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         sinks: builder.sinks,
         transforms: builder.transforms,
         tests: builder.tests,
+        pipelines: Default::default(),
         expansions,
     };
 
@@ -1483,7 +1484,9 @@ mod tests {
         "#})
         .unwrap();
 
-        let err = crate::config::compiler::compile(config).err().unwrap();
+        let err = crate::config::compiler::compile(config, Default::default())
+            .err()
+            .unwrap();
         assert_eq!(
             err,
             vec!["Data type mismatch between foo.step1 (Metric) and foo.step2 (Log)".to_owned()]

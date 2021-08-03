@@ -146,7 +146,8 @@ fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
                         let (output_lines, topology) = rt.block_on(async move {
                             let output_lines = CountReceiver::receive_lines(out_addr);
                             let (topology, _crash) =
-                                start_topology(config.build().unwrap(), false).await;
+                                start_topology(config.build(Default::default()).unwrap(), false)
+                                    .await;
                             wait_for_tcp(in_addr).await;
                             (output_lines, topology)
                         });
