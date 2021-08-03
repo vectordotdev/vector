@@ -215,7 +215,11 @@ impl Batch for LokiBuffer {
         let latest_timestamp = events.last().expect("Batch is empty").timestamp;
         let events = events.into_iter().map(|e| e.encoded).collect::<Vec<_>>();
 
-        let labels = partition.labels.iter().cloned().collect::<HashMap<_, _>>();
+        let labels = partition
+            .labels
+            .iter()
+            .map(|&(ref key, ref value)| (key, value))
+            .collect::<HashMap<_, _>>();
         let stream = to_raw_value(&labels).expect("JSON encoding should never fail");
 
         self.global_timestamps.insert(partition, latest_timestamp);
