@@ -163,7 +163,7 @@ Users should be able to observe and monitor individual pipelines.
 This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline's `id`.
 This approach would extend the [RFC 2064](https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md#collecting-uniform-context-data) by _just_ adding `pipeline_id` to the context.
 
-In Vector, once [the topology is built from the configuration](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), every component is encapsulated in a `Task`, that intercept any incoming event and does why it has to do. This task also keeps track of its internal metrics and finally emits those `internal_metrics` events.
+In Vector, once [the topology is built from the configuration](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), every component is encapsulated in a `Task` that intercepts an incoming event and processes it accordingly. This task also keeps track of its internal metrics and finally emits `internal_metrics` events.
 
 To add the pipeline information to the task, we need to add a new optional parameter to the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/task.rs#L29) method.
 
