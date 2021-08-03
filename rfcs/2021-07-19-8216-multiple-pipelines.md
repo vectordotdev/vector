@@ -16,7 +16,7 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 ### Out of scope
 
-- How the pipelines should be synchronized between vector instances
+- How pipelines should be synchronized between Vector instances.
 - Pre/post-processing of data - The ability to prepare and normalize data.
 - Connecting pipelines together - The ability to take input from another pipeline.
 - Component reuse - The ability to define boilerplate for reuse across many different pipelines. This will likely align with Datadog’s “pipeline catalogue”.
