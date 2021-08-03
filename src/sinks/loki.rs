@@ -193,7 +193,7 @@ impl HttpSink for LokiSink {
                 })
                 .ok()
         });
-        let key = PartitionKey { tenant_id };
+        
 
         let mut labels = Vec::new();
 
@@ -242,6 +242,8 @@ impl HttpSink for LokiSink {
         if labels.is_empty() {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
+
+        let key = PartitionKey { tenant_id, labels: labels.clone() };
 
         let event = LokiEvent { timestamp, event };
         Some(

@@ -54,6 +54,7 @@ impl From<&LokiEvent> for LokiEncodedEvent {
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub tenant_id: Option<String>,
+    pub labels: Labels,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -292,7 +293,7 @@ mod tests {
         );
         assert!(matches!(
             buffer.push(LokiRecord {
-                partition: PartitionKey { tenant_id: None },
+                partition: PartitionKey { tenant_id: None, labels: vec![("label1".into(), "value1".into())] },
                 labels: vec![("label1".into(), "value1".into())],
                 event: LokiEvent {
                     timestamp: 123456789,
@@ -320,7 +321,7 @@ mod tests {
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
-                    partition: PartitionKey { tenant_id: None },
+                    partition: PartitionKey { tenant_id: None, labels: vec![("asdf".into(), format!("value{}", n))]},
                     labels: vec![("asdf".into(), format!("value{}", n))],
                     event: LokiEvent {
                         timestamp: 123456780 + n,
@@ -349,7 +350,7 @@ mod tests {
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
-                    partition: PartitionKey { tenant_id: None },
+                    partition: PartitionKey { tenant_id: None, labels: vec![("asdf".into(), "value1".into())] },
                     labels: vec![("asdf".into(), "value1".into())],
                     event: LokiEvent {
                         timestamp: 123456780 + n,
