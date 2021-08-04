@@ -5,24 +5,39 @@ const TOML = require('@iarna/toml');
 const YAML = require('yaml');
 
 // Helper functions
+const getArrayValue = (obj) => {
+  const enumVal = (obj.enum != null) ? [Object.keys(obj.enum)[0]] : null;
+
+  const examplesVal = (obj.examples != null && obj.examples.length > 0) ? [obj.examples[0]] : null;
+
+  return obj.default || examplesVal || enumVal || null;
+}
+
+const getValue = (obj) => {
+  const enumVal = (obj.enum != null) ? Object.keys(obj.enum)[0] : null;
+
+  const examplesVal = (obj.examples != null && obj.examples.length > 0) ? obj.examples[0] : null;
+
+  return obj.default || examplesVal || enumVal || null;
+}
+
+// Convert object to TOML string
+const toToml = (obj) => {
+  return TOML.stringify(obj);
+}
+
+// Convert object to YAML string
+const toYaml = (obj) => {
+  return `---\n${YAML.stringify(obj)}`;
+}
+
+// Convert object to JSON string (indented)
+const toJson = (obj) => {
+  return JSON.stringify(obj, null, 2);
+}
+
 const getExampleValue = (param, deepFilter) => {
   let value;
-
-  const getArrayValue = (obj) => {
-    const enumVal = (obj.enum != null) ? [Object.keys(obj.enum)[0]] : null;
-
-    const examplesVal = (obj.examples != null && obj.examples.length > 0) ? [obj.examples[0]] : null;
-
-    return obj.default || examplesVal || enumVal || null;
-  }
-
-  const getValue = (obj) => {
-    const enumVal = (obj.enum != null) ? Object.keys(obj.enum)[0] : null;
-
-    const examplesVal = (obj.examples != null && obj.examples.length > 0) ? obj.examples[0] : null;
-
-    return obj.default || examplesVal || enumVal || null;
-  }
 
   Object.keys(param.type).forEach(k => {
     const p = param.type[k];
@@ -52,7 +67,6 @@ const getExampleValue = (param, deepFilter) => {
                   } else {
                     subObj[k] = getValue(deepTypeInfo);
                   }
-
                 });
               });
 
@@ -81,109 +95,35 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
     .keys(params)
     .filter(k => filter(params[k]))
     .forEach(k => {
-      obj[k] = getExampleValue(params[k], deepFilter);
+      const paramName = k;
+      const p = params[k];
+
+      obj[paramName] = {};
+
+      Object.keys(p['type']).forEach(k => {
+        if (k === 'object') {
+          const options = p['type']['object']['options'];
+          Object.keys(options).forEach(name => {
+            const optionName = name;
+            const fullKey = `${paramName}.${optionName}`;
+            const option = options[name];
+            Object.keys(option['type']).forEach(k => {
+              const typeInfo = option['type'][k];
+              const exampleVal = getValue(typeInfo);
+
+              if (exampleVal) {
+                obj[paramName][optionName] = {};
+                obj[paramName][optionName] = exampleVal
+              }
+            });
+          });
+        } else {
+          obj[paramName] = getExampleValue(p, deepFilter);
+        }
+      });
     });
 
   return obj;
-}
-
-// Convert object to TOML string
-const toToml = (obj) => {
-  return TOML.stringify(obj);
-}
-
-// Convert object to YAML string
-const toYaml = (obj) => {
-  return `---\n${YAML.stringify(obj)}`;
-}
-
-// Convert object to JSON string (indented)
-const toJson = (obj) => {
-  return JSON.stringify(obj, null, 2);
-}
-
-// Set the example value for a given config parameter
-const setExampleValue = (exampleConfig, paramName, param) => {
-  // Because the `type` field can have one of several different values
-  // (`string`, `array`, `object`, etc.) you need to use recursion here to
-  // get through to the lower level params, e.g. `type.string.examples`. If
-  // there's a more idiomatic way to do this in JS, please advise.
-  Object.keys(param.type).forEach((k) => {
-    const p = param.type[k];
-
-    if (p.default) {
-      exampleConfig[paramName] = p.default;
-    }
-
-    if (p.examples != null && p.examples.length > 0) {
-      exampleConfig[paramName] = p.examples[0];
-    }
-
-    if (['array', 'object'].includes(k)) {
-      if (p.items) {
-        var obj = {};
-
-        Object.keys(p.items.type).forEach((t) => {
-          const typeInfo = p.items.type[t];
-
-          if (typeInfo.examples && typeInfo.examples.length > 0) {
-            exampleConfig[paramName] = typeInfo.examples[0];
-          }
-
-          if (typeInfo.options) {
-            Object.keys(typeInfo.options).forEach((k) => {
-              const opt = typeInfo.options[k];
-
-              if (opt.required) {
-                Object.keys(opt.type).forEach((t) => {
-                  const typeInfo = opt.type[t];
-
-                  if (typeInfo.examples && typeInfo.examples.length > 0) {
-                    obj[k] = typeInfo.examples[0];
-                  }
-                });
-              }
-            });
-
-            exampleConfig[paramName] = obj;
-          }
-        });
-      }
-    }
-  });
-}
-
-// Assemble the "common" params for an example config
-const makeCommonParams = (configuration) => {
-  var common = {};
-
-  for (const paramName in configuration) {
-    if (paramName != "type") {
-      const param = configuration[paramName];
-
-      // Restrict to common params only
-      if (param.common || param.required) {
-        setExampleValue(common, paramName, param);
-      }
-    }
-  }
-
-  return common;
-}
-
-// Assemble the "advanced" params for an example config
-const makeAllParams = (configuration) => {
-  var optional = {};
-
-  for (const paramName in configuration) {
-    if (paramName != "type") {
-      const param = configuration[paramName];
-
-      setExampleValue(optional, paramName, param);
-    }
-  }
-
-  return optional;
 }
 
 // Convert the use case examples (`component.examples`) into multi-format
@@ -248,7 +188,6 @@ const main = () => {
     const data = fs.readFileSync(cueJsonOutput, 'utf8');
     const docs = JSON.parse(data);
     const components = docs.components;
-
 
     console.log(chalk.blue("Creating example configurations for all Vector components..."));
 
