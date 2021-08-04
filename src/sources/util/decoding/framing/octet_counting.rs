@@ -17,7 +17,14 @@ enum State {
 }
 
 impl OctetCountingDecoder {
-    pub fn new(max_length: usize) -> Self {
+    pub fn new() -> Self {
+        Self {
+            other: LinesCodec::new(),
+            octet_decoding: None,
+        }
+    }
+
+    pub fn new_with_max_length(max_length: usize) -> Self {
         Self {
             other: LinesCodec::new_with_max_length(max_length),
             octet_decoding: None,
@@ -207,7 +214,7 @@ mod tests {
 
     #[test]
     fn non_octet_decode_works_with_multiple_frames() {
-        let mut decoder = OctetCountingDecoder::new(128);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(128);
         let mut buffer = BytesMut::with_capacity(16);
 
         buffer.put(&b"<57>Mar 25 21:47:46 gleichner6005 quaerat[2444]: There were "[..]);
@@ -224,7 +231,7 @@ mod tests {
 
     #[test]
     fn octet_decode_works_with_multiple_frames() {
-        let mut decoder = OctetCountingDecoder::new(30);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(30);
         let mut buffer = BytesMut::with_capacity(16);
 
         buffer.put(&b"28 abcdefghijklm"[..]);
@@ -240,7 +247,7 @@ mod tests {
 
     #[test]
     fn octet_decode_moves_past_invalid_length() {
-        let mut decoder = OctetCountingDecoder::new(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(16);
 
         // An invalid syslog message that starts with a digit so we think it is starting with the len.
@@ -253,7 +260,7 @@ mod tests {
 
     #[test]
     fn octet_decode_moves_past_exceeded_frame_length() {
-        let mut decoder = OctetCountingDecoder::new(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit\n"[..]);
@@ -265,7 +272,7 @@ mod tests {
 
     #[test]
     fn octet_decode_rejects_exceeded_frame_length() {
-        let mut decoder = OctetCountingDecoder::new(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"26 abcdefghijklmnopqrstuvwxyzand here we are"[..]);
@@ -279,7 +286,7 @@ mod tests {
 
     #[test]
     fn octet_decode_rejects_exceeded_frame_length_multiple_frames() {
-        let mut decoder = OctetCountingDecoder::new(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"26 abc"[..]);
@@ -295,7 +302,7 @@ mod tests {
 
     #[test]
     fn octet_decode_moves_past_exceeded_frame_length_multiple_frames() {
-        let mut decoder = OctetCountingDecoder::new(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);

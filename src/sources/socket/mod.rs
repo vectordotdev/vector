@@ -265,8 +265,8 @@ mod test {
 
         let mut config = TcpConfig::from_address(addr.into());
         config.set_decoding(DecodingConfig::new(
-            Some(FramingConfig::BytesDelimited {
-                delimiter: b'\n',
+            Some(FramingConfig::CharacterDelimited {
+                delimiter: '\n',
                 max_length: Some(10),
             }),
             None,

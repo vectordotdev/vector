@@ -142,7 +142,9 @@ impl SourceConfig for SyslogConfig {
                 let max_length = self.max_length;
                 let build_decoder = move || {
                     Decoder::new(
-                        Box::new(BytesDecoder::new(OctetCountingDecoder::new(max_length))),
+                        Box::new(BytesDecoder::new(
+                            OctetCountingDecoder::new_with_max_length(max_length),
+                        )),
                         Box::new(SyslogParser),
                     )
                 };
@@ -207,9 +209,9 @@ impl TcpSource for SyslogTcpSource {
 
     fn build_decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(
-            Box::new(BytesDecoder::new(OctetCountingDecoder::new(
-                self.max_length,
-            ))),
+            Box::new(BytesDecoder::new(
+                OctetCountingDecoder::new_with_max_length(self.max_length),
+            )),
             Box::new(SyslogParser),
         )
     }
@@ -249,7 +251,9 @@ pub fn udp(
         let _ = UdpFramed::new(
             socket,
             decoding::Decoder::new(
-                Box::new(BytesDecoder::new(OctetCountingDecoder::new(max_length))),
+                Box::new(BytesDecoder::new(
+                    OctetCountingDecoder::new_with_max_length(max_length),
+                )),
                 Box::new(SyslogParser),
             ),
         )
