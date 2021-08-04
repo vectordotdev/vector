@@ -64,22 +64,21 @@ If the violation occurs during a reload, an error will be triggered and handled 
 
 As mentioned in the previous section, a pipeline is _just_ a set of transforms.
 
-To be able to forward the events going through the pipeline to a `sink`, we need add a new concept of `route`.
+To be able to forward the events going through the pipeline to a `sink`, we'll add a new option `outputs` on the pipeline's transforms that will simply specify where the transforms events are redirected to.
 
-`route` components are used solely to build the topology and represent an interface between the topology and the external sinks.
+`outputs` options are used solely to build the topology and represent an interface between the transform and the external sinks.
 
 A pipeline will have the following internal representation before building the topology.
 
 ```rust
-struct Route {
-  inputs: Vec<String>,
+struct PipelineTransform {
+  inner: TransformOuter,
   outputs: Vec<String>,
 }
 
-struct PipelineConfigBuilder {
+struct Pipeline {
   id: String,
-  transforms: Map<String, TransformOuter>,
-  routes: Map<String, Route>,
+  transforms: Map<String, PipelineTransform>,
 }
 ```
 
@@ -90,31 +89,25 @@ Which corresponds to the following configuration file:
 [transforms.foo]
 type = "remap"
 inputs = ["from-root"]
+outputs = ["dc1", "dc2"]
 # ...
 
 [transforms.bar]
 type = "remap"
 inputs = ["foo"]
-# ...
-
-[routes.hot-storage]
-inputs = ["foo"]
-outputs = ["dc1", "dc2"]
-
-[routes.cold-storage]
-inputs = ["bar"]
 outputs = ["dc-us", "dc-eu"]
+# ...
 ```
 
-The `Route` structure is made to forward the events from inside the pipeline to an external component.
+The `outputs` option is made to forward the events from inside the pipeline to an external component.
 
 #### From configuration to topology
 
 If we look deeper at the configuration building process, the configuration compiler will require the pipelines to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
 
-To do so, we'll need to implement a `PipelineConfigBuilder` from the previous section. We'll then update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4) to build a `Config` containing the required pipeline components. The compiler will load the pipeline's transforms and add the route `outputs` to the corresponding `sinks`.
+To do so, we'll need to implement a `Pipeline` from the previous section. We'll then update [the `compile` function](https://github.com/timberio/vector/blob/v0.15.0/src/config/compiler.rs#L4) to build a `Config` containing the required pipelines components. The compiler will load the pipelines' transforms and add the `outputs` to the corresponding `sinks`.
 
-The components coming from the pipeline will be cloned inside the final `Config`, in the `IndexMap` containing the `transforms` and the `Routes` from the pipeline components will be added to the referring components input field.
+The components coming from the pipeline will be cloned inside the final `Config`, in the `IndexMap` containing the `transforms` and the `outputs` from the pipeline components will be added to the referring components input field.
 
 For example, the following configuration and pipeline, and its **equivalent** once built.
 
@@ -129,11 +122,8 @@ For example, the following configuration and pipeline, and its **equivalent** on
 # /etc/vector/pipelines/foo.toml
 [transforms.bar]
 inputs = ["in"]
-# ...
-
-[routes.baz]
-inputs = ["bar"]
 outputs = ["out"]
+# ...
 
 # equivalent once compiled
 [sources.in]
