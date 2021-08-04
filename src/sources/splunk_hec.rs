@@ -144,10 +144,15 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig) -> Self {
-        let valid_tokens = config.valid_tokens.iter().flatten()
+        let valid_tokens = config
+            .valid_tokens
+            .iter()
+            .flatten()
             .chain(config.token.iter());
         SplunkSource {
-            valid_credentials: valid_tokens.map(|token| format!("Splunk {}", token)).collect(),
+            valid_credentials: valid_tokens
+                .map(|token| format!("Splunk {}", token))
+                .collect(),
         }
     }
 
@@ -795,10 +800,14 @@ mod tests {
         source_with(Some(TOKEN.to_owned()), None).await
     }
 
-    async fn source_with(token: Option<String>, valid_tokens: Option<&[&str]>) -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source_with(
+        token: Option<String>,
+        valid_tokens: Option<&[&str]>,
+    ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
-        let valid_tokens = valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
+        let valid_tokens =
+            valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
         tokio::spawn(async move {
             SplunkConfig {
                 address,
