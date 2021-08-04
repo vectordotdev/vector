@@ -54,19 +54,33 @@ All JavaScript for the site is built using [Hugo Pipes] rather than tools like W
 
 ### CSS
 
-Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. The Tailwind configuration is in [`tailwind.config.js`](./tailwind.config.js); it mostly consists of default values but there are some custom colors, sizes, and other attributes provided there.
+Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. The Tailwind configuration is in [`tailwind.config.js`](./tailwind.config.js); it mostly consists of default values but there are some custom colors, sizes, and other attributes provided there. Tailwind was chosen for the sake of maintainability; having most CSS *inside* the HTML templates makes it easier to understand and update a given component's styling. CSS post-processing for Tailwind is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
 
-CSS post-processing is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
+In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files are in [`assets/sass`](./assets/sass)):
+
+* [`home.sass`](./assets/sass/home.sass) styles some elements that are only on the home page
+* [`syntax.sass`](./assets/sass/syntax.sass) provides the colors for syntax highlighting
+* [`toc.sass`](./assets/sass/toc.sass) styles documentation pages' table of contents. Tailwind doesn't work for this because the HTML for the TOCs is generated at page load time by [Tocbot].
+* [`unpurged.sass`](./assets/sass/variables.sass) contains all the CSS that should *not* be run through PostCSS. The problem in some cases is that PostCSS [purges][purgecss] classes that aren't found in the HTML that's built by Hugo because they're built by other processes, like JavaScript that runs at load time. Anything in `unpurged.sass` escapes the purging process.
 
 ### Search
+
+Search for vector.dev is provided by [Algolia]. Our search solution is largely custom:
+
+* The [`algolia-index.ts`](./scripts/algolia-index.ts) script indexes all of the relevant pages on the site and stores the entire index in a single JSON file (output to `public/search.json`).
+* The [`atomic-algolia`][atomic-algolia] tool syncs the generated JSON index with the Algolia backend, performing all the necessary create, update, and delete operations.
+
+The Algolia configuration for the site is controlled via the [`algolia.json`](./algolia.json) file. The Algolia CLI syncs this config with the Algolia API.
+
+> Everything needed to configure Algolia search for vector.dev is in this repo; you should never make manual configuration changes through the Algolia dashboard.
 
 ### Redirects
 
 Redirects for vector.dev are defined in three difference places (depending on the use):
 
-1. Domain-level redirects, e.g. chat.vector.dev to our Discord server, are defined in [`netlify.toml`](../netlify.toml) in the repo root.
+1. Domain-level redirects, e.g. the chat.vector.dev redirect to our Discord server, are defined in [`netlify.toml`](../netlify.toml) in the repo root.
 2. Splat-style redirects (which can't be defined as Hugo aliases) are defined in [`./static/_redirects`](./static/_redirects).
-3. Redirects for specific pages are defined in the `aliases` field in that page's front matter.
+3. Redirects for specific pages are defined in the [`aliases`][aliases] field in the relevant page's front matter.
 
 ### Link checking
 
@@ -82,7 +96,7 @@ make local-production-build
 make local-preview-build
 ```
 
-The standard link checking configuration is in [`.htmltest.yml`](./.htmltest.yml). As you can see from this config, external links are *not* checked (`CheckExternal: false`). That's because external link checking makes builds highly brittle, as they become dependent upon external systems, i.e. if CloudFlare has an outage or an external site is down, the vector.dev build fails. The trade-off here, of course, is that broken external links can go undetected. The semi-solution is to periodically run ad hoc external link checks:
+The standard link checking configuration is in [`.htmltest.yml`](./.htmltest.yml). As you can see from this config, external links are *not* checked (`CheckExternal: false`). That's because external link checking makes builds highly brittle, as they become dependent upon the availability of external websites, i.e. if CloudFlare has an outage or Wikipedia goes down, the vector.dev build fails. The trade-off here, of course, is that broken external links can go undetected. The half-solution is to periodically run ad hoc external link checks:
 
 ```shell
 make local-production-build
@@ -124,7 +138,10 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
 
+[algolia]: https://algolia.com
+[aliases]: https://gohugo.io/content-management/urls
 [alpine]: https://alpinejs.dev
+[atomic-algolia]: https://github.com/chrisdmacrae/atomic-algolia
 [components]: https://vector.dev/components
 [cue]: https://cue-lang.org
 [deploy previews]: https://docs.netlify.com/site-deploys/deploy-previews
@@ -138,6 +155,7 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 [netlify_project]: https://app.netlify.com/sites/vector-project/overview
 [node.js]: https://nodejs.org
 [postcss]: https://github.com/postcss/postcss
+[purgecss]: https://purgecss.com
 [react.js]: https://reactjs.org
 [reference documentation]: https://vector.dev/docs/reference
 [sass]: https://sass-lang.com
