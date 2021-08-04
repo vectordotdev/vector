@@ -16,11 +16,11 @@
     </div>
 
     <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 pr-0 lg:pr-24">
-      <div id="page-content">
-        <div class="mb-4 md:mb-6">
-          {{ partial "breadcrumb.html" . }}
-        </div>
+      <div class="mb-4 md:mb-6">
+        {{ partial "breadcrumb.html" . }}
+      </div>
 
+      <div id="page-content">
         <h1 class="dark:text-gray-50 font-secondary font-extrabold text-4xl lg:text-5xl leading-tight tracking-tight">
           {{ .Title | markdownify }}
         </h1>
@@ -33,9 +33,9 @@
 
         {{ partial "docs/component-under-hero.html" . }}
 
-        <div class="mt-12 prose dark:prose-dark tracking-tight pb-32">
+        <div class="mt-12 prose dark:prose-dark max-w-none tracking-tight pb-32">
           {{ with $config.description }}
-          <div class="prose dark:prose-dark">
+          <div class="prose dark:prose-dark max-w-none">
             {{ . | markdownify }}
           </div>
           {{ end }}
@@ -115,7 +115,7 @@
                 {{ partial "svg.html" (dict "src" .) }}
                 {{ end }}
 
-                <div class="mt-2 prose dark:prose-dark">
+                <div class="mt-2 prose dark:prose-dark max-w-none">
                   {{ $v.body | markdownify }}
                 </div>
 
@@ -130,7 +130,7 @@
                   {{ partial "svg.html" (dict "src" .) }}
                   {{ end }}
 
-                  <div class="mt-2 prose dark:prose-dark">
+                  <div class="mt-2 prose dark:prose-dark max-w-none">
                     {{ .body | markdownify }}
                   </div>
                   {{ end }}
