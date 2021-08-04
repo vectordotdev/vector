@@ -35,7 +35,7 @@ impl From<String> for FieldBuf {
             // There is unfortunately no way to make an owned substring of a string.
             // So we have to take a slice and clone it.
             let len = name.len();
-            name = name[1..len - 1].to_string();
+            name = name[1..len - 1].replace(r#"\""#, r#"""#).to_string();
             requires_quoting = true;
         } else if !field::is_valid_fieldname(&name) {
             requires_quoting = true
