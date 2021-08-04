@@ -701,7 +701,7 @@ mod tests {
 
             writeln!(&mut file, "line for checkpointing").unwrap();
             for _i in 0..n {
-                writeln!(&mut file, "").unwrap();
+                writeln!(&mut file).unwrap();
             }
 
             sleep_500_millis().await;
