@@ -74,6 +74,13 @@ The Algolia configuration for the site is controlled via the [`algolia.json`](./
 
 > Everything needed to configure Algolia search for vector.dev is in this repo; you should never make manual configuration changes through the Algolia dashboard.
 
+### Icons
+
+vector.dev uses two different icon sets for different purposes:
+
+1. [Ionicons] is used for corporate logos (Twitter, GitHub, etc.)
+2. [Heroicons] is used for everything else. In general the outline variants are preferred.
+
 ### Redirects
 
 Redirects for vector.dev are defined in three difference places (depending on the use):
@@ -148,9 +155,11 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 [directory structure]: https://gohugo.io/getting-started/directory-structure
 [esbuild]: https://github.com/evanw/esbuild
 [guides]: https://vector.dev/guides
+[heroicons]: https://heroicons.com
 [htmltest]: https://github.com/wjdp/htmltest
 [hugo]: https://gohugo.io
 [hugo pipes]: https://gohugo.io/hugo-pipes
+[ionicons]: https://ionic.io/ionicons
 [netlify]: https://netlify.com
 [netlify_project]: https://app.netlify.com/sites/vector-project/overview
 [node.js]: https://nodejs.org
