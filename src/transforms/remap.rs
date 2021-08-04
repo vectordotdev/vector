@@ -83,10 +83,6 @@ impl Remap {
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let handle = self.enrichment_tables.handle();
-        println!("zork");
-        if handle.is_destroyed() {
-            println!("DESTRUCTION");
-        }
         let table = handle.read().unwrap();
         for (key, table) in table.iter() {
             let table = &table.get_one().unwrap().0;
