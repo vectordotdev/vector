@@ -17,7 +17,6 @@ shared vision of good user experience -- the purpose of this document.
    1. [Build momentum with consistency](#build-momentum-with-consistency)
 1. [Guidelines](#guidelines)
    1. [Logical boundaries](#logical-boundaries)
-      1. [Edition boundaries](#edition-boundaries)
       1. [Source & sink boundaries](#source--sink-boundaries)
       1. [Transform boundaries](#transform-boundaries)
    1. [Naming](#naming)
@@ -89,13 +88,6 @@ Examples:
 The following guidelines help to uphold the above principles.
 
 ### Logical boundaries
-
-#### Edition boundaries
-
-Vector offers both an enterprise and open-source edition. Vector's internal
-state, AKA configuration, should not differ between the editions. An open-source
-user should be able to transition to the enterprise edition by simply adding
-a Datadog API key to their Vector configuration.
 
 #### Source & sink boundaries
 
