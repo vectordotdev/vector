@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer, PartitionBuffer,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig, UriSerde,
     },
     template::{Template, TemplateRenderingError},
@@ -122,7 +122,7 @@ impl HttpSink for LogdnaConfig {
     type Input = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
     type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, PartitionKey>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let key = self
             .render_key(&event)
             .map_err(|(field, error)| {
@@ -180,7 +180,7 @@ impl HttpSink for LogdnaConfig {
             map.insert("meta".into(), json!(&log));
         }
 
-        Some(EncodedEvent::new(PartitionInnerBuffer::new(map.into(), key)).with_metadata(log))
+        Some(PartitionInnerBuffer::new(map.into(), key))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -332,13 +332,13 @@ mod tests {
         let mut event4 = Event::from("hello world");
         event4.as_mut_log().insert("env", "staging");
 
-        let event1_out = config.encode_event(event1).unwrap().item.into_parts().0;
+        let event1_out = config.encode_event(event1).unwrap().into_parts().0;
         let event1_out = event1_out.as_object().unwrap();
-        let event2_out = config.encode_event(event2).unwrap().item.into_parts().0;
+        let event2_out = config.encode_event(event2).unwrap().into_parts().0;
         let event2_out = event2_out.as_object().unwrap();
-        let event3_out = config.encode_event(event3).unwrap().item.into_parts().0;
+        let event3_out = config.encode_event(event3).unwrap().into_parts().0;
         let event3_out = event3_out.as_object().unwrap();
-        let event4_out = config.encode_event(event4).unwrap().item.into_parts().0;
+        let event4_out = config.encode_event(event4).unwrap().into_parts().0;
         let event4_out = event4_out.as_object().unwrap();
 
         assert_eq!(event1_out.get("app").unwrap(), &json!("notvector"));

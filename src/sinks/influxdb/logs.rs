@@ -11,7 +11,7 @@ use crate::{
             encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -152,7 +152,7 @@ impl HttpSink for InfluxDbLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
@@ -195,7 +195,7 @@ impl HttpSink for InfluxDbLogsSink {
             return None;
         };
 
-        Some(EncodedEvent::new(output.into_bytes()).with_metadata(event))
+        Some(output.into_bytes())
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -283,7 +283,7 @@ mod tests {
         );
         sink.encoding.except_fields = Some(vec!["host".into()]);
 
-        let bytes = sink.encode_event(event).unwrap().item;
+        let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -313,7 +313,7 @@ mod tests {
             ["source_type", "host"].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap().item;
+        let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -357,7 +357,7 @@ mod tests {
             ["source_type", "host"].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap().item;
+        let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -396,7 +396,7 @@ mod tests {
             [].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap().item;
+        let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -433,7 +433,7 @@ mod tests {
             [].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap().item;
+        let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -470,7 +470,7 @@ mod tests {
             ["as_a_tag", "not_exists_field", "source_type"].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap().item;
+        let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
