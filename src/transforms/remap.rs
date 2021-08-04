@@ -66,6 +66,12 @@ impl Remap {
         config: RemapConfig,
         enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
     ) -> crate::Result<Self> {
+        // Add a dummy index to test it works.
+        match enrichment_tables.get_mut("file") {
+            None => (),
+            Some(mut table) => table.add_index(vec!["field1"]),
+        }
+
         let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
             Formatter::new(&config.source, diagnostics)
                 .colored()
@@ -86,11 +92,12 @@ impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         for table in self.enrichment_tables.iter() {
             trace!(
-                "Testing we have {} {:?}",
+                "Testing we have {} {:?} {:?}",
                 table.key(),
                 table
                     .value()
-                    .find_table_row(std::collections::BTreeMap::new())
+                    .find_table_row(std::collections::BTreeMap::new()),
+                *table
             );
         }
 

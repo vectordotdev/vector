@@ -16,6 +16,7 @@ impl EnrichmentTableConfig for FileConfig {
         trace!("Building file enrichment table");
         Ok(Box::new(File {
             data: vec![vec!["field1".to_string(), "field2".to_string()]],
+            indexes: Vec::new(),
         }))
     }
 }
@@ -28,6 +29,7 @@ impl_generate_config_from_default!(FileConfig);
 
 struct File {
     data: Vec<Vec<String>>,
+    indexes: Vec<Vec<String>>,
 }
 
 impl EnrichmentTable for File {
@@ -38,10 +40,20 @@ impl EnrichmentTable for File {
         trace!("Searching enrichment table.");
         Some(&self.data[0])
     }
+
+    fn add_index(&mut self, fields: Vec<&str>) {
+        self.indexes
+            .push(fields.iter().map(ToString::to_string).collect());
+    }
 }
 
 impl std::fmt::Debug for File {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "File {} row(s)", self.data.len())
+        write!(
+            f,
+            "File {} row(s) {} index(es)",
+            self.data.len(),
+            self.indexes.len()
+        )
     }
 }
