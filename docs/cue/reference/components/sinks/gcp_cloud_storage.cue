@@ -36,6 +36,7 @@ components: sinks: gcp_cloud_storage: {
 					enum: ["ndjson", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                25

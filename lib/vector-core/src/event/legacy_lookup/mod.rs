@@ -93,7 +93,7 @@ impl Lookup {
     #[instrument(level = "trace")]
     pub fn push(&mut self, segment: Segment) {
         trace!(length = %self.segments.len(), "Pushing.");
-        self.segments.push(segment)
+        self.segments.push(segment);
     }
 
     #[instrument(level = "trace")]

@@ -29,6 +29,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: enabled: false
+			proxy: enabled:    true
 			request: enabled:  false
 			tls: enabled:      false
 			to: {

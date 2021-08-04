@@ -37,6 +37,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				adaptive_concurrency:       false

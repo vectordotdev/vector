@@ -174,7 +174,7 @@ impl_generate_config_from_default!(DatadogConfig);
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(None)?;
+        let client = HttpClient::new(None, cx.proxy())?;
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.api_key.clone(),
@@ -229,17 +229,12 @@ impl SinkConfig for DatadogConfig {
 }
 
 fn encode_metric(
-    metric: Metric,
+    mut metric: Metric,
 ) -> Result<EncodedEvent<PartitionInnerBuffer<Metric, DatadogEndpoint>>, ()> {
     let endpoint = DatadogEndpoint::from_metric(&metric);
-    // TODO: Avoiding this clone requires rewriting MetricsBuffer to
-    // accept separated MetricSeries and MetricData values, which in
-    // turn requires rewriting all metrics sinks. See Issue #6045
-    let metadata = metric.metadata().clone();
-    Ok(EncodedEvent {
-        item: PartitionInnerBuffer::new(metric, endpoint),
-        metadata: Some(metadata),
-    })
+    let finalizers = metric.metadata_mut().take_finalizers();
+    let item = PartitionInnerBuffer::new(metric, endpoint);
+    Ok(EncodedEvent { item, finalizers })
 }
 
 impl DatadogSink {

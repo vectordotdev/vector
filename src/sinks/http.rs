@@ -7,8 +7,7 @@ use crate::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
-        UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -108,6 +107,13 @@ impl GenerateConfig for HttpSinkConfig {
     }
 }
 
+impl HttpSinkConfig {
+    fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
+        let tls = TlsSettings::from_options(&self.tls)?;
+        Ok(HttpClient::new(tls, cx.proxy())?)
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
@@ -115,8 +121,7 @@ impl SinkConfig for HttpSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls)?;
+        let client = self.build_http_client(&cx)?;
 
         let healthcheck = match cx.healthcheck.uri.clone() {
             Some(healthcheck_uri) => {
@@ -172,7 +177,7 @@ impl HttpSink for HttpSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
@@ -209,7 +214,7 @@ impl HttpSink for HttpSinkConfig {
             byte_size: body.len(),
         });
 
-        Some(EncodedEvent::new(body).with_metadata(event))
+        Some(body)
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -335,7 +340,7 @@ mod tests {
 
         let mut config = default_config(Encoding::Text);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
 
         assert_eq!(bytes, Vec::from("hello world\n"));
     }
@@ -347,7 +352,7 @@ mod tests {
 
         let mut config = default_config(Encoding::Json);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
@@ -407,7 +412,7 @@ mod tests {
         user = "user"
         password = "password"
         "#;
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         let cx = SinkContext::new_test();
 

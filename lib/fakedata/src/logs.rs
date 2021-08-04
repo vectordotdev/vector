@@ -126,15 +126,15 @@ pub fn json_log_line() -> String {
 
 // Formatted timestamps
 fn timestamp_apache_common() -> String {
-    Local::now().format(&APACHE_COMMON_TIME_FORMAT).to_string()
+    Local::now().format(APACHE_COMMON_TIME_FORMAT).to_string()
 }
 
 fn timestamp_apache_error() -> String {
-    Local::now().format(&APACHE_ERROR_TIME_FORMAT).to_string()
+    Local::now().format(APACHE_ERROR_TIME_FORMAT).to_string()
 }
 
 fn timestamp_syslog_3164() -> String {
-    Local::now().format(&SYSLOG_3164_FORMAT).to_string()
+    Local::now().format(SYSLOG_3164_FORMAT).to_string()
 }
 
 fn timestamp_syslog_5424() -> String {
@@ -142,7 +142,7 @@ fn timestamp_syslog_5424() -> String {
 }
 
 fn timestamp_json() -> String {
-    Local::now().format(&JSON_TIME_FORMAT).to_string()
+    Local::now().format(JSON_TIME_FORMAT).to_string()
 }
 
 // Other random strings

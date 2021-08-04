@@ -32,7 +32,7 @@ pub trait HttpSink: Send + Sync + 'static {
     type Input;
     type Output;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>>;
+    fn encode_event(&self, event: Event) -> Option<Self::Input>;
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>>;
 }
 
@@ -173,9 +173,10 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        if let Some(item) = self.sink.encode_event(item) {
-            *self.project().slot = Some(item);
+    fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
+        let finalizers = event.metadata_mut().take_finalizers();
+        if let Some(item) = self.sink.encode_event(event) {
+            *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
         Ok(())
@@ -319,9 +320,10 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        if let Some(item) = self.sink.encode_event(item) {
-            *self.project().slot = Some(item);
+    fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
+        let finalizers = event.metadata_mut().take_finalizers();
+        if let Some(item) = self.sink.encode_event(event) {
+            *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
         Ok(())
@@ -461,7 +463,7 @@ impl RequestConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{sinks::util::service::Concurrency, test_util::next_addr};
+    use crate::{config::ProxyConfig, sinks::util::service::Concurrency, test_util::next_addr};
     use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},
@@ -496,7 +498,8 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
         let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(
                 http::Request::post(&uri).body(body).map_err(Into::into),

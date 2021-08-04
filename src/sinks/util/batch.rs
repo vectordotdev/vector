@@ -1,5 +1,5 @@
 use super::EncodedEvent;
-use crate::event::EventMetadata;
+use crate::event::EventFinalizers;
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -192,25 +192,25 @@ pub trait Batch: Sized {
     fn num_items(&self) -> usize;
 }
 
-/// This is a batch construct that stores an vector of metadata alongside the batch itself.
+/// This is a batch construct that stores an set of event finalizers alongside the batch itself.
 #[derive(Clone, Debug)]
-pub struct MetadataBatch<B> {
+pub struct FinalizersBatch<B> {
     inner: B,
-    metadata: Vec<EventMetadata>,
+    finalizers: EventFinalizers,
 }
 
-impl<B: Batch> From<B> for MetadataBatch<B> {
+impl<B: Batch> From<B> for FinalizersBatch<B> {
     fn from(inner: B) -> Self {
         Self {
             inner,
-            metadata: Vec::new(),
+            finalizers: Default::default(),
         }
     }
 }
 
-impl<B: Batch> Batch for MetadataBatch<B> {
+impl<B: Batch> Batch for FinalizersBatch<B> {
     type Input = EncodedEvent<B::Input>;
-    type Output = (B::Output, Vec<EventMetadata>);
+    type Output = (B::Output, EventFinalizers);
 
     fn get_settings_defaults(
         config: BatchConfig,
@@ -220,15 +220,13 @@ impl<B: Batch> Batch for MetadataBatch<B> {
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        let EncodedEvent { item, metadata } = item;
+        let EncodedEvent { item, finalizers } = item;
         match self.inner.push(item) {
             PushResult::Ok(full) => {
-                if let Some(metadata) = metadata {
-                    self.metadata.push(metadata);
-                }
+                self.finalizers.merge(finalizers);
                 PushResult::Ok(full)
             }
-            PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent { item, metadata }),
+            PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent { item, finalizers }),
         }
     }
 
@@ -239,12 +237,12 @@ impl<B: Batch> Batch for MetadataBatch<B> {
     fn fresh(&self) -> Self {
         Self {
             inner: self.inner.fresh(),
-            metadata: Vec::new(),
+            finalizers: Default::default(),
         }
     }
 
     fn finish(self) -> Self::Output {
-        (self.inner.finish(), self.metadata)
+        (self.inner.finish(), self.finalizers)
     }
 
     fn num_items(&self) -> usize {

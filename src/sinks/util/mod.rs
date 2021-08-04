@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::{Event, EventMetadata, LogEvent};
+use crate::event::{Event, EventFinalizers};
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
@@ -46,26 +46,15 @@ enum SinkBuildError {
 #[derive(Debug)]
 pub struct EncodedEvent<I> {
     pub item: I,
-    pub metadata: Option<EventMetadata>,
+    pub finalizers: EventFinalizers,
 }
 
 impl<I> EncodedEvent<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
     pub fn new(item: I) -> Self {
-        Self {
-            item,
-            metadata: None,
-        }
-    }
-
-    /// Helper function to set up the metadata.
-    pub fn with_metadata(self, log: LogEvent) -> Self {
-        let (_fields, metadata) = log.into_parts();
-        Self {
-            item: self.item,
-            metadata: Some(metadata),
-        }
+        let finalizers = Default::default();
+        Self { item, finalizers }
     }
 
     // This should be:
@@ -79,7 +68,7 @@ impl<I> EncodedEvent<I> {
     {
         Self {
             item: I::from(that.item),
-            metadata: that.metadata,
+            finalizers: that.finalizers,
         }
     }
 }
@@ -99,10 +88,7 @@ pub enum Encoding {
 * the given encoding. If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(
-    mut event: Event,
-    encoding: &EncodingConfig<Encoding>,
-) -> Option<EncodedEvent<Bytes>> {
+pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
@@ -116,14 +102,10 @@ pub fn encode_event(
             Ok(bytes)
         }
     };
-    let (_fields, metadata) = log.into_parts();
 
     b.map(|mut b| {
         b.push(b'\n');
-        EncodedEvent {
-            item: Bytes::from(b),
-            metadata: Some(metadata),
-        }
+        Bytes::from(b)
     })
     .map_err(|error| error!(message = "Unable to encode.", %error))
     .ok()

@@ -80,7 +80,7 @@ impl SinkConfig for RemoteWriteConfig {
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
 
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let tenant_id = self.tenant_id.clone();
         let auth = self.auth.clone();
 

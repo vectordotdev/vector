@@ -1,5 +1,24 @@
 # Reviewing
 
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
+
+1. [Checklist](#checklist)
+1. [Expectations](#expectations)
+1. [Backward Compatibility](#backward-compatibility)
+1. [Code Of Conduct](#code-of-conduct)
+1. [Dependencies](#dependencies)
+1. [Documentation](#documentation)
+1. [Performance Testing](#performance-testing)
+1. [Single Concern](#single-concern)
+1. [Readability](#readability)
+1. [Safe Code](#safe-code)
+1. [Security](#security)
+1. [Testing](#testing)
+
+<!-- /MarkdownTOC -->
+
+## Checklist
+
 Pull request reviews are required before merging code into Vector. This document
 will outline Vector's pull request review requirements. The following checklist
 should be used for all pull requests:

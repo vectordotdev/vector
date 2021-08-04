@@ -6,8 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
-        TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -104,7 +103,7 @@ impl SinkConfig for HecSinkConfig {
             ..Default::default()
         });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -135,7 +134,7 @@ impl HttpSink for HecSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&event)
@@ -231,7 +230,7 @@ impl HttpSink for HecSinkConfig {
                 emit!(SplunkEventSent {
                     byte_size: value.len()
                 });
-                Some(EncodedEvent::new(value).with_metadata(log))
+                Some(value)
             }
             Err(error) => {
                 emit!(SplunkEventEncodeError { error });
@@ -345,7 +344,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
@@ -397,7 +396,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEventText>(&bytes[..]).unwrap();
 
@@ -445,7 +444,7 @@ mod integration_tests {
     use crate::test_util::retry_until;
     use crate::{
         assert_downcast_matches,
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         sinks,
         test_util::{random_lines_with_stream, random_string},
     };
@@ -699,7 +698,8 @@ mod integration_tests {
     async fn splunk_healthcheck() {
         let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
-            let client = HttpClient::new(tls_settings).unwrap();
+            let proxy = ProxyConfig::default();
+            let client = HttpClient::new(tls_settings, &proxy).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
         };
 

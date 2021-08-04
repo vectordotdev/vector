@@ -44,6 +44,9 @@ spec:
           args:
             - --config-dir
             - /etc/vector/
+            {{- with .Values.args }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           env:
             {{- include "libvector.globalEnv" . | nindent 12 }}
             {{- with .Values.env }}

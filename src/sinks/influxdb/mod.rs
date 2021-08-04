@@ -814,6 +814,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use crate::{
+        config::ProxyConfig,
         http::HttpClient,
         sinks::influxdb::{
             healthcheck,
@@ -833,7 +834,8 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -852,7 +854,8 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -871,7 +874,8 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -890,7 +894,8 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()

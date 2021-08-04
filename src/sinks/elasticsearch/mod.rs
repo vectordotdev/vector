@@ -10,8 +10,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
-        UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
@@ -364,7 +363,7 @@ impl SinkConfig for ElasticSearchConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(self)?;
-        let client = HttpClient::new(common.tls_settings.clone())?;
+        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
         let healthcheck = common.healthcheck(client.clone()).boxed();
 
@@ -491,7 +490,7 @@ enum ParseError {
 }
 
 impl ElasticSearchCommon {
-    fn encode_log(&self, event: Event) -> Option<EncodedEvent<Vec<u8>>> {
+    fn encode_log(&self, event: Event) -> Option<Vec<u8>> {
         let index = self.mode.index(&event)?;
 
         let mut event = if let Some(cfg) = self.mode.as_data_stream_config() {
@@ -520,8 +519,7 @@ impl ElasticSearchCommon {
 
         self.encoding.apply_rules(&mut event);
 
-        let log = event.into_log();
-        serde_json::to_writer(&mut body, &log).unwrap();
+        serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
 
         emit!(ElasticSearchEventEncoded {
@@ -529,7 +527,7 @@ impl ElasticSearchCommon {
             index,
         });
 
-        Some(EncodedEvent::new(body).with_metadata(log))
+        Some(body)
     }
 }
 
@@ -538,7 +536,7 @@ impl HttpSink for ElasticSearchCommon {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let log = match event {
             Event::Log(log) => Some(log),
             Event::Metric(metric) => self.metric_to_log.transform_one(metric),
@@ -868,7 +866,7 @@ mod tests {
             Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
         );
         event.as_mut_log().insert("action", "crea");
-        let encoded = es.encode_event(event).unwrap().item;
+        let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
 {"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
@@ -901,7 +899,7 @@ mod tests {
             Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
         );
         event.as_mut_log().insert("data_stream", data_stream_body());
-        let encoded = es.encode_event(event).unwrap().item;
+        let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there"}
 "#;
@@ -932,7 +930,7 @@ mod tests {
             log_schema().timestamp_key(),
             Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
         );
-        let encoded = es.encode_event(event).unwrap().item;
+        let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"create":{"_index":"logs-generic-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there"}
 "#;
@@ -956,7 +954,7 @@ mod tests {
         );
         let event = Event::from(metric);
 
-        let encoded = es.encode_event(event).unwrap().item;
+        let encoded = es.encode_event(event).unwrap();
         let encoded = std::str::from_utf8(&encoded).unwrap();
         let encoded_lines = encoded.split('\n').map(String::from).collect::<Vec<_>>();
         assert_eq!(encoded_lines.len(), 3); // there's an empty line at the end
@@ -1027,7 +1025,7 @@ mod tests {
             log_schema().timestamp_key(),
             Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
         );
-        let encoded = es.encode_event(event).unwrap().item;
+        let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there"}
 "#;
@@ -1065,7 +1063,7 @@ mod tests {
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("idx", "purple");
 
-        let encoded = es.encode_event(event).unwrap().item;
+        let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar","message":"hello there"}
 "#;
@@ -1106,7 +1104,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         http::HttpClient,
         sinks::HealthcheckError,
         test_util::{random_events_with_stream, random_string, trace_init},
@@ -1138,7 +1136,7 @@ mod integration_tests {
                     request.add_header(header, value);
                 }
 
-                builder = finish_signer(&mut request, &credentials_provider, builder).await?;
+                builder = finish_signer(&mut request, credentials_provider, builder).await?;
             } else {
                 if let Some(ce) = self.compression.content_encoding() {
                     builder = builder.header("Content-Encoding", ce);
@@ -1154,7 +1152,8 @@ mod integration_tests {
             }
 
             let request = builder.body(Body::empty())?;
-            let client = HttpClient::new(self.tls_settings.clone())
+            let proxy = ProxyConfig::default();
+            let client = HttpClient::new(self.tls_settings.clone(), &proxy)
                 .expect("Could not build client to flush");
             let response = client.send(request).await?;
 
@@ -1423,7 +1422,7 @@ mod integration_tests {
         break_events: bool,
         batch_status: BatchStatus,
     ) {
-        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let common = ElasticSearchCommon::parse_config(config).expect("Config error");
         let index = match config.mode {
             // Data stream mode uses an index name generated from the event.
             ElasticSearchMode::DataStream => format!(
@@ -1508,7 +1507,7 @@ mod integration_tests {
                     let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
                     obj.insert(log_schema().timestamp_key().into(), timestamp);
                 }
-                assert!(input.contains(&hit));
+                assert!(input.contains(hit));
             }
         }
     }

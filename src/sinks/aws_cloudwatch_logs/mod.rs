@@ -1,7 +1,9 @@
 mod request;
 
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::{Event, LogEvent, Value},
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -153,10 +155,10 @@ pub enum CloudwatchError {
 }
 
 impl CloudwatchLogsSinkConfig {
-    fn create_client(&self) -> crate::Result<CloudWatchLogsClient> {
+    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudWatchLogsClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client()?;
+        let client = rusoto::client(proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -181,7 +183,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
-        let client = self.create_client()?;
+        let client = self.create_client(cx.proxy())?;
         let svc = ServiceBuilder::new()
             .concurrency_limit(request.concurrency.unwrap())
             .service(CloudwatchLogsPartitionSvc::new(
@@ -788,7 +790,7 @@ mod tests {
             stream: "stream".into(),
             group: "group".into(),
         };
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
         CloudwatchLogsSvc::new(&config, &key, client)
     }
 
@@ -854,7 +856,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
@@ -1258,7 +1260,7 @@ mod integration_tests {
             auth: Default::default(),
         };
 
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&ProxyConfig::default()).unwrap();
         healthcheck(config, client).await.unwrap();
     }
 
@@ -1268,7 +1270,8 @@ mod integration_tests {
             endpoint: "http://localhost:6000".into(),
         };
 
-        let client = rusoto::client().unwrap();
+        let proxy = ProxyConfig::default();
+        let client = rusoto::client(&proxy).unwrap();
         let creds = rusoto::AwsCredentialsProvider::new(&region, None).unwrap();
         CloudWatchLogsClient::new_with(client, creds, region)
     }

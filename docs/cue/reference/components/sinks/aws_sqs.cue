@@ -25,6 +25,7 @@ components: sinks: aws_sqs: components._aws & {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                5

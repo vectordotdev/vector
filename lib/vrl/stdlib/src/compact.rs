@@ -123,7 +123,7 @@ impl Default for CompactOptions {
 impl CompactOptions {
     /// Check if the value is empty according to the given options
     fn is_empty(&self, value: &Value) -> bool {
-        if self.nullish && util::is_nullish(&value) {
+        if self.nullish && util::is_nullish(value) {
             return true;
         }
 

@@ -29,6 +29,7 @@ components: sources: prometheus_scrape: {
 					ssl: "optional"
 				}
 			}
+			proxy: enabled: true
 			tls: {
 				enabled:                true
 				can_enable:             false

@@ -3,7 +3,8 @@ package metadata
 components: sinks: _influxdb: {
 	features: {
 		send: {
-			tls: enabled: false
+			proxy: enabled: true
+			tls: enabled:   false
 			to: {
 				service: services.influxdb
 

@@ -30,6 +30,7 @@ components: sources: nginx_metrics: {
 					}
 				}
 			}
+			proxy: enabled: true
 		}
 		multiline: enabled: false
 	}

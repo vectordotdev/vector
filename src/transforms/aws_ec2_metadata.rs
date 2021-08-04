@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, ProxyConfig, TransformConfig, TransformDescription},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
@@ -78,6 +78,11 @@ pub struct Ec2Metadata {
     namespace: Option<String>,
     refresh_interval_secs: Option<u64>,
     fields: Option<Vec<String>>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    proxy: ProxyConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -110,7 +115,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -140,7 +145,8 @@ impl TransformConfig for Ec2Metadata {
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let http_client = HttpClient::new(None)?;
+        let proxy = ProxyConfig::merge_with_env(&globals.proxy, &self.proxy);
+        let http_client = HttpClient::new(None, &proxy)?;
 
         let mut client =
             MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);

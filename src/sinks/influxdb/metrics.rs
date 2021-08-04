@@ -80,7 +80,7 @@ impl_generate_config_from_default!(InfluxDbConfig);
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
@@ -1003,7 +1003,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let client = HttpClient::new(None).unwrap();
+        let client = HttpClient::new(None, cx.proxy()).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 
