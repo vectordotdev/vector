@@ -1,4 +1,4 @@
-# Vector's Documentation
+# The Vector website and documentation
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/abeaffe6-d38a-4f03-8b6c-c6909e94918e/deploy-status)](https://app.netlify.com/sites/vector-project/deploys)
 
@@ -6,22 +6,21 @@ This directory houses all of the assets used to build Vector's website and docum
 
 ## Prerequisites
 
-In order to run the site locally, you need to have these installed:
+In order to run the site [locally](#run-the-site-locally), you need to have these installed:
 
-* The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`][netlify.toml].
-* The [CUE] configuration and validation language. See the value of `CUE_VERSION` in [`amplify.yml`](./amplify.yml) to see which version of CUE is currently being used for the docs.
-* [Node.js] and the [Yarn] package manager (used for static assets and some scripting).
+* The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`](../netlify.toml).
+* The CLI tool for the [CUE] configuration and validation language.
+* [Node.js] and the [Yarn] package manager (for static assets and some scripting).
 * [htmltest] for link checking.
 
 ## How it works
 
 vector.dev is a complex site with a lot of moving parts. This section breaks the site down into some key components.
 
-### Basic workflows
+### Netlify
 
-vector.dev is built by and hosted on the [Netlify] platform.
-
-{#run-the-site-locally}
+vector.dev is built by and hosted on the [Netlify] platform. [Deploy previews] are built for *all* pull requests to the Vector project (though this may change in the near future).
+ You can update site configuration and see the results of site builds on the Netlify [project page][netlify_project]. The configuration for Netlify is in the root of this repo, in the [`netlify.toml`][netlify_toml] file.
 
 #### Branches
 
@@ -31,29 +30,37 @@ The `master` branch, on the other hand, often contains unreleased, "nightly" cha
 
 ### Static site generator
 
-vector.dev is built using the [Hugo] static site generator. The site configuration is in [`config.toml`](./config.toml)
+vector.dev is built using the [Hugo] static site generator. The site configuration is in [`config.toml`](./config.toml). The standard Hugo [directory structure] is obeyed.
 
 ### Structured data
 
+The Vector documentation relies heavily on structured data supplied using the [CUE] configuration and data validation language. Uses of CUE data include the docs for Vector's many [components] and the docs for [Vector Remap Language][vrl].
+
+All of the CUE sources for the site are in the [`cue`](./cue) directory. Whenever you build the Vector site, the CUE sources are compiled into a single JSON file that's stored at `data/docs.json`. That information is then used in conjunction with Hugo's templating system to build HTML.
+
+There's a variety of helper commands available for working with CUE. Run `make cue-help` for CLI docs.
+
 ### JavaScript
 
-`package.json`
-[Alpine]
-[Babel config](./babel.config.js)
-[React.js]
+For the most part, vector.dev uses the [Alpine] framework for interactive functionality. If you see directives like `x-show`, `x-data`, `@click`, and `:class` in HTML templates, those are Alpine directives. Alpine was chosen over jQuery and other frameworks for the sake of maintainability. Alpine directives live inside your HTML rather than in separate JavaScript files, which enables you to see how a component behaves without referring to an external `.js` file.
+
+The [Spruce] library is used for all JavaScript state management. It stores things like light/dark mode preferences in `localStorage` and makes those values available in Alpine-wired components. See the [`app.js`](./assets/js/app.js) for managed state values.
+
+The [Tocbot] library is used to auto-generate documentation table of contents on each page. The TOC is generated at page load time.
+
+You'll also find two [React.js] components on the site: the spinning globe on the main page and the interactive search bar. The [TypeScript] for those components is in [`home.tsx`](./assets/js/home.tsx) and [`search.tsx`](./assets/js/search.tsx), respectively. React.js compilation is configured using the [`babel.config.js`](./babel.config.js) file and TypeScript compilation is configured using the [`tsconfig.json`](./tsconfig.json) file.
+
+All JavaScript for the site is built using [Hugo Pipes] rather than tools like Webpack, Gulp, or Parcel.
 
 ### CSS
 
+Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. The Tailwind configuration is in [`tailwind.config.js`](./tailwind.config.js); it mostly consists of default values but there are some custom colors, sizes, and other attributes provided there.
+
+CSS post-processing is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
+
 ### Search
 
-The Vector documentation is built using [Hugo], a static site generator with the following details.
-
-* The [reference documentation] is powered by manually curated data located in the [`cue` directory](./cue).
-* Other pages, such as the [guides], are powered by markdown files located in the [`content` directory](./content).
-* Layouts and custom pages are powered by HTML files located in the [`layouts` directory](./layouts).
-* Search is powered by Alogolia through a custom implementation.
-
-## Redirects
+### Redirects
 
 Redirects for vector.dev are defined in three difference places (depending on the use):
 
@@ -86,11 +93,17 @@ That second make command runs htmltest using the [`.htmltest.external.yml`](./ht
 
 ## Tasks
 
+Below is a list of common tasks that maintainers will need to carry out from time to time.
+
 ### Run the site locally
 
 ```shell
 make serve
 ```
+
+This builds all the necessary [prereqs](#prerequisites) for the site and starts up a local web server. Navigate to http://localhost:1313 to view the site.
+
+When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site re-builds and Hugo automatically reloads the page that you're on. If you make changes to the [structured data](#structured-data) sources, however, you need to stop the server and run `make serve` again.
 
 ### Add a new version of Vector
 
@@ -112,20 +125,28 @@ make serve
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
 
 [alpine]: https://alpinejs.dev
+[components]: https://vector.dev/components
 [cue]: https://cue-lang.org
+[deploy previews]: https://docs.netlify.com/site-deploys/deploy-previews
+[directory structure]: https://gohugo.io/getting-started/directory-structure
 [esbuild]: https://github.com/evanw/esbuild
 [guides]: https://vector.dev/guides
 [htmltest]: https://github.com/wjdp/htmltest
 [hugo]: https://gohugo.io
+[hugo pipes]: https://gohugo.io/hugo-pipes
 [netlify]: https://netlify.com
 [netlify_project]: https://app.netlify.com/sites/vector-project/overview
-[netlify.toml]: ../netlify.toml
 [node.js]: https://nodejs.org
+[postcss]: https://github.com/postcss/postcss
 [react.js]: https://reactjs.org
 [reference documentation]: https://vector.dev/docs/reference
 [sass]: https://sass-lang.com
+[spruce]: https://spruce.ryangjchandler.co.uk
 [tailwind]: https://tailwindcss.com
+[tocbot]: https://tscanlin.github.io/tocbot
+[typescript]: https://www.typescriptlang.org
 [typography]: https://github.com/tailwindlabs/tailwindcss-typography
 [vector]: https://vector.dev
+[vrl]: https://vrl.dev
 [website_branch]: https://github.com/timberio/vector/tree/website
 [yarn]: https://yarnpkg.com

@@ -12,6 +12,29 @@ CUE_SOURCES="${ROOT}/docs/cue"
 JSON_OUT="${ROOT}/docs/data/docs.json"
 CHECK_DOCS_SCRIPT="${ROOT}/scripts/check-docs.sh"
 
+USAGE=$(cat >&2 <<-EOF
+Usage: make cue-COMMAND
+
+Commands:
+  build   - build all of the CUE sources and export them into a Hugo-processable
+            JSON object
+  check   - check for the CUE sources' correctness
+  fmt     - format all CUE files using the built-in formatter
+  list    - list all the documentation files
+  vet     - check the documentation files and print errors
+
+Examples:
+
+  Write all CUE data as JSON to ${JSON_OUT}:
+
+    make cue-build
+
+  Reformat the CUE sources:
+
+    make cue-fmt
+EOF
+)
+
 list-docs-files() {
   find "${CUE_SOURCES}" -name '*.cue'
 }
@@ -51,42 +74,18 @@ cmd_build() {
   list-docs-files | xargs cue export --all-errors "$@" --outfile "${JSON_OUT}"
 }
 
+cmd_help() {
+  ${USAGE}
+}
+
 usage() {
-  cat >&2 <<-EOF
-Usage: $0 MODE
-
-Modes:
-  check   - check for the CUE sources' correctness
-  format  - format all CUE files using the built-in formatter
-  list    - list all the documentation files
-  fmt     - format all the documentation files
-  vet     - check the documentation files and print errors
-  eval    - print the evaluated documentation,
-            optionally pass the expression to evaluate via "-e EXPRESSION"
-  build   - build all of the CUE sources and export them into a Hugo-processable
-            JSON object
-
-Examples:
-
-  Print the whole documentation in the JSON format:
-
-    $0 export
-
-  Print the "components.sources.kubernetes_logs" subtree in CUE format:
-
-    $0 eval -e components.sources.kubernetes_logs
-
-  Print the "cli" subtree in JSON format:
-
-    $0 export -e cli
-
-EOF
+  ${USAGE}
   exit 1
 }
 
 MODE="${1:-}"
 case "$MODE" in
-  check|format|list|fmt|vet|eval|build)
+  build|check|fmt|help|list|vet)
     shift
     "cmd_$MODE" "$@"
     ;;

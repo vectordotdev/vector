@@ -431,7 +431,7 @@ components: sources: kubernetes_logs: {
 				"kubernetes.namespace_labels": {
 					"kubernetes.io/metadata.name": "kube-system"
 				}
-				"kubernetes.pod_ip":          "192.168.1.1"
+				"kubernetes.pod_ip": "192.168.1.1"
 				"kubernetes.pod_ips": ["192.168.1.1", "::1"]
 				"kubernetes.pod_labels": {
 					"addonmanager.kubernetes.io/mode": "Reconcile"

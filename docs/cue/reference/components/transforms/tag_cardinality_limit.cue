@@ -109,7 +109,7 @@ components: transforms: tag_cardinality_limit: {
 				"""
 			configuration: {
 				fields: {
-					value_limit: 1
+					value_limit:           1
 					limit_exceeded_action: "drop_tag"
 				}
 			}
