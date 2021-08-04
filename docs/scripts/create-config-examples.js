@@ -45,32 +45,7 @@ const getExampleValue = (param, deepFilter) => {
     if (['array', 'object'].includes(k)) {
       const topType = k;
 
-      if (p.options) {
-        const subOptions = p.options;
-
-        var subObj = {};
-
-        Object
-          .keys(subOptions)
-          .filter(k => deepFilter(subOptions[k]))
-          .forEach(k => {
-            const subOptionName = k;
-            const subOption = subOptions[k];
-            const key = `${param.name}.${subOptionName}`;
-            const typeInfo = subOption.type;
-
-            Object.keys(typeInfo).forEach(k => {
-              const info = typeInfo[k];
-              const exampleVal = getValue(info);
-
-              if (exampleVal) {
-                subObj[key] = exampleVal;
-              }
-            });
-          });
-
-        value = subObj;
-      } else if (p.items && p.items.type) {
+      if (p.items && p.items.type) {
         const typeInfo = p.items.type;
 
         Object.keys(typeInfo).forEach(k => {
@@ -238,10 +213,6 @@ const main = () => {
           p => p.required || p.common || p.relevant_when,
         );
         const useCaseExamples = makeUseCaseExamples(component);
-
-        if (kind === 'sinks' && component['title'] === 'Console') {
-          console.log(commonParams);
-        }
 
         const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
