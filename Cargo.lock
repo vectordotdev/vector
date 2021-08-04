@@ -391,7 +391,7 @@ dependencies = [
  "event-listener",
  "futures-lite",
  "once_cell",
- "signal-hook 0.3.8",
+ "signal-hook",
  "winapi 0.3.9",
 ]
 
@@ -1584,42 +1584,17 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c36c10130df424b2f3552fcc2ddcd9b28a27b1e54b358b45874f88d1ca6888c"
-dependencies = [
- "bitflags",
- "crossterm_winapi 0.7.0",
- "lazy_static",
- "libc",
- "mio 0.7.11",
- "parking_lot",
- "signal-hook 0.1.17",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0ebde6a9dd5e331cd6c6f48253254d117642c31653baa475e394657c59c1f7d"
 dependencies = [
  "bitflags",
- "crossterm_winapi 0.8.0",
+ "crossterm_winapi",
  "libc",
  "mio 0.7.11",
  "parking_lot",
- "signal-hook 0.3.8",
+ "signal-hook",
  "signal-hook-mio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm_winapi"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0da8964ace4d3e4a044fd027919b2237000b24315a37c916f61809f1ff2140b9"
-dependencies = [
  "winapi 0.3.9",
 ]
 
@@ -6806,17 +6781,6 @@ checksum = "42a568c8f2cd051a4d283bd6eb0343ac214c1b0f1ac19f93e1175b2dee38c73d"
 
 [[package]]
 name = "signal-hook"
-version = "0.1.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e31d442c16f047a671b5a71e2161d6e68814012b7f5379d269ebd915fac2729"
-dependencies = [
- "libc",
- "mio 0.7.11",
- "signal-hook-registry",
-]
-
-[[package]]
-name = "signal-hook"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef33d6d0cd06e0840fba9985aab098c147e67e05cee14d412d3345ed14ff30ac"
@@ -6833,7 +6797,7 @@ checksum = "29fd5867f1c4f2c5be079aee7a2adf1152ebb04a4bc4d341f504b7dece607ed4"
 dependencies = [
  "libc",
  "mio 0.7.11",
- "signal-hook 0.3.8",
+ "signal-hook",
 ]
 
 [[package]]
@@ -7959,13 +7923,13 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tui"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "861d8f3ad314ede6219bcb2ab844054b1de279ee37a9bc38e3d606f9d3fb2a71"
+checksum = "39c8ce4e27049eed97cfa363a5048b09d995e209994634a0efc26a14ab6c0c23"
 dependencies = [
  "bitflags",
  "cassowary",
- "crossterm 0.19.0",
+ "crossterm",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -8290,7 +8254,7 @@ dependencies = [
  "codec",
  "colored",
  "criterion",
- "crossterm 0.20.0",
+ "crossterm",
  "dashmap",
  "data-encoding",
  "datadog-search-syntax",
