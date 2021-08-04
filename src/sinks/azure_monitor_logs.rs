@@ -58,9 +58,6 @@ pub enum Encoding {
 }
 
 lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        ..Default::default()
-    };
     static ref LOG_TYPE_REGEX: Regex = Regex::new(r"^\w+$").unwrap();
     static ref LOG_TYPE_HEADER: HeaderName = HeaderName::from_static("log-type");
     static ref X_MS_DATE_HEADER: HeaderName = HeaderName::from_static(X_MS_DATE);
@@ -110,10 +107,10 @@ impl SinkConfig for AzureMonitorLogsConfig {
         }
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(Some(tls_settings))?;
+        let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
 
         let sink = AzureMonitorLogsSink::new(self)?;
-        let request_settings = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let healthcheck = healthcheck(sink.clone(), client.clone()).boxed();
 

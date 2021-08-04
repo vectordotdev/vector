@@ -82,6 +82,7 @@ components: transforms: aws_ec2_metadata: {
 				syntax: "literal"
 			}
 		}
+		proxy: configuration._proxy
 		refresh_interval_secs: {
 			common:      true
 			description: "The interval in seconds at which the EC2 Metadata api will be called."
@@ -92,6 +93,15 @@ components: transforms: aws_ec2_metadata: {
 				unit:    null
 			}
 		}
+	}
+
+	env_vars: {
+		http_proxy: env_vars._http_proxy
+		HTTP_PROXY: env_vars._http_proxy
+		https_proxy: env_vars._https_proxy
+		HTTPS_PROXY: env_vars._https_proxy
+		no_proxy: env_vars._no_proxy
+		NO_PROXY: env_vars._no_proxy
 	}
 
 	input: {

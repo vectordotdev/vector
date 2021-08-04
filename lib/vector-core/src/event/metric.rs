@@ -518,7 +518,7 @@ impl Metric {
 
     /// Zero out the data in this metric
     pub fn zero(&mut self) {
-        self.data.zero()
+        self.data.zero();
     }
 
     /// Add the data from the other metric to this one. The `other` must
@@ -698,7 +698,7 @@ impl MetricValue {
                     statistic: statistic_b,
                 },
             ) if statistic_a == statistic_b => {
-                samples.extend_from_slice(&samples2);
+                samples.extend_from_slice(samples2);
                 true
             }
             (

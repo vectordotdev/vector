@@ -6,13 +6,14 @@ use super::path_helpers::build_pod_logs_directory;
 use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
 use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
-use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::api::core::v1::{Namespace, Pod};
 use std::path::PathBuf;
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
 pub struct K8sPathsProvider {
     pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+    namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
     exclude_paths: Vec<glob::Pattern>,
 }
 
@@ -20,10 +21,12 @@ impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
     pub fn new(
         pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+        namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
         exclude_paths: Vec<glob::Pattern>,
     ) -> Self {
         Self {
             pods_state_reader,
+            namespace_state_reader,
             exclude_paths,
         }
     }
@@ -48,6 +51,20 @@ impl PathsProvider for K8sPathsProvider {
 
         read_ref
             .into_iter()
+            // filter out pods where we haven't fetched the namespace metadata yet
+            // they will be picked up on a later run
+            .filter(|(uid, values)| {
+                let pod: &Pod = values
+                    .get_one()
+                    .expect("we are supposed to be working with single-item values only")
+                    .as_ref();
+                trace!(message = "Verifying Namespace metadata for pod.", uid = ?uid);
+                if let Some(namespace) = pod.metadata.namespace.as_ref() {
+                    self.namespace_state_reader.get(namespace).is_some()
+                } else {
+                    false
+                }
+            })
             .flat_map(|(uid, values)| {
                 let pod = values
                     .get_one()

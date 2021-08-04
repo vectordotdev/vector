@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -18,7 +20,6 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use http::StatusCode;
-use lazy_static::lazy_static;
 use md5::Digest;
 use rusoto_core::RusotoError;
 use rusoto_s3::{
@@ -117,14 +118,6 @@ enum S3StorageClass {
     DeepArchive,
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        concurrency: Concurrency::Fixed(50),
-        rate_limit_num: Some(250),
-        ..Default::default()
-    };
-}
-
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
@@ -164,7 +157,7 @@ impl SinkConfig for S3SinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client()?;
+        let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
@@ -191,7 +184,12 @@ enum HealthcheckError {
 
 impl S3SinkConfig {
     pub fn new(&self, client: S3Client, cx: SinkContext) -> crate::Result<super::VectorSink> {
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(50),
+            rate_limit_num: Some(250),
+            ..Default::default()
+        });
+
         let encoding = self.encoding.clone();
 
         let compression = self.compression;
@@ -260,9 +258,9 @@ impl S3SinkConfig {
         }
     }
 
-    pub fn create_client(&self) -> crate::Result<S3Client> {
+    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<S3Client> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client()?;
+        let client = rusoto::client(proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
@@ -599,7 +597,7 @@ mod integration_tests {
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 10);
@@ -634,7 +632,7 @@ mod integration_tests {
             ..config(&bucket, 1010)
         };
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
@@ -684,7 +682,7 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 500);
@@ -738,7 +736,7 @@ mod integration_tests {
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 10);
@@ -770,7 +768,7 @@ mod integration_tests {
         // Break the bucket name
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (_lines, events, mut receiver) = make_events_batch(1, 1);
@@ -788,7 +786,7 @@ mod integration_tests {
         create_bucket(&bucket, false).await;
 
         let config = config(&bucket, 1);
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
         config.healthcheck(client).await.unwrap();
     }
 
@@ -796,7 +794,7 @@ mod integration_tests {
     async fn s3_healthchecks_invalid_bucket() {
         let config = config("s3_healthchecks_invalid_bucket", 1);
 
-        let client = config.create_client().unwrap();
+        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
         assert_downcast_matches!(
             config.healthcheck(client).await.unwrap_err(),
             HealthcheckError,

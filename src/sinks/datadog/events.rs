@@ -94,7 +94,7 @@ impl DatadogEventsConfig {
             false,
         )?;
 
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.default_api_key.clone(),

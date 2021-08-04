@@ -167,8 +167,7 @@ impl CheckpointsView {
         fingerprinter: &Fingerprinter,
         fingerprint_buffer: &mut Vec<u8>,
     ) {
-        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(&path, fingerprint_buffer)
-        {
+        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(path, fingerprint_buffer) {
             self.update_key(old_checksum, fng)
         }
 
@@ -181,7 +180,7 @@ impl CheckpointsView {
 
         if self.checkpoints.get(&fng).is_none() {
             if let Ok(Some(fingerprint)) =
-                fingerprinter.get_legacy_checksum(&path, fingerprint_buffer)
+                fingerprinter.get_legacy_checksum(path, fingerprint_buffer)
             {
                 if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
                     self.update(fng, pos);
@@ -438,7 +437,7 @@ mod test {
         for fingerprint in fingerprints {
             let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             assert_eq!(
                 chkptr.decode(&chkptr.encode(fingerprint, position)),
                 (fingerprint, position)
@@ -473,7 +472,7 @@ mod test {
 
         // load and persist the checkpoints
         {
-            let chkptr = Checkpointer::new(&data_dir.path());
+            let chkptr = Checkpointer::new(data_dir.path());
 
             for (fingerprint, modified) in &[&newer, &newish, &oldish, &older] {
                 chkptr.checkpoints.load(Checkpoint {
@@ -488,7 +487,7 @@ mod test {
 
         // read them back and assert old are removed
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(ignore_before);
 
             assert_eq!(chkptr.get_checkpoint(newish.0), Some(position));
@@ -510,13 +509,13 @@ mod test {
             let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
             {
-                let mut chkptr = Checkpointer::new(&data_dir.path());
+                let mut chkptr = Checkpointer::new(data_dir.path());
                 chkptr.update_checkpoint(fingerprint, position);
                 assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
                 chkptr.write_checkpoints().ok();
             }
             {
-                let mut chkptr = Checkpointer::new(&data_dir.path());
+                let mut chkptr = Checkpointer::new(data_dir.path());
                 assert_eq!(chkptr.get_checkpoint(fingerprint), None);
                 chkptr.read_checkpoints(None);
                 assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
@@ -544,13 +543,13 @@ mod test {
 
         let data_dir = tempdir().unwrap();
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
             chkptr.write_checkpoints().ok();
         }
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
@@ -585,13 +584,13 @@ mod test {
 
         let data_dir = tempdir().unwrap();
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
             chkptr.write_checkpoints().ok();
         }
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
@@ -611,7 +610,7 @@ mod test {
 
         // Write out checkpoints in the legacy file format
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
             chkptr.write_legacy_checkpoints().unwrap();
@@ -625,7 +624,7 @@ mod test {
         // Read from those old files, ensure the checkpoints were loaded properly, and then write
         // them normally (i.e. in the new format)
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
             chkptr.write_checkpoints().unwrap();
@@ -639,7 +638,7 @@ mod test {
 
         // Ensure one last time that we can reread from the new files and get the same result
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
         }
@@ -656,7 +655,7 @@ mod test {
         ];
 
         let data_dir = tempdir().unwrap();
-        let mut chkptr = Checkpointer::new(&data_dir.path());
+        let mut chkptr = Checkpointer::new(data_dir.path());
 
         for (fingerprint, position, removed) in cases.clone() {
             chkptr.update_checkpoint(fingerprint, position);
@@ -718,7 +717,7 @@ mod test {
             _ => panic!("unexpected checksum types"),
         }
 
-        let mut chkptr = Checkpointer::new(&data_dir.path());
+        let mut chkptr = Checkpointer::new(data_dir.path());
 
         // pretend that we had loaded this old style checksum from disk after an upgrade
         chkptr.update_checkpoint(old, 1234);
@@ -758,7 +757,7 @@ mod test {
 
             let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
 
             chkptr.update_checkpoint(fingerprint, position);
             chkptr.write_checkpoints().unwrap();
@@ -822,7 +821,7 @@ mod test {
 
         let data_dir = tempdir().unwrap();
 
-        let mut chkptr = Checkpointer::new(&data_dir.path());
+        let mut chkptr = Checkpointer::new(data_dir.path());
 
         std::fs::write(
             data_dir.path().join("checkpoints.json"),

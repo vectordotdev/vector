@@ -120,14 +120,14 @@ where
                         match msg {
                             Message::Init => self.hook_init(|event| acc.push(event)),
                             Message::Process(event) => {
-                                self.hook_process(event, |event| acc.push(event))
+                                self.hook_process(event, |event| acc.push(event));
                             }
                             Message::Shutdown => {
                                 self.hook_shutdown(|event| acc.push(event));
                                 is_shutdown = true;
                             }
                             Message::Timer(timer) => {
-                                self.timer_handler(timer, |event| acc.push(event))
+                                self.timer_handler(timer, |event| acc.push(event));
                             }
                         }
                     }

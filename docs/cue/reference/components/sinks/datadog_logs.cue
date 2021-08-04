@@ -23,12 +23,9 @@ components: sinks: datadog_logs: {
 			}
 			encoding: {
 				enabled: true
-				codec: {
-					enabled: true
-					default: null
-					enum: ["json", "text"]
-				}
+				codec: enabled: false
 			}
+			proxy: enabled:   true
 			request: enabled: false
 			tls: {
 				enabled:                true

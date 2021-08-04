@@ -47,7 +47,7 @@ impl EventMetadata {
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
         if self.datadog_api_key.is_none() {
-            self.datadog_api_key = other.datadog_api_key
+            self.datadog_api_key = other.datadog_api_key;
         }
     }
 

@@ -1,5 +1,24 @@
 # Reviewing
 
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
+
+1. [Checklist](#checklist)
+1. [Expectations](#expectations)
+1. [Backward Compatibility](#backward-compatibility)
+1. [Code Of Conduct](#code-of-conduct)
+1. [Dependencies](#dependencies)
+1. [Documentation](#documentation)
+1. [Performance Testing](#performance-testing)
+1. [Single Concern](#single-concern)
+1. [Readability](#readability)
+1. [Safe Code](#safe-code)
+1. [Security](#security)
+1. [Testing](#testing)
+
+<!-- /MarkdownTOC -->
+
+## Checklist
+
 Pull request reviews are required before merging code into Vector. This document
 will outline Vector's pull request review requirements. The following checklist
 should be used for all pull requests:
@@ -30,13 +49,6 @@ development time.
 
 If you have not, please review Vector's [Code of Conduct](CODE_OF_CONDUCT.md)
 to ensure reviews are welcoming, open, and respectful.
-
-## Code Owners
-
-Code owners should be involved in reviews that touch their code. This is
-defined in the [`.github/CODEOWNERS`](.github/CODEOWNERS) file. Involving code
-owners ensures all context is applied to reviews since they have intimate
-knowledge of the code.
 
 ## Dependencies
 

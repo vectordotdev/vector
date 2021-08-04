@@ -19,7 +19,6 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures::{stream, FutureExt, SinkExt};
 use http::{uri::InvalidUri, Request, Uri};
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -62,13 +61,6 @@ struct DatadogSink {
     config: DatadogConfig,
     /// Endpoint -> (uri_path, last_sent_timestamp)
     endpoint_data: HashMap<DatadogEndpoint, (Uri, AtomicI64)>,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        retry_attempts: Some(5),
-        ..Default::default()
-    };
 }
 
 // https://docs.datadoghq.com/api/?lang=bash#post-timeseries-points
@@ -182,7 +174,7 @@ impl_generate_config_from_default!(DatadogConfig);
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(None)?;
+        let client = HttpClient::new(None, cx.proxy())?;
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.api_key.clone(),
@@ -194,7 +186,10 @@ impl SinkConfig for DatadogConfig {
             .events(20)
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            retry_attempts: Some(5),
+            ..Default::default()
+        });
 
         let uri = DatadogEndpoint::build_uri(&self.get_endpoint())?;
         let timestamp = Utc::now().timestamp();

@@ -463,7 +463,7 @@ impl RequestConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{sinks::util::service::Concurrency, test_util::next_addr};
+    use crate::{config::ProxyConfig, sinks::util::service::Concurrency, test_util::next_addr};
     use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},
@@ -498,7 +498,8 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
         let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(
                 http::Request::post(&uri).body(body).map_err(Into::into),

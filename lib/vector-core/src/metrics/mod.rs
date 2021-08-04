@@ -92,7 +92,7 @@ pub fn init() -> crate::Result<()> {
 
 /// Clear all metrics from the registry.
 pub fn reset(controller: &Controller) {
-    controller.registry.clear()
+    controller.registry.clear();
 }
 
 /// Get a handle to the globally registered controller, if it's initialized.

@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -13,7 +15,6 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
 use rand::random;
 use rusoto_core::RusotoError;
 use rusoto_kinesis::{
@@ -56,13 +57,6 @@ pub struct KinesisSinkConfig {
     pub auth: AwsAuthentication,
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        timeout_secs: Some(30),
-        ..Default::default()
-    };
-}
-
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
@@ -92,7 +86,7 @@ impl SinkConfig for KinesisSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client()?;
+        let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisService::new(self.clone(), client, cx)?;
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
@@ -130,10 +124,10 @@ impl KinesisSinkConfig {
         }
     }
 
-    fn create_client(&self) -> crate::Result<KinesisClient> {
+    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client()?;
+        let client = rusoto::client(proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -152,7 +146,11 @@ impl KinesisService {
             .events(500)
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            timeout_secs: Some(30),
+            ..Default::default()
+        });
+
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
 
@@ -430,7 +428,7 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let client = config.create_client().unwrap();
+        let client = config.create_client(cx.proxy()).unwrap();
         let mut sink = KinesisService::new(config, client, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
