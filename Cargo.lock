@@ -152,9 +152,9 @@ dependencies = [
 
 [[package]]
 name = "assert_cmd"
-version = "1.0.7"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d20831bd004dda4c7c372c19cdabff369f794a95e955b3f13fe460e3e1ae95f"
+checksum = "c98233c6673d8601ab23e77eb38f999c51100d46c5703b17288c57fddf3a1ffe"
 dependencies = [
  "bstr",
  "doc-comment",
