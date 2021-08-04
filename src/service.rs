@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use structopt::StructOpt;
 
@@ -95,6 +96,28 @@ impl InstallOpts {
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
+struct RestartOpts {
+    /// The name of the service.
+    #[structopt(long)]
+    name: Option<String>,
+
+    /// How long to wait for the service to stop before starting it back, in seconds.
+    #[structopt(default_value = "60", long)]
+    stop_timeout: u32,
+}
+
+impl RestartOpts {
+    fn service_info(&self) -> ServiceInfo {
+        let mut default_service = ServiceInfo::default();
+        let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
+
+        default_service.name = OsString::from(service_name);
+        default_service
+    }
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(rename_all = "kebab-case")]
 struct StandardOpts {
     /// The name of the service.
     #[structopt(long)]
@@ -123,7 +146,7 @@ enum SubCommand {
     /// Stop the service.
     Stop(StandardOpts),
     /// Restart the service.
-    Restart(StandardOpts),
+    Restart(RestartOpts),
 }
 
 struct ServiceInfo {
@@ -155,7 +178,7 @@ enum ControlAction {
     Uninstall,
     Start,
     Stop,
-    Restart,
+    Restart { stop_timeout: Duration },
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -171,7 +194,11 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             SubCommand::Start(opts) => control_service(&opts.service_info(), ControlAction::Start),
             SubCommand::Stop(opts) => control_service(&opts.service_info(), ControlAction::Stop),
             SubCommand::Restart(opts) => {
-                control_service(&opts.service_info(), ControlAction::Restart)
+                let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
+                control_service(
+                    &opts.service_info(),
+                    ControlAction::Restart { stop_timeout },
+                )
             }
         },
         None => {
@@ -209,9 +236,9 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
             &service_definition,
             vector_windows::service_control::ControlAction::Stop,
         ),
-        ControlAction::Restart => vector_windows::service_control::control(
+        ControlAction::Restart { stop_timeout } => vector_windows::service_control::control(
             &service_definition,
-            vector_windows::service_control::ControlAction::Restart,
+            vector_windows::service_control::ControlAction::Restart { stop_timeout },
         ),
     };
 
