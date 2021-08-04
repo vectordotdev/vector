@@ -122,7 +122,7 @@ Examples:
 #### Transform boundaries
 
 Opposite of source and sinks, Vector transforms should be broad and minimal.
-They should align with a high-level use case, like mapping, aggregator, or
+They should align with a high-level use case, like mapping, aggregation, or
 routing. The goal here is to reduce the number of choices a user makes and
 be opinionated with solutions. Our opinions should prioritize performance and
 reliability over ease of use (within reason), but we should strive to achieve
