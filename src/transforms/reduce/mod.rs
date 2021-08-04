@@ -1,6 +1,6 @@
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     transforms::{TaskTransform, Transform},
@@ -51,11 +51,7 @@ impl_generate_config_from_default!(ReduceConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        _globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Reduce::new(self).map(Transform::task)
     }
 

@@ -84,6 +84,7 @@ criterion_group!(
               parse_timestamp,
               parse_tokens,
               parse_url,
+              parse_user_agent,
               parse_xml,
               push,
               redact,
@@ -1463,6 +1464,54 @@ bench_function! {
                         "path": "/",
                         "query": {},
                         "fragment": null,
+        }))
+    }
+}
+
+bench_function! {
+    parse_user_agent => vrl_stdlib::ParseUserAgent;
+
+    fast {
+        args: func_args![value: "Mozilla Firefox 1.0.1 Mozilla/5.0 (X11; U; Linux i686; de-DE; rv:1.7.6) Gecko/20050223 Firefox/1.0.1"],
+        want: Ok(value!({
+            "browser": {
+                "family": "Firefox",
+                "version": "1.0.1",
+            },
+            "device": {
+                "category": "pc",
+            },
+            "os": {
+                "family": "Linux",
+                "version": null,
+            },
+        }))
+    }
+
+    enriched {
+        args: func_args![value: "Opera/9.80 (J2ME/MIDP; Opera Mini/4.3.24214; iPhone; CPU iPhone OS 4_2_1 like Mac OS X; AppleWebKit/24.783; U; en) Presto/2.5.25 Version/10.54", mode: "enriched"],
+        want: Ok(value!({
+            "browser": {
+                "family": "Opera Mini",
+                "major": "4",
+                "minor": "3",
+                "patch": "24214",
+                "version": "10.54",
+            },
+            "device": {
+                "brand": "Apple",
+                "category": "smartphone",
+                "family": "iPhone",
+                "model": "iPhone",
+            },
+            "os": {
+                "family": "iOS",
+                "major": "4",
+                "minor": "2",
+                "patch": "1",
+                "patch_minor": null,
+                "version": "4.2.1",
+            },
         }))
     }
 }

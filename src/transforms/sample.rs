@@ -1,9 +1,6 @@
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, EnrichmentTableList, GenerateConfig, GlobalOptions, TransformConfig,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::SampleEventDiscarded,
     transforms::{FunctionTransform, Transform},
@@ -40,11 +37,7 @@ impl GenerateConfig for SampleConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        _globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
             self.rate,
             self.key_field.clone(),
@@ -75,12 +68,8 @@ struct SampleCompatConfig(SampleConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SampleCompatConfig {
-    async fn build(
-        &self,
-        enrichment_tables: EnrichmentTableList,
-        globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
-        self.0.build(enrichment_tables, globals).await
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        self.0.build(context).await
     }
 
     fn input_type(&self) -> DataType {

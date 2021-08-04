@@ -5,19 +5,21 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, ProxyConfig, SinkContext, SourceContext},
+    config::{DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
+    enrichment_tables,
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
 };
+use dashmap::DashMap;
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::pin::Pin;
 use std::{
     collections::HashMap,
     future::ready,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
@@ -30,6 +32,8 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
+    pub enrichment_tables:
+        Arc<DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -41,13 +45,14 @@ pub async fn build_pieces(
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
-    let mut enrichment_tables = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
     let mut shutdown_coordinator = SourceShutdownCoordinator::default();
     let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
+
+    let enrichment_tables = DashMap::new();
 
     // Build enrichment tables
     for (name, table) in config
@@ -57,15 +62,13 @@ pub async fn build_pieces(
     {
         let table = match table.inner.build(&config.global).await {
             Ok(table) => table,
-            Err(_) => {
-                errors.push("ohno".to_string());
+            Err(error) => {
+                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
                 continue;
             }
         };
         enrichment_tables.insert(name.clone(), table);
     }
-
-    let enrichment_tables = Arc::new(RwLock::new(enrichment_tables));
 
     // Build sources
     for (name, source) in config
@@ -122,6 +125,13 @@ pub async fn build_pieces(
         source_tasks.insert(name.clone(), server);
     }
 
+    let enrichment_tables = Arc::new(enrichment_tables);
+
+    let context = TransformContext {
+        globals: config.global.clone(),
+        enrichment_tables: enrichment_tables.clone(),
+    };
+
     // Build transforms
     for (name, transform) in config
         .transforms
@@ -133,11 +143,7 @@ pub async fn build_pieces(
         let typetag = transform.inner.transform_type();
 
         let input_type = transform.inner.input_type();
-        let transform = match transform
-            .inner
-            .build(enrichment_tables.clone(), &config.global)
-            .await
-        {
+        let transform = match transform.inner.build(&context).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -316,6 +322,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
+            enrichment_tables,
         };
 
         Ok(pieces)

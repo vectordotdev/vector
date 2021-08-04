@@ -1,7 +1,7 @@
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, EnrichmentTableList, GenerateConfig, GlobalOptions, TransformConfig,
+        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::Event,
@@ -22,11 +22,7 @@ pub struct LaneConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "lane")]
 impl TransformConfig for LaneConfig {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        _globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Lane::new(self.condition.build()?)))
     }
 
@@ -96,15 +92,13 @@ impl GenerateConfig for RouteConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        _globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Err("this transform must be expanded".into())
     }
 
-    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+    fn expand(
+        &mut self,
+    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
         while let Some((k, v)) = self.route.pop() {
@@ -112,7 +106,7 @@ impl TransformConfig for RouteConfig {
         }
 
         if !map.is_empty() {
-            Ok(Some(map))
+            Ok(Some((map, ExpandType::Parallel)))
         } else {
             Err("must specify at least one lane".into())
         }
@@ -138,15 +132,13 @@ struct RouteCompatConfig(RouteConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for RouteCompatConfig {
-    async fn build(
-        &self,
-        enrichment_tables: EnrichmentTableList,
-        globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
-        self.0.build(enrichment_tables, globals).await
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        self.0.build(context).await
     }
 
-    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+    fn expand(
+        &mut self,
+    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         self.0.expand()
     }
 
@@ -216,7 +208,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}}"#
+            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},"Parallel"]"#
         );
     }
 }

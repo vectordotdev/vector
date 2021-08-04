@@ -1,9 +1,6 @@
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, EnrichmentTableList, GenerateConfig, GlobalOptions, TransformConfig,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::FilterEventDiscarded,
     transforms::{FunctionTransform, Transform},
@@ -33,11 +30,7 @@ impl GenerateConfig for FilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        _globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Filter::new(self.condition.build()?)))
     }
 

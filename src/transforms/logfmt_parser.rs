@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
     transforms::{FunctionTransform, Transform},
@@ -28,16 +28,12 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
-        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let conversions = parse_conversion_map(&self.types, timezone)?;
 
         Ok(Transform::function(Logfmt {

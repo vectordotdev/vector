@@ -8,19 +8,18 @@ use crate::{
 };
 use async_trait::async_trait;
 use component::ComponentDescription;
+use dashmap::DashMap;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display, Formatter};
 use std::fs::DirBuilder;
 use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
-};
+use std::sync::Arc;
 
 pub mod api;
 mod builder;
@@ -470,17 +469,41 @@ pub struct TransformOuter {
     pub inner: Box<dyn TransformConfig>,
 }
 
-pub type EnrichmentTableList =
-    Arc<RwLock<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>;
+#[derive(Deserialize, Serialize, Debug)]
+pub enum ExpandType {
+    Parallel,
+    Serial,
+}
+
+#[derive(Debug)]
+pub struct TransformContext {
+    pub globals: GlobalOptions,
+    pub enrichment_tables:
+        Arc<DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
+}
+
+impl TransformContext {
+    pub fn new_with_globals(globals: GlobalOptions) -> Self {
+        Self {
+            globals,
+            enrichment_tables: Arc::new(DashMap::new()),
+        }
+    }
+}
+
+impl Default for TransformContext {
+    fn default() -> Self {
+        TransformContext {
+            globals: Default::default(),
+            enrichment_tables: Arc::new(DashMap::new()),
+        }
+    }
+}
 
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(
-        &self,
-        enrichment_tables: EnrichmentTableList,
-        globals: &GlobalOptions,
-    ) -> crate::Result<transforms::Transform>;
+    async fn build(&self, context: &TransformContext) -> crate::Result<transforms::Transform>;
 
     fn input_type(&self) -> DataType;
 
@@ -491,7 +514,9 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     /// Allows a transform configuration to expand itself into multiple "child"
     /// transformations to replace it. This allows a transform to act as a macro
     /// for various patterns.
-    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+    fn expand(
+        &mut self,
+    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         Ok(None)
     }
 }

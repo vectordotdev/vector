@@ -104,6 +104,11 @@ securityContext: {}
 # Extra env vars to pass to the `vector` container.
 env: []
 
+# Extra arguments to pass to the `vector` container.
+args: []
+  # - --quiet
+  # - --verbose
+
 # Tolerations to set for the `Pod`s managed by `DaemonSet`.
 tolerations:
   # This toleration is to have the `DaemonSet` runnable on master nodes.

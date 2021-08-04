@@ -89,7 +89,7 @@ Vector**][docs.installation].
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter]
 * [**Releases**][urls.vector_releases] - [latest][urls.vector_releases]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
-* **Policies** - [Code of Conduct][urls.vector_code_of_conduct], [Privacy][urls.vector_privacy_policy], [Releasing][urls.vector_release_policy], [Security][urls.vector_security_policy]
+* **Policies** - [Code of Conduct][urls.vector_code_of_conduct], [Privacy][urls.vector_privacy_policy], [Releasing][urls.vector_release_policy], [RFCs][urls.vector_rfc_policy] [Reviewing][urls.vector_release_policy], [Security][urls.vector_security_policy]
 
 ## Comparisons
 
@@ -151,7 +151,7 @@ Vector is an end-to-end, unified, open data platform.
 ---
 
 <p align="center">
-  Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong> - <a href="https://github.com/timberio/vector/security/policy">Security Policy</a> - <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
+  Developed with ❤️ by <strong><a href="https://datadoghq.com">Datadog</a></strong> - <a href="https://github.com/timberio/vector/security/policy">Security Policy</a> - <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
 </p>
 
 [docs.about.concepts]: https://vector.dev/docs/about/concepts/
@@ -218,7 +218,9 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_community]: https://vector.dev/community/
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_release_policy]: https://github.com/timberio/vector/blob/master/RELEASING.md
+[urls.vector_review_policy]: https://github.com/timberio/vector/blob/master/REVIEWING.md
 [urls.vector_releases]: https://vector.dev/releases/latest/
+[urls.vector_rfc_policy]: https://github.com/timberio/vector/blob/master/rfcs/README.md
 [urls.vector_roadmap]: https://roadmap.vector.dev
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/

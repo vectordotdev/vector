@@ -1,8 +1,5 @@
 use crate::{
-    config::{
-        log_schema, DataType, EnrichmentTableList, GlobalOptions, TransformConfig,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
     transforms::{FunctionTransform, Transform},
@@ -40,12 +37,8 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
-        let timezone = self.timezone.unwrap_or(globals.timezone);
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let conversions = parse_conversion_map(&self.types, timezone)?;
         let field = self
             .field

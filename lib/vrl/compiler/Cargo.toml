@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
-shared = { path = "../../shared", default-features = false }
+shared = { path = "../../shared", default-features = false, features = ["conversion"] }
 lookup = { path = "../../lookup" }
 
 bitflags = "1"

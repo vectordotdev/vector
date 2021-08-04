@@ -1,4 +1,4 @@
-# vector.dev
+# Vector's Documentation
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/abeaffe6-d38a-4f03-8b6c-c6909e94918e/deploy-status)](https://app.netlify.com/sites/vector-project/deploys)
 
@@ -12,6 +12,15 @@ In order to run the site locally, you need to have these installed:
 * The [CUE] configuration and validation language. See the value of `CUE_VERSION` in [`amplify.yml`](./amplify.yml) to see which version of CUE is currently being used for the docs.
 * The [Yarn] package manager (used for static assets).
 * [htmltest] for link checking.
+
+## How it works
+
+The Vector documentation is built on [Hugo], a static site generator with the following details:
+
+* The [reference documentation] is powered by manually curated data located in the [`cue` directory](./cue).
+* Other pages, such as the [guides], are powered by markdown files located in the [`content` directory](./content).
+* Layouts and custom pages are powered by HTML files located in the [`layouts` directory](./layouts).
+* Search is powered by Alogolia through a custom implementation.
 
 ## Run the site locally
 
@@ -73,9 +82,11 @@ That second make command runs htmltest using the [`.htmltest.external.yml`](./ht
 
 [cue]: https://cue-lang.org
 [esbuild]: https://github.com/evanw/esbuild
+[guides]: https://vector.dev/guides/
 [htmltest]: https://github.com/wjdp/htmltest
 [hugo]: https://gohugo.io
 [netlify_toml]: ../netlify.toml
+[reference documentation]: https://vector.dev/docs/reference/
 [sass]: https://sass-lang.com
 [tailwind]: https://tailwindcss.com
 [typography]: https://github.com/tailwindlabs/tailwindcss-typography
