@@ -257,7 +257,7 @@ rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "
 redis = { version = "0.21.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 seahash = { version = "4.1.0", default-features = false, optional = true }
-semver = { version = "1.0.3", default-features = false, features = ["serde", "std"], optional = true }
+semver = { version = "1.0.4", default-features = false, features = ["serde", "std"], optional = true }
 snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.1", default-features = false }
