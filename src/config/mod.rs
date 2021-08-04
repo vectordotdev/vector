@@ -12,15 +12,13 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display, Formatter};
 use std::fs::DirBuilder;
 use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, Mutex};
 
 pub mod api;
 mod builder;
@@ -471,7 +469,7 @@ pub struct TransformOuter {
 }
 
 pub type EnrichmentTableList =
-    Arc<RwLock<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>;
+    evmap::ReadHandleFactory<String, Box<dyn enrichment_tables::EnrichmentTable + Send>>;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ExpandType {
@@ -479,14 +477,57 @@ pub enum ExpandType {
     Serial,
 }
 
+// https://github.com/jonhoo/left-right/issues/70#issuecomment-723703854
+#[derive(Debug)]
+pub struct EnrichmentTableWrap(pub Box<dyn enrichment_tables::EnrichmentTable + Send>);
+
+impl std::hash::Hash for EnrichmentTableWrap {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_u8(32);
+    }
+}
+
+impl PartialEq for EnrichmentTableWrap {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for EnrichmentTableWrap {}
+
+#[derive(Debug)]
+pub struct TransformContext {
+    pub globals: GlobalOptions,
+    pub enrichment_tables_read: evmap::ReadHandleFactory<String, Box<EnrichmentTableWrap>>,
+    pub enrichment_tables_write: Arc<Mutex<evmap::WriteHandle<String, Box<EnrichmentTableWrap>>>>,
+}
+
+impl TransformContext {
+    pub fn new_with_globals(globals: GlobalOptions) -> Self {
+        let (read, write) = evmap::new();
+        Self {
+            globals,
+            enrichment_tables_read: read.factory(),
+            enrichment_tables_write: Arc::new(Mutex::new(write)),
+        }
+    }
+}
+
+impl Default for TransformContext {
+    fn default() -> Self {
+        let (read, write) = evmap::new();
+        TransformContext {
+            globals: Default::default(),
+            enrichment_tables_read: read.factory(),
+            enrichment_tables_write: Arc::new(Mutex::new(write)),
+        }
+    }
+}
+
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(
-        &self,
-        enrichment_tables: EnrichmentTableList,
-        globals: &GlobalOptions,
-    ) -> crate::Result<transforms::Transform>;
+    async fn build(&self, context: &TransformContext) -> crate::Result<transforms::Transform>;
 
     fn input_type(&self) -> DataType;
 

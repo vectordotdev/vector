@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
     internal_events::CoercerConversionFailed,
     transforms::{FunctionTransform, Transform},
@@ -27,12 +27,8 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
-        let timezone = self.timezone.unwrap_or(globals.timezone);
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_conversion_map(&self.types, timezone)?;
         Ok(Transform::function(Coercer {
             types,

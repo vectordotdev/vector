@@ -1,5 +1,5 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{self, ConfigPath, GlobalOptions, TransformConfig};
+use crate::config::{self, ConfigPath, GlobalOptions, TransformConfig, TransformContext};
 use crate::{
     conditions::Condition,
     event::{Event, Value},
@@ -133,7 +133,7 @@ fn walk(
                 // TODO: This is a hack.
                 // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
                 transforms.insert(key, UnitTestTransform {
-                    transform:  futures::executor::block_on(target.config.clone().build(Default::default(), globals))
+                    transform:  futures::executor::block_on(target.config.clone().build(&TransformContext::new_with_globals(globals.clone())))
                         .expect("Failed to build a known valid transform config. Things may have changed during runtime."),
                     config: target.config,
                     next: target.next
@@ -452,15 +452,13 @@ async fn build_unit_test(
         &mut transform_outputs,
     );
 
+    let context = TransformContext::new_with_globals(config.global.clone());
+
     // Build reduced transforms.
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config
-                .inner
-                .build(Default::default(), &config.global)
-                .await
-            {
+            match transform_config.inner.build(&context).await {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),

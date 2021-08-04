@@ -12,7 +12,7 @@ mod task;
 
 use crate::{
     buffers::{self, EventStream},
-    config::{Config, ConfigDiff, HealthcheckOptions, Resource},
+    config::{Config, ConfigDiff, EnrichmentTableWrap, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{
@@ -61,6 +61,7 @@ pub struct RunningTopology {
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
+    enrichment_tables_write: Arc<Mutex<evmap::WriteHandle<String, Box<EnrichmentTableWrap>>>>,
 }
 
 pub async fn start_validated(
@@ -80,6 +81,7 @@ pub async fn start_validated(
         tasks: HashMap::new(),
         abort_tx,
         watch: watch::channel(HashMap::new()),
+        enrichment_tables_write: pieces.enrichment_tables_write.clone(),
     };
 
     if !running_topology

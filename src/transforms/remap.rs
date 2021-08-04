@@ -1,5 +1,7 @@
 use crate::{
-    config::{DataType, EnrichmentTableList, GlobalOptions, TransformConfig, TransformDescription},
+    config::{
+        DataType, EnrichmentTableWrap, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
@@ -31,12 +33,8 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(
-        &self,
-        enrichment_tables: EnrichmentTableList,
-        _globals: &GlobalOptions,
-    ) -> Result<Transform> {
-        Remap::new(self.clone(), enrichment_tables.clone()).map(Transform::function)
+    async fn build(&self, context: &TransformContext) -> Result<Transform> {
+        Remap::new(self.clone(), context.enrichment_tables_read.clone()).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -58,11 +56,14 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
-    enrichment_tables: EnrichmentTableList,
+    enrichment_tables: evmap::ReadHandleFactory<String, Box<EnrichmentTableWrap>>,
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig, enrichment_tables: EnrichmentTableList) -> crate::Result<Self> {
+    pub fn new(
+        config: RemapConfig,
+        enrichment_tables: evmap::ReadHandleFactory<String, Box<EnrichmentTableWrap>>,
+    ) -> crate::Result<Self> {
         let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
             Formatter::new(&config.source, diagnostics)
                 .colored()
@@ -81,8 +82,14 @@ impl Remap {
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let table = self.enrichment_tables.read().unwrap();
+        let handle = self.enrichment_tables.handle();
+        println!("zork");
+        if handle.is_destroyed() {
+            println!("DESTRUCTION");
+        }
+        let table = handle.read().unwrap();
         for (key, table) in table.iter() {
+            let table = &table.get_one().unwrap().0;
             trace!(
                 "Testing we have {} {:?}",
                 key,

@@ -1,8 +1,5 @@
 use crate::{
-    config::{
-        DataType, EnrichmentTableList, GlobalOptions, ProxyConfig, TransformConfig,
-        TransformDescription,
-    },
+    config::{DataType, ProxyConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
@@ -118,11 +115,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(
-        &self,
-        _enrichment_tables: EnrichmentTableList,
-        globals: &GlobalOptions,
-    ) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -152,7 +145,7 @@ impl TransformConfig for Ec2Metadata {
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let proxy = ProxyConfig::merge_with_env(&globals.proxy, &self.proxy);
+        let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
 
         let mut client =
@@ -566,7 +559,7 @@ mod integration_tests {
 
     async fn make_transform(config: Ec2Metadata) -> Box<dyn TaskTransform> {
         config
-            .build(&GlobalOptions::default())
+            .build(&TransformContext::default())
             .await
             .unwrap()
             .into_task()

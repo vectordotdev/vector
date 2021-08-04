@@ -39,3 +39,9 @@ impl EnrichmentTable for File {
         Some(&self.data[0])
     }
 }
+
+impl std::fmt::Debug for File {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "File {} row(s)", self.data.len())
+    }
+}

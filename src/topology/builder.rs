@@ -5,7 +5,9 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, ProxyConfig, SinkContext, SourceContext},
+    config::{
+        DataType, EnrichmentTableWrap, ProxyConfig, SinkContext, SourceContext, TransformContext,
+    },
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
@@ -17,7 +19,7 @@ use std::pin::Pin;
 use std::{
     collections::HashMap,
     future::ready,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
@@ -30,6 +32,7 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
+    pub enrichment_tables_write: Arc<Mutex<evmap::WriteHandle<String, Box<EnrichmentTableWrap>>>>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -41,13 +44,14 @@ pub async fn build_pieces(
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
-    let mut enrichment_tables = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
     let mut shutdown_coordinator = SourceShutdownCoordinator::default();
     let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
+
+    let (enrichment_tables_read, mut enrichment_tables_write) = evmap::new();
 
     // Build enrichment tables
     for (name, table) in config
@@ -62,10 +66,9 @@ pub async fn build_pieces(
                 continue;
             }
         };
-        enrichment_tables.insert(name.clone(), table);
+        let table = crate::config::EnrichmentTableWrap(table);
+        enrichment_tables_write.insert(name.clone(), Box::new(table));
     }
-
-    let enrichment_tables = Arc::new(RwLock::new(enrichment_tables));
 
     // Build sources
     for (name, source) in config
@@ -122,6 +125,12 @@ pub async fn build_pieces(
         source_tasks.insert(name.clone(), server);
     }
 
+    let context = TransformContext {
+        globals: config.global.clone(),
+        enrichment_tables_read: enrichment_tables_read.factory(),
+        enrichment_tables_write: Arc::new(Mutex::new(enrichment_tables_write)),
+    };
+
     // Build transforms
     for (name, transform) in config
         .transforms
@@ -133,11 +142,7 @@ pub async fn build_pieces(
         let typetag = transform.inner.transform_type();
 
         let input_type = transform.inner.input_type();
-        let transform = match transform
-            .inner
-            .build(enrichment_tables.clone(), &config.global)
-            .await
-        {
+        let transform = match transform.inner.build(&context).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -307,6 +312,8 @@ pub async fn build_pieces(
         detach_triggers.insert(name.clone(), trigger);
     }
 
+    context.enrichment_tables_write.lock().unwrap().refresh();
+
     if errors.is_empty() {
         let pieces = Pieces {
             inputs,
@@ -316,6 +323,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
+            enrichment_tables_write: context.enrichment_tables_write,
         };
 
         Ok(pieces)
