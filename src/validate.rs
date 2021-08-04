@@ -23,22 +23,37 @@ pub struct Opts {
     deny_warnings: bool,
 
     /// Vector config files in TOML format to validate.
-    #[structopt(name = "config-toml", long, use_delimiter(true))]
+    #[structopt(
+        name = "config-toml",
+        long,
+        env = "VECTOR_CONFIG_TOML",
+        use_delimiter(true)
+    )]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to validate.
-    #[structopt(name = "config-json", long, use_delimiter(true))]
+    #[structopt(
+        name = "config-json",
+        long,
+        env = "VECTOR_CONFIG_JSON",
+        use_delimiter(true)
+    )]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to validate.
-    #[structopt(name = "config-yaml", long, use_delimiter(true))]
+    #[structopt(
+        name = "config-yaml",
+        long,
+        env = "VECTOR_CONFIG_YAML",
+        use_delimiter(true)
+    )]
     paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to validate.
     /// Format is detected from the file name.
     /// If none are specified the default config path `/etc/vector/vector.toml`
     /// will be targeted.
-    #[structopt(use_delimiter(true))]
+    #[structopt(env = "VECTOR_CONFIG", use_delimiter(true))]
     paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
