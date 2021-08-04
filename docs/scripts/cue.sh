@@ -12,29 +12,6 @@ CUE_SOURCES="${ROOT}/docs/cue"
 JSON_OUT="${ROOT}/docs/data/docs.json"
 CHECK_DOCS_SCRIPT="${ROOT}/scripts/check-docs.sh"
 
-USAGE=$(cat >&2 <<-EOF
-Usage: make cue-COMMAND
-
-Commands:
-  build   - build all of the CUE sources and export them into a Hugo-processable
-            JSON object
-  check   - check for the CUE sources' correctness
-  fmt     - format all CUE files using the built-in formatter
-  list    - list all the documentation files
-  vet     - check the documentation files and print errors
-
-Examples:
-
-  Write all CUE data as JSON to ${JSON_OUT}:
-
-    make cue-build
-
-  Reformat the CUE sources:
-
-    make cue-fmt
-EOF
-)
-
 list-docs-files() {
   find "${CUE_SOURCES}" -name '*.cue'
 }
@@ -43,7 +20,7 @@ cmd_check() {
   ${CHECK_DOCS_SCRIPT}
 }
 
-cmd_format() {
+cmd_fmt() {
   list-docs-files | xargs cue fmt "$@"
 }
 
@@ -75,11 +52,25 @@ cmd_build() {
 }
 
 cmd_help() {
-  ${USAGE}
+  cat >&2 <<-EOF
+Usage: make cue-COMMAND
+Commands:
+  build   - build all of the CUE sources and export them into a Hugo-processable
+            JSON object
+  check   - check for the CUE sources' correctness
+  fmt     - format all CUE files using the built-in formatter
+  list    - list all the documentation files
+  vet     - check the documentation files and print errors
+Examples:
+  Write all CUE data as JSON to ${JSON_OUT}:
+    make cue-build
+  Reformat the CUE sources:
+    make cue-fmt
+EOF
 }
 
 usage() {
-  ${USAGE}
+  cmd_help
   exit 1
 }
 
