@@ -144,8 +144,8 @@ Configuration option names should adhere to the following rules:
 - Alphanumeric, lowercase, snake case format
 - Use nouns, not verbs, as names (e.g., `fingerprint` instead of `fingerprinting`)
 - Suffix options with their unit. (e.g., `_seconds`, `_bytes`, etc.)
-- Be consistent with units within the same scope. (e.g., don't mix second and milliseconds)
-- Don't repeat the name space in the option name (e.g., `fingerprint.fingerprint_bytes`)
+- Be consistent with units within the same scope. (e.g., don't mix seconds and milliseconds)
+- Don't repeat the name space in the option name (e.g., `fingerprint.bytes` instead of `fingerprint.fingerprint_bytes`)
 
 #### Metric naming
 
