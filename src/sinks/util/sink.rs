@@ -32,14 +32,14 @@
 //! it to notify the consumer that the request has succeeded.
 
 use super::{
-    batch::{Batch, MetadataBatch, PushResult, StatefulBatch},
+    batch::{Batch, FinalizersBatch, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
     EncodedEvent,
 };
 use crate::{
     buffers::Acker,
-    event::{EventMetadata, EventStatus},
+    event::{EventFinalizers, EventStatus},
 };
 use futures::{
     future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
@@ -82,8 +82,9 @@ pub use vector_core::sink::StreamSink;
 /// in all requests will not be acked until r1 has completed.
 #[pin_project]
 #[derive(Debug)]
-pub struct BatchSink<S, B>
+pub struct BatchSink<S, B, L>
 where
+    S: Service<B::Output>,
     B: Batch,
 {
     #[pin]
@@ -91,30 +92,52 @@ where
         Map<S, PartitionInnerBuffer<B::Output, ()>, B::Output>,
         PartitionBuffer<B, ()>,
         (),
+        L,
     >,
 }
 
-impl<S, B> BatchSink<S, B>
+impl<S, B> BatchSink<S, B, StdServiceLogic<S::Response>>
 where
     S: Service<B::Output>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
+    S::Response: Response + Send + 'static,
     B: Batch,
 {
     pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
+        Self::new_with_logic(service, batch, timeout, acker, StdServiceLogic::default())
+    }
+}
+
+impl<S, B, SL> BatchSink<S, B, SL>
+where
+    S: Service<B::Output>,
+    S::Future: Send + 'static,
+    S::Error: Into<crate::Error> + Send + 'static,
+    S::Response: Response + Send + 'static,
+    B: Batch,
+    SL: ServiceLogic<Response = S::Response> + Send + 'static,
+{
+    pub fn new_with_logic(
+        service: S,
+        batch: B,
+        timeout: Duration,
+        acker: Acker,
+        logic: SL,
+    ) -> Self {
         let service = ServiceBuilder::new()
             .map(|req: PartitionInnerBuffer<B::Output, ()>| req.into_parts().0)
             .service(service);
         let batch = PartitionBuffer::new(batch);
-        let inner = PartitionBatchSink::new(service, batch, timeout, acker);
+        let inner = PartitionBatchSink::new_with_logic(service, batch, timeout, acker, logic);
         Self { inner }
     }
 }
 
 #[cfg(test)]
-impl<S, B> BatchSink<S, B>
+impl<S, B, L> BatchSink<S, B, L>
 where
+    S: Service<B::Output>,
     B: Batch,
 {
     pub fn get_ref(&self) -> &S {
@@ -122,13 +145,14 @@ where
     }
 }
 
-impl<S, B> Sink<EncodedEvent<B::Input>> for BatchSink<S, B>
+impl<S, B, SL> Sink<EncodedEvent<B::Input>> for BatchSink<S, B, SL>
 where
     S: Service<B::Output>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
+    S::Response: Response + Send + 'static,
     B: Batch,
+    SL: ServiceLogic<Response = S::Response> + Send + 'static,
 {
     type Error = crate::Error;
 
@@ -137,10 +161,10 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: EncodedEvent<B::Input>) -> Result<(), Self::Error> {
-        let EncodedEvent { item, metadata } = item;
+        let EncodedEvent { item, finalizers } = item;
         self.project().inner.start_send(EncodedEvent {
             item: PartitionInnerBuffer::new(item, ()),
-            metadata,
+            finalizers,
         })
     }
 
@@ -174,20 +198,21 @@ where
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
 #[pin_project]
-pub struct PartitionBatchSink<S, B, K>
+pub struct PartitionBatchSink<S, B, K, SL>
 where
     B: Batch,
+    S: Service<B::Output>,
 {
-    service: ServiceSink<S, B::Output>,
+    service: ServiceSink<S, B::Output, SL>,
     buffer: Option<(K, EncodedEvent<B::Input>)>,
-    batch: StatefulBatch<MetadataBatch<B>>,
-    partitions: HashMap<K, StatefulBatch<MetadataBatch<B>>>,
+    batch: StatefulBatch<FinalizersBatch<B>>,
+    partitions: HashMap<K, StatefulBatch<FinalizersBatch<B>>>,
     timeout: Duration,
     lingers: HashMap<K, Pin<Box<Sleep>>>,
     closing: bool,
 }
 
-impl<S, B, K> PartitionBatchSink<S, B, K>
+impl<S, B, K> PartitionBatchSink<S, B, K, StdServiceLogic<S::Response>>
 where
     B: Batch,
     B::Input: Partition<K>,
@@ -195,15 +220,37 @@ where
     S: Service<B::Output>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
+    S::Response: Response + Send + 'static,
 {
     pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
-        let service = ServiceSink::new(service, acker);
+        Self::new_with_logic(service, batch, timeout, acker, StdServiceLogic::default())
+    }
+}
+
+impl<S, B, K, SL> PartitionBatchSink<S, B, K, SL>
+where
+    B: Batch,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    S: Service<B::Output>,
+    S::Future: Send + 'static,
+    S::Error: Into<crate::Error> + Send + 'static,
+    S::Response: Response + Send + 'static,
+    SL: ServiceLogic<Response = S::Response> + Send + 'static,
+{
+    pub fn new_with_logic(
+        service: S,
+        batch: B,
+        timeout: Duration,
+        acker: Acker,
+        service_logic: SL,
+    ) -> Self {
+        let service = ServiceSink::new_with_logic(service, acker, service_logic);
 
         Self {
             service,
             buffer: None,
-            batch: StatefulBatch::from(MetadataBatch::from(batch)),
+            batch: StatefulBatch::from(FinalizersBatch::from(batch)),
             partitions: HashMap::new(),
             timeout,
             lingers: HashMap::new(),
@@ -212,7 +259,7 @@ where
     }
 }
 
-impl<S, B, K> Sink<EncodedEvent<B::Input>> for PartitionBatchSink<S, B, K>
+impl<S, B, K, SL> Sink<EncodedEvent<B::Input>> for PartitionBatchSink<S, B, K, SL>
 where
     B: Batch,
     B::Input: Partition<K>,
@@ -220,7 +267,8 @@ where
     S: Service<B::Output>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
+    S::Response: Response + Send + 'static,
+    SL: ServiceLogic<Response = S::Response> + Send + 'static,
 {
     type Error = crate::Error;
 
@@ -304,8 +352,8 @@ where
                     self.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
-                    let (batch, metadata) = batch.finish();
-                    tokio::spawn(self.service.call(batch, batch_size, metadata));
+                    let (batch, finalizers) = batch.finish();
+                    tokio::spawn(self.service.call(batch, batch_size, finalizers));
 
                     batch_consumed = true;
                 } else {
@@ -344,9 +392,9 @@ where
     }
 }
 
-impl<S, B, K> fmt::Debug for PartitionBatchSink<S, B, K>
+impl<S, B, K, SL> fmt::Debug for PartitionBatchSink<S, B, K, SL>
 where
-    S: fmt::Debug,
+    S: Service<B::Output> + fmt::Debug,
     B: Batch + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -360,7 +408,7 @@ where
 
 // === ServiceSink ===
 
-struct ServiceSink<S, Request> {
+struct ServiceSink<S, Request, SL> {
     service: S,
     in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
     acker: Acker,
@@ -368,17 +416,32 @@ struct ServiceSink<S, Request> {
     seq_tail: usize,
     pending_acks: HashMap<usize, usize>,
     next_request_id: usize,
+    logic: SL,
     _pd: PhantomData<Request>,
 }
 
-impl<S, Request> ServiceSink<S, Request>
+impl<S, Request> ServiceSink<S, Request, StdServiceLogic<S::Response>>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
+    S::Response: Response + Send + 'static,
 {
+    #[cfg(test)]
     fn new(service: S, acker: Acker) -> Self {
+        Self::new_with_logic(service, acker, StdServiceLogic::default())
+    }
+}
+
+impl<S, Request, SL> ServiceSink<S, Request, SL>
+where
+    S: Service<Request>,
+    S::Future: Send + 'static,
+    S::Error: Into<crate::Error> + Send + 'static,
+    S::Response: Response + Send + 'static,
+    SL: ServiceLogic<Response = S::Response> + Send + 'static,
+{
+    fn new_with_logic(service: S, acker: Acker, logic: SL) -> Self {
         Self {
             service,
             in_flight: FuturesUnordered::new(),
@@ -387,6 +450,7 @@ where
             seq_tail: 0,
             pending_acks: HashMap::new(),
             next_request_id: 0,
+            logic,
             _pd: PhantomData,
         }
     }
@@ -399,7 +463,7 @@ where
         &mut self,
         req: Request,
         batch_size: usize,
-        metadata: Vec<EventMetadata>,
+        finalizers: EventFinalizers,
     ) -> BoxFuture<'static, ()> {
         let seqno = self.seq_head;
         self.seq_head += 1;
@@ -415,31 +479,12 @@ where
             message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
+        let logic = self.logic.clone();
         self.service
             .call(req)
             .err_into()
             .map(move |result| {
-                let status = match result {
-                    Ok(response) => {
-                        if response.is_successful() {
-                            trace!(message = "Response successful.", ?response);
-                            EventStatus::Delivered
-                        } else if response.is_transient() {
-                            error!(message = "Response wasn't successful.", ?response);
-                            EventStatus::Errored
-                        } else {
-                            error!(message = "Response failed.", ?response);
-                            EventStatus::Failed
-                        }
-                    }
-                    Err(error) => {
-                        error!(message = "Request failed.", %error);
-                        EventStatus::Errored
-                    }
-                };
-                for metadata in metadata {
-                    metadata.update_status(status);
-                }
+                logic.update_finalizers(result, finalizers);
 
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
@@ -473,7 +518,7 @@ where
     }
 }
 
-impl<S, Request> fmt::Debug for ServiceSink<S, Request>
+impl<S, Request, SL> fmt::Debug for ServiceSink<S, Request, SL>
 where
     S: fmt::Debug,
 {
@@ -485,6 +530,62 @@ where
             .field("seq_tail", &self.seq_tail)
             .field("pending_acks", &self.pending_acks)
             .finish()
+    }
+}
+
+// === Response ===
+
+pub trait ServiceLogic: Clone {
+    type Response: Response;
+
+    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus;
+
+    fn update_finalizers(
+        &self,
+        result: crate::Result<Self::Response>,
+        finalizers: EventFinalizers,
+    ) {
+        finalizers.update_status(self.result_status(result));
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Clone)]
+pub struct StdServiceLogic<R> {
+    _pd: PhantomData<R>,
+}
+
+impl<R> Default for StdServiceLogic<R> {
+    fn default() -> Self {
+        Self { _pd: PhantomData }
+    }
+}
+
+impl<R> ServiceLogic for StdServiceLogic<R>
+where
+    R: Response + Send,
+{
+    type Response = R;
+
+    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus {
+        match result {
+            Ok(response) => {
+                if response.is_successful() {
+                    trace!(message = "Response successful.", ?response);
+                    EventStatus::Delivered
+                } else if response.is_transient() {
+                    error!(message = "Response wasn't successful.", ?response);
+                    EventStatus::Errored
+                } else {
+                    error!(message = "Response failed.", ?response);
+                    EventStatus::Failed
+                }
+            }
+            Err(error) => {
+                error!(message = "Request failed.", %error);
+                EventStatus::Errored
+            }
+        }
     }
 }
 
@@ -944,8 +1045,8 @@ mod tests {
         let mut sink = ServiceSink::new(svc, acker);
 
         // send some initial requests
-        let mut fut1 = sink.call(1, 1, vec![]);
-        let mut fut2 = sink.call(2, 2, vec![]);
+        let mut fut1 = sink.call(1, 1, Default::default());
+        let mut fut2 = sink.call(2, 2, Default::default());
 
         assert_eq!(ack_counter.load(Relaxed), 0);
 
@@ -957,8 +1058,8 @@ mod tests {
         assert_eq!(ack_counter.load(Relaxed), 3);
 
         // send one request that will error and one normal
-        let mut fut3 = sink.call(3, 3, vec![]); // i will error
-        let mut fut4 = sink.call(4, 4, vec![]);
+        let mut fut3 = sink.call(3, 3, Default::default()); // i will error
+        let mut fut4 = sink.call(4, 4, Default::default());
 
         // make sure they all "worked"
         assert!(matches!(fut3.poll_unpin(&mut cx), Poll::Ready(())));

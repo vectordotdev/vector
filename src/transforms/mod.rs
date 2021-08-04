@@ -14,6 +14,8 @@ pub mod aws_cloudwatch_logs_subscription_parser;
 pub mod aws_ec2_metadata;
 #[cfg(feature = "transforms-coercer")]
 pub mod coercer;
+#[cfg(feature = "transforms-compound")]
+pub mod compound;
 #[cfg(feature = "transforms-concat")]
 pub mod concat;
 #[cfg(feature = "transforms-dedupe")]

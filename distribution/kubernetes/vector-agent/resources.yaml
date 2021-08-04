@@ -89,6 +89,7 @@ rules:
   - apiGroups:
       - ""
     resources:
+      - namespaces
       - pods
     verbs:
       - watch
@@ -158,8 +159,8 @@ spec:
           command:
             []
           args:
-            - --config
-            - /etc/vector/*.toml
+            - --config-dir
+            - /etc/vector/
           env:
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:

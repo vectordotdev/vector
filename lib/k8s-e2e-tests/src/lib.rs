@@ -312,7 +312,7 @@ pub async fn create_affinity_pod(
 ) -> Result<Manager<CommandBuilder>, Box<dyn std::error::Error>> {
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
-            &namespace,
+            namespace,
             "affinity-pod",
             "tail -f /dev/null",
             vec![(affinity_label, "yes")],
@@ -321,7 +321,7 @@ pub async fn create_affinity_pod(
         .await?;
     framework
         .wait(
-            &namespace,
+            namespace,
             vec!["pods/affinity-pod"],
             WaitFor::Condition("initialized"),
             vec!["--timeout=60s"],

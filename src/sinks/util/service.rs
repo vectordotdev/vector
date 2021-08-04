@@ -1,17 +1,15 @@
-use super::{
-    adaptive_concurrency::{
-        AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
-    },
-    retries::{FixedRetryPolicy, RetryLogic},
-    sink::Response,
-    Batch, BatchSink, Partition, PartitionBatchSink,
-};
 use crate::buffers::Acker;
-use serde::{
-    de::{self, Unexpected, Visitor},
-    Deserialize, Deserializer, Serialize,
+use crate::sinks::util::adaptive_concurrency::{
+    AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
 };
-use std::{fmt, hash::Hash, sync::Arc, task::Poll, time::Duration};
+use crate::sinks::util::retries::{FixedRetryPolicy, RetryLogic};
+pub use crate::sinks::util::service::concurrency::{Concurrency, ConcurrencyOption};
+pub use crate::sinks::util::service::map::Map;
+use crate::sinks::util::service::map::MapLayer;
+use crate::sinks::util::sink::{Response, ServiceLogic};
+use crate::sinks::util::{Batch, BatchSink, Partition, PartitionBatchSink};
+use serde::{Deserialize, Serialize};
+use std::{hash::Hash, sync::Arc, time::Duration};
 use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
@@ -21,9 +19,12 @@ use tower::{
     Service, ServiceBuilder,
 };
 
+mod concurrency;
+mod map;
+
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
-pub type TowerBatchedSink<S, B, L> = BatchSink<Svc<S, L>, B>;
-pub type TowerPartitionSink<S, B, L, K> = PartitionBatchSink<Svc<S, L>, B, K>;
+pub type TowerBatchedSink<S, B, RL, SL> = BatchSink<Svc<S, RL>, B, SL>;
+pub type TowerPartitionSink<S, B, RL, K, SL> = PartitionBatchSink<Svc<S, RL>, B, K, SL>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -42,7 +43,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     where
         F: Fn(R1) -> R2 + Send + Sync + 'static,
     {
-        self.layer(MapLayer { f: Arc::new(f) })
+        self.layer(MapLayer::new(Arc::new(f)))
     }
 
     fn settings<RL, Request>(
@@ -58,155 +59,84 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Serialize)]
-#[derivative(Default)]
-pub enum Concurrency {
-    #[derivative(Default)]
-    None,
-    Adaptive,
-    Fixed(usize),
-}
-
-impl Concurrency {
-    pub fn if_none(self, other: Self) -> Self {
-        match self {
-            Self::None => other,
-            _ => self,
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for Concurrency {
-    // Deserialize either a positive integer or the string "adaptive"
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct UsizeOrAdaptive;
-
-        impl<'de> Visitor<'de> for UsizeOrAdaptive {
-            type Value = Concurrency;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(r#"positive integer or "adaptive""#)
-            }
-
-            fn visit_str<E: de::Error>(self, value: &str) -> Result<Concurrency, E> {
-                if value == "adaptive" {
-                    Ok(Concurrency::Adaptive)
-                } else {
-                    Err(de::Error::unknown_variant(value, &["adaptive"]))
-                }
-            }
-
-            fn visit_i64<E: de::Error>(self, value: i64) -> Result<Concurrency, E> {
-                if value > 0 {
-                    Ok(Concurrency::Fixed(value as usize))
-                } else {
-                    Err(de::Error::invalid_value(
-                        Unexpected::Signed(value),
-                        &"positive integer",
-                    ))
-                }
-            }
-
-            fn visit_u64<E: de::Error>(self, value: u64) -> Result<Concurrency, E> {
-                if value > 0 {
-                    Ok(Concurrency::Fixed(value as usize))
-                } else {
-                    Err(de::Error::invalid_value(
-                        Unexpected::Unsigned(value),
-                        &"positive integer",
-                    ))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(UsizeOrAdaptive)
-    }
-}
-
-pub trait ConcurrencyOption {
-    fn parse_concurrency(&self, default: &Self) -> Option<usize>;
-    fn is_none(&self) -> bool;
-    fn is_some(&self) -> bool {
-        !self.is_none()
-    }
-}
-
-impl ConcurrencyOption for Option<usize> {
-    fn parse_concurrency(&self, default: &Self) -> Option<usize> {
-        let limit = match self {
-            None => *default,
-            Some(x) => Some(*x),
-        };
-        limit.or(Some(5))
-    }
-
-    fn is_none(&self) -> bool {
-        matches!(self, None)
-    }
-}
-
-impl ConcurrencyOption for Concurrency {
-    fn parse_concurrency(&self, default: &Self) -> Option<usize> {
-        match self.if_none(*default) {
-            Concurrency::None => Some(5),
-            Concurrency::Adaptive => None,
-            Concurrency::Fixed(limit) => Some(limit),
-        }
-    }
-
-    fn is_none(&self) -> bool {
-        matches!(self, Concurrency::None)
-    }
-}
-
 /// Tower Request based configuration
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
     #[serde(default)]
     #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
-    pub concurrency: T, // 5
+    pub concurrency: T, // 1024
     /// The same as concurrency but with old deprecated name.
     /// Alias couldn't be used because of https://github.com/serde-rs/serde/issues/1504
     #[serde(default)]
     #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
-    pub in_flight_limit: T, // 5
-    pub timeout_secs: Option<u64>,             // 60
-    pub rate_limit_duration_secs: Option<u64>, // 1
-    pub rate_limit_num: Option<u64>,           // 5
-    pub retry_attempts: Option<usize>,         // max_value()
+    pub in_flight_limit: T, // 1024
+    pub timeout_secs: Option<u64>,             // 1 minute
+    pub rate_limit_duration_secs: Option<u64>, // 1 second
+    pub rate_limit_num: Option<u64>,           // i64::MAX
+    pub retry_attempts: Option<usize>,         // isize::MAX
     pub retry_max_duration_secs: Option<u64>,
     pub retry_initial_backoff_secs: Option<u64>, // 1
     #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
+pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1; // one second
+pub const RATE_LIMIT_NUM_DEFAULT: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
+pub const RETRY_ATTEMPTS_DEFAULT: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
+pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600; // one hour
+pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1; // one second
+pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60; // one minute
+
+impl<T> Default for TowerRequestConfig<T>
+where
+    T: ConcurrencyOption + Default,
+{
+    fn default() -> Self {
+        Self {
+            concurrency: T::default(),
+            in_flight_limit: T::default(),
+            timeout_secs: Some(TIMEOUT_SECONDS_DEFAULT),
+            rate_limit_duration_secs: Some(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
+            rate_limit_num: Some(RATE_LIMIT_NUM_DEFAULT),
+            retry_attempts: Some(RETRY_ATTEMPTS_DEFAULT),
+            retry_max_duration_secs: Some(RETRY_MAX_DURATION_SECONDS_DEFAULT),
+            retry_initial_backoff_secs: Some(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
+            adaptive_concurrency: AdaptiveConcurrencySettings::default(),
+        }
+    }
+}
+
 impl<T: ConcurrencyOption> TowerRequestConfig<T> {
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
             concurrency: self.concurrency().parse_concurrency(defaults.concurrency()),
-            timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
+            timeout: Duration::from_secs(
+                self.timeout_secs
+                    .or(defaults.timeout_secs)
+                    .unwrap_or(TIMEOUT_SECONDS_DEFAULT),
+            ),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
                     .or(defaults.rate_limit_duration_secs)
-                    .unwrap_or(1),
+                    .unwrap_or(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
             ),
-            rate_limit_num: self.rate_limit_num.or(defaults.rate_limit_num).unwrap_or(5),
+            rate_limit_num: self
+                .rate_limit_num
+                .or(defaults.rate_limit_num)
+                .unwrap_or(RATE_LIMIT_NUM_DEFAULT),
             retry_attempts: self
                 .retry_attempts
                 .or(defaults.retry_attempts)
-                .unwrap_or(usize::max_value()),
+                .unwrap_or(RETRY_ATTEMPTS_DEFAULT),
             retry_max_duration_secs: Duration::from_secs(
                 self.retry_max_duration_secs
                     .or(defaults.retry_max_duration_secs)
-                    .unwrap_or(3600),
+                    .unwrap_or(RETRY_MAX_DURATION_SECONDS_DEFAULT),
             ),
             retry_initial_backoff_secs: Duration::from_secs(
                 self.retry_initial_backoff_secs
                     .or(defaults.retry_initial_backoff_secs)
-                    .unwrap_or(1),
+                    .unwrap_or(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
             ),
             adaptive_concurrency: self.adaptive_concurrency,
         }
@@ -246,16 +176,17 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn partition_sink<B, L, S, K>(
+    pub fn partition_sink<B, RL, S, K, SL>(
         &self,
-        retry_logic: L,
+        retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-    ) -> TowerPartitionSink<S, B, L, K>
+        service_logic: SL,
+    ) -> TowerPartitionSink<S, B, RL, K, SL>
     where
-        L: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -264,43 +195,48 @@ impl TowerRequestSettings {
         B::Input: Partition<K>,
         B::Output: Send + Clone + 'static,
         K: Hash + Eq + Clone + Send + 'static,
+        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        PartitionBatchSink::new(
+        PartitionBatchSink::new_with_logic(
             self.service(retry_logic, service),
             batch,
             batch_timeout,
             acker,
+            service_logic,
         )
     }
 
-    pub fn batch_sink<B, L, S>(
+    pub fn batch_sink<B, RL, S, SL>(
         &self,
-        retry_logic: L,
+        retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-    ) -> TowerBatchedSink<S, B, L>
+        service_logic: SL,
+    ) -> TowerBatchedSink<S, B, RL, SL>
     where
-        L: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
         S::Future: Send + 'static,
         B: Batch,
         B::Output: Send + Clone + 'static,
+        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        BatchSink::new(
+        BatchSink::new_with_logic(
             self.service(retry_logic, service),
             batch,
             batch_timeout,
             acker,
+            service_logic,
         )
     }
 
-    pub fn service<L, S, Request>(&self, retry_logic: L, service: S) -> Svc<S, L>
+    pub fn service<RL, S, Request>(&self, retry_logic: RL, service: S) -> Svc<S, RL>
     where
-        L: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -328,13 +264,13 @@ pub struct TowerRequestLayer<L, Request> {
     _pd: std::marker::PhantomData<Request>,
 }
 
-impl<S, L, Request> Layer<S> for TowerRequestLayer<L, Request>
+impl<S, RL, Request> Layer<S> for TowerRequestLayer<RL, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
     S::Response: Response + Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
-    L: RetryLogic<Response = S::Response> + Send + 'static,
+    RL: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
     type Service = BoxService<Request, S::Response, crate::Error>;
@@ -353,70 +289,6 @@ where
             .service(inner);
 
         BoxService::new(l)
-    }
-}
-
-// === map ===
-
-pub struct MapLayer<R1, R2> {
-    f: Arc<dyn Fn(R1) -> R2 + Send + Sync + 'static>,
-}
-
-impl<S, R1, R2> Layer<S> for MapLayer<R1, R2>
-where
-    S: Service<R2>,
-{
-    type Service = Map<S, R1, R2>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        Map {
-            f: Arc::clone(&self.f),
-            inner,
-        }
-    }
-}
-
-pub struct Map<S, R1, R2> {
-    f: Arc<dyn Fn(R1) -> R2 + Send + Sync + 'static>,
-    pub(crate) inner: S,
-}
-
-impl<S, R1, R2> Service<R1> for Map<S, R1, R2>
-where
-    S: Service<R2>,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = S::Future;
-
-    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, req: R1) -> Self::Future {
-        let req = (self.f)(req);
-        self.inner.call(req)
-    }
-}
-
-impl<S, R1, R2> Clone for Map<S, R1, R2>
-where
-    S: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            f: Arc::clone(&self.f),
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-impl<S, R1, R2> fmt::Debug for Map<S, R1, R2>
-where
-    S: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Map").field("inner", &self.inner).finish()
     }
 }
 

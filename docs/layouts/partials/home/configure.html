@@ -1,5 +1,5 @@
 {{ $configure := .Params.configure }}
-{{ $configs := $configure.example_configs }}
+{{ $configs := site.Data.docs.config_examples }}
 {{ $defaultConfig := (index $configs 0).title }}
 <div class="relative py-12 md:py-16 lg:py-20 mx-auto max-w-7xl px-8 md:px-4 lg:px-0">
   <div class="text-center">
@@ -36,10 +36,10 @@
         </div>
       </div>
 
-      <div class="p-4">
+      <div class="p-4 overflow-x-scroll">
         {{ range $configs }}
-        {{ $code := highlight .config "toml" "" }}
-        <div x-show="config === '{{ .title }}'">
+        {{ $code := highlight .example "toml" "" }}
+        <div x-show="config === '{{ .title }}'" class="text-sm">
           {{ $code }}
         </div>
         {{ end }}

@@ -20,7 +20,7 @@ components: sources: internal_logs: {
 				name:     "Vector instance"
 				thing:    "a \(name)"
 				url:      urls.vector_docs
-				versions: ">= 0.11.0"
+				versions: ">= 0.12.0"
 			}
 		}
 		multiline: enabled: false
@@ -47,6 +47,37 @@ components: sources: internal_logs: {
 	}
 
 	configuration: {
+		host_key: {
+			category:    "Context"
+			common:      false
+			description: """
+				The key name added to each event representing the current host. This can also be globally set via the
+				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
+
+				Set to "" to suppress this key.
+				"""
+			required:    false
+			warnings: []
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
+		}
+		pid_key: {
+			category: "Context"
+			common:   false
+			description: """
+				The key name added to each event representing the current process ID.
+
+				Set to "" to suppress this key.
+				"""
+			required: false
+			warnings: []
+			type: string: {
+				default: "pid"
+				syntax:  "literal"
+			}
+		}
 	}
 
 	output: logs: line: {
@@ -62,6 +93,15 @@ components: sources: internal_logs: {
 			}
 			timestamp: fields._current_timestamp & {
 				description: "The exact time the log or trace was generated."
+			}
+			host: fields._local_host
+			pid: {
+				description: "The process ID of the Vector instance."
+				required:    true
+				type: uint: {
+					examples: [4232]
+					unit: null
+				}
 			}
 			"*": {
 				description: "Each field from the original message is copied into the event."

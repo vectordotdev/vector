@@ -46,11 +46,11 @@ type = "console"
 encoding.codec = "text"
 ```
 
-Each component has a unique identifier and is prefixed with the type of the component, for example `sources` for a source. Our first component, `sources.in`, uses the [`stdin` source][stdin], which tells Vector to receive data over stdin and is identified as `in`.
+Each component has a unique name and is prefixed with the type of the component, for example `sources` for a source. Our first component, `sources.in`, uses the [`stdin` source][stdin], which tells Vector to receive data over stdin and is named as `in`.
 
 Our second component, `sinks.out`, uses [`console` sink][console], which tells Vector to print the data to stdout, while the `encoding.codec` option tells Vector to print data as plain text (unencoded).
 
-The `inputs` option the `sinks.out` component tells Vector where this sink's events are coming from. In our case, events are received from our other component, the source identified as `in`.s
+The `inputs` option the `sinks.out` component tells Vector where this sink's events are coming from. In our case, events are received from our other component, the source named as `in`.s
 
 ## Hello world!
 

@@ -21,8 +21,8 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         service::ConcurrencyOption,
-        BatchConfig, BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+        UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -38,7 +38,7 @@ pub struct LokiConfig {
     encoding: EncodingConfig<Encoding>,
 
     tenant_id: Option<Template>,
-    labels: HashMap<String, Template>,
+    labels: HashMap<Template, Template>,
 
     #[serde(default = "crate::serde::default_false")]
     remove_label_fields: bool,
@@ -112,7 +112,7 @@ impl SinkConfig for LokiConfig {
             .timeout(1)
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls)?;
+        let client = HttpClient::new(tls, cx.proxy())?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
@@ -154,7 +154,7 @@ struct LokiSink {
     encoding: EncodingConfig<Encoding>,
 
     tenant_id: Option<Template>,
-    labels: HashMap<String, Template>,
+    labels: HashMap<Template, Template>,
 
     remove_label_fields: bool,
     remove_timestamp: bool,
@@ -181,7 +181,7 @@ impl HttpSink for LokiSink {
     type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
     type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let tenant_id = self.tenant_id.as_ref().and_then(|t| {
             t.render_string(&event)
                 .map_err(|missing| {
@@ -197,9 +197,12 @@ impl HttpSink for LokiSink {
 
         let mut labels = Vec::new();
 
-        for (key, template) in &self.labels {
-            if let Ok(value) = template.render_string(&event) {
-                labels.push((key.clone(), value));
+        for (key_template, value_template) in &self.labels {
+            if let (Ok(key), Ok(value)) = (
+                key_template.render_string(&event),
+                value_template.render_string(&event),
+            ) {
+                labels.push((key, value));
             }
         }
 
@@ -241,17 +244,14 @@ impl HttpSink for LokiSink {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(
-            EncodedEvent::new(PartitionInnerBuffer::new(
-                LokiRecord {
-                    labels,
-                    event,
-                    partition: key.clone(),
-                },
-                key,
-            ))
-            .with_metadata(log),
-        )
+        Some(PartitionInnerBuffer::new(
+            LokiRecord {
+                labels,
+                event,
+                partition: key.clone(),
+            },
+            key,
+        ))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -299,6 +299,7 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ProxyConfig;
     use crate::event::Event;
     use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::{build_test_server, load_sink};
@@ -315,7 +316,7 @@ mod tests {
         let (config, _cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
-            labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}"}
+            labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
             encoding = "json"
             remove_label_fields = true
         "#,
@@ -327,7 +328,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let mut record = sink.encode_event(e1).unwrap().item.into_parts().0;
+        let mut record = sink.encode_event(e1).unwrap().into_parts().0;
 
         // HashMap -> Vec doesn't like keeping ordering
         record.labels.sort();
@@ -340,13 +341,14 @@ mod tests {
 
         assert_eq!(record.event.event, expected_line);
 
-        assert_eq!(record.labels[0], ("label1".to_string(), "bar".to_string()));
+        assert_eq!(record.labels[0], ("bar".to_string(), "bar".to_string()));
+        assert_eq!(record.labels[1], ("label1".to_string(), "bar".to_string()));
         assert_eq!(
-            record.labels[1],
+            record.labels[2],
             ("label2".to_string(), "some-static-label".to_string())
         );
         // make sure we can reuse fields across labels.
-        assert_eq!(record.labels[2], ("label3".to_string(), "bar".to_string()));
+        assert_eq!(record.labels[3], ("label3".to_string(), "bar".to_string()));
     }
 
     #[test]
@@ -366,7 +368,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let record = sink.encode_event(e1).unwrap().item.into_parts().0;
+        let record = sink.encode_event(e1).unwrap().into_parts().0;
 
         let expected_line = serde_json::to_string(&serde_json::json!({
             "message": "hello world",
@@ -404,7 +406,8 @@ mod tests {
         tokio::spawn(server);
 
         let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
-        let client = HttpClient::new(tls).expect("could not cerate HTTP client");
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
         healthcheck(config.clone(), client)
             .await
@@ -450,7 +453,10 @@ mod integration_tests {
 
         let (mut config, cx) = load_sink::<LokiConfig>(&config).unwrap();
 
-        let test_name = config.labels.get_mut("test_name").unwrap();
+        let test_name = config
+            .labels
+            .get_mut(&Template::try_from("test_name").unwrap())
+            .unwrap();
         assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
         *test_name = Template::try_from(stream.to_string()).unwrap();
@@ -601,6 +607,54 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn interpolate_stream_key() {
+        let stream = uuid::Uuid::new_v4();
+
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {"{{ stream_key }}" = "placeholder"}
+            encoding = "text"
+            tenant_id = "default"
+        "#,
+        )
+        .unwrap();
+        config.labels.insert(
+            Template::try_from("{{ stream_key }}").unwrap(),
+            Template::try_from(stream.to_string()).unwrap(),
+        );
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
+
+        let mut events = lines
+            .clone()
+            .into_iter()
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        for i in 0..10 {
+            let event = events.get_mut(i).unwrap();
+            event.as_mut_log().insert("stream_key", "test_name");
+        }
+
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
+            .await
+            .unwrap();
+
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+
+        assert_eq!(outputs.len(), lines.len());
+
+        for (i, output) in outputs.iter().enumerate() {
+            assert_eq!(output, &lines[i]);
+        }
+    }
+
+    #[tokio::test]
     async fn many_tenants() {
         let stream = uuid::Uuid::new_v4();
 
@@ -614,7 +668,10 @@ mod integration_tests {
         )
         .unwrap();
 
-        let test_name = config.labels.get_mut("test_name").unwrap();
+        let test_name = config
+            .labels
+            .get_mut(&Template::try_from("test_name").unwrap())
+            .unwrap();
         assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
         *test_name = Template::try_from(stream.to_string()).unwrap();
@@ -749,7 +806,7 @@ mod integration_tests {
         .unwrap();
         config.out_of_order_action = action;
         config.labels.insert(
-            "test_name".to_owned(),
+            Template::try_from("test_name").unwrap(),
             Template::try_from(stream.to_string()).unwrap(),
         );
         config.batch.max_events = Some(batch_size);

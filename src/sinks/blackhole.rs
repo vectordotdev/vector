@@ -2,7 +2,6 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::Event,
     internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
 };
@@ -11,6 +10,8 @@ use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::time::sleep_until;
+use vector_core::event::Event;
+use vector_core::ByteSizeOf;
 
 pub struct BlackholeSink {
     total_events: usize,
@@ -80,37 +81,32 @@ impl BlackholeSink {
 
 #[async_trait]
 impl StreamSink for BlackholeSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(event) = input.next().await {
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let mut chunks = input.chunks(self.config.print_amount);
+        while let Some(events) = chunks.next().await {
             if let Some(rate) = self.config.rate {
-                let until = self.last.unwrap_or_else(Instant::now)
-                    + Duration::from_secs_f32(1.0 / rate as f32);
+                let factor: f32 = 1.0 / rate as f32;
+                let secs: f32 = factor * (events.len() as f32);
+                let until = self.last.unwrap_or_else(Instant::now) + Duration::from_secs_f32(secs);
                 sleep_until(until.into()).await;
                 self.last = Some(until);
             }
 
-            let message_len = match event {
-                Event::Log(log) => serde_json::to_string(&log),
-                Event::Metric(metric) => serde_json::to_string(&metric),
-            }
-            .map(|v| v.len())
-            .unwrap_or(0);
+            let message_len = events.size_of();
 
-            self.total_events += 1;
+            self.total_events += events.len();
             self.total_raw_bytes += message_len;
 
             emit!(BlackholeEventReceived {
                 byte_size: message_len
             });
 
-            if self.total_events % self.config.print_amount == 0 {
-                info!({
-                    events = self.total_events,
-                    raw_bytes_collected = self.total_raw_bytes
-                }, "Total events collected");
-            }
+            info!({
+                events = self.total_events,
+                raw_bytes_collected = self.total_raw_bytes
+            }, "Total events collected");
 
-            self.acker.ack(1);
+            self.acker.ack(events.len());
         }
         Ok(())
     }

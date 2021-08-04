@@ -1,1 +1,0 @@
-Each line is read until a new line delimiter (by default, i.e. the `0xA` byte) or `EOF` is found. If needed, the default line delimiter can be overriden via the [`line_delimiter`](#line_delimiter) option.

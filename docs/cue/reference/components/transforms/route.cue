@@ -81,14 +81,16 @@ components: transforms: route: {
 	examples: [
 		{
 			title: "Split by log level"
-			configuration: #"""
-				[transforms.route]
-				type = "route"
-				route.debug = '.level == "debug"'
-				route.info = '.level == "info"'
-				route.warn = '.level == "warn"'
-				route.error = '.level == "error"'
-				"""#
+
+			configuration: {
+				route: {
+					debug: #".level == "debug""#
+					info: #".level == "info""#
+					warn: #".level == "warn""#
+					error: #".level == "error""#
+				}
+			}
+
 			input: log: {
 				level: "info"
 			}
@@ -98,12 +100,14 @@ components: transforms: route: {
 		},
 		{
 			title: "Split by metric namespace"
-			configuration: #"""
-				[transforms.route]
-				type = "route"
-				route.app = '.namespace == "app"'
-				route.host = '.namespace == "host"'
-				"""#
+
+			configuration: {
+				route: {
+					app: #".namespace == "app""#
+					host: #".namespace == "host""#
+				}
+			}
+
 			input: metric: {
 				counter: {
 					value: 10000.0

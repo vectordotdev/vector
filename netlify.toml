@@ -1,11 +1,12 @@
 [build]
 base = "docs"
 publish = "public"
-ignore = "git diff --quiet HEAD^ HEAD ./docs"
+
+# Reinstate this when we figure out how to target this better
+#ignore = "./scripts/build-ignore.sh"
 
 [build.environment]
 HUGO_VERSION = "0.84.0"
-HUGO_ENVIRONMENT = "production"
 ALGOLIA_INDEX_FILE="public/search.json"
 
 [context.production]
@@ -47,7 +48,7 @@ force = true
 
 [[redirects]]
 from = "https://roadmap.vector.dev/*"
-to = "https://github.com/timberio/vector/projects/57"
+to = "https://airtable.com/shriTZW5LeOE4cIyJ"
 status = 302
 force = true
 

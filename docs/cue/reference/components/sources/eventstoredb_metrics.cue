@@ -2,7 +2,6 @@ package metadata
 
 components: sources: eventstoredb_metrics: {
 	title: "EventStoreDB Metrics"
-	alias: "eventstoredb"
 
 	classes: {
 		commonly_used: false
@@ -29,6 +28,7 @@ components: sources: eventstoredb_metrics: {
 					ssl: "optional"
 				}
 			}
+			proxy: enabled: true
 		}
 		multiline: enabled: false
 	}

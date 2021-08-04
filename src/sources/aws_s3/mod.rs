@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
     line_agg,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
 };
@@ -72,7 +72,7 @@ impl SourceConfig for AwsS3Config {
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
-                self.create_sqs_ingestor(multiline_config)
+                self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
                     .run(cx.out, cx.shutdown),
             )),
@@ -92,12 +92,13 @@ impl AwsS3Config {
     async fn create_sqs_ingestor(
         &self,
         multiline: Option<line_agg::Config>,
+        proxy: &ProxyConfig,
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         use std::sync::Arc;
 
         let region: Region = (&self.region).try_into().context(RegionParse {})?;
 
-        let client = rusoto::client().with_context(|| Client {})?;
+        let client = rusoto::client(proxy).with_context(|| Client {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())

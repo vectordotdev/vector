@@ -1,6 +1,7 @@
 use indoc::indoc;
 use k8s_e2e_tests::*;
-use k8s_test_framework::{lock, test_pod, vector::Config as VectorConfig};
+use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use k8s_test_framework::{lock, namespace, test_pod, vector::Config as VectorConfig};
 use serde_json::Value;
 
 const HELM_CHART_VECTOR_AGGREGATOR: &str = "vector-aggregator";
@@ -15,7 +16,7 @@ const HELM_VALUES_DDOG_AGG_TOPOLOGY: &str = indoc! {r#"
           targetPort: 8080
     sources:
       datadog-agent:
-        type: datadog_logs
+        type: datadog_agent
         address: 0.0.0.0:8080
 
     sinks:
@@ -117,8 +118,12 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
             vec!["--timeout=60s"],
         )
         .await?;
+    let _test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
-    let _test_namespace = framework.namespace(&pod_namespace).await?;
     let _test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
             &pod_namespace,
@@ -147,7 +152,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
 
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
-        assert_eq!(val["source_type"], "datadog_logs");
+        assert_eq!(val["source_type"], "datadog_agent");
 
         if got_marker {
             // We've already seen one marker! This is not good, we only emitted

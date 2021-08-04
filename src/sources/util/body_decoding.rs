@@ -22,7 +22,6 @@ pub enum Encoding {
     Binary,
 }
 
-#[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
     let mut body = BytesMut::new();
     body.extend_from_slice(&buf);
@@ -45,7 +44,6 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
     })
 }
 
-#[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
         Encoding::Text => body_to_lines(body)
@@ -67,7 +65,6 @@ pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessag
     }
 }
 
-#[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 fn json_parse_object(value: JsonValue) -> Result<LogEvent, ErrorMessage> {
     match value {
         JsonValue::Object(map) => {
@@ -85,7 +82,6 @@ fn json_parse_object(value: JsonValue) -> Result<LogEvent, ErrorMessage> {
     }
 }
 
-#[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
     match value {
         JsonValue::Array(v) => v
@@ -103,12 +99,10 @@ fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessa
     }
 }
 
-#[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 fn json_error(s: String) -> ErrorMessage {
     ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
 }
 
-#[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 fn json_value_to_type_string(value: &JsonValue) -> &'static str {
     match value {
         JsonValue::Object(_) => "Object",

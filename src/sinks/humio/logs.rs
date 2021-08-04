@@ -128,7 +128,7 @@ mod tests {
         .unwrap();
         let config = config.build_hec_config();
 
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
         let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
