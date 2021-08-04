@@ -8,6 +8,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use component::ComponentDescription;
+use dashmap::DashMap;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
@@ -18,7 +19,7 @@ use std::fs::DirBuilder;
 use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub mod api;
 mod builder;
@@ -468,58 +469,33 @@ pub struct TransformOuter {
     pub inner: Box<dyn TransformConfig>,
 }
 
-pub type EnrichmentTableList =
-    evmap::ReadHandleFactory<String, Box<dyn enrichment_tables::EnrichmentTable + Send>>;
-
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ExpandType {
     Parallel,
     Serial,
 }
 
-// https://github.com/jonhoo/left-right/issues/70#issuecomment-723703854
-#[derive(Debug)]
-pub struct EnrichmentTableWrap(pub Box<dyn enrichment_tables::EnrichmentTable + Send>);
-
-impl std::hash::Hash for EnrichmentTableWrap {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        state.write_u8(32);
-    }
-}
-
-impl PartialEq for EnrichmentTableWrap {
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
-
-impl Eq for EnrichmentTableWrap {}
-
 #[derive(Debug)]
 pub struct TransformContext {
     pub globals: GlobalOptions,
-    pub enrichment_tables_read: evmap::ReadHandleFactory<String, Box<EnrichmentTableWrap>>,
-    pub enrichment_tables_write: Arc<Mutex<evmap::WriteHandle<String, Box<EnrichmentTableWrap>>>>,
+    pub enrichment_tables:
+        Arc<DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
 }
 
 impl TransformContext {
     pub fn new_with_globals(globals: GlobalOptions) -> Self {
-        let (read, write) = evmap::new();
         Self {
             globals,
-            enrichment_tables_read: read.factory(),
-            enrichment_tables_write: Arc::new(Mutex::new(write)),
+            enrichment_tables: Arc::new(DashMap::new()),
         }
     }
 }
 
 impl Default for TransformContext {
     fn default() -> Self {
-        let (read, write) = evmap::new();
         TransformContext {
             globals: Default::default(),
-            enrichment_tables_read: read.factory(),
-            enrichment_tables_write: Arc::new(Mutex::new(write)),
+            enrichment_tables: Arc::new(DashMap::new()),
         }
     }
 }

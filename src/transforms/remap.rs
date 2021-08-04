@@ -1,12 +1,14 @@
+use std::sync::Arc;
+
 use crate::{
-    config::{
-        DataType, EnrichmentTableWrap, TransformConfig, TransformContext, TransformDescription,
-    },
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    enrichment_tables::EnrichmentTable,
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
     Result,
 };
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use vrl::diagnostic::Formatter;
@@ -34,7 +36,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        Remap::new(self.clone(), context.enrichment_tables_read.clone()).map(Transform::function)
+        Remap::new(self.clone(), context.enrichment_tables.clone()).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -56,13 +58,13 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
-    enrichment_tables: evmap::ReadHandleFactory<String, Box<EnrichmentTableWrap>>,
+    enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
 }
 
 impl Remap {
     pub fn new(
         config: RemapConfig,
-        enrichment_tables: evmap::ReadHandleFactory<String, Box<EnrichmentTableWrap>>,
+        enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
     ) -> crate::Result<Self> {
         let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
             Formatter::new(&config.source, diagnostics)
@@ -82,14 +84,13 @@ impl Remap {
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let handle = self.enrichment_tables.handle();
-        let table = handle.read().unwrap();
-        for (key, table) in table.iter() {
-            let table = &table.get_one().unwrap().0;
+        for table in self.enrichment_tables.iter() {
             trace!(
                 "Testing we have {} {:?}",
-                key,
-                table.find_table_row(std::collections::BTreeMap::new())
+                table.key(),
+                table
+                    .value()
+                    .find_table_row(std::collections::BTreeMap::new())
             );
         }
 

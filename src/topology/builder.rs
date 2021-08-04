@@ -5,15 +5,15 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{
-        DataType, EnrichmentTableWrap, ProxyConfig, SinkContext, SourceContext, TransformContext,
-    },
+    config::{DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
+    enrichment_tables,
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
 };
+use dashmap::DashMap;
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::pin::Pin;
 use std::{
@@ -32,7 +32,8 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
-    pub enrichment_tables_write: Arc<Mutex<evmap::WriteHandle<String, Box<EnrichmentTableWrap>>>>,
+    pub enrichment_tables:
+        Arc<DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -51,7 +52,7 @@ pub async fn build_pieces(
 
     let mut errors = vec![];
 
-    let (enrichment_tables_read, mut enrichment_tables_write) = evmap::new();
+    let enrichment_tables = DashMap::new();
 
     // Build enrichment tables
     for (name, table) in config
@@ -61,13 +62,12 @@ pub async fn build_pieces(
     {
         let table = match table.inner.build(&config.global).await {
             Ok(table) => table,
-            Err(_) => {
-                errors.push("ohno".to_string());
+            Err(error) => {
+                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
                 continue;
             }
         };
-        let table = crate::config::EnrichmentTableWrap(table);
-        enrichment_tables_write.insert(name.clone(), Box::new(table));
+        enrichment_tables.insert(name.clone(), table);
     }
 
     // Build sources
@@ -125,10 +125,11 @@ pub async fn build_pieces(
         source_tasks.insert(name.clone(), server);
     }
 
+    let enrichment_tables = Arc::new(enrichment_tables);
+
     let context = TransformContext {
         globals: config.global.clone(),
-        enrichment_tables_read: enrichment_tables_read.factory(),
-        enrichment_tables_write: Arc::new(Mutex::new(enrichment_tables_write)),
+        enrichment_tables: enrichment_tables.clone(),
     };
 
     // Build transforms
@@ -312,8 +313,6 @@ pub async fn build_pieces(
         detach_triggers.insert(name.clone(), trigger);
     }
 
-    context.enrichment_tables_write.lock().unwrap().refresh();
-
     if errors.is_empty() {
         let pieces = Pieces {
             inputs,
@@ -323,7 +322,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables_write: context.enrichment_tables_write,
+            enrichment_tables,
         };
 
         Ok(pieces)

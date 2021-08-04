@@ -12,7 +12,8 @@ mod task;
 
 use crate::{
     buffers::{self, EventStream},
-    config::{Config, ConfigDiff, EnrichmentTableWrap, HealthcheckOptions, Resource},
+    config::{Config, ConfigDiff, HealthcheckOptions, Resource},
+    enrichment_tables,
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{
@@ -21,6 +22,7 @@ use crate::{
     },
     trigger::DisabledTrigger,
 };
+use dashmap::DashMap;
 use futures::{future, Future, FutureExt, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
@@ -61,7 +63,8 @@ pub struct RunningTopology {
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
-    enrichment_tables_write: Arc<Mutex<evmap::WriteHandle<String, Box<EnrichmentTableWrap>>>>,
+    enrichment_tables:
+        Arc<DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
 }
 
 pub async fn start_validated(
@@ -81,7 +84,7 @@ pub async fn start_validated(
         tasks: HashMap::new(),
         abort_tx,
         watch: watch::channel(HashMap::new()),
-        enrichment_tables_write: pieces.enrichment_tables_write.clone(),
+        enrichment_tables: pieces.enrichment_tables.clone(),
     };
 
     if !running_topology
