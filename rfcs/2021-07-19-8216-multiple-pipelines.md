@@ -1,6 +1,6 @@
 # RFC 8216 - 2021-07-19 - Multiple Pipelines
 
-Large Vector users often require complex Vector topologies to facilitate the collection and processing of data from many different upstream sources. This results in large Vector configuration files that are hard to manage across different teams. This makes Vector a bad candidate for large teams that require autonomy to facilitate sane collaboration.
+Large Vector users often require complex Vector topologies to facilitate the collection and processing of data from many different upstream sources. Currently, this results in large Vector configuration files that are hard to manage, especially across different teams. This RFC lays out the concept of pipelines, a structured way to organize configuration that makes Vector a better candidate for use cases involving widespread collaboration on configuration.
 
 ## Context
 
@@ -10,68 +10,57 @@ Large Vector users often require complex Vector topologies to facilitate the col
 
 ### In scope
 
-- How and where pipelines are defined.
-- How Vector loads pipelines
-- Fundamental limitations of pipelines.
-- How pipelines are monitored.
+- The definition of pipelines and their limitations
+- How pipelines fit into Vector's configuration loading and topology
+- Expected observability outputs related to pipelines
 
 ### Out of scope
 
-- How pipelines should be synchronized between Vector instances.
-- Pre/post-processing of data - The ability to prepare and normalize data.
-- Connecting pipelines together - The ability to take input from another pipeline.
-- Component reuse - The ability to define boilerplate for reuse across many different pipelines. This will likely align with Datadog’s “pipeline catalogue”.
-- Pipeline quotas - The ability to limit how much data a pipeline can send to a sink.
 - Access control - The ability to control access of global resources (sources and sinks) within pipelines.
+- Component reuse - The ability to define boilerplate for reuse across many different pipelines. This will likely align with Datadog’s “pipeline catalogue”.
+- Connecting pipelines together - The ability to take input from another pipeline.
+- Pipeline quotas - The ability to limit how much data a pipeline can send to a sink.
+- Pre/post-processing of data - The ability to prepare and normalize data.
+- How pipelines should be synchronized between Vector instances.
 
 ## Pain
 
-- It is not possible to delegate the management of pipelines across a matrix of teams and services.
-- It is not possible to observe individual pipelines (paths on the graph).
-- It is not possible to restrict what pipelines can do (which data they can access, how much data they can send, etc).
-- Managing a large graph is cumbersome and usually results in a very large Vector configuration file that is hard to navigate. Splitting the vector config into multiple files is a creative exercise for the user without any guidance.
+- Vector does not provide the ability to enforce any kind of organizational structure on configuration files, making large configurations painful.
+  - Because of this lack of structure, this is no clear path to achieving delegation and/or isolation of configuration subsections.
+- There is no means for grouping individual components together for observability purposes.
 
-## User Experience
+## Proposal
 
-- These changes provide a way for Vector users to split their configuration in a way that improves the collaboration between ops and devs.
-- This split will be made by allowing the creation of individual pipeline configuration files, intended to align with services and teams, enabling autonomous management.
-- The ops will now configure their `sources`, `sinks` and `transforms`, and expose them to be used by the devs.
-- The devs will have the ability to consume the provided components without being able to change the common configuration.
-- The users will be able to monitor their pipelines through the `internal_metrics` source.
+### User Experience
 
-## Motivation
+This change will introduce the concept of pipelines to users. A pipeline is defined as:
 
-- Helps Vector to grow organically within an organization by allowing teams to adopt Vector at their own pace without heavy administrator involvement.
-- Reduces the management overhead of devops/SREs by enabling teams to manage their own pipelines (spread the management load).
+1. A collection of transforms defined together, outside of the top-level configuration file
+1. Able to draw input from and send output to components defined in the top-level configuration, but are isolated from other pipelines
+1. Having each contained component's internal metrics tagged with the `id` of the pipeline
 
-## Implementation
-
-### How and where pipelines are stored
-
-To avoid backward incompatibility, pipelines will be loaded from a `pipelines` sub-directory relative to the Vector configuration directory (e.g., `/etc/vector/pipelines`). Therefore, if a user changes the location of the Vector configuration directory they will also change the `pipelines` directory path. They are coupled.
+Pipelines will be loaded from a `pipelines` sub-directory relative to the Vector configuration directory (e.g., `/etc/vector/pipelines`). Therefore, if a user changes the location of the Vector configuration directory they will also change the `pipelines` directory path. They are coupled.
 
 The `pipelines` directory will contain all pipelines represented as individual files. For simplicity, and to ensure users do not overcomplicate pipeline management, sub-directories/nesting are not allowed. This is inspired by Terraform's single-level directory nesting, which has been a net positive for simple management of large Terraform projects.
 
-Each pipeline file is a processing subset of a larger Vector configuration file. Therefore, it follows the same syntax as Vector's configuration (`toml`, `yaml`, and `json`).
+Each pipeline file is a processing subset of a larger Vector configuration file. Therefore, it follows the same syntax as Vector's configuration (`toml`, `yaml`, and `json`). Each pipeline will have an `id` derived the name of the file without the extension. For example, the pipeline defined in `load-balancer.yml` will have `load-balancer` as its `id`.
 
-### What is a pipeline
+Pipelines have access to any components defined in the root configuration directory. For example, if the transform `foo` is defined in `/etc/vector/bar.toml`, it will be accessible by the pipeline `/etc/vector/pipelines/pipeline.toml`, but if a transform `bar` is defined in `/etc/vector/pipelines/another-pipeline.toml`, it will _not_ be accessible by other pipelines.
 
-- A pipeline is a collection of transforms, sources and sinks cannot be defined within pipelines.
-- A pipeline has an `id` being the name of the file without the extension. The pipeline `load-balancer.yml` will have `load-balancer` as its `id`.
-- Pipelines have access to any components defined in the root configuration directory. For example, if the transform `foo` is defined in `/etc/vector/bar.toml`, it will be accessible by the pipeline `/etc/vector/pipelines/pipeline.toml`, but if a transform `bar` is defined in `/etc/vector/pipelines/another-pipeline.toml`, it will _not_ be accessible by other pipelines.
-- If no pipeline is defined, Vector behaves as if the feature didn't exist. This way, a configuration from a version without the `pipeline` feature will keep working.
-- If a pipeline file is left empty, Vector behaves as if it doesn't exist.
+If no pipeline is defined, Vector behaves as if the feature didn't exist. This way, a configuration from a version without the `pipeline` feature will keep working. If a pipeline file is left empty, Vector behaves as if it doesn't exist.
 
-### Pipeline constraints
-
-If any of the following constraints are not valid, Vector will error on boot. If this occurs during a reload, an error will be triggered and handled in the same fashion as other reload errors.
+If any of the following constraints are violated, Vector will error on boot:
 
 - There cannot be several pipelines with the same id (for example `load-balancer.yml` and `load-balancer.json`).
 - The pipeline's configuration files should only contain transforms.
 - A pipeline's transform cannot have the same name as any component from the root configuration.
-- A pipeline cannot use another pipeline's component.
+- A pipeline cannot use another pipeline's component as input or output.
 
-### Internal representation
+If the violation occurs during a reload, an error will be triggered and handled in the same fashion as other reload errors.
+
+### Implementation
+
+#### Internal representation
 
 As mentioned in the previous section, a pipeline is _just_ a set of transforms.
 
@@ -86,6 +75,7 @@ struct Route {
   inputs: Vec<String>,
   outputs: Vec<String>,
 }
+
 struct PipelineConfigBuilder {
   id: String,
   transforms: Map<String, TransformOuter>,
@@ -93,7 +83,7 @@ struct PipelineConfigBuilder {
 }
 ```
 
-Which will create the following configuration file.
+Which corresponds to the following configuration file:
 
 ```toml
 # /etc/vector/pipelines/pipeline.toml
@@ -118,7 +108,7 @@ outputs = ["dc-us", "dc-eu"]
 
 The `Route` structure is made to forward the events from inside the pipeline to an external component.
 
-### From configuration to topology
+#### From configuration to topology
 
 If we look deeper at the configuration building process, the configuration compiler will require the pipelines to build the [configuration](https://github.com/timberio/vector/blob/v0.15.0/src/config/builder.rs#L71).
 
@@ -160,7 +150,7 @@ inputs = ["foo#baz"]
 In order to avoid internal conflicts with the pipeline components `id`s, the components `id`s will be internally prefixed with the pipeline `id` (`pipeline_id#component_id`) but the user can still reference the components with their `id` inside the pipeline configuration.
 That way, if a transform `foo` is defined in the pipeline `bar` and in the pipeline `baz`, they will not conflict.
 
-### Observing pipelines
+#### Observing pipelines
 
 Users should be able to observe and monitor individual pipelines.
 This means relevant metrics coming from the `internal_metrics` source must contain a `pipeline_id` tag referring to the pipeline's `id`.
@@ -178,6 +168,7 @@ pub struct Task {
     typetag: String,
     pipeline: Option<String>,
 }
+
 impl Task {
     pub fn new<S1, S2, Fut>(name: S1, typetag: S2, pipeline: Option<String>, inner: Fut) -> Self
     where
@@ -211,17 +202,23 @@ Doing so, each time the task will emit an internal event, it will be populated b
 
 ## Rationale
 
-- Why is this change worth it?
+Why is this change worth it?
 
-This split improves the readability of the configuration files and allows users to collaborate (including across teams), which makes using Vector more user and team friendly.
+- These changes provide a way for Vector users to split their configuration in a way that improves the collaboration between ops and devs.
+- This split will be made by allowing the creation of individual pipeline configuration files, intended to align with services and teams, enabling autonomous management.
+- The ops will now configure their `sources`, `sinks` and `transforms`, and expose them to be used by the devs.
+- The devs will have the ability to consume the provided components without being able to change the common configuration.
+- The users will be able to monitor their pipelines through the `internal_metrics` source.
+- Helps Vector to grow organically within an organization by allowing teams to adopt Vector at their own pace without heavy administrator involvement.
+- Reduces the management overhead of devops/SREs by enabling teams to manage their own pipelines (spread the management load).
 
-- What is the impact of not doing this?
+What is the impact of not doing this?
 
-This would force users to maintain complex configuration files and/or to duplicate component configuration across configuration files.
+- This would force users to maintain complex configuration files and/or to duplicate component configuration across configuration files.
 
-- How does this position us for success in the future?
+How does this position us for success in the future?
 
-With this representation, we'll be able add access control by, for example, declaring the pipelines inside the configuration files to limit the reachable components. We would also be able to specify a quota for each pipeline.
+- With this representation, we'll be able add access control by, for example, declaring the pipelines inside the configuration files to limit the reachable components. We would also be able to specify a quota for each pipeline.
 
 ## Prior Art
 
@@ -257,6 +254,10 @@ Doesn't block to create other sources/sinks.
 
 ## Outstanding Questions
 
+1. Will components defined in the top-level configuration be considered part of a "default" pipeline or no pipeline at all? Sources and sinks seems straightforward to leave out of pipelines, but transforms are a more interesting question. They're the most obvious way to implement filters that limit the data available to specific pipelines.
+1. Is the concept of routes worth introducing, or should we allow an `outputs` option on transforms within a pipeline instead? Routes as described here are simple output connections, quite different from the same concept from competitors where they act as input definitions. If we think we'll want to add that later it may be worth saving the name.
+1. Do we need to consider pipelines with no transforms? As described, they could just be a route, but there would be no actual component for collecting metrics and therefore not observable.
+1. Will this implementation be sufficient for observability? Since we're relying on the same component-level metrics, getting an overall input/output rate will still require knowledge of the configuration. To do so automatically, we'd need to insert something into the topology.
 
 ## Plan Of Attack
 
