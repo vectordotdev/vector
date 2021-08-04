@@ -241,6 +241,7 @@ mod tests {
     use super::{Error, Reflector};
     use crate::{
         kubernetes::{
+            hash_value::HashKey,
             instrumenting_watcher::InstrumentingWatcher,
             mock_watcher::{self, MockWatcher},
             state,
@@ -1070,7 +1071,7 @@ mod tests {
 
         // Prepare state.
         let (state_reader, state_writer) = evmap::new();
-        let state_writer = state::evmap::Writer::new(state_writer, None); // test without debounce to avouid complexity
+        let state_writer = state::evmap::Writer::new(state_writer, None, HashKey::Uid); // test without debounce to avoid complexity
         let state_writer = state::instrumenting::Writer::new(state_writer);
         let resulting_state_reader = state_reader.clone();
 

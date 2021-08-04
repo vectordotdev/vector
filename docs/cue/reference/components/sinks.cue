@@ -233,6 +233,12 @@ components: sinks: [Name=string]: {
 		}
 
 		if features.send != _|_ {
+			if features.send.proxy != _|_ {
+				if features.send.proxy.enabled {
+					proxy: configuration._proxy
+				}
+			}
+
 			if features.send.request.enabled {
 				request: {
 					common:      false

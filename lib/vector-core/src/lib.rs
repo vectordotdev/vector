@@ -33,6 +33,11 @@ pub mod source;
 mod test_util;
 pub mod transform;
 pub use buffers;
+mod byte_size_of;
+pub mod serde;
+
+pub use byte_size_of::ByteSizeOf;
+use std::path::PathBuf;
 
 #[macro_use]
 extern crate derivative;
@@ -40,6 +45,10 @@ extern crate derivative;
 extern crate pest_derive;
 #[macro_use]
 extern crate tracing;
+
+pub fn default_data_dir() -> Option<PathBuf> {
+    Some(PathBuf::from("/var/lib/vector/"))
+}
 
 /// Vector's basic error type, dynamically dispatched and safe to send across
 /// threads.

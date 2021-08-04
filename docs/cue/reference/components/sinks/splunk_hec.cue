@@ -36,6 +36,7 @@ components: sinks: splunk_hec: {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:                    true
 				concurrency:                10

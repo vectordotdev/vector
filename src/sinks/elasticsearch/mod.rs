@@ -25,7 +25,6 @@ use http::{
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use lazy_static::lazy_static;
 use rusoto_core::Region;
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
@@ -287,12 +286,6 @@ impl DataStreamConfig {
     }
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        ..Default::default()
-    };
-}
-
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
@@ -371,7 +364,7 @@ impl SinkConfig for ElasticSearchConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(self)?;
-        let client = HttpClient::new(common.tls_settings.clone())?;
+        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
         let healthcheck = common.healthcheck(client.clone()).boxed();
 
@@ -381,7 +374,10 @@ impl SinkConfig for ElasticSearchConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.tower.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
 
         let sink = BatchedHttpSink::with_logic(
             common,
@@ -640,7 +636,10 @@ impl ElasticSearchCommon {
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
 
-        let tower_request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
+        let tower_request = config
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert(
@@ -1107,7 +1106,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{ProxyConfig, SinkConfig, SinkContext},
         http::HttpClient,
         sinks::HealthcheckError,
         test_util::{random_events_with_stream, random_string, trace_init},
@@ -1139,7 +1138,7 @@ mod integration_tests {
                     request.add_header(header, value);
                 }
 
-                builder = finish_signer(&mut request, &credentials_provider, builder).await?;
+                builder = finish_signer(&mut request, credentials_provider, builder).await?;
             } else {
                 if let Some(ce) = self.compression.content_encoding() {
                     builder = builder.header("Content-Encoding", ce);
@@ -1155,7 +1154,8 @@ mod integration_tests {
             }
 
             let request = builder.body(Body::empty())?;
-            let client = HttpClient::new(self.tls_settings.clone())
+            let proxy = ProxyConfig::default();
+            let client = HttpClient::new(self.tls_settings.clone(), &proxy)
                 .expect("Could not build client to flush");
             let response = client.send(request).await?;
 
@@ -1424,7 +1424,7 @@ mod integration_tests {
         break_events: bool,
         batch_status: BatchStatus,
     ) {
-        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let common = ElasticSearchCommon::parse_config(config).expect("Config error");
         let index = match config.mode {
             // Data stream mode uses an index name generated from the event.
             ElasticSearchMode::DataStream => format!(
@@ -1509,7 +1509,7 @@ mod integration_tests {
                     let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
                     obj.insert(log_schema().timestamp_key().into(), timestamp);
                 }
-                assert!(input.contains(&hit));
+                assert!(input.contains(hit));
             }
         }
     }

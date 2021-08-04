@@ -15,3 +15,6 @@ tmp/
 
 # Yarn errors
 yarn-error.log
+
+# Local env vars
+.env
