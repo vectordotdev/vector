@@ -5,7 +5,7 @@ components: sinks: papertrail: {
 
 	classes: {
 		commonly_used: false
-		delivery:      "best_effort"
+		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "stream"
 		service_providers: ["Papertrail"]
