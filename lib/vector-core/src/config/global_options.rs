@@ -41,8 +41,12 @@ pub struct GlobalOptions {
 }
 
 impl GlobalOptions {
-    /// Resolve the `data_dir` option in either the global or local
-    /// config, and validate that it exists and is writable.
+    /// Resolve the `data_dir` option in either the global or local config, and
+    /// validate that it exists and is writable.
+    ///
+    /// # Errors
+    ///
+    /// Function will error if it is unable to make data directory.
     pub fn resolve_and_validate_data_dir(
         &self,
         local_data_dir: Option<&PathBuf>,
@@ -51,7 +55,7 @@ impl GlobalOptions {
             .or_else(|| self.data_dir.as_ref())
             .ok_or(DataDirError::MissingDataDir)
             .map_err(Box::new)?
-            .to_path_buf();
+            .clone();
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());
         }
@@ -64,9 +68,12 @@ impl GlobalOptions {
         Ok(data_dir)
     }
 
-    /// Resolve the `data_dir` option using
-    /// `resolve_and_validate_data_dir` and then ensure a named
-    /// subdirectory exists.
+    /// Resolve the `data_dir` option using `resolve_and_validate_data_dir` and
+    /// then ensure a named subdirectory exists.
+    ///
+    /// # Errors
+    ///
+    /// Function will error if it is unable to make data subdirectory.
     pub fn resolve_and_make_data_subdir(
         &self,
         local: Option<&PathBuf>,

@@ -20,17 +20,13 @@ impl NoProxyInterceptor {
                 if scheme.is_some() && scheme != Some(expected_scheme) {
                     return false;
                 }
-                let matches = host
-                    .map(|host| {
-                        self.0.matches(host)
-                            || port
-                                .map(|port| {
-                                    let url = format!("{}:{}", host, port);
-                                    self.0.matches(&url)
-                                })
-                                .unwrap_or(false)
-                    })
-                    .unwrap_or(false);
+                let matches = host.map_or(false, |host| {
+                    self.0.matches(host)
+                        || port.map_or(false, |port| {
+                            let url = format!("{}:{}", host, port);
+                            self.0.matches(&url)
+                        })
+                });
                 // only intercept those that don't match
                 !matches
             },
@@ -136,6 +132,11 @@ impl ProxyConfig {
             .transpose()
     }
 
+    /// Install the [`ProxyConnector<C>`] for this `ProxyConfig`
+    ///
+    /// # Errors
+    ///
+    /// Function will error if passed `ProxyConnector` has a faulty URI.
     pub fn configure<C>(&self, connector: &mut ProxyConnector<C>) -> Result<(), InvalidUri> {
         if self.enabled {
             if let Some(proxy) = self.http_proxy()? {
