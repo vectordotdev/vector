@@ -3,7 +3,7 @@ use super::format::{deserialize, Format};
 use super::TransformOuter;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -71,6 +71,13 @@ impl Pipelines {
         self.0
             .iter()
             .for_each(|(pipeline_id, pipeline)| pipeline.check_inputs(pipeline_id, config, errors));
+    }
+
+    // Check if a pipeline and all its transforms are being used
+    pub(crate) fn warnings(&self, warnings: &mut Vec<String>) {
+        self.0
+            .iter()
+            .for_each(|(pipeline_id, pipeline)| pipeline.warnings(&pipeline_id, warnings));
     }
 }
 
@@ -183,6 +190,39 @@ impl Pipeline {
                     "Output {:?} for transform {:?} in pipeline {:?} doesn't exist.",
                     input, name, pipeline_id
                 ));
+            });
+    }
+
+    // Check if a pipeline and all its transforms are being used
+    fn warnings(&self, pipeline_id: &str, warnings: &mut Vec<String>) {
+        if self
+            .transforms
+            .values()
+            .map(|transform| transform.outputs.iter())
+            .flatten()
+            .next()
+            .is_none()
+        {
+            warnings.push(format!(
+                "Pipeline {:?} has no output on its components",
+                pipeline_id
+            ));
+        }
+
+        let used: HashSet<&String> = self
+            .transforms
+            .values()
+            .map(|transform| transform.inner.inputs.iter())
+            .flatten()
+            .collect();
+        self.transforms
+            .keys()
+            .filter(|name| !used.contains(name))
+            .for_each(|name| {
+                warnings.push(format!(
+                    "Transform {:?} from pipeline {:?} has no consumer",
+                    name, pipeline_id
+                ))
             });
     }
 }

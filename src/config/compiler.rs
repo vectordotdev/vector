@@ -11,7 +11,7 @@ pub fn compile(
 
     expand_globs(&mut builder);
 
-    let warnings = builder.warnings();
+    let warnings = builder.warnings(&pipelines);
 
     if let Err(type_errors) = builder.check_shape(&pipelines) {
         errors.extend(type_errors);
