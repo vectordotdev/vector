@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, validation, Config, ExpandType, Pipelines, TransformOuter};
+use super::{builder::ConfigBuilder, Config, ExpandType, Pipelines, TransformOuter};
 use indexmap::IndexMap;
 
 pub fn compile(
@@ -17,7 +17,7 @@ pub fn compile(
         errors.extend(type_errors);
     }
 
-    if let Err(type_errors) = validation::typecheck(&builder) {
+    if let Err(type_errors) = builder.typecheck(&pipelines) {
         errors.extend(type_errors);
     }
 

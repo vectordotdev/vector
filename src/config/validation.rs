@@ -1,8 +1,11 @@
+use super::pipeline::{Pipeline, Pipelines};
 use super::{builder::ConfigBuilder, DataType};
 use std::collections::HashMap;
 
-pub fn typecheck(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    Graph::from(config).typecheck()
+impl ConfigBuilder {
+    pub fn typecheck(&self, pipelines: &Pipelines) -> Result<(), Vec<String>> {
+        Graph::from(self).with_pipelines(pipelines).typecheck()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -19,6 +22,20 @@ enum Node {
         ty: DataType,
         inputs: Vec<String>,
     },
+}
+
+impl Node {
+    fn add_input(&mut self, input: String) {
+        match self {
+            Self::Transform { inputs, .. } => {
+                inputs.push(input);
+            }
+            Self::Sink { inputs, .. } => {
+                inputs.push(input);
+            }
+            _ => {}
+        }
+    }
 }
 
 #[derive(Default)]
@@ -47,6 +64,12 @@ impl Graph {
                 inputs,
             },
         );
+    }
+
+    fn add_transform_input(&mut self, name: &str, input: String) {
+        if let Some(node) = self.nodes.get_mut(name) {
+            node.add_input(input);
+        }
     }
 
     fn add_sink(&mut self, name: &str, ty: DataType, inputs: Vec<impl Into<String>>) {
@@ -119,6 +142,45 @@ impl Graph {
             errors.dedup();
             Err(errors)
         }
+    }
+
+    fn with_pipeline(mut self, pipeline_id: &str, pipeline: &Pipeline) -> Self {
+        for (name, transform) in pipeline.transforms.iter() {
+            let prefixed_name = format!("{}#{}", pipeline_id, name);
+            self.add_transform(
+                prefixed_name.as_str(),
+                transform.inner.inner.input_type(),
+                transform.inner.inner.output_type(),
+                transform
+                    .inner
+                    .inputs
+                    .iter()
+                    .map(|input| {
+                        // prefix with pipeline id when the name input is part of the pipeline
+                        if pipeline.transforms.contains_key(input.as_str()) {
+                            format!("{}#{}", pipeline_id, input)
+                        } else {
+                            input.clone()
+                        }
+                    })
+                    .collect(),
+            );
+            // doing that in a single round because outputs are only
+            // from the global config
+            for output in transform.outputs.iter() {
+                self.add_transform_input(prefixed_name.as_str(), output.clone());
+            }
+        }
+        self
+    }
+
+    fn with_pipelines(self, pipelines: &Pipelines) -> Self {
+        pipelines
+            .0
+            .iter()
+            .fold(self, |res, (pipeline_id, pipeline)| {
+                res.with_pipeline(pipeline_id.as_str(), pipeline)
+            })
     }
 }
 
