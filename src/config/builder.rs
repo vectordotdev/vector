@@ -340,6 +340,8 @@ impl ConfigBuilder {
 
         pipelines.warnings(&mut warnings);
 
+        pipelines.warnings(&mut warnings);
+
         warnings
     }
 }
