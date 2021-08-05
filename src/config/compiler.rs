@@ -11,9 +11,9 @@ pub fn compile(
 
     expand_globs(&mut builder);
 
-    let warnings = validation::warnings(&builder);
+    let warnings = builder.warnings();
 
-    if let Err(type_errors) = validation::check_shape(&builder, &pipelines) {
+    if let Err(type_errors) = builder.check_shape(&pipelines) {
         errors.extend(type_errors);
     }
 
@@ -21,7 +21,7 @@ pub fn compile(
         errors.extend(type_errors);
     }
 
-    if let Err(type_errors) = validation::check_resources(&builder) {
+    if let Err(type_errors) = builder.check_resources() {
         errors.extend(type_errors);
     }
 

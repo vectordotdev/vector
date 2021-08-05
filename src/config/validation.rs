@@ -1,22 +1,5 @@
-use super::{builder::ConfigBuilder, DataType, Pipelines};
+use super::{builder::ConfigBuilder, DataType};
 use std::collections::HashMap;
-
-/// Check that provide + topology config aren't present in the same builder, which is an error.
-pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    config.check_provider()
-}
-
-pub fn check_shape(config: &ConfigBuilder, pipelines: &Pipelines) -> Result<(), Vec<String>> {
-    config.check_shape(pipelines)
-}
-
-pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    config.check_resources()
-}
-
-pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
-    config.warnings()
-}
 
 pub fn typecheck(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     Graph::from(config).typecheck()
@@ -242,7 +225,7 @@ mod test {
         pipelines.insert("baz".to_string(), pipeline);
         let pipelines = Pipelines::from(pipelines);
         //
-        let errors = check_shape(&root, &pipelines).unwrap_err();
+        let errors = root.check_shape(&pipelines).unwrap_err();
         assert!(errors.contains(&"The component name \"foo\" from the pipeline \"baz\" is conflicting with an existing one (source)".to_string()));
         assert!(errors.contains(
             &"Input \"bar\" for transform \"foo\" in pipeline \"baz\" doesn't exist.".to_string()
