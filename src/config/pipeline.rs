@@ -18,10 +18,19 @@ impl From<IndexMap<String, Pipeline>> for Pipelines {
 
 // Validation related
 impl Pipelines {
+    pub(crate) fn inputs<'a>(&'a self) -> impl Iterator<Item = &'a String> {
+        self.0
+            .values()
+            .map(|pipeline| pipeline.transforms.values())
+            .flatten()
+            .map(|transform| transform.inner.inputs.iter())
+            .flatten()
+    }
+
     pub(crate) fn outputs<'a>(&'a self) -> impl Iterator<Item = &'a String> {
         self.0
-            .iter()
-            .map(|(_id, pipeline)| pipeline.transforms.values())
+            .values()
+            .map(|pipeline| pipeline.transforms.values())
             .flatten()
             .map(|transform| transform.outputs.iter())
             .flatten()
@@ -198,7 +207,7 @@ impl Pipeline {
             .is_none()
         {
             warnings.push(format!(
-                "Pipeline {:?} has no output on its components",
+                "Pipeline {:?} has no output on its components.",
                 pipeline_id
             ));
         }
@@ -210,14 +219,21 @@ impl Pipeline {
             .flatten()
             .collect();
         self.transforms
-            .keys()
-            .filter(|name| !used.contains(name))
-            .for_each(|name| {
+            .iter()
+            .filter(|(name, transform)| !used.contains(name) && transform.outputs.is_empty())
+            .for_each(|(name, _)| {
                 warnings.push(format!(
-                    "Transform {:?} from pipeline {:?} has no consumer",
+                    "Transform {:?} from pipeline {:?} has no consumer.",
                     name, pipeline_id
                 ))
             });
+    }
+}
+
+#[cfg(test)]
+impl Pipeline {
+    pub fn from_toml(input: &str) -> Self {
+        deserialize(input, Some(Format::Toml)).unwrap()
     }
 }
 
@@ -227,14 +243,37 @@ mod tests {
 
     #[test]
     fn parsing() {
-        let src = r#"
+        Pipeline::from_toml(
+            r#"
         [transforms.first]
         inputs = ["input"]
         outputs = ["output"]
         type = "remap"
         source = ""
-        "#;
-        let result: Pipeline = deserialize(src, Some(Format::Toml)).unwrap();
-        assert_eq!(result.transforms.len(), 1);
+        "#,
+        );
+    }
+
+    #[test]
+    fn warnings() {
+        let pipeline = Pipeline::from_toml(
+            r#"
+        [transforms.alone]
+        type = "remap"
+        inputs = ["in"]
+        source = ""
+        [transforms.foo]
+        type = "remap"
+        inputs = ["in", "bar"]
+        source = ""
+        "#,
+        );
+        //
+        let mut warnings = Vec::new();
+        pipeline.warnings("baz", &mut warnings);
+        assert!(warnings.contains(&"Pipeline \"baz\" has no output on its components.".to_string()));
+        assert!(warnings
+            .contains(&"Transform \"alone\" from pipeline \"baz\" has no consumer.".to_string()));
+        assert_eq!(warnings.len(), 3);
     }
 }

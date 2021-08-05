@@ -188,52 +188,7 @@ fn paths_rec(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::config::format::{deserialize, Format};
-    use crate::config::pipeline::{Pipeline, Pipelines};
-    use indexmap::IndexMap;
     use pretty_assertions::assert_eq;
-
-    #[test]
-    fn check_shape_with_pipelines() {
-        let root: ConfigBuilder = deserialize(
-            r#"
-        [sources.in]
-        type = "generator"
-        format = "json"
-        [sources.foo]
-        type = "generator"
-        format = "json"
-        [sinks.out]
-        type = "console"
-        encoding.codec = "json"
-        "#,
-            Some(Format::Toml),
-        )
-        .unwrap();
-        let pipeline: Pipeline = deserialize(
-            r#"
-        [transforms.foo]
-        type = "remap"
-        inputs = ["in", "bar"]
-        outputs = ["out", "nope"]
-        source = ""
-        "#,
-            Some(Format::Toml),
-        )
-        .unwrap();
-        let mut pipelines = IndexMap::new();
-        pipelines.insert("baz".to_string(), pipeline);
-        let pipelines = Pipelines::from(pipelines);
-        //
-        let errors = root.check_shape(&pipelines).unwrap_err();
-        assert!(errors.contains(&"The component name \"foo\" from the pipeline \"baz\" is conflicting with an existing one (source)".to_string()));
-        assert!(errors.contains(
-            &"Input \"bar\" for transform \"foo\" in pipeline \"baz\" doesn't exist.".to_string()
-        ));
-        assert!(errors.contains(
-            &"Output \"nope\" for transform \"foo\" in pipeline \"baz\" doesn't exist.".to_string()
-        ));
-    }
 
     #[test]
     fn paths_detects_cycles() {
