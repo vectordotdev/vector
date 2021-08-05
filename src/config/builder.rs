@@ -7,7 +7,7 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use vector_core::config::GlobalOptions;
 use vector_core::default_data_dir;
 use vector_core::transform::TransformConfig;
@@ -169,8 +169,11 @@ impl ConfigBuilder {
 
         Ok(())
     }
+}
 
-    pub(crate) fn component_names(&self) -> HashMap<&str, Vec<&'static str>> {
+// Related to validation
+impl ConfigBuilder {
+    pub(super) fn component_names(&self) -> HashMap<&str, Vec<&'static str>> {
         let mut name_uses = HashMap::<&str, Vec<&'static str>>::new();
         for (ctype, name) in tagged("source", self.sources.keys())
             .chain(tagged("transform", self.transforms.keys()))
@@ -182,13 +185,90 @@ impl ConfigBuilder {
         name_uses
     }
 
-    pub(crate) fn has_input(&self, name: &str) -> bool {
+    // Check for non-unique names across sources, sinks, and transforms
+    fn check_conflicts(&self, pipelines: &Pipelines, errors: &mut Vec<String>) {
+        let name_uses = self.component_names();
+        for (name, uses) in name_uses.iter().filter(|(_name, uses)| uses.len() > 1) {
+            errors.push(format!(
+                "More than one component with name {:?} ({}).",
+                name,
+                uses.join(", ")
+            ));
+        }
+
+        pipelines.check_conflicts(&name_uses, errors);
+    }
+
+    // Check that sinks and transforms have inputs and that thoses inputs exist
+    fn check_inputs(&self, pipelines: &Pipelines, errors: &mut Vec<String>) {
+        let sink_inputs = self
+            .sinks
+            .iter()
+            .map(|(name, sink)| ("sink", name.clone(), sink.inputs.clone()));
+        let transform_inputs = self
+            .transforms
+            .iter()
+            .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
+        let pipeline_outputs: HashSet<_> = pipelines.outputs().collect();
+        for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
+            if inputs.is_empty() && !pipeline_outputs.contains(&name) {
+                errors.push(format!(
+                    "{} {:?} has no inputs",
+                    capitalize(output_type),
+                    name
+                ));
+            }
+
+            for input in inputs {
+                if !self.has_input(&input) {
+                    errors.push(format!(
+                        "Input {:?} for {} {:?} doesn't exist.",
+                        input, output_type, name
+                    ));
+                }
+            }
+        }
+    }
+
+    pub(super) fn check_shape(&self, pipelines: &Pipelines) -> Result<(), Vec<String>> {
+        let mut errors = vec![];
+
+        if self.sources.is_empty() {
+            errors.push("No sources defined in the config.".to_owned());
+        }
+
+        if self.sinks.is_empty() {
+            errors.push("No sinks defined in the config.".to_owned());
+        }
+
+        self.check_conflicts(pipelines, &mut errors);
+
+        pipelines.check_shape(&self, &mut errors);
+
+        self.check_inputs(pipelines, &mut errors);
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    pub(super) fn has_input(&self, name: &str) -> bool {
         self.sources.contains_key(name) || self.transforms.contains_key(name)
     }
 
-    pub(crate) fn has_output(&self, name: &str) -> bool {
+    pub(super) fn has_output(&self, name: &str) -> bool {
         self.transforms.contains_key(name) || self.sinks.contains_key(name)
     }
+}
+
+fn capitalize(s: &str) -> String {
+    let mut s = s.to_owned();
+    if let Some(r) = s.get_mut(0..1) {
+        r.make_ascii_uppercase();
+    }
+    s
 }
 
 fn tagged<'a>(

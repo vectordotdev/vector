@@ -3,6 +3,7 @@ use super::format::{deserialize, Format};
 use super::TransformOuter;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -17,18 +18,6 @@ impl From<IndexMap<String, Pipeline>> for Pipelines {
 
 // Validation related
 impl Pipelines {
-    pub(crate) fn transform_keys<'a>(&'a self) -> impl Iterator<Item = (&'a String, &'a String)> {
-        self.0
-            .iter()
-            .map(|(pipeline_id, pipeline)| {
-                pipeline
-                    .transforms
-                    .keys()
-                    .map(move |name| (pipeline_id, name))
-            })
-            .flatten()
-    }
-
     pub(crate) fn outputs<'a>(&'a self) -> impl Iterator<Item = &'a String> {
         self.0
             .iter()
@@ -41,6 +30,35 @@ impl Pipelines {
     pub(crate) fn check_shape(&self, config: &ConfigBuilder, errors: &mut Vec<String>) {
         self.check_inputs(config, errors);
         self.check_outputs(config, errors);
+    }
+
+    fn transform_names<'a>(&'a self) -> impl Iterator<Item = (&'a String, &'a String)> {
+        self.0
+            .iter()
+            .map(|(pipeline_id, pipeline)| {
+                pipeline
+                    .transforms
+                    .keys()
+                    .map(move |name| (pipeline_id, name))
+            })
+            .flatten()
+    }
+
+    pub(super) fn check_conflicts(
+        &self,
+        used_names: &HashMap<&str, Vec<&'static str>>,
+        errors: &mut Vec<String>,
+    ) {
+        self.transform_names()
+            .filter_map(|(pipeline_id, name)| {
+                used_names.get(name.as_str()).map(move |used| (pipeline_id, name, used.join(", ")))
+            })
+            .for_each(|(pipeline_id, name, used)| {
+                errors.push(format!(
+                    "The component name {:?} from the pipeline {:?} is conflicting with an existing one ({})",
+                    name, pipeline_id, used
+                ))
+            });
     }
 
     fn check_outputs(&self, config: &ConfigBuilder, errors: &mut Vec<String>) {
