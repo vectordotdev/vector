@@ -32,7 +32,7 @@ shared vision of good user experience -- the purpose of this document.
 
 <!-- /MarkdownTOC -->
 
-## Pinciples
+## Principles
 
 ### Don't please everyone
 
