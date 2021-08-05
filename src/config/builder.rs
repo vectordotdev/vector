@@ -2,8 +2,8 @@
 use super::api;
 use super::Pipelines;
 use super::{
-    compiler, provider, Config, HealthcheckOptions, Resource, SinkConfig, SinkOuter, SourceConfig,
-    SourceOuter, TestDefinition, TransformOuter,
+    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
+    SourceOuter, TestDefinition, TransformOuter, Resource
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -169,8 +169,11 @@ impl ConfigBuilder {
 
         Ok(())
     }
+}
 
-    pub(crate) fn component_names(&self) -> HashMap<&str, Vec<&'static str>> {
+// Related to validation
+impl ConfigBuilder {
+    pub(super) fn component_names(&self) -> HashMap<&str, Vec<&'static str>> {
         let mut name_uses = HashMap::<&str, Vec<&'static str>>::new();
         for (ctype, name) in tagged("source", self.sources.keys())
             .chain(tagged("transform", self.transforms.keys()))
@@ -182,17 +185,6 @@ impl ConfigBuilder {
         name_uses
     }
 
-    pub(crate) fn has_input(&self, name: &str) -> bool {
-        self.sources.contains_key(name) || self.transforms.contains_key(name)
-    }
-
-    pub(crate) fn has_output(&self, name: &str) -> bool {
-        self.transforms.contains_key(name) || self.sinks.contains_key(name)
-    }
-}
-
-// Related to validation
-impl ConfigBuilder {
     // Check for non-unique names across sources, sinks, and transforms
     fn check_conflicts(&self, pipelines: &Pipelines, errors: &mut Vec<String>) {
         let name_uses = self.component_names();
@@ -251,7 +243,7 @@ impl ConfigBuilder {
 
         self.check_conflicts(pipelines, &mut errors);
 
-        pipelines.check_shape(self, &mut errors);
+        pipelines.check_shape(&self, &mut errors);
 
         self.check_inputs(pipelines, &mut errors);
 
@@ -260,6 +252,14 @@ impl ConfigBuilder {
         } else {
             Err(errors)
         }
+    }
+
+    pub(super) fn has_input(&self, name: &str) -> bool {
+        self.sources.contains_key(name) || self.transforms.contains_key(name)
+    }
+
+    pub(super) fn has_output(&self, name: &str) -> bool {
+        self.transforms.contains_key(name) || self.sinks.contains_key(name)
     }
 
     pub(super) fn check_resources(&self) -> Result<(), Vec<String>> {
@@ -343,6 +343,12 @@ impl ConfigBuilder {
         warnings
     }
 }
+
+// Related to validation
+impl ConfigBuilder {}
+
+// =======
+// >>>>>>> 69c02ce5a (refactor(pipeline): split validation logic)
 
 fn capitalize(s: &str) -> String {
     let mut s = s.to_owned();
