@@ -1,6 +1,6 @@
 use crate::config::{
-    component::ExampleError, default_data_dir, GlobalOptions, SinkDescription,
-    SinkHealthcheckOptions, SourceDescription, TransformDescription,
+    component::ExampleError, SinkDescription, SinkHealthcheckOptions, SourceDescription,
+    TransformDescription,
 };
 use colored::*;
 use indexmap::IndexMap;
@@ -12,6 +12,8 @@ use std::{
 };
 use structopt::StructOpt;
 use toml::{map::Map, Value};
+use vector_core::config::GlobalOptions;
+use vector_core::default_data_dir;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]

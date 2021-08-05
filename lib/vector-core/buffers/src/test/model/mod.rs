@@ -160,7 +160,7 @@ fn model_check() {
                             // then this is only valid so long as the model is
                             // full.
                             Poll::Pending => {
-                                debug_assert!(model.is_full(), "{:?}", msg)
+                                debug_assert!(model.is_full(), "{:?}", msg);
                             }
                             // The SUT must never signal an error when we
                             // flush. There is no way to recover from an error.
@@ -172,7 +172,7 @@ fn model_check() {
                 },
                 Action::Recv => match Stream::poll_next(Pin::new(&mut rx), &mut rcv_context) {
                     Poll::Pending => {
-                        assert!(model.is_empty())
+                        assert!(model.is_empty());
                     }
                     Poll::Ready(val) => {
                         assert_eq!(model.recv(), val);

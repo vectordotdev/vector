@@ -117,7 +117,7 @@ impl Expression for ParseNginxLogFn {
 
         let captures = regex.captures(&message).ok_or("failed parsing log line")?;
 
-        log_util::log_fields(&regex, &captures, &timestamp_format, ctx.timezone())
+        log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
             .map(rename_referrer)
             .map_err(Into::into)
     }

@@ -1,7 +1,8 @@
 use indoc::formatdoc;
 use k8s_e2e_tests::*;
+use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use k8s_test_framework::{
-    lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
+    lock, namespace, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
 
 const HELM_CHART_VECTOR: &str = "vector";
@@ -210,7 +211,11 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
@@ -314,7 +319,11 @@ async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
+    let test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(

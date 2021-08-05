@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, validation, Config, TransformOuter};
+use super::{builder::ConfigBuilder, validation, Config, ExpandType, TransformOuter};
 use indexmap::IndexMap;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -52,7 +52,7 @@ pub(super) fn expand_macros(
     let mut errors = Vec::new();
 
     while let Some((k, mut t)) = config.transforms.pop() {
-        if let Some(expanded) = match t.inner.expand() {
+        if let Some((expanded, expand_type)) = match t.inner.expand() {
             Ok(e) => e,
             Err(err) => {
                 errors.push(format!("failed to expand transform '{}': {}", k, err));
@@ -60,16 +60,23 @@ pub(super) fn expand_macros(
             }
         } {
             let mut children = Vec::new();
+            let mut inputs = t.inputs.clone();
+
             for (name, child) in expanded {
                 let full_name = format!("{}.{}", k, name);
+
                 expanded_transforms.insert(
                     full_name.clone(),
                     TransformOuter {
-                        inputs: t.inputs.clone(),
+                        inputs,
                         inner: child,
                     },
                 );
-                children.push(full_name);
+                children.push(full_name.clone());
+                inputs = match expand_type {
+                    ExpandType::Parallel => t.inputs.clone(),
+                    ExpandType::Serial => vec![full_name],
+                }
             }
             expansions.insert(k.clone(), children);
         } else {

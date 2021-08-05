@@ -259,7 +259,7 @@ impl Value {
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
         match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
@@ -466,7 +466,7 @@ impl Value {
         };
 
         map.entry(name.to_string())
-            .and_modify(|entry| Value::correct_type(entry, &next_segment))
+            .and_modify(|entry| Value::correct_type(entry, next_segment))
             .or_insert_with(|| {
                 // The entry this segment is referring to doesn't exist, so we must push the appropriate type
                 // into the value.
@@ -794,12 +794,12 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
+            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => {
                 if working_lookup.is_empty() {
-                    Ok(map.remove(*name))
+                    Ok(map.remove(name))
                 } else {
                     let mut inner_is_empty = false;
-                    let retval = match map.get_mut(*name) {
+                    let retval = match map.get_mut(name) {
                         Some(inner) => {
                             let ret = inner.remove(working_lookup.clone(), prune);
                             if inner.is_empty() {
@@ -810,7 +810,7 @@ impl Value {
                         None => Ok(None),
                     };
                     if inner_is_empty && prune {
-                        map.remove(*name);
+                        map.remove(name);
                     }
                     retval
                 }
@@ -843,7 +843,7 @@ impl Value {
                         Some(inner) => {
                             let ret = inner.remove(working_lookup.clone(), prune);
                             if inner.is_empty() {
-                                inner_is_empty = true
+                                inner_is_empty = true;
                             }
                             ret
                         }
@@ -911,12 +911,10 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
-                match map.get(*name) {
-                    Some(inner) => inner.get(working_lookup.clone()),
-                    None => Ok(None),
-                }
-            }
+            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => match map.get(name) {
+                Some(inner) => inner.get(working_lookup.clone()),
+                None => Ok(None),
+            },
             (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
@@ -1015,8 +1013,8 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
-                match map.get_mut(*name) {
+            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => {
+                match map.get_mut(name) {
                     Some(inner) => inner.get_mut(working_lookup.clone()),
                     None => Ok(None),
                 }
@@ -1656,6 +1654,6 @@ mod test {
                         });
                 }
                 _ => panic!("This test should never read Err'ing type folders."),
-            })
+            });
     }
 }

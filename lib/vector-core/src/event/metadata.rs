@@ -47,7 +47,7 @@ impl EventMetadata {
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
         if self.datadog_api_key.is_none() {
-            self.datadog_api_key = other.datadog_api_key
+            self.datadog_api_key = other.datadog_api_key;
         }
     }
 
@@ -64,6 +64,11 @@ impl EventMetadata {
     /// Add a new finalizer to the array
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
         self.finalizers.add(finalizer);
+    }
+
+    /// Swap the finalizers list with an empty list and return the original.
+    pub fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
     }
 }
 

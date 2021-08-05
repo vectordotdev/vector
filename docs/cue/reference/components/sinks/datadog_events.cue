@@ -18,6 +18,7 @@ components: sinks: datadog_events: {
 			}
 			compression: enabled: false
 			encoding: enabled:    false
+			proxy: enabled:       true
 			request: {
 				enabled:                    true
 				adaptive_concurrency:       true

@@ -1,6 +1,7 @@
 use indoc::indoc;
 use k8s_e2e_tests::*;
-use k8s_test_framework::{lock, test_pod, vector::Config as VectorConfig};
+use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use k8s_test_framework::{lock, namespace, test_pod, vector::Config as VectorConfig};
 use serde_json::Value;
 
 const HELM_CHART_VECTOR_AGGREGATOR: &str = "vector-aggregator";
@@ -117,8 +118,12 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
             vec!["--timeout=60s"],
         )
         .await?;
+    let _test_namespace = framework
+        .namespace(namespace::Config::from_namespace(
+            &namespace::make_namespace(pod_namespace.clone(), None),
+        )?)
+        .await?;
 
-    let _test_namespace = framework.namespace(&pod_namespace).await?;
     let _test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
             &pod_namespace,

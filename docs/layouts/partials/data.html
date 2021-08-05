@@ -252,33 +252,55 @@
 
   {{/* Source/transform/sink examples */}}
   {{ with .component_examples }}
-  {{ $multiple := gt (len . ) 1 }}
-  <div class="no-prose">
-    {{ if $multiple }}
-    {{ $first := index . 0 }}
-    <div x-data="{ selected: '{{ $first.title }}' }">
-      <nav class="grid grid-cols-2 gap-x-3 gap-y-1 pt-2 px-3" aria-label="Component examples tabs">
-        {{ range . }}
-        <a @click="selected = '{{ .title }}'" :class="{ 'bg-gray-100 dark:bg-black': selected === '{{ .title }}' }" class="cursor-pointer dark:text-gray-100 text-gray-600 hover:text-dark px-1.5 py-1 font-medium text-sm rounded-md">
-          {{ .title }}
-        </a>
-        {{ end }}
-      </nav>
+  {{ $formats := slice "toml" "yaml" "json" }}
+  {{ $defaultFormat := index $formats 0 }}
+  <div class="no-prose flex flex-col divide-y dark:divide-gray-700">
+    {{ range . }}
+    {{ $configs := .configuration }}
+    {{ $id := printf "examples-%s" .title | urlize }}
+    <div class="py-3 px-5 flex flex-col space-y-2">
+      <span>
+        {{ partial "heading.html" (dict "text" .title "level" 3 "id" $id) }}
+      </span>
 
-      <div class="mt-4 pb-2 px-3">
-        {{ range . }}
-        <div x-show="selected === '{{ .title }}'">
-          {{ template "example" . }}
+      <span>
+        Given this event...
+      </span>
+
+      <div>
+        {{ template "code" .input }}
+      </div>
+
+      <span>
+        ...and this configuration...
+      </span>
+
+      <div class="py-2.5 px-3.5 border rounded dark:border-gray-700">
+        <div class="flex space-x-2">
+          {{ range $formats }}
+          <button @click="$store.global.setFormat('{{ . }}')" :class="{ 'text-secondary dark:text-primary': $store.global.isFormat('{{ . }}') }" class="font-semibold">
+            {{ . | upper }}
+          </button>
+          {{ end }}
+        </div>
+
+        {{ range $formats }}
+        {{ $config := index $configs . }}
+        <div x-show="$store.global.isFormat('{{ . }}')" class="mt-2">
+          {{ highlight $config . "" }}
         </div>
         {{ end }}
       </div>
+
+      <span>
+        ...this Vector event is produced:
+      </span>
+
+      <div>
+        {{ template "code" .output }}
+      </div>
     </div>
-    {{ else }}
-    {{ $example := index . 0 }}
-    <div class="py-2 px-3">
-      {{ template "example" $example }}
-    </div>
-    {{ end }}
+    {{ end}}
   </div>
   {{ end }}
 
@@ -1374,116 +1396,6 @@
     {{ end }}
   </tbody>
 </table>
-{{ end }}
-
-{{ define "example" }}
-<span>
-  Given this event...
-</span>
-
-<div class="my-2.5">
-  {{ if or (reflect.IsMap .input) (reflect.IsSlice .input) }}
-  {{ $event := .input | jsonify (dict "indent" "  ") | safeJS }}
-  {{ highlight $event "json" "" }}
-  {{ else }}
-  {{ .input | markdownify }}
-  {{ end }}
-</div>
-
-<span>
-  ...and this Vector configuration...
-</span>
-
-<div class="my-2.5">
-  {{ if or (reflect.IsMap .configuration) (reflect.IsSlice .configuration) }}
-  {{ $json := .configuration | jsonify (dict "indent" "  ") }}
-  {{ highlight $json "json" "" }}
-  {{ else }}
-  {{ highlight .configuration "toml" "" }}
-  {{ end }}
-</div>
-
-{{ if reflect.IsSlice .output }}
-{{ $multiple := gt (len .output) 1 }}
-{{ if $multiple }}
-{{ $kind := "" }}
-{{ $event := slice }}
-{{ range .output }}
-{{ if .log }}
-{{ $kind = "log" }}
-{{ $event = $event | append .log }}
-{{ end }}
-{{ if .metric }}
-{{ $kind = "metric" }}
-{{ $event = $event | append .metric }}
-{{ end }}
-{{ end }}
-
-{{ if eq $kind "log" }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</span>
-{{ end }}
-
-{{ if eq $kind "metric" }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</span>
-{{ end }}
-
-{{ $json := $event | jsonify (dict "indent" "  ") }}
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ else }}
-{{ $out := index .output 0 }}
-{{ with $out.metric }}
-{{ $json := . | jsonify (dict "indent" "  ") }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</span>
-
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ end }}
-
-{{ with $out.log }}
-{{ $json := . | jsonify (dict "indent" "  ") }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</span>
-
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ end }}
-{{ end }}
-{{ end }}
-
-{{ if reflect.IsMap .output }}
-{{ with .output.log }}
-{{ $json := . | jsonify (dict "indent" "  ") }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</span>
-
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ end }}
-
-{{ with .output.metric }}
-{{ $json := . | jsonify (dict "indent" "  ") }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</span>
-
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ end }}
-{{ end }}
 {{ end }}
 
 {{ define "config-toggler" }}

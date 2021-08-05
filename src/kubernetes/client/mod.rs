@@ -20,6 +20,7 @@
 //!
 
 use crate::{
+    config::ProxyConfig,
     http::{HttpClient, HttpError},
     tls::TlsSettings,
 };
@@ -52,7 +53,7 @@ impl Client {
     /// Consumes the configuration to populate the internal state.
     /// Returns an error if the configuration is not valid.
     // TODO: add a proper error type.
-    pub fn new(config: Config) -> crate::Result<Self> {
+    pub fn new(config: Config, proxy: &ProxyConfig) -> crate::Result<Self> {
         let Config {
             base,
             tls_options,
@@ -60,7 +61,7 @@ impl Client {
         } = config;
 
         let tls_settings = TlsSettings::from_options(&Some(tls_options))?;
-        let inner = HttpClient::new(tls_settings)?;
+        let inner = HttpClient::new(tls_settings, proxy)?;
 
         let uri::Parts {
             scheme, authority, ..

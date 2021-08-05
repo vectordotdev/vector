@@ -28,6 +28,7 @@ components: sources: eventstoredb_metrics: {
 					ssl: "optional"
 				}
 			}
+			proxy: enabled: true
 		}
 		multiline: enabled: false
 	}

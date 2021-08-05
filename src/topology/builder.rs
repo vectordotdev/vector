@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, SinkContext, SourceContext},
+    config::{DataType, ProxyConfig, SinkContext, SourceContext},
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
@@ -67,6 +67,7 @@ pub async fn build_pieces(
             shutdown: shutdown_signal,
             out: pipeline,
             acknowledgements: source.acknowledgements,
+            proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -197,6 +198,7 @@ pub async fn build_pieces(
             acker: acker.clone(),
             healthcheck,
             globals: config.global.clone(),
+            proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
