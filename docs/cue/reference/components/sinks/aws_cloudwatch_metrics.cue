@@ -121,7 +121,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			policies: [
 				{
 					_action: "PutMetricData"
-					required_for: ["healthcheck", "write"]
+					required_for: ["healthcheck", "operation"]
 				},
 			]
 		},
