@@ -1230,7 +1230,7 @@ mod tests {
                 address,
                 "services/collector/event",
                 message,
-                &VALID_TOKENS.get(1).unwrap(),
+                VALID_TOKENS.get(1).unwrap(),
                 &options
             )
             .await
