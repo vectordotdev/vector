@@ -41,7 +41,6 @@ pub use loading::{
 };
 pub use pipeline::Pipelines;
 pub use unit_test::build_unit_tests_main as build_unit_tests;
-pub use validation::warnings;
 pub use vector_core::config::proxy::ProxyConfig;
 pub use vector_core::config::{log_schema, LogSchema};
 

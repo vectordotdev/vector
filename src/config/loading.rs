@@ -1,6 +1,6 @@
 use super::{
-    builder::ConfigBuilder, format, pipeline::Pipeline, validation, vars, Config, ConfigPath,
-    Format, FormatHint, Pipelines,
+    builder::ConfigBuilder, format, pipeline::Pipeline, vars, Config, ConfigPath, Format,
+    FormatHint, Pipelines,
 };
 use crate::signal;
 use glob::glob;
@@ -118,7 +118,7 @@ pub async fn load_from_paths_with_provider(
 ) -> Result<Config, Vec<String>> {
     let pipelines = load_pipelines_from_paths(config_paths)?;
     let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    validation::check_provider(&builder)?;
+    builder.check_provider()?;
     signal_handler.clear();
 
     // If there's a provider, overwrite the existing config builder with the remote variant.

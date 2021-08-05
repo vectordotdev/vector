@@ -294,7 +294,7 @@ impl ConfigBuilder {
         }
     }
 
-    pub(super) fn warnings(&self) -> Vec<String> {
+    pub fn warnings(&self) -> Vec<String> {
         let mut warnings = vec![];
 
         let source_names = self.sources.keys().map(|name| ("source", name.clone()));

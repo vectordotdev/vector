@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use vector::{
-    config::{self, ConfigDiff, Format},
+    config::{self, ConfigBuilder, ConfigDiff, Format},
     topology,
 };
 
@@ -8,9 +8,12 @@ async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, V
     match config::load_from_str(config, format, Default::default()) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
-            let c2 = config::load_from_str(config, format, Default::default()).unwrap();
+            let c2: ConfigBuilder = config::load_from_str(config, format, Default::default())
+                .unwrap()
+                .into();
             match (
-                config::warnings(&c2.into()),
+                c2.warnings(),
+                // config::warnings(&c2.into()),
                 topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
             ) {
                 (warnings, Ok(_pieces)) => Ok(warnings),
