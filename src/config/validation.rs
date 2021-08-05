@@ -1,5 +1,5 @@
 use super::{builder::ConfigBuilder, DataType, Pipelines, Resource};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -15,73 +15,7 @@ pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 }
 
 pub fn check_shape(config: &ConfigBuilder, pipelines: &Pipelines) -> Result<(), Vec<String>> {
-    let mut errors = vec![];
-
-    if config.sources.is_empty() {
-        errors.push("No sources defined in the config.".to_owned());
-    }
-
-    if config.sinks.is_empty() {
-        errors.push("No sinks defined in the config.".to_owned());
-    }
-
-    // Check for non-unique names across sources, sinks, and transforms
-    let name_uses = config.component_names();
-    for (name, uses) in name_uses.iter().filter(|(_name, uses)| uses.len() > 1) {
-        errors.push(format!(
-            "More than one component with name {:?} ({}).",
-            name,
-            uses.join(", ")
-        ));
-    }
-
-    // Check that pipelines transforms are not using a pre-defined name
-    for (pipeline_id, transform_name) in pipelines.transform_keys() {
-        if let Some(used) = name_uses.get(transform_name.as_str()) {
-            errors.push(format!(
-                    "The component name {:?} from the pipeline {:?} is conflicting with an existing one ({})",
-                    transform_name, pipeline_id, used.join(", ")
-                    ));
-        }
-    }
-
-    // Check that pipelines have matching inputs and outputs
-    pipelines.check_shape(&config, &mut errors);
-
-    // Warnings and errors
-    let sink_inputs = config
-        .sinks
-        .iter()
-        .map(|(name, sink)| ("sink", name.clone(), sink.inputs.clone()));
-    let transform_inputs = config
-        .transforms
-        .iter()
-        .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
-    let pipeline_outputs: HashSet<_> = pipelines.outputs().collect();
-    for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
-        if inputs.is_empty() && !pipeline_outputs.contains(&name) {
-            errors.push(format!(
-                "{} {:?} has no inputs",
-                capitalize(output_type),
-                name
-            ));
-        }
-
-        for input in inputs {
-            if !config.has_input(&input) {
-                errors.push(format!(
-                    "Input {:?} for {} {:?} doesn't exist.",
-                    input, output_type, name
-                ));
-            }
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
+    config.check_shape(pipelines)
 }
 
 pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
