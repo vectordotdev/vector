@@ -18,11 +18,12 @@ see which components support specific guarantees.
 The **at-least-once** delivery guarantee ensures that an [event]
 received by a Vector component is ultimately delivered at least
 once. For a source, when the `acknowledgements` option is enabled, this
-indicates that it will wait for _all_ connected sinks to mark the event
-as delivered before acknowledging receipt of the event. For a sink, this
-indicates that it will attempt to retry the delivery until the events
-are either accepted or rejected and then signal the source with the
-results of that delivery.
+indicates that it will wait for _all_ connected sinks to either mark the
+event as delivered or to persist the events to a disk-based buffer
+before acknowledging receipt of the event. For a sink, this indicates
+that it will attempt to retry the delivery until the events are either
+accepted or rejected and then signal the source with the results of that
+delivery.
 
 While rare, it is possible for an event to be delivered more than
 once. See the [Does Vector support exactly-once
