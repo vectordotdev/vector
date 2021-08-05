@@ -31,6 +31,8 @@ title: ${title}
 from: ${from}
 to: ${to}
 event_type: ${info['eventType']}
+layout: integrate
+kind: ${info['kind']}
 ---`;
 
   fs.writeFileSync(markdownPath, frontMatter, 'utf8');
@@ -83,7 +85,8 @@ const main = () => {
         title = `Send ${eventType} to ${toService['name']}`;
         createGuide({
           kind: 'sinks',
-          to: sink
+          to: sink,
+          eventType: eventType,
         }, title);
       } else if (platform) {
         const fromService = services[service];
@@ -103,7 +106,8 @@ const main = () => {
             kind: 'platforms',
             from: platform,
             to: toSink['name'],
-            componentName: componentName
+            componentName: componentName,
+            eventType: eventType,
           }, title);
         });
       }

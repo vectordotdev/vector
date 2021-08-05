@@ -1,7 +1,7 @@
 CUE = ./scripts/cue.sh
 
 clean:
-	rm -rf public resources data/docs.json content/en/guides/integrate/**
+	rm -rf public resources data/docs.json
 
 setup:
 	yarn
@@ -31,7 +31,7 @@ structured-data: cue-build config-examples
 integration-guides:
 	yarn run integration-guides
 
-serve: clean setup structured-data
+serve: clean setup structured-data integration-guides
 	hugo server \
 	--buildDrafts \
 	--buildFuture \
@@ -43,7 +43,7 @@ production-build:
 	--environment "production" \
 	--minify
 
-ci-production-build: setup structured-data production-build run-link-checker algolia
+ci-production-build: setup structured-data integration-guides production-build run-link-checker algolia
 
 # Preview site
 preview-build:
@@ -53,7 +53,7 @@ preview-build:
 	--environment "preview" \
 	--minify
 
-ci-preview-build: setup structured-data preview-build algolia
+ci-preview-build: setup structured-data integration-guides preview-build algolia
 
 run-link-checker:
 	htmltest
@@ -72,10 +72,10 @@ algolia:
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
-	make setup cue-build production-build
+	make setup structured-data integration-guides production-build
 	python -m http.server 8000 --directory ./public --bind 127.0.0.1
 
 # Full local builds without Algolia updates (for debugging, link checking, etc.)
-local-production-build: clean setup structured-data production-build run-link-checker
+local-production-build: clean setup structured-data integration-guides production-build run-link-checker
 
-local-preview-build: clean setup structured-data preview-build run-link-checker
+local-preview-build: clean setup structured-data integration-guides preview-build run-link-checker

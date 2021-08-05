@@ -1,0 +1,43 @@
+{{ define "title" }}
+{{ .Title }} | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+<div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
+  <main aria-label="Main guide content" class="lg:col-span-4 md:px-0 pb-32">
+    <div class="mb-4 md:mb-6">
+      {{ partial "breadcrumb.html" . }}
+    </div>
+
+    <div id="page-content">
+      <h1 class="dark:text-gray-50 font-secondary font-extrabold text-4xl lg:text-5xl leading-tight tracking-tight">
+        {{ .Title | markdownify }}
+      </h1>
+
+      {{ with .Description }}
+      <p class="dark:text-gray-200 mt-5 md:text-lg text-gray-500 prose dark:prose-dark">
+        {{ . | markdownify }}
+      </p>
+      {{ end }}
+
+      {{ if eq .Section "guides" }}
+      {{ partial "guides/badges.html" . }}
+      {{ end }}
+
+      <div class="mt-12 prose dark:prose-dark max-w-none tracking-tight">
+
+      </div>
+    </div>
+  </main>
+
+  <div class="hidden lg:block xl:col-span-1">
+    <aside aria-label="Table of contents" class="sticky top-6">
+      {{ partial "toc.html" . }}
+    </aside>
+  </div>
+</div>
+{{ end }}
+
+{{ define "below" }}
+{{ partial "guides/pagination.html" . }}
+{{ end }}

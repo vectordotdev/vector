@@ -20,6 +20,12 @@ yarn-error.log
 .env
 
 # Generated integration guides
-content/en/guides/integrate/platforms/
-content/en/guides/integrate/sinks/
-content/en/guides/integrate/sources/
+!content/en/guides/integrate/_index.md
+
+content/en/guides/integrate/platforms/**/*.md
+content/en/guides/integrate/sinks/**/*.md
+content/en/guides/integrate/sources/**/*.md
+
+!content/en/guides/integrate/platforms/_index.md
+!content/en/guides/integrate/sinks/_index.md
+!content/en/guides/integrate/sources/_index.md
