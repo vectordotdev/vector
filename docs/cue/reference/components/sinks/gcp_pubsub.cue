@@ -150,7 +150,7 @@ components: sinks: gcp_pubsub: {
 				},
 				{
 					_action: "topics.publish"
-					required_for: ["write"]
+					required_for: ["operation"]
 				},
 			]
 		},

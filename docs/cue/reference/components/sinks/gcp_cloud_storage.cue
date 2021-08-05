@@ -284,7 +284,7 @@ components: sinks: gcp_cloud_storage: {
 			policies: [
 				{
 					_action: "objects.create"
-					required_for: ["write"]
+					required_for: ["operation"]
 				},
 				{
 					_action: "objects.get"

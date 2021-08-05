@@ -434,11 +434,11 @@ components: {
 
 	#IAM: {
 		#Policy: {
-			#RequiredFor: "write" | "healthcheck"
+			#RequiredFor: "operation" | "healthcheck"
 
 			// TODO: come up with a less janky URL generation scheme
 			_action:        !=""
-			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
+			required_for:   *["operation"] | [#RequiredFor, ...#RequiredFor]
 			docs_url:       !=""
 			required_when?: !=""
 
