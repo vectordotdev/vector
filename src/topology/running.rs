@@ -13,7 +13,7 @@ use crate::{
     topology::{builder::Pieces, task::TaskOutput},
     trigger::DisabledTrigger,
 };
-use dashmap::DashMap;
+use arc_swap::ArcSwap;
 use futures::{future, Future, FutureExt, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
@@ -37,7 +37,7 @@ pub struct RunningTopology {
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
     enrichment_tables:
-        Arc<DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
+        Arc<ArcSwap<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>,
 }
 
 impl RunningTopology {
@@ -45,7 +45,7 @@ impl RunningTopology {
         config: Config,
         abort_tx: mpsc::UnboundedSender<()>,
         enrichment_tables: Arc<
-            DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>,
+            ArcSwap<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
         >,
     ) -> Self {
         Self {

@@ -6,9 +6,9 @@ use crate::{
     sinks::{self, util::UriSerde},
     sources, transforms, Pipeline,
 };
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use component::ComponentDescription;
-use dashmap::DashMap;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
@@ -479,14 +479,14 @@ pub enum ExpandType {
 pub struct TransformContext {
     pub globals: GlobalOptions,
     pub enrichment_tables:
-        Arc<DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
+        Arc<ArcSwap<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>,
 }
 
 impl TransformContext {
     pub fn new_with_globals(globals: GlobalOptions) -> Self {
         Self {
             globals,
-            enrichment_tables: Arc::new(DashMap::new()),
+            enrichment_tables: Default::default(),
         }
     }
 }
@@ -495,7 +495,7 @@ impl Default for TransformContext {
     fn default() -> Self {
         TransformContext {
             globals: Default::default(),
-            enrichment_tables: Arc::new(DashMap::new()),
+            enrichment_tables: Default::default(),
         }
     }
 }
