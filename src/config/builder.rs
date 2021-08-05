@@ -297,28 +297,38 @@ impl ConfigBuilder {
     pub fn warnings(&self, pipelines: &Pipelines) -> Vec<String> {
         let mut warnings = vec![];
 
+        let pipelines_io_names: HashSet<_> =
+            pipelines.inputs().chain(pipelines.outputs()).collect();
+        let config_consumer_names: HashSet<_> = self
+            .transforms
+            .values()
+            .map(|transform| transform.inputs.iter())
+            .flatten()
+            .chain(
+                self.sinks
+                    .values()
+                    .map(|transform| transform.inputs.iter())
+                    .flatten(),
+            )
+            .collect();
         let source_names = self.sources.keys().map(|name| ("source", name.clone()));
         let transform_names = self
             .transforms
             .keys()
             .map(|name| ("transform", name.clone()));
-        for (input_type, name) in transform_names.chain(source_names) {
-            if !self
-                .transforms
-                .iter()
-                .any(|(_, transform)| transform.inputs.contains(&name))
-                && !self
-                    .sinks
-                    .iter()
-                    .any(|(_, sink)| sink.inputs.contains(&name))
-            {
+
+        transform_names
+            .chain(source_names)
+            .filter(|(_, name)| {
+                !config_consumer_names.contains(&name) && !pipelines_io_names.contains(&name)
+            })
+            .for_each(|(input_type, name)| {
                 warnings.push(format!(
                     "{} {:?} has no consumers",
                     capitalize(input_type),
                     name
-                ));
-            }
-        }
+                ))
+            });
 
         pipelines.warnings(&mut warnings);
 
@@ -347,4 +357,114 @@ fn tagged<'a>(
     iter: impl Iterator<Item = &'a String>,
 ) -> impl Iterator<Item = (&'static str, &'a String)> {
     iter.map(move |x| (tag, x))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::config::format::{deserialize, Format};
+    use crate::config::pipeline::{Pipeline, Pipelines};
+    use indexmap::IndexMap;
+
+    fn create_config(input: &str) -> ConfigBuilder {
+        deserialize(input, Some(Format::Toml)).unwrap()
+    }
+
+    #[test]
+    fn check_shape_with_pipelines() {
+        let root = create_config(
+            r#"
+        [sources.in]
+        type = "generator"
+        format = "json"
+        [sources.foo]
+        type = "generator"
+        format = "json"
+        [sinks.out]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "first".to_string(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.foo]
+        type = "remap"
+        inputs = ["in", "bar"]
+        outputs = ["out", "nope"]
+        source = ""
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        //
+        let errors = root.check_shape(&pipelines).unwrap_err();
+        println!("errors: {:#?}", errors);
+        assert!(errors.contains(&"The component name \"foo\" from the pipeline \"first\" is conflicting with an existing one (source)".to_string()));
+        assert!(errors.contains(
+            &"Input \"bar\" for transform \"foo\" in pipeline \"first\" doesn't exist.".to_string()
+        ));
+        assert!(errors.contains(
+            &"Output \"nope\" for transform \"foo\" in pipeline \"first\" doesn't exist."
+                .to_string()
+        ));
+        assert_eq!(errors.len(), 3);
+    }
+
+    #[test]
+    fn warnings_with_pipelines() {
+        // this ensures also that a component at root config with no inputs from the root
+        // configuration doesn't raise any warning
+        let root = create_config(
+            r#"
+        [sources.in]
+        type = "generator"
+        format = "json"
+        [sinks.out]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "first".to_string(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.foo]
+        type = "remap"
+        inputs = ["in"]
+        source = ""
+        [transforms.bar]
+        type = "remap"
+        inputs = ["in"]
+        outputs = ["out"]
+        source = ""
+        "#,
+            ),
+        );
+        pipelines.insert(
+            "second".to_string(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.foo]
+        type = "remap"
+        inputs = ["in"]
+        source = ""
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        //
+        let warnings = root.warnings(&pipelines);
+        assert!(
+            warnings.contains(&"Pipeline \"second\" has no output on its components.".to_string())
+        );
+        assert!(warnings
+            .contains(&"Transform \"foo\" from pipeline \"second\" has no consumer.".to_string()));
+        assert!(warnings
+            .contains(&"Transform \"foo\" from pipeline \"first\" has no consumer.".to_string()));
+        assert_eq!(warnings.len(), 3);
+    }
 }
