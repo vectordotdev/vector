@@ -1,5 +1,3 @@
-{{/* vim: set filetype=mustache: */}}
-
 {{/*
 Internal template to render service ports depending on whether service is a headless service or not. Use
 either 'vector-aggregator.servicePorts' or 'vector-aggregator.headlessServicePorts' as entry points.
@@ -40,4 +38,12 @@ Determines whether there are any ports present.
 */}}
 {{- define "vector-aggregator.servicePortsPresent" -}}
 {{- or (and .Values.vectorSource.enabled (not .Values.customConfig)) (not (empty .Values.service.ports)) }}
+{{- end }}
+
+{{/*
+Automatically generate required ports based on customConfig
+*/}}
+{{- define "vector-aggregator.generatePorts" -}}
+{{- $config := .Values.customConfig.sources -}}
+{{- print (keys $config) }}
 {{- end }}

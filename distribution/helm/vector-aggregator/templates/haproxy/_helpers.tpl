@@ -44,7 +44,7 @@ Helper to create HAProxy server-templates to discover Vector endpoints
 */}}
 {{- define "haproxy.vectorConfig" -}}
 {{- $values := .Values -}}
-{{- if $values.vectorSource.enabled }}
+{{- if not $values.vectorSource.enabled }}
 frontend vector
   bind :::{{ $values.vectorSource.listenPort }} proto h2
   mode http
