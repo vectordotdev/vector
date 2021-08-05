@@ -1,0 +1,3 @@
+integrate/sinks/**/*.md
+integrate/sources/**/*.md
+integrate/platform/**/*.md

@@ -1,7 +1,7 @@
 CUE = ./scripts/cue.sh
 
 clean:
-	rm -rf public resources data/docs.json
+	rm -rf public resources data/docs.json content/en/guides/integrate/**
 
 setup:
 	yarn
@@ -27,6 +27,9 @@ config-examples:
 	yarn run config-examples
 
 structured-data: cue-build config-examples
+
+integration-guides:
+	yarn run integration-guides
 
 serve: clean setup structured-data
 	hugo server \

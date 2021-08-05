@@ -1,15 +1,25 @@
 package metadata
 
 #Guide: {
-	#Str: !=""
+	#Str:       !=""
 	#EventType: "logs" | "metrics" | "logs and metrics"
 
-	source?: #Str
-	sink?: #Str
-	platform?: "docker" | "kubernetes"
+	source?:    #Str
+	sink?:      #Str
+	platform?:  "docker" | "kubernetes"
+	service:    #Str
 	event_type: #EventType
 
 	component_name: #Str
+
+	#Sink: {
+		name:    #Str
+		service: #Str
+
+		if service == _|_ {
+			service: name
+		}
+	}
 
 	if platform != _|_ {
 		if platform == "docker" {
@@ -38,273 +48,334 @@ package metadata
 			sinks: _metrics_sinks
 		}
 	}
+
+	_logs_sinks: [#Sink, ...#Sink] & [
+			{name: "aws_cloudwatch_logs"},
+			{name: "aws_kinesis_firehose"},
+			{name: "aws_kinesis_streams", service: "aws_kinesis_data_streams"},
+			{name: "aws_s3"},
+			{name: "aws_sqs"},
+			{name: "azure_monitor_logs"},
+			{name: "clickhouse"},
+			{name: "datadog_logs"},
+			{name: "elasticsearch"},
+			{name: "file", service: "files"},
+			{name: "gcp_cloud_storage"},
+			{name: "gcp_stackdriver_logs", service: "gcp_cloud_monitoring"},
+			{name: "gcp_pubsub"},
+			{name: "honeycomb"},
+			{name: "http"},
+			{name: "humio_logs", service:    "humio"},
+			{name: "influxdb_logs", service: "influxdb"},
+			{name: "kafka"},
+			{name: "logdna"},
+			{name: "loki"},
+			{name: "nats"},
+			{name: "new_relic_logs"},
+			{name: "papertrail"},
+			{name: "pulsar"},
+			{name: "sematext_logs", service: "sematext"},
+			{name: "socket", service:        "socket_client"},
+			{name: "splunk_hec", service:    "splunk"},
+	]
+
+	_metrics_sinks: [#Sink, ...#Sink] & [
+			{name: "aws_cloudwatch_metrics"},
+			{name: "datadog_metrics"},
+			{name: "gcp_stackdriver_metrics", service: "gcp_cloud_monitoring"},
+			{name: "humio_metrics", service:           "humio"},
+			{name: "influxdb_metrics", service:        "influxdb"},
+			{name: "kafka"},
+			{name: "prometheus_remote_write"},
+			{name: "sematext_metrics", service: "sematext"},
+			{name: "statsd"},
+	]
 }
 
-_metrics_sinks: [
-	"aws_cloudwatch_metrics",
-	"datadog_metrics",
-	"gcp_stackdriver_metrics",
-	"humio_metrics",
-	"influxdb_metrics",
-	"kafka",
-	"prometheus_remote_write",
-	"sematext_metrics",
-	"statsd",
-]
-
-_logs_sinks: [
-	"aws_cloudwatch_logs",
-	"aws_kinesis_firehose",
-	"aws_kinesis_streams",
-	"aws_s3",
-	"aws_sqs",
-	"azure_monitor_logs",
-	"clickhouse",
-	"datadog_logs",
-	"elasticsearch",
-	"file",
-	"gcp_cloud_storage",
-	"gcp_stackdriver_logs",
-	"gcp_pubsub",
-	"honeycomb",
-	"http",
-	"humio_logs",
-	"influxdb_logs",
-	"kafka",
-	"logdna",
-	"loki",
-	"nats",
-	"new_relic_logs",
-	"papertrail",
-	"pulsar",
-	"sematext_logs",
-	"socket",
-	"splunk_hec",
-]
-
 guides: integrate: [#Guide, ...#Guide] & [
-	{
-		sink: "aws_sqs"
+			{
+		sink:       "aws_sqs"
+		service:    "aws_sqs"
 		event_type: "logs"
 	},
 	{
-		source: "apache_metrics"
+		source:     "apache_metrics"
+		service:    "apache_http"
 		event_type: "metrics"
 	},
 	{
-		sink: "pulsar"
+		sink:       "pulsar"
+		service:    "pulsar"
 		event_type: "logs"
 	},
 	{
-		sink: "aws_cloudwatch_metrics"
+		sink:       "aws_cloudwatch_metrics"
+		service:    "aws_cloudwatch_metrics"
 		event_type: "metrics"
 	},
 	{
-		sink: "aws_ecs_metrics"
+		sink:       "aws_ecs_metrics"
+		service:    "aws_ecs"
 		event_type: "metrics"
 	},
 	{
-		source: "aws_ecs_metrics"
+		source:     "aws_ecs_metrics"
+		service:    "aws_ecs"
 		event_type: "metrics"
 	},
 	{
-		sink: "aws_kinesis_firehose"
+		sink:       "aws_kinesis_firehose"
+		service:    "aws_kinesis_firehose"
 		event_type: "logs"
 	},
 	{
-		source: "aws_kinesis_firehose"
+		source:     "aws_kinesis_firehose"
+		service:    "aws_kinesis_firehose"
 		event_type: "logs"
 	},
 	{
-		sink: "aws_kinesis_streams"
+		sink:       "aws_kinesis_streams"
+		service:    "aws_kinesis_data_streams"
 		event_type: "logs"
 	},
 	{
-		sink: "aws_s3"
+		sink:       "aws_s3"
+		service:    "aws_s3"
 		event_type: "logs"
 	},
 	{
-		source: "aws_s3"
+		source:     "aws_s3"
+		service:    "aws_s3"
 		event_type: "logs"
 	},
 	{
-		sink: "azure_monitor_logs"
+		sink:       "azure_monitor_logs"
+		service:    "azure_monitor_logs"
 		event_type: "logs"
 	},
 	{
-		sink: "clickhouse"
+		sink:       "clickhouse"
+		service:    "clickhouse"
 		event_type: "logs"
 	},
 	{
-		sink: "datadog_logs"
+		sink:       "datadog_logs"
+		service:    "datadog_logs"
 		event_type: "logs"
 	},
 	{
-		source: "datadog_logs"
+		source:     "datadog_logs"
+		service:    "datadog_logs"
 		event_type: "logs"
 	},
 	{
-		sink: "datadog_metrics"
+		sink:       "datadog_metrics"
+		service:    "datadog_metrics"
 		event_type: "metrics"
 	},
 	{
-		platform: "docker"
+		platform:   "docker"
+		service:    "docker"
 		event_type: "logs"
 	},
 	{
-		sink: "elasticsearch"
+		sink:       "elasticsearch"
+		service:    "elasticsearch"
 		event_type: "logs"
 	},
 	{
-		source: "exec"
+		source:     "exec"
+		service:    "exec"
 		event_type: "logs"
 	},
 	{
-		sink: "file"
+		sink:       "file"
+		service:    "files"
 		event_type: "logs"
 	},
 	{
-		source: "file"
+		source:     "file"
+		service:    "files"
 		event_type: "logs"
 	},
 	{
-		sink: "gcp_stackdriver_metrics"
+		sink:       "gcp_stackdriver_logs"
+		service:    "gcp_cloud_monitoring"
+		event_type: "logs"
+	},
+	{
+		sink:       "gcp_stackdriver_metrics"
+		service:    "gcp_cloud_monitoring"
 		event_type: "metrics"
 	},
 	{
-		sink: "gcp_cloud_storage"
+		sink:       "gcp_cloud_storage"
+		service:    "gcp_cloud_storage"
 		event_type: "logs"
 	},
 	{
-		sink: "gcp_stackdriver_logs"
+		sink:       "gcp_pubsub"
+		service:    "gcp_pubsub"
 		event_type: "logs"
 	},
 	{
-		sink: "gcp_pubsub"
+		source:     "heroku_logs"
+		service:    "heroku"
 		event_type: "logs"
 	},
 	{
-		source: "heroku_logs"
+		sink:       "honeycomb"
+		service:    "honeycomb"
 		event_type: "logs"
 	},
 	{
-		sink: "honeycomb"
-		event_type: "logs"
-	},
-	{
-		source: "host_metrics"
+		source:     "host_metrics"
+		service:    "host"
 		event_type: "metrics"
 	},
 	{
-		sink: "http"
+		sink:       "http"
+		service:    "http"
 		event_type: "logs"
 	},
 	{
-		source: "http"
+		source:     "http"
+		service:    "http"
 		event_type: "logs"
 	},
 	{
-		sink: "humio_logs"
+		sink:       "humio_logs"
+		service:    "humio"
 		event_type: "logs"
 	},
 	{
-		sink: "humio_metrics"
+		sink:       "humio_metrics"
+		service:    "humio"
 		event_type: "metrics"
 	},
 	{
-		sink: "influxdb_logs"
+		sink:       "influxdb_logs"
+		service:    "influxdb"
 		event_type: "logs"
 	},
 	{
-		sink: "influxdb_metrics"
+		sink:       "influxdb_metrics"
+		service:    "influxdb"
 		event_type: "metrics"
 	},
 	{
-		source: "journald"
+		source:     "journald"
+		service:    "journald"
 		event_type: "logs"
 	},
 	{
-		sink: "kafka"
+		sink:       "kafka"
+		service:    "kafka"
 		event_type: "logs and metrics"
 	},
 	{
-		source: "kafka"
+		source:     "kafka"
+		service:    "kafka"
 		event_type: "logs"
 	},
 	{
-		platform: "kubernetes"
+		platform:   "kubernetes"
+		service:    "kubernetes"
 		event_type: "logs"
 	},
 	{
-		sink: "logdna"
+		sink:       "logdna"
+		service:    "logdna"
 		event_type: "logs"
 	},
 	{
-		sink: "loki"
+		sink:       "loki"
+		service:    "loki"
 		event_type: "logs"
 	},
 	{
-		source: "mongodb_metrics"
+		source:     "mongodb_metrics"
+		service:    "mongodb"
 		event_type: "metrics"
 	},
 	{
-		sink: "nats"
+		sink:       "nats"
+		service:    "nats"
 		event_type: "logs"
 	},
 	{
-		sink: "new_relic_logs"
+		sink:       "new_relic_logs"
+		service:    "new_relic_logs"
 		event_type: "logs"
 	},
 	{
-		source: "nginx_metrics"
+		source:     "nginx_metrics"
+		service:    "nginx"
 		event_type: "metrics"
 	},
 	{
-		sink: "papertrail"
+		sink:       "papertrail"
+		service:    "papertrail"
 		event_type: "logs"
 	},
 	{
-		source: "postgresql_metrics"
+		source:     "postgresql_metrics"
+		service:    "postgresql"
 		event_type: "metrics"
 	},
 	{
-		source: "prometheus_scrape"
+		source:     "prometheus_scrape"
+		service:    "prometheus"
 		event_type: "metrics"
 	},
 	{
-		sink: "sematext_logs"
+		sink:       "sematext_logs"
+		service:    "sematext"
 		event_type: "logs"
 	},
 	{
-		sink: "sematext_metrics"
+		sink:       "sematext_metrics"
+		service:    "sematext"
 		event_type: "metrics"
 	},
 	{
-		sink: "socket"
+		sink:       "socket"
+		service:    "socket_receiver"
 		event_type: "logs"
 	},
 	{
-		sink: "splunk_hec"
+		source:     "socket"
+		service:    "socket_client"
 		event_type: "logs"
 	},
 	{
-		source: "splunk_hec"
+		sink:       "splunk_hec"
+		service:    "splunk"
 		event_type: "logs"
 	},
 	{
-		sink: "statsd"
+		source:     "splunk_hec"
+		service:    "splunk"
+		event_type: "logs"
+	},
+	{
+		sink:       "statsd"
+		service:    "statsd"
 		event_type: "metrics"
 	},
 	{
-		source: "statsd"
+		source:     "statsd"
+		service:    "statsd"
 		event_type: "metrics"
 	},
 	{
-		source: "stdin"
+		source:     "stdin"
+		service:    "stdin"
 		event_type: "logs"
 	},
 	{
-		source: "syslog"
+		source:     "syslog"
+		service:    "syslog"
 		event_type: "logs"
-	}
+	},
 ]

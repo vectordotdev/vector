@@ -1,8 +1,9 @@
 const fs = require('fs');
-const cueJsonOutput = "data/docs.json";
 const chalk = require('chalk');
 const TOML = require('@iarna/toml');
 const YAML = require('yaml');
+
+const cueJsonOutput = 'data/docs.json';
 
 // Helper functions
 const getArrayValue = (obj) => {

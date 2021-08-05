@@ -18,3 +18,8 @@ yarn-error.log
 
 # Local env vars
 .env
+
+# Generated integration guides
+content/en/guides/integrate/platforms/
+content/en/guides/integrate/sinks/
+content/en/guides/integrate/sources/
