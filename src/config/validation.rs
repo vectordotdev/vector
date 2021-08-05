@@ -1,17 +1,9 @@
-use super::{builder::ConfigBuilder, DataType, Pipelines, Resource};
+use super::{builder::ConfigBuilder, DataType, Pipelines};
 use std::collections::HashMap;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    if config.provider.is_some()
-        && (!config.sources.is_empty() || !config.transforms.is_empty() || !config.sinks.is_empty())
-    {
-        Err(vec![
-            "No sources/transforms/sinks are allowed if provider config is present.".to_owned(),
-        ])
-    } else {
-        Ok(())
-    }
+    config.check_provider()
 }
 
 pub fn check_shape(config: &ConfigBuilder, pipelines: &Pipelines) -> Result<(), Vec<String>> {
@@ -19,59 +11,11 @@ pub fn check_shape(config: &ConfigBuilder, pipelines: &Pipelines) -> Result<(), 
 }
 
 pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    let source_resources = config
-        .sources
-        .iter()
-        .map(|(name, config)| (name, config.inner.resources()));
-    let sink_resources = config
-        .sinks
-        .iter()
-        .map(|(name, config)| (name, config.resources(name)));
-
-    let conflicting_components = Resource::conflicts(source_resources.chain(sink_resources));
-
-    if conflicting_components.is_empty() {
-        Ok(())
-    } else {
-        Err(conflicting_components
-            .into_iter()
-            .map(|(resource, components)| {
-                format!(
-                    "Resource `{}` is claimed by multiple components: {:?}",
-                    resource, components
-                )
-            })
-            .collect())
-    }
+    config.check_resources()
 }
 
 pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
-    let mut warnings = vec![];
-
-    let source_names = config.sources.keys().map(|name| ("source", name.clone()));
-    let transform_names = config
-        .transforms
-        .keys()
-        .map(|name| ("transform", name.clone()));
-    for (input_type, name) in transform_names.chain(source_names) {
-        if !config
-            .transforms
-            .iter()
-            .any(|(_, transform)| transform.inputs.contains(&name))
-            && !config
-                .sinks
-                .iter()
-                .any(|(_, sink)| sink.inputs.contains(&name))
-        {
-            warnings.push(format!(
-                "{} {:?} has no consumers",
-                capitalize(input_type),
-                name
-            ));
-        }
-    }
-
-    warnings
+    config.warnings()
 }
 
 pub fn typecheck(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -256,14 +200,6 @@ fn paths_rec(
             Ok(paths)
         }
     }
-}
-
-fn capitalize(s: &str) -> String {
-    let mut s = s.to_owned();
-    if let Some(r) = s.get_mut(0..1) {
-        r.make_ascii_uppercase();
-    }
-    s
 }
 
 #[cfg(test)]

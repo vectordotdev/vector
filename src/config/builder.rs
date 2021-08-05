@@ -2,7 +2,7 @@
 use super::api;
 use super::Pipelines;
 use super::{
-    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
+    compiler, provider, Config, HealthcheckOptions, Resource, SinkConfig, SinkOuter, SourceConfig,
     SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
@@ -252,6 +252,75 @@ impl ConfigBuilder {
         } else {
             Err(errors)
         }
+    }
+
+    pub(super) fn check_resources(&self) -> Result<(), Vec<String>> {
+        let source_resources = self
+            .sources
+            .iter()
+            .map(|(name, config)| (name, config.inner.resources()));
+        let sink_resources = self
+            .sinks
+            .iter()
+            .map(|(name, config)| (name, config.resources(name)));
+
+        let conflicting_components = Resource::conflicts(source_resources.chain(sink_resources));
+
+        if conflicting_components.is_empty() {
+            Ok(())
+        } else {
+            Err(conflicting_components
+                .into_iter()
+                .map(|(resource, components)| {
+                    format!(
+                        "Resource `{}` is claimed by multiple components: {:?}",
+                        resource, components
+                    )
+                })
+                .collect())
+        }
+    }
+
+    /// Check that provide + topology config aren't present in the same builder, which is an error.
+    pub(super) fn check_provider(&self) -> Result<(), Vec<String>> {
+        if self.provider.is_some()
+            && (!self.sources.is_empty() || !self.transforms.is_empty() || !self.sinks.is_empty())
+        {
+            Err(vec![
+                "No sources/transforms/sinks are allowed if provider config is present.".to_owned(),
+            ])
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(super) fn warnings(&self) -> Vec<String> {
+        let mut warnings = vec![];
+
+        let source_names = self.sources.keys().map(|name| ("source", name.clone()));
+        let transform_names = self
+            .transforms
+            .keys()
+            .map(|name| ("transform", name.clone()));
+        for (input_type, name) in transform_names.chain(source_names) {
+            if !self
+                .transforms
+                .iter()
+                .any(|(_, transform)| transform.inputs.contains(&name))
+                && !self
+                    .sinks
+                    .iter()
+                    .any(|(_, sink)| sink.inputs.contains(&name))
+            {
+                warnings.push(format!(
+                    "{} {:?} has no consumers",
+                    capitalize(input_type),
+                    name
+                ));
+            }
+        }
+
+        warnings
     }
 
     pub(super) fn has_input(&self, name: &str) -> bool {
