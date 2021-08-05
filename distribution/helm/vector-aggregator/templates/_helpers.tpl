@@ -44,6 +44,27 @@ Determines whether there are any ports present.
 Automatically generate required ports based on customConfig
 */}}
 {{- define "vector-aggregator.generatePorts" -}}
-{{- $config := .Values.customConfig.sources -}}
-{{- print (keys $config) }}
+{{- range $componentKind, $configs := .Values.customConfig }}
+{{- if eq $componentKind "sources" }}
+{{- range $componentId, $componentConfig := $configs }}
+{{- if (hasKey $componentConfig "address") }}
+{{- $port := mustRegexFind "[0-9]+$" (get $componentConfig "address") }}
+- name: {{ $componentId | kebabcase }}
+  port: {{ $port }}
+  protocol: {{ default (get $componentConfig "mode" | upper) "TCP" }}
+  targetPort: {{ $port }}
+{{- end }}
+{{- end }}
+{{- else if eq $componentKind "sinks" }}
+{{- range $componentId, $componentConfig := $configs }}
+{{- if (hasKey $componentConfig "address") }}
+{{- $port := mustRegexFind "[0-9]+$" (get $componentConfig "address") }}
+- name: {{ $componentId | kebabcase }}
+  port: {{ $port }}
+  protocol: {{ default (get $componentConfig "mode" | upper) "TCP" }}
+  targetPort: {{ $port }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}
