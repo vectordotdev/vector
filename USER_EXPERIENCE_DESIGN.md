@@ -11,7 +11,7 @@ shared vision of good user experience -- the purpose of this document.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Pinciples](#pinciples)
+1. [Principles](#principles)
    1. [Don't please everyone](#dont-please-everyone)
    1. [Be opinionated & reduce decisions](#be-opinionated--reduce-decisions)
    1. [Build momentum with consistency](#build-momentum-with-consistency)
@@ -32,7 +32,7 @@ shared vision of good user experience -- the purpose of this document.
 
 <!-- /MarkdownTOC -->
 
-## Pinciples
+## Principles
 
 ### Don't please everyone
 
