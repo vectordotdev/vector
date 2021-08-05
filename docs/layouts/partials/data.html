@@ -1353,7 +1353,9 @@
                   </a>
                 </td>
                 <td>
-                  {{ range .required_for }}<code>{{ . }}</code>{{ end }}
+                  <ul>
+                    {{ range .required_for }}<li><code>{{ . }}</code></li>{{ end }}
+                  </ul>
                 </td>
                 <td>
                   {{ .required_when | markdownify }}
