@@ -30,6 +30,7 @@ const createGuide = (info, title) => {
 title: ${title}
 from: ${from}
 to: ${to}
+event_type: ${info['eventType']}
 ---`;
 
   fs.writeFileSync(markdownPath, frontMatter, 'utf8');
@@ -61,27 +62,49 @@ const main = () => {
         const fromService = services[service];
 
         title = `Send ${eventType} from ${fromService['name']} to anywhere`;
-        createGuide({ kind: 'sources', from: source }, title);
+        createGuide({
+          kind: 'sources',
+          from: source,
+          eventType: eventType,
+        }, title);
 
         guide['sinks'].forEach((toSink) => {
           const toService = services[toSink['service']];
           title = `Send ${eventType} from ${fromService['name']} to ${toService['name']}`;
-          createGuide({ kind: 'sources', from: source, to: toSink['name'] }, title);
+          createGuide({
+            kind: 'sources',
+            from: source,
+            to: toSink['name'],
+            eventType: eventType,
+          }, title);
         });
       } else if (sink) {
         const toService = services[service];
         title = `Send ${eventType} to ${toService['name']}`;
-        createGuide({ kind: 'sinks', to: sink }, title);
+        createGuide({
+          kind: 'sinks',
+          to: sink
+        }, title);
       } else if (platform) {
         const fromService = services[service];
 
         title = `Send ${eventType} from ${fromService['name']} to anywhere`;
-        createGuide({ kind: 'platforms', from: platform, componentName: componentName }, title);
+        createGuide({
+          kind: 'platforms',
+          from: platform,
+          componentName: componentName,
+          eventType: eventType,
+        }, title);
 
         guide['sinks'].forEach((toSink) => {
           const toService = services[toSink['service']];
           title = `Send ${eventType} from ${fromService['name']} to ${toService['name']}`;
-          createGuide({ kind: 'platforms', from: platform, to: toSink['name'], componentName: componentName }, title);
+          createGuide({
+            kind: 'platforms',
+            from: platform,
+            to: toSink['name'],
+            componentName: componentName
+          }, title);
         });
       }
     });
