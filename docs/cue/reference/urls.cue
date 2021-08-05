@@ -79,6 +79,7 @@ urls: {
 	aws_sqs:                                                  "https://aws.amazon.com/sqs/"
 	aws_sqs_api:                                              "\(aws_docs)/AWSSimpleQueueService/latest/APIReference/Welcome.html"
 	aws_sqs_create:                                           "\(aws_docs)/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-create-queue.html"
+	aws_sqs_message_deduplication_id:                         "\(aws_docs)/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html"
 	aws_vpc_flow_logs:                                        "\(aws_docs)/vpc/latest/userguide/flow-logs.html"
 	azure_blob:                                               "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	azure_blob_endpoints:                                     "https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-rest-api"
