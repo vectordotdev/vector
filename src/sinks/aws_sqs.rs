@@ -340,6 +340,26 @@ mod tests {
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
+
+    #[test]
+    fn sqs_encode_event_deduplication_id() {
+        let message = "hello world".to_string();
+        let message_deduplication_id = Template::try_from("{{ transaction_id }}").unwrap();
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("transaction_id", "some id");
+        let event = encode_event(
+            event,
+            &Encoding::Json.into(),
+            None,
+            Some(&message_deduplication_id),
+        )
+        .unwrap();
+
+        assert_eq!(
+            event.item.message_deduplication_id,
+            Some("some id".to_string())
+        );
+    }
 }
 
 #[cfg(feature = "aws-sqs-integration-tests")]
