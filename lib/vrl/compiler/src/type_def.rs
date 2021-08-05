@@ -99,6 +99,9 @@ impl From<Kind> for KindInfo {
         if kind.contains_regex() {
             set.insert(TypeKind::Regex);
         }
+        if kind.contains_enrichment_table() {
+            set.insert(TypeKind::EnrichmentTable);
+        }
         if kind.contains_null() {
             set.insert(TypeKind::Null);
         }

@@ -12,6 +12,7 @@ parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
 shared = { path = "../../shared", default-features = false }
 
+dashmap = { version = "4.0.2", default-features = false }
 bytes = "1.0.0"
 indoc = "1"
 ordered-float = "2"

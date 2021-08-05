@@ -1,6 +1,7 @@
 use crate::expression::assignment;
-use crate::{parser::ast::Ident, TypeDef, Value};
-use std::collections::HashMap;
+use crate::{parser::ast::Ident, value::EnrichmentTable, TypeDef, Value};
+use dashmap::DashMap;
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 /// The state held by the compiler.
 ///
@@ -13,6 +14,8 @@ pub struct Compiler {
 
     // stored internal variable type definitions
     variables: HashMap<Ident, assignment::Details>,
+
+    enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -36,15 +39,38 @@ impl Compiler {
                 value: None,
             }),
             variables: HashMap::new(),
+            enrichment_tables: Arc::new(DashMap::new()),
             snapshot: None,
         }
+    }
+
+    pub fn new_with_enrichment_tables(
+        enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
+    ) -> Self {
+        let mut new = Self::default();
+        new.enrichment_tables = enrichment_tables.clone();
+
+        for table in enrichment_tables.iter() {
+            new.insert_variable(
+                Ident::new(table.key()),
+                assignment::Details {
+                    type_def: TypeDef {
+                        fallible: false,
+                        kind: crate::value::Kind::EnrichmentTable.into(),
+                    },
+                    value: None,
+                },
+            );
+        }
+
+        new
     }
 
     pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
         self.variables.get(ident)
     }
 
-    pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
+    pub fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
         self.variables.insert(ident, details);
     }
 
@@ -62,10 +88,12 @@ impl Compiler {
     pub(crate) fn snapshot(&mut self) {
         let target = self.target.clone();
         let variables = self.variables.clone();
+        let enrichment_tables = self.enrichment_tables.clone();
 
         let snapshot = Self {
             target,
             variables,
+            enrichment_tables,
             snapshot: None,
         };
 
@@ -82,6 +110,13 @@ impl Compiler {
     /// Returns the root typedef for the paths (not the variables) of the object.
     pub fn target_type_def(&self) -> Option<&TypeDef> {
         self.target.as_ref().map(|assignment| &assignment.type_def)
+    }
+
+    pub fn get_enrichment_table<'a>(
+        &'a self,
+        name: &str,
+    ) -> Option<impl Deref<Target = Box<dyn EnrichmentTable + Send + Sync>> + 'a> {
+        self.enrichment_tables.get(name)
     }
 }
 

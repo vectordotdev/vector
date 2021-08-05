@@ -20,7 +20,10 @@ pub use self::regex::Regex;
 pub use error::Error;
 pub use kind::Kind;
 
-pub trait EnrichmentTable {}
+pub trait EnrichmentTable: std::fmt::Debug {
+    fn find_table_row<'a>(&'a self, criteria: BTreeMap<String, String>) -> Option<&'a Vec<String>>;
+    fn add_index(&mut self, fields: Vec<&str>);
+}
 
 #[derive(Clone)]
 pub struct EnrichmentTableW {
@@ -50,7 +53,7 @@ pub enum Value {
     Array(Vec<Value>),
     Timestamp(DateTime<Utc>),
     Regex(Regex),
-    EnrichmentTable(EnrichmentTableW),
+    EnrichmentTable(String),
     Null,
 }
 

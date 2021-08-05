@@ -220,7 +220,7 @@ impl TryInto<serde_json::Value> for Value {
 impl From<vrl_core::Value> for Value {
     fn from(v: vrl_core::Value) -> Self {
         use vrl_core::Value::{
-            Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp,
+            Array, Boolean, Bytes, EnrichmentTable, Float, Integer, Null, Object, Regex, Timestamp,
         };
 
         match v {
@@ -232,6 +232,7 @@ impl From<vrl_core::Value> for Value {
             Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
             Timestamp(v) => Value::Timestamp(v),
             Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
+            EnrichmentTable(v) => Value::Bytes(v.into()),
             Null => Value::Null,
         }
     }

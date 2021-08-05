@@ -43,11 +43,13 @@ impl ConditionConfig for VrlConfig {
             .filter(|f| f.identifier() != "only_fields")
             .collect::<Vec<_>>();
 
-        let program = vrl::compile(&self.source, &functions).map_err(|diagnostics| {
-            Formatter::new(&self.source, diagnostics)
-                .colored()
-                .to_string()
-        })?;
+        // TODO Add enrichment tables here.
+        let program =
+            vrl::compile(&self.source, Default::default(), &functions).map_err(|diagnostics| {
+                Formatter::new(&self.source, diagnostics)
+                    .colored()
+                    .to_string()
+            })?;
 
         Ok(Box::new(Vrl {
             program,

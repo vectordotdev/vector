@@ -8550,6 +8550,7 @@ name = "vrl"
 version = "0.1.0"
 dependencies = [
  "bytes 1.0.1",
+ "dashmap",
  "indoc",
  "lookup",
  "ordered-float",
@@ -8588,6 +8589,7 @@ dependencies = [
  "bytes 1.0.1",
  "chrono",
  "criterion",
+ "dashmap",
  "dyn-clone",
  "indoc",
  "lalrpop-util",

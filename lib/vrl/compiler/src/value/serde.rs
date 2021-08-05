@@ -25,7 +25,7 @@ impl Serialize for Value {
                 serializer.serialize_str(&v.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
             Regex(v) => serializer.serialize_str(&v.to_string()),
-            EnrichmentTable(v) => serializer.serialize_str(&v.name),
+            EnrichmentTable(v) => serializer.serialize_str(&v),
             Null => serializer.serialize_none(),
         }
     }

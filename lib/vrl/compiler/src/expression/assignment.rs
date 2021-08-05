@@ -422,7 +422,7 @@ where
 // -----------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-pub(crate) struct Details {
+pub struct Details {
     pub type_def: TypeDef,
     pub value: Option<Value>,
 }

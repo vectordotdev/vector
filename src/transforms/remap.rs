@@ -72,7 +72,12 @@ impl Remap {
             Some(mut table) => table.add_index(vec!["field1"]),
         }
 
-        let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
+        let program = vrl::compile(
+            &config.source,
+            enrichment_tables.clone(),
+            &vrl_stdlib::all(),
+        )
+        .map_err(|diagnostics| {
             Formatter::new(&config.source, diagnostics)
                 .colored()
                 .to_string()
