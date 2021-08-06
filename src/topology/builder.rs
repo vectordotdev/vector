@@ -13,7 +13,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use dashmap::DashMap;
+use arc_swap::ArcSwap;
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::pin::Pin;
 use std::{
@@ -33,7 +33,7 @@ pub struct Pieces {
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
     pub enrichment_tables:
-        Arc<DashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
+        Arc<ArcSwap<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -52,7 +52,7 @@ pub async fn build_pieces(
 
     let mut errors = vec![];
 
-    let enrichment_tables = DashMap::new();
+    let mut enrichment_tables = HashMap::new();
 
     // Build enrichment tables
     for (name, table) in config
@@ -125,7 +125,7 @@ pub async fn build_pieces(
         source_tasks.insert(name.clone(), server);
     }
 
-    let enrichment_tables = Arc::new(enrichment_tables);
+    let enrichment_tables = Arc::new(ArcSwap::from_pointee(enrichment_tables));
 
     let context = TransformContext {
         globals: config.global.clone(),

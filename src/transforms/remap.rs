@@ -8,9 +8,10 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use dashmap::DashMap;
+use arc_swap::ArcSwap;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
+use std::collections::HashMap;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -58,19 +59,36 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
-    enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
+    enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
+}
+
+lazy_static::lazy_static! {
+    static ref MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 
 impl Remap {
     pub fn new(
         config: RemapConfig,
-        enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
+        enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
     ) -> crate::Result<Self> {
-        // Add a dummy index to test it works.
-        match enrichment_tables.get_mut("file") {
+        // Add a dummy index to test it works. This is is not final code, ultimately the index
+        // creation will occur within VRL as the remap code is compiled.
+        //
+        // Ensure we don't have multiple threads running this code at the same time, since the
+        // enrichment_tables is essentially global data, whilst we are adding the index we are
+        // swapping that data out of the structure. If there were two Remaps being compiled at the
+        // same time is separate threads it could result in one compilation accessing the
+        // empty enrichment tables, and thus compiling incorrectly.
+        let lock = MUTEX.lock().unwrap();
+
+        let mut tables = enrichment_tables.swap(Default::default());
+        match Arc::get_mut(&mut tables).unwrap().get_mut("file") {
             None => (),
-            Some(mut table) => table.add_index(vec!["field1"]),
+            Some(table) => table.add_index(vec!["field1"]),
         }
+        enrichment_tables.swap(tables);
+
+        drop(lock);
 
         let program = vrl::compile(
             &config.source,
@@ -95,14 +113,13 @@ impl Remap {
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        for table in self.enrichment_tables.iter() {
+        let tables = self.enrichment_tables.load();
+        for (key, value) in tables.iter() {
             trace!(
                 "Testing we have {} {:?} {:?}",
-                table.key(),
-                table
-                    .value()
-                    .find_table_row(std::collections::BTreeMap::new()),
-                *table
+                key,
+                value.find_table_row(std::collections::BTreeMap::new()),
+                value
             );
         }
 
