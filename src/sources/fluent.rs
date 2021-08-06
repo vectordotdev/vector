@@ -4,22 +4,25 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{Event, LogEvent, Value},
+    event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
 use bytes::{Buf, Bytes, BytesMut};
-use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, VecDeque},
-    convert::TryInto,
+    collections::VecDeque,
     io::{self, Read},
 };
 use tokio_util::codec::Decoder;
+
+use crate::sources::fluent::message::{
+    FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp,
+};
+mod message;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FluentConfig {
@@ -343,196 +346,14 @@ impl From<FluentFrame> for LogEvent {
     }
 }
 
-/// Fluent msgpack messages can be encoded in one of three ways, each with and without
-/// options, all using arrays to encode the top-level fields.
-///
-/// The spec refers to 4 ways, but really CompressedPackedForward is encoded the same as
-/// PackedForward, it just has an additional decompression step.
-///
-/// Not yet handled are the handshake messages.
-///
-/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#event-modes
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum FluentMessage {
-    Message(FluentTag, FluentTimestamp, FluentRecord),
-    // I attempted to just one variant for each of these, with and without options, using an
-    // `Option` for the last element, but rmp expected the number of elements to match in that case
-    // still (it just allows the last element to be `nil`).
-    MessageWithOptions(
-        FluentTag,
-        FluentTimestamp,
-        FluentRecord,
-        FluentMessageOptions,
-    ),
-    Forward(FluentTag, Vec<FluentEntry>),
-    ForwardWithOptions(FluentTag, Vec<FluentEntry>, FluentMessageOptions),
-    PackedForward(FluentTag, serde_bytes::ByteBuf),
-    PackedForwardWithOptions(FluentTag, serde_bytes::ByteBuf, FluentMessageOptions),
-
-    // should be last as it'll match any other message
-    Heartbeat(rmpv::Value), // should be Nil if heartbeat
-}
-
-/// Server options sent by client.
-///
-/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#option
-#[derive(Default, Debug, Deserialize)]
-#[serde(default)]
-struct FluentMessageOptions {
-    size: Option<u64>,          // client provided hint for the number of entries
-    chunk: Option<String>,      // unused right now, would be used for acks
-    compressed: Option<String>, // this one is required if present
-}
-
-/// Fluent entry consisting of timestamp and record.
-///
-/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode
-#[derive(Debug, Deserialize)]
-struct FluentEntry(FluentTimestamp, FluentRecord);
-
-/// Fluent record is just key/value pairs.
-type FluentRecord = BTreeMap<String, FluentValue>;
-
-/// Fluent message tag.
-type FluentTag = String;
-
-/// Value for fluent record key.
-///
-/// Used mostly just to implement value conversion.
-#[derive(Debug, Deserialize, PartialEq)]
-struct FluentValue(rmpv::Value);
-
-impl From<FluentValue> for Value {
-    fn from(value: FluentValue) -> Self {
-        match value.0 {
-            rmpv::Value::Nil => Value::Null,
-            rmpv::Value::Boolean(b) => Value::Boolean(b),
-            rmpv::Value::Integer(i) => i
-                .as_i64()
-                .map(Value::Integer)
-                // unwrap large numbers to string similar to how `From<serde_json::Value> for Value` handles it
-                .unwrap_or_else(|| Value::Bytes(i.to_string().into())),
-            rmpv::Value::F32(f) => Value::Float(f.into()),
-            rmpv::Value::F64(f) => Value::Float(f),
-            rmpv::Value::String(s) => Value::Bytes(s.into_bytes().into()),
-            rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
-            rmpv::Value::Array(values) => Value::Array(
-                values
-                    .into_iter()
-                    .map(|value| Value::from(FluentValue(value)))
-                    .collect(),
-            ),
-            rmpv::Value::Map(values) => Value::Map(
-                values
-                    .into_iter()
-                    .map(|(key, value)| (format!("{}", key), Value::from(FluentValue(value))))
-                    .collect(),
-            ),
-            rmpv::Value::Ext(code, bytes) => {
-                let mut fields = BTreeMap::new();
-                fields.insert(
-                    String::from("msgpack_extension_code"),
-                    Value::Integer(code.into()),
-                );
-                fields.insert(String::from("bytes"), Value::Bytes(bytes.into()));
-                Value::Map(fields)
-            }
-        }
-    }
-}
-
-/// Fluent message timestamp.
-///
-/// Message timestamps can be a unix timestamp or EventTime messagepack ext.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-#[serde(untagged)]
-enum FluentTimestamp {
-    #[serde(with = "ts_seconds")]
-    Unix(DateTime<Utc>),
-    Ext(FluentEventTime),
-}
-
-impl From<FluentTimestamp> for Value {
-    fn from(timestamp: FluentTimestamp) -> Self {
-        match timestamp {
-            FluentTimestamp::Unix(timestamp) | FluentTimestamp::Ext(FluentEventTime(timestamp)) => {
-                Value::Timestamp(timestamp)
-            }
-        }
-    }
-}
-
-/// Custom decoder for Fluent's EventTime msgpack extension.
-///
-/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#eventtime-ext-format
-#[derive(Clone, Debug, PartialEq)]
-struct FluentEventTime(DateTime<Utc>);
-
-impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
-    fn deserialize<D>(deserializer: D) -> Result<FluentEventTime, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct FluentEventTimeVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for FluentEventTimeVisitor {
-            type Value = FluentEventTime;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("fluent timestamp extension")
-            }
-
-            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-            where
-                D: serde::de::Deserializer<'de>,
-            {
-                deserializer.deserialize_tuple(2, self)
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let tag: u32 = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
-
-                if tag != 0 {
-                    return Err(serde::de::Error::custom(format!(
-                        "expected extension type 0 for fluent timestamp, got got {}",
-                        tag
-                    )));
-                }
-
-                let bytes: serde_bytes::ByteBuf = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
-
-                if bytes.len() != 8 {
-                    return Err(serde::de::Error::custom(format!(
-                        "expected exactly 8 bytes for binary encoded fluent timestamp, got {}",
-                        bytes.len()
-                    )));
-                }
-
-                // length checked right above
-                let seconds = u32::from_be_bytes(bytes[..4].try_into().expect("exactly 4 bytes"));
-                let nanoseconds =
-                    u32::from_be_bytes(bytes[4..].try_into().expect("exactly 4 bytes"));
-
-                Ok(FluentEventTime(Utc.timestamp(seconds.into(), nanoseconds)))
-            }
-        }
-
-        deserializer.deserialize_any(FluentEventTimeVisitor)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::sources::fluent::{DecodeError, FluentConfig, FluentDecoder};
+    use bytes::BytesMut;
+    use chrono::DateTime;
     use shared::{assert_event_data_eq, btreemap};
+    use tokio_util::codec::Decoder;
+    use vector_core::event::{LogEvent, Value};
 
     #[test]
     fn generate_config() {
@@ -776,13 +597,12 @@ mod tests {
 
 #[cfg(all(test, feature = "fluent-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{
-        config::SourceContext,
-        docker::docker,
-        test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp},
-        Pipeline,
-    };
+    use crate::config::SourceConfig;
+    use crate::config::SourceContext;
+    use crate::docker::docker;
+    use crate::sources::fluent::FluentConfig;
+    use crate::test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp};
+    use crate::Pipeline;
     use bollard::{
         container::{Config as ContainerConfig, CreateContainerOptions},
         image::{CreateImageOptions, ListImagesOptions},
@@ -793,6 +613,7 @@ mod integration_tests {
     use std::{collections::HashMap, fs::File, io::Write, net::SocketAddr, time::Duration};
     use tokio::time::sleep;
     use uuid::Uuid;
+    use vector_core::event::Event;
 
     #[tokio::test]
     async fn fluentbit() {
