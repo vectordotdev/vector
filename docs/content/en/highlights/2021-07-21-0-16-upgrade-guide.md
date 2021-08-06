@@ -17,7 +17,7 @@ Vector's 0.16.0 release includes one breaking change:
 
 We cover it below to help you upgrade quickly:
 
-[##](##) Upgrade Guide
+## Upgrade Guide
 
 ### Datadog Log sink encoding option removed {#encoding}
 
