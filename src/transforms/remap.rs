@@ -63,7 +63,7 @@ pub struct Remap {
 }
 
 lazy_static::lazy_static! {
-    static ref MUTEX: std::sync::Mutex<usize> = std::sync::Mutex::new(0);
+    static ref MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 
 impl Remap {
@@ -71,10 +71,16 @@ impl Remap {
         config: RemapConfig,
         enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
     ) -> crate::Result<Self> {
-        // Ensure we don't have multiple threads running this code at the same time.
+        // Add a dummy index to test it works. This is is not final code, ultimately the index
+        // creation will occur within VRL as the remap code is compiled.
+        //
+        // Ensure we don't have multiple threads running this code at the same time, since the
+        // enrichment_tables is essentially global data, whilst we are adding the index we are
+        // swapping that data out of the structure. If there were two Remaps being compiled at the
+        // same time is separate threads it could result in one compilation accessing the
+        // empty enrichment tables, and thus compiling incorrectly.
         let lock = MUTEX.lock().unwrap();
 
-        // Add a dummy index to test it works.
         let mut tables = enrichment_tables.swap(Default::default());
         match Arc::get_mut(&mut tables).unwrap().get_mut("file") {
             None => (),
