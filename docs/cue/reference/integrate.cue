@@ -92,6 +92,20 @@ package metadata
 	]
 }
 
+guides: types: {
+	logs: """
+		Logs are an essential part...
+		"""
+
+	metrics: """
+		Metrics are an essential part...
+		"""
+
+	"logs and metrics": """
+		Both logs and metrics...
+		"""
+}
+
 guides: integrate: [#Guide, ...#Guide] & [
 			{
 		sink:       "aws_sqs"

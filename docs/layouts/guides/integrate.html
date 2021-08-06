@@ -3,6 +3,9 @@
 {{ end }}
 
 {{ define "main" }}
+{{ $eventType := .Params.event_type }}
+{{ $types := site.Data.docs.guides.types }}
+{{ $desc := index $types $eventType | markdownify }}
 <div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
   <main aria-label="Main guide content" class="lg:col-span-4 md:px-0 pb-32">
     <div class="mb-4 md:mb-6">
@@ -25,6 +28,8 @@
       {{ end }}
 
       <div class="mt-12 prose dark:prose-dark max-w-none tracking-tight">
+        {{ $desc }}
+
 
       </div>
     </div>

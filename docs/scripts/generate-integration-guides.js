@@ -9,7 +9,7 @@ const createDir = (dir) => {
   }
 }
 
-const createGuide = (info, title) => {
+const createGuide = (info, title, description) => {
   var path = `content/en/guides/integrate/${info['kind']}`;
   createDir(path);
 
@@ -28,10 +28,13 @@ const createGuide = (info, title) => {
   const markdownPath = `${path}.md`;
   const frontMatter = `---
 title: ${title}
+description: |
+  ${description}
 from: ${from}
 to: ${to}
 event_type: ${info['eventType']}
 layout: integrate
+domain: integration
 kind: ${info['kind']}
 ---`;
 
@@ -51,7 +54,7 @@ const main = () => {
     });
 
     guides.forEach((guide) => {
-      let title;
+      let title, description;
 
       const source = guide['source'];
       const sink = guide['sink'];
@@ -64,51 +67,70 @@ const main = () => {
         const fromService = services[service];
 
         title = `Send ${eventType} from ${fromService['name']} to anywhere`;
+        description = `A guide to sending ${eventType} from ${fromService['name']} to anywhere in just a few minutes`;
+
+        // Source only, e.g. /guides/integrate/sources/syslog
         createGuide({
           kind: 'sources',
           from: source,
           eventType: eventType,
-        }, title);
+        }, title, description);
 
+        // Source and sink, e.g. /guides/integrate/sources/syslog/aws_s3
         guide['sinks'].forEach((toSink) => {
           const toService = services[toSink['service']];
+
           title = `Send ${eventType} from ${fromService['name']} to ${toService['name']}`;
+          description = `A guide to sending ${eventType} from ${fromService['name']} to ${toService['name']} in just a few minutes`;
+
           createGuide({
             kind: 'sources',
             from: source,
             to: toSink['name'],
             eventType: eventType,
-          }, title);
+          }, title, description);
         });
+
       } else if (sink) {
         const toService = services[service];
+
         title = `Send ${eventType} to ${toService['name']}`;
+        description = `A guide to sending ${eventType} to ${toService['name']} in just a few minutes`;
+
+        // Sink only, e.g. /guides/integrate/sinks/aws_s3
         createGuide({
           kind: 'sinks',
           to: sink,
           eventType: eventType,
-        }, title);
+        }, title, description);
       } else if (platform) {
         const fromService = services[service];
 
         title = `Send ${eventType} from ${fromService['name']} to anywhere`;
+        description = `A guide to sending ${eventType} from ${fromService['name']} to anywhere in just a few minutes`;
+
+        // Platform only, e.g. /guides/integrate/platforms/docker
         createGuide({
           kind: 'platforms',
           from: platform,
           componentName: componentName,
           eventType: eventType,
-        }, title);
+        }, title, description);
 
+        // Platform and sink, e.g. /guides/integrate/platforms/docker/aws_s3
         guide['sinks'].forEach((toSink) => {
           const toService = services[toSink['service']];
+
           title = `Send ${eventType} from ${fromService['name']} to ${toService['name']}`;
+          description = `A guide to sending ${eventType} from ${fromService['name']} to ${toService['name']} in just a few minutes`;
+
           createGuide({
             kind: 'platforms',
             from: platform,
             to: toSink['name'],
             componentName: componentName,
             eventType: eventType,
-          }, title);
+          }, title, description);
         });
       }
     });

@@ -43,12 +43,12 @@
       </span>
 
       {{ with .Description }}
-        <div class="mt-4 text-lg leading-tight prose dark:prose-dark">
-          {{ . | markdownify }}
-        </div>
-        {{ end }}
+      <div class="mt-4 text-lg leading-tight prose dark:prose-dark">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
 
-      <div class="mt-4 grid grid-cols-1 md:grid-cols-2">
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-8">
         {{ range .Sections }}
         <div>
           <span class="prose dark:prose-dark">
