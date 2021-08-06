@@ -423,12 +423,25 @@ impl From<FluentValue> for Value {
                     .map(|value| Value::from(FluentValue(value)))
                     .collect(),
             ),
-            rmpv::Value::Map(values) => Value::Map(
-                values
-                    .into_iter()
-                    .map(|(key, value)| (format!("{}", key), Value::from(FluentValue(value))))
-                    .collect(),
-            ),
+            rmpv::Value::Map(values) => {
+                // Per
+                // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes
+                // we should expect that keys are always stringy. Ultimately a
+                // lot hinges on what
+                // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#grammar
+                // defines 'object' as.
+                //
+                // The current implementation will SILENTLY DROP non-stringy keys.
+                Value::Map(
+                    values
+                        .into_iter()
+                        .filter_map(|(key, value)| {
+                            key.as_str()
+                                .map(|k| (k.to_owned(), Value::from(FluentValue(value))))
+                        })
+                        .collect(),
+                )
+            }
             rmpv::Value::Ext(code, bytes) => {
                 let mut fields = BTreeMap::new();
                 fields.insert(
