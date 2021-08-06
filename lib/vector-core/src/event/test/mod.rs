@@ -1,5 +1,6 @@
 mod common;
 mod serialization;
+mod size_of;
 
 use super::*;
 use std::collections::HashSet;

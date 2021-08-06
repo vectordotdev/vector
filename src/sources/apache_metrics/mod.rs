@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     event::Event,
     http::HttpClient,
@@ -77,6 +77,7 @@ impl SourceConfig for ApacheMetricsConfig {
             namespace,
             cx.shutdown,
             cx.out,
+            cx.proxy,
         ))
     }
 
@@ -137,6 +138,7 @@ fn apache_metrics(
     namespace: Option<String>,
     shutdown: ShutdownSignal,
     out: Pipeline,
+    proxy: ProxyConfig,
 ) -> super::Source {
     let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
@@ -146,7 +148,7 @@ fn apache_metrics(
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
             .map(move |url| {
-                let client = HttpClient::new(None).expect("HTTPS initialization failed");
+                let client = HttpClient::new(None, &proxy).expect("HTTPS initialization failed");
                 let sanitized_url = url.to_sanitized_string();
 
                 let request = Request::get(&url)

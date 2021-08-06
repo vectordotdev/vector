@@ -73,7 +73,7 @@ mod json_parser;
 mod kafka;
 #[cfg(feature = "transforms-key_value_parser")]
 mod key_value_parser;
-#[cfg(feature = "sources-kubernetes-logs")]
+#[cfg(feature = "sources-kubernetes_logs")]
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
@@ -86,7 +86,7 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
-#[cfg(feature = "sinks-nats")]
+#[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
@@ -187,7 +187,7 @@ pub use self::eventstoredb_metrics::*;
 pub use self::exec::*;
 #[cfg(any(
     feature = "sources-file",
-    feature = "sources-kubernetes-logs",
+    feature = "sources-kubernetes_logs",
     feature = "sinks-file",
 ))]
 pub use self::file::*;
@@ -214,7 +214,7 @@ pub(crate) use self::json_parser::*;
 pub use self::kafka::*;
 #[cfg(feature = "transforms-key_value_parser")]
 pub(crate) use self::key_value_parser::*;
-#[cfg(feature = "sources-kubernetes-logs")]
+#[cfg(feature = "sources-kubernetes_logs")]
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
@@ -225,7 +225,7 @@ pub use self::logplex::*;
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
-#[cfg(feature = "sinks-nats")]
+#[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
@@ -300,7 +300,7 @@ macro_rules! emit {
 // Modules that require emit! macro so they need to be defined after the macro.
 #[cfg(any(
     feature = "sources-file",
-    feature = "sources-kubernetes-logs",
+    feature = "sources-kubernetes_logs",
     feature = "sinks-file",
 ))]
 mod file;

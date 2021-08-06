@@ -7,9 +7,11 @@ use dashmap::DashMap;
 use glob::glob;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeSet,
     fs, io,
     path::{Path, PathBuf},
     sync::Arc,
+    sync::Mutex,
 };
 use tracing::{error, info, warn};
 
@@ -20,16 +22,16 @@ const STABLE_FILE_NAME: &str = "checkpoints.json";
 /// now there is only one variant, but any incompatible changes will require and
 /// additional variant to be added here and handled anywhere that we transit
 /// this format.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "version", rename_all = "snake_case")]
 enum State {
     #[serde(rename = "1")]
-    V1 { checkpoints: Vec<Checkpoint> },
+    V1 { checkpoints: BTreeSet<Checkpoint> },
 }
 
 /// A simple JSON-friendly struct of the fingerprint/position pair, since
 /// fingerprints as objects cannot be keys in a plain JSON map.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 struct Checkpoint {
     fingerprint: FileFingerprint,
@@ -43,6 +45,7 @@ pub struct Checkpointer {
     stable_file_path: PathBuf,
     glob_string: String,
     checkpoints: Arc<CheckpointsView>,
+    last: Mutex<Option<State>>,
 }
 
 /// A thread-safe handle for reading and writing checkpoints in-memory across
@@ -164,8 +167,7 @@ impl CheckpointsView {
         fingerprinter: &Fingerprinter,
         fingerprint_buffer: &mut Vec<u8>,
     ) {
-        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(&path, fingerprint_buffer)
-        {
+        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(path, fingerprint_buffer) {
             self.update_key(old_checksum, fng)
         }
 
@@ -178,7 +180,7 @@ impl CheckpointsView {
 
         if self.checkpoints.get(&fng).is_none() {
             if let Ok(Some(fingerprint)) =
-                fingerprinter.get_legacy_checksum(&path, fingerprint_buffer)
+                fingerprinter.get_legacy_checksum(path, fingerprint_buffer)
             {
                 if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
                     self.update(fng, pos);
@@ -201,6 +203,7 @@ impl Checkpointer {
             tmp_file_path,
             stable_file_path,
             checkpoints: Arc::new(CheckpointsView::default()),
+            last: Mutex::new(None),
         }
     }
 
@@ -292,20 +295,28 @@ impl Checkpointer {
         // matter anymore.
         self.checkpoints.remove_expired();
 
-        // Write the new checkpoints to a tmp file and flush it fully to
-        // disk. If vector dies anywhere during this section, the existing
-        // stable file will still be in its current valid state and we'll be
-        // able to recover.
-        let mut f = io::BufWriter::new(fs::File::create(&self.tmp_file_path)?);
-        serde_json::to_writer(&mut f, &self.checkpoints.get_state())?;
-        f.into_inner()?.sync_all()?;
+        let current = self.checkpoints.get_state();
 
-        // Once the temp file is fully flushed, rename the tmp file to replace
-        // the previous stable file. This is an atomic operation on POSIX
-        // systems (and the stdlib claims to provide equivalent behavior on
-        // Windows), which should prevent scenarios where we don't have at least
-        // one full valid file to recover from.
-        fs::rename(&self.tmp_file_path, &self.stable_file_path)?;
+        // Fetch last written state.
+        let mut last = self.last.lock().expect("Data poisoned.");
+        if last.as_ref() != Some(&current) {
+            // Write the new checkpoints to a tmp file and flush it fully to
+            // disk. If vector dies anywhere during this section, the existing
+            // stable file will still be in its current valid state and we'll be
+            // able to recover.
+            let mut f = io::BufWriter::new(fs::File::create(&self.tmp_file_path)?);
+            serde_json::to_writer(&mut f, &current)?;
+            f.into_inner()?.sync_all()?;
+
+            // Once the temp file is fully flushed, rename the tmp file to replace
+            // the previous stable file. This is an atomic operation on POSIX
+            // systems (and the stdlib claims to provide equivalent behavior on
+            // Windows), which should prevent scenarios where we don't have at least
+            // one full valid file to recover from.
+            fs::rename(&self.tmp_file_path, &self.stable_file_path)?;
+
+            *last = Some(current);
+        }
 
         Ok(self.checkpoints.checkpoints.len())
     }
@@ -426,7 +437,7 @@ mod test {
         for fingerprint in fingerprints {
             let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             assert_eq!(
                 chkptr.decode(&chkptr.encode(fingerprint, position)),
                 (fingerprint, position)
@@ -461,7 +472,7 @@ mod test {
 
         // load and persist the checkpoints
         {
-            let chkptr = Checkpointer::new(&data_dir.path());
+            let chkptr = Checkpointer::new(data_dir.path());
 
             for (fingerprint, modified) in &[&newer, &newish, &oldish, &older] {
                 chkptr.checkpoints.load(Checkpoint {
@@ -476,7 +487,7 @@ mod test {
 
         // read them back and assert old are removed
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(ignore_before);
 
             assert_eq!(chkptr.get_checkpoint(newish.0), Some(position));
@@ -498,13 +509,13 @@ mod test {
             let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
             {
-                let mut chkptr = Checkpointer::new(&data_dir.path());
+                let mut chkptr = Checkpointer::new(data_dir.path());
                 chkptr.update_checkpoint(fingerprint, position);
                 assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
                 chkptr.write_checkpoints().ok();
             }
             {
-                let mut chkptr = Checkpointer::new(&data_dir.path());
+                let mut chkptr = Checkpointer::new(data_dir.path());
                 assert_eq!(chkptr.get_checkpoint(fingerprint), None);
                 chkptr.read_checkpoints(None);
                 assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
@@ -532,13 +543,13 @@ mod test {
 
         let data_dir = tempdir().unwrap();
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
             chkptr.write_checkpoints().ok();
         }
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
@@ -573,13 +584,13 @@ mod test {
 
         let data_dir = tempdir().unwrap();
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
             chkptr.write_checkpoints().ok();
         }
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
@@ -599,7 +610,7 @@ mod test {
 
         // Write out checkpoints in the legacy file format
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
             chkptr.write_legacy_checkpoints().unwrap();
@@ -613,7 +624,7 @@ mod test {
         // Read from those old files, ensure the checkpoints were loaded properly, and then write
         // them normally (i.e. in the new format)
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
             chkptr.write_checkpoints().unwrap();
@@ -627,7 +638,7 @@ mod test {
 
         // Ensure one last time that we can reread from the new files and get the same result
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
         }
@@ -644,7 +655,7 @@ mod test {
         ];
 
         let data_dir = tempdir().unwrap();
-        let mut chkptr = Checkpointer::new(&data_dir.path());
+        let mut chkptr = Checkpointer::new(data_dir.path());
 
         for (fingerprint, position, removed) in cases.clone() {
             chkptr.update_checkpoint(fingerprint, position);
@@ -706,7 +717,7 @@ mod test {
             _ => panic!("unexpected checksum types"),
         }
 
-        let mut chkptr = Checkpointer::new(&data_dir.path());
+        let mut chkptr = Checkpointer::new(data_dir.path());
 
         // pretend that we had loaded this old style checksum from disk after an upgrade
         chkptr.update_checkpoint(old, 1234);
@@ -746,7 +757,7 @@ mod test {
 
             let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let mut chkptr = Checkpointer::new(data_dir.path());
 
             chkptr.update_checkpoint(fingerprint, position);
             chkptr.write_checkpoints().unwrap();
@@ -810,7 +821,7 @@ mod test {
 
         let data_dir = tempdir().unwrap();
 
-        let mut chkptr = Checkpointer::new(&data_dir.path());
+        let mut chkptr = Checkpointer::new(data_dir.path());
 
         std::fs::write(
             data_dir.path().join("checkpoints.json"),

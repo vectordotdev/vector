@@ -85,17 +85,17 @@ option = "{{ parent.child[0] }}"
 
 ### Fallback values
 
-Vector doesn't currently support fallback values. [Issue 1692][1692] is open to add this functionality. In the interim, you can use the [`lua` transform][lua] to set a default value:
+Vector doesn't currently support fallback values. [Issue 1692][1692] is open to add this functionality. In the interim, you can use the [`remap` transform][remap] to set a default value:
 
 ```toml
 [transforms.set_defaults]
   # REQUIRED
-  type = "lua"
+  type = "remap"
   inputs = ["my-source-id"]
   source = '''
-    if event["my_field"] == nil then
-      event["my_field"] = "default"
-    end
+    if !exists(.my_field) {
+      .my_field = "default"
+    }
   '''
 ```
 
@@ -117,6 +117,7 @@ option = "{{ parent.child[0] }}"
 [fields]: /docs/reference/configuration/field-path-notation
 [log]: /docs/about/under-the-hood/architecture/data-model/log
 [paths]: /docs/reference/configuration/field-path-notation
+[remap]: /docs/reference/configuration/transforms/remap
 [strftime]: https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html#specifiers
 [timestamp]: /docs/about/under-the-hood/architecture/data-model/log/#timestamps
 [timestamp_key]: /docs/reference/configuration/global-options/#log_schema.timestamp_key

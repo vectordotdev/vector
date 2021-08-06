@@ -60,9 +60,9 @@ impl Framework {
     /// Create a new namespace.
     pub async fn namespace(
         &self,
-        namespace: &str,
+        config: namespace::Config,
     ) -> Result<up_down::Manager<namespace::CommandBuilder>> {
-        let mut manager = namespace::manager(&self.interface.kubectl_command, namespace);
+        let mut manager = namespace::manager(&self.interface.kubectl_command, config);
         manager.up().await?;
         Ok(manager)
     }
@@ -199,7 +199,7 @@ impl Framework {
             .map_err(|_| "need the node name")?;
 
         Ok(self
-            .get_pod_on_node(&vector_pod_namespace, &node, &vector_pod_name)
+            .get_pod_on_node(vector_pod_namespace, &node, vector_pod_name)
             .await
             .map_err(|_| "cant get the vector pod running on the test node")?)
     }

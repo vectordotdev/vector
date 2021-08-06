@@ -8,8 +8,6 @@ module.exports = {
     // Non-default theming
     extend: {
       backgroundImage: {
-        // Custom
-        'home-hero': "url('/img/hero-hex.svg')",
         // Built in
         none: 'none',
         'gradient-to-t': 'linear-gradient(to top, var(--tw-gradient-stops))',
@@ -264,6 +262,7 @@ module.exports = {
       '2.5': '2.5px',
       3: '3px',
       4: '4px',
+      6: '6px',
       8: '8px',
     },
     boxShadow: {

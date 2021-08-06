@@ -70,7 +70,7 @@ pub(crate) fn regex_type_def(regex: &regex::Regex) -> BTreeMap<String, Kind> {
 pub(crate) fn is_nullish(value: &Value) -> bool {
     match value {
         Value::Bytes(v) => {
-            let s = &String::from_utf8_lossy(&v)[..];
+            let s = &String::from_utf8_lossy(v)[..];
 
             match s {
                 "-" => true,

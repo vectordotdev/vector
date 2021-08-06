@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -12,7 +14,6 @@ use crate::{
     template::{Template, TemplateParseError},
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
     GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
@@ -67,13 +68,6 @@ pub struct SqsSinkConfig {
     pub auth: AwsAuthentication,
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        timeout_secs: Some(30),
-        ..Default::default()
-    };
-}
-
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
@@ -103,7 +97,7 @@ impl SinkConfig for SqsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client()?;
+        let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone());
         let sink = SqsSink::new(self.clone(), cx, client)?;
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck.boxed()))
@@ -131,9 +125,9 @@ impl SqsSinkConfig {
             .map_err(Into::into)
     }
 
-    pub fn create_client(&self) -> crate::Result<SqsClient> {
+    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client()?;
+        let client = rusoto::client(proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
@@ -152,7 +146,10 @@ impl SqsSink {
         // Up to 10 events, not more than 256KB as total size.
         let batch = BatchSettings::default().events(1).bytes(262_144);
 
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            timeout_secs: Some(30),
+            ..Default::default()
+        });
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
         let message_group_id = match (config.message_group_id, fifo) {

@@ -179,7 +179,7 @@ impl TryFrom<Value> for Filter {
                                 .map(|value| match value {
                                     Value::Regex(regex) => Ok(Pattern::Regex((**regex).clone())),
                                     Value::Bytes(bytes) => Ok(Pattern::String(
-                                        String::from_utf8_lossy(&bytes).into_owned(),
+                                        String::from_utf8_lossy(bytes).into_owned(),
                                     )),
                                     _ => Err("`patterns` must be regular expressions"),
                                 })
@@ -219,7 +219,7 @@ impl Filter {
                     })
             }
             Filter::UsSocialSecurityNumber => {
-                US_SOCIAL_SECURITY_NUMBER.replace_all(&input, redactor.pattern())
+                US_SOCIAL_SECURITY_NUMBER.replace_all(input, redactor.pattern())
             }
         }
     }

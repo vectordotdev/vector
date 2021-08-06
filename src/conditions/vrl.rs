@@ -49,7 +49,10 @@ impl ConditionConfig for VrlConfig {
                 .to_string()
         })?;
 
-        Ok(Box::new(Vrl { program }))
+        Ok(Box::new(Vrl {
+            program,
+            source: self.source.clone(),
+        }))
     }
 }
 
@@ -58,6 +61,7 @@ impl ConditionConfig for VrlConfig {
 #[derive(Clone)]
 pub struct Vrl {
     pub(super) program: Program,
+    pub(super) source: String,
 }
 
 impl Vrl {
@@ -95,9 +99,30 @@ impl Condition for Vrl {
     }
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        let value = self
-            .run(event)
-            .map_err(|err| format!("source execution failed: {:#}", err))?;
+        let value = self.run(event).map_err(|err| match err {
+            vrl::Terminate::Abort(err) => {
+                let err = Formatter::new(
+                    &self.source,
+                    vrl::diagnostic::Diagnostic::from(
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                    ),
+                )
+                .colored()
+                .to_string();
+                format!("source execution aborted: {}", err)
+            }
+            vrl::Terminate::Error(err) => {
+                let err = Formatter::new(
+                    &self.source,
+                    vrl::diagnostic::Diagnostic::from(
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                    ),
+                )
+                .colored()
+                .to_string();
+                format!("source execution failed: {}", err)
+            }
+        })?;
 
         match value {
             Value::Boolean(v) if v => Ok(()),

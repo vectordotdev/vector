@@ -263,7 +263,7 @@ mod tests {
 
         for (format, logs) in logs {
             for log in logs {
-                assert!(parse_log(&log, format).is_ok());
+                assert!(parse_log(log, format).is_ok());
             }
         }
     }

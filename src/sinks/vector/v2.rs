@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
-    event::proto::EventWrapper,
+    event::{proto::EventWrapper, Event},
     proto::vector as proto,
     sinks::util::{
         retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
@@ -10,7 +10,6 @@ use crate::{
 };
 use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
-use lazy_static::lazy_static;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -21,7 +20,6 @@ use tonic::{
     IntoRequest,
 };
 use tower::ServiceBuilder;
-use vector_core::event::{Event, WithMetadata};
 
 type Client = proto::Client<Channel>;
 type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
@@ -60,12 +58,6 @@ fn default_config(address: &str) -> VectorConfig {
         request: TowerRequestConfig::default(),
         tls: None,
     }
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        ..Default::default()
-    };
 }
 
 /// grpc doesn't like an address without a scheme, so we default to http if one isn't specified in
@@ -124,7 +116,7 @@ impl VectorConfig {
 
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck.clone());
 
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch = BatchSettings::default()
             .events(1000)
             .timeout(1)
@@ -211,13 +203,11 @@ impl tower::Service<Vec<EventWrapper>> for Client {
     }
 }
 
-fn encode_event(event: Event) -> EncodedEvent<EventWrapper> {
-    let event: WithMetadata<EventWrapper> = event.into();
+fn encode_event(mut event: Event) -> EncodedEvent<EventWrapper> {
+    let finalizers = event.metadata_mut().take_finalizers();
+    let item = event.into();
 
-    EncodedEvent {
-        item: event.data,
-        metadata: Some(event.metadata),
-    }
+    EncodedEvent { item, finalizers }
 }
 
 impl EncodedLength for EventWrapper {

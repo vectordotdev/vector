@@ -223,7 +223,7 @@ impl Value {
 
     pub fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
         match self.as_bytes() {
-            Some(bytes) => Ok(String::from_utf8_lossy(&bytes)),
+            Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
             None => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::Bytes,

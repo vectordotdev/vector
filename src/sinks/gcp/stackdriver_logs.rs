@@ -9,8 +9,7 @@ use crate::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer,
-            TowerRequestConfig,
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -20,7 +19,6 @@ use crate::{
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
@@ -63,6 +61,7 @@ struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
     severity_key: Option<String>,
+    uri: Uri,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -101,16 +100,7 @@ inventory::submit! {
 
 impl_generate_config_from_default!(StackdriverConfig);
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        rate_limit_num: Some(1000),
-        rate_limit_duration_secs: Some(1),
-        ..Default::default()
-    };
-    static ref URI: Uri = "https://logging.googleapis.com/v2/entries:write"
-        .parse()
-        .unwrap();
-}
+const ENDPOINT_URI: &str = "https://logging.googleapis.com/v2/entries:write";
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
@@ -122,14 +112,19 @@ impl SinkConfig for StackdriverConfig {
             .bytes(bytesize::kib(5000u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            rate_limit_num: Some(1000),
+            rate_limit_duration_secs: Some(1),
+            ..Default::default()
+        });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let sink = StackdriverSink {
             config: self.clone(),
             creds,
             severity_key: self.severity_key.clone(),
+            uri: ENDPOINT_URI.parse().unwrap(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
@@ -161,7 +156,7 @@ impl HttpSink for StackdriverSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut labels = HashMap::with_capacity(self.config.resource.labels.len());
         for (key, template) in &self.config.resource.labels {
             let value = template
@@ -218,7 +213,7 @@ impl HttpSink for StackdriverSink {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
-        Some(EncodedEvent::new(json!(entry)).with_metadata(log))
+        Some(json!(entry))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -226,7 +221,7 @@ impl HttpSink for StackdriverSink {
 
         let body = serde_json::to_vec(&events).unwrap();
 
-        let mut request = Request::post(URI.clone())
+        let mut request = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
@@ -330,6 +325,7 @@ mod tests {
             config,
             creds: None,
             severity_key: Some("anumber".into()),
+            uri: ENDPOINT_URI.parse().unwrap(),
         };
 
         let log = [
@@ -341,7 +337,7 @@ mod tests {
         .iter()
         .copied()
         .collect::<LogEvent>();
-        let json = sink.encode_event(Event::from(log)).unwrap().item;
+        let json = sink.encode_event(Event::from(log)).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
@@ -370,6 +366,7 @@ mod tests {
             config,
             creds: None,
             severity_key: Some("anumber".into()),
+            uri: ENDPOINT_URI.parse().unwrap(),
         };
 
         let mut log = LogEvent::default();
@@ -380,7 +377,7 @@ mod tests {
             Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
         );
 
-        let json = sink.encode_event(Event::from(log)).unwrap().item;
+        let json = sink.encode_event(Event::from(log)).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
@@ -437,12 +434,13 @@ mod tests {
             config,
             creds: None,
             severity_key: None,
+            uri: ENDPOINT_URI.parse().unwrap(),
         };
 
         let log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
         let log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
-        let event1 = sink.encode_event(Event::from(log1)).unwrap().item;
-        let event2 = sink.encode_event(Event::from(log2)).unwrap().item;
+        let event1 = sink.encode_event(Event::from(log1)).unwrap();
+        let event2 = sink.encode_event(Event::from(log2)).unwrap();
 
         let json1 = serde_json::to_string(&event1).unwrap();
         let json2 = serde_json::to_string(&event2).unwrap();

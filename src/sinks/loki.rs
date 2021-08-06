@@ -21,8 +21,8 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         service::ConcurrencyOption,
-        BatchConfig, BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+        UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -112,7 +112,7 @@ impl SinkConfig for LokiConfig {
             .timeout(1)
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls)?;
+        let client = HttpClient::new(tls, cx.proxy())?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
@@ -181,7 +181,7 @@ impl HttpSink for LokiSink {
     type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
     type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let tenant_id = self.tenant_id.as_ref().and_then(|t| {
             t.render_string(&event)
                 .map_err(|missing| {
@@ -244,17 +244,14 @@ impl HttpSink for LokiSink {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(
-            EncodedEvent::new(PartitionInnerBuffer::new(
-                LokiRecord {
-                    labels,
-                    event,
-                    partition: key.clone(),
-                },
-                key,
-            ))
-            .with_metadata(log),
-        )
+        Some(PartitionInnerBuffer::new(
+            LokiRecord {
+                labels,
+                event,
+                partition: key.clone(),
+            },
+            key,
+        ))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -302,6 +299,7 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ProxyConfig;
     use crate::event::Event;
     use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::{build_test_server, load_sink};
@@ -330,7 +328,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let mut record = sink.encode_event(e1).unwrap().item.into_parts().0;
+        let mut record = sink.encode_event(e1).unwrap().into_parts().0;
 
         // HashMap -> Vec doesn't like keeping ordering
         record.labels.sort();
@@ -370,7 +368,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let record = sink.encode_event(e1).unwrap().item.into_parts().0;
+        let record = sink.encode_event(e1).unwrap().into_parts().0;
 
         let expected_line = serde_json::to_string(&serde_json::json!({
             "message": "hello world",
@@ -408,7 +406,8 @@ mod tests {
         tokio::spawn(server);
 
         let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
-        let client = HttpClient::new(tls).expect("could not create HTTP client");
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
         healthcheck(config.clone(), client)
             .await

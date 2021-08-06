@@ -1,9 +1,11 @@
 use crate::event::Event;
 use futures::Stream;
 use std::pin::Pin;
-
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;
+pub use config::{DataType, ExpandType, TransformConfig};
+
+mod config;
 
 /// Transforms come in two variants. Functions, or tasks.
 ///

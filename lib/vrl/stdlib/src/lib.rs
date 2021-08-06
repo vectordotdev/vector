@@ -108,6 +108,8 @@ mod r#match;
 mod match_any;
 #[cfg(feature = "match_array")]
 mod match_array;
+#[cfg(feature = "match_datadog_query")]
+mod match_datadog_query;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -166,6 +168,8 @@ mod parse_timestamp;
 mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
+#[cfg(feature = "parse_user_agent")]
+mod parse_user_agent;
 #[cfg(feature = "parse_xml")]
 mod parse_xml;
 #[cfg(feature = "push")]
@@ -333,6 +337,8 @@ pub use log::Log;
 pub use match_any::MatchAny;
 #[cfg(feature = "match_array")]
 pub use match_array::MatchArray;
+#[cfg(feature = "match_datadog_query")]
+pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -389,6 +395,8 @@ pub use parse_timestamp::ParseTimestamp;
 pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
+#[cfg(feature = "parse_user_agent")]
+pub use parse_user_agent::ParseUserAgent;
 #[cfg(feature = "parse_xml")]
 pub use parse_xml::ParseXml;
 #[cfg(feature = "push")]
@@ -554,6 +562,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(MatchAny),
         #[cfg(feature = "match_array")]
         Box::new(MatchArray),
+        #[cfg(feature = "match_datadog_query")]
+        Box::new(MatchDatadogQuery),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -614,6 +624,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
+        #[cfg(feature = "parse_user_agent")]
+        Box::new(ParseUserAgent),
         #[cfg(feature = "parse_xml")]
         Box::new(ParseXml),
         #[cfg(feature = "push")]

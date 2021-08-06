@@ -67,7 +67,7 @@ lazy_static! {
         (?P<severity>[^\[]*))\])\s+                 # Match ary character except `]`, `]` and at least one whitespace.
         (-|\[\s*pid\s*(-|(?P<pid>[^:]*)             # Match `-` or `[` followed by `pid`, `-` or any character except `:`.
         (:\s*tid\s*(?P<thread>[^\[]*))?)\])\s       # Match `tid` followed by any character except `]`, `]` and at least one whitespace.
-        (-|\[\s*client\s*(-|(?P<client>[^:]*):      # Match `-` or `[` followed by `client`, `-` or any character except `:`.
+        (-|\[\s*client\s*(-|(?P<client>.*:?):       # Match `-` or `[` followed by `client`, `-` or any character until the first or last `:` for the port.
         (?P<port>[^\[]*))\])\s                      # Match `-` or `[` followed by `-` or any character except `]`, `]` and at least one whitespace.
         (-|(?P<message>.*))                         # Match `-` or any character.
         \s*$                                        # Match any number of whitespaces (to be discarded).
@@ -123,7 +123,7 @@ fn parse_time(
 ) -> std::result::Result<DateTime<Utc>, String> {
     timezone
         .datetime_from_str(time, format)
-        .or_else(|_| DateTime::parse_from_str(time, &format).map(Into::into))
+        .or_else(|_| DateTime::parse_from_str(time, format).map(Into::into))
         .map_err(|err| {
             format!(
                 "failed parsing timestamp {} using format {}: {}",
@@ -142,7 +142,7 @@ fn capture_value(
     timezone: &TimeZone,
 ) -> std::result::Result<Value, String> {
     Ok(match name {
-        "timestamp" => Value::Timestamp(parse_time(&value, &timestamp_format, timezone)?),
+        "timestamp" => Value::Timestamp(parse_time(value, timestamp_format, timezone)?),
         "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
             value
                 .parse()
@@ -166,7 +166,7 @@ pub fn log_fields(
                 captures.name(name).map(|value| {
                     Ok((
                         name.to_string(),
-                        capture_value(&name, &value.as_str(), &timestamp_format, timezone)?,
+                        capture_value(name, value.as_str(), timestamp_format, timezone)?,
                     ))
                 })
             })

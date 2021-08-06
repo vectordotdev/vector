@@ -17,6 +17,7 @@ components: sinks: datadog_metrics: {
 			}
 			compression: enabled: false
 			encoding: enabled:    false
+			proxy: enabled:       true
 			request: {
 				enabled:                    true
 				concurrency:                5

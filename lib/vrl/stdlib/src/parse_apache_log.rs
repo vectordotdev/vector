@@ -105,7 +105,7 @@ impl Expression for ParseApacheLogFn {
             .captures(&message)
             .ok_or("failed parsing common log line")?;
 
-        log_util::log_fields(&regex, &captures, &timestamp_format, ctx.timezone())
+        log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
             .map_err(Into::into)
     }
 
@@ -247,6 +247,24 @@ mod tests {
                 "pid" => 4803,
                 "thread" => "3814",
                 "client" => "147.159.108.175",
+                "port" => 24259
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::default(),
+        }
+
+        error_line_ip_v6 {
+            args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client eda7:35d:3ceb:ef1e:2133:e7bf:116e:24cc:24259] I'll bypass the haptic COM bandwidth, that should matrix the CSS driver!"#,
+                             format: "error"
+                             ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().into()),
+                "message" => "I'll bypass the haptic COM bandwidth, that should matrix the CSS driver!",
+                "module" => "ab",
+                "severity" => "alert",
+                "pid" => 4803,
+                "thread" => "3814",
+                "client" => "eda7:35d:3ceb:ef1e:2133:e7bf:116e:24cc",
                 "port" => 24259
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),

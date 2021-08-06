@@ -156,7 +156,7 @@ fn main() {
                             } else if want.starts_with("s'") && want.ends_with('\'') {
                                 want[2..want.len() - 1].into()
                             } else {
-                                match serde_json::from_str::<'_, serde_json::Value>(&want.trim()) {
+                                match serde_json::from_str::<'_, serde_json::Value>(want.trim()) {
                                     Ok(want) => want,
                                     Err(err) => {
                                         eprintln!("{}", err);
@@ -201,7 +201,7 @@ fn main() {
                                 || got == want
                             {
                                 println!("{}", Colour::Green.bold().paint("OK"));
-                            } else if err == Terminate::Abort {
+                            } else if matches!(err, Terminate::Abort { .. }) {
                                 let want =
                                     match serde_json::from_str::<'_, serde_json::Value>(&want) {
                                         Ok(want) => want,

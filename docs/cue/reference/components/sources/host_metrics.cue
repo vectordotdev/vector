@@ -376,6 +376,7 @@ components: sources: host_metrics: {
 		filesystem_free_bytes:  _host & _filesystem_bytes & {description: "The number of bytes free on the named filesystem."}
 		filesystem_total_bytes: _host & _filesystem_bytes & {description: "The total number of bytes in the named filesystem."}
 		filesystem_used_bytes:  _host & _filesystem_bytes & {description: "The number of bytes used on the named filesystem."}
+		filesystem_used_ratio:  _host & _filesystem_bytes & {description: "The ratio between used and total bytes on the named filesystem."}
 
 		// Host load
 		load1:  _host & _loadavg & {description: "System load averaged over the last 1 second."}

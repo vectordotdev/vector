@@ -14,30 +14,50 @@ then
 fi
 ACTION=$1
 
+NGINX_VERSION=1.19.4
+
 #
 # Functions
 #
 
 start_podman () {
   podman pod create --replace --name vector-test-integration-nginx -p 8010:8000
-  podman run -d --pod=vector-test-integration-nginx --name vector_nginx \
-	-v "$(pwd)"tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
+  podman run -d \
+    --pod=vector-test-integration-nginx \
+    --name vector_squid \
+    babim/squid
+  podman run -d \
+    --pod=vector-test-integration-nginx \
+    --name vector_nginx \
+	  -v "$(pwd)"/tests/data/nginx/:/etc/nginx:ro \
+    nginx:$NGINX_VERSION
 }
 
 start_docker () {
   docker network create vector-test-integration-nginx
-  docker run -d --network=vector-test-integration-nginx -p 8010:8000 --name vector_nginx \
-	-v "$(pwd)"/tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
+  docker run -d \
+    --network=vector-test-integration-nginx \
+    -p 3128:3128 \
+    --name vector_squid \
+    babim/squid
+  docker run -d \
+    --network=vector-test-integration-nginx \
+    -p 8010:8000 \
+    --name vector_nginx \
+	  -v "$(pwd)"/tests/data/nginx/:/etc/nginx:ro \
+    nginx:$NGINX_VERSION
 }
 
 stop_podman () {
   podman rm --force vector_nginx 2>/dev/null; true
+  podman rm --force vector_squid 2>/dev/null; true
   podman pod stop vector-test-integration-nginx 2>/dev/null; true
   podman pod rm --force vector-test-integration-nginx 2>/dev/null; true
 }
 
 stop_docker () {
   docker rm --force vector_nginx 2>/dev/null; true
+  docker rm --force vector_squid 2>/dev/null; true
   docker network rm vector-test-integration-nginx 2>/dev/null; true
 }
 

@@ -57,6 +57,7 @@ criterion_group!(
               r#match,
               match_any,
               match_array,
+              match_datadog_query,
               md5,
               merge,
               // TODO: value is dynamic so we cannot assert equality
@@ -83,6 +84,7 @@ criterion_group!(
               parse_timestamp,
               parse_tokens,
               parse_url,
+              parse_user_agent,
               parse_xml,
               push,
               redact,
@@ -775,6 +777,85 @@ bench_function! {
 }
 
 bench_function! {
+    match_datadog_query => vrl_stdlib::MatchDatadogQuery;
+
+    equals_message {
+        args: func_args![value: value!({"message": "match by word boundary"}), query: "match"],
+        want: Ok(true),
+    }
+
+    equals_tag {
+        args: func_args![value: value!({"tags": ["x:1", "y:2", "z:3"]}), query: "y:2"],
+        want: Ok(true),
+    }
+
+    equals_facet {
+        args: func_args![value: value!({"custom": {"z": 1}}), query: "@z:1"],
+        want: Ok(true),
+    }
+
+    negate_wildcard_prefix_message {
+        args: func_args![value: value!({"message": "vector"}), query: "-*tor"],
+        want: Ok(false),
+    }
+
+    wildcard_prefix_tag_no_match {
+        args: func_args![value: value!({"tags": ["b:vector"]}), query: "a:*tor"],
+        want: Ok(false),
+    }
+
+    wildcard_suffix_facet {
+        args: func_args![value: value!({"custom": {"a": "vector"}}), query: "@a:vec*"],
+        want: Ok(true),
+    }
+
+    wildcard_multiple_message {
+        args: func_args![value: value!({"message": "vector"}), query: "v*c*r"],
+        want: Ok(true),
+    }
+
+    not_wildcard_multiple_facet_no_match {
+        args: func_args![value: value!({"custom": {"b": "vector"}}), query: "NOT @a:v*c*r"],
+        want: Ok(true),
+    }
+
+    negate_range_facet_between_no_match {
+        args: func_args![value: value!({"custom": {"a": 200}}), query: "-@a:[1 TO 6]"],
+        want: Ok(true),
+    }
+
+    not_range_facet_between_no_match_string {
+        args: func_args![value: value!({"custom": {"a": "7"}}), query: r#"NOT @a:["1" TO "60"]"#],
+        want: Ok(true),
+    }
+
+    exclusive_range_message_lower {
+        args: func_args![value: value!({"message": "200"}), query: "{1 TO *}"],
+        want: Ok(true),
+    }
+
+    not_exclusive_range_message_upper_no_match {
+        args: func_args![value: value!({"message": "3"}), query: "NOT {* TO 3}"],
+        want: Ok(true),
+    }
+
+    negate_message_and_or_2 {
+        args: func_args![value: value!({"message": "this contains the_other"}), query: "this AND -(that OR the_other)"],
+        want: Ok(false),
+    }
+
+    message_or_and {
+        args: func_args![value: value!({"message": "just this"}), query: "this OR (that AND the_other)"],
+        want: Ok(true),
+    }
+
+    kitchen_sink_2 {
+        args: func_args![value: value!({"tags": ["c:that", "d:the_other"], "custom": {"b": "testing", "e": 3}}), query: "host:this OR ((@b:test* AND c:that) AND d:the_other @e:[1 TO 5])"],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
     md5  => vrl_stdlib::Md5;
 
     literal {
@@ -1383,6 +1464,54 @@ bench_function! {
                         "path": "/",
                         "query": {},
                         "fragment": null,
+        }))
+    }
+}
+
+bench_function! {
+    parse_user_agent => vrl_stdlib::ParseUserAgent;
+
+    fast {
+        args: func_args![value: "Mozilla Firefox 1.0.1 Mozilla/5.0 (X11; U; Linux i686; de-DE; rv:1.7.6) Gecko/20050223 Firefox/1.0.1"],
+        want: Ok(value!({
+            "browser": {
+                "family": "Firefox",
+                "version": "1.0.1",
+            },
+            "device": {
+                "category": "pc",
+            },
+            "os": {
+                "family": "Linux",
+                "version": null,
+            },
+        }))
+    }
+
+    enriched {
+        args: func_args![value: "Opera/9.80 (J2ME/MIDP; Opera Mini/4.3.24214; iPhone; CPU iPhone OS 4_2_1 like Mac OS X; AppleWebKit/24.783; U; en) Presto/2.5.25 Version/10.54", mode: "enriched"],
+        want: Ok(value!({
+            "browser": {
+                "family": "Opera Mini",
+                "major": "4",
+                "minor": "3",
+                "patch": "24214",
+                "version": "10.54",
+            },
+            "device": {
+                "brand": "Apple",
+                "category": "smartphone",
+                "family": "iPhone",
+                "model": "iPhone",
+            },
+            "os": {
+                "family": "iOS",
+                "major": "4",
+                "minor": "2",
+                "patch": "1",
+                "patch_minor": null,
+                "version": "4.2.1",
+            },
         }))
     }
 }

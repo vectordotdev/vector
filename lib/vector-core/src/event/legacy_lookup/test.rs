@@ -98,7 +98,7 @@ fn impl_index_usize() {
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
     for i in 0..SUFFICIENTLY_DECOMPOSED.len() {
-        assert_eq!(lookup[i], SUFFICIENTLY_DECOMPOSED[i])
+        assert_eq!(lookup[i], SUFFICIENTLY_DECOMPOSED[i]);
     }
 }
 
@@ -108,7 +108,7 @@ fn impl_index_mut_index_mut() {
 
     for i in 0..SUFFICIENTLY_DECOMPOSED.len() {
         let x = &mut lookup[i]; // Make sure we force a mutable borrow!
-        assert_eq!(*x, SUFFICIENTLY_DECOMPOSED[i])
+        assert_eq!(*x, SUFFICIENTLY_DECOMPOSED[i]);
     }
 }
 

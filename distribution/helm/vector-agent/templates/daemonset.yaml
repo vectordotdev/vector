@@ -48,6 +48,9 @@ spec:
           args:
             - --config-dir
             - /etc/vector/
+            {{- with .Values.args }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           env:
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:

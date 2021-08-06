@@ -94,6 +94,12 @@ components: sources: [Name=string]: {
 		}
 
 		if features.collect != _|_ {
+			if features.collect.proxy != _|_ {
+				if features.collect.proxy.enabled {
+					proxy: configuration._proxy
+				}
+			}
+
 			if features.collect.tls != _|_ {
 				if features.collect.tls.enabled {
 					tls: configuration._tls_connect & {_args: {
@@ -161,7 +167,7 @@ components: sources: [Name=string]: {
 				}
 
 				_local_host: {
-					description: "The local hostname, equivalent to the `gethostname` command."
+					description: string | *"The local hostname, equivalent to the `gethostname` command."
 					required:    true
 					type: string: {
 						examples: [_values.local_host]
