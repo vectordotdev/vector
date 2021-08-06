@@ -8,6 +8,7 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
+  {{- include "vector-aggregator.servicePorts" . | nindent 2 }}
   {{- include "vector-aggregator.generatePorts" . | indent 2 }}
   selector:
     {{- include "libvector.selectorLabels" . | nindent 4 }}

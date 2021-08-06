@@ -173,35 +173,11 @@ service:
   # Service type - defaults to `ClusterIP` (only relevant for the regular service).
   type: "ClusterIP"
   # Additional ports to expose.
-  ports:
-    - name: datadog
-      port: 8282
-      protocol: TCP
-      targetPort: 8282
-    - name: fluent
-      port: 24224
-      protocol: TCP
-      targetPort: 24224
-    - name: logstash
-      port: 5044
-      protocol: TCP
-      targetPort: 5044
-    - name: splunk-hec
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
-    - name: statsd
-      port: 8125
-      protocol: TCP
-      targetPort: 8125
-    - name: syslog
-      port: 9000
-      protocol: TCP
-      targetPort: 9000
-    - name: vector
-      port: 6000
-      protocol: TCP
-      targetPort: 6000
+  ports: []
+  #  - name: vector
+  #    port: 6000
+  #    protocol: TCP
+  #    targetPort: 6000
 
 # Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
 # of using a generated one.
@@ -212,45 +188,45 @@ existingConfigMap: ""
 # Note a complete and valid configuration is required. If used, the deprecated
 # configuration keys will be ignored. More information can be found at:
 # https://vector.dev/highlights/2021-07-13-helm-customconfig
-customConfig:
-  data_dir: "/vector-data-dir"
-  sources:
-    datadog_agent:
-      type: datadog_logs
-      address: 0.0.0.0:8282
-    fluent:
-      type: fluent
-      address: 0.0.0.0:24224
-    internal_metrics:
-      type: internal_metrics
-    logstash:
-      type: logstash
-      address: 0.0.0.0:5044
-    splunk_hec:
-      type: splunk_hec
-      address: 0.0.0.0:8080
-    statsd:
-      type: statsd
-      address: 0.0.0.0:8125
-      mode: tcp
-    syslog:
-      type: syslog
-      address: 0.0.0.0:9000
-      mode: tcp
-    vector:
-      type: vector
-      address: 0.0.0.0:6000
-      version: "2"
-  sinks:
-    prometheus_sink:
-      type: prometheus_exporter
-      inputs: ["internal_metrics"]
-      address: 0.0.0.0:9090
-    stdout:
-      type: console
-      inputs: ["datadog_agent", "fluent", "logstash", "splunk_hec", "statsd", "syslog", "vector"]
-      encoding:
-        codec: json
+customConfig: {}
+#  data_dir: "/vector-data-dir"
+#  sources:
+#    datadog_agent:
+#      type: datadog_logs
+#      address: 0.0.0.0:8282
+#    fluent:
+#      type: fluent
+#      address: 0.0.0.0:24224
+#    internal_metrics:
+#      type: internal_metrics
+#    logstash:
+#      type: logstash
+#      address: 0.0.0.0:5044
+#    splunk_hec:
+#      type: splunk_hec
+#      address: 0.0.0.0:8080
+#    statsd:
+#      type: statsd
+#      address: 0.0.0.0:8125
+#      mode: tcp
+#    syslog:
+#      type: syslog
+#      address: 0.0.0.0:9000
+#      mode: tcp
+#    vector:
+#      type: vector
+#      address: 0.0.0.0:6000
+#      version: "2"
+#  sinks:
+#    prometheus_sink:
+#      type: prometheus_exporter
+#      inputs: ["internal_metrics"]
+#      address: 0.0.0.0:9090
+#    stdout:
+#      type: console
+#      inputs: ["datadog_agent", "fluent", "logstash", "splunk_hec", "statsd", "syslog", "vector"]
+#      encoding:
+#        codec: json
 
 # Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping.
 # To be used in clusters that rely on prometheus-operator to gather metrics.

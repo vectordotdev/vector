@@ -37,34 +37,43 @@ Generate effective service ports for headless service definition.
 Determines whether there are any ports present.
 */}}
 {{- define "vector-aggregator.servicePortsPresent" -}}
-{{- or (and .Values.vectorSource.enabled (not .Values.customConfig)) (not (empty .Values.service.ports)) }}
+{{- or (or .Values.vectorSource.enabled (.Values.customConfig)) (not (empty .Values.service.ports)) }}
 {{- end }}
 
 {{/*
-Automatically generate required ports based on customConfig
+Generate an array of ServicePorts based on customConfig
 */}}
 {{- define "vector-aggregator.generatePorts" -}}
 {{- range $componentKind, $configs := .Values.customConfig }}
 {{- if eq $componentKind "sources" }}
 {{- range $componentId, $componentConfig := $configs }}
 {{- if (hasKey $componentConfig "address") }}
-{{- $port := mustRegexFind "[0-9]+$" (get $componentConfig "address") }}
-- name: {{ $componentId | kebabcase }}
-  port: {{ $port }}
-  protocol: {{ default (get $componentConfig "mode" | upper) "TCP" }}
-  targetPort: {{ $port }}
+{{- tuple $componentId $componentConfig | include "_helper.generatePort" -}}
 {{- end }}
 {{- end }}
 {{- else if eq $componentKind "sinks" }}
 {{- range $componentId, $componentConfig := $configs }}
 {{- if (hasKey $componentConfig "address") }}
-{{- $port := mustRegexFind "[0-9]+$" (get $componentConfig "address") }}
-- name: {{ $componentId | kebabcase }}
+{{- tuple $componentId $componentConfig | include "_helper.generatePort" -}}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Generate a single ServicePort based on a component configuration
+*/}}
+{{- define "_helper.generatePort" -}}
+{{- $name := index . 0 | kebabcase -}}
+{{- $config := index . 1 -}}
+{{- $port := mustRegexFind "[0-9]+$" (get $config "address") -}}
+{{- $protocol := default (get $config "mode" | upper) "TCP" }}
+- name: {{ $name }}
   port: {{ $port }}
-  protocol: {{ default (get $componentConfig "mode" | upper) "TCP" }}
+  protocol: {{ $protocol }}
   targetPort: {{ $port }}
-{{- end }}
-{{- end }}
-{{- end }}
+{{- if not (mustHas $protocol (list "TCP" "UDP")) }}
+{{ fail "Component's `mode` is not a supported protocol, please raise a issue at https://github.com/timberio/vector" }}
 {{- end }}
 {{- end }}
