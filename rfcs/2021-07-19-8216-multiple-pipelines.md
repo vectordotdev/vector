@@ -251,3 +251,8 @@ Doesn't block to create other sources/sinks.
 - [ ] Update compiler to take the pipelines into consideration during validation
 - [ ] Update topology with pipeline's components
 - [ ] Update the context for taking pipeline information
+
+## Future Improvements
+
+- Implement a mechanism to avoid Vector to stop when a pipeline is misconfigured. This could be done by just logging the error and ignoring the pipeline.
+- Allow to customize the pipelines location.
