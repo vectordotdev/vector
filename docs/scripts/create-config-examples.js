@@ -6,20 +6,24 @@ const YAML = require('yaml');
 const cueJsonOutput = 'data/docs.json';
 
 // Helper functions
-const getArrayValue = (obj) => {
-  const enumVal = (obj.enum != null) ? [Object.keys(obj.enum)[0]] : null;
+const computeExampleArrayValue = (obj) => {
+  const enumVal = (obj['enum'] != null) ? [Object.keys(obj['enum'])[0]] : null;
 
-  const examplesVal = (obj.examples != null && obj.examples.length > 0) ? [obj.examples[0]] : null;
+  const examplesVal = (obj['examples'] != null && obj['examples'].length > 0) ? [obj['examples'][0]] : null;
 
-  return obj.default || examplesVal || enumVal || null;
+  return obj['default'] || examplesVal || enumVal || null;
 }
 
-const getValue = (obj) => {
-  const enumVal = (obj.enum != null) ? Object.keys(obj.enum)[0] : null;
+const computeExampleValue = (obj) => {
+  const enumVal = (obj['enum'] != null) ? Object.keys(obj['enum'])[0] : null;
 
-  const examplesVal = (obj.examples != null && obj.examples.length > 0) ? obj.examples[0] : null;
+  const examplesVal = (obj['examples'] != null && obj['examples'].length > 0) ? obj['examples'][0] : null;
 
-  return obj.default || examplesVal || enumVal || null;
+  return obj['default'] || examplesVal || enumVal || null;
+}
+
+Object.removeNullFields = (obj) => {
+  return Object.fromEntries(Object.entries(obj).filter(([_, v]) => v != null));
 }
 
 // Convert object to TOML string
@@ -40,19 +44,19 @@ const toJson = (obj) => {
 const getExampleValue = (param, deepFilter) => {
   let value;
 
-  Object.keys(param.type).forEach(k => {
-    const p = param.type[k];
+  Object.keys(param['type']).forEach(k => {
+    const p = param['type'][k];
 
     if (['array', 'object'].includes(k)) {
       const topType = k;
 
-      if (p.items && p.items.type) {
-        const typeInfo = p.items.type;
+      if (p['items'] && p['items']['type']) {
+        const typeInfo = p['items']['type'];
 
         Object.keys(typeInfo).forEach(k => {
           if (['array', 'object'].includes(k)) {
             const subType = k;
-            const options = typeInfo[k].options;
+            const options = typeInfo[k]['options'];
 
             var subObj = {};
 
@@ -60,13 +64,13 @@ const getExampleValue = (param, deepFilter) => {
               .keys(options)
               .filter(k => deepFilter(options[k]))
               .forEach(k => {
-                Object.keys(options[k].type).forEach(key => {
-                  const deepTypeInfo = options[k].type[key];
+                Object.keys(options[k]['type']).forEach(key => {
+                  const deepTypeInfo = options[k]['type'][key];
 
                   if (subType === 'array') {
-                    subObj[k] = getArrayValue(deepTypeInfo);
+                    subObj[k] = computeExampleArrayValue(deepTypeInfo);
                   } else {
-                    subObj[k] = getValue(deepTypeInfo);
+                    subObj[k] = computeExampleValue(deepTypeInfo);
                   }
                 });
               });
@@ -74,15 +78,15 @@ const getExampleValue = (param, deepFilter) => {
             value = subObj;
           } else {
             if (topType === 'array') {
-              value = getArrayValue(typeInfo[k]);
+              value = computeExampleArrayValue(typeInfo[k]);
             } else {
-              value = getValue(typeInfo[k]);
+              value = computeExampleValue(typeInfo[k]);
             }
           }
         });
       }
     } else {
-      value = getValue(p);
+      value = computeExampleValue(p);
     }
   });
 
@@ -106,15 +110,14 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
           const options = p['type']['object']['options'];
           Object.keys(options).forEach(name => {
             const optionName = name;
-            const fullKey = `${paramName}.${optionName}`;
             const option = options[name];
             Object.keys(option['type']).forEach(k => {
               const typeInfo = option['type'][k];
-              const exampleVal = getValue(typeInfo);
+              const exampleVal = computeExampleValue(typeInfo);
 
               if (exampleVal) {
                 obj[paramName][optionName] = {};
-                obj[paramName][optionName] = exampleVal
+                obj[paramName][optionName] = exampleVal;
               }
             });
           });
@@ -129,23 +132,23 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
 
 // Convert the use case examples (`component.examples`) into multi-format
 const makeUseCaseExamples = (component) => {
-  if (component.examples) {
+  if (component['examples']) {
     var useCases = [];
-    const kind = component.kind;
+    const kind = component['kind'];
     const kindPlural = `${kind}s`;
     const keyName = `my_${kind}_id`;
 
-    component.examples.forEach((example) => {
-      const config = example.configuration;
-      const extra = Object.fromEntries(Object.entries(config).filter(([_, v]) => v != null));
+    component['examples'].forEach((example) => {
+      const config = example['configuration'];
+      const extra = Object.removeNullFields(config);
 
       let exampleConfig;
 
-      if (["transform", "sink"].includes(component.kind)) {
+      if (["transform", "sink"].includes(component['kind'])) {
         exampleConfig = {
           [kindPlural]: {
             [keyName]: {
-              "type": component.type,
+              "type": component['type'],
               inputs: ['my-source-or-transform-id'],
               ...extra
             }
@@ -155,7 +158,7 @@ const makeUseCaseExamples = (component) => {
         exampleConfig = {
           [kindPlural]: {
             [keyName]: {
-              "type": component.type,
+              "type": component['type'],
               ...extra
             }
           }
@@ -163,15 +166,15 @@ const makeUseCaseExamples = (component) => {
       }
 
       useCase = {
-        title: example.title,
-        description: example.description,
+        title: example['title'],
+        description: example['description'],
         configuration: {
           toml: toToml(exampleConfig),
           yaml: toYaml(exampleConfig),
           json: toJson(exampleConfig),
         },
-        input: example.input,
-        output: example.output,
+        input: example['input'],
+        output: example['output'],
       }
 
       useCases.push(useCase);
@@ -188,7 +191,7 @@ const main = () => {
     const debug = process.env.DEBUG === "true" || false;
     const data = fs.readFileSync(cueJsonOutput, 'utf8');
     const docs = JSON.parse(data);
-    const components = docs.components;
+    const components = docs['components'];
 
     console.log(chalk.blue("Creating example configurations for all Vector components..."));
 
@@ -201,17 +204,17 @@ const main = () => {
       // Specific components
       for (const componentType in componentsOfKind) {
         const component = componentsOfKind[componentType];
-        const configuration = component.configuration;
+        const configuration = component['configuration'];
 
         const commonParams = Object.makeExampleParams(
           configuration,
-          p => p.required || p.common,
-          p => p.required || p.common,
+          p => p['required'] || p['common'],
+          p => p['required'] || p['common'],
         );
         const advancedParams = Object.makeExampleParams(
           configuration,
           _ => true,
-          p => p.required || p.common || p.relevant_when,
+          p => p['required'] || p['common'] || p['relevant_when'],
         );
         const useCaseExamples = makeUseCaseExamples(component);
 
