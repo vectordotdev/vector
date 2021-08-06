@@ -317,6 +317,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LogEvent;
     use std::collections::BTreeMap;
 
     #[test]
@@ -345,10 +346,10 @@ mod tests {
     fn sqs_encode_event_deduplication_id() {
         let message = "hello world".to_string();
         let message_deduplication_id = Template::try_from("{{ transaction_id }}").unwrap();
-        let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("transaction_id", "some id");
+        let mut log = LogEvent::from(message.clone());
+        log.insert("transaction_id", "some id");
         let event = encode_event(
-            event,
+            log.into(),
             &Encoding::Json.into(),
             &None,
             &Some(message_deduplication_id),
