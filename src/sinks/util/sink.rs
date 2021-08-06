@@ -337,7 +337,7 @@ where
             let this = self.as_mut().project();
             let mut partitions_ready = vec![];
             for (partition, batch) in this.partitions.iter() {
-                if (*this.closing && !batch.is_empty())
+                if ((*this.closing && !batch.is_empty())
                     || batch.was_full()
                     || matches!(
                         this.lingers
@@ -345,17 +345,15 @@ where
                             .expect("linger should exists for poll_flush")
                             .poll_unpin(cx),
                         Poll::Ready(())
-                    )
-                {
-                    if this
+                    ))
+                    && this
                         .in_flight
                         .as_mut()
                         .and_then(|map| map.get_mut(partition))
                         .map(|req| matches!(req.poll_unpin(cx), Poll::Ready(())))
                         .unwrap_or(true)
-                    {
-                        partitions_ready.push(partition.clone());
-                    }
+                {
+                    partitions_ready.push(partition.clone());
                 }
             }
             let mut batch_consumed = false;
