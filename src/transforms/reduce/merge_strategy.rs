@@ -207,7 +207,7 @@ impl ShortestArrayMerger {
 impl ReduceValueMerger for ShortestArrayMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Array(a) = v {
-            if a.len() > self.v.len() {
+            if a.len() < self.v.len() {
                 self.v = a;
             }
         }
@@ -226,17 +226,35 @@ struct UniqueMerger {
     v: HashSet<Value>,
 }
 
+fn insert_value(h: &mut HashSet<Value>, v: Value) {
+    match v {
+        Value::Map(m) => {
+            for (_, v) in m {
+                h.insert(v);
+            }
+        }
+        Value::Array(vec) => {
+            for v in vec {
+                h.insert(v);
+            }
+        }
+        _ => {
+            h.insert(v);
+        }
+    }
+}
+
 impl UniqueMerger {
     fn new(v: Value) -> Self {
         let mut h = HashSet::default();
-        h.insert(v);
+        insert_value(&mut h, v);
         Self { v: h }
     }
 }
 
 impl ReduceValueMerger for UniqueMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
-        self.v.insert(v.into());
+        insert_value(&mut self.v, v);
         Ok(())
     }
 
@@ -540,14 +558,14 @@ pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceVal
                 "expected array value, found: '{}'",
                 v.to_string_lossy()
             )),
-        }
+        },
         MergeStrategy::Longest => match v {
             Value::Array(a) => Ok(Box::new(LongestArrayMerger::new(a))),
             _ => Err(format!(
                 "expected array value, found: '{}'",
                 v.to_string_lossy()
             )),
-        }
+        },
         MergeStrategy::Discard => Ok(Box::new(DiscardMerger::new(v))),
         MergeStrategy::Retain => Ok(Box::new(RetainMerger::new(v))),
         MergeStrategy::Unique => Ok(Box::new(UniqueMerger::new(v))),
@@ -736,18 +754,56 @@ mod test {
         );
 
         assert_eq!(
-            merge(json!([34]).into(), json!([42, 43]).into(), &MergeStrategy::Shortest),
-            Ok(json!([42, 43]).into())
+            merge(
+                json!([34]).into(),
+                json!([42, 43]).into(),
+                &MergeStrategy::Shortest
+            ),
+            Ok(json!([34]).into())
         );
         assert_eq!(
-            merge(json!([34]).into(), json!([42, 43]).into(), &MergeStrategy::Longest),
-            Ok(json!([34]).into())
+            merge(
+                json!([34]).into(),
+                json!([42, 43]).into(),
+                &MergeStrategy::Longest
+            ),
+            Ok(json!([42, 43]).into())
         );
 
         let v = merge(34.into(), 43.into(), &MergeStrategy::Unique).unwrap();
-        assert_eq!(v, json!([34, 43]).into());
+        if let Value::Array(v) = v.clone() {
+            let v: Vec<_> = v
+                .into_iter()
+                .map(|i| {
+                    if let Value::Integer(i) = i {
+                        i
+                    } else {
+                        panic!("Bad value");
+                    }
+                })
+                .collect();
+            assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
+            assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
+        } else {
+            panic!("Not array");
+        }
         let v = merge(v, 34.into(), &MergeStrategy::Unique).unwrap();
-        assert_eq!(v, json!([34, 43]).into());
+        if let Value::Array(mut v) = v {
+            let v: Vec<_> = v
+                .into_iter()
+                .map(|i| {
+                    if let Value::Integer(i) = i {
+                        i
+                    } else {
+                        panic!("Bad value");
+                    }
+                })
+                .collect();
+            assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
+            assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
+        } else {
+            panic!("Not array");
+        }
     }
 
     fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {

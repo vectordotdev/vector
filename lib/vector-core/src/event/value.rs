@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
-use std::hash::{Hash,  Hasher};
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
@@ -23,9 +23,7 @@ pub enum Value {
     Null,
 }
 
-impl Eq for Value {
-
-}
+impl Eq for Value {}
 
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
