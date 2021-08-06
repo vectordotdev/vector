@@ -56,15 +56,16 @@ const main = () => {
     guides.forEach((guide) => {
       let title, description;
 
-      const source = guide['source'];
-      const sink = guide['sink'];
-      const platform = guide['platform'];
-      const service = guide['service'];
+      const sourceName = guide['source'];
+      const sinkName = guide['sink'];
+      const platformName = guide['platform'];
+      const serviceName = guide['service'];
       const eventType = guide['event_type'];
+      // For cases when the component name differs from the link (e.g. "docker" vs. "docker_logs")
       const componentName = guide['component_name'];
 
-      if (source) {
-        const fromService = services[service];
+      if (sourceName) {
+        const fromService = services[serviceName];
 
         title = `Send ${eventType} from ${fromService['name']} to anywhere`;
         description = `A guide to sending ${eventType} from ${fromService['name']} to anywhere in just a few minutes`;
@@ -72,7 +73,7 @@ const main = () => {
         // Source only, e.g. /guides/integrate/sources/syslog
         createGuide({
           kind: 'sources',
-          from: source,
+          from: sourceName,
           eventType: eventType,
         }, title, description);
 
@@ -85,14 +86,14 @@ const main = () => {
 
           createGuide({
             kind: 'sources',
-            from: source,
+            from: sourceName,
             to: toSink['name'],
             eventType: eventType,
           }, title, description);
         });
 
-      } else if (sink) {
-        const toService = services[service];
+      } else if (sinkName) {
+        const toService = services[serviceName];
 
         title = `Send ${eventType} to ${toService['name']}`;
         description = `A guide to sending ${eventType} to ${toService['name']} in just a few minutes`;
@@ -100,11 +101,11 @@ const main = () => {
         // Sink only, e.g. /guides/integrate/sinks/aws_s3
         createGuide({
           kind: 'sinks',
-          to: sink,
+          to: sinkName,
           eventType: eventType,
         }, title, description);
-      } else if (platform) {
-        const fromService = services[service];
+      } else if (platformName) {
+        const fromService = services[serviceName];
 
         title = `Send ${eventType} from ${fromService['name']} to anywhere`;
         description = `A guide to sending ${eventType} from ${fromService['name']} to anywhere in just a few minutes`;
@@ -112,7 +113,7 @@ const main = () => {
         // Platform only, e.g. /guides/integrate/platforms/docker
         createGuide({
           kind: 'platforms',
-          from: platform,
+          from: platformName,
           componentName: componentName,
           eventType: eventType,
         }, title, description);
@@ -126,7 +127,7 @@ const main = () => {
 
           createGuide({
             kind: 'platforms',
-            from: platform,
+            from: platformName,
             to: toSink['name'],
             componentName: componentName,
             eventType: eventType,
