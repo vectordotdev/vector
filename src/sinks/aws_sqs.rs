@@ -344,10 +344,9 @@ mod tests {
 
     #[test]
     fn sqs_encode_event_deduplication_id() {
-        let message = "hello world".to_string();
         let message_deduplication_id = Template::try_from("{{ transaction_id }}").unwrap();
-        let mut log = LogEvent::from(message.clone());
-        log.insert("transaction_id", "some id");
+        let mut log = LogEvent::from(message);
+        log.insert("transaction_id", "hello world".to_string());
         let event = encode_event(
             log.into(),
             &Encoding::Json.into(),
