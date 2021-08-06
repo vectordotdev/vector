@@ -2,12 +2,14 @@ const fs = require('fs');
 
 const cueJsonOutput = 'data/docs.json';
 
+// Create a directory if it doesn't already exist
 const createDir = (dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir);
   }
 }
 
+// Create the guide's title
 const makeTitle = (obj) => {
   var s = `Send ${obj['eventType']}`;
 
@@ -21,6 +23,7 @@ const makeTitle = (obj) => {
   return s;
 }
 
+// Create the guide's description
 const makeDescription = (obj) => {
   var s = `A guide to sending ${obj['eventType']}`;
 
@@ -36,6 +39,7 @@ const makeDescription = (obj) => {
   return s;
 }
 
+// Create the Markdown string for the guide and write it to the filesystem
 const createGuide = (obj) => {
   const title = makeTitle(obj);
   const description = makeDescription(obj);
