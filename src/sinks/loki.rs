@@ -20,7 +20,6 @@ use crate::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
-        service::ConcurrencyOption,
         BatchConfig, BatchSettings, Concurrency, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig, UriSerde,
     },
