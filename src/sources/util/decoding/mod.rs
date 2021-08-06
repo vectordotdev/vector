@@ -7,6 +7,8 @@ use bytes::{Bytes, BytesMut};
 pub use config::{DecodingConfig, FramingConfig};
 pub use framing::OctetCountingDecoder;
 pub use parsers::BytesParser;
+#[cfg(feature = "sources-syslog")]
+pub use parsers::SyslogParser;
 use tokio_util::codec::LinesCodecError;
 
 pub trait Parser {

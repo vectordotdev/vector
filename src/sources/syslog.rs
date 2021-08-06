@@ -1,4 +1,3 @@
-use crate::internal_events::SyslogConvertUtf8Error;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 #[cfg(unix)]
@@ -9,11 +8,11 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{Event, Value},
+    event::Event,
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
     sources::util::{
-        decoding::{self, BytesDecoder, OctetCountingDecoder},
+        decoding::{self, BytesDecoder, OctetCountingDecoder, SyslogParser},
         SocketListenAddr, TcpSource,
     },
     tcp::TcpKeepaliveConfig,
@@ -21,13 +20,12 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use chrono::{DateTime, Datelike, Utc};
+use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::{net::SocketAddr, sync::Arc};
-use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
 
@@ -183,19 +181,6 @@ impl SourceConfig for SyslogConfig {
     }
 }
 
-struct SyslogParser;
-
-impl decoding::Parser for SyslogParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
-        let bytes: &[u8] = &bytes;
-        let line = std::str::from_utf8(bytes).map_err(|error| {
-            emit!(SyslogConvertUtf8Error { error });
-            error
-        })?;
-        Ok(event_from_str(line))
-    }
-}
-
 #[derive(Debug, Clone)]
 struct SyslogTcpSource {
     max_length: usize,
@@ -282,35 +267,6 @@ pub fn udp(
     })
 }
 
-/// Function used to resolve the year for syslog messages that don't include the year.
-/// If the current month is January, and the syslog message is for December, it will take the previous year.
-/// Otherwise, take the current year.
-fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
-    let now = Utc::now();
-    if now.month() == 1 && month == 12 {
-        now.year() - 1
-    } else {
-        now.year()
-    }
-}
-
-/**
-* Function to pass to build_unix_stream_source, specific to the Unix mode of the syslog source.
-* Handles the logic of parsing and decoding the syslog message format.
-**/
-// TODO: many more cases to handle:
-// octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
-// null byte delimiter in place of newline
-fn event_from_str(line: &str) -> Event {
-    let line = line.trim();
-    let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
-    let mut event = Event::from(parsed.msg);
-
-    insert_fields_from_syslog(&mut event, parsed);
-
-    event
-}
-
 fn enrich_syslog_event(
     event: &mut Event,
     host_key: &str,
@@ -344,54 +300,11 @@ fn enrich_syslog_event(
     );
 }
 
-fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
-    let log = event.as_mut_log();
-
-    if let Some(timestamp) = parsed.timestamp {
-        log.insert(
-            log_schema().timestamp_key(),
-            DateTime::<Utc>::from(timestamp),
-        );
-    }
-    if let Some(host) = parsed.hostname {
-        log.insert("hostname", host.to_string());
-    }
-    if let Some(severity) = parsed.severity {
-        log.insert("severity", severity.as_str().to_owned());
-    }
-    if let Some(facility) = parsed.facility {
-        log.insert("facility", facility.as_str().to_owned());
-    }
-    if let Protocol::RFC5424(version) = parsed.protocol {
-        log.insert("version", version as i64);
-    }
-    if let Some(app_name) = parsed.appname {
-        log.insert("appname", app_name.to_owned());
-    }
-    if let Some(msg_id) = parsed.msgid {
-        log.insert("msgid", msg_id.to_owned());
-    }
-    if let Some(procid) = parsed.procid {
-        let value: Value = match procid {
-            ProcId::PID(pid) => pid.into(),
-            ProcId::Name(name) => name.to_string().into(),
-        };
-        log.insert("procid", value);
-    }
-
-    for element in parsed.structured_data.into_iter() {
-        for (name, value) in element.params.into_iter() {
-            let key = format!("{}.{}", element.id, name);
-            log.insert(key, value.to_string());
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::Event};
-    use chrono::TimeZone;
+    use crate::{config::log_schema, event::Event, sources::util::decoding::Parser};
+    use chrono::{DateTime, Datelike, TimeZone};
     use shared::assert_event_data_eq;
 
     #[test]
@@ -527,7 +440,10 @@ mod test {
         default_host: Option<Bytes>,
         byte_size: usize,
     ) -> Event {
-        let mut event = event_from_str(line);
+        let parser = SyslogParser;
+        let mut event = parser
+            .parse(Bytes::copy_from_slice(line.as_bytes()))
+            .unwrap();
         enrich_syslog_event(&mut event, host_key, default_host, byte_size);
         event
     }

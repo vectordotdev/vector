@@ -1,7 +1,6 @@
+use super::Parser;
 use crate::event::Event;
 use bytes::Bytes;
-
-use super::Parser;
 
 pub struct BytesParser;
 

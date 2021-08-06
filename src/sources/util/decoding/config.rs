@@ -48,6 +48,8 @@ impl From<FramingConfig>
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ParserConfig {
     Bytes,
+    #[cfg(feature = "sources-syslog")]
+    Syslog,
 }
 
 #[derive(Debug, Copy, Clone, Default, Deserialize, Serialize)]
@@ -76,6 +78,8 @@ impl From<DecodingConfig> for Decoder {
 
         let parser: Box<dyn Parser + Send + Sync + 'static> = match config.decoding {
             Some(ParserConfig::Bytes) | None => Box::new(super::BytesParser),
+            #[cfg(feature = "sources-syslog")]
+            Some(ParserConfig::Syslog) => Box::new(super::SyslogParser),
         };
 
         Decoder::new(framer, parser)
