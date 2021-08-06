@@ -597,8 +597,10 @@ mod tests {
 
 #[cfg(all(test, feature = "fluent-integration-tests"))]
 mod integration_tests {
+    use crate::config::SourceConfig;
     use crate::config::SourceContext;
     use crate::docker::docker;
+    use crate::sources::fluent::FluentConfig;
     use crate::test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp};
     use crate::Pipeline;
     use bollard::{
@@ -607,11 +609,11 @@ mod integration_tests {
         models::HostConfig,
         Docker,
     };
-    use chrono::DateTime;
     use futures::{channel::mpsc, StreamExt};
     use std::{collections::HashMap, fs::File, io::Write, net::SocketAddr, time::Duration};
     use tokio::time::sleep;
     use uuid::Uuid;
+    use vector_core::event::Event;
 
     #[tokio::test]
     async fn fluentbit() {

@@ -295,7 +295,9 @@ mod test {
 
     quickcheck! {
         fn from_map(input: Vec<(String, i64)>) -> () {
-            let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.clone().into_iter().map(|(k,v)| (rmpv::Value::String(rmpv::Utf8String::from(k)), rmpv::Value::Integer(rmpv::Integer::from(v)))).collect();
+            let key_fn = |k| { rmpv::Value::String(rmpv::Utf8String::from(k)) };
+            let val_fn = |k| { rmpv::Value::Integer(rmpv::Integer::from(k)) };
+            let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.clone().into_iter().map(|(k,v)| (key_fn(k), val_fn(v))).collect();
             let actual = rmpv::Value::Map(actual_inner);
 
             let mut expected_inner = BTreeMap::new();
@@ -314,7 +316,9 @@ mod test {
             // map. Such maps are a violation of the fluent protocol and we
             // prefer to silently drop keys rather than crash the process.
 
-            let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.clone().into_iter().map(|(k,v)| (rmpv::Value::Integer(rmpv::Integer::from(k)), rmpv::Value::Integer(rmpv::Integer::from(v)))).collect();
+            let key_fn = |k| { rmpv::Value::Integer(rmpv::Integer::from(k)) };
+            let val_fn = |k| { rmpv::Value::Integer(rmpv::Integer::from(k)) };
+            let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.into_iter().map(|(k,v)| (key_fn(k), val_fn(v))).collect();
             let actual = rmpv::Value::Map(actual_inner);
 
             let expected = Value::Map(BTreeMap::new());
