@@ -7,6 +7,10 @@
 {{ $numSections := len .Sections }}
 {{ $isRoot := eq .FirstSection .CurrentSection }}
 <div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 my-16">
+  <div class="mb-4 md:mb-6">
+    {{ partial "breadcrumb.html" . }}
+  </div>
+
   <div>
     {{ partial "hero.html" . }}
   </div>
@@ -69,14 +73,15 @@
       </div>
     </div>
     {{ end }}
+
     {{ else }}
     <div class="mt-4">
       {{ with .Sections }}
-      <div class="grid grid-cols-2">
+      <div>
         {{ range . }}
         <div>
           <span class="prose dark:prose-dark">
-            {{ partial "heading.html" (dict "text" .Title "level" 3 "href" .RelPermalink "icon" false) }}
+            {{ partial "heading.html" (dict "text" .Title "level" 2 "href" .RelPermalink "icon" false) }}
           </span>
 
           {{ with .Description }}
@@ -86,13 +91,13 @@
           {{ end }}
 
           <div class="mt-3">
-            {{ .Render "list" }}
+            {{ .Render "tight-list" }}
           </div>
         </div>
         {{ end }}
       </div>
       {{ else }}
-      {{ .Render "list" }}
+      {{ .Render "tight-list" }}
       {{ end }}
     </div>
     {{ end }}

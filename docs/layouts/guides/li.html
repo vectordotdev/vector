@@ -1,6 +1,6 @@
 {{ $title := .Params.short | default .Title }}
 {{ $section := cond (eq .CurrentSection.Parent.Title "Integrate") "Integrate" .CurrentSection.Title }}
-
+{{ $displayAll := ne .Layout "integrate" }}
 <div class="cursor-pointer">
   <a href="{{ .RelPermalink }}">
     <div class="border rounded-md py-4 px-6 hover:border-secondary dark:hover:border-primary dark:border-gray-700">
@@ -21,10 +21,12 @@
         </span>
       </div>
 
+      {{ if $displayAll }}
       {{ with .Description }}
       <div class="mt-2 tracking-tight leading-tighter lg:text-md dark:text-gray-300 text-gray-500">
         {{ . | markdownify }}
       </div>
+      {{ end }}
       {{ end }}
 
       <div class="mt-3 overflow-x-scroll">
