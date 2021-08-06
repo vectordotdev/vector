@@ -44,7 +44,7 @@ impl UnixSinkConfig {
     pub fn build(
         &self,
         cx: SinkContext,
-        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
         let sink = UnixSink::new(connector.clone(), cx.acker(), encode_event);
@@ -103,14 +103,14 @@ impl UnixConnector {
 struct UnixSink {
     connector: UnixConnector,
     acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync>,
+    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
 }
 
 impl UnixSink {
     pub fn new(
         connector: UnixConnector,
         acker: Acker,
-        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> Self {
         Self {
             connector,
@@ -136,7 +136,12 @@ impl StreamSink for UnixSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
-            .map(|event| encode_event(event).unwrap_or_else(|| EncodedEvent::new(Bytes::new())))
+            .map(|mut event| {
+                let finalizers = event.metadata_mut().take_finalizers();
+                encode_event(event)
+                    .map(|item| EncodedEvent { item, finalizers })
+                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new()))
+            })
             .peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
@@ -166,7 +171,7 @@ impl StreamSink for UnixSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::{encode_event, Encoding};
+    use crate::sinks::util::{encode_log, Encoding};
     use crate::test_util::{random_lines_with_stream, CountReceiver};
     use tokio::net::UnixListener;
 
@@ -207,7 +212,7 @@ mod tests {
         let cx = SinkContext::new_test();
         let encoding = Encoding::Text.into();
         let (sink, _healthcheck) = config
-            .build(cx, move |event| encode_event(event, &encoding))
+            .build(cx, move |event| encode_log(event, &encoding))
             .unwrap();
 
         // Send the test data

@@ -32,14 +32,14 @@
 //! it to notify the consumer that the request has succeeded.
 
 use super::{
-    batch::{Batch, MetadataBatch, PushResult, StatefulBatch},
+    batch::{Batch, FinalizersBatch, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
     EncodedEvent,
 };
 use crate::{
     buffers::Acker,
-    event::{EventMetadata, EventStatus},
+    event::{EventFinalizers, EventStatus},
 };
 use futures::{
     future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
@@ -161,10 +161,10 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: EncodedEvent<B::Input>) -> Result<(), Self::Error> {
-        let EncodedEvent { item, metadata } = item;
+        let EncodedEvent { item, finalizers } = item;
         self.project().inner.start_send(EncodedEvent {
             item: PartitionInnerBuffer::new(item, ()),
-            metadata,
+            finalizers,
         })
     }
 
@@ -210,8 +210,8 @@ where
 {
     service: ServiceSink<S, B::Output, SL>,
     buffer: Option<(K, EncodedEvent<B::Input>)>,
-    batch: StatefulBatch<MetadataBatch<B>>,
-    partitions: HashMap<K, StatefulBatch<MetadataBatch<B>>>,
+    batch: StatefulBatch<FinalizersBatch<B>>,
+    partitions: HashMap<K, StatefulBatch<FinalizersBatch<B>>>,
     timeout: Duration,
     lingers: HashMap<K, Pin<Box<Sleep>>>,
     in_flight: Option<HashMap<K, BoxFuture<'static, ()>>>,
@@ -256,7 +256,7 @@ where
         Self {
             service,
             buffer: None,
-            batch: StatefulBatch::from(MetadataBatch::from(batch)),
+            batch: StatefulBatch::from(FinalizersBatch::from(batch)),
             partitions: HashMap::new(),
             timeout,
             lingers: HashMap::new(),
@@ -372,8 +372,8 @@ where
                     this.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
-                    let (batch, metadata) = batch.finish();
-                    let future = tokio::spawn(this.service.call(batch, batch_size, metadata));
+                    let (batch, finalizers) = batch.finish();
+                    let future = tokio::spawn(this.service.call(batch, batch_size, finalizers));
 
                     this.in_flight.as_mut().map(|map| {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed())
@@ -507,7 +507,7 @@ where
         &mut self,
         req: Request,
         batch_size: usize,
-        metadata: Vec<EventMetadata>,
+        finalizers: EventFinalizers,
     ) -> BoxFuture<'static, ()> {
         let seqno = self.seq_head;
         self.seq_head += 1;
@@ -528,7 +528,7 @@ where
             .call(req)
             .err_into()
             .map(move |result| {
-                logic.update_metadata(result, metadata);
+                logic.update_finalizers(result, finalizers);
 
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
@@ -582,7 +582,15 @@ where
 pub trait ServiceLogic: Clone {
     type Response: Response;
 
-    fn update_metadata(&self, result: crate::Result<Self::Response>, metadata: Vec<EventMetadata>);
+    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus;
+
+    fn update_finalizers(
+        &self,
+        result: crate::Result<Self::Response>,
+        finalizers: EventFinalizers,
+    ) {
+        finalizers.update_status(self.result_status(result));
+    }
 }
 
 #[derive(Derivative)]
@@ -603,8 +611,8 @@ where
 {
     type Response = R;
 
-    fn update_metadata(&self, result: crate::Result<Self::Response>, metadata: Vec<EventMetadata>) {
-        let status = match result {
+    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus {
+        match result {
             Ok(response) => {
                 if response.is_successful() {
                     trace!(message = "Response successful.", ?response);
@@ -621,9 +629,6 @@ where
                 error!(message = "Request failed.", %error);
                 EventStatus::Errored
             }
-        };
-        for metadata in metadata {
-            metadata.update_status(status);
         }
     }
 }
@@ -1084,8 +1089,8 @@ mod tests {
         let mut sink = ServiceSink::new(svc, acker);
 
         // send some initial requests
-        let mut fut1 = sink.call(1, 1, vec![]);
-        let mut fut2 = sink.call(2, 2, vec![]);
+        let mut fut1 = sink.call(1, 1, Default::default());
+        let mut fut2 = sink.call(2, 2, Default::default());
 
         assert_eq!(ack_counter.load(Relaxed), 0);
 
@@ -1097,8 +1102,8 @@ mod tests {
         assert_eq!(ack_counter.load(Relaxed), 3);
 
         // send one request that will error and one normal
-        let mut fut3 = sink.call(3, 3, vec![]); // i will error
-        let mut fut4 = sink.call(4, 4, vec![]);
+        let mut fut3 = sink.call(3, 3, Default::default()); // i will error
+        let mut fut4 = sink.call(4, 4, Default::default());
 
         // make sure they all "worked"
         assert!(matches!(fut3.poll_unpin(&mut cx), Poll::Ready(())));

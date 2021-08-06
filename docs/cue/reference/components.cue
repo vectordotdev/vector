@@ -724,7 +724,7 @@ components: {
 						}
 					}
 					no_proxy: {
-						common:      false
+						common: false
 						description: """
 							List of hosts to avoid proxying globally.
 
@@ -735,7 +735,7 @@ components: {
 								- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
 								- `*` will match all hosts
 							"""
-						required:    false
+						required: false
 						type: array: {
 							default: null
 							items: type: string: {

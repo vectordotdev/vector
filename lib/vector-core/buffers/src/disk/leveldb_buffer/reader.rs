@@ -71,7 +71,7 @@ where
     /// Sizes in bytes of read, not acked/deleted, events.
     pub(crate) unacked_sizes: VecDeque<usize>,
     /// Buffer for internal use.
-    pub(crate) buffer: VecDeque<Vec<u8>>,
+    pub(crate) buffer: VecDeque<(Key, Vec<u8>)>,
     /// Limit on uncompacted_size after which we trigger compaction.
     pub(crate) max_uncompacted_size: usize,
     /// Last time that compaction was triggered.
@@ -111,16 +111,16 @@ where
             tokio::task::block_in_place(|| {
                 this.buffer.extend(
                     this.db
-                        .value_iter(ReadOptions::new())
+                        .iter(ReadOptions::new())
                         .from(&Key(this.read_offset))
-                        .to(&Key(this.read_offset + 100)),
+                        .take(100),
                 );
             });
         }
 
-        if let Some(value) = this.buffer.pop_front() {
+        if let Some((key, value)) = this.buffer.pop_front() {
             this.unacked_sizes.push_back(value.len());
-            this.read_offset += 1;
+            this.read_offset = key.0;
 
             let buffer: Bytes = Bytes::from(value);
             match T::decode(buffer) {
