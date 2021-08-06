@@ -1186,15 +1186,16 @@ impl TypeDef {
                 kinds
                     .iter()
                     .map(|kind| match (kind, path.next(), path.peek()) {
-                        (TypeKind::Object(object), Some(SegmentBuf::Field(_)), Some(_)) => {
+                        (TypeKind::Object(object), Some(SegmentBuf::Field(fieldname)), Some(_)) => {
                             TypeKind::Object(
                                 object
                                     .iter()
-                                    .map(|(field, kindinfo)| {
-                                        (
+                                    .map(|(field, kindinfo)| match field {
+                                        Field::Field(name) if name == fieldname.as_str() => (
                                             field.clone(),
                                             Self::remove_segment(kindinfo, path.clone()),
-                                        )
+                                        ),
+                                        _ => (field.clone(), kindinfo.clone()),
                                     })
                                     .collect(),
                             )
@@ -1212,19 +1213,28 @@ impl TypeDef {
                             )
                         }
 
-                        (TypeKind::Object(object), Some(SegmentBuf::Coalesce(_)), Some(_)) => {
-                            TypeKind::Object(
-                                object
-                                    .iter()
-                                    .map(|(field, kindinfo)| {
+                        (
+                            TypeKind::Object(object),
+                            Some(SegmentBuf::Coalesce(fieldnames)),
+                            Some(_),
+                        ) => TypeKind::Object(
+                            object
+                                .iter()
+                                .map(|(field, kindinfo)| match field {
+                                    Field::Field(name)
+                                        if fieldnames
+                                            .iter()
+                                            .any(|fieldname| fieldname.as_str() == name) =>
+                                    {
                                         (
                                             field.clone(),
                                             Self::remove_segment(kindinfo, path.clone()),
                                         )
-                                    })
-                                    .collect(),
-                            )
-                        }
+                                    }
+                                    _ => (field.clone(), kindinfo.clone()),
+                                })
+                                .collect(),
+                        ),
 
                         (
                             TypeKind::Object(object),
@@ -1248,12 +1258,20 @@ impl TypeDef {
                                 .collect(),
                         ),
 
-                        (TypeKind::Array(array), Some(SegmentBuf::Index(_)), Some(_)) => {
+                        (TypeKind::Array(array), Some(SegmentBuf::Index(index)), Some(_)) => {
                             TypeKind::Array(
                                 array
                                     .iter()
-                                    .map(|(idx, kindinfo)| {
-                                        (*idx, Self::remove_segment(kindinfo, path.clone()))
+                                    .map(|(idx, kindinfo)| match idx {
+                                        Index::Index(idx)
+                                            if *index >= 0 && *idx == *index as usize =>
+                                        {
+                                            (
+                                                Index::Index(*idx),
+                                                Self::remove_segment(kindinfo, path.clone()),
+                                            )
+                                        }
+                                        _ => (*idx, kindinfo.clone()),
                                     })
                                     .collect(),
                             )
@@ -1529,20 +1547,42 @@ mod tests {
             // A field is removed.
             TestCase {
                 old: type_def! { object {
-                    "nonk" => type_def! { array [
-                        type_def! { object {
+                    "nonk" => type_def! { array {
+                        0 => type_def! { object {
                             "noog" => type_def! { bytes },
                             "nork" => type_def! { bytes },
                         } },
-                    ] },
+                    } },
                 } },
                 path: "nonk[0].noog",
                 new: type_def! { object {
-                    "nonk" => type_def! { array [
-                        type_def! { object {
+                    "nonk" => type_def! { array {
+                        0 => type_def! { object {
                             "nork" => type_def! { bytes },
                         } },
-                    ] },
+                    } },
+                } },
+            },
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "nork" => type_def! { bytes },
+                        "nark" => type_def! { bytes },
+                    } },
+                    "noog" => type_def! { object {
+                        "nork" => type_def! { bytes },
+                        "nark" => type_def! { bytes },
+                    } },
+                } },
+                path: "nonk.nork",
+                new: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "nark" => type_def! { bytes },
+                    } },
+                    "noog" => type_def! { object {
+                        "nork" => type_def! { bytes },
+                        "nark" => type_def! { bytes },
+                    } },
                 } },
             },
             // Coalesced field
