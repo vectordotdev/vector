@@ -21,7 +21,12 @@ pub mod multiline_config;
 mod tcp;
 #[cfg(any(
     all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "sources-kafka"
+    feature = "sources-kafka",
+    feature = "sources-socket",
+    feature = "sources-statsd",
+    feature = "sources-stdin",
+    feature = "sources-syslog",
+    feature = "sources-vector",
 ))]
 mod tcp_error;
 #[cfg(all(unix, feature = "sources-socket"))]
@@ -43,7 +48,12 @@ pub use multiline_config::MultilineConfig;
 pub use tcp::{SocketListenAddr, TcpSource};
 #[cfg(any(
     all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "sources-kafka"
+    feature = "sources-kafka",
+    feature = "sources-socket",
+    feature = "sources-statsd",
+    feature = "sources-stdin",
+    feature = "sources-syslog",
+    feature = "sources-vector",
 ))]
 pub use tcp_error::TcpError;
 #[cfg(all(unix, feature = "sources-socket",))]
