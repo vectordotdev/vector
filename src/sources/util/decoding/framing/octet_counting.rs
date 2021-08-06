@@ -179,6 +179,12 @@ impl OctetCountingDecoder {
     }
 }
 
+impl Default for OctetCountingDecoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl tokio_util::codec::Decoder for OctetCountingDecoder {
     type Item = Bytes;
     type Error = LinesCodecError;
