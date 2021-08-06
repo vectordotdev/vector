@@ -17,27 +17,27 @@ pub enum FramingConfig {
     },
 }
 
-impl From<FramingConfig>
-    for Box<
+impl FramingConfig {
+    pub fn build(
+        &self,
+    ) -> Box<
         dyn tokio_util::codec::Decoder<Item = Bytes, Error = super::Error> + Send + Sync + 'static,
-    >
-{
-    fn from(config: FramingConfig) -> Self {
+    > {
         use FramingConfig::*;
 
-        match config {
+        match self {
             NewlineDelimited => Box::new(BytesDecoder::new(LinesCodec::new())),
             CharacterDelimited {
                 delimiter,
                 max_length,
             } => Box::new(BytesDecoder::new(match max_length {
                 Some(max_length) => {
-                    BytesDelimitedCodec::new_with_max_length(delimiter as u8, max_length)
+                    BytesDelimitedCodec::new_with_max_length(*delimiter as u8, *max_length)
                 }
-                None => BytesDelimitedCodec::new(delimiter as u8),
+                None => BytesDelimitedCodec::new(*delimiter as u8),
             })),
             OctetCounting { max_length } => Box::new(BytesDecoder::new(match max_length {
-                Some(max_length) => super::OctetCountingDecoder::new_with_max_length(max_length),
+                Some(max_length) => super::OctetCountingDecoder::new_with_max_length(*max_length),
                 None => super::OctetCountingDecoder::new(),
             })),
         }
@@ -64,19 +64,19 @@ impl DecodingConfig {
     }
 }
 
-impl From<DecodingConfig> for Decoder {
-    fn from(config: DecodingConfig) -> Self {
+impl DecodingConfig {
+    pub fn build(&self) -> Decoder {
         let framer: Box<
             dyn tokio_util::codec::Decoder<Item = Bytes, Error = super::Error>
                 + Send
                 + Sync
                 + 'static,
-        > = match config.framing {
-            Some(framing) => framing.into(),
+        > = match self.framing {
+            Some(framing) => framing.build(),
             None => Box::new(super::BytesDecoder::new(BytesDelimitedCodec::new(b'\n'))),
         };
 
-        let parser: Box<dyn Parser + Send + Sync + 'static> = match config.decoding {
+        let parser: Box<dyn Parser + Send + Sync + 'static> = match self.decoding {
             Some(ParserConfig::Bytes) | None => Box::new(super::BytesParser),
             #[cfg(feature = "sources-syslog")]
             Some(ParserConfig::Syslog) => Box::new(super::SyslogParser),

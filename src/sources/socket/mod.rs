@@ -8,7 +8,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    sources::util::{decoding::Decoder, TcpSource},
+    sources::util::TcpSource,
     tls::MaybeTlsSettings,
 };
 use serde::{Deserialize, Serialize};
@@ -83,7 +83,7 @@ impl SourceConfig for SocketConfig {
                 let decoding = config.decoding();
                 let tcp = Arc::new(tcp::RawTcpSource::new(
                     config.clone(),
-                    Box::new(move || -> Decoder { decoding.into() }),
+                    Box::new(move || decoding.build()),
                 ));
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
@@ -101,7 +101,7 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder: Decoder = config.decoding().into();
+                let decoder = config.decoding().build();
                 Ok(udp::udp(
                     config.address(),
                     config.max_length(),
@@ -117,7 +117,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder: Decoder = config.decoding.into();
+                let decoder = config.decoding.build();
                 Ok(unix::unix_datagram(
                     config.path,
                     config.max_length,
@@ -133,7 +133,7 @@ impl SourceConfig for SocketConfig {
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
                 let decoding = config.decoding;
-                let build_decoder = move || -> Decoder { decoding.into() };
+                let build_decoder = move || decoding.build();
                 Ok(unix::unix_stream(
                     config.path,
                     config.max_length,

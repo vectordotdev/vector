@@ -124,7 +124,7 @@ impl SourceConfig for KafkaSourceConfig {
             self.partition_key.clone(),
             self.offset_key.clone(),
             self.headers_key.clone(),
-            self.decoding.into(),
+            self.decoding.build(),
             cx.shutdown,
             cx.out,
             cx.acknowledgements,

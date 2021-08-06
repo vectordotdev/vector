@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
-    sources::util::decoding::{self, DecodingConfig},
+    sources::util::decoding::DecodingConfig,
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};
@@ -79,7 +79,7 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
-    let mut decoder: decoding::Decoder = config.decoding.into();
+    let mut decoder = config.decoding.build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
