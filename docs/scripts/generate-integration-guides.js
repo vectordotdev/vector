@@ -1,4 +1,3 @@
-const { create } = require('domain');
 const fs = require('fs');
 
 const cueJsonOutput = 'data/docs.json';
