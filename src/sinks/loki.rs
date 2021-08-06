@@ -99,8 +99,7 @@ impl SinkConfig for LokiConfig {
             return Err("`labels` must include at least one label.".into());
         }
 
-        let mut request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        request_settings.concurrency = Some(5);
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let batch_settings = BatchSettings::default()
             .bytes(102_400)
@@ -790,6 +789,33 @@ mod integration_tests {
         .await;
     }
 
+    #[tokio::test]
+    async fn out_of_order_per_partition() {
+        let batch_size = 2;
+        let big_lines = random_lines(1_000_000).take(2).collect::<Vec<_>>();
+        let small_lines = random_lines(1).take(20).collect::<Vec<_>>();
+        let mut events = big_lines
+            .into_iter()
+            .chain(small_lines)
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        let base = chrono::Utc::now() - Duration::seconds(30);
+        for (i, event) in events.iter_mut().enumerate() {
+            let log = event.as_mut_log();
+            log.insert(
+                log_schema().timestamp_key(),
+                base + Duration::seconds(i as i64),
+            );
+        }
+
+        // So, since all of the events are of the same partition, and if there is concurrency,
+        // then if ordering inside paritions isn't upheld, the big line events will take longer
+        // time to flush than small line events so loki will receive smaller ones before large
+        // ones hence out of order events.
+        test_out_of_order_events(OutOfOrderAction::Drop, batch_size, events.clone(), events).await;
+    }
+
     async fn test_out_of_order_events(
         action: OutOfOrderAction,
         batch_size: usize,
@@ -814,6 +840,7 @@ mod integration_tests {
             Template::try_from(stream.to_string()).unwrap(),
         );
         config.batch.max_events = Some(batch_size);
+        config.batch.max_bytes = Some(4_000_000);
 
         let (sink, _) = config.build(cx).await.unwrap();
         sink.into_sink()

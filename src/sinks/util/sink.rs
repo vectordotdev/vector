@@ -1108,6 +1108,58 @@ mod tests {
         assert_eq!(ack_counter.load(Relaxed), 10);
     }
 
+    #[tokio::test]
+    async fn partition_batch_sink_ordering_per_partition() {
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let mut delay = true;
+        let svc = tower::service_fn(|req| {
+            let sent_requests = Arc::clone(&sent_requests);
+            if delay {
+                // Delay and then error
+                delay = false;
+                let sent_requests = sent_requests.clone();
+                sleep(Duration::from_secs(1))
+                    .map(move |_| {
+                        sent_requests.lock().unwrap().push(req);
+                        Result::<_, std::io::Error>::Ok(())
+                    })
+                    .boxed()
+            } else {
+                sent_requests.lock().unwrap().push(req);
+                future::ok::<_, std::io::Error>(()).boxed()
+            }
+        });
+
+        let batch = BatchSettings::default().bytes(9999).events(10);
+        let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        sink.ordered();
+
+        let input = (0..20)
+            .into_iter()
+            .map(|i| (0, i))
+            .chain((0..20).into_iter().map(|i| (1, i)));
+        sink.sink_map_err(drop)
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .await
+            .unwrap();
+
+        let output = sent_requests.lock().unwrap();
+        // We sended '0' partition first and delayed sending only first request, first 10 events,
+        // which should delay sending the second batch of events in the same partition until
+        // the first one succeeds.
+        assert_eq!(
+            &*output,
+            &vec![
+                (0..10).into_iter().map(|i| (1, i)).collect::<Vec<_>>(),
+                (10..20).into_iter().map(|i| (1, i)).collect(),
+                (0..10).into_iter().map(|i| (0, i)).collect(),
+                (10..20).into_iter().map(|i| (0, i)).collect(),
+            ]
+        );
+    }
+
     #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
     enum Partitions {
         A,
@@ -1147,6 +1199,18 @@ mod tests {
     impl Partition<Bytes> for Vec<i32> {
         fn partition(&self) -> Bytes {
             "key".into()
+        }
+    }
+
+    impl Partition<Bytes> for (usize, usize) {
+        fn partition(&self) -> Bytes {
+            format!("{}", self.0).into()
+        }
+    }
+
+    impl EncodedLength for (usize, usize) {
+        fn encoded_length(&self) -> usize {
+            16
         }
     }
 }
