@@ -4,8 +4,10 @@ use crate::{
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
-    sources::util::decoding,
-    sources::util::{decoding::BytesDecoder, finalizer::OrderedFinalizer},
+    sources::util::{
+        decoding::{self, DecodingConfig},
+        finalizer::OrderedFinalizer,
+    },
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};
@@ -21,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use tokio_util::codec::BytesCodec;
+use tokio_util::codec::Decoder;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -60,6 +62,7 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+    decoding: DecodingConfig,
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -121,10 +124,7 @@ impl SourceConfig for KafkaSourceConfig {
             self.partition_key.clone(),
             self.offset_key.clone(),
             self.headers_key.clone(),
-            decoding::Decoder::new(
-                Box::new(BytesDecoder::new(BytesCodec::new())),
-                Box::new(decoding::BytesParser),
-            ),
+            self.decoding.into(),
             cx.shutdown,
             cx.out,
             cx.acknowledgements,
@@ -140,22 +140,18 @@ impl SourceConfig for KafkaSourceConfig {
     }
 }
 
-async fn kafka_source<D>(
+async fn kafka_source(
     consumer: StreamConsumer<KafkaStatisticsContext>,
     key_field: String,
     topic_key: String,
     partition_key: String,
     offset_key: String,
     headers_key: String,
-    mut decoder: D,
+    mut decoder: decoding::Decoder,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
     acknowledgements: bool,
-) -> Result<(), ()>
-where
-    D: tokio_util::codec::Decoder<Item = (Event, usize)> + Send + 'static,
-    D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
-{
+) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let shutdown = shutdown.shared();
     let mut finalizer = acknowledgements
@@ -383,6 +379,7 @@ mod integration_test {
         util::Timeout,
     };
     use std::time::Duration;
+    use tokio_util::codec::BytesCodec;
     use vector_core::event::EventStatus;
 
     fn default_decoder() -> decoding::Decoder {
