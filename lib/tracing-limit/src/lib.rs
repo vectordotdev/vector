@@ -484,11 +484,8 @@ mod test {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
                     for line_number in &[1, 2] {
-                        let span = info_span!(
-                            "span",
-                            component_id = &key,
-                            vrl_line_number = &line_number
-                        );
+                        let span =
+                            info_span!("span", component_id = &key, vrl_line_number = &line_number);
                         let _enter = span.enter();
                         info!(
                             message =
