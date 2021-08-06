@@ -99,7 +99,10 @@ impl SinkConfig for LokiConfig {
             return Err("`labels` must include at least one label.".into());
         }
 
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(5),
+            ..Default::default()
+        });
 
         let batch_settings = BatchSettings::default()
             .bytes(102_400)
