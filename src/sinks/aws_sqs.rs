@@ -185,8 +185,8 @@ impl SqsSink {
                 stream::iter(encode_event(
                     event,
                     &encoding,
-                    message_group_id.as_ref(),
-                    message_deduplication_id.as_ref(),
+                    &message_group_id,
+                    &message_deduplication_id,
                 ))
                 .map(Ok)
             });
@@ -264,8 +264,8 @@ impl RetryLogic for SqsRetryLogic {
 fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
-    message_group_id: Option<&Template>,
-    message_deduplication_id: Option<&Template>,
+    message_group_id: &Option<Template>,
+    message_deduplication_id: &Option<Template>,
 ) -> Option<EncodedEvent<SendMessageEntry>> {
     encoding.apply_rules(&mut event);
 
@@ -323,7 +323,7 @@ mod tests {
     fn sqs_encode_event_text() {
         let message = "hello world".to_string();
         let event =
-            encode_event(message.clone().into(), &Encoding::Text.into(), None, None).unwrap();
+            encode_event(message.clone().into(), &Encoding::Text.into(), &None, &None).unwrap();
 
         assert_eq!(&event.item.message_body, &message);
     }
@@ -333,7 +333,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &Encoding::Json.into(), None, None).unwrap();
+        let event = encode_event(event, &Encoding::Json.into(), &None, &None).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_str(&event.item.message_body).unwrap();
 
@@ -350,8 +350,8 @@ mod tests {
         let event = encode_event(
             event,
             &Encoding::Json.into(),
-            None,
-            Some(&message_deduplication_id),
+            &None,
+            &Some(message_deduplication_id),
         )
         .unwrap();
 
