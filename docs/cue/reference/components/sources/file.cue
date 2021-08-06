@@ -126,13 +126,13 @@ components: sources: file: {
 			}
 		}
 		glob_minimum_cooldown_ms: {
-			common:      false
+			common: false
 			description: """
 				Delay between file discovery calls. This controls the interval at which Vector searches for files.
 				Higher value result in greater chances of some short living files being missed between
 				searches, but lower value increases the performance impact of file discovery.
 				"""
-			required:    false
+			required: false
 			type: uint: {
 				default: 1_000
 				unit:    "milliseconds"
