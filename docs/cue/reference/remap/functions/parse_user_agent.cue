@@ -9,7 +9,7 @@ remap: functions: parse_user_agent: {
 	notices: [
 		"All values are returned as strings or as null. We recommend manually coercing values to desired types as you see fit.",
 		"Different modes return different schema.",
-		"Field which were not parsed out are set as `null`."
+		"Field which were not parsed out are set as `null`.",
 	]
 
 	arguments: [
@@ -24,7 +24,7 @@ remap: functions: parse_user_agent: {
 			description: "Determines performance and reliability characteristics."
 			required:    false
 			enum: {
-				fast: "Fastest mode but most unreliable. Uses parser from project [Woothee](\(urls.woothee))."
+				fast:     "Fastest mode but most unreliable. Uses parser from project [Woothee](\(urls.woothee))."
 				reliable: """
 					Provides greater reliability than `fast` and retains it's speed in common cases.
 					Parses with [Woothee](\(urls.woothee)) parser and with parser from [uap project](\(urls.uap)) if

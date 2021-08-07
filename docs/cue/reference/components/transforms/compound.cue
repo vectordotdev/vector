@@ -50,7 +50,7 @@ components: transforms: compound: {
 							Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
 							for the list of available transforms and their configuration.
 							"""
-						required: true
+						required:    true
 						warnings: []
 						type: object: {}
 					}

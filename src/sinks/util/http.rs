@@ -32,7 +32,7 @@ pub trait HttpSink: Send + Sync + 'static {
     type Input;
     type Output;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>>;
+    fn encode_event(&self, event: Event) -> Option<Self::Input>;
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>>;
 }
 
@@ -173,9 +173,10 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        if let Some(item) = self.sink.encode_event(item) {
-            *self.project().slot = Some(item);
+    fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
+        let finalizers = event.metadata_mut().take_finalizers();
+        if let Some(item) = self.sink.encode_event(event) {
+            *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
         Ok(())
@@ -319,9 +320,10 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        if let Some(item) = self.sink.encode_event(item) {
-            *self.project().slot = Some(item);
+    fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
+        let finalizers = event.metadata_mut().take_finalizers();
+        if let Some(item) = self.sink.encode_event(event) {
+            *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
         Ok(())

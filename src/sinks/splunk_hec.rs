@@ -6,8 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
-        TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -135,7 +134,7 @@ impl HttpSink for HecSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&event)
@@ -231,7 +230,7 @@ impl HttpSink for HecSinkConfig {
                 emit!(SplunkEventSent {
                     byte_size: value.len()
                 });
-                Some(EncodedEvent::new(value).with_metadata(log))
+                Some(value)
             }
             Err(error) => {
                 emit!(SplunkEventEncodeError { error });
@@ -345,7 +344,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
@@ -397,7 +396,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEventText>(&bytes[..]).unwrap();
 

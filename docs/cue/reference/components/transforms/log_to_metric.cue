@@ -152,15 +152,15 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type: "counter"
-						field: "status"
-						name: "response_total"
+						type:      "counter"
+						field:     "status"
+						name:      "response_total"
 						namespace: "service"
 						tags: {
 							status: "{{status}}"
-							host: "{{host}}"
+							host:   "{{host}}"
 						}
-					}
+					},
 				]
 			}
 
@@ -189,14 +189,14 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type: "counter"
-						field: "total"
-						name: "order_total"
+						type:               "counter"
+						field:              "total"
+						name:               "order_total"
 						increment_by_value: true
 						tags: {
 							host: "{{host}}"
 						}
-					}
+					},
 				]
 			}
 
@@ -223,26 +223,26 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type: "gauge"
+						type:  "gauge"
 						field: "1m_load_avg"
 						tags: {
 							host: "{{host}}"
 						}
 					},
 					{
-						type: "gauge"
+						type:  "gauge"
 						field: "5m_load_avg"
 						tags: {
 							host: "{{host}}"
 						}
 					},
 					{
-						type: "gauge"
+						type:  "gauge"
 						field: "15m_load_avg"
 						tags: {
 							host: "{{host}}"
 						}
-					}
+					},
 				]
 			}
 
@@ -293,14 +293,14 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type: "histogram"
+						type:  "histogram"
 						field: "time"
-						name: "time_ms"
+						name:  "time_ms"
 						tags: {
 							status: "{{status}}"
-							host: "{{host}}"
+							host:   "{{host}}"
 						}
-					}
+					},
 				]
 			}
 
@@ -330,14 +330,14 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type: "summary"
+						type:  "summary"
 						field: "time"
-						name: "time_ms"
+						name:  "time_ms"
 						tags: {
 							status: "{{status}}"
-							host: "{{host}}"
+							host:   "{{host}}"
 						}
-					}
+					},
 				]
 			}
 
@@ -371,13 +371,13 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type: "set"
-						field: "remote_addr"
+						type:      "set"
+						field:     "remote_addr"
 						namespace: "{{branch}}"
 						tags: {
 							host: "{{host}}"
 						}
-					}
+					},
 				]
 			}
 
