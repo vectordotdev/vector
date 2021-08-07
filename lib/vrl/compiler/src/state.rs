@@ -1,5 +1,6 @@
 use crate::expression::assignment;
 use crate::{parser::ast::Ident, value::EnrichmentTable, TypeDef, Value};
+use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
 
@@ -45,7 +46,7 @@ impl Compiler {
     }
 
     pub fn new_with_enrichment_tables(
-        enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
+        enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
     ) -> Self {
         let mut new = Self::default();
         new.enrichment_tables = enrichment_tables.clone();

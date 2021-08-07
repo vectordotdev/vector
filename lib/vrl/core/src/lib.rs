@@ -3,18 +3,19 @@ mod runtime;
 
 use dashmap::DashMap;
 
+use arc_swap::ArcSwap;
 pub use compiler::{
     function, state, type_def::Index, value, value::EnrichmentTable, Context, Expression, Function,
     Program, Target, Value,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 /// Compile a given source into the final [`Program`].
 pub fn compile(
     source: &str,
-    enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
+    enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
     fns: &[Box<dyn Function>],
 ) -> compiler::Result {
     let mut state = state::Compiler::new_with_enrichment_tables(enrichment_tables);

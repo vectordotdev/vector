@@ -8550,8 +8550,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 name = "vrl"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "bytes 1.0.1",
- "dashmap",
  "indoc",
  "lookup",
  "ordered-float",
@@ -8586,11 +8586,11 @@ dependencies = [
 name = "vrl-compiler"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "bitflags",
  "bytes 1.0.1",
  "chrono",
  "criterion",
- "dashmap",
  "dyn-clone",
  "indoc",
  "lalrpop-util",

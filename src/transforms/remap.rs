@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     enrichment_tables::EnrichmentTable,
@@ -12,6 +10,7 @@ use arc_swap::ArcSwap;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use std::collections::HashMap;
+use std::sync::Arc;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
