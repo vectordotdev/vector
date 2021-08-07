@@ -1,4 +1,5 @@
 use crate::config::GlobalOptions;
+use crate::enrichment_table::EnrichmentTables;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
@@ -18,8 +19,7 @@ pub enum ExpandType {
 #[derive(Debug)]
 pub struct TransformContext {
     pub globals: GlobalOptions,
-    pub enrichment_tables:
-        Arc<ArcSwap<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>,
+    pub enrichment_tables: EnrichmentTables,
 }
 
 impl TransformContext {

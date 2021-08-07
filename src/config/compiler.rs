@@ -149,8 +149,8 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
-            TransformConfig,
+            DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
+            TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
@@ -187,7 +187,7 @@ mod test {
     #[async_trait]
     #[typetag::serde(name = "mock")]
     impl TransformConfig for MockTransformConfig {
-        async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+        async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
             unimplemented!()
         }
 

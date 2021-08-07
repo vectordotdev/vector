@@ -6,7 +6,6 @@ use super::{
 use crate::{
     buffers,
     config::{DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
-    enrichment_tables,
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
@@ -23,6 +22,7 @@ use std::{
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
+use vector_core::enrichment_table::EnrichmentTables;
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner<Event>, Vec<String>)>,
@@ -32,8 +32,7 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
-    pub enrichment_tables:
-        Arc<ArcSwap<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>,
+    pub enrichment_tables: EnrichmentTables,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -125,7 +124,8 @@ pub async fn build_pieces(
         source_tasks.insert(name.clone(), server);
     }
 
-    let enrichment_tables = Arc::new(ArcSwap::from_pointee(enrichment_tables));
+    let enrichment_tables: EnrichmentTables =
+        Arc::new(ArcSwap::from_pointee(enrichment_tables)).into();
 
     let context = TransformContext {
         globals: config.global.clone(),

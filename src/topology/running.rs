@@ -7,13 +7,11 @@ use crate::topology::{
 use crate::{
     buffers,
     config::{Config, ConfigDiff, HealthcheckOptions, Resource},
-    enrichment_tables,
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::TaskOutput},
     trigger::DisabledTrigger,
 };
-use arc_swap::ArcSwap;
 use futures::{future, Future, FutureExt, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
@@ -24,6 +22,7 @@ use tokio::{
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
+use vector_core::enrichment_table::EnrichmentTables;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -36,17 +35,14 @@ pub struct RunningTopology {
     pub(crate) config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
-    enrichment_tables:
-        Arc<ArcSwap<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>>,
+    enrichment_tables: EnrichmentTables,
 }
 
 impl RunningTopology {
     pub fn new(
         config: Config,
         abort_tx: mpsc::UnboundedSender<()>,
-        enrichment_tables: Arc<
-            ArcSwap<HashMap<String, Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>>,
-        >,
+        enrichment_tables: EnrichmentTables,
     ) -> Self {
         Self {
             inputs: HashMap::new(),
