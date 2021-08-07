@@ -1,16 +1,13 @@
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    enrichment_tables::EnrichmentTable,
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use arc_swap::ArcSwap;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
-use std::collections::{BTreeMap, HashMap};
-use std::sync::Arc;
+use vector_core::enrichment_table::EnrichmentTables;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -61,65 +58,13 @@ pub struct Remap {
     enrichment_tables: EnrichmentTables,
 }
 
-lazy_static::lazy_static! {
-    static ref MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
-}
-
-#[derive(Clone)]
-struct EnrichmentTables {
-    tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
-}
-
-impl vrl::EnrichmentTables for EnrichmentTables {
-    fn get_tables(&self) -> Vec<String> {
-        let tables = self.tables.load();
-        tables.iter().map(|(key, _)| key.clone()).collect()
-    }
-
-    fn find_table_row<'a>(
-        &'a self,
-        table: &str,
-        criteria: BTreeMap<String, String>,
-    ) -> Option<Vec<String>> {
-        let tables = self.tables.load();
-        let table = tables.get(table)?;
-        table.find_table_row(criteria).map(|t| t.clone())
-    }
-
-    fn add_index(&mut self, table: &str, fields: Vec<&str>) {
-        // Ensure we don't have multiple threads running this code at the same time, since the
-        // enrichment_tables is essentially global data, whilst we are adding the index we are
-        // swapping that data out of the structure. If there were two Remaps being compiled at the
-        // same time is separate threads it could result in one compilation accessing the
-        // empty enrichment tables, and thus compiling incorrectly.
-        let lock = MUTEX.lock().unwrap();
-
-        let mut tables = self.tables.swap(Default::default());
-        match Arc::get_mut(&mut tables).unwrap().get_mut(table) {
-            None => (),
-            Some(table) => table.add_index(fields),
-        }
-        self.tables.swap(tables);
-
-        drop(lock);
-    }
-}
-
 impl Remap {
-    pub fn new(
-        config: RemapConfig,
-        enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
-    ) -> crate::Result<Self> {
-        let tables = EnrichmentTables {
-            tables: enrichment_tables,
-        };
-
-        let program = vrl::compile(&config.source, Box::new(tables.clone()), &vrl_stdlib::all())
-            .map_err(|diagnostics| {
-                Formatter::new(&config.source, diagnostics)
-                    .colored()
-                    .to_string()
-            })?;
+    pub fn new(config: RemapConfig, enrichment_tables: EnrichmentTables) -> crate::Result<Self> {
+        let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
+            Formatter::new(&config.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         Ok(Remap {
             program,
@@ -227,7 +172,7 @@ mod tests {
             drop_on_error: true,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, Default::default()).unwrap();
 
         let result = transform_one(&mut tform, event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
@@ -259,7 +204,7 @@ mod tests {
             drop_on_error: true,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, Default::default()).unwrap();
 
         let mut result = vec![];
         tform.transform(&mut result, event);
@@ -288,7 +233,7 @@ mod tests {
             drop_on_error: false,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, Default::default()).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -315,7 +260,7 @@ mod tests {
             drop_on_error: true,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, Default::default()).unwrap();
 
         assert!(transform_one(&mut tform, event).is_none())
     }
@@ -337,7 +282,7 @@ mod tests {
             drop_on_error: false,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, Default::default()).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -364,7 +309,7 @@ mod tests {
             drop_on_error: false,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, Default::default()).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -391,7 +336,7 @@ mod tests {
             drop_on_error: false,
             drop_on_abort: true,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, Default::default()).unwrap();
 
         assert!(transform_one(&mut tform, event).is_none())
     }
@@ -415,7 +360,7 @@ mod tests {
             drop_on_error: true,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, Default::default()).unwrap();
 
         let result = transform_one(&mut tform, metric).unwrap();
         assert_eq!(

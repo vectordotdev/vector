@@ -152,9 +152,9 @@ dependencies = [
 
 [[package]]
 name = "assert_cmd"
-version = "1.0.7"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d20831bd004dda4c7c372c19cdabff369f794a95e955b3f13fe460e3e1ae95f"
+checksum = "54f002ce7d0c5e809ebb02be78fd503aeed4a511fd0fcaff6e6914cbdabbfa33"
 dependencies = [
  "bstr",
  "doc-comment",
@@ -391,7 +391,7 @@ dependencies = [
  "event-listener",
  "futures-lite",
  "once_cell",
- "signal-hook 0.3.8",
+ "signal-hook",
  "winapi 0.3.9",
 ]
 
@@ -986,9 +986,9 @@ dependencies = [
 
 [[package]]
 name = "bytesize"
-version = "1.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81a18687293a1546b67c246452202bbbf143d239cb43494cc163da14979082da"
+checksum = "6c58ec36aac5066d5ca17df51b3e70279f5670a72102f5752cb7e7c856adfc70"
 
 [[package]]
 name = "cache-padded"
@@ -1584,42 +1584,17 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c36c10130df424b2f3552fcc2ddcd9b28a27b1e54b358b45874f88d1ca6888c"
-dependencies = [
- "bitflags",
- "crossterm_winapi 0.7.0",
- "lazy_static",
- "libc",
- "mio 0.7.11",
- "parking_lot",
- "signal-hook 0.1.17",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0ebde6a9dd5e331cd6c6f48253254d117642c31653baa475e394657c59c1f7d"
 dependencies = [
  "bitflags",
- "crossterm_winapi 0.8.0",
+ "crossterm_winapi",
  "libc",
  "mio 0.7.11",
  "parking_lot",
- "signal-hook 0.3.8",
+ "signal-hook",
  "signal-hook-mio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm_winapi"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0da8964ace4d3e4a044fd027919b2237000b24315a37c916f61809f1ff2140b9"
-dependencies = [
  "winapi 0.3.9",
 ]
 
@@ -6299,7 +6274,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
- "semver 1.0.3",
+ "semver 1.0.4",
 ]
 
 [[package]]
@@ -6520,9 +6495,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f3aac57ee7f3272d8395c6e4f502f434f0e289fcd62876f70daa008c20dcabe"
+checksum = "568a8e6258aa33c13358f81fd834adb854c6f7c9468520910a9b1e8fac068012"
 dependencies = [
  "serde",
 ]
@@ -6806,17 +6781,6 @@ checksum = "42a568c8f2cd051a4d283bd6eb0343ac214c1b0f1ac19f93e1175b2dee38c73d"
 
 [[package]]
 name = "signal-hook"
-version = "0.1.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e31d442c16f047a671b5a71e2161d6e68814012b7f5379d269ebd915fac2729"
-dependencies = [
- "libc",
- "mio 0.7.11",
- "signal-hook-registry",
-]
-
-[[package]]
-name = "signal-hook"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef33d6d0cd06e0840fba9985aab098c147e67e05cee14d412d3345ed14ff30ac"
@@ -6833,7 +6797,7 @@ checksum = "29fd5867f1c4f2c5be079aee7a2adf1152ebb04a4bc4d341f504b7dece607ed4"
 dependencies = [
  "libc",
  "mio 0.7.11",
- "signal-hook 0.3.8",
+ "signal-hook",
 ]
 
 [[package]]
@@ -7959,13 +7923,13 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tui"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "861d8f3ad314ede6219bcb2ab844054b1de279ee37a9bc38e3d606f9d3fb2a71"
+checksum = "39c8ce4e27049eed97cfa363a5048b09d995e209994634a0efc26a14ab6c0c23"
 dependencies = [
  "bitflags",
  "cassowary",
- "crossterm 0.19.0",
+ "crossterm",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -8002,11 +7966,11 @@ dependencies = [
 
 [[package]]
 name = "twox-hash"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04f8ab788026715fa63b31960869617cba39117e520eb415b0139543e325ab59"
+checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
@@ -8291,7 +8255,7 @@ dependencies = [
  "codec",
  "colored",
  "criterion",
- "crossterm 0.20.0",
+ "crossterm",
  "dashmap",
  "data-encoding",
  "datadog-search-syntax",
@@ -8300,7 +8264,6 @@ dependencies = [
  "dnsmsg-parser",
  "dyn-clone",
  "encoding_rs",
- "env-test-util",
  "evmap",
  "exitcode",
  "fakedata",
@@ -8391,7 +8354,7 @@ dependencies = [
  "schannel",
  "seahash",
  "security-framework",
- "semver 1.0.3",
+ "semver 1.0.4",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -8483,6 +8446,7 @@ dependencies = [
 name = "vector_core"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "async-graphql",
  "async-trait",
  "atomig",
@@ -8493,8 +8457,11 @@ dependencies = [
  "db-key",
  "derivative 2.2.0",
  "dyn-clone",
+ "env-test-util",
  "futures 0.3.16",
  "getset",
+ "http",
+ "hyper-proxy",
  "indexmap",
  "lazy_static",
  "lookup",
@@ -8502,6 +8469,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "mlua",
+ "no-proxy",
  "once_cell",
  "pest",
  "pest_derive",
@@ -8525,6 +8493,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
+ "typetag",
  "vrl",
 ]
 

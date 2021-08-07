@@ -11,7 +11,7 @@ Vector team member will find this document useful.
 1. [Introduction](#introduction)
 1. [Your First Contribution](#your-first-contribution)
    1. [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
-1. [Change Control](#change-control)
+1. [Workflow](#workflow)
    1. [Git Branches](#git-branches)
    1. [Git Commits](#git-commits)
       1. [Style](#style)
@@ -40,8 +40,6 @@ Vector team member will find this document useful.
       1. [Dependencies](#dependencies)
    1. [Guidelines](#guidelines)
       1. [Sink Healthchecks](#sink-healthchecks)
-      1. [Metric naming convention](#metric-naming-convention)
-      1. [Option naming](#option-naming)
    1. [Testing](#testing-1)
       1. [Unit Tests](#unit-tests)
       1. [Integration Tests](#integration-tests)
@@ -123,7 +121,7 @@ To merge a new source, sink, or transform, you need to:
 - [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/timberio/vector/blob/master/docs).
 - [ ] Update [`.github/CODEOWNERS`](https://github.com/timberio/vector/blob/master/.github/CODEOWNERS) or talk to us about identifying someone on the team to help look after the new integration.
 
-## Change Control
+## Workflow
 
 ### Git Branches
 
@@ -516,40 +514,6 @@ option to disable individual health checks, there's an escape hatch for users
 that fall into a false negative circumstance. Our goal should be to minimize the
 likelihood of users needing to pull that lever while still making a good effort
 to detect common problems.
-
-#### Metric naming convention
-
-For metrics naming, Vector broadly follows the [Prometheus metric naming standards](https://prometheus.io/docs/practices/naming/). Hence, a metric name:
-
-- Must only contain valid characters, which are ASCII letters and digits, as well as underscores. It should match the regular expression: `[a-z_][a-z0-9_]*`.
-- Metrics have a broad template:
-
-  `<namespace>_<name>_<unit>_[total]`
-
-  - The `namespace` is a single word prefix that groups metrics from a specific source, for example host-based metrics like CPU, disk, and memory are prefixed with `host`, Apache metrics are prefixed with `apache`, etc.
-  - The `name` describes what the metric measures.
-  - The `unit` is a [single base unit](https://en.wikipedia.org/wiki/SI_base_unit), for example seconds, bytes, metrics.
-  - The suffix should describe the unit in plural form: seconds, bytes. Accumulating counts, both with units or without, should end in `total`, for example `disk_written_bytes_total` and `http_requests_total`.
-
-- Where required, use tags to differentiate the characteristic of the measurement. For example, whilst `host_cpu_seconds_total` is name of the metric, we also record the `mode` that is being used for each CPU. The `mode` and the specific CPU then become tags on the metric:
-
-```text
-host_cpu_seconds_total{cpu="0",mode="idle"}
-host_cpu_seconds_total{cpu="0",mode="idle"}
-host_cpu_seconds_total{cpu="0",mode="nice"}
-host_cpu_seconds_total{cpu="0",mode="system"}
-host_cpu_seconds_total{cpu="0",mode="user"}
-host_cpu_seconds_total
-```
-
-#### Option naming
-
-When naming options for sinks, sources, and transforms it's important to keep in mind these guidelines:
-
-- Suffix options with their unit. Ex: `_seconds`, `_bytes`, etc.
-- Don't repeat the name space in the option name, ex. `fingerprinting.fingerprint_bytes`.
-- Normalize around time units where relevant and possible, for example using seconds consistently rather than seconds and milliseconds.
-- Use nouns as category names, for example `fingerprint` instead of `fingerprinting`.
 
 ### Testing
 

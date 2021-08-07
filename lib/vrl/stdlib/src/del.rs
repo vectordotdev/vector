@@ -125,6 +125,10 @@ impl Expression for DelFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().unknown()
     }
+
+    fn update_state(&self, state: &mut state::Compiler) {
+        self.query.delete_type_def(state);
+    }
 }
 
 impl fmt::Display for DelFn {
