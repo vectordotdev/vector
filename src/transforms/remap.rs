@@ -9,7 +9,7 @@ use crate::{
 use arc_swap::ArcSwap;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
@@ -58,21 +58,35 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
-    enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
+    enrichment_tables: EnrichmentTables,
 }
 
 lazy_static::lazy_static! {
     static ref MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 
-impl Remap {
-    pub fn new(
-        config: RemapConfig,
-        enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
-    ) -> crate::Result<Self> {
-        // Add a dummy index to test it works. This is is not final code, ultimately the index
-        // creation will occur within VRL as the remap code is compiled.
-        //
+#[derive(Clone)]
+struct EnrichmentTables {
+    tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
+}
+
+impl vrl::EnrichmentTables for EnrichmentTables {
+    fn get_tables(&self) -> Vec<String> {
+        let tables = self.tables.load();
+        tables.iter().map(|(key, _)| key.clone()).collect()
+    }
+
+    fn find_table_row<'a>(
+        &'a self,
+        table: &str,
+        criteria: BTreeMap<String, String>,
+    ) -> Option<Vec<String>> {
+        let tables = self.tables.load();
+        let table = tables.get(table)?;
+        table.find_table_row(criteria).map(|t| t.clone())
+    }
+
+    fn add_index(&mut self, table: &str, fields: Vec<&str>) {
         // Ensure we don't have multiple threads running this code at the same time, since the
         // enrichment_tables is essentially global data, whilst we are adding the index we are
         // swapping that data out of the structure. If there were two Remaps being compiled at the
@@ -80,48 +94,45 @@ impl Remap {
         // empty enrichment tables, and thus compiling incorrectly.
         let lock = MUTEX.lock().unwrap();
 
-        let mut tables = enrichment_tables.swap(Default::default());
-        match Arc::get_mut(&mut tables).unwrap().get_mut("file") {
+        let mut tables = self.tables.swap(Default::default());
+        match Arc::get_mut(&mut tables).unwrap().get_mut(table) {
             None => (),
-            Some(table) => table.add_index(vec!["field1"]),
+            Some(table) => table.add_index(fields),
         }
-        enrichment_tables.swap(tables);
+        self.tables.swap(tables);
 
         drop(lock);
+    }
+}
 
-        let program = vrl::compile(
-            &config.source,
-            enrichment_tables.clone(),
-            &vrl_stdlib::all(),
-        )
-        .map_err(|diagnostics| {
-            Formatter::new(&config.source, diagnostics)
-                .colored()
-                .to_string()
-        })?;
+impl Remap {
+    pub fn new(
+        config: RemapConfig,
+        enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
+    ) -> crate::Result<Self> {
+        let tables = EnrichmentTables {
+            tables: enrichment_tables,
+        };
+
+        let program = vrl::compile(&config.source, Box::new(tables.clone()), &vrl_stdlib::all())
+            .map_err(|diagnostics| {
+                Formatter::new(&config.source, diagnostics)
+                    .colored()
+                    .to_string()
+            })?;
 
         Ok(Remap {
             program,
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
-            enrichment_tables,
+            enrichment_tables: tables,
         })
     }
 }
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let tables = self.enrichment_tables.load();
-        for (key, value) in tables.iter() {
-            trace!(
-                "Testing we have {} {:?} {:?}",
-                key,
-                value.find_table_row(std::collections::BTreeMap::new()),
-                value
-            );
-        }
-
         // If a program can fail or abort at runtime, we need to clone the
         // original event and keep it around, to allow us to discard any
         // mutations made to the event while the VRL program runs, before it

@@ -66,6 +66,7 @@ default = [
     "encode_percent",
     "ends_with",
     "exists",
+    "find_table_row",
     "flatten",
     "float",
     "floor",
@@ -179,6 +180,7 @@ encode_logfmt = ["encode_key_value"]
 encode_percent = ["percent-encoding"]
 ends_with = []
 exists = []
+find_table_row = []
 flatten = []
 float = []
 floor = []

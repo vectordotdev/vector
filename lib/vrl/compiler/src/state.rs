@@ -1,8 +1,7 @@
+use crate::enrichment_tables::EnrichmentTables;
 use crate::expression::assignment;
-use crate::{parser::ast::Ident, value::EnrichmentTable, TypeDef, Value};
-use arc_swap::ArcSwap;
-use dashmap::DashMap;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use crate::{parser::ast::Ident, TypeDef, Value};
+use std::collections::HashMap;
 
 /// The state held by the compiler.
 ///
@@ -16,7 +15,7 @@ pub struct Compiler {
     // stored internal variable type definitions
     variables: HashMap<Ident, assignment::Details>,
 
-    enrichment_tables: Arc<DashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
+    enrichment_tables: Option<Box<dyn EnrichmentTables>>,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -40,20 +39,17 @@ impl Compiler {
                 value: None,
             }),
             variables: HashMap::new(),
-            enrichment_tables: Arc::new(DashMap::new()),
+            enrichment_tables: None,
             snapshot: None,
         }
     }
 
-    pub fn new_with_enrichment_tables(
-        enrichment_tables: Arc<ArcSwap<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>,
-    ) -> Self {
+    pub fn new_with_enrichment_tables(enrichment_tables: Box<dyn EnrichmentTables>) -> Self {
         let mut new = Self::default();
-        new.enrichment_tables = enrichment_tables.clone();
 
-        for table in enrichment_tables.iter() {
+        for table in enrichment_tables.get_tables() {
             new.insert_variable(
-                Ident::new(table.key()),
+                Ident::new(table),
                 assignment::Details {
                     type_def: TypeDef {
                         fallible: false,
@@ -63,6 +59,8 @@ impl Compiler {
                 },
             );
         }
+
+        new.enrichment_tables = Some(enrichment_tables);
 
         new
     }
@@ -113,11 +111,8 @@ impl Compiler {
         self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
-    pub fn get_enrichment_table<'a>(
-        &'a self,
-        name: &str,
-    ) -> Option<impl Deref<Target = Box<dyn EnrichmentTable + Send + Sync>> + 'a> {
-        self.enrichment_tables.get(name)
+    pub fn get_enrichment_tables_mut(&mut self) -> &mut Option<Box<dyn EnrichmentTables>> {
+        &mut self.enrichment_tables
     }
 }
 

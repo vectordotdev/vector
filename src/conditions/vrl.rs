@@ -44,12 +44,11 @@ impl ConditionConfig for VrlConfig {
             .collect::<Vec<_>>();
 
         // TODO Add enrichment tables here.
-        let program =
-            vrl::compile(&self.source, Default::default(), &functions).map_err(|diagnostics| {
-                Formatter::new(&self.source, diagnostics)
-                    .colored()
-                    .to_string()
-            })?;
+        let program = vrl::compile(&self.source, todo!(), &functions).map_err(|diagnostics| {
+            Formatter::new(&self.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         Ok(Box::new(Vrl {
             program,

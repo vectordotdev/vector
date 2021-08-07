@@ -72,6 +72,6 @@ impl Expression for FindTableRowFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().unknown()
+        TypeDef::new().fallible().unknown()
     }
 }
