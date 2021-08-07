@@ -5,7 +5,7 @@ use crate::parser::Node;
 use crate::value::Kind;
 use crate::{Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
@@ -129,6 +129,33 @@ impl ArgumentList {
         Ok(required(self.optional_literal(keyword)?))
     }
 
+    pub fn optional_enrichment_table(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<Option<String>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| match expr {
+                Expr::Variable(var) if var.value().is_some() => match var.value().unwrap() {
+                    Value::EnrichmentTable(table) => Ok(table.clone()),
+                    expr => Err(Error::UnexpectedExpression {
+                        keyword,
+                        expected: "enrichment_table",
+                        expr: expr.clone().into_expr(),
+                    }),
+                },
+                expr => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "enrichment_table",
+                    expr,
+                }),
+            })
+            .transpose()
+    }
+
+    pub fn required_enrichment_table(&mut self, keyword: &'static str) -> Result<String, Error> {
+        Ok(required(self.optional_enrichment_table(keyword)?))
+    }
+
     pub fn optional_enum(
         &mut self,
         keyword: &'static str,
@@ -190,6 +217,31 @@ impl ArgumentList {
 
     pub fn required_regex(&mut self, keyword: &'static str) -> Result<regex::Regex, Error> {
         Ok(required(self.optional_regex(keyword)?))
+    }
+
+    pub fn optional_object(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<Option<BTreeMap<String, Expr>>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| match expr {
+                Expr::Container(Container {
+                    variant: Variant::Object(object),
+                }) => Ok((*object).clone()),
+                expr => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "object",
+                    expr,
+                }),
+            })
+            .transpose()
+    }
+
+    pub fn required_object(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<BTreeMap<String, Expr>, Error> {
+        Ok(required(self.optional_object(keyword)?))
     }
 
     pub fn optional_array(&mut self, keyword: &'static str) -> Result<Option<Vec<Expr>>, Error> {

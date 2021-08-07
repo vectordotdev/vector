@@ -62,9 +62,9 @@ impl Expression for FindTableRowFn {
     }
 
     fn update_state(&self, state: &mut state::Compiler) {
-        match state.get_enrichment_table_mut(&self.table) {
-            Some(mut table) => {
-                (*table).as_mut().add_index(vec!["nork"]);
+        match state.get_enrichment_tables_mut() {
+            Some(ref mut table) => {
+                table.add_index(&self.table, vec!["nork"]);
             }
             // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
             None => (),

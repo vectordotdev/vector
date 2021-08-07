@@ -60,7 +60,12 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig, enrichment_tables: EnrichmentTables) -> crate::Result<Self> {
-        let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
+        let program = vrl::compile(
+            &config.source,
+            Box::new(enrichment_tables.clone()), // Clones are cheap.
+            &vrl_stdlib::all(),
+        )
+        .map_err(|diagnostics| {
             Formatter::new(&config.source, diagnostics)
                 .colored()
                 .to_string()
@@ -71,7 +76,7 @@ impl Remap {
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
-            enrichment_tables: tables,
+            enrichment_tables: enrichment_tables,
         })
     }
 }
