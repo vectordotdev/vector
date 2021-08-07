@@ -5,7 +5,6 @@ use crate::{
         FunctionTransform,
     },
 };
-use bytes::Bytes;
 use derivative::Derivative;
 use shared::TimeZone;
 use snafu::{OptionExt, Snafu};
@@ -101,6 +100,7 @@ pub mod tests {
     use super::super::test_util;
     use super::*;
     use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
+    use bytes::Bytes;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -189,7 +189,7 @@ pub mod tests {
         trace_init();
         test_util::test_parser(
             || Transform::function(Cri::new(TimeZone::Local)),
-            |line| Event::from(line),
+            Event::from,
             cases(),
         );
     }
@@ -199,7 +199,7 @@ pub mod tests {
         trace_init();
         test_util::test_parser(
             || Transform::function(Cri::new(TimeZone::Local)),
-            |bytes| Event::from(bytes),
+            Event::from,
             byte_cases(),
         );
     }

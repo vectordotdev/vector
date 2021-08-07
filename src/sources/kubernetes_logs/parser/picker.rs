@@ -89,7 +89,7 @@ mod tests {
         trace_init();
         test_util::test_parser(
             || Transform::function(Picker::new(TimeZone::Local)),
-            |message| Event::from(message),
+            Event::from,
             cases(),
         );
     }
