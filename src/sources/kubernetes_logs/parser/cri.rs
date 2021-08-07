@@ -11,6 +11,7 @@ use shared::TimeZone;
 use snafu::{OptionExt, Snafu};
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
+pub const NEW_LINE_TAG: &str = "new_line_tag";
 
 /// Parser for the CRI log format.
 ///
@@ -35,7 +36,7 @@ impl Cri {
         let regex_parser = {
             let mut rp_config = RegexParserConfig::default();
 
-            let pattern = r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)$";
+            let pattern = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)(?P<new_line_tag>\n?)$";
             rp_config.patterns = vec![pattern.to_owned()];
 
             rp_config.types.insert(
@@ -67,6 +68,9 @@ impl FunctionTransform for Cri {
 }
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
+    // Remove possible new_line tag
+    // for additional details, see https://github.com/timberio/vector/issues/8606
+    let _ = log.remove(NEW_LINE_TAG);
     // Detect if this is a partial event.
     let multiline_tag = log
         .remove(MULTILINE_TAG)
