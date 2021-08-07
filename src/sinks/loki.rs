@@ -792,8 +792,8 @@ mod integration_tests {
     #[tokio::test]
     async fn out_of_order_per_partition() {
         let batch_size = 2;
-        let big_lines = random_lines(1_000_000).take(2).collect::<Vec<_>>();
-        let small_lines = random_lines(1).take(20).collect::<Vec<_>>();
+        let big_lines = random_lines(1_000_000).take(2);
+        let small_lines = random_lines(1).take(20);
         let mut events = big_lines
             .into_iter()
             .chain(small_lines)

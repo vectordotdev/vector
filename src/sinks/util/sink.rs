@@ -1122,7 +1122,6 @@ mod tests {
             if delay {
                 // Delay and then error
                 delay = false;
-                let sent_requests = sent_requests.clone();
                 sleep(Duration::from_secs(1))
                     .map(move |_| {
                         sent_requests.lock().unwrap().push(req);
