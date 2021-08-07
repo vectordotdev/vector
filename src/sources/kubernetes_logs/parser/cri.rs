@@ -5,6 +5,7 @@ use crate::{
         FunctionTransform,
     },
 };
+use bytes::Bytes;
 use derivative::Derivative;
 use shared::TimeZone;
 use snafu::{OptionExt, Snafu};
@@ -157,9 +158,45 @@ pub mod tests {
         ]
     }
 
+    pub fn byte_cases() -> Vec<(Bytes, Vec<LogEvent>)> {
+        vec![(
+            // This is not valid UTF-8 string, ends with \n
+            // 2021-08-05T17:35:26.640507539Z stdout P Hello World Привет Ми\xd1\n
+            Bytes::from(vec![
+                50, 48, 50, 49, 45, 48, 56, 45, 48, 53, 84, 49, 55, 58, 51, 53, 58, 50, 54, 46, 54,
+                52, 48, 53, 48, 55, 53, 51, 57, 90, 32, 115, 116, 100, 111, 117, 116, 32, 80, 32,
+                72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128, 208,
+                184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209, 10,
+            ]),
+            vec![test_util::make_log_event_with_byte_message(
+                Bytes::from(vec![
+                    72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128,
+                    208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209,
+                ]),
+                "2021-08-05T17:35:26.640507539Z",
+                "stdout",
+                true,
+            )],
+        )]
+    }
+
     #[test]
     fn test_parsing() {
         trace_init();
-        test_util::test_parser(|| Transform::function(Cri::new(TimeZone::Local)), cases());
+        test_util::test_parser(
+            || Transform::function(Cri::new(TimeZone::Local)),
+            |line| Event::from(line),
+            cases(),
+        );
+    }
+
+    #[test]
+    fn test_parsing_bytes() {
+        trace_init();
+        test_util::test_parser(
+            || Transform::function(Cri::new(TimeZone::Local)),
+            |bytes| Event::from(bytes),
+            byte_cases(),
+        );
     }
 }
