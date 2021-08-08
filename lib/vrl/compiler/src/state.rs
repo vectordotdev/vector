@@ -49,13 +49,13 @@ impl Compiler {
 
         for table in enrichment_tables.get_tables() {
             new.insert_variable(
-                Ident::new(table),
+                Ident::new(table.clone()),
                 assignment::Details {
                     type_def: TypeDef {
                         fallible: false,
                         kind: crate::value::Kind::EnrichmentTable.into(),
                     },
-                    value: None,
+                    value: Some(Value::EnrichmentTable(table)),
                 },
             );
         }

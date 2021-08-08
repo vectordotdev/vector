@@ -57,8 +57,21 @@ pub struct FindTableRowFn {
 }
 
 impl Expression for FindTableRowFn {
-    fn resolve(&self, _ctx: &mut Context) -> Resolved {
-        Ok(Value::Null)
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        match ctx.get_enrichment_tables() {
+            None => Err("enrichment tables not loaded".into()),
+            Some(tables) => match tables.find_table_row(&self.table, self.condition.clone()) {
+                None => Err("data not found".into()),
+                Some(data) => {
+                    println!("Found {:?}", data);
+                    Ok(Value::Object(
+                        data.iter()
+                            .map(|(key, value)| (key.clone(), value.as_str().into()))
+                            .collect::<BTreeMap<_, Value>>(),
+                    ))
+                }
+            },
+        }
     }
 
     fn update_state(&self, state: &mut state::Compiler) {
@@ -72,6 +85,8 @@ impl Expression for FindTableRowFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().unknown()
+        TypeDef::new()
+            .fallible()
+            .add_object::<(), Kind>(map! { (): Kind::Bytes })
     }
 }

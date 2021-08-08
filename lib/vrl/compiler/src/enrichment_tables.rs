@@ -7,7 +7,7 @@ pub trait EnrichmentTables: DynClone {
         &'a self,
         table: &str,
         criteria: BTreeMap<String, String>,
-    ) -> Option<Vec<String>>;
+    ) -> Option<BTreeMap<String, String>>;
     fn add_index(&mut self, table: &str, fields: Vec<&str>);
 }
 
@@ -26,7 +26,7 @@ impl EnrichmentTables for EmptyEnrichmentTables {
         &'a self,
         _table: &str,
         _criteria: BTreeMap<String, String>,
-    ) -> Option<Vec<String>> {
+    ) -> Option<BTreeMap<String, String>> {
         None
     }
 

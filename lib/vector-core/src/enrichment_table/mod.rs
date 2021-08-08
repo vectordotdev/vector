@@ -53,7 +53,7 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
         &'a self,
         table: &str,
         criteria: BTreeMap<String, String>,
-    ) -> Option<Vec<String>> {
+    ) -> Option<BTreeMap<String, String>> {
         let tables = self.tables.load();
         let table = tables.get(table)?;
         table.find_table_row(criteria).map(|t| t.clone())

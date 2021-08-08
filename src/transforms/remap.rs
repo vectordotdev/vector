@@ -104,7 +104,12 @@ impl FunctionTransform for Remap {
 
         let mut runtime = Runtime::default();
 
-        let result = runtime.resolve(&mut target, &self.program, &self.timezone);
+        let result = runtime.resolve(
+            &mut target,
+            &self.program,
+            &self.timezone,
+            &Some(Box::new(self.enrichment_tables.clone())),
+        );
 
         match result {
             Ok(_) => {

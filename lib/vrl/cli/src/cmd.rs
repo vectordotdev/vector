@@ -145,7 +145,7 @@ fn execute(
     let mut runtime = Runtime::new(state);
 
     runtime
-        .resolve(object, program, timezone)
+        .resolve(object, program, timezone, &None)
         .map_err(Error::Runtime)
 }
 

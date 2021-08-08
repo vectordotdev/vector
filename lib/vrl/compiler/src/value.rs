@@ -13,18 +13,20 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::Arc;
-use std::sync::RwLock;
 
 pub use self::regex::Regex;
 pub use error::Error;
 pub use kind::Kind;
 
 pub trait EnrichmentTable: std::fmt::Debug {
-    fn find_table_row<'a>(&'a self, criteria: BTreeMap<String, String>) -> Option<&'a Vec<String>>;
+    fn find_table_row<'a>(
+        &'a self,
+        criteria: BTreeMap<String, String>,
+    ) -> Option<&'a BTreeMap<String, String>>;
     fn add_index(&mut self, fields: Vec<&str>);
 }
 
+/*
 #[derive(Clone)]
 pub struct EnrichmentTableW {
     name: String,
@@ -42,6 +44,7 @@ impl std::fmt::Debug for EnrichmentTableW {
         write!(f, "{}", self.name)
     }
 }
+*/
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

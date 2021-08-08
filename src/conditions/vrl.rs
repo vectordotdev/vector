@@ -82,7 +82,7 @@ impl Vrl {
         let mut target = VrlTarget::new(event.clone());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
-        Runtime::default().resolve(&mut target, &self.program, &timezone)
+        Runtime::default().resolve(&mut target, &self.program, &timezone, todo!())
     }
 }
 
