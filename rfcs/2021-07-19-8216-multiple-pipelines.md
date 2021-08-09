@@ -133,11 +133,20 @@ outputs = ["out"]
 inputs = ["in"]
 
 [sinks.out]
+# the # notation is just a representation of the pipeline namespace
 inputs = ["foo#baz"]
 # ...
 ```
 
-In order to avoid internal conflicts with the pipeline components `id`s, the components `id`s will be internally prefixed with the pipeline `id` (`pipeline_id#component_id`) but the user can still reference the components with their `id` inside the pipeline configuration.
+In order to avoid internal conflicts with the pipeline components `id`s, the components `id`s internal representation will be changed to the following `enum`
+
+```rust
+enum ComponentScope {
+  Public { name: String },
+  Scoped { scope: String, name: String },
+}
+```
+
 That way, if a transform `foo` is defined in the pipeline `bar` and in the pipeline `baz`, they will not conflict.
 
 #### Observing pipelines
