@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: vector: {
-	_port: 9000
+	_port: 6000
 
 	title: "Vector"
 
