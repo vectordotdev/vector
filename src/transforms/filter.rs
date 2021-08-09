@@ -30,8 +30,10 @@ impl GenerateConfig for FilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Filter::new(self.condition.build()?)))
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(Filter::new(
+            self.condition.build(context.enrichment_tables.clone())?,
+        )))
     }
 
     fn input_type(&self) -> DataType {

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use vector_core::enrichment_table::EnrichmentTables;
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
@@ -18,7 +19,7 @@ impl_generate_config_from_default!(IsLogConfig);
 
 #[typetag::serde(name = "is_log")]
 impl ConditionConfig for IsLogConfig {
-    fn build(&self) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, _enrichment_tables: EnrichmentTables) -> crate::Result<Box<dyn Condition>> {
         Ok(Box::new(IsLog {}))
     }
 }

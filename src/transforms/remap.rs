@@ -76,7 +76,7 @@ impl Remap {
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
-            enrichment_tables: enrichment_tables,
+            enrichment_tables,
         })
     }
 }

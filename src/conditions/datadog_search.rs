@@ -3,6 +3,7 @@ use crate::conditions::{Condition, ConditionConfig, ConditionDescription};
 
 #[cfg(feature = "transforms-filter")]
 use serde::{Deserialize, Serialize};
+use vector_core::enrichment_table::EnrichmentTables;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct DatadogSearchConfig {
@@ -17,7 +18,7 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 
 #[typetag::serde(name = "datadog_search")]
 impl ConditionConfig for DatadogSearchConfig {
-    fn build(&self) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, enrichment_tables: EnrichmentTables) -> crate::Result<Box<dyn Condition>> {
         let config = VrlConfig {
             source: format!(
                 r#"match_datadog_query(., "{}")"#,
@@ -25,7 +26,7 @@ impl ConditionConfig for DatadogSearchConfig {
             ),
         };
 
-        config.build()
+        config.build(enrichment_tables)
     }
 }
 

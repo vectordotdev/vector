@@ -6,6 +6,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
+use vector_core::enrichment_table::EnrichmentTables;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Value};
 
@@ -22,7 +23,7 @@ impl_generate_config_from_default!(VrlConfig);
 
 #[typetag::serde(name = "vrl")]
 impl ConditionConfig for VrlConfig {
-    fn build(&self) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, enrichment_tables: EnrichmentTables) -> crate::Result<Box<dyn Condition>> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
         //     allow_any: false,
@@ -43,8 +44,12 @@ impl ConditionConfig for VrlConfig {
             .filter(|f| f.identifier() != "only_fields")
             .collect::<Vec<_>>();
 
-        // TODO Add enrichment tables here.
-        let program = vrl::compile(&self.source, todo!(), &functions).map_err(|diagnostics| {
+        let program = vrl::compile(
+            &self.source,
+            Box::new(enrichment_tables.clone()),
+            &functions,
+        )
+        .map_err(|diagnostics| {
             Formatter::new(&self.source, diagnostics)
                 .colored()
                 .to_string()
@@ -53,6 +58,7 @@ impl ConditionConfig for VrlConfig {
         Ok(Box::new(Vrl {
             program,
             source: self.source.clone(),
+            enrichment_tables: enrichment_tables,
         }))
     }
 }
@@ -63,6 +69,7 @@ impl ConditionConfig for VrlConfig {
 pub struct Vrl {
     pub(super) program: Program,
     pub(super) source: String,
+    pub(super) enrichment_tables: EnrichmentTables,
 }
 
 impl Vrl {
@@ -82,7 +89,12 @@ impl Vrl {
         let mut target = VrlTarget::new(event.clone());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
-        Runtime::default().resolve(&mut target, &self.program, &timezone, todo!())
+        Runtime::default().resolve(
+            &mut target,
+            &self.program,
+            &timezone,
+            &Some(Box::new(self.enrichment_tables.clone())),
+        )
     }
 }
 
