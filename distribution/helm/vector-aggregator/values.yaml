@@ -9,6 +9,11 @@ global:
 # commonLabels:
 #   app.kubernetes.io/component: aggregator
 
+secrets: {}
+  # aws:
+  #  accessKeyId: ""
+  #  secretAccessKey: ""
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent

@@ -6,6 +6,11 @@
 # commonLabels:
 #   app.kubernetes.io/component: agent
 
+secrets: {}
+  # aws:
+  #  accessKeyId: ""
+  #  secretAccessKey: ""
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
