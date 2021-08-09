@@ -62,6 +62,7 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+    #[serde(flatten)]
     decoding: DecodingConfig,
 }
 
