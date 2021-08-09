@@ -32,6 +32,18 @@ updateStrategy: RollingUpdate
 # Only used when updateStrategy is set to "RollingUpdate".
 maxUnavailable: 1
 
+# Use Liveness Probe
+livenessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Use Readyness Probe
+readinessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
 # Deploy a service resource to use Topology-aware traffic routing with topology keys.
 service:
   # Whether to create service resource or not.
