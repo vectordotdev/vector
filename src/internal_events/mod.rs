@@ -137,6 +137,8 @@ mod tokenizer;
 mod udp;
 mod unix;
 mod vector;
+#[cfg(feature = "sinks-websocket")]
+mod websocket;
 
 pub mod kubernetes;
 
@@ -282,6 +284,8 @@ pub(crate) use self::tokenizer::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
+#[cfg(feature = "sinks-websocket")]
+pub use self::websocket::*;
 #[cfg(windows)]
 pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]

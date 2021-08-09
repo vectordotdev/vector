@@ -268,6 +268,7 @@ structopt = { version = "0.3.23", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.15.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.3", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-tungstenite = {version = "0.15.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
@@ -643,6 +644,7 @@ sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
+sinks-websocket = ["tokio-tungstenite"]
 
 # Datadog integration
 datadog-pipelines = ["sources-internal_metrics", "sinks-datadog"]

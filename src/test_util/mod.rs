@@ -457,6 +457,23 @@ impl<T: Send + 'static> CountReceiver<T> {
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
     }
+
+    pub fn receive_items_stream<S, F, Fut>(make_stream: F) -> CountReceiver<T>
+    where
+        S: Stream<Item = T> + Send + 'static,
+        F: FnOnce(oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut + Send + 'static,
+        Fut: Future<Output = S> + Send + 'static,
+    {
+        CountReceiver::new(|count, tripwire, connected| async move {
+            let stream = make_stream(tripwire, connected).await;
+            stream
+                .inspect(move |_| {
+                    count.fetch_add(1, Ordering::Relaxed);
+                })
+                .collect::<Vec<T>>()
+                .await
+        })
+    }
 }
 
 impl<T> Future for CountReceiver<T> {
