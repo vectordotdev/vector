@@ -13,11 +13,12 @@ badges:
 Vector's 0.16.0 release includes two breaking changes:
 
 1. [Component name field renamed to ID](#name-to-id)
-2. [Datadog Log sink encoding option removed](#encoding)
+1. [Datadog Log sink encoding option removed](#encoding)
+1. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
 
 We cover them below to help you upgrade quickly:
 
-[##](##) Upgrade Guide
+## Upgrade Guide
 
 ### Component name field renamed to ID {#name-to-id}
 
@@ -70,3 +71,17 @@ inputs = ["datadog_agent"]
 ```
 
 Encoding fields other than `codec` are still valid.
+
+### Renaming of `memory_use_bytes` internal metric {#memory_use_bytes}
+
+Vector previously documented the `internal_metrics` `memory_use_bytes` metric as
+being "The total memory currently being used by Vector (in bytes)."; however,
+this metric was actually published by the `lua` transform and indicated the
+memory use of just the Lua runtime.
+
+To make this more clear, the metric has been renamed from `memory_use_bytes` to
+`lua_memory_use_bytes`. If you were previously using `memory_use_bytes` as
+a measure of the `lua` runtime memory usage, you should update to refer to
+`lua_memory_use_bytes`.
+
+The documentation for this metric has also been updated.

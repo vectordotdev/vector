@@ -89,7 +89,24 @@ components: sinks: aws_sqs: components._aws & {
 			type: string: {
 				default: null
 				examples: ["vector", "vector-%Y-%m-%d"]
-				syntax: "literal"
+				syntax: "template"
+			}
+		}
+		message_deduplication_id: {
+			common:      false
+			description: """
+			The message deduplication ID value to allow AWS to identify duplicate messages. This value is a template
+			which should result in a unique string for each event.
+
+			See the [AWS documentation](\(urls.aws_sqs_message_deduplication_id)) for more about how AWS does message
+			deduplication.
+			"""
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["{{ transaction_id }}"]
+				syntax: "template"
 			}
 		}
 	}

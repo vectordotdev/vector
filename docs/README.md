@@ -1,59 +1,95 @@
-# Vector's Documentation
+# The Vector website and documentation
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/abeaffe6-d38a-4f03-8b6c-c6909e94918e/deploy-status)](https://app.netlify.com/sites/vector-project/deploys)
 
-This directory houses the assets used to build Vector's website and documentation, available at [vector.dev][vector].
+This directory houses all of the assets used to build Vector's website and documentation, available at [vector.dev][vector].
 
 ## Prerequisites
 
-In order to run the site locally, you need to have these installed:
+In order to run the site [locally](#run-the-site-locally), you need to have these installed:
 
-* The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`][netlify_toml].
-* The [CUE] configuration and validation language. See the value of `CUE_VERSION` in [`amplify.yml`](./amplify.yml) to see which version of CUE is currently being used for the docs.
-* The [Yarn] package manager (used for static assets).
+* The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`](../netlify.toml).
+* The CLI tool for the [CUE] configuration and validation language.
+* [Node.js] and the [Yarn] package manager (for static assets and some scripting).
 * [htmltest] for link checking.
 
 ## How it works
 
-The Vector documentation is built on [Hugo], a static site generator with the following details:
+vector.dev is a complex site with a lot of moving parts. This section breaks the site down into some key components.
 
-* The [reference documentation] is powered by manually curated data located in the [`cue` directory](./cue).
-* Other pages, such as the [guides], are powered by markdown files located in the [`content` directory](./content).
-* Layouts and custom pages are powered by HTML files located in the [`layouts` directory](./layouts).
-* Search is powered by Alogolia through a custom implementation.
+### Netlify
 
-## Run the site locally
+vector.dev is built by and hosted on the [Netlify] platform. [Deploy previews] are built for *all* pull requests to the Vector project (though this may change in the near future).
+ You can update site configuration and see the results of site builds on the Netlify [project page][netlify_project]. The configuration for Netlify is in the root of this repo, in the [`netlify.toml`][netlify_toml] file.
 
-```shell
-make serve
-```
+#### Branches
 
-## Tasks
+The [`website`][website_branch] branch is used to build the "production" site at https://vector.dev. If you want to update the production site, make sure to target your changes to that branch.
 
-### Add a new version of Vector
+The `master` branch, on the other hand, often contains unreleased, "nightly" changes to Vector that we don't yet want reflected in the website. The nightly version of the site is available at https://master.vector.dev. This version of the site may be useful for Vector users taking advantage of not-yet-released features. The `master` and `website` branches should be synced
 
-1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue). Make sure to preserve reverse ordering.
-1. Generate a new CUE file for the release by running `make release-prepare` in the root directory of the Vector repo.
-1. Add a new Markdown file to [`content/en/releases`](./content/en/releases), where the filename is `{version}.md` (e.g. `0.12.0.md`) and the file has metadata that looks like this:
+### Static site generator
 
-    ```markdown
-    ---
-    title: Vector v0.13.0 release notes
-    weight: 19
-    ---
-    ```
+vector.dev is built using the [Hugo] static site generator. The site configuration is in [`config.toml`](./config.toml). The standard Hugo [directory structure] is obeyed.
 
-    The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit. If Hugo ever does allow for semver sorting, we should remove the `weight`s.
+### Structured data
 
-## Redirects
+The Vector documentation relies heavily on structured data supplied using the [CUE] configuration and data validation language. Uses of CUE data include the docs for Vector's many [components] and the docs for [Vector Remap Language][vrl].
+
+All of the CUE sources for the site are in the [`cue`](./cue) directory. Whenever you build the Vector site, the CUE sources are compiled into a single JSON file that's stored at `data/docs.json`. That information is then used in conjunction with Hugo's templating system to build HTML.
+
+There's a variety of helper commands available for working with CUE. Run `make cue-help` for CLI docs.
+
+### JavaScript
+
+For the most part, vector.dev uses the [Alpine] framework for interactive functionality. If you see directives like `x-show`, `x-data`, `@click`, and `:class` in HTML templates, those are Alpine directives. Alpine was chosen over jQuery and other frameworks for the sake of maintainability. Alpine directives live inside your HTML rather than in separate JavaScript files, which enables you to see how a component behaves without referring to an external `.js` file.
+
+The [Spruce] library is used for all JavaScript state management. It stores things like light/dark mode preferences in `localStorage` and makes those values available in Alpine-wired components. See the [`app.js`](./assets/js/app.js) for managed state values.
+
+The [Tocbot] library is used to auto-generate documentation table of contents on each page. The TOC is generated at page load time.
+
+You'll also find two [React.js] components on the site: the spinning globe on the main page and the interactive search bar. The [TypeScript] for those components is in [`home.tsx`](./assets/js/home.tsx) and [`search.tsx`](./assets/js/search.tsx), respectively. React.js compilation is configured using the [`babel.config.js`](./babel.config.js) file and TypeScript compilation is configured using the [`tsconfig.json`](./tsconfig.json) file.
+
+All JavaScript for the site is built using [Hugo Pipes] rather than tools like Webpack, Gulp, or Parcel.
+
+### CSS
+
+Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. The Tailwind configuration is in [`tailwind.config.js`](./tailwind.config.js); it mostly consists of default values but there are some custom colors, sizes, and other attributes provided there. Tailwind was chosen for the sake of maintainability; having most CSS *inside* the HTML templates makes it easier to understand and update a given component's styling. CSS post-processing for Tailwind is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
+
+In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files are in [`assets/sass`](./assets/sass)):
+
+* [`home.sass`](./assets/sass/home.sass) styles some elements that are only on the home page
+* [`syntax.sass`](./assets/sass/syntax.sass) provides the colors for syntax highlighting
+* [`toc.sass`](./assets/sass/toc.sass) styles documentation pages' table of contents. Tailwind doesn't work for this because the HTML for the TOCs is generated at page load time by [Tocbot].
+* [`unpurged.sass`](./assets/sass/variables.sass) contains all the CSS that should *not* be run through PostCSS. The problem in some cases is that PostCSS [purges][purgecss] classes that aren't found in the HTML that's built by Hugo because they're built by other processes, like JavaScript that runs at load time. Anything in `unpurged.sass` escapes the purging process.
+
+### Search
+
+Search for vector.dev is provided by [Algolia]. Our search solution is largely custom:
+
+* The [`algolia-index.ts`](./scripts/algolia-index.ts) script indexes all of the relevant pages on the site and stores the entire index in a single JSON file (output to `public/search.json`).
+* The [`atomic-algolia`][atomic-algolia] tool syncs the generated JSON index with the Algolia backend, performing all the necessary create, update, and delete operations.
+
+The Algolia configuration for the site is controlled via the [`algolia.json`](./algolia.json) file. The Algolia CLI syncs this config with the Algolia API.
+
+> Everything needed to configure Algolia search for vector.dev is in this repo; you should never make manual configuration changes through the Algolia dashboard.
+
+### Icons
+
+vector.dev uses two different icon sets for different purposes:
+
+1. [Ionicons] is used for corporate logos (Twitter, GitHub, etc.)
+2. [Heroicons] is used for everything else. In general the outline variants are preferred.
+
+### Redirects
 
 Redirects for vector.dev are defined in three difference places (depending on the use):
 
-1. Domain-level redirects, e.g. chat.vector.dev to our Discord server, are defined in [`netlify.toml`](../netlify.toml) in the repo root.
+1. Domain-level redirects, e.g. the chat.vector.dev redirect to our Discord server, are defined in [`netlify.toml`](../netlify.toml) in the repo root.
 2. Splat-style redirects (which can't be defined as Hugo aliases) are defined in [`./static/_redirects`](./static/_redirects).
-3. Redirects for specific pages are defined in the `aliases` field in that page's front matter.
+3. Redirects for specific pages are defined in the [`aliases`][aliases] field in the relevant page's front matter.
 
-## Link checker
+### Link checking
 
 vector.dev uses the [htmltest] link checker to sniff out broken links. Whenever the site is built in CI, be it the preview build or the production build, all internal links on the site are checked. If *any* link is broken, the build fails. If you push changes to the docs/site and your build yields a big red X but running the site locally works fine, scan the CI output for broken links. There's a good chance that that's your culprit.
 
@@ -67,7 +103,7 @@ make local-production-build
 make local-preview-build
 ```
 
-The standard link checking configuration is in [`.htmltest.yml`](./.htmltest.yml). As you can see from this config, external links are *not* checked (`CheckExternal: false`). That's because external link checking makes builds highly brittle, as they become dependent upon external systems, i.e. if CloudFlare has an outage or an external site is down, the vector.dev build fails. The trade-off here, of course, is that broken external links can go undetected. The semi-solution is to periodically run ad hoc external link checks:
+The standard link checking configuration is in [`.htmltest.yml`](./.htmltest.yml). As you can see from this config, external links are *not* checked (`CheckExternal: false`). That's because external link checking makes builds highly brittle, as they become dependent upon the availability of external websites, i.e. if CloudFlare has an outage or Wikipedia goes down, the vector.dev build fails. The trade-off here, of course, is that broken external links can go undetected. The half-solution is to periodically run ad hoc external link checks:
 
 ```shell
 make local-production-build
@@ -76,19 +112,68 @@ make run-external-link-checker
 
 That second make command runs htmltest using the [`.htmltest.external.yml`](./htmltest.external.yml) configuration, which sets `CheckExternal` to `true`. We should strive to run this periodically in local environments to make sure we don't have too much drift over time.
 
+## Tasks
+
+Below is a list of common tasks that maintainers will need to carry out from time to time.
+
+### Run the site locally
+
+```shell
+make serve
+```
+
+This builds all the necessary [prereqs](#prerequisites) for the site and starts up a local web server. Navigate to http://localhost:1313 to view the site.
+
+When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site re-builds and Hugo automatically reloads the page that you're on. If you make changes to the [structured data](#structured-data) sources, however, you need to stop the server and run `make serve` again.
+
+### Add a new version of Vector
+
+1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue). Make sure to preserve reverse ordering.
+1. Generate a new CUE file for the release by running `make release-prepare` in the root directory of the Vector repo. This generates a CUE file at `cue/releases/{VERSION}.cue`.
+1. Add a new Markdown file to [`content/en/releases`](./content/en/releases), where the filename is `{version}.md` (e.g. `0.12.0.md`) and the file has metadata that looks like this:
+
+    ```markdown
+    ---
+    title: Vector v0.13.0 release notes
+    weight: 19
+    ---
+    ```
+
+    The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit. If Hugo ever does allow for semver sorting, we should remove the `weight`s.
+
 ## Known issues
 
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
 
+[algolia]: https://algolia.com
+[aliases]: https://gohugo.io/content-management/urls
+[alpine]: https://alpinejs.dev
+[atomic-algolia]: https://github.com/chrisdmacrae/atomic-algolia
+[components]: https://vector.dev/components
 [cue]: https://cue-lang.org
+[deploy previews]: https://docs.netlify.com/site-deploys/deploy-previews
+[directory structure]: https://gohugo.io/getting-started/directory-structure
 [esbuild]: https://github.com/evanw/esbuild
-[guides]: https://vector.dev/guides/
+[guides]: https://vector.dev/guides
+[heroicons]: https://heroicons.com
 [htmltest]: https://github.com/wjdp/htmltest
 [hugo]: https://gohugo.io
-[netlify_toml]: ../netlify.toml
-[reference documentation]: https://vector.dev/docs/reference/
+[hugo pipes]: https://gohugo.io/hugo-pipes
+[ionicons]: https://ionic.io/ionicons
+[netlify]: https://netlify.com
+[netlify_project]: https://app.netlify.com/sites/vector-project/overview
+[node.js]: https://nodejs.org
+[postcss]: https://github.com/postcss/postcss
+[purgecss]: https://purgecss.com
+[react.js]: https://reactjs.org
+[reference documentation]: https://vector.dev/docs/reference
 [sass]: https://sass-lang.com
+[spruce]: https://spruce.ryangjchandler.co.uk
 [tailwind]: https://tailwindcss.com
+[tocbot]: https://tscanlin.github.io/tocbot
+[typescript]: https://www.typescriptlang.org
 [typography]: https://github.com/tailwindlabs/tailwindcss-typography
 [vector]: https://vector.dev
+[vrl]: https://vrl.dev
+[website_branch]: https://github.com/timberio/vector/tree/website
 [yarn]: https://yarnpkg.com
