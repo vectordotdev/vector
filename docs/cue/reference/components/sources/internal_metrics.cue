@@ -683,8 +683,8 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		memory_used_bytes: {
-			description:       "The total memory currently being used by Vector (in bytes)."
+		lua_memory_used_bytes: {
+			description:       "The total memory currently being used by the Lua runtime."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
