@@ -124,7 +124,7 @@ tracing-subscriber = { version = "0.2.19", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 tracing-opentelemetry = { version = "0.14.0", default-features = false }
 opentelemetry = { version = "0.15.0", default-features = false, features = ["trace", "rt-tokio"] }
-opentelemetry-datadog = { version = "0.3.1", default-features = false, features = ["reqwest-client"] }
+opentelemetry-datadog = { version = "0.4.0", default-features = false, features = ["reqwest-client"] }
 
 # Metrics
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
