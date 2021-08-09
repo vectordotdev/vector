@@ -80,7 +80,7 @@ fn new_client(
     let mut http = HttpConnector::new();
     http.enforce_http(false);
 
-    let tls = tls_connector_builder(&tls_settings)?;
+    let tls = tls_connector_builder(tls_settings)?;
     let mut https = HttpsConnector::with_connector(http, tls)?;
 
     let settings = tls_settings.tls().cloned();
