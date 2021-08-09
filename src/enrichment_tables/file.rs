@@ -19,8 +19,8 @@ impl EnrichmentTableConfig for FileConfig {
         trace!("Building file enrichment table");
         Ok(Box::new(File {
             data: vec![btreemap! {
-                "field1" => "thing1",
-                "field2" => "thing2"
+                "field1" => vrl::Value::from("thing1"),
+                "field2" => vrl::Value::from("thing2"),
             }],
             indexes: Vec::new(),
         }))
@@ -34,7 +34,7 @@ inventory::submit! {
 impl_generate_config_from_default!(FileConfig);
 
 struct File {
-    data: Vec<BTreeMap<String, String>>,
+    data: Vec<BTreeMap<String, vrl::Value>>,
     indexes: Vec<Vec<String>>,
 }
 
@@ -42,7 +42,7 @@ impl EnrichmentTable for File {
     fn find_table_row<'a>(
         &'a self,
         _criteria: std::collections::BTreeMap<String, String>,
-    ) -> Option<&'a BTreeMap<String, String>> {
+    ) -> Option<&'a BTreeMap<String, vrl::Value>> {
         trace!("Searching enrichment table.");
         Some(&self.data[0])
     }

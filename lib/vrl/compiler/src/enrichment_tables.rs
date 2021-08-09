@@ -1,3 +1,4 @@
+use crate::Value;
 use dyn_clone::DynClone;
 use std::collections::BTreeMap;
 
@@ -7,7 +8,7 @@ pub trait EnrichmentTables: DynClone {
         &'a self,
         table: &str,
         criteria: BTreeMap<String, String>,
-    ) -> Option<BTreeMap<String, String>>;
+    ) -> Option<BTreeMap<String, Value>>;
     fn add_index(&mut self, table: &str, fields: Vec<&str>);
 }
 
@@ -26,7 +27,7 @@ impl EnrichmentTables for EmptyEnrichmentTables {
         &'a self,
         _table: &str,
         _criteria: BTreeMap<String, String>,
-    ) -> Option<BTreeMap<String, String>> {
+    ) -> Option<BTreeMap<String, Value>> {
         None
     }
 

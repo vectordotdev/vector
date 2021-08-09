@@ -62,14 +62,7 @@ impl Expression for FindTableRowFn {
             None => Err("enrichment tables not loaded".into()),
             Some(tables) => match tables.find_table_row(&self.table, self.condition.clone()) {
                 None => Err("data not found".into()),
-                Some(data) => {
-                    println!("Found {:?}", data);
-                    Ok(Value::Object(
-                        data.iter()
-                            .map(|(key, value)| (key.clone(), value.as_str().into()))
-                            .collect::<BTreeMap<_, Value>>(),
-                    ))
-                }
+                Some(data) => Ok(Value::Object(data)),
             },
         }
     }

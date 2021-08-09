@@ -134,23 +134,13 @@ impl ArgumentList {
         keyword: &'static str,
     ) -> Result<Option<String>, Error> {
         self.optional_expr(keyword)
-            .map(|expr| {
-                println!("Expr -> {:?}", expr);
-                match expr {
-                    Expr::Variable(var) if var.value().is_some() => match var.value().unwrap() {
-                        Value::EnrichmentTable(table) => Ok(table.clone()),
-                        expr => Err(Error::UnexpectedExpression {
-                            keyword,
-                            expected: "enrichment_table",
-                            expr: expr.clone().into_expr(),
-                        }),
-                    },
-                    expr => Err(Error::UnexpectedExpression {
-                        keyword,
-                        expected: "enrichment_table",
-                        expr,
-                    }),
-                }
+            .map(|expr| match expr.as_value() {
+                Some(Value::EnrichmentTable(table)) => Ok(table.clone()),
+                _ => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "enrichment_table",
+                    expr,
+                }),
             })
             .transpose()
     }

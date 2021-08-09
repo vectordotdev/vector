@@ -18,34 +18,6 @@ pub use self::regex::Regex;
 pub use error::Error;
 pub use kind::Kind;
 
-pub trait EnrichmentTable: std::fmt::Debug {
-    fn find_table_row<'a>(
-        &'a self,
-        criteria: BTreeMap<String, String>,
-    ) -> Option<&'a BTreeMap<String, String>>;
-    fn add_index(&mut self, fields: Vec<&str>);
-}
-
-/*
-#[derive(Clone)]
-pub struct EnrichmentTableW {
-    name: String,
-    table: Arc<RwLock<Box<dyn EnrichmentTable + Sync + Send>>>,
-}
-
-impl PartialEq for EnrichmentTableW {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
-}
-
-impl std::fmt::Debug for EnrichmentTableW {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
-*/
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Bytes(Bytes),

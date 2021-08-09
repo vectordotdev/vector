@@ -3,8 +3,7 @@ mod runtime;
 
 pub use compiler::{
     enrichment_tables::EmptyEnrichmentTables, enrichment_tables::EnrichmentTables, function, state,
-    type_def::Index, value, value::EnrichmentTable, Context, Expression, Function, Program, Target,
-    Value,
+    type_def::Index, value, Context, Expression, Function, Program, Target, Value,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
