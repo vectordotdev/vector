@@ -12,7 +12,6 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use arc_swap::ArcSwap;
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::pin::Pin;
 use std::{
@@ -124,8 +123,7 @@ pub async fn build_pieces(
         source_tasks.insert(name.clone(), server);
     }
 
-    let enrichment_tables: EnrichmentTables =
-        Arc::new(ArcSwap::from_pointee(enrichment_tables)).into();
+    let enrichment_tables = EnrichmentTables::new(enrichment_tables);
 
     let context = TransformContext {
         globals: config.global.clone(),
