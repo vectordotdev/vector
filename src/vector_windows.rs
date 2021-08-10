@@ -79,7 +79,7 @@ pub mod service_control {
         Uninstall,
         Start,
         Stop,
-        Restart,
+        Restart { stop_timeout: Duration },
     }
 
     #[derive(Debug, Clone, PartialEq)]
@@ -121,7 +121,7 @@ pub mod service_control {
         match action {
             ControlAction::Start => start_service(&service_def),
             ControlAction::Stop => stop_service(&service_def),
-            ControlAction::Restart => restart_service(&service_def),
+            ControlAction::Restart { stop_timeout } => restart_service(&service_def, stop_timeout),
             ControlAction::Install => install_service(&service_def),
             ControlAction::Uninstall => uninstall_service(&service_def),
         }
@@ -173,7 +173,10 @@ pub mod service_control {
         Ok(())
     }
 
-    fn restart_service(service_def: &ServiceDefinition) -> crate::Result<()> {
+    fn restart_service(
+        service_def: &ServiceDefinition,
+        stop_timeout: Duration,
+    ) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP;
         let service = open_service(&service_def, service_access)?;
@@ -188,7 +191,7 @@ pub mod service_control {
         let service_status = ensure_state(
             &service,
             ServiceState::Stopped,
-            Duration::from_secs(10),
+            stop_timeout,
             Duration::from_secs(1),
         )?;
         handle_service_exit_code(service_status.exit_code);

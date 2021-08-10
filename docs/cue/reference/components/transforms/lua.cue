@@ -486,7 +486,7 @@ components: transforms: lua: {
 	}
 
 	telemetry: metrics: {
-		memory_used_bytes:       components.sources.internal_metrics.output.metrics.memory_used_bytes
+		lua_memory_used_bytes:   components.sources.internal_metrics.output.metrics.lua_memory_used_bytes
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

@@ -8,7 +8,7 @@ components: sources: aws_s3: components._aws & {
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false
-			proxy: enabled:	     true
+			proxy: enabled:      true
 			from: service:       services.aws_s3
 		}
 	}

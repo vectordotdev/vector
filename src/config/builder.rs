@@ -1,11 +1,14 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, default_data_dir, provider, Config, GlobalOptions, HealthcheckOptions, SinkConfig,
-    SinkOuter, SourceConfig, SourceOuter, TestDefinition, TransformConfig, TransformOuter,
+    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
+    SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use vector_core::config::GlobalOptions;
+use vector_core::default_data_dir;
+use vector_core::transform::TransformConfig;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]

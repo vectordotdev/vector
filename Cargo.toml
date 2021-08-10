@@ -154,7 +154,7 @@ tower = { version = "0.4.8", default-features = false, features = ["buffer", "li
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
-serde = { version = "1.0.126", default-features = false, features = ["derive"] }
+serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.66", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.17", default-features = false }
@@ -182,7 +182,7 @@ itertools = { version = "0.10.1", default-features = false, optional = true }
 crossterm = { version = "0.20.0", default-features = false, optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-tui = { version = "0.15.0", optional = true, default-features = false, features = ["crossterm"] }
+tui = { version = "0.16.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
@@ -201,7 +201,7 @@ base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.11.0", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
-bytesize = { version = "1.0.1", default-features = false, optional = true }
+bytesize = { version = "1.1.0", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.4", default-features = false }
 colored = { version = "2.0.0", default-features = false }
@@ -236,7 +236,7 @@ maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.9", optional = true }
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.6.2", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
-mongodb = { version = "2.0.0-beta.2", default-features = false, features = ["tokio-runtime"], optional = true }
+mongodb = { version = "2.0.0-beta.3", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.9.18", default-features = false, optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
 nom = { version = "6.1.2", default-features = false, optional = true }
@@ -257,7 +257,7 @@ rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "
 redis = { version = "0.21.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 seahash = { version = "4.1.0", default-features = false, optional = true }
-semver = { version = "1.0.3", default-features = false, features = ["serde", "std"], optional = true }
+semver = { version = "1.0.4", default-features = false, features = ["serde", "std"], optional = true }
 snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.1", default-features = false }
@@ -269,7 +269,7 @@ syslog_loose = { version = "0.14.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.2", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
-twox-hash = { version = "1.6.0", default-features = false }
+twox-hash = { version = "1.6.1", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"], optional = true }
 warp = { version = "0.3.1", default-features = false, optional = true }
@@ -303,12 +303,11 @@ tonic-build = { version = "0.4", default-features = false, features = ["transpor
 
 [dev-dependencies]
 approx = "0.5.0"
-assert_cmd = "1.0.7"
+assert_cmd = "2.0.0"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-env-test-util = "1.0.1"
 httpmock = { version = "0.5.8", default-features = false }
-libc = "0.2.98"
+libc = "0.2.99"
 libz-sys = "1.1.3"
 matches = "0.1.8"
 pretty_assertions = "0.7.2"
@@ -422,6 +421,7 @@ sources-logs = [
   "sources-stdin",
   "sources-syslog",
   "sources-vector",
+  "sources-nats",
 ]
 sources-metrics = [
   "sources-apache_metrics",
@@ -456,6 +456,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
+sources-nats = ["async-nats"]
 sources-logstash = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
 sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]
@@ -705,7 +706,7 @@ kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
 logstash-integration-tests = ["docker", "sources-logstash", "uuid"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
-nats-integration-tests = ["sinks-nats"]
+nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["bytesize", "sinks-prometheus", "sources-prometheus"]

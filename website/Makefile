@@ -17,6 +17,9 @@ cue-check:
 cue-fmt:
 	${CUE} fmt
 
+cue-help:
+	${CUE} help
+
 cue-list:
 	${CUE} list
 

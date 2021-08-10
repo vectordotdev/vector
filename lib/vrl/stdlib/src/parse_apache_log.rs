@@ -253,6 +253,24 @@ mod tests {
             tz: shared::TimeZone::default(),
         }
 
+        error_line_ip_v6 {
+            args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client eda7:35d:3ceb:ef1e:2133:e7bf:116e:24cc:24259] I'll bypass the haptic COM bandwidth, that should matrix the CSS driver!"#,
+                             format: "error"
+                             ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().into()),
+                "message" => "I'll bypass the haptic COM bandwidth, that should matrix the CSS driver!",
+                "module" => "ab",
+                "severity" => "alert",
+                "pid" => 4803,
+                "thread" => "3814",
+                "client" => "eda7:35d:3ceb:ef1e:2133:e7bf:116e:24cc",
+                "port" => 24259
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::default(),
+        }
+
         error_line_thread_id {
             args: func_args![
                 value: r#"[2021-06-04 15:40:27.138633] [php7:emerg] [pid 4803] [client 95.223.77.60:35106] PHP Parse error:  syntax error, unexpected \'->\' (T_OBJECT_OPERATOR) in /var/www/prod/releases/master-c7225365fd9faa26262cffeeb57b31bd7448c94a/source/index.php on line 14"#,

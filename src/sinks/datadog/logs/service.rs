@@ -5,7 +5,7 @@ use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::encoding::EncodingConfiguration;
 use crate::sinks::util::http::HttpSink;
 use crate::sinks::util::Compression;
-use crate::sinks::util::{BoxedRawValue, EncodedEvent, PartitionInnerBuffer};
+use crate::sinks::util::{BoxedRawValue, PartitionInnerBuffer};
 use crate::{config::log_schema, internal_events::DatadogLogEventProcessed};
 use flate2::write::GzEncoder;
 use http::Request;
@@ -98,7 +98,7 @@ impl HttpSink for Service {
     type Input = PartitionInnerBuffer<serde_json::Value, ApiKey>;
     type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, ApiKey>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let log = event.as_mut_log();
 
         if self.log_schema_message_key != "message" {
@@ -128,10 +128,7 @@ impl HttpSink for Service {
             .as_ref()
             .unwrap_or(&self.default_api_key);
 
-        Some(EncodedEvent {
-            item: PartitionInnerBuffer::new(json_event, Arc::clone(api_key)),
-            metadata: Some(metadata),
-        })
+        Some(PartitionInnerBuffer::new(json_event, Arc::clone(api_key)))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
