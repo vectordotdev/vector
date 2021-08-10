@@ -311,6 +311,10 @@ pub async fn build_pieces(
         detach_triggers.insert(name.clone(), trigger);
     }
 
+    // We should have all the data for the enrichment tables loaded now, so switch them over to
+    // readonly.
+    enrichment_tables.finish_load();
+
     if errors.is_empty() {
         let pieces = Pieces {
             inputs,
