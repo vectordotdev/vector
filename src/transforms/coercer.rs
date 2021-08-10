@@ -97,7 +97,7 @@ impl FunctionTransform for Coercer {
 mod tests {
     use super::CoercerConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
     use pretty_assertions::assert_eq;
@@ -129,7 +129,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let coercer = coercer.as_function();

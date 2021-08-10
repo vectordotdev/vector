@@ -34,9 +34,9 @@ struct File {
 
 impl EnrichmentTable for File {
     fn find_table_row<'a>(
-        &'a self,
+        &self,
         _criteria: std::collections::BTreeMap<String, String>,
-    ) -> Option<&'a Vec<String>> {
+    ) -> Option<&Vec<String>> {
         trace!("Searching enrichment table.");
         Some(&self.data[0])
     }

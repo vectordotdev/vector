@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 
 pub trait EnrichmentTables: DynClone {
     fn get_tables(&self) -> Vec<String>;
-    fn find_table_row<'a>(
-        &'a self,
+    fn find_table_row(
+        &self,
         table: &str,
         criteria: BTreeMap<String, String>,
     ) -> Result<Option<Vec<String>>, String>;
@@ -22,8 +22,8 @@ impl EnrichmentTables for EmptyEnrichmentTables {
         Vec::new()
     }
 
-    fn find_table_row<'a>(
-        &'a self,
+    fn find_table_row(
+        &self,
         _table: &str,
         _criteria: BTreeMap<String, String>,
     ) -> Result<Option<Vec<String>>, String> {

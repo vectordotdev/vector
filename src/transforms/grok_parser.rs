@@ -150,7 +150,7 @@ impl FunctionTransform for GrokParser {
 mod tests {
     use super::GrokParserConfig;
     use crate::{
-        config::{log_schema, GlobalOptions, TransformConfig},
+        config::{log_schema, TransformConfig, TransformContext},
         event::{self, Event, LogEvent},
     };
     use pretty_assertions::assert_eq;
@@ -177,7 +177,7 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             timezone: Default::default(),
         }
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let parser = parser.as_function();

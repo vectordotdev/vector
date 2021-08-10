@@ -417,7 +417,7 @@ interval_ms = 999999
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
 
@@ -478,7 +478,7 @@ interval_ms = 999999
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
 

@@ -317,7 +317,7 @@ group_by = [ "request_id" ]
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -379,7 +379,7 @@ merge_strategies.baz = "max"
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -431,7 +431,7 @@ group_by = [ "request_id" ]
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -490,7 +490,7 @@ merge_strategies.bar = "concat"
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let reduce = reduce.into_task();
