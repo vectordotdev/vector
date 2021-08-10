@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 pub trait EnrichmentTables: DynClone {
     fn get_tables(&self) -> Vec<String>;
+    // TODO This does not need to be String...
     fn find_table_row(
         &self,
         table: &str,

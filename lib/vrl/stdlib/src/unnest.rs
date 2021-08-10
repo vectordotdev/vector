@@ -426,7 +426,9 @@ mod tests {
         for (object, expected, func, expected_typedef) in cases {
             let mut object = object.clone();
             let mut runtime_state = vrl::state::Runtime::default();
-            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+            let enrichment_tables =
+                Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTables>);
+            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, &enrichment_tables);
 
             let typedef = func.type_def(&compiler);
 

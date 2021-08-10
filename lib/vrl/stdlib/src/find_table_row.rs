@@ -30,21 +30,7 @@ impl Function for FindTableRow {
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let table = arguments.required_enrichment_table("table")?;
-        let condition = arguments
-            .required_object("condition")?
-            .into_iter()
-            .map(|(key, expr)| {
-                Ok((
-                    key,
-                    expr.as_value()
-                        .ok_or(vrl::function::Error::ExpectedStaticExpression {
-                            keyword: "condition",
-                            expr,
-                        })
-                        .map(|value| value.to_string())?,
-                ))
-            })
-            .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>()?;
+        let condition = arguments.required_object("condition")?;
 
         Ok(Box::new(FindTableRowFn { table, condition }))
     }
@@ -53,17 +39,30 @@ impl Function for FindTableRow {
 #[derive(Debug, Clone)]
 pub struct FindTableRowFn {
     table: String,
-    condition: BTreeMap<String, String>,
+    condition: BTreeMap<String, expression::Expr>,
 }
 
 impl Expression for FindTableRowFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match ctx.get_enrichment_tables() {
-            None => Err("enrichment tables not loaded".into()),
-            Some(tables) => match tables.find_table_row(&self.table, self.condition.clone())? {
-                None => Err("data not found".into()),
-                Some(data) => Ok(Value::Object(data)),
-            },
+        let condition = self
+            .condition
+            .iter()
+            .map(|(key, value)| {
+                Ok((
+                    key.clone(),
+                    value.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned(),
+                ))
+            })
+            .collect::<Result<_>>()?;
+
+        let tables = ctx
+            .get_enrichment_tables()
+            .as_ref()
+            .ok_or("enrichment tables not loaded")?;
+
+        match tables.find_table_row(&self.table, condition)? {
+            None => Err("data not found".into()),
+            Some(data) => Ok(Value::Object(data)),
         }
     }
 
