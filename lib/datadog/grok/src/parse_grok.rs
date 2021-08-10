@@ -88,7 +88,7 @@ mod tests {
                     .to_string(),
             ],
         )
-        .expect("should parse rules");
+        .expect("couldn't parse rules");
         let parsed = parse_grok("2020-10-02T23:22:12.223222Z info Hello world", &rules).unwrap();
 
         assert_eq!(
@@ -122,7 +122,7 @@ mod tests {
             &[
                 r#"access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
                 r#"access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
-            ]).expect("should parse rules");
+            ]).expect("couldn't parse rules");
         let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36 +0000] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules).unwrap();
 
         assert_eq!(
@@ -250,7 +250,7 @@ mod tests {
     fn test_grok_pattern(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
             let rules = parse_grok_rules(&[], &[format!(r#"test {}"#, filter)])
-                .expect("should parse rules");
+                .expect("couldn't parse rules");
             let parsed = parse_grok(k, &rules);
 
             if v.is_ok() {
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn sets_field_to_null_on_filter_runtime_error() {
         let rules = parse_grok_rules(&[], &["test_rule %{data:field:number}".to_string()])
-            .expect("should parse rules");
+            .expect("couldn't parse rules");
         let parsed = parse_grok("not a number", &rules).unwrap();
 
         assert_eq!(
@@ -340,7 +340,7 @@ mod tests {
                     .to_string(),
             ],
         )
-        .expect("should parse rules");
+        .expect("couldn't parse rules");
         let error = parse_grok("an ungrokkable message", &rules).unwrap_err();
 
         assert_eq!(error, Error::NoMatch);
@@ -355,7 +355,7 @@ mod tests {
                     .to_string(),
             ],
         )
-            .expect("should parse rules");
+            .expect("couldn't parse rules");
         let parsed = parse_grok("1 info -", &rules).unwrap();
 
         let value = get_field(&parsed, &LookupBuf::from_str("some.nested.field").unwrap());

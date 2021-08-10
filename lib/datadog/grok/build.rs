@@ -22,20 +22,22 @@ fn read_grok_patterns() {
     let mut output = "static PATTERNS: &[(&str, &str)] = &[\n".to_string();
 
     fs::read_dir(Path::new("patterns"))
-        .expect("can read 'patterns' dir")
-        .filter_map(|path| File::open(path.expect("can read 'patterns' dir").path()).ok())
+        .expect("can't read 'patterns' dir")
+        .filter_map(|path| File::open(path.expect("can't read 'patterns' dir").path()).ok())
         .flat_map(|f| BufReader::new(f).lines().filter_map(|l| l.ok()))
         .filter(|line| !line.starts_with('#') && !line.is_empty())
         .for_each(|line| {
-            let (key, value) =
-                line.split_at(line.find(' ').expect("pattern is 'ruleName definition'"));
+            let (key, value) = line.split_at(
+                line.find(' ')
+                    .expect("pattern should follow the format 'ruleName definition'"),
+            );
             write!(output, "\t(\"{}\", r#\"{}\"#),", key, &value[1..])
-                .expect("can append patterns");
+                .expect("can't read pattern definitions");
         });
 
     output.push_str("];\n");
 
-    let out_dir = env::var("OUT_DIR").expect("OUT_DIR is defined");
+    let out_dir = env::var("OUT_DIR").expect("OUT_DIR isn't defined");
     let dest_path = Path::new(&out_dir).join("patterns.rs");
-    fs::write(dest_path, output).expect("'patterns.rs' is created");
+    fs::write(dest_path, output).expect("'patterns.rs' wasn't generated");
 }
