@@ -264,7 +264,10 @@ impl RetryLogic for VectorGrpcRetryLogic {
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
         match err {
-            Error::Request { source } => !matches!(source.code(), tonic::Code::Unknown),
+            Error::Request { source } => !matches!(
+                source.code(),
+                tonic::Code::Unknown | tonic::Code::Internal | tonic::Code::PermissionDenied
+            ),
             _ => true,
         }
     }
@@ -327,7 +330,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // This test hangs, possibly an infinite retry loop
     async fn acknowledges_error() {
         let num_lines = 10;
 
@@ -339,28 +341,15 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+        let (_, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
         tokio::spawn(server);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+        let (_, events) = random_lines_with_stream(8, num_lines, Some(batch));
 
         sink.run(events).await.unwrap();
         drop(trigger);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
-
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
-            assert_eq!(
-                "application/grpc",
-                parts.headers.get("content-type").unwrap().to_str().unwrap()
-            );
-        })
-        .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     async fn get_received(
