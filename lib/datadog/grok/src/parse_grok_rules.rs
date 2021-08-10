@@ -276,16 +276,15 @@ fn process_match_function(
 ) -> Result<String, Error> {
     let match_fn = &pattern.match_fn;
     let result = match match_fn.name.as_ref() {
-        "regex" => {
-            if match_fn.args.is_some() {
-                if let ast::FunctionArgument::Arg(Value::Bytes(b)) =
-                    &match_fn.args.as_ref().unwrap()[0]
-                {
+        "regex" => match match_fn.args.as_ref() {
+            Some(args) if !args.is_empty() => {
+                if let ast::FunctionArgument::Arg(Value::Bytes(ref b)) = args[0] {
                     return Ok(String::from_utf8_lossy(&b).to_string());
                 }
+                Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
             }
-            Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
-        }
+            _ => Err(Error::InvalidFunctionArguments(match_fn.name.clone())),
+        },
         "date" => Ok("13\\/Jul\\/2016:10:55:36 \\+0000".to_string()), // TODO in a follow-up PR
         "integer" => replace_with_pattern_and_add_as_filter(
             "integerStr",
@@ -311,40 +310,42 @@ fn process_match_function(
             filters,
             pattern,
         ),
-        "boolean" => {
-            if match_fn.args.is_some() {
-                let args = match_fn.args.as_ref().unwrap();
-                if args.len() == 2 {
-                    if let ast::FunctionArgument::Arg(true_pattern) = &args[0] {
-                        if let ast::FunctionArgument::Arg(false_pattern) = &args[1] {
-                            let regex = Regex::new(
-                                format!("^{}$", true_pattern.to_string_lossy()).as_str(),
+        "boolean" => match match_fn.args.as_ref() {
+            Some(args) if args.len() == 2 => {
+                if let ast::FunctionArgument::Arg(true_pattern) = &args[0] {
+                    if let ast::FunctionArgument::Arg(false_pattern) = &args[1] {
+                        let regex =
+                            Regex::new(format!("^{}$", true_pattern.to_string_lossy()).as_str())
+                                .unwrap();
+                        return replace_with_pattern_and_add_as_filter(
+                            format!(
+                                "{}|{}",
+                                true_pattern.to_string_lossy(),
+                                false_pattern.to_string_lossy()
                             )
-                            .unwrap();
-                            return replace_with_pattern_and_add_as_filter(
-                                format!(
-                                    "{}|{}",
-                                    true_pattern.to_string_lossy(),
-                                    false_pattern.to_string_lossy()
-                                )
-                                .as_str(),
-                                GrokFilter::Boolean(Some(regex)),
-                                filters,
-                                pattern,
-                            );
-                        }
+                            .as_str(),
+                            GrokFilter::Boolean(Some(regex)),
+                            filters,
+                            pattern,
+                        );
                     }
                 }
                 Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
-            } else {
-                replace_with_pattern_and_add_as_filter(
-                    "[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]",
-                    GrokFilter::Boolean(None),
-                    filters,
-                    pattern,
-                )
             }
-        }
+            None => replace_with_pattern_and_add_as_filter(
+                "[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]",
+                GrokFilter::Boolean(None),
+                filters,
+                pattern,
+            ),
+            Some(args) if args.is_empty() => replace_with_pattern_and_add_as_filter(
+                "[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]",
+                GrokFilter::Boolean(None),
+                filters,
+                pattern,
+            ),
+            _ => Err(Error::InvalidFunctionArguments(match_fn.name.clone())),
+        },
         // otherwise just add it as is, it should be a known grok pattern
         grok_pattern_name => Ok(grok_pattern_name.to_string()),
     };
