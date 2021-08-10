@@ -126,8 +126,12 @@ impl Expression for DelFn {
         TypeDef::new().unknown()
     }
 
-    fn update_state(&self, state: &mut state::Compiler) {
+    fn update_state(
+        &self,
+        state: &mut state::Compiler,
+    ) -> std::result::Result<(), ExpressionError> {
         self.query.delete_type_def(state);
+        Ok(())
     }
 }
 

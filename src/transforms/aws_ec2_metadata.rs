@@ -528,8 +528,8 @@ enum Ec2MetadataError {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::GlobalOptions, event::metric, event::LogEvent, event::Metric,
-        test_util::trace_init, transforms::TaskTransform,
+        event::metric, event::LogEvent, event::Metric, test_util::trace_init,
+        transforms::TaskTransform,
     };
     use futures::{SinkExt, StreamExt};
 

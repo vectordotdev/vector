@@ -304,7 +304,7 @@ impl FunctionTransform for RegexParser {
 mod tests {
     use super::RegexParserConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
 
@@ -324,7 +324,7 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let parser = parser.as_function();

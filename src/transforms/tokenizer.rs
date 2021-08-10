@@ -126,7 +126,7 @@ impl FunctionTransform for Tokenizer {
 mod tests {
     use super::TokenizerConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
 
@@ -152,7 +152,7 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             timezone: Default::default(),
         }
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let parser = parser.as_function();

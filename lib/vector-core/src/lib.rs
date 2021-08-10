@@ -24,12 +24,12 @@
 #[cfg(feature = "api")]
 pub mod api;
 pub mod config;
+pub mod enrichment_table;
 pub mod event;
 pub mod mapping;
 pub mod metrics;
 pub mod sink;
 pub mod source;
-pub mod enrichment_table;
 #[cfg(test)]
 mod test_util;
 pub mod transform;

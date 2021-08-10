@@ -176,7 +176,11 @@ impl FunctionCall {
         }
 
         // Update the state if necessary.
-        expr.update_state(state);
+        expr.update_state(state)
+            .map_err(|err| Error::UpdateStateError {
+                call_span,
+                error: err.to_string(),
+            })?;
 
         Ok(Self {
             abort_on_error,
@@ -398,6 +402,9 @@ pub enum Error {
 
     #[error("fallible argument")]
     FallibleArgument { expr_span: Span },
+
+    #[error("error updating state {}", error)]
+    UpdateStateError { call_span: Span, error: String },
 }
 
 impl DiagnosticError for Error {
@@ -413,6 +420,7 @@ impl DiagnosticError for Error {
             AbortInfallible { .. } => 620,
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
+            UpdateStateError { .. } => 640,
         }
     }
 
@@ -561,6 +569,11 @@ impl DiagnosticError for Error {
                     expr_span,
                 ),
             ],
+
+            UpdateStateError { call_span, error } => vec![Label::primary(
+                format!("an error occurred updating the compiler state: {}", error),
+                call_span,
+            )],
         }
     }
 

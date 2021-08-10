@@ -60,20 +60,24 @@ impl Expression for FindTableRowFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match ctx.get_enrichment_tables() {
             None => Err("enrichment tables not loaded".into()),
-            Some(tables) => match tables.find_table_row(&self.table, self.condition.clone()) {
+            Some(tables) => match tables.find_table_row(&self.table, self.condition.clone())? {
                 None => Err("data not found".into()),
                 Some(data) => Ok(Value::Object(data)),
             },
         }
     }
 
-    fn update_state(&self, state: &mut state::Compiler) {
+    fn update_state(
+        &self,
+        state: &mut state::Compiler,
+    ) -> std::result::Result<(), ExpressionError> {
         match state.get_enrichment_tables_mut() {
             Some(ref mut table) => {
-                table.add_index(&self.table, vec!["nork"]);
+                table.add_index(&self.table, vec!["nork"])?;
+                Ok(())
             }
             // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
-            None => (),
+            None => Err("enrichment tables aren't loaded".into()),
         }
     }
 

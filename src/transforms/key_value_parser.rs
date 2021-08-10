@@ -186,7 +186,7 @@ impl FunctionTransform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
 
@@ -215,7 +215,7 @@ mod tests {
             trim_value,
             timezone: Default::default(),
         }
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
 

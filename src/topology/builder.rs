@@ -12,7 +12,6 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use arc_swap::ArcSwap;
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::pin::Pin;
 use std::{
@@ -124,8 +123,7 @@ pub async fn build_pieces(
         source_tasks.insert(name.clone(), server);
     }
 
-    let enrichment_tables: EnrichmentTables =
-        Arc::new(ArcSwap::from_pointee(enrichment_tables)).into();
+    let enrichment_tables = EnrichmentTables::new(enrichment_tables);
 
     let context = TransformContext {
         globals: config.global.clone(),
@@ -312,6 +310,10 @@ pub async fn build_pieces(
         tasks.insert(name.clone(), task);
         detach_triggers.insert(name.clone(), trigger);
     }
+
+    // We should have all the data for the enrichment tables loaded now, so switch them over to
+    // readonly.
+    enrichment_tables.finish_load();
 
     if errors.is_empty() {
         let pieces = Pieces {
