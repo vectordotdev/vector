@@ -10,8 +10,6 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use tracing::{debug, info};
 
-const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
-
 const HELM_VALUES_LOWER_GLOB: &str = indoc! {r#"
     kubernetesLogsSource:
       rawConfig: |
@@ -100,9 +98,10 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -204,9 +203,10 @@ async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -305,9 +305,10 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -405,9 +406,10 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -533,9 +535,10 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -610,9 +613,10 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -712,9 +716,10 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -861,9 +866,10 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1064,9 +1070,10 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     "#};
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1261,9 +1268,10 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1434,9 +1442,10 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1596,9 +1605,10 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1733,9 +1743,10 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1833,9 +1844,10 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1984,9 +1996,10 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -2045,9 +2058,10 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
 
     let vector = framework
-        .vector(
+        .helm_chart(
             "test-vector",
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![HELM_VALUES_STDOUT_SINK, HELM_VALUES_LOWER_GLOB],
                 ..Default::default()
