@@ -106,7 +106,7 @@ fn bench_field_filter(c: &mut Criterion) {
                     field: "the_field".to_string(),
                     value: "0".to_string(),
                 }
-                .build(&TrasformContext::default())
+                .build(&TransformContext::default())
                 .await
                 .unwrap()
             })

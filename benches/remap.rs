@@ -10,7 +10,7 @@ use vector::transforms::{
     FunctionTransform,
 };
 use vector::{
-    config::{GlobalOptions, TransformConfig},
+    config::{TransformConfig, TransformContext},
     event::{Event, Value},
     test_util::runtime,
 };
@@ -43,16 +43,19 @@ fn benchmark_remap(c: &mut Criterion) {
 
     group.bench_function("add_fields/remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
-            Remap::new(RemapConfig {
-                source: indoc! {r#".foo = "bar"
+            Remap::new(
+                RemapConfig {
+                    source: indoc! {r#".foo = "bar"
                     .bar = "baz"
                     .copy = string!(.copy_from)
                 "#}
-                .to_string(),
-                timezone: TimeZone::default(),
-                drop_on_error: true,
-                drop_on_abort: true,
-            })
+                    .to_string(),
+                    timezone: TimeZone::default(),
+                    drop_on_error: true,
+                    drop_on_abort: true,
+                },
+                Default::default(),
+            )
             .unwrap(),
         );
 
@@ -109,12 +112,15 @@ fn benchmark_remap(c: &mut Criterion) {
 
     group.bench_function("parse_json/remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
-            Remap::new(RemapConfig {
-                source: ".bar = parse_json!(string!(.foo))".to_owned(),
-                timezone: TimeZone::default(),
-                drop_on_error: true,
-                drop_on_abort: true,
-            })
+            Remap::new(
+                RemapConfig {
+                    source: ".bar = parse_json!(string!(.foo))".to_owned(),
+                    timezone: TimeZone::default(),
+                    drop_on_error: true,
+                    drop_on_abort: true,
+                },
+                Default::default(),
+            )
             .unwrap(),
         );
 
@@ -185,7 +191,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 timezone: TimeZone::default(),
                 drop_on_error: true,
                 drop_on_abort: true,
-            })
+            }, Default::default())
             .unwrap(),
         );
 
@@ -222,7 +228,7 @@ fn benchmark_remap(c: &mut Criterion) {
                         timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
                    "#})
                 .unwrap()
-                .build(&GlobalOptions::default())
+                .build(&TransformContext::default())
                 .await
                 .unwrap()
             })
