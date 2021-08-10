@@ -168,14 +168,14 @@ psp:
   # Whether to create `PodSecurityPolicy` or not.
   enabled: false
 
-# Use Liveness Probe (The Probe is using API endpoint which is disabled by default. 
+# Use Liveness Probe (The Probe is using API endpoint which is disabled by default.
 # You have to enable the API in the Config to expose the endpoint.)
 livenessProbe: {}
   # httpGet:
   #   path: /health
   #   port: api
 
-# Use Readyness Probe (The Probe is using API endpoint which is disabled by default. 
+# Use Readyness Probe (The Probe is using API endpoint which is disabled by default.
 # You have to enable the API in the Config to expose the endpoint.)
 readinessProbe: {}
   # httpGet:
