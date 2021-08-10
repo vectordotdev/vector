@@ -32,6 +32,35 @@ updateStrategy: RollingUpdate
 # Only used when updateStrategy is set to "RollingUpdate".
 maxUnavailable: 1
 
+# Use Liveness Probe (The Probe is using API endpoint which is disabled by default. 
+# You have to enable the API in the Config to expose the endpoint.)
+livenessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Use Readyness Probe (The Probe is using API endpoint which is disabled by default. 
+# You have to enable the API in the Config to expose the endpoint.)
+readinessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Change DNS Policy
+dnsPolicy:
+
+# Custom DNS configuration to be added to vector-agent pods
+dnsConfig: {}
+  # nameservers:
+  #   - 1.2.3.4
+  # searches:
+  #   - ns1.svc.cluster-domain.example
+  #   - my.dns.search.suffix
+  # options:
+  #   - name: ndots
+  #     value: "2"
+  #   - name: edns0
+
 # Deploy a service resource to use Topology-aware traffic routing with topology keys.
 service:
   # Whether to create service resource or not.
