@@ -51,6 +51,7 @@ components: transforms: "remap": {
 
 				Required if `file` is missing.
 				"""
+			common:      true
 			required:    false
 			type: string: {
 				examples: [
@@ -62,7 +63,8 @@ components: transforms: "remap": {
 						.new_name = del(.old_name)
 						""",
 				]
-				syntax: "remap_program"
+				syntax:  "remap_program"
+				default: null
 			}
 		}
 		file: {
@@ -71,12 +73,14 @@ components: transforms: "remap": {
 
 				Required if `source` is missing.
 				"""
+			common:      true
 			required:    false
 			type: string: {
 				examples: [
 					"./my/program.vrl",
 				]
-				syntax: "literal"
+				syntax:  "literal"
+				default: null
 			}
 		}
 		drop_on_error: {
