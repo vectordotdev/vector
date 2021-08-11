@@ -186,6 +186,19 @@ building more general codecs on the topology level in the future. The decoders
 could be wrapped in a transform-like structure if we recognize a demand for this
 feature.
 
+Alternatively, introducing a `remap` codec could give users enough flexibility
+to express their data transformation needs in a source:
+
+```toml
+[decoding]
+codec = "remap"
+src = """
+. = parse_json!(.)
+.nested = parse_json!(.nested)
+.encoded = parse_base64!(.encoded)
+"""
+```
+
 # Alternatives Considered
 
 In a previous iteration of this RFC, codecs were implemented on the topology
@@ -212,7 +225,7 @@ options that cover the most common use cases. However, users might want to use a
 custom codec that only applies to their specific use case or is not supported by
 Vector yet. Adding a system that would allow custom-defined codecs could be
 considered in the future, for now this is can be accomplished by the `wasm` or
-`lua` transform.
+`lua` transform, or alternatively by the proposed `remap` codec.
 
 ## Plan Of Attack
 
