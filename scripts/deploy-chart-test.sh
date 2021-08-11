@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# deploy-kubernetes-test.sh
+# deploy-public-chart-test.sh
 #
 # SUMMARY
 #
-#   Deploys Vector into Kubernetes for testing purposes.
+#   Deploys a public chart into Kubernetes for testing purposes.
 #   Uses the same installation method our users would use.
 #
 #   This script implements cli interface required by the kubernetes E2E
@@ -15,11 +15,11 @@ set -euo pipefail
 #
 #   Deploy:
 #
-#   $ CONTAINER_IMAGE=timberio/vector:alpine-latest scripts/deploy-kubernetes-test.sh up vector-test-qwerty vector
+#   $ CHART_REPO=https://helm.testmaterial.tld scripts/deploy-public-chart-test.sh up test-namespace-qwerty chart
 #
 #   Teardown:
 #
-#   $ scripts/deploy-kubernetes-test.sh down vector-test-qwerty vector
+#   $ scripts/deploy-public-chart-test.sh down test-namespace-qwerty chart
 #
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -30,10 +30,8 @@ COMMAND="${1:?"Specify the command (up/down) as the first argument"}"
 # A Kubernetes namespace to deploy to.
 NAMESPACE="${2:?"Specify the namespace as the second argument"}"
 
-if [[ "$COMMAND" == "up" ]]; then
-  # The helm chart to deploy.
-  HELM_CHART="${3:?"Specify the helm chart name as the third argument"}"
-fi
+# The helm chart to manage
+HELM_CHART="${3:?"Specify the helm chart name as the third argument"}"
 
 # Allow overriding kubectl with something like `minikube kubectl --`.
 VECTOR_TEST_KUBECTL="${VECTOR_TEST_KUBECTL:-"kubectl"}"
@@ -47,6 +45,9 @@ CUSTOM_RESOURCE_CONFIGS_FILE="${CUSTOM_RESOURCE_CONFIGS_FILE:-""}"
 # Allow optionally passing custom Helm values.
 CUSTOM_HELM_VALUES_FILES="${CUSTOM_HELM_VALUES_FILES:-""}"
 
+# Allow overriding the local repo name, useful to use multiple external repo
+CUSTOM_HELM_REPO_LOCAL_NAME="${CUSTOM_HELM_REPO_LOCAL_NAME:-"local_repo"}"
+
 split-container-image() {
   local INPUT="$1"
   CONTAINER_IMAGE_REPOSITORY="${INPUT%:*}"
@@ -57,19 +58,17 @@ up() {
   # A Vector container image to use.
   CONTAINER_IMAGE="${CONTAINER_IMAGE:?"You must assign CONTAINER_IMAGE variable with the Vector container image name"}"
 
+  $VECTOR_TEST_HELM repo add "$CUSTOM_HELM_REPO_LOCAL_NAME" "$CHART_REPO" --force-update || true
+  $VECTOR_TEST_HELM repo update
+
   $VECTOR_TEST_KUBECTL create namespace "$NAMESPACE"
 
   if [[ -n "$CUSTOM_RESOURCE_CONFIGS_FILE" ]]; then
     $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
   fi
 
-  HELM_VALUES=()
 
-  HELM_VALUES+=(
-    # Set a reasonable log level to avoid issues with internal logs
-    # overwriting console output.
-    --set "global.vector.commonEnvKV.LOG=info"
-  )
+  HELM_VALUES=()
 
   for file in $CUSTOM_HELM_VALUES_FILES ; do
     HELM_VALUES+=(
@@ -77,8 +76,11 @@ up() {
     )
   done
 
+  # Set a reasonable log level to avoid issues with internal logs
+  # overwriting console output.
   split-container-image "$CONTAINER_IMAGE"
   HELM_VALUES+=(
+    --set "global.vector.commonEnvKV.LOG=info"
     --set "global.vector.image.repository=$CONTAINER_IMAGE_REPOSITORY"
     --set "global.vector.image.tag=$CONTAINER_IMAGE_TAG"
   )
@@ -88,8 +90,9 @@ up() {
     --atomic \
     --namespace "$NAMESPACE" \
     "${HELM_VALUES[@]}" \
-    "vector" \
-    "./distribution/helm/$HELM_CHART"
+    "$HELM_CHART" \
+    "$CUSTOM_HELM_REPO_LOCAL_NAME/$HELM_CHART" \
+    --devel
   { set +x; } &>/dev/null
 }
 
@@ -98,11 +101,11 @@ down() {
     $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
   fi
 
-  if $VECTOR_TEST_HELM status --namespace "$NAMESPACE" "vector" &>/dev/null; then
-    $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "vector"
+  if $VECTOR_TEST_HELM status --namespace "$NAMESPACE" "$HELM_CHART" &>/dev/null; then
+    $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "$HELM_CHART"
   fi
 
-  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE" --force=true --grace-period=0 --wait=false
+  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
 }
 
 case "$COMMAND" in
