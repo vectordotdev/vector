@@ -117,11 +117,11 @@ vector config, e.g.:
 
 ```yaml
 [framing]
-type = "character_delimited"
-delimiter = "\t"
+method = "character_delimited"
+character_delimited.delimiter = "\t"
 
 [decoding]
-type = "json"
+codec = "json"
 ```
 
 which would transform the input of
