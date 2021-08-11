@@ -13,7 +13,7 @@ impl EnrichmentTableConfig for FileConfig {
         &self,
         _globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn super::EnrichmentTable + Send + Sync>> {
-        trace!("Building file enrichment table");
+        trace!("Building file enrichment table.");
         Ok(Box::new(File {
             data: vec![vec!["field1".to_string(), "field2".to_string()]],
             indexes: Vec::new(),
