@@ -116,10 +116,24 @@ vector config, e.g.:
 [framing]
 type = "character_delimited"
 delimiter = "\t"
-max_length = 1337
 
 [decoding]
 type = "json"
+```
+
+which would transform the input of
+
+```text
+"{ \"foo\": 1 }\t{ \"bar\": 2 }\t{ \"baz\": 3 }"
+```
+
+to
+
+
+```text
+{ "foo": 1 }
+{ "bar": 2 }
+{ "baz": 3 }
 ```
 
 ## Rationale
