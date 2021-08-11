@@ -9,10 +9,13 @@ global:
 # commonLabels:
 #   app.kubernetes.io/component: aggregator
 
-secrets: {}
-  # aws:
-  #  accessKeyId: ""
-  #  secretAccessKey: ""
+secrets:
+  generic: {}
+    # Each Key/Value will be added to a Secret resource
+    # Values should be entered base64 encoded (examples below are "REPLACE_ME" encoded)
+    # NOTE: Don't commit unencrypted secrets to git!
+    # awsAccessKeyId: "UkVQTEFDRV9NRQo="
+    # awsSecretAccessKey: "UkVQTEFDRV9NRQo="
 
 image:
   repository: timberio/vector
