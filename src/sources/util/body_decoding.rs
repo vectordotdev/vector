@@ -5,7 +5,7 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use codec::BytesDelimitedCodec;
+use codec::CharacterDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use tokio_util::codec::Decoder;
@@ -26,7 +26,7 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
     let mut body = BytesMut::new();
     body.extend_from_slice(&buf);
 
-    let mut decoder = BytesDelimitedCodec::new(b'\n');
+    let mut decoder = CharacterDelimitedCodec::new(b'\n');
     std::iter::from_fn(move || {
         match decoder.decode_eof(&mut body) {
             Err(error) => Some(Err(ErrorMessage::new(

@@ -7,7 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::TimeZone;
-use codec::BytesDelimitedCodec;
+use codec::CharacterDelimitedCodec;
 use futures::{future, stream::BoxStream, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use nix::{
@@ -352,7 +352,7 @@ fn start_journalctl(
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),
-        BytesDelimitedCodec::new(b'\n'),
+        CharacterDelimitedCodec::new(b'\n'),
     )
     .boxed();
 

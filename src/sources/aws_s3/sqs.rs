@@ -12,7 +12,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use codec::BytesDelimitedCodec;
+use codec::CharacterDelimitedCodec;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
@@ -408,7 +408,7 @@ impl IngestorProcess {
                 // the case that the same vector instance processes the same message.
                 let mut read_error: Option<std::io::Error> = None;
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-                    FramedRead::new(object_reader, BytesDelimitedCodec::new(b'\n'))
+                    FramedRead::new(object_reader, CharacterDelimitedCodec::new(b'\n'))
                         .map(|res| {
                             res.map_err(|err| {
                                 read_error = Some(err);

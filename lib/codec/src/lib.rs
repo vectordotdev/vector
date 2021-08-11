@@ -6,17 +6,17 @@ use std::{cmp, io, usize};
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct BytesDelimitedCodec {
+pub struct CharacterDelimitedCodec {
     delim: u8,
     max_length: usize,
     is_discarding: bool,
     next_index: usize,
 }
 
-impl BytesDelimitedCodec {
-    /// Returns a `BytesDelimitedCodec` with the specified delimiter.
+impl CharacterDelimitedCodec {
+    /// Returns a `CharacterDelimitedCodec` with the specified delimiter.
     pub fn new(delim: u8) -> Self {
-        BytesDelimitedCodec {
+        CharacterDelimitedCodec {
             delim,
             max_length: usize::MAX,
             is_discarding: false,
@@ -24,11 +24,11 @@ impl BytesDelimitedCodec {
         }
     }
 
-    /// Returns a `BytesDelimitedCodec` with a maximum frame length limit.
+    /// Returns a `CharacterDelimitedCodec` with a maximum frame length limit.
     pub fn new_with_max_length(delim: u8, max_length: usize) -> Self {
-        BytesDelimitedCodec {
+        CharacterDelimitedCodec {
             max_length,
-            ..BytesDelimitedCodec::new(delim)
+            ..CharacterDelimitedCodec::new(delim)
         }
     }
 
@@ -38,7 +38,7 @@ impl BytesDelimitedCodec {
     }
 }
 
-impl Decoder for BytesDelimitedCodec {
+impl Decoder for CharacterDelimitedCodec {
     type Item = Bytes;
     type Error = io::Error;
 
@@ -126,7 +126,7 @@ impl Decoder for BytesDelimitedCodec {
     }
 }
 
-impl<T> Encoder<T> for BytesDelimitedCodec
+impl<T> Encoder<T> for CharacterDelimitedCodec
 where
     T: AsRef<[u8]>,
 {

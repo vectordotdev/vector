@@ -1,19 +1,19 @@
 use bytes::{BufMut, BytesMut};
-use codec::BytesDelimitedCodec;
+use codec::CharacterDelimitedCodec;
 use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
 #[test]
-fn bytes_delim_decode() {
-    let mut codec = BytesDelimitedCodec::new(b'\n');
+fn character_delimited_decode() {
+    let mut codec = CharacterDelimitedCodec::new(b'\n');
     let buf = &mut BytesMut::new();
     buf.put_slice(b"abc\n");
     assert_eq!(Some("abc".into()), codec.decode(buf).unwrap());
 }
 
 #[test]
-fn bytes_delim_encode() {
-    let mut codec = BytesDelimitedCodec::new(b'\n');
+fn character_delimited_encode() {
+    let mut codec = CharacterDelimitedCodec::new(b'\n');
 
     let mut buf = BytesMut::new();
     codec.encode(b"abc", &mut buf).unwrap();
@@ -22,10 +22,10 @@ fn bytes_delim_encode() {
 }
 
 #[test]
-fn bytes_decode_max_length() {
+fn decode_max_length() {
     const MAX_LENGTH: usize = 6;
 
-    let mut codec = BytesDelimitedCodec::new_with_max_length(b'\n', MAX_LENGTH);
+    let mut codec = CharacterDelimitedCodec::new_with_max_length(b'\n', MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -41,10 +41,10 @@ fn bytes_decode_max_length() {
 // Regression test for [infinite loop bug](https://github.com/timberio/vector/issues/2564)
 // Derived from https://github.com/tokio-rs/tokio/issues/1483
 #[test]
-fn bytes_decoder_discard_repeat() {
+fn decoder_discard_repeat() {
     const MAX_LENGTH: usize = 1;
 
-    let mut codec = BytesDelimitedCodec::new_with_max_length(b'\n', MAX_LENGTH);
+    let mut codec = CharacterDelimitedCodec::new_with_max_length(b'\n', MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
@@ -55,7 +55,7 @@ fn bytes_decoder_discard_repeat() {
 }
 
 #[test]
-fn bytes_decode_json_escaped() {
+fn decode_json_escaped() {
     let mut input = HashMap::new();
     input.insert("key", "value");
     input.insert("new", "li\nne");
@@ -63,7 +63,7 @@ fn bytes_decode_json_escaped() {
     let mut bytes = serde_json::to_vec(&input).unwrap();
     bytes.push(b'\n');
 
-    let mut codec = BytesDelimitedCodec::new(b'\n');
+    let mut codec = CharacterDelimitedCodec::new(b'\n');
     let buf = &mut BytesMut::new();
 
     buf.reserve(bytes.len());
@@ -76,7 +76,7 @@ fn bytes_decode_json_escaped() {
 }
 
 #[test]
-fn bytes_decode_json_multiline() {
+fn decode_json_multiline() {
     let events = r#"
 {"log":"\u0009at org.springframework.security.web.context.SecurityContextPersistenceFilter.doFilter(SecurityContextPersistenceFilter.java:105)\n","stream":"stdout","time":"2019-01-18T07:49:27.374616758Z"}
 {"log":"\u0009at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:334)\n","stream":"stdout","time":"2019-01-18T07:49:27.374640288Z"}
@@ -131,7 +131,7 @@ fn bytes_decode_json_multiline() {
 {"log":"2019-01-18 07:53:06.419 [               ]  INFO 1 --- [vent-bus.prod-1] c.t.listener.CommonListener              : warehousing Dailywarehousing.daily\n","stream":"stdout","time":"2019-01-18T07:53:06.420527437Z"}
 "#;
 
-    let mut codec = BytesDelimitedCodec::new(b'\n');
+    let mut codec = CharacterDelimitedCodec::new(b'\n');
     let buf = &mut BytesMut::new();
 
     buf.extend(events.to_string().as_bytes());

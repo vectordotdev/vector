@@ -1,5 +1,5 @@
 use super::{BoxedFramer, BoxedParser, BytesDecoder, Decoder};
-use codec::BytesDelimitedCodec;
+use codec::CharacterDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::LinesCodec;
 
@@ -27,9 +27,9 @@ impl FramingConfig {
                 max_length,
             } => Box::new(BytesDecoder::new(match max_length {
                 Some(max_length) => {
-                    BytesDelimitedCodec::new_with_max_length(*delimiter as u8, *max_length)
+                    CharacterDelimitedCodec::new_with_max_length(*delimiter as u8, *max_length)
                 }
-                None => BytesDelimitedCodec::new(*delimiter as u8),
+                None => CharacterDelimitedCodec::new(*delimiter as u8),
             })),
             OctetCounting { max_length } => Box::new(BytesDecoder::new(match max_length {
                 Some(max_length) => super::OctetCountingDecoder::new_with_max_length(*max_length),
@@ -63,7 +63,9 @@ impl DecodingConfig {
     pub fn build(&self) -> Decoder {
         let framer: BoxedFramer = match self.framing {
             Some(framing) => framing.build(),
-            None => Box::new(super::BytesDecoder::new(BytesDelimitedCodec::new(b'\n'))),
+            None => Box::new(super::BytesDecoder::new(CharacterDelimitedCodec::new(
+                b'\n',
+            ))),
         };
 
         let parser: BoxedParser = match self.decoding {

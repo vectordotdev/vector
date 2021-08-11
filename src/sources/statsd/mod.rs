@@ -13,7 +13,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
+use codec::CharacterDelimitedCodec;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -181,7 +181,7 @@ async fn statsd_udp(
     );
 
     let codec = decoding::Decoder::new(
-        Box::new(BytesDecoder::new(BytesDelimitedCodec::new(b'\n'))),
+        Box::new(BytesDecoder::new(CharacterDelimitedCodec::new(b'\n'))),
         Box::new(StatsdParser),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
@@ -212,7 +212,7 @@ impl TcpSource for StatsdTcpSource {
 
     fn build_decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(
-            Box::new(BytesDecoder::new(BytesDelimitedCodec::new(b'\n'))),
+            Box::new(BytesDecoder::new(CharacterDelimitedCodec::new(b'\n'))),
             Box::new(StatsdParser),
         )
     }
