@@ -9,6 +9,7 @@ pub use framing::OctetCountingDecoder;
 pub use parsers::BytesParser;
 #[cfg(feature = "sources-syslog")]
 pub use parsers::SyslogParser;
+use std::sync::Arc;
 use tokio_util::codec::LinesCodecError;
 
 pub trait Parser {
@@ -19,7 +20,7 @@ pub trait DecoderError: std::error::Error + TcpError + Send + Sync {}
 
 #[derive(Debug)]
 pub struct Error {
-    error: std::sync::Arc<dyn DecoderError>,
+    error: Arc<dyn DecoderError>,
 }
 
 impl std::fmt::Display for Error {
@@ -41,7 +42,7 @@ impl DecoderError for LinesCodecError {}
 impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
         Self {
-            error: std::sync::Arc::new(error),
+            error: Arc::new(error),
         }
     }
 }
@@ -49,23 +50,23 @@ impl From<std::io::Error> for Error {
 impl From<LinesCodecError> for Error {
     fn from(error: LinesCodecError) -> Self {
         Self {
-            error: std::sync::Arc::new(error),
+            error: Arc::new(error),
         }
     }
 }
 
+pub type BoxedFramer =
+    Box<dyn tokio_util::codec::Decoder<Item = Bytes, Error = Error> + Send + Sync>;
+
+pub type BoxedParser = Box<dyn Parser + Send + Sync + 'static>;
+
 pub struct Decoder {
-    framer: Box<dyn tokio_util::codec::Decoder<Item = Bytes, Error = Error> + Send + Sync>,
-    parser: Box<dyn Parser + Send + Sync>,
+    framer: BoxedFramer,
+    parser: BoxedParser,
 }
 
 impl Decoder {
-    pub fn new(
-        framer: Box<
-            dyn tokio_util::codec::Decoder<Item = Bytes, Error = Error> + Send + Sync + 'static,
-        >,
-        parser: Box<dyn Parser + Send + Sync + 'static>,
-    ) -> Self {
+    pub fn new(framer: BoxedFramer, parser: BoxedParser) -> Self {
         Self { framer, parser }
     }
 }

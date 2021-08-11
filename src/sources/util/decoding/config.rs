@@ -1,5 +1,4 @@
-use super::{BytesDecoder, Decoder, Parser};
-use bytes::Bytes;
+use super::{BoxedFramer, BoxedParser, BytesDecoder, Decoder};
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::LinesCodec;
@@ -18,11 +17,7 @@ pub enum FramingConfig {
 }
 
 impl FramingConfig {
-    pub fn build(
-        &self,
-    ) -> Box<
-        dyn tokio_util::codec::Decoder<Item = Bytes, Error = super::Error> + Send + Sync + 'static,
-    > {
+    pub fn build(&self) -> BoxedFramer {
         use FramingConfig::*;
 
         match self {
@@ -66,17 +61,12 @@ impl DecodingConfig {
 
 impl DecodingConfig {
     pub fn build(&self) -> Decoder {
-        let framer: Box<
-            dyn tokio_util::codec::Decoder<Item = Bytes, Error = super::Error>
-                + Send
-                + Sync
-                + 'static,
-        > = match self.framing {
+        let framer: BoxedFramer = match self.framing {
             Some(framing) => framing.build(),
             None => Box::new(super::BytesDecoder::new(BytesDelimitedCodec::new(b'\n'))),
         };
 
-        let parser: Box<dyn Parser + Send + Sync + 'static> = match self.decoding {
+        let parser: BoxedParser = match self.decoding {
             Some(ParserConfig::Bytes) | None => Box::new(super::BytesParser),
             #[cfg(feature = "sources-syslog")]
             Some(ParserConfig::Syslog) => Box::new(super::SyslogParser),
