@@ -3,7 +3,7 @@ use super::TransformOuter;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PipelineTransform {
@@ -21,7 +21,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn load_from_folder(folder: &PathBuf) -> Result<IndexMap<String, Self>, Vec<String>> {
+    pub fn load_from_folder(folder: &Path) -> Result<IndexMap<String, Self>, Vec<String>> {
         let entries = fs::read_dir(folder)
             .map_err(|err| {
                 vec![format!(
@@ -51,7 +51,7 @@ impl Pipeline {
         }
     }
 
-    pub fn load_from_file(file: &PathBuf) -> Result<(String, Self), String> {
+    pub fn load_from_file(file: &Path) -> Result<(String, Self), String> {
         let format =
             Format::from_path(file).map_err(|err| format!("Could not read format: {:?}", err))?;
         let filename = file

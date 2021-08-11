@@ -143,7 +143,7 @@ pub fn load_pipelines_from_paths(
     let mut index: IndexMap<String, Pipeline> = IndexMap::new();
     let mut errors: Vec<String> = Vec::new();
     for folder in folders {
-        match Pipeline::load_from_folder(&folder) {
+        match Pipeline::load_from_folder(folder) {
             Ok(result) => {
                 for (key, value) in result.into_iter() {
                     index.insert(key, value);
