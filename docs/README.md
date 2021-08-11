@@ -22,4 +22,14 @@ contributors:
 1. **[REVIEWING.md](REVIEWING.md)** - Code review expectations and guidelines.
 2. **[USER_EXPERIENCE_DESIGN.md](USER_EXPERIENCE_DESIGN.md)** - User experience
    principles and guidelines.
+3. **[RELEASING.md](USER_EXPERIENCE_DESIGN.md)** - How to release a new Vector
+   version.
+
+## Project policies
+
+Vector's policies are located in the root directory:
+
+* **[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)**
+* **[PRIVACY.md](../PRIVACY.md)**
+* **[SECURITY.md](../SECURITY.md)**
 

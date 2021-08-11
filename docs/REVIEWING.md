@@ -74,8 +74,8 @@ documentation, nor should they be merged with "TODOs" opened for documentation.
 Vector currently offers 2 methods for performance testing:
 
 1. Internal benchmarks located in the [`/benches` folder](benches).
-2. A full end-to-end [test harness][urls.vector_test_harness] for complex
-   integration and performance testing.
+2. A full end-to-end [test harness](https://github.com/timberio/vector-test-harness)
+   for complex integration and performance testing.
 
 ## Single Concern
 
@@ -107,5 +107,3 @@ We believe this level of coverage is unnecessary. As a general rule of thumb,
 we strive for 80% coverage, beyond this returns are diminishing. Please use
 your best judgment, some code requires more testing than others depending
 on its importance.
-
-[urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/

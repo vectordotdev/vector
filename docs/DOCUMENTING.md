@@ -115,6 +115,6 @@ Highlights are not blog posts. They are short one, maybe two, paragraph
 announcements. Highlights should allude to, or link to, a blog post if
 relevant.
 
-For example, [this adaptive concurrency announcement][urls.adaptive_concurrency]
+For example, [this adaptive concurrency announcement](https://vector.dev/highlights/2020-09-18-adaptive-concurrency)
 is noteworthy, but also deserves an in-depth blog post covering the work that
 resulted in the performance and reliability benefit.

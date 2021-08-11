@@ -27,16 +27,14 @@ Vector team member will find this document useful.
          1. [Daily tests](#daily-tests)
       1. [Flakey tests](#flakey-tests)
          1. [Test harness](#test-harness)
-1. [Security](#security)
 1. [Legal](#legal)
    1. [DCO](#dco)
       1. [Trivial changes](#trivial-changes)
    1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-1. [FAQ](#faq)
-   1. [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
-   1. [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
-   1. [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
-1. [Contact](#contact)
+   1. [FAQ](#faq)
+      1. [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
+      1. [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
+      1. [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
 
 <!-- /MarkdownTOC -->
 
@@ -211,10 +209,6 @@ any pull request with:
 /test -t <name>
 ```
 
-## Security
-
-Please see the [`SECURITY.md` file](/SECURITY.md).
-
 ## Legal
 
 To protect all users of Vector, the following legal requirements are made.
@@ -237,9 +231,9 @@ Trivial changes, such as spelling fixes, do not need to be signed.
 This is covered by the DCO. Contributions are covered by the DCO and do not
 require a CLA.
 
-## FAQ
+### FAQ
 
-### Why a DCO instead of a CLA?
+#### Why a DCO instead of a CLA?
 
 It's simpler, clearer, and still protects users of Vector. We believe the DCO
 more accurately embodies the principles of open-source. More info can be found
@@ -248,13 +242,13 @@ here:
 - [Gitlab's switch to DCO](https://about.gitlab.com/2017/11/01/gitlab-switches-to-dco-license/)
 - [DCO vs CLA](https://opensource.com/article/18/3/cla-vs-dco-whats-difference)
 
-### If I’m contributing while an employee, do I still need my employer to sign something?
+#### If I’m contributing while an employee, do I still need my employer to sign something?
 
 Nope! The DCO confirms that you are entitled to submit the code, which assumes
 that you are authorized to do so. It treats you like an adult and relies on
 your accurate statement about your rights to submit a contribution.
 
-### What if I forgot to sign my commits?
+#### What if I forgot to sign my commits?
 
 No problem! We made this simple with the [`signoff` Makefile target](Makefile):
 
@@ -268,20 +262,9 @@ If you prefer to do this manually:
 git commit --amend --signoff
 ```
 
-## Contact
-
-If you have questions about this document or the project as a whole, please
-contact us at vector@timber.io.
-
-[urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
-[urls.cue]: https://cuelang.org
 [urls.existing_issues]: https://github.com/timberio/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
-[urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits
 [urls.new_issue]: https://github.com/timberio/vector/issues/new
-[urls.push_it_to_the_limit]: https://www.youtube.com/watch?v=ueRzA9GUj9c
-[urls.adaptive_concurrency]: https://vector.dev/highlights/2020-09-18-adaptive-concurrency
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.watchexec]: https://github.com/watchexec/watchexec
