@@ -28,7 +28,7 @@ As a Vector contributor you _are_ responsible for coupling the following user
 experience related changes with your code:
 
 * Reference docs changes located in the [`/website/cue` folder](../website/cue) (generally configuration changes)
-* Existing guide changes located in the [`/docs/content` folder](../website/content)
+* Existing guide changes located in the [`/website/content` folder](../website/content)
 * If relevant, [highlighting](../website/content/en/highlights) your change for future release notes
 
 By default, you are _not_ responsible for:

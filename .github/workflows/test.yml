@@ -70,7 +70,7 @@ jobs:
               - 'Makefile'
               - 'scripts/cross/**'
             cue:
-              - 'docs/cue/**'
+              - 'website/cue/**'
             internal_events:
               - 'src/internal_events/**'
             helm:
