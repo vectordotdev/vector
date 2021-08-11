@@ -295,7 +295,7 @@ mod tests {
 
     #[test]
     fn load_pipelines_from_tests() {
-        let path = PathBuf::from("tests/behavior/pipelines/pipelines");
+        let path = PathBuf::from("tests/pipelines/pipelines");
         let path = ConfigPath::Dir(path);
         let paths = vec![path];
         load_pipelines_from_paths(&paths).unwrap();
