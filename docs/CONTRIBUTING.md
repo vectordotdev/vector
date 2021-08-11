@@ -27,6 +27,7 @@ Vector team member will find this document useful.
          1. [Daily tests](#daily-tests)
       1. [Flakey tests](#flakey-tests)
          1. [Test harness](#test-harness)
+1. [Next steps](#next-steps)
 1. [Legal](#legal)
    1. [DCO](#dco)
       1. [Trivial changes](#trivial-changes)
@@ -208,6 +209,14 @@ any pull request with:
 ```bash
 /test -t <name>
 ```
+
+## Next steps
+
+As discussed in the [`README`](README.md), you should continue to the following
+documents:
+
+2. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
+3. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
 
 ## Legal
 
