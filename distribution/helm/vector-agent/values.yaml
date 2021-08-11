@@ -111,6 +111,11 @@ securityContext: {}
 
 # Extra env vars to pass to the `vector` container.
 env: []
+  # - name: AWS_ACCESS_KEY_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: vector-agent
+  #       key: awsAcessKeyId
 
 # Extra arguments to pass to the `vector` container.
 args: []
