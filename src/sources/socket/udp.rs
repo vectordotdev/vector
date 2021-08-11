@@ -98,12 +98,9 @@ where
                     let mut payload = buf.split_to(byte_size);
 
                     while let Ok(Some((mut event, byte_size))) = decoder.decode_eof(&mut payload) {
-                        match event {
-                            Event::Log(ref mut log) => {
-                                log.insert(log_schema().source_type_key(), Bytes::from("socket"));
-                                log.insert(host_key.clone(), address.to_string());
-                            },
-                            Event::Metric(_) => {}
+                        if let Event::Log(ref mut log) = event {
+                            log.insert(log_schema().source_type_key(), Bytes::from("socket"));
+                            log.insert(host_key.clone(), address.to_string());
                         }
 
                         emit!(SocketEventReceived { byte_size, mode: SocketMode::Udp });

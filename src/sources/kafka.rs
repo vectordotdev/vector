@@ -205,18 +205,15 @@ async fn kafka_source(
                 let msg_offset = msg.offset();
 
                 while let Ok(Some((mut event, _))) = decoder.decode_eof(&mut payload) {
-                    match event {
-                        Event::Log(ref mut log) => {
-                            log.insert(log_schema().timestamp_key(), timestamp);
-                            // Add source type
-                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
-                            log.insert(&key_field, msg_key.clone());
-                            log.insert(&topic_key, Value::from(msg_topic.clone()));
-                            log.insert(&partition_key, Value::from(msg_partition));
-                            log.insert(&offset_key, Value::from(msg_offset));
-                            log.insert(&headers_key, Value::from(headers_map.clone()));
-                        }
-                        Event::Metric(_) => {}
+                    if let Event::Log(ref mut log) = event {
+                        log.insert(log_schema().timestamp_key(), timestamp);
+                        // Add source type
+                        log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
+                        log.insert(&key_field, msg_key.clone());
+                        log.insert(&topic_key, Value::from(msg_topic.clone()));
+                        log.insert(&partition_key, Value::from(msg_partition));
+                        log.insert(&offset_key, Value::from(msg_offset));
+                        log.insert(&headers_key, Value::from(headers_map.clone()));
                     }
 
                     match &mut finalizer {
