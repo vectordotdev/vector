@@ -4,11 +4,10 @@ use std::collections::BTreeMap;
 
 pub trait EnrichmentTables: DynClone {
     fn get_tables(&self) -> Vec<String>;
-    // TODO This does not need to be String...
     fn find_table_row(
         &self,
         table: &str,
-        criteria: BTreeMap<String, String>,
+        criteria: BTreeMap<&str, String>,
     ) -> Result<Option<BTreeMap<String, Value>>, String>;
     fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String>;
 }
@@ -27,7 +26,7 @@ impl EnrichmentTables for EmptyEnrichmentTables {
     fn find_table_row(
         &self,
         _table: &str,
-        _criteria: BTreeMap<String, String>,
+        _criteria: BTreeMap<&str, String>,
     ) -> Result<Option<BTreeMap<String, Value>>, String> {
         Ok(None)
     }

@@ -31,7 +31,7 @@ use std::{collections::HashMap, sync::Mutex};
 ///
 /// Cloning this object is designed to be cheap. The underlying data will be shared by all clones.
 ///
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct EnrichmentTables {
     loading: Arc<Mutex<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
     tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
@@ -56,6 +56,12 @@ impl EnrichmentTables {
         let mut tables_lock = self.loading.lock().unwrap();
         let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
+    }
+}
+
+impl Default for EnrichmentTables {
+    fn default() -> Self {
+        Self::new(HashMap::new())
     }
 }
 
@@ -108,7 +114,7 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
     fn find_table_row(
         &self,
         table: &str,
-        criteria: BTreeMap<String, String>,
+        criteria: BTreeMap<&str, String>,
     ) -> Result<Option<BTreeMap<String, vrl_core::Value>>, String> {
         let tables = self.tables.load();
         if let Some(ref tables) = **tables {

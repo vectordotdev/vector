@@ -221,9 +221,15 @@ mod test {
             let source = source.to_owned();
             let config = VrlConfig { source };
 
-            assert_eq!(config.build().map(|_| ()).map_err(|e| e.to_string()), build);
+            assert_eq!(
+                config
+                    .build(Default::default())
+                    .map(|_| ())
+                    .map_err(|e| e.to_string()),
+                build
+            );
 
-            if let Ok(cond) = config.build() {
+            if let Ok(cond) = config.build(Default::default()) {
                 assert_eq!(
                     cond.check_with_context(&event),
                     check.map_err(|e| e.to_string())

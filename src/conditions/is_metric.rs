@@ -60,7 +60,7 @@ mod test {
 
     #[test]
     fn is_metric_basic() {
-        let cond = IsMetricConfig {}.build().unwrap();
+        let cond = IsMetricConfig {}.build(Default::default()).unwrap();
 
         assert!(!cond.check(&Event::from("just a log")));
         assert!(cond.check(&Event::from(Metric::new(

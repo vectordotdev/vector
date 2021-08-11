@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 use vrl::prelude::*;
-
 #[derive(Clone, Copy, Debug)]
 pub struct FindTableRow;
-
 impl Function for FindTableRow {
     fn identifier(&self) -> &'static str {
         "find_table_row"
@@ -49,11 +47,11 @@ impl Expression for FindTableRowFn {
             .iter()
             .map(|(key, value)| {
                 Ok((
-                    key.clone(),
-                    value.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned(),
+                    key.as_ref(),
+                    value.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(),
                 ))
             })
-            .collect::<Result<_>>()?;
+            .collect::<Result<BTreeMap<&str, String>>>()?;
 
         let tables = ctx
             .get_enrichment_tables()
@@ -72,7 +70,12 @@ impl Expression for FindTableRowFn {
     ) -> std::result::Result<(), ExpressionError> {
         match state.get_enrichment_tables_mut() {
             Some(ref mut table) => {
-                table.add_index(&self.table, vec!["nork"])?;
+                let fields = self
+                    .condition
+                    .iter()
+                    .map(|(field, _)| field.as_ref())
+                    .collect::<Vec<_>>();
+                table.add_index(&self.table, fields)?;
                 Ok(())
             }
             // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
@@ -84,5 +87,90 @@ impl Expression for FindTableRowFn {
         TypeDef::new()
             .fallible()
             .add_object::<(), Kind>(map! { (): Kind::Bytes })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::{btreemap, TimeZone};
+    use vrl::EnrichmentTables;
+
+    #[derive(Clone)]
+    struct DummyEnrichmentTable;
+
+    impl EnrichmentTables for DummyEnrichmentTable {
+        fn get_tables(&self) -> Vec<String> {
+            vec!["table".to_string()]
+        }
+
+        fn find_table_row(
+            &self,
+            table: &str,
+            criteria: BTreeMap<&str, String>,
+        ) -> std::result::Result<Option<BTreeMap<String, Value>>, String> {
+            assert_eq!(table, "table");
+            assert_eq!(
+                criteria,
+                btreemap! {
+                    "field" => "value".to_string(),
+                }
+            );
+
+            Ok(Some(btreemap! {
+                "field" => Value::from("value"),
+                "field2" => Value::from("value2"),
+            }))
+        }
+
+        fn add_index(&mut self, table: &str, fields: Vec<&str>) -> std::result::Result<(), String> {
+            assert_eq!("table", table);
+            assert_eq!(vec!["field"], fields);
+
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn find_table_row() {
+        let func = FindTableRowFn {
+            table: "table".to_string(),
+            condition: btreemap! {
+                "field" =>  expression::Literal::from("value"),
+            },
+        };
+
+        let tz = TimeZone::default();
+        let enrichment_tables =
+            Some(Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTables>);
+
+        let mut object: Value = BTreeMap::new().into();
+        let mut runtime_state = vrl::state::Runtime::default();
+        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, &enrichment_tables);
+
+        let got = func.resolve(&mut ctx);
+
+        assert_eq!(
+            Ok(Value::from(btreemap! {
+                "field" => Value::from("value"),
+                "field2" => Value::from("value2"),
+            })),
+            got
+        );
+    }
+
+    #[test]
+    fn add_indexes() {
+        let func = FindTableRowFn {
+            table: "table".to_string(),
+            condition: btreemap! {
+                "field" =>  expression::Literal::from("value"),
+            },
+        };
+
+        let enrichment_tables = Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTables>;
+        let mut compiler = state::Compiler::new_with_enrichment_tables(enrichment_tables);
+
+        assert_eq!(Ok(()), func.update_state(&mut compiler));
     }
 }
