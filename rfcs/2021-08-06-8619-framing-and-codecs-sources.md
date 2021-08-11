@@ -178,8 +178,13 @@ It is possible that the proposed abstraction is too rigid, in a sense that it is
 not possible to cleanly separate these stages into "framing" and "codec"
 responsibilities. This limits what codecs can do, e.g. applying framing after
 decoding/decompression would not be possible as there are no means to "go back"
-to the framing stage. However, the proposed solution is still strictly better
-than the status quo, as it provides a consistent interface.
+to the framing stage.
+
+However, the proposed solution is still strictly better than the status quo, as
+it provides a consistent interface. The proposed changes don't conflict with
+building more general codecs on the topology level in the future. The decoders
+could be wrapped in a transform-like structure if we recognize a demand for this
+feature.
 
 # Alternatives Considered
 
