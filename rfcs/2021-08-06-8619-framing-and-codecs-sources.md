@@ -95,6 +95,9 @@ pub trait Parser {
 }
 ```
 
+Ideally, implementations for `Parser` can be shared/derived from VRL's `parse_*`
+functions.
+
 Consequently, the `FramingConfig` exposes a `build` method to create a
 `Box<dyn tokio_util::codec::Decoder<Item = Bytes> + Send + Sync>` and the
 `ParserConfig` to create a `Box<dyn Parser + Send + Sync>` which are placed into
