@@ -45,6 +45,8 @@ pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
+#[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
+pub mod nats;
 pub(crate) mod pipeline;
 pub(crate) mod proto;
 pub mod providers;

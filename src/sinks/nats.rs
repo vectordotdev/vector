@@ -1,3 +1,4 @@
+use crate::nats::NatsAuthConfig;
 use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
@@ -33,6 +34,7 @@ pub struct NatsSinkConfig {
     connection_name: String,
     subject: String,
     url: String,
+    auth: Option<NatsAuthConfig>,
 }
 
 fn default_name() -> String {
@@ -86,10 +88,14 @@ impl SinkConfig for NatsSinkConfig {
 
 impl NatsSinkConfig {
     fn to_nats_options(&self) -> async_nats::Options {
-        // Set reconnect_buffer_size on the nats client to 0 bytes so that the
-        // client doesn't buffer internally (to avoid message loss).
-        async_nats::Options::new()
+        let options = match &self.auth {
+            None => async_nats::Options::new(),
+            Some(auth) => auth.to_nats_options(),
+        };
+        options
             .with_name(&self.connection_name)
+            // Set reconnect_buffer_size on the nats client to 0 bytes so that the
+            // client doesn't buffer internally (to avoid message loss).
             .reconnect_buffer_size(0)
     }
 
@@ -112,6 +118,7 @@ async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
 #[derive(Clone)]
 struct NatsOptions {
     connection_name: String,
+    auth: Option<NatsAuthConfig>,
 }
 
 pub struct NatsSink {
@@ -136,9 +143,12 @@ impl NatsSink {
 
 impl From<NatsOptions> for async_nats::Options {
     fn from(options: NatsOptions) -> Self {
-        async_nats::Options::new()
-            .with_name(&options.connection_name)
-            .reconnect_buffer_size(0)
+        (match &options.auth {
+            None => async_nats::Options::new(),
+            Some(auth) => auth.to_nats_options(),
+        })
+        .with_name(&options.connection_name)
+        .reconnect_buffer_size(0)
     }
 }
 
@@ -146,6 +156,7 @@ impl From<&NatsSinkConfig> for NatsOptions {
     fn from(options: &NatsSinkConfig) -> Self {
         Self {
             connection_name: options.connection_name.clone(),
+            auth: options.auth.clone(),
         }
     }
 }
@@ -248,21 +259,50 @@ mod integration_tests {
 
     #[tokio::test]
     async fn nats_happy() {
+        // Runs the standard test_publish test below, against a server with no authentication.
+        let subject = format!("test-{}", random_string(10));
+
+        test_publish(
+            subject.clone(),
+            NatsSinkConfig {
+                encoding: EncodingConfig::from(Encoding::Text),
+                connection_name: "".to_owned(),
+                subject: subject.clone(),
+                url: "nats://127.0.0.1:4222".to_owned(),
+                auth: None,
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn nats_user_password() {
+        // Runs the standard test_publish test below, against a server requiring username/password.
+        let subject = format!("test-{}", random_string(10));
+
+        test_publish(
+            subject.clone(),
+            NatsSinkConfig {
+                encoding: EncodingConfig::from(Encoding::Text),
+                connection_name: "".to_owned(),
+                subject: subject.clone(),
+                url: "nats://127.0.0.1:4223".to_owned(),
+                auth: Some(NatsAuthConfig::UserPassword {
+                    user: "missioncritical".to_owned(),
+                    password: "hunter2".to_owned(),
+                }),
+            },
+        )
+        .await;
+    }
+
+    async fn test_publish(subject: String, cnf: NatsSinkConfig) {
         // Publish `N` messages to NATS.
         //
         // Verify with a separate subscriber that the messages were
         // successfully published.
 
         trace_init();
-
-        let subject = format!("test-{}", random_string(10));
-
-        let cnf = NatsSinkConfig {
-            encoding: EncodingConfig::from(Encoding::Text),
-            connection_name: "".to_owned(),
-            subject: subject.clone(),
-            url: "nats://127.0.0.1:4222".to_owned(),
-        };
 
         // Establish the consumer subscription.
         let consumer = cnf.clone().connect().await.unwrap();

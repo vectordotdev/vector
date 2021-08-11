@@ -1,3 +1,4 @@
+use crate::nats::NatsAuthConfig;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
@@ -29,6 +30,7 @@ pub struct NatsSourceConfig {
     connection_name: String,
     subject: String,
     queue: Option<String>,
+    auth: Option<NatsAuthConfig>,
 }
 
 inventory::submit! {
@@ -72,10 +74,14 @@ impl SourceConfig for NatsSourceConfig {
 
 impl NatsSourceConfig {
     fn to_nats_options(&self) -> async_nats::Options {
-        // Set reconnect_buffer_size on the nats client to 0 bytes so that the
-        // client doesn't buffer internally (to avoid message loss).
-        async_nats::Options::new()
+        let options = match &self.auth {
+            None => async_nats::Options::new(),
+            Some(auth) => auth.to_nats_options(),
+        };
+        options
             .with_name(&self.connection_name)
+            // Set reconnect_buffer_size on the nats client to 0 bytes so that the
+            // client doesn't buffer internally (to avoid message loss).
             .reconnect_buffer_size(0)
     }
 
@@ -172,13 +178,40 @@ mod integration_tests {
     async fn nats_happy() {
         let subject = format!("test-{}", random_string(10));
 
-        let conf = NatsSourceConfig {
-            connection_name: "".to_owned(),
-            subject: subject.clone(),
-            url: "nats://127.0.0.1:4222".to_owned(),
-            queue: None,
-        };
+        test_subscription(
+            subject.clone(),
+            NatsSourceConfig {
+                connection_name: "".to_owned(),
+                subject: subject.clone(),
+                url: "nats://127.0.0.1:4222".to_owned(),
+                queue: None,
+                auth: None,
+            },
+        )
+        .await;
+    }
 
+    #[tokio::test]
+    async fn nats_user_password() {
+        let subject = format!("test-{}", random_string(10));
+
+        test_subscription(
+            subject.clone(),
+            NatsSourceConfig {
+                connection_name: "".to_owned(),
+                subject: subject.clone(),
+                url: "nats://127.0.0.1:4223".to_owned(),
+                queue: None,
+                auth: Some(NatsAuthConfig::UserPassword {
+                    user: "missioncritical".to_owned(),
+                    password: "hunter2".to_owned(),
+                }),
+            },
+        )
+        .await;
+    }
+
+    async fn test_subscription(subject: String, conf: NatsSourceConfig) {
         let (nc, sub) = create_subscription(&conf).await.unwrap();
         let nc_pub = nc.clone();
 
