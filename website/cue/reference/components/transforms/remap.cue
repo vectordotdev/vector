@@ -48,8 +48,10 @@ components: transforms: "remap": {
 		source: {
 			description: """
 				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
+
+				Required if `file` is missing.
 				"""
-			required:    true
+			required:    false
 			type: string: {
 				examples: [
 					"""
@@ -61,6 +63,20 @@ components: transforms: "remap": {
 						""",
 				]
 				syntax: "remap_program"
+			}
+		}
+		file: {
+			description: """
+				File path to the [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
+
+				Required if `source` is missing.
+				"""
+			required:    false
+			type: string: {
+				examples: [
+					"./my/program.vrl",
+				]
+				syntax: "literal"
 			}
 		}
 		drop_on_error: {
