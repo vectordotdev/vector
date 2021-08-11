@@ -11,9 +11,9 @@
   class="z-50 dark:bg-dark dark:border-gray-700 border-b"
   tabindex="0">
 
-  <div class="max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-1 md:py-1.5 lg:py-2">
+  <div class="mx-auto px-4 sm:px-6 lg:px-10 py-1 md:py-1.5 lg:py-2">
     <div class="relative flex items-center justify-between h-16">
-      <div class="flex items-center px-2 lg:px-0">
+      <div class="flex items-center">
         <div class="flex-shrink-0">
           <a href="{{ site.BaseURL }}">
             {{ range $modes }}
@@ -47,11 +47,20 @@
       </div>
       <div class="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end">
         {{/* Dark/light mode toggler */}}
-        {{ partial "navbar/mode-toggler.html" . }}
+        <div class="mr-6 pt-0.5">
+          {{ partial "navbar/mode-toggler.html" . }}
+        </div>
 
 
         {{/* Search bar */}}
-        {{ partial "navbar/search-bar.html" . }}
+        <div class="w-64 max-w-full">
+          <label for="search" class="sr-only">
+            Search
+          </label>
+
+          {{/* Targeted by the global site search in assets/js/site-search.tsx */}}
+          <div id="site-search"></div>
+        </div>
       </div>
 
       {{/* Social icons */}}

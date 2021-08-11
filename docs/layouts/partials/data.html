@@ -1,6 +1,6 @@
 {{/* This partial is for pretty much all structured data (VRL stuff, CLI, API, component configs/output/telemetry, etc.) */}}
 {{ $ctx := . }}
-<div class="relative no-prose w-full border dark:border-gray-700 rounded-md shadow">
+<div class="relative no-prose border dark:border-gray-700 rounded-md shadow">
   {{/* Source/transform/sink config */}}
   {{ with .component_config }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
@@ -44,7 +44,7 @@
         </span>
       </span>
 
-      <div class="mt-6 prose dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
+      <div class="mt-6 prose dark:prose-dark max-w-none leading-snug text-gray-600 dark:text-gray-300">
         {{ $v.description | markdownify }}
       </div>
 
@@ -69,6 +69,10 @@
               {{ range $k, $v := $v.type }}
               {{ partial "badge.html" (dict "word" $k "color" "gray") }}
 
+              {{ with $v.enum }}
+              {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
+              {{ end }}
+
               {{ with $v.syntax }}
               {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
               {{ end }}
@@ -76,7 +80,7 @@
             </span>
           </span>
 
-          <div class="mt-4 prose dark:prose-dark leading-snug">
+          <div class="mt-4 prose dark:prose-dark max-w-none leading-snug">
             {{ $v.description | markdownify }}
           </div>
 
@@ -88,9 +92,21 @@
             </span>
           </div>
           {{ end }}
-
           {{/* Default value */}}
           {{ range $k, $v := $v.type }}
+          {{ with $v.enum }}
+          <div class="mt-4">
+            <span class="font-semibold">
+              Enum options
+            </span>
+
+            <div class="mt-2 prose dark:prose-dark max-w-none">
+              {{ template "enum-options-table" . }}
+            </div>
+          </div>
+          {{ end }}
+
+
           {{ if or $v.default (eq $v.default false) }}
           <div class="mt-4">
             {{ template "default" . }}
@@ -116,7 +132,7 @@
           </span>
         </span>
 
-        <div class="mt-4 prose dark:prose-dark">
+        <div class="mt-4 prose dark:prose-dark max-w-none">
           {{ template "enum-options-table" . }}
         </div>
       </div>
@@ -187,7 +203,7 @@
     </div>
     <div class="flex flex-col space-y-4 overflow-x-auto">
       {{ range . }}
-      <div class="prose dark:prose-dark leading-normal">
+      <div class="prose dark:prose-dark max-w-none leading-normal">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -197,7 +213,7 @@
 
   {{/* Source/transform/sink output */}}
   {{ with .component_output }}
-  <div class="p-4">
+  <div class="py-3 px-5">
     {{ with .metrics }}
     <span class="flex items-center justify-between">
       {{ partial "heading.html" (dict "text" "Metrics" "level" 3 "id" "output-metrics" "href" "#output-metrics") }}
@@ -228,7 +244,7 @@
     </span>
 
     <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
-      {{ template "telemetry" . }}
+      {{ template "logs_output" . }}
     </div>
     {{ end }}
   </div>
@@ -236,33 +252,55 @@
 
   {{/* Source/transform/sink examples */}}
   {{ with .component_examples }}
-  {{ $multiple := gt (len . ) 1 }}
-  <div class="no-prose">
-    {{ if $multiple }}
-    {{ $first := index . 0 }}
-    <div x-data="{ selected: '{{ $first.title }}' }">
-      <nav class="grid grid-cols-2 gap-x-3 gap-y-1 pt-2 px-3" aria-label="Component examples tabs">
-        {{ range . }}
-        <a @click="selected = '{{ .title }}'" :class="{ 'bg-gray-100 dark:bg-black': selected === '{{ .title }}' }" class="cursor-pointer dark:text-gray-100 text-gray-600 hover:text-dark px-1.5 py-1 font-medium text-sm rounded-md">
-          {{ .title }}
-        </a>
-        {{ end }}
-      </nav>
+  {{ $formats := slice "toml" "yaml" "json" }}
+  {{ $defaultFormat := index $formats 0 }}
+  <div class="no-prose flex flex-col divide-y dark:divide-gray-700">
+    {{ range . }}
+    {{ $configs := .configuration }}
+    {{ $id := printf "examples-%s" .title | urlize }}
+    <div class="py-3 px-5 flex flex-col space-y-2">
+      <span>
+        {{ partial "heading.html" (dict "text" .title "level" 3 "id" $id) }}
+      </span>
 
-      <div class="mt-4 pb-2 px-3">
-        {{ range . }}
-        <div x-show="selected === '{{ .title }}'">
-          {{ template "example" . }}
+      <span>
+        Given this event...
+      </span>
+
+      <div>
+        {{ template "code" .input }}
+      </div>
+
+      <span>
+        ...and this configuration...
+      </span>
+
+      <div class="py-2.5 px-3.5 border rounded dark:border-gray-700">
+        <div class="flex space-x-2">
+          {{ range $formats }}
+          <button @click="$store.global.setFormat('{{ . }}')" :class="{ 'text-secondary dark:text-primary': $store.global.isFormat('{{ . }}') }" class="font-semibold">
+            {{ . | upper }}
+          </button>
+          {{ end }}
+        </div>
+
+        {{ range $formats }}
+        {{ $config := index $configs . }}
+        <div x-show="$store.global.isFormat('{{ . }}')" class="mt-2">
+          {{ highlight $config . "" }}
         </div>
         {{ end }}
       </div>
+
+      <span>
+        ...this Vector event is produced:
+      </span>
+
+      <div>
+        {{ template "code" .output }}
+      </div>
     </div>
-    {{ else }}
-    {{ $example := index . 0 }}
-    <div class="py-2 px-3">
-      {{ template "example" $example }}
-    </div>
-    {{ end }}
+    {{ end}}
   </div>
   {{ end }}
 
@@ -309,7 +347,7 @@
     </div>
     <div class="flex flex-col space-y-4 overflow-x-auto">
       {{ range . }}
-      <div class="prose dark:prose-dark leading-normal">
+      <div class="prose dark:prose-dark max-w-none leading-normal">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -346,7 +384,7 @@
         </span>
       </span>
 
-      <div class="my-4 prose prose-sm dark:prose-dark">
+      <div class="my-4 prose prose-sm dark:prose-dark max-w-none">
         {{ $v.description | markdownify }}
       </div>
 
@@ -389,7 +427,7 @@
   {{/* Data schemas (logs and metrics) */}}
   {{ with .data_schema }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
-    <div class="prose dark:prose-dark py-4 px-6">
+    <div class="prose dark:prose-dark max-w-none py-4 px-6">
       {{ .description | markdownify }}
     </div>
 
@@ -475,7 +513,7 @@
                     </span>
                   </span>
 
-                  <div class="prose dark:prose-dark">
+                  <div class="prose dark:prose-dark max-w-none">
                     {{ $v.description | markdownify }}
                   </div>
 
@@ -554,7 +592,7 @@
       </span>
 
       {{/* Function description */}}
-      <div class="mt-4 text-md prose dark:prose-dark leading-snug">
+      <div class="mt-4 prose prose-md dark:prose-dark max-w-none leading-snug">
         {{ $func.description | markdownify }}
       </div>
 
@@ -583,7 +621,7 @@
 
         {{/* Function arguments */}}
         {{ with $args }}
-        <div class="mt-2 prose">
+        <div class="mt-2 prose dark:prose-dark max-w-none">
           {{ template "vrl-function-args" . }}
         </div>
         {{ end }}
@@ -630,7 +668,7 @@
                 </svg>
               </div>
 
-              <div class="prose dark:prose-dark prose-sm leading-snug">
+              <div class="prose prose-sm dark:prose-dark max-w-none leading-snug">
                 {{ . | markdownify }}
               </div>
             </div>
@@ -860,7 +898,7 @@
         {{ partial "heading.html" (dict "text" $v.title "level" 3 "anchor" true "icon" false) }}
       </span>
 
-      <div class="mt-6 prose dark:prose-dark leading-snug">
+      <div class="mt-6 prose dark:prose-dark max-w-none leading-snug">
         {{ $v.description | markdownify }}
       </div>
 
@@ -878,7 +916,7 @@
         </div>
 
         {{ with .definitions }}
-        <div class="mt-3 prose">
+        <div class="mt-3 prose dark:prose-dark max-w-none">
           <table>
             <thead>
               <tr>
@@ -940,7 +978,7 @@
         {{ partial "heading.html" (dict "text" $name "level" 3) }}
       </span>
 
-      <div class="my-4 prose dark:prose-dark leading-snug">
+      <div class="my-4 prose dark:prose-dark max-w-none leading-snug">
         {{ .description | markdownify }}
       </div>
 
@@ -1001,7 +1039,7 @@
       {{ partial "heading.html" (dict "text" .title "level" 3) }}
 
       {{ with .description }}
-      <div class="mt-2 prose dark:prose-dark">
+      <div class="mt-2 prose dark:prose-dark max-w-none">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -1035,7 +1073,7 @@
       </span>
 
       {{ with $v.description }}
-      <div class="mt-2 prose dark:prose-dark leading-6">
+      <div class="mt-2 prose dark:prose-dark max-w-none leading-6">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -1066,7 +1104,7 @@
             {{ partial "heading.html" (dict "text" .title "level" 5 "icon" false) }}
 
             {{ with .description }}
-            <div class="mt-1 prose dark:prose-dark prose-sm">
+            <div class="mt-1 prose prose-sm dark:prose-dark max-w-none">
               {{ . | markdownify }}
             </div>
             {{ end }}
@@ -1077,7 +1115,7 @@
                 Enum options
               </span>
 
-              <div class="prose dark:prose-dark">
+              <div class="prose dark:prose-dark max-w-none">
                 {{ template "enum-options-table" . }}
               </div>
             </div>
@@ -1102,7 +1140,7 @@
         {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
       </span>
 
-      <div class="mt-2 prose dark:prose-dark">
+      <div class="mt-2 prose dark:prose-dark max-w-none">
         {{ $v.description | markdownify }}
       </div>
 
@@ -1120,7 +1158,7 @@
               {{ partial "heading.html" (dict "text" .title "level" 5) }}
             </span>
 
-            <div class="mt-2 prose dark:prose-dark prose-sm">
+            <div class="mt-2 prose prose-sm dark:prose-dark max-w-none">
               {{ .description | markdownify }}
             </div>
           </div>
@@ -1143,7 +1181,7 @@
         {{ partial "heading.html" (dict "text" .title "level" 3) }}
       </span>
 
-      <div class="mt-3 prose dark:prose-dark">
+      <div class="mt-3 prose dark:prose-dark max-w-none">
         {{ .description | markdownify }}
       </div>
 
@@ -1159,7 +1197,7 @@
           <div>
             {{ partial "heading.html" (dict "text" .title "level" 5) }}
 
-            <div class="mt-2 prose dark:prose-dark prose-sm">
+            <div class="mt-2 prose prose-sm dark:prose-dark max-w-none">
               {{ .description | markdownify }}
             </div>
           </div>
@@ -1181,7 +1219,7 @@
         {{ partial "heading.html" (dict "text" .title "level" 3) }}
       </span>
 
-      <div class="mt-3 prose dark:prose-dark">
+      <div class="mt-3 prose dark:prose-dark max-w-none">
         {{ .description | markdownify }}
       </div>
     </div>
@@ -1198,11 +1236,11 @@
         {{ partial "heading.html" (dict "text" "Signals" "level" 3 "anchor" true) }}
       </span>
 
-      <div class="my-4 prose dark:prose-dark leading-snug">
+      <div class="my-4 prose dark:prose-dark max-w-none leading-snug">
         {{ .process_signals.description | markdownify }}
       </div>
 
-      <div class="mt-2 prose dark:prose-dark">
+      <div class="mt-2 prose dark:prose-dark max-w-none">
         <table>
           <thead>
             <tr>
@@ -1236,11 +1274,11 @@
         {{ partial "heading.html" (dict "text" "Exit codes" "level" 3 "anchor" true) }}
       </span>
 
-      <div class="my-4 prose dark:prose-dark leading-snug">
+      <div class="my-4 prose dark:prose-dark max-w-none leading-snug">
         {{ .exit_codes.description | markdownify }}
       </div>
 
-      <div class="prose dark:prose-dark">
+      <div class="prose dark:prose-dark max-w-none">
         <table>
           <thead>
             <tr>
@@ -1289,7 +1327,7 @@
           Relevant policies
         </span>
 
-        <div class="p-3 prose dark:prose-dark">
+        <div class="p-3 prose dark:prose-dark max-w-none">
           <table>
             <thead>
               <tr>
@@ -1315,7 +1353,9 @@
                   </a>
                 </td>
                 <td>
-                  {{ range .required_for }}<code>{{ . }}</code>{{ end }}
+                  <ul>
+                    {{ range .required_for }}<li><code>{{ . }}</code></li>{{ end }}
+                  </ul>
                 </td>
                 <td>
                   {{ .required_when | markdownify }}
@@ -1358,116 +1398,6 @@
     {{ end }}
   </tbody>
 </table>
-{{ end }}
-
-{{ define "example" }}
-<span>
-  Given this event...
-</span>
-
-<div class="my-2.5">
-  {{ if or (reflect.IsMap .input) (reflect.IsSlice .input) }}
-  {{ $event := .input | jsonify (dict "indent" "  ") | safeJS }}
-  {{ highlight $event "json" "" }}
-  {{ else }}
-  {{ .input | markdownify }}
-  {{ end }}
-</div>
-
-<span>
-  ...and this Vector configuration...
-</span>
-
-<div class="my-2.5">
-  {{ if or (reflect.IsMap .configuration) (reflect.IsSlice .configuration) }}
-  {{ $json := .configuration | jsonify (dict "indent" "  ") }}
-  {{ highlight $json "json" "" }}
-  {{ else }}
-  {{ highlight .configuration "toml" "" }}
-  {{ end }}
-</div>
-
-{{ if reflect.IsSlice .output }}
-{{ $multiple := gt (len .output) 1 }}
-{{ if $multiple }}
-{{ $kind := "" }}
-{{ $event := slice }}
-{{ range .output }}
-{{ if .log }}
-{{ $kind = "log" }}
-{{ $event = $event | append .log }}
-{{ end }}
-{{ if .metric }}
-{{ $kind = "metric" }}
-{{ $event = $event | append .metric }}
-{{ end }}
-{{ end }}
-
-{{ if eq $kind "log" }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</span>
-{{ end }}
-
-{{ if eq $kind "metric" }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</span>
-{{ end }}
-
-{{ $json := $event | jsonify (dict "indent" "  ") }}
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ else }}
-{{ $out := index .output 0 }}
-{{ with $out.metric }}
-{{ $json := . | jsonify (dict "indent" "  ") }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</span>
-
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ end }}
-
-{{ with $out.log }}
-{{ $json := . | jsonify (dict "indent" "  ") }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</span>
-
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ end }}
-{{ end }}
-{{ end }}
-
-{{ if reflect.IsMap .output }}
-{{ with .output.log }}
-{{ $json := . | jsonify (dict "indent" "  ") }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</span>
-
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ end }}
-
-{{ with .output.metric }}
-{{ $json := . | jsonify (dict "indent" "  ") }}
-<span>
-  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</span>
-
-<div class="mt-2.5">
-  {{ highlight $json "json" "" }}
-</div>
-{{ end }}
-{{ end }}
 {{ end }}
 
 {{ define "config-toggler" }}
@@ -1526,9 +1456,95 @@
 </div>
 {{ end }}
 
+{{ define "logs_output" }}
+{{ range $k, $v := . }}
+{{ $title := $k | title }}
+{{ $id := printf "%s-log-output" $k }}
+<div class="py-3 px-5">
+  <span class="flex justify-between items-center">
+    <span class="text-lg">
+      {{ partial "heading.html" (dict "text" $title "level" 4 "id" $id) }}
+    </span>
+  </span>
+
+  {{ with $v.description }}
+  <div class="mt-3 prose dark:prose-dark">
+    {{ . | markdownify }}
+  </div>
+  {{ end }}
+
+  {{ with $v.fields }}
+  {{ $id := printf "%s-fields" $k }}
+  <div class="mt-4 font-semibold">
+    {{ partial "heading.html" (dict "text" "Fields" "level" 5 "id" $id) }}
+  </div>
+
+  <div class="mt-2 flex flex-col divide-y dark:divide-gray-700 border rounded dark:border-gray-700">
+
+    {{ range $k, $v := . }}
+    <div class="py-2.5 px-3.5">
+      <span class="flex justify-between items-center">
+        <span class="font-mono font-semibold">
+          {{ $k }}
+        </span>
+
+        <span class="flex space-x-1">
+          {{ if $v.required }}
+          {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+          {{ else }}
+          {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
+          {{ end }}
+
+          {{ range $k, $v := $v.type }}
+          {{ $isArray := eq $k "array" }}
+          {{ if $isArray }}
+          {{ range $k, $v := $v.items.type }}
+          {{ $name := printf "[%s]" $k }}
+          {{ partial "badge.html" (dict "word" $name "color" "gray") }}
+          {{ end }}
+          {{ else }}
+          {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+
+          {{ with $v.syntax }}
+          {{ partial "badge.html" (dict "word" . "color" "gray") }}
+          {{ end }}
+          {{ end }}
+          {{ end }}
+        </span>
+      </span>
+
+      {{ with $v.description }}
+      <div class="mt-2 prose dark:prose-dark">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+
+      {{ range $k, $v := $v.type }}
+      {{ with $v.examples }}
+      <div class="mt-2">
+        <span>
+          Examples
+        </span>
+
+        <div class="mt-1.5 flex flex-col space-y-1 text-sm">
+          {{ range . }}
+          {{ template "code" . }}
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+{{ end }}
+
 {{ define "telemetry" }}
 {{ range $k, $v := . }}
-<div class="py-4 px-6">
+<div class="py-3 px-5">
   <span class="flex justify-between items-center">
     <span class="font-mono font-bold text-dark dark:text-gray-200">
       {{ partial "heading.html" (dict "text" $k "level" 4) }}
@@ -1538,7 +1554,7 @@
   </span>
 
   {{ with $v.description }}
-  <div class="my-3 prose dark:prose-dark">
+  <div class="my-3 prose dark:prose-dark max-w-none">
     {{ . | markdownify }}
   </div>
   {{ end }}
@@ -1547,7 +1563,7 @@
   <div class="mt-3 border rounded dark:border-gray-700">
     <div class="flex flex-col divide-y dark:divide-gray-700">
       {{ range $k, $v := . }}
-      <div class="py-3 px-4">
+      <div class="py-2.5 px-4">
         <span class="flex justify-between items-center">
           <span class="font-mono font-semibold">
             {{ $k }}
@@ -1562,9 +1578,11 @@
           </span>
         </span>
 
-        <div>
-          {{ $v.description }}
+        {{ with $v.description }}
+        <div class="prose dark:prose-dark">
+          {{ . | markdownify }}
         </div>
+        {{ end }}
       </div>
       {{ end }}
     </div>

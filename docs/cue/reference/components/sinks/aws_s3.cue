@@ -326,51 +326,35 @@ components: sinks: aws_s3: components._aws & {
 		object_naming: {
 			title: "Object naming"
 			body:  """
-				By default, Vector will name your S3 objects in the following format:
-
-				<Tabs
-				  block={true}
-				  defaultValue="without_compression"
-				  values={[
-				    { label: 'Without Compression', value: 'without_compression', },
-				    { label: 'With Compression', value: 'with_compression', },
-				  ]
-				}>
-
-				<TabItem value="without_compression">
-
-				```text
-				<key_prefix><timestamp>-<uuidv4>.log
-				```
-
-				For example:
-
-				```text
-				date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
-				```
-
-				</TabItem>
-				<TabItem value="with_compression">
+				Vector uses two different naming schemes for S3 objects. If you set the
+				[`compression`](#compression) parameter to `true` (this is the default), Vector uses
+				this scheme:
 
 				```text
 				<key_prefix><timestamp>-<uuidv4>.log.gz
 				```
 
-				For example:
+				If compression isn't enabled, Vector uses this scheme (only the file extension
+				is different):
+
+				```text
+				<key_prefix><timestamp>-<uuidv4>.log
+				```
+
+				Some sample S3 object names (with and without compression, respectively):
 
 				```text
 				date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log.gz
+				date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
 				```
 
-				</TabItem>
-				</Tabs>
+				Vector appends a [UUIDV4](\(urls.uuidv4)) token to ensure there are no naming
+				conflicts in the unlikely event that two Vector instances are writing data at the
+				same time.
 
-				Vector appends a [UUIDV4](\(urls.uuidv4)) token to ensure there are no name
-				conflicts in the unlikely event 2 Vector instances are writing data at the same
-				time.
-
-				You can control the resulting name via the `key_prefix`, `filename_time_format`,
-				and `filename_append_uuid` options.
+				You can control the resulting name via the [`key_prefix`](#key_prefix),
+				[`filename_time_format`](#filename_time_format), and
+				[`filename_append_uuid`](#filename_append_uuid) options.
 				"""
 		}
 

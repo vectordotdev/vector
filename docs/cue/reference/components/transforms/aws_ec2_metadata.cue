@@ -95,7 +95,7 @@ components: transforms: aws_ec2_metadata: {
 	}
 
 	input: {
-		logs:    true
+		logs: true
 		metrics: {
 			counter:      true
 			distribution: true

@@ -13,7 +13,7 @@ const clearLocalStorageOnNewGeneration = () => {
   const storedGeneration = localStorage.getItem('generation');
 
   if ((storedGeneration != null) && (storedGeneration < currentGeneration)) {
-    ['__spruce:ui', '__spruce:global'].forEach((item) => localStorage.removeItem(item));
+    ['__spruce:global'].forEach((item) => localStorage.removeItem(item));
   }
 
   localStorage.setItem('generation', currentGeneration);
@@ -38,9 +38,18 @@ const manageState = () => {
     versionBackup: '{{ $latest }}',
     // Release version
     release: 'stable',
-
     // Home page platform tab
     platformTab: '{{ $defaultPlatformTab }}',
+    // Config format
+    format: 'toml',
+
+    setFormat(f) {
+      this.format = f;
+    },
+
+    isFormat(f) {
+      return this.format === f;
+    },
 
     isDark() {
       return this.dark;
@@ -101,19 +110,6 @@ const manageState = () => {
     isCurrent(version) {
       return this.version === version;
     },
-  }, useLocalStorage);
-
-  window.Spruce.store('ui', {
-    // Management UI data
-    {{ range site.Data.docs.administration.ui.management.families }}
-    {{ .name }}_interface: '{{ (index .interfaces 0).title }}',
-    {{ end }}
-
-
-    platform: '{{ index site.Data.docs.administration.ui.management.family_names 0 }}',
-    interface: '{{ site.Data.ui.defaults.interface }}',
-    dockerVersion: '{{ site.Data.ui.default.dockerVersion }}',
-    dockerDistro: '{{ site.Data.ui.default.dockerDistro }}',
   }, useLocalStorage);
 }
 
