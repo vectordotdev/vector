@@ -18,7 +18,7 @@ impl From<IndexMap<String, Pipeline>> for Pipelines {
 
 // Validation related
 impl Pipelines {
-    pub(crate) fn inputs<'a>(&'a self) -> impl Iterator<Item = &'a String> {
+    pub(crate) fn inputs(&self) -> impl Iterator<Item = &String> {
         self.0
             .values()
             .map(|pipeline| pipeline.transforms.values())
@@ -27,7 +27,7 @@ impl Pipelines {
             .flatten()
     }
 
-    pub(crate) fn outputs<'a>(&'a self) -> impl Iterator<Item = &'a String> {
+    pub(crate) fn outputs(&self) -> impl Iterator<Item = &String> {
         self.0
             .values()
             .map(|pipeline| pipeline.transforms.values())
@@ -41,7 +41,7 @@ impl Pipelines {
         self.check_outputs(config, errors);
     }
 
-    fn transform_names<'a>(&'a self) -> impl Iterator<Item = (&'a String, &'a String)> {
+    fn transform_names(&self) -> impl Iterator<Item = (&String, &String)> {
         self.0
             .iter()
             .map(|(pipeline_id, pipeline)| {
@@ -86,7 +86,7 @@ impl Pipelines {
     pub(crate) fn warnings(&self, warnings: &mut Vec<String>) {
         self.0
             .iter()
-            .for_each(|(pipeline_id, pipeline)| pipeline.warnings(&pipeline_id, warnings));
+            .for_each(|(pipeline_id, pipeline)| pipeline.warnings(pipeline_id, warnings));
     }
 }
 
@@ -164,7 +164,7 @@ impl Pipeline {
                     .inputs
                     .iter()
                     .filter(|input| {
-                        !config.has_input(&input) && !self.transforms.contains_key(input.as_str())
+                        !config.has_input(input) && !self.transforms.contains_key(input.as_str())
                     })
                     .map(move |input| (name, input))
             })
@@ -184,7 +184,7 @@ impl Pipeline {
                 transform
                     .outputs
                     .iter()
-                    .filter(|input| !config.has_output(&input))
+                    .filter(|input| !config.has_output(input))
                     .map(move |input| (name, input))
             })
             .flatten()
