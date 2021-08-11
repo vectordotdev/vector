@@ -243,7 +243,7 @@ impl ConfigBuilder {
 
         self.check_conflicts(pipelines, &mut errors);
 
-        pipelines.check_shape(&self, &mut errors);
+        pipelines.check_shape(self, &mut errors);
 
         self.check_inputs(pipelines, &mut errors);
 
