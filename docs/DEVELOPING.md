@@ -31,14 +31,13 @@
          1. [Where to find things](#where-to-find-things)
       1. [Development](#development)
          1. [Requirements](#requirements)
-         1. [Tutorial](#tutorial)
-            1. [Automatic](#automatic)
-            1. [Manual](#manual)
+         1. [Automatic](#automatic)
+         1. [Manual](#manual)
          1. [Troubleshooting](#troubleshooting)
       1. [Testing](#testing-1)
          1. [Integration tests](#integration-tests-1)
             1. [Requirements](#requirements-1)
-            1. [Tutorial](#tutorial-1)
+            1. [Tutorial](#tutorial)
 
 <!-- /MarkdownTOC -->
 
@@ -162,15 +161,19 @@ If you run `make` you'll see a full list of all our tasks. Some of these will st
 
 ### Directory structure
 
+- [`/.github`](/github) - Github & CI related configuration.
 - [`/benches`](/benches) - Internal benchmarks.
 - [`/config`](/config) - Public facing Vector config, included in releases.
 - [`/distribution`](/distribution) - Distribution artifacts for various targets.
-- [`/docs`](/docs) - Structured data used to generate documentation.
+- [`/docs`](/docs) - Internal documentation for Vector contributors.
 - [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
 - [`/proto`](/proto) - Protobuf definitions.
+- [`/rfcs`](/rfcs) - Previous Vector proposals, a great place to build context on previous decisions.
 - [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
+- [`/skaffold`](/skaffold) - Resources for Kubernetes local development.
 - [`/src`](/src) - Vector source.
 - [`/tests`](/tests) - Various high-level test cases.
+- [`/website`](/website) - Vector's website and external documentation for Vector users.
 
 ### Makefile
 
@@ -563,9 +566,7 @@ Vector:
 - [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
 - [`cargo watch`](https://github.com/passcod/cargo-watch)
 
-##### Tutorial
-
-###### Automatic
+##### Automatic
 
 Once you have the requirements, use the `scripts/skaffold.sh dev` command.
 
@@ -591,7 +592,7 @@ the cluster state and exit.
 `scripts/skaffold.sh` wraps `skaffold`, you can use other `skaffold` subcommands
 if it fits you better.
 
-###### Manual
+##### Manual
 
 Is some cases `skaffold` may not work. It's possible to go through the dev flow
 manually, without `skaffold`.
