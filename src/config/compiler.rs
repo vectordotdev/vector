@@ -23,20 +23,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     }
 
     if errors.is_empty() {
-        Ok((
-            Config {
-                global: builder.global,
-                #[cfg(feature = "api")]
-                api: builder.api,
-                healthchecks: builder.healthchecks,
-                sources: builder.sources,
-                sinks: builder.sinks,
-                transforms: builder.transforms,
-                tests: builder.tests,
-                expansions,
-            },
-            warnings,
-        ))
+        Ok((builder.into_config(expansions), warnings))
     } else {
         Err(errors)
     }

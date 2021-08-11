@@ -72,15 +72,68 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WithInputs<Input, Inner> {
+    #[serde(default)]
+    pub inputs: Vec<Input>,
+    #[serde(flatten)]
+    pub inner: Inner,
+}
+
+impl<Inner> WithInputs<ComponentScope, Inner> {
+    pub fn to_public(self) -> WithInputs<String, Inner> {
+        WithInputs {
+            inputs: self
+                .inputs
+                .into_iter()
+                .map(|name| name.into_name())
+                .collect(),
+            inner: self.inner,
+        }
+    }
+}
+
+impl<Inner> WithInputs<String, Inner> {
+    pub fn to_scoped(self) -> WithInputs<ComponentScope, Inner> {
+        WithInputs {
+            inputs: self
+                .inputs
+                .into_iter()
+                .map(|name| ComponentScope::Public { name })
+                .collect(),
+            inner: self.inner,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum ComponentScope {
+    Public { name: String },
+}
+
+impl ComponentScope {
+    pub fn public<N: ToString>(name: N) -> Self {
+        Self::Public {
+            name: name.to_string(),
+        }
+    }
+
+    pub fn into_name(self) -> String {
+        match self {
+            Self::Public { name } => name,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, SourceOuter>,
-    pub sinks: IndexMap<String, SinkOuter>,
-    pub transforms: IndexMap<String, TransformOuter>,
+    pub sources: IndexMap<ComponentScope, SourceOuter>,
+    pub sinks: IndexMap<ComponentScope, SinkScoped>,
+    pub transforms: IndexMap<ComponentScope, TransformScoped>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,
 }
@@ -218,10 +271,11 @@ pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
 
 inventory::collect!(SourceDescription);
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter {
-    pub inputs: Vec<String>,
+pub type SinkScoped = WithInputs<String, SinkInner>;
+pub type SinkOuter = WithInputs<String, SinkInner>;
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SinkInner {
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
 
@@ -243,15 +297,17 @@ pub struct SinkOuter {
     pub inner: Box<dyn SinkConfig>,
 }
 
-impl SinkOuter {
-    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> Self {
+impl SinkInner {
+    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> SinkOuter {
         SinkOuter {
-            buffer: Default::default(),
-            healthcheck: SinkHealthcheckOptions::default(),
-            healthcheck_uri: None,
-            inner,
             inputs,
-            proxy: Default::default(),
+            inner: SinkInner {
+                buffer: Default::default(),
+                healthcheck: SinkHealthcheckOptions::default(),
+                healthcheck_uri: None,
+                inner,
+                proxy: Default::default(),
+            },
         }
     }
 
@@ -367,12 +423,8 @@ pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 
 inventory::collect!(SinkDescription);
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter {
-    pub inputs: Vec<String>,
-    #[serde(flatten)]
-    pub inner: Box<dyn TransformConfig>,
-}
+pub type TransformScoped = WithInputs<ComponentScope, Box<dyn TransformConfig>>;
+pub type TransformOuter = WithInputs<String, Box<dyn TransformConfig>>;
 
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 

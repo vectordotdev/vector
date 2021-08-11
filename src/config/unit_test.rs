@@ -23,17 +23,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
     let expansions = super::compiler::expand_macros(&mut builder)?;
 
     // Don't let this escape since it's not validated
-    let config = Config {
-        global: builder.global,
-        #[cfg(feature = "api")]
-        api: builder.api,
-        healthchecks: builder.healthchecks,
-        sources: builder.sources,
-        sinks: builder.sinks,
-        transforms: builder.transforms,
-        tests: builder.tests,
-        expansions,
-    };
+    let config = builder.into_config(expansions);
 
     for test in &config.tests {
         match build_unit_test(test, &config).await {
