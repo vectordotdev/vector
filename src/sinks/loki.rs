@@ -451,7 +451,7 @@ mod tests {
         test_util::trace_init();
         let (config, _cx) = load_sink::<LokiConfig>(
             r#"
-            endpoint = "https://logs-prod-us-central1.grafana.net"
+            endpoint = "http://logs-prod-us-central1.grafana.net"
             encoding = "json"
             labels = {test_name = "placeholder"}
         "#,
