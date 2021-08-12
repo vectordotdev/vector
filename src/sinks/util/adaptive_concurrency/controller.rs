@@ -187,7 +187,7 @@ impl<L> Controller<L> {
                         past_rtt = inner.past_rtt.update(current_rtt);
                     }
                     inner.next_update = now + Duration::from_secs_f64(past_rtt.mean);
-                    inner.current_rtt.reset();
+                    inner.current_rtt = Default::default();
                     inner.had_back_pressure = false;
                     inner.reached_limit = false;
                 }

@@ -98,10 +98,40 @@ impl Mean {
             _ => Some(self.sum / self.count as f64),
         }
     }
+}
 
-    pub fn reset(&mut self) {
-        self.sum = 0.0;
-        self.count = 0;
+/// Simple unweighted arithmetic mean with variance
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MeanVar {
+    count: usize,
+    mean: f64,
+    variance: f64,
+}
+
+impl MeanVar {
+    /// Update the and return the current average
+    pub fn update(&mut self, point: f64) {
+        let count0 = self.count as f64;
+        self.count += 1;
+        // Ref: Knuth TAOCP vol 2, 3rd edition, page 232 and https://www.johndcook.com/blog/skewness_kurtosis/
+        let delta = point - self.mean;
+        let delta_n = delta / self.count as f64;
+        self.mean += delta_n;
+        self.variance += delta * delta_n * count0;
+    }
+
+    pub fn average(&self) -> Option<f64> {
+        match self.count {
+            0 => None,
+            _ => Some(self.mean),
+        }
+    }
+
+    pub fn variance(&self) -> Option<f64> {
+        match self.count {
+            0 | 1 => None,
+            _ => Some(self.variance / (self.count - 1) as f64),
+        }
     }
 }
 
@@ -121,6 +151,25 @@ mod tests {
         assert_eq!(mean.average(), Some(2.0));
         assert_eq!(mean.count, 3);
         assert_eq!(mean.sum, 6.0);
+    }
+
+    #[test]
+    fn mean_variance_update_works() {
+        let mut mean = MeanVar::default();
+        assert_eq!(mean.average(), None);
+        assert_eq!(mean.variance(), None);
+        mean.update(0.0);
+        assert_eq!(mean.average(), Some(0.0));
+        assert_eq!(mean.variance(), None);
+        mean.update(2.0);
+        assert_eq!(mean.average(), Some(1.0));
+        assert_eq!(mean.variance(), Some(2.0));
+        mean.update(4.0);
+        assert_eq!(mean.average(), Some(2.0));
+        assert_eq!(mean.variance(), Some(4.0));
+        assert_eq!(mean.count, 3);
+        assert_eq!(mean.mean, 2.0);
+        assert_eq!(mean.variance, 8.0);
     }
 
     #[test]
