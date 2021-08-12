@@ -30,12 +30,7 @@ components: sinks: gcp_stackdriver_metrics: {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				concurrency:                5
-				rate_limit_duration_secs:   1
 				rate_limit_num:             1000
-				retry_initial_backoff_secs: 1
-				retry_max_duration_secs:    10
-				timeout_secs:               60
 				headers:                    false
 			}
 			tls: {

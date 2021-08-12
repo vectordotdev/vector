@@ -40,13 +40,6 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				adaptive_concurrency:       false
-				concurrency:                5
-				rate_limit_duration_secs:   1
-				rate_limit_num:             5
-				retry_initial_backoff_secs: 1
-				retry_max_duration_secs:    10
-				timeout_secs:               30
 				headers:                    false
 			}
 			tls: enabled: false

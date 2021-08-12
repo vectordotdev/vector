@@ -33,11 +33,6 @@ components: sinks: redis: {
 			request: {
 				enabled:                    true
 				concurrency:                1
-				rate_limit_duration_secs:   1
-				rate_limit_num:             65535
-				retry_initial_backoff_secs: 1
-				retry_max_duration_secs:    10
-				timeout_secs:               1
 				headers:                    false
 			}
 			tls: {

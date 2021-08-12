@@ -39,12 +39,6 @@ components: sinks: splunk_hec: {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				concurrency:                10
-				rate_limit_duration_secs:   1
-				rate_limit_num:             10
-				retry_initial_backoff_secs: 1
-				retry_max_duration_secs:    10
-				timeout_secs:               60
 				headers:                    false
 			}
 			tls: {
