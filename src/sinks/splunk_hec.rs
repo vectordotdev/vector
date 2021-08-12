@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
