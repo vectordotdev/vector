@@ -5,9 +5,8 @@
 //!
 //! https://github.com/grafana/loki/blob/master/docs/api.md
 //!
-//! This sink does not use `PartitionBatching` but elects to do
-//! stream multiplexing by organizing the streams in the `build_request`
-//! phase. There must be at least one valid set of labels.
+//! This sink uses `PartitionBatching` to partition events
+//! by streams. There must be at least one valid set of labels.
 //!
 //! If an event produces no labels, this can happen if the template
 //! does not match, we will add a default label `{agent="vector"}`.
