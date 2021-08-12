@@ -282,7 +282,7 @@ components: sinks: gcp_stackdriver_logs: {
 			policies: [
 				{
 					_action: "logEntries.create"
-					required_for: ["healthcheck", "write"]
+					required_for: ["healthcheck", "operation"]
 				},
 			]
 		},

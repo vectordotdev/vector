@@ -43,7 +43,6 @@ const manageState = () => {
     // Config format
     format: 'toml',
 
-    // Helper functions
     setFormat(f) {
       this.format = f;
     },

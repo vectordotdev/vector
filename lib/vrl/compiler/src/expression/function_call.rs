@@ -206,27 +206,29 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|err| match err {
-            ExpressionError::Abort { .. } => {
-                panic!("abort errors must only be defined by `abort` statement")
-            }
-            ExpressionError::Error {
-                message,
-                mut labels,
-                notes,
-            } => {
-                labels.push(Label::primary(message.clone(), self.span));
-
+        span!(Level::ERROR, "remap", vrl_position = &self.span.start()).in_scope(|| {
+            self.expr.resolve(ctx).map_err(|err| match err {
+                ExpressionError::Abort { .. } => {
+                    panic!("abort errors must only be defined by `abort` statement")
+                }
                 ExpressionError::Error {
-                    message: format!(
-                        r#"function call error for "{}" at ({}:{}): {}"#,
-                        self.ident,
-                        self.span.start(),
-                        self.span.end(),
-                        message
-                    ),
-                    labels,
+                    message,
+                    mut labels,
                     notes,
+                } => {
+                    labels.push(Label::primary(message.clone(), self.span));
+
+                    ExpressionError::Error {
+                        message: format!(
+                            r#"function call error for "{}" at ({}:{}): {}"#,
+                            self.ident,
+                            self.span.start(),
+                            self.span.end(),
+                            message
+                        ),
+                        labels,
+                        notes,
+                    }
                 }
             }
         })

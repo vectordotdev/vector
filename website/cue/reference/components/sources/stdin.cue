@@ -87,11 +87,7 @@ components: sources: stdin: {
 				"""
 			title: "STDIN line"
 			configuration: {}
-			input: """
-				```text
-				\( _line )
-				```
-				"""
+			input: _line
 			output: log: {
 				timestamp: _values.current_timestamp
 				message:   _line

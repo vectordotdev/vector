@@ -25,7 +25,10 @@ impl ConditionConfig for DatadogSearchConfig {
             ),
         };
 
-        config.build()
+        Ok(Box::new(Vrl {
+            program,
+            source: self.source.clone(),
+        }))
     }
 }
 
