@@ -60,7 +60,11 @@ impl Expression for FindTableRowFn {
 
         match tables.find_table_row(&self.table, condition)? {
             None => Err("data not found".into()),
-            Some(data) => Ok(Value::Object(data)),
+            Some(data) => Ok(Value::Object(
+                data.into_iter()
+                    .map(|(key, value)| (key, Value::from(value)))
+                    .collect(),
+            )),
         }
     }
 
@@ -108,7 +112,7 @@ mod tests {
             &self,
             table: &str,
             criteria: BTreeMap<&str, String>,
-        ) -> std::result::Result<Option<BTreeMap<String, Value>>, String> {
+        ) -> std::result::Result<Option<BTreeMap<String, String>>, String> {
             assert_eq!(table, "table");
             assert_eq!(
                 criteria,
@@ -118,8 +122,8 @@ mod tests {
             );
 
             Ok(Some(btreemap! {
-                "field" => Value::from("value"),
-                "field2" => Value::from("value2"),
+                "field".to_string() => "value".to_string(),
+                "field2".to_string() => "value2".to_string(),
             }))
         }
 

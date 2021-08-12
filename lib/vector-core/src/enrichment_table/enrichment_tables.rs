@@ -111,16 +111,16 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
 
     /// Search the given table to find the data.
     /// If we are in the writing stage, this function will return an error.
-    fn find_table_row(
-        &self,
+    fn find_table_row<'a>(
+        &'a self,
         table: &str,
         criteria: BTreeMap<&str, String>,
-    ) -> Result<Option<BTreeMap<String, vrl_core::Value>>, String> {
-        let tables = self.tables.load();
-        if let Some(ref tables) = **tables {
+    ) -> Result<Option<BTreeMap<String, String>>, String> {
+        let tables = self.tables.load_full();
+        if let Some(ref tables) = *tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => Ok(table.find_table_row(criteria).cloned()),
+                Some(table) => Ok(table.find_table_row(criteria)),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -159,29 +159,36 @@ mod tests {
 
     #[derive(Debug)]
     struct DummyEnrichmentTable {
-        data: Vec<String>,
+        data: BTreeMap<String, vrl_core::Value>,
         indexes: Arc<Mutex<Vec<Vec<String>>>>,
     }
 
     impl DummyEnrichmentTable {
         fn new() -> Self {
-            Self {
-                data: vec!["result".to_string()],
-                indexes: Arc::new(Mutex::new(Vec::new())),
-            }
+            Self::new_with_index(Arc::new(Mutex::new(Vec::new())))
         }
 
         fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
             Self {
-                data: vec!["result".to_string()],
+                data: btreemap! {
+                    "field" => vrl_core::Value::from("result"),
+                },
                 indexes,
             }
         }
     }
 
     impl EnrichmentTable for DummyEnrichmentTable {
-        fn find_table_row(&self, _criteria: BTreeMap<String, String>) -> Option<&Vec<String>> {
-            Some(&self.data)
+        fn find_table_row(
+            &self,
+            _criteria: BTreeMap<&str, String>,
+        ) -> Option<BTreeMap<&str, &vrl_core::Value>> {
+            Some(
+                self.data
+                    .iter()
+                    .map(|(key, value)| (key.as_ref(), value))
+                    .collect(),
+            )
         }
 
         fn add_index(&mut self, fields: Vec<&str>) {

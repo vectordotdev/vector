@@ -8256,6 +8256,7 @@ dependencies = [
  "colored",
  "criterion",
  "crossterm",
+ "csv",
  "dashmap",
  "data-encoding",
  "datadog-search-syntax",
