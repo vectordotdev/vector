@@ -807,6 +807,7 @@
         {{ end }}
 
         {{ with $error.examples }}
+        {{ $id := printf "error-%s-examples" $code }}
         <div x-data="{ open: location.hash.startsWith('#error-{{ $code }}') }" class="mt-5 rounded-md px-3 py-2 dark:border-gray-700 border">
           <span class="flex justify-between items-center">
             <span class="flex items-center space-x-2">
@@ -815,7 +816,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
 
-              {{ partial "heading.html" (dict "text" "Examples" "level" 4 "toc_hide" true) }}
+              {{ partial "heading.html" (dict "text" "Examples" "level" 4 "toc_hide" true "id" $id) }}
             </span>
 
             {{ template "vrl-toggler" }}
