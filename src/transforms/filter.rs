@@ -89,7 +89,7 @@ mod test {
     #[test]
     fn passes_metadata() {
         let mut filter = Filter {
-            condition: IsLogConfig {}.build().unwrap(),
+            condition: IsLogConfig {}.build(Default::default()).unwrap(),
         };
         let event = Event::from("message");
         let metadata = event.metadata().clone();

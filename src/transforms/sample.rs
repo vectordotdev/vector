@@ -154,7 +154,7 @@ mod tests {
         VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
         }
-        .build()
+        .build(Default::default())
         .unwrap()
     }
 

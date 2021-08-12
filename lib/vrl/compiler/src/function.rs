@@ -135,7 +135,7 @@ impl ArgumentList {
     ) -> Result<Option<String>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr.as_value() {
-                Some(Value::EnrichmentTable(table)) => Ok(table.clone()),
+                Some(Value::EnrichmentTable(table)) => Ok(table),
                 _ => Err(Error::UnexpectedExpression {
                     keyword,
                     expected: "enrichment_table",
