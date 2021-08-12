@@ -8,8 +8,8 @@ set -euo pipefail
 #   CUE utilities.
 
 ROOT=$(git rev-parse --show-toplevel)
-CUE_SOURCES="${ROOT}/docs/cue"
-JSON_OUT="${ROOT}/docs/data/docs.json"
+CUE_SOURCES="${ROOT}/website/cue"
+JSON_OUT="${ROOT}/website/data/docs.json"
 CHECK_DOCS_SCRIPT="${ROOT}/scripts/check-docs.sh"
 
 list-docs-files() {
