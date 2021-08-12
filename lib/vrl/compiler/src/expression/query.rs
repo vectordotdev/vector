@@ -86,7 +86,7 @@ impl Expression for Query {
         match self.target {
             Target::Internal(ref variable) => variable
                 .value()
-                .and_then(|v| v.get_by_path(&self.path()))
+                .and_then(|v| v.get_by_path(self.path()))
                 .cloned(),
             _ => None,
         }

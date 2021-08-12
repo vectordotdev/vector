@@ -1,4 +1,4 @@
-use std::collections::{self, BTreeMap};
+use std::collections::BTreeMap;
 
 use super::EnrichmentTable;
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
@@ -89,7 +89,7 @@ impl File {
 impl EnrichmentTable for File {
     fn find_table_row<'a>(
         &'a self,
-        criteria: collections::BTreeMap<&str, String>,
+        criteria: BTreeMap<&str, String>,
     ) -> Option<BTreeMap<String, String>> {
         // Sequential scan
         let results = self

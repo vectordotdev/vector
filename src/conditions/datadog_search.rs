@@ -742,7 +742,7 @@ mod test {
 
             // Every query should build successfully.
             let cond = config
-                .build()
+                .build(Default::default())
                 .unwrap_or_else(|_| panic!("build failed: {}", source));
 
             assert!(

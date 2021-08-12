@@ -58,7 +58,7 @@ impl ConditionConfig for VrlConfig {
         Ok(Box::new(Vrl {
             program,
             source: self.source.clone(),
-            enrichment_tables: enrichment_tables,
+            enrichment_tables,
         }))
     }
 }

@@ -4,7 +4,7 @@ use glob::glob;
 use shared::TimeZone;
 use std::str::FromStr;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
+use vrl::{diagnostic::Formatter, state, EmptyEnrichmentTables, Runtime, Terminate, Value};
 
 use vrl_tests::{docs, Test};
 
@@ -124,14 +124,23 @@ fn main() {
 
         let state = state::Runtime::default();
         let mut runtime = Runtime::new(state);
-        let program = vrl::compile(&test.source, &stdlib::all());
+        let program = vrl::compile(
+            &test.source,
+            Box::new(EmptyEnrichmentTables),
+            &stdlib::all(),
+        );
 
         let want = test.result.clone();
         let timezone = cmd.timezone();
 
         match program {
             Ok(program) => {
-                let result = runtime.resolve(&mut test.object, &program, &timezone);
+                let result = runtime.resolve(
+                    &mut test.object,
+                    &program,
+                    &timezone,
+                    &Some(Box::new(EmptyEnrichmentTables)),
+                );
 
                 match result {
                     Ok(got) => {
@@ -335,6 +344,7 @@ fn vrl_value_to_json_value(value: Value) -> serde_json::Value {
             .collect::<serde_json::Value>(),
         Value::Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
         Value::Regex(v) => v.to_string().into(),
+        Value::EnrichmentTable(v) => v.into(),
         Value::Null => Null,
     }
 }

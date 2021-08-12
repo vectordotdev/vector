@@ -159,7 +159,7 @@ mod tests {
 
     #[derive(Debug)]
     struct DummyEnrichmentTable {
-        data: BTreeMap<String, vrl_core::Value>,
+        data: BTreeMap<String, String>,
         indexes: Arc<Mutex<Vec<Vec<String>>>>,
     }
 
@@ -171,7 +171,7 @@ mod tests {
         fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
             Self {
                 data: btreemap! {
-                    "field" => vrl_core::Value::from("result"),
+                    "field" => "result"
                 },
                 indexes,
             }
@@ -182,13 +182,8 @@ mod tests {
         fn find_table_row(
             &self,
             _criteria: BTreeMap<&str, String>,
-        ) -> Option<BTreeMap<&str, &vrl_core::Value>> {
-            Some(
-                self.data
-                    .iter()
-                    .map(|(key, value)| (key.as_ref(), value))
-                    .collect(),
-            )
+        ) -> Option<BTreeMap<String, String>> {
+            Some(self.data.clone())
         }
 
         fn add_index(&mut self, fields: Vec<&str>) {
@@ -263,7 +258,9 @@ mod tests {
         tables.finish_load();
 
         assert_eq!(
-            Ok(Some(vec!["result".to_string()])),
+            Ok(Some(btreemap! {
+                "field" => "result"
+            })),
             tables.find_table_row(
                 "dummy1",
                 btreemap! {
@@ -287,7 +284,9 @@ mod tests {
 
         // find_table_row now works on tables2
         assert_eq!(
-            Ok(Some(vec!["result".to_string()])),
+            Ok(Some(btreemap! {
+                "field" => "result"
+            })),
             tables2.find_table_row(
                 "dummy1",
                 btreemap! {
