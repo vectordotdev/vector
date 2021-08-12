@@ -30,7 +30,6 @@ components: sinks: gcp_stackdriver_logs: {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				rate_limit_duration_secs:   1
 				rate_limit_num:             1000
 				headers:                    false
 			}
