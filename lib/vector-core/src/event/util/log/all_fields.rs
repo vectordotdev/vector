@@ -185,9 +185,7 @@ mod test {
         .map(|(k, v)| (k.into(), v))
         .collect();
 
-        let collected: Vec<_> = all_fields(&fields)
-            .map(|(k, v)| (k, v.to_owned()))
-            .collect();
+        let collected: Vec<_> = all_fields(&fields).map(|(k, v)| (k, v.clone())).collect();
         assert_eq!(collected, expected);
     }
 }
