@@ -68,7 +68,7 @@ impl File {
         self.headers.iter().position(|header| header == col)
     }
 
-    fn row_equals(&self, criteria: &BTreeMap<&str, String>, row: &Vec<String>) -> bool {
+    fn row_equals(&self, criteria: &BTreeMap<&str, String>, row: &[String]) -> bool {
         criteria
             .iter()
             .all(|(col, value)| match self.column_index(col) {
@@ -77,7 +77,7 @@ impl File {
             })
     }
 
-    fn add_columns<'a>(&'a self, row: &'a Vec<String>) -> BTreeMap<String, String> {
+    fn add_columns(&self, row: &[String]) -> BTreeMap<String, String> {
         self.headers
             .iter()
             .zip(row)
@@ -87,10 +87,7 @@ impl File {
 }
 
 impl EnrichmentTable for File {
-    fn find_table_row<'a>(
-        &'a self,
-        criteria: BTreeMap<&str, String>,
-    ) -> Option<BTreeMap<String, String>> {
+    fn find_table_row(&self, criteria: BTreeMap<&str, String>) -> Option<BTreeMap<String, String>> {
         // Sequential scan
         let results = self
             .data
@@ -115,5 +112,53 @@ impl std::fmt::Debug for File {
             self.data.len(),
             self.indexes.len()
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::btreemap;
+
+    #[test]
+    fn finds_row() {
+        let file = File {
+            data: vec![
+                vec!["zip".to_string(), "zup".to_string()],
+                vec!["zirp".to_string(), "zurp".to_string()],
+            ],
+            headers: vec!["field1".to_string(), "field2".to_string()],
+            indexes: vec![],
+        };
+
+        let condition = btreemap! {
+            "field1" => "zirp"
+        };
+
+        assert_eq!(
+            Some(btreemap! {
+                "field1" => "zirp",
+                "field2" => "zurp",
+            }),
+            file.find_table_row(condition)
+        );
+    }
+
+    #[test]
+    fn doesnt_find_row() {
+        let file = File {
+            data: vec![
+                vec!["zip".to_string(), "zup".to_string()],
+                vec!["zirp".to_string(), "zurp".to_string()],
+            ],
+            headers: vec!["field1".to_string(), "field2".to_string()],
+            indexes: vec![],
+        };
+
+        let condition = btreemap! {
+            "field1" => "zorp"
+        };
+
+        assert_eq!(None, file.find_table_row(condition));
     }
 }
