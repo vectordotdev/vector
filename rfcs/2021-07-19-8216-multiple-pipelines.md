@@ -141,9 +141,9 @@ inputs = ["foo#baz"]
 In order to avoid internal conflicts with the pipeline components `id`s, the components `id`s internal representation will be changed to the following `enum`
 
 ```rust
-enum ComponentScope {
-  Public { name: String },
-  Scoped { scope: String, name: String },
+enum ComponentId {
+  Global { name: String },
+  Pipeline { pipeline_id: String, name: String },
 }
 ```
 
@@ -157,29 +157,26 @@ This approach would extend the [RFC 2064](https://github.com/timberio/vector/blo
 
 In Vector, once [the topology is built from the configuration](https://github.com/timberio/vector/blob/v0.15.0/src/topology/builder.rs#L106), every component is encapsulated in a `Task` that intercepts an incoming event and processes it accordingly. This task also keeps track of its internal metrics and finally emits `internal_metrics` events.
 
-To add the pipeline information to the task, we need to add a new optional parameter to the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/task.rs#L29) method.
+To add the pipeline information to the task, we need to change the `name` parameter to `id: ComponentId` in the [`Task::new`](https://github.com/timberio/vector/blob/v0.15.0/src/topology/task.rs#L29) method.
 
 ```rust
 pub struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
-    name: String,
+    id: ComponentId,
     typetag: String,
-    pipeline: Option<String>,
 }
 
 impl Task {
-    pub fn new<S1, S2, Fut>(name: S1, typetag: S2, pipeline: Option<String>, inner: Fut) -> Self
+    pub fn new<S, Fut>(id: ComponentId, typetag: S, inner: Fut) -> Self
     where
-        S1: Into<String>,
-        S2: Into<String>,
+        S: Into<String>,
         Fut: Future<Output = Result<TaskOutput, ()>> + Send + 'static,
     {
         Self {
             inner: inner.boxed(),
-            name: name.into(),
+            id,
             typetag: typetag.into(),
-            pipeline,
         }
     }
 }
