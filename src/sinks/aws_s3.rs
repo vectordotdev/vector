@@ -1,21 +1,13 @@
-use crate::{
-    config::{
+use crate::{config::{
         log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-    },
-    event::Event,
-    internal_events::TemplateRenderingFailed,
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
-    serde::to_string,
-    sinks::util::{
+    }, event::Event, internal_events::{TemplateRenderingFailed, aws_s3::sink::S3EventsSent}, rusoto::{self, AwsAuthentication, RegionOrEndpoint}, serde::to_string, sinks::util::{
         batch::{BatchConfig, BatchSettings},
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
         Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
-    },
-    template::Template,
-};
+    }, template::Template};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
@@ -297,6 +289,10 @@ impl Service<Request> for S3Sink {
             }
         }
         let tagging = tagging.finish();
+
+        emit!(S3EventsSent {
+            byte_size: request.body.len(),
+        });
 
         let client = self.client.clone();
         let request = PutObjectRequest {
