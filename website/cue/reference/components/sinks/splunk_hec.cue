@@ -39,8 +39,6 @@ components: sinks: splunk_hec: {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				concurrency:                10
-				rate_limit_num:             10
 				headers:                    false
 			}
 			tls: {
