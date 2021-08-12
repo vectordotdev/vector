@@ -633,9 +633,11 @@
 
         {{ with $func.examples }}
         {{ $id := printf "%s-examples" $name }}
-        <div class="mt-4 border rounded py-2 px-3 dark:border-gray-700">
-          <span>
+        <div x-data="{ open: location.hash.startsWith('#{{ $id }}') }" class="mt-4 border rounded py-2 px-3 dark:border-gray-700">
+          <span class="flex justify-between items-center">
             {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id "toc_hide" true) }}
+
+            {{ template "config-toggler" (dict "size" 4) }}
           </span>
 
           <div x-show="open" class="pt-4 flex flex-col space-y-5 overflow-x-scroll">
