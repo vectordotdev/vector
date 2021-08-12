@@ -39,7 +39,6 @@ components: sinks: http: {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				timeout_secs:               30
 				headers:                    true
 			}
 			tls: {

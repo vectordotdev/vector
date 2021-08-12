@@ -40,7 +40,6 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				timeout_secs:               30
 				headers:                    false
 			}
 			tls: enabled: false

@@ -143,11 +143,10 @@ impl SinkConfig for HttpSinkConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.tower.unwrap_with(&TowerRequestConfig {
-            timeout_secs: Some(30),
-            ..Default::default()
-        });
-
+        let request = config
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
         let sink = BatchedHttpSink::new(
             config,
             Buffer::new(batch.size, Compression::None),
