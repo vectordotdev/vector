@@ -1,271 +1,54 @@
-# Contributing
-
-First, thank you for contributing to Vector! The goal of this document is to
-provide everything you need to start contributing to Vector. The
-following TOC is sorted progressively, starting with the basics and
-expanding into more specifics. Everyone from a first time contributor to a
-Vector team member will find this document useful.
+# Developing
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Introduction](#introduction)
-1. [Your First Contribution](#your-first-contribution)
-   1. [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
-1. [Workflow](#workflow)
-   1. [Git Branches](#git-branches)
-   1. [Git Commits](#git-commits)
-      1. [Style](#style)
-      1. [Signing-off](#signing-off)
-   1. [Github Pull Requests](#github-pull-requests)
-      1. [Title](#title)
-      1. [Reviews & Approvals](#reviews--approvals)
-      1. [Merge Style](#merge-style)
-   1. [CI](#ci)
-      1. [Releasing](#releasing)
-      1. [Testing](#testing)
-         1. [Skipping tests](#skipping-tests)
-         1. [Daily tests](#daily-tests)
-      1. [Flakey tests](#flakey-tests)
-         1. [Test harness](#test-harness)
-1. [Development](#development)
-   1. [Setup](#setup)
-      1. [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
-      1. [Bring your own toolbox](#bring-your-own-toolbox)
-   1. [The Basics](#the-basics)
-      1. [Directory Structure](#directory-structure)
-      1. [Makefile](#makefile)
-      1. [Code Style](#code-style)
-         1. [Logging style](#logging-style)
-      1. [Feature flags](#feature-flags)
-      1. [Dependencies](#dependencies)
-   1. [Guidelines](#guidelines)
-      1. [Sink Healthchecks](#sink-healthchecks)
-   1. [Testing](#testing-1)
-      1. [Unit Tests](#unit-tests)
-      1. [Integration Tests](#integration-tests)
-      1. [Blackbox Tests](#blackbox-tests)
-      1. [Tips and Tricks](#tips-and-tricks)
-         1. [Faster Builds With `sccache`](#faster-builds-with-sccache)
-         1. [Testing Specific Components](#testing-specific-components)
-         1. [Generating Sample Logs](#generating-sample-logs)
-   1. [Benchmarking](#benchmarking)
-   1. [Profiling](#profiling)
+1. [Setup](#setup)
+   1. [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
+   1. [Bring your own toolbox](#bring-your-own-toolbox)
+1. [The basics](#the-basics)
+   1. [Directory structure](#directory-structure)
+   1. [Makefile](#makefile)
+   1. [Code style](#code-style)
+      1. [Logging style](#logging-style)
+   1. [Feature flags](#feature-flags)
+   1. [Dependencies](#dependencies)
+1. [Guidelines](#guidelines)
+   1. [Sink healthchecks](#sink-healthchecks)
+1. [Testing](#testing)
+   1. [Unit tests](#unit-tests)
+   1. [Integration tests](#integration-tests)
+   1. [Blackbox tests](#blackbox-tests)
+   1. [Tips and tricks](#tips-and-tricks)
+      1. [Faster builds With `sccache`](#faster-builds-with-sccache)
+      1. [Testing specific components](#testing-specific-components)
+      1. [Generating sample logs](#generating-sample-logs)
+1. [Benchmarking](#benchmarking)
+1. [Profiling](#profiling)
+1. [Domains](#domains)
    1. [Kubernetes](#kubernetes)
-      1. [Kubernetes Dev Flow](#kubernetes-dev-flow)
-         1. [Requirements](#requirements)
-         1. [The dev flow](#the-dev-flow)
-         1. [Troubleshooting](#troubleshooting)
-         1. [Going through the dev flow manually](#going-through-the-dev-flow-manually)
-      1. [Kubernetes E2E tests](#kubernetes-e2e-tests)
-         1. [Requirements](#requirements-1)
-         1. [Running the E2E tests](#running-the-e2e-tests)
-      1. [Kubernetes Architecture](#kubernetes-architecture)
+      1. [Architecture](#architecture)
          1. [The operation logic](#the-operation-logic)
          1. [Where to find things](#where-to-find-things)
-1. [User experience \(UX\)](#user-experience-ux)
-   1. [UX responsibilities](#ux-responsibilities)
-   1. [Documentation](#documentation)
-      1. [Formatting docs](#formatting-docs)
-      1. [Validating docs](#validating-docs)
-      1. [Docs development workflow](#docs-development-workflow)
-   1. [Changes](#changes)
-      1. [Changelog](#changelog)
-      1. [Highlights](#highlights)
-         1. [What makes a highlight noteworthy?](#what-makes-a-highlight-noteworthy)
-         1. [How is a highlight different from a blog post?](#how-is-a-highlight-different-from-a-blog-post)
-1. [Security](#security)
-1. [Legal](#legal)
-   1. [DCO](#dco)
-      1. [Trivial changes](#trivial-changes)
-   1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-1. [FAQ](#faq)
-   1. [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
-   1. [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
-   1. [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
-1. [Contact](#contact)
+      1. [Development](#development)
+         1. [Requirements](#requirements)
+         1. [Automatic](#automatic)
+         1. [Manual](#manual)
+         1. [Troubleshooting](#troubleshooting)
+      1. [Testing](#testing-1)
+         1. [Integration tests](#integration-tests-1)
+            1. [Requirements](#requirements-1)
+            1. [Tutorial](#tutorial)
 
 <!-- /MarkdownTOC -->
 
-## Introduction
 
-1. **You're familiar with [Github](https://github.com) and the pull request
-   workflow.**
-2. **You've read Vector's [docs](https://vector.dev/docs/).**
-3. **You know about the [Vector community](https://vector.dev/community/).
-   Please use this for help.**
-
-## Your First Contribution
-
-1. Ensure your change has an issue! Find an
-   [existing issue][urls.existing_issues] or [open a new issue][urls.new_issue].
-   - This is where you can get a feel if the change will be accepted or not.
-     Changes that are questionable will have a `needs: approval` label.
-2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
-   Github account (only applicable to outside contributors).
-3. [Create a new Git branch][urls.create_branch].
-4. Review the Vector [change control](#change-control) and [development](#development) workflows.
-5. Make your changes.
-6. [Submit the branch as a pull request][urls.submit_pr] to the main Vector
-   repo. A Vector team member should comment and/or review your pull request
-   within a few days. Although, depending on the circumstances, it may take
-   longer.
-
-### New sources, sinks, and transforms
-
-If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a few steps you need think about if you want to make sure we can merge your contribution. We're here to help you along with these steps but they are a blocker to getting a new integration released.
-
-To merge a new source, sink, or transform, you need to:
-
-- [ ] Add tests, especially integration tests if your contribution connects to an external service.
-- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
-- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/timberio/vector/blob/master/docs).
-- [ ] Update [`.github/CODEOWNERS`](https://github.com/timberio/vector/blob/master/.github/CODEOWNERS) or talk to us about identifying someone on the team to help look after the new integration.
-
-## Workflow
-
-### Git Branches
-
-_All_ changes must be made in a branch and submitted as [pull requests](#pull-requests).
-Vector does not adopt any type of branch naming style, but please use something
-descriptive of your changes.
-
-### Git Commits
-
-#### Style
-
-Please ensure your commits are small and focused; they should tell a story of
-your change. This helps reviewers to follow your changes, especially for more
-complex changes.
-
-#### Signing-off
-
-Your commits must include a [DCO](https://developercertificate.org/) signature.
-This is simpler than it sounds; it just means that all of your commits
-must contain:
-
-```text
-Signed-off-by: Joe Smith <joe.smith@email.com>
-```
-
-Git makes this easy by adding the `-s` or `--signoff` flags when you commit:
-
-```bash
-git commit -sm 'My commit message'
-```
-
-We also included a `make signoff` target that handles this for you if
-you forget.
-
-### Github Pull Requests
-
-Once your changes are ready you must submit your branch as a [pull \
-request](https://github.com/timberio/vector/pulls).
-
-#### Title
-
-The pull request title must follow the format outlined in the [conventional \
-commits spec](https://www.conventionalcommits.org).
-[Conventional commits](https://www.conventionalcommits.org) is a standardized
-format for commit messages. Vector only requires this format for commits on
-the `master` branch. And because Vector squashes commits before merging
-branches, this means that only the pull request title must conform to this
-format. Vector performs a pull request check to verify the pull request title
-in case you forget.
-
-A list of allowed sub-categories is defined
-[here](https://github.com/timberio/vector/tree/master/.github).
-
-The following are all good examples of pull request titles:
-
-```text
-feat(new sink): new `xyz` sink
-feat(tcp source): add foo bar baz feature
-fix(tcp source): fix foo bar baz bug
-chore: improve build process
-docs: fix typos
-```
-
-#### Reviews & Approvals
-
-All pull requests should be reviewed by:
-
-- No review required for cosmetic changes like whitespace, typos, and spelling
-  by a maintainer
-- One Vector team member for minor changes or trivial changes from contributors
-- Two Vector team members for major changes
-- Three Vector team members for RFCs
-
-If there are any CODEOWNERs automatically assigned, you should also wait for
-their review.
-
-#### Merge Style
-
-All pull requests are squashed and merged. We generally discourage large pull
-requests that are over 300-500 lines of diff. If you would like to propose a
-change that is larger we suggest coming onto our [Discord server](https://chat.vector.dev/) and discuss it
-with one of our engineers. This way we can talk through the solution and
-discuss if a change that large is even needed! This will produce a quicker
-response to the change and likely produce code that aligns better with our
-process.
-
-### CI
-
-Currently Vector uses Github Actions to run tests. The workflows are defined in
-`.github/workflows`.
-
-#### Releasing
-
-Github Actions is responsible for releasing updated versions of Vector through
-various channels.
-
-#### Testing
-
-##### Skipping tests
-
-Tests are run for all changes except those that have the label:
-
-```text
-ci-condition: skip
-```
-
-##### Daily tests
-
-Some long running tests are only run daily, rather than on every pull request.
-If needed, an administrator can kick off these tests manually via the button on
-the [nightly build action
-page](https://github.com/timberio/vector/actions?query=workflow%3Anightly)
-
-#### Flakey tests
-
-Historically, we've had some trouble with tests being flakey. If your PR does
-not have passing tests:
-
-- Ensure that the test failures are unrelated to your change
-  - Is it failing on master?
-  - Does it fail if you rerun CI?
-  - Can you reproduce locally?
-- Find or open an issue for the test failure
-  ([example](https://github.com/timberio/vector/issues/3781))
-- Link the PR in the issue for the failing test so that there are more examples
-
-##### Test harness
-
-You can invoke the [test harness][urls.vector_test_harness] by commenting on
-any pull request with:
-
-```bash
-/test -t <name>
-```
-
-## Development
-
-### Setup
+## Setup
 
 We're super excited to have you interested in working on Vector! Before you start you should pick how you want to develop.
 
 For small or first-time contributions, we recommend the Docker method. Prefer to do it yourself? That's fine too!
 
-#### Using a Docker or Podman environment
+### Using a Docker or Podman environment
 
 > **Targets:** You can use this method to produce AARCH64, Arm6/7, as well as x86/64 Linux builds.
 
@@ -326,7 +109,7 @@ make fmt ENVIRONMENT=true
 
 We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local.
 
-#### Bring your own toolbox
+### Bring your own toolbox
 
 > **Targets:** This option is required for MSVC/Mac/FreeBSD toolchains. It can be used to build for any environment or OS.
 
@@ -374,28 +157,32 @@ cargo fmt
 
 If you run `make` you'll see a full list of all our tasks. Some of these will start Docker containers, sign commits, or even make releases. These are not common development commands and your mileage may vary.
 
-### The Basics
+## The basics
 
-#### Directory Structure
+### Directory structure
 
+- [`/.github`](/github) - Github & CI related configuration.
 - [`/benches`](/benches) - Internal benchmarks.
 - [`/config`](/config) - Public facing Vector config, included in releases.
 - [`/distribution`](/distribution) - Distribution artifacts for various targets.
-- [`/docs`](/docs) - Structured data used to generate documentation.
+- [`/docs`](/docs) - Internal documentation for Vector contributors.
 - [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
 - [`/proto`](/proto) - Protobuf definitions.
+- [`/rfcs`](/rfcs) - Previous Vector proposals, a great place to build context on previous decisions.
 - [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
+- [`/skaffold`](/skaffold) - Resources for Kubernetes local development.
 - [`/src`](/src) - Vector source.
 - [`/tests`](/tests) - Various high-level test cases.
+- [`/website`](/website) - Vector's website and external documentation for Vector users.
 
-#### Makefile
+### Makefile
 
 Vector includes a [`Makefile`](/Makefile) in the root of the repo. This serves
 as a high-level interface for common commands. Running `make` will produce
 a list of make targets with descriptions. These targets will be referenced
 throughout this document.
 
-#### Code Style
+### Code style
 
 We use `rustfmt` on `stable` to format our code and CI will verify that your
 code follows
@@ -410,7 +197,7 @@ rustup component add rustfmt
 make fmt
 ```
 
-##### Logging style
+#### Logging style
 
 
 - Always use the [Tracing crate](https://tracing.rs/tracing/)'s key/value style for log events.
@@ -431,7 +218,7 @@ Yep!
 warn!(message = "Failed to merge value.", %error);
 ```
 
-#### Feature flags
+### Feature flags
 
 When a new component (a source, transform, or sink) is added, it has to be put
 behind a feature flag with the corresponding name. This ensures that it is
@@ -449,7 +236,7 @@ cargo test --lib --no-default-features --features sinks-console sinks::console
 In case if the tests are already built and only the component file changed, it
 is around 4 times faster than rebuilding tests with all features.
 
-#### Dependencies
+### Dependencies
 
 Dependencies should be _carefully_ selected and avoided if possible. You can
 see how dependencies are reviewed in the
@@ -459,9 +246,9 @@ If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
 the features corresponding to these components in `Cargo.toml`.
 
-### Guidelines
+## Guidelines
 
-#### Sink Healthchecks
+### Sink healthchecks
 
 Sinks may implement a health check as a means for validating their configuration
 against the environment and external systems. Ideally, this allows the system to
@@ -515,13 +302,13 @@ that fall into a false negative circumstance. Our goal should be to minimize the
 likelihood of users needing to pull that lever while still making a good effort
 to detect common problems.
 
-### Testing
+## Testing
 
 Testing is very important since Vector's primary design principle is reliability.
 You can read more about how Vector tests in our
 [testing blog post](https://vector.dev/blog/how-we-test-vector/).
 
-#### Unit Tests
+### Unit tests
 
 Unit tests refer to the majority of inline tests throughout Vector's code. A
 defining characteristic of unit tests is that they do not require external
@@ -531,7 +318,7 @@ services to run, therfore they should be much quicker. You can run them with:
 cargo test
 ```
 
-#### Integration Tests
+### Integration tests
 
 Integration tests verify that Vector actually works with the services it
 integrates with. Unlike unit tests, integration tests require external services
@@ -553,18 +340,19 @@ Once complete, you can run your integration tests with:
 make test-integration-<name>
 ```
 
-#### Blackbox Tests
+### Blackbox tests
 
 Vector also offers blackbox testing via
-[Vector's test harness][urls.vector_test_harness]. This is a complex testing
-suite that tests Vector's performance in real-world environments. It is
-typically used for benchmarking, but also correctness testing.
+[Vector's test harness](https://github.com/timberio/vector-test-harness). This
+is a complex testing suite that tests Vector's performance in real-world
+environments. It is typically used for benchmarking, but also correctness
+testing.
 
 You can run these tests within a PR as described in the [CI section](#ci).
 
-#### Tips and Tricks
+### Tips and tricks
 
-##### Faster Builds With `sccache`
+#### Faster builds With `sccache`
 
 Vector is a large project with a plethora of dependencies.  Changing to a different branch, or
 running `cargo clean`, can sometimes necessitate rebuilding many of those dependencies, which has an
@@ -588,7 +376,7 @@ Local mode works well for local development as it is much easier to delete the c
 you ever encounter issues with the cached assets.  It also involves no extra infrastructure or
 spending.
 
-##### Testing Specific Components
+#### Testing specific components
 
 If you are developing a particular component and want to quickly iterate on unit
 tests related only to this component, the following approach can reduce waiting
@@ -617,7 +405,7 @@ times:
      'cargo test --lib --no-default-features --features=transforms-add_fields transforms::add_fields'
    ```
 
-##### Generating Sample Logs
+#### Generating sample logs
 
 We use `flog` to build a sample set of log files to test sending logs from a
 file. This can be done with the following commands on mac with homebrew.
@@ -630,14 +418,14 @@ flog --bytes $((100 * 1024 * 1024)) > sample.log
 
 This will create a `100MiB` sample log file in the `sample.log` file.
 
-### Benchmarking
+## Benchmarking
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make bench` command. In addition, Vector
-maintains a full [test harness][urls.vector_test_harness] for complex
-end-to-end integration and performance testing.
+maintains a full [test harness](https://github.com/timberio/vector-test-harness)
+for complex end-to-end integration and performance testing.
 
-### Profiling
+## Profiling
 
 If you're trying to improve Vector's performance (or understand why your change
 made it worse), profiling is a useful tool for seeing where time is being spent.
@@ -713,9 +501,51 @@ cat stacks.folded | inferno-flamegraph > flamegraph.svg
 And that's it! You now have a flamegraph SVG file that can be opened and
 navigated in your favorite web browser.
 
+## Domains
+
+This section contains domain specific development knowledge for various areas
+of Vector. You should scan this section for any relevant domains for your
+development area.
+
 ### Kubernetes
 
-#### Kubernetes Dev Flow
+#### Architecture
+
+Kubernetes integration architecture is largely inspired by
+the [RFC 2221](rfcs/2020-04-04-2221-kubernetes-integration.md), so this
+is a concise outline of the effective design, rather than a deep dive into
+the concepts.
+
+##### The operation logic
+
+With `kubernetes_logs` source, Vector connects to the Kubernetes API doing
+a streaming watch request over the `Pod`s executing on the same `Node` that
+Vector itself runs at. Once Vector gets the list of all the `Pod`s that are
+running on the `Node`, it starts collecting logs for the logs files
+corresponding to each of the `Pod`. Only plaintext (as in non-gzipped) files
+are taken into consideration.
+The log files are then parsed into events, and the said events are annotated
+with the metadata from the corresponding `Pod`s, correlated via the file path
+of the originating log file.
+The events are then passed to the topology.
+
+##### Where to find things
+
+We use custom Kubernetes API client and machinery, that lives
+at `src/kubernetes`.
+The `kubernetes_logs` source lives at `src/sources/kubernetes_logs`.
+There is also an end-to-end (E2E) test framework that resides
+at `lib/k8s-test-framework`, and the actual end-to-end tests using that
+framework are at `lib/k8s-e2e-tests`.
+
+The Kubernetes-related distribution bit that are at `distribution/docker`,
+`distribution/kubernetes` and `distribution/helm`.
+There are also snapshot tests for Helm at `tests/helm-snapshots`.
+
+The development assistance resources are located at `skaffold.yaml`
+and `skaffold` dir.
+
+#### Development
 
 There is a special flow for when you develop portions of Vector that are
 designed to work with Kubernetes, like `kubernetes_logs` source or the
@@ -737,7 +567,7 @@ Vector:
 - [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
 - [`cargo watch`](https://github.com/passcod/cargo-watch)
 
-##### The dev flow
+##### Automatic
 
 Once you have the requirements, use the `scripts/skaffold.sh dev` command.
 
@@ -763,6 +593,19 @@ the cluster state and exit.
 `scripts/skaffold.sh` wraps `skaffold`, you can use other `skaffold` subcommands
 if it fits you better.
 
+##### Manual
+
+Is some cases `skaffold` may not work. It's possible to go through the dev flow
+manually, without `skaffold`.
+
+One of the important thing `skaffold` does is it patches the configuration to
+tie things together. If you want to go without it, you'll have to take care of
+that yourself, thus some additional knowledge of Kubernetes inner workings is
+required.
+
+Essentially, the steps you have to take to deploy manually are the same that
+`skaffold` will perform, and they're outlined at the previous section.
+
 ##### Troubleshooting
 
 You might need to tweak `skaffold`, here are some hints:
@@ -781,22 +624,11 @@ You might need to tweak `skaffold`, here are some hints:
 - For the rest of the `skaffold` tweaks you might want to apply check out
   [this page](https://skaffold.dev/docs/environment/).
 
-##### Going through the dev flow manually
+#### Testing
 
-Is some cases `skaffold` may not work. It's possible to go through the dev flow
-manually, without `skaffold`.
+##### Integration tests
 
-One of the important thing `skaffold` does is it patches the configuration to
-tie things together. If you want to go without it, you'll have to take care of
-that yourself, thus some additional knowledge of Kubernetes inner workings is
-required.
-
-Essentially, the steps you have to take to deploy manually are the same that
-`skaffold` will perform, and they're outlined at the previous section.
-
-#### Kubernetes E2E tests
-
-Kubernetes integration has a lot of parts that can go wrong.
+The Kubernetes integration tests have a lot of parts that can go wrong.
 
 To cope with the complexity and ensure we maintain high quality, we use
 E2E (end-to-end) tests.
@@ -804,7 +636,7 @@ E2E (end-to-end) tests.
 > E2E tests normally run at CI, so there's typically no need to run them
 > manually.
 
-##### Requirements
+###### Requirements
 
 - `kubernetes` cluster (`minikube` has special support, but any cluster should
   work)
@@ -829,7 +661,7 @@ Notes:
 >   usually 8GB of RAM with 2CPUs are sufficient to succesfully complete E2E tests
 >   locally.
 
-##### Running the E2E tests
+###### Tutorial
 
 To run the E2E tests, use the following command:
 
@@ -883,210 +715,3 @@ or
 ```shell
 QUICK_BUILD=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
 ```
-
-#### Kubernetes Architecture
-
-Kubernetes integration architecture is largely inspired by
-the [RFC 2221](rfcs/2020-04-04-2221-kubernetes-integration.md), so this
-is a concise outline of the effective design, rather than a deep dive into
-the concepts.
-
-##### The operation logic
-
-With `kubernetes_logs` source, Vector connects to the Kubernetes API doing
-a streaming watch request over the `Pod`s executing on the same `Node` that
-Vector itself runs at. Once Vector gets the list of all the `Pod`s that are
-running on the `Node`, it starts collecting logs for the logs files
-corresponding to each of the `Pod`. Only plaintext (as in non-gzipped) files
-are taken into consideration.
-The log files are then parsed into events, and the said events are annotated
-with the metadata from the corresponding `Pod`s, correlated via the file path
-of the originating log file.
-The events are then passed to the topology.
-
-##### Where to find things
-
-We use custom Kubernetes API client and machinery, that lives
-at `src/kubernetes`.
-The `kubernetes_logs` source lives at `src/sources/kubernetes_logs`.
-There is also an end-to-end (E2E) test framework that resides
-at `lib/k8s-test-framework`, and the actual end-to-end tests using that
-framework are at `lib/k8s-e2e-tests`.
-
-The Kubernetes-related distribution bit that are at `distribution/docker`,
-`distribution/kubernetes` and `distribution/helm`.
-There are also snapshot tests for Helm at `tests/helm-snapshots`.
-
-The development assistance resources are located at `skaffold.yaml`
-and `skaffold` dir.
-
-## User experience (UX)
-
-After making your change, you'll want to prepare it for Vector's users. This
-includes documentation, release notes, and more.
-
-### UX responsibilities
-
-As a Vector contributor you _are_ responsible for coupling the following user
-experience related changes with your code:
-
-* Reference docs changes located in the [`docs/cue` folder](docs/cue) (generally configuration changes)
-* Existing guide changes located in the [`docs/content` folder](docs/content)
-* If relevant, [highlighting] your change for future release notes
-
-You are _not_ responsible for:
-
-* Writing new guides related to your change
-
-### Documentation
-
-Documentation is very important to the Vector project! The official
-docs live at https://vector.dev/docs which is powered by the
-[`/docs` folder](docs). The `/docs` folder [README](docs/README.md)
-covers how the docs work and building them locally.
-
-#### Formatting docs
-
-Vector has some CUE-related CI checks that are run whenever changes are made to
-the `docs` directory. This includes checks to make sure that the CUE sources are
-properly formatted. To run CUE's autoformatting, run this command from the
-`vector` root:
-
-```bash
-cue fmt ./docs/**/*.cue
-```
-
-If that rewrites any files, make sure to commit your changes or else you'll see
-CI failures.
-
-#### Validating docs
-
-In addition to proper formatting, the CUE sources need to be *valid*, that is,
-the provided data needs to conform to various CUE schemas. To check the validity
-of the CUE sources:
-
-```bash
-make check-docs
-```
-
-#### Docs development workflow
-
-A good practice for writing CUE is to make small, incremental changes and to
-frequently check to ensure that those changes are valid. If you introduce larger
-changes that introduce multiple errors, you may have difficulty interpreting
-CUE's verbose (and not always super helpful) log output. In fact, we recommend
-using a tool like [watchexec] to validate the sources every time you save a
-change:
-
-```bash
-# From the root
-watchexec "make check-docs"
-```
-
-### Changes
-
-#### Changelog
-
-Contributors do not need to maintain a changelog. This is automatically generated
-via the `make release` command, made possible by the use of
-[conventional commit](#title) titles.
-
-#### Highlights
-
-Because Vector releases often contain many different changes, we use highlights
-to surface high-value, meaningful changes. Highlights are markdown files located
-in the [`docs/content/en/highlights` folder](docs/content/en/highlights) that
-thoughtfully describe a feature. Each highlight is prominently displayed in the
-relevant [release notes](https://vector.dev/releases/).
-
-##### What makes a highlight noteworthy?
-
-It should offer meaningful value to users. This is inherently subjective and
-it is impossible to define exact rules for this distinction. But we should be
-cautious not to dilute the meaning of a highlight by producing low values
-highlights. Typically, a release contains no more than 6 highlights.
-
-##### How is a highlight different from a blog post?
-
-Highlights are not blog posts. They are short one, maybe two, paragraph
-announcements. Highlights should allude to, or link to, a blog post if
-relevant.
-
-For example, [this adaptive concurrency announcement][urls.adaptive_concurrency]
-is noteworthy, but also deserves an in-depth blog post covering the work that
-resulted in the performance and reliability benefit.
-
-## Security
-
-Please see the [`SECURITY.md` file](/SECURITY.md).
-
-## Legal
-
-To protect all users of Vector, the following legal requirements are made.
-If you have additional questions, please [contact us](#contact).
-
-### DCO
-
-Vector requires all contributors to agree to the DCO. DCO stands for Developer
-Certificate of Origin and is maintained by the
-[Linux Foundation](https://www.linuxfoundation.org). It is an attestation
-attached to every commit made by every developer. All contributions are covered
-by, and fall under, the DCO.
-
-#### Trivial changes
-
-Trivial changes, such as spelling fixes, do not need to be signed.
-
-### Granted rights and copyright assignment
-
-This is covered by the DCO. Contributions are covered by the DCO and do not
-require a CLA.
-
-## FAQ
-
-### Why a DCO instead of a CLA?
-
-It's simpler, clearer, and still protects users of Vector. We believe the DCO
-more accurately embodies the principles of open-source. More info can be found
-here:
-
-- [Gitlab's switch to DCO](https://about.gitlab.com/2017/11/01/gitlab-switches-to-dco-license/)
-- [DCO vs CLA](https://opensource.com/article/18/3/cla-vs-dco-whats-difference)
-
-### If I’m contributing while an employee, do I still need my employer to sign something?
-
-Nope! The DCO confirms that you are entitled to submit the code, which assumes
-that you are authorized to do so. It treats you like an adult and relies on
-your accurate statement about your rights to submit a contribution.
-
-### What if I forgot to sign my commits?
-
-No problem! We made this simple with the [`signoff` Makefile target](Makefile):
-
-```bash
-make signoff
-```
-
-If you prefer to do this manually:
-
-```bash
-git commit --amend --signoff
-```
-
-## Contact
-
-If you have questions about this document or the project as a whole, please
-contact us at vector@timber.io.
-
-[urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
-[urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
-[urls.cue]: https://cuelang.org
-[urls.existing_issues]: https://github.com/timberio/vector/issues
-[urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
-[urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits
-[urls.new_issue]: https://github.com/timberio/vector/issues/new
-[urls.push_it_to_the_limit]: https://www.youtube.com/watch?v=ueRzA9GUj9c
-[urls.adaptive_concurrency]: https://vector.dev/highlights/2020-09-18-adaptive-concurrency
-[urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
-[urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.watchexec]: https://github.com/watchexec/watchexec

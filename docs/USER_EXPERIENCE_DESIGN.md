@@ -199,9 +199,9 @@ experience.
 As a Vector contributor you are responsible for coupling the following non-code
 changes with your code changes:
 
-* Reference docs changes located in the [`docs/cue` folder](docs/cue)
+* Reference docs changes located in the [`/website/cue` folder](../website/cue)
   (generally configuration changes)
-* Existing guide changes located in the [`docs/content` folder](docs/content)
+* Existing guide changes located in the [`/website/content` folder](../website/content)
 * If relevant, [highlighting] your change for future release notes
 
 You are _not_ responsible for:
