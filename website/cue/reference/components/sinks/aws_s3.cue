@@ -40,11 +40,7 @@ components: sinks: aws_s3: components._aws & {
 			request: {
 				enabled:                    true
 				concurrency:                50
-				rate_limit_duration_secs:   1
 				rate_limit_num:             250
-				retry_initial_backoff_secs: 1
-				retry_max_duration_secs:    10
-				timeout_secs:               30
 				headers:                    false
 			}
 			tls: enabled: false
