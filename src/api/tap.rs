@@ -1,4 +1,5 @@
 use super::{ShutdownRx, ShutdownTx};
+use crate::config::ComponentScope;
 use crate::topology::fanout::ControlChannel;
 use crate::{
     event::{Event, LogEvent},
@@ -246,7 +247,7 @@ async fn tap_handler(
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(id.clone(), Box::new(sink)))
+                                .send(fanout::ControlMessage::Add(ComponentScope::public(&id), Box::new(sink)))
                                 .await
                             {
                                 Ok(_) => {

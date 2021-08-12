@@ -82,16 +82,100 @@ impl ConfigPath {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WithInputs<Input, Inner> {
+    #[serde(default)]
+    pub inputs: Vec<Input>,
+    #[serde(flatten)]
+    pub inner: Inner,
+}
+
+impl<Input, Inner> WithInputs<Input, Inner> {
+    pub fn new(inputs: Vec<Input>, inner: Inner) -> Self {
+        WithInputs { inputs, inner }
+    }
+}
+
+impl<Inner> WithInputs<ComponentScope, Inner> {
+    pub fn into_public(self) -> WithInputs<String, Inner> {
+        WithInputs {
+            inputs: self
+                .inputs
+                .into_iter()
+                .map(|name| name.into_name())
+                .collect(),
+            inner: self.inner,
+        }
+    }
+}
+
+impl<Inner> WithInputs<String, Inner> {
+    pub fn into_scoped(self) -> WithInputs<ComponentScope, Inner> {
+        WithInputs {
+            inputs: self
+                .inputs
+                .into_iter()
+                .map(|name| ComponentScope::Public { name })
+                .collect(),
+            inner: self.inner,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub enum ComponentScope {
+    Public { name: String },
+    Scoped { scope: String, name: String },
+}
+
+impl ComponentScope {
+    pub fn public<N: ToString>(name: N) -> Self {
+        Self::Public {
+            name: name.to_string(),
+        }
+    }
+
+    pub fn is_public(&self) -> bool {
+        matches!(self, Self::Public { .. })
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Public { name } => name,
+            Self::Scoped { name, .. } => name,
+        }
+    }
+
+    pub fn scope(&self) -> Option<&String> {
+        match self {
+            Self::Public { .. } => None,
+            Self::Scoped { scope, .. } => Some(scope),
+        }
+    }
+
+    pub fn into_name(self) -> String {
+        match self {
+            Self::Public { name } => name,
+            Self::Scoped { name, .. } => name,
+        }
+    }
+}
+
+impl ToString for ComponentScope {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, SourceOuter>,
-    pub sinks: IndexMap<String, SinkOuter>,
-    pub transforms: IndexMap<String, TransformOuter>,
-    pub pipelines: Pipelines,
+    pub sources: IndexMap<ComponentScope, SourceOuter>,
+    pub sinks: IndexMap<ComponentScope, SinkScoped>,
+    pub transforms: IndexMap<ComponentScope, TransformScoped>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,
 }
@@ -183,7 +267,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub name: String,
+    pub scope: ComponentScope,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -194,14 +278,14 @@ pub struct SourceContext {
 impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
-        name: &str,
+        scope: ComponentScope,
         out: Pipeline,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(name);
+        let (shutdown_signal, _) = shutdown.register_source(scope);
         (
             Self {
-                name: name.into(),
+                scope,
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -215,7 +299,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            name: "default".into(),
+            scope: ComponentScope::public("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
@@ -229,11 +313,11 @@ pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
 
 inventory::collect!(SourceDescription);
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter {
-    #[serde(default)]
-    pub inputs: Vec<String>,
+pub type SinkScoped = WithInputs<ComponentScope, SinkInner>;
+pub type SinkOuter = WithInputs<String, SinkInner>;
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SinkInner {
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
 
@@ -255,15 +339,17 @@ pub struct SinkOuter {
     pub inner: Box<dyn SinkConfig>,
 }
 
-impl SinkOuter {
-    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> Self {
+impl SinkInner {
+    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> SinkOuter {
         SinkOuter {
-            buffer: Default::default(),
-            healthcheck: SinkHealthcheckOptions::default(),
-            healthcheck_uri: None,
-            inner,
             inputs,
-            proxy: Default::default(),
+            inner: SinkInner {
+                buffer: Default::default(),
+                healthcheck: SinkHealthcheckOptions::default(),
+                healthcheck_uri: None,
+                inner,
+                proxy: Default::default(),
+            },
         }
     }
 
@@ -379,13 +465,8 @@ pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 
 inventory::collect!(SinkDescription);
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter {
-    #[serde(default)]
-    pub inputs: Vec<String>,
-    #[serde(flatten)]
-    pub inner: Box<dyn TransformConfig>,
-}
+pub type TransformScoped = WithInputs<ComponentScope, Box<dyn TransformConfig>>;
+pub type TransformOuter = WithInputs<String, Box<dyn TransformConfig>>;
 
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
@@ -487,7 +568,7 @@ pub struct TestDefinition {
     #[serde(default)]
     pub outputs: Vec<TestOutput>,
     #[serde(default)]
-    pub no_outputs_from: Vec<String>,
+    pub no_outputs_from: Vec<ComponentScope>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -502,7 +583,7 @@ pub enum TestInputValue {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestInput {
-    pub insert_at: String,
+    pub insert_at: ComponentScope,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
     pub value: Option<String>,
@@ -517,7 +598,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
-    pub extract_from: String,
+    pub extract_from: ComponentScope,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -529,7 +610,7 @@ impl Config {
     /// Expand a logical component name (i.e. from the config file) into the names of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &str) -> Vec<String> {
+    pub fn get_inputs(&self, identifier: &str) -> Vec<ComponentScope> {
         self.expansions
             .get(identifier)
             .cloned()

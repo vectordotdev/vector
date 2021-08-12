@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, ProxyConfig, SinkContext, SourceContext},
+    config::{ComponentScope, DataType, ProxyConfig, SinkContext, SourceContext},
     event::Event,
     internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
@@ -23,13 +23,13 @@ use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
-    pub inputs: HashMap<String, (buffers::BufferInputCloner<Event>, Vec<String>)>,
-    pub outputs: HashMap<String, fanout::ControlChannel>,
-    pub tasks: HashMap<String, Task>,
-    pub source_tasks: HashMap<String, Task>,
-    pub healthchecks: HashMap<String, Task>,
+    pub inputs: HashMap<ComponentScope, (buffers::BufferInputCloner<Event>, Vec<ComponentScope>)>,
+    pub outputs: HashMap<ComponentScope, fanout::ControlChannel>,
+    pub tasks: HashMap<ComponentScope, Task>,
+    pub source_tasks: HashMap<ComponentScope, Task>,
+    pub healthchecks: HashMap<ComponentScope, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
-    pub detach_triggers: HashMap<String, Trigger>,
+    pub detach_triggers: HashMap<ComponentScope, Trigger>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -49,20 +49,21 @@ pub async fn build_pieces(
     let mut errors = vec![];
 
     // Build sources
-    for (name, source) in config
+    for (scope, source) in config
         .sources
         .iter()
-        .filter(|(name, _)| diff.sources.contains_new(name))
+        .filter(|(scope, _)| diff.sources.contains_new(*scope))
     {
         let (tx, rx) = futures::channel::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.inner.source_type();
 
-        let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
+        let (shutdown_signal, force_shutdown_tripwire) =
+            shutdown_coordinator.register_source(scope.name());
 
         let context = SourceContext {
-            name: name.into(),
+            scope: scope.clone(),
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,
@@ -71,7 +72,7 @@ pub async fn build_pieces(
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
-                errors.push(format!("Source \"{}\": {}", name, error));
+                errors.push(format!("Source {:?}: {}", scope, error));
                 continue;
             }
             Ok(server) => server,
@@ -79,7 +80,7 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
         let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
-        let pump = Task::new(name, typetag, pump);
+        let pump = Task::new(scope.clone(), typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
@@ -96,18 +97,18 @@ pub async fn build_pieces(
                 Err(_) => Err(()),
             }
         };
-        let server = Task::new(name, typetag, server);
+        let server = Task::new(scope.clone(), typetag, server);
 
-        outputs.insert(name.clone(), control);
-        tasks.insert(name.clone(), pump);
-        source_tasks.insert(name.clone(), server);
+        outputs.insert(scope.clone(), control);
+        tasks.insert(scope.clone(), pump);
+        source_tasks.insert(scope.clone(), server);
     }
 
     // Build transforms
-    for (name, transform) in config
+    for (scope, transform) in config
         .transforms
         .iter()
-        .filter(|(name, _)| diff.transforms.contains_new(name))
+        .filter(|(scope, _)| diff.transforms.contains_new(scope))
     {
         let trans_inputs = &transform.inputs;
 
@@ -116,7 +117,7 @@ pub async fn build_pieces(
         let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(&config.global).await {
             Err(error) => {
-                errors.push(format!("Transform \"{}\": {}", name, error));
+                errors.push(format!("Transform {:?}: {}", scope, error));
                 continue;
             }
             Ok(transform) => transform,
@@ -161,33 +162,34 @@ pub async fn build_pieces(
             debug!("Finished.");
             TaskOutput::Transform
         });
-        let task = Task::new(name, typetag, transform);
+        let task = Task::new(scope.clone(), typetag, transform);
 
-        inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
-        outputs.insert(name.clone(), control);
-        tasks.insert(name.clone(), task);
+        inputs.insert(scope.clone(), (input_tx, trans_inputs.clone()));
+        outputs.insert(scope.clone(), control);
+        tasks.insert(scope.clone(), task);
     }
 
     // Build sinks
-    for (name, sink) in config
+    for (scope, sink) in config
         .sinks
         .iter()
-        .filter(|(name, _)| diff.sinks.contains_new(name))
+        .filter(|(scope, _)| diff.sinks.contains_new(scope))
     {
         let sink_inputs = &sink.inputs;
+        let sink = &sink.inner;
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input_type();
 
-        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(name) {
+        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(scope.name()) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, name);
+            let buffer = sink.buffer.build(&config.global.data_dir, scope.name());
             match buffer {
                 Err(error) => {
-                    errors.push(format!("Sink \"{}\": {}", name, error));
+                    errors.push(format!("Sink {:?}: {}", scope, error));
                     continue;
                 }
                 Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into()))), acker),
@@ -203,7 +205,7 @@ pub async fn build_pieces(
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
-                errors.push(format!("Sink \"{}\": {}", name, error));
+                errors.push(format!("Sink {:?}: {}", scope, error));
                 continue;
             }
             Ok(built) => built,
@@ -238,9 +240,10 @@ pub async fn build_pieces(
                 TaskOutput::Sink(rx, acker)
             })
         };
-        let task = Task::new(name, typetag, sink);
+        let task = Task::new(scope.clone(), typetag, sink);
 
-        let component_name = name.clone();
+        let component_name = scope.name().to_string();
+        let component_scope = scope.scope().cloned();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -257,6 +260,7 @@ pub async fn build_pieces(
                                 component_kind = "sink",
                                 component_type = typetag,
                                 ?component_name,
+                                ?component_scope,
                             );
                             Err(())
                         }
@@ -266,6 +270,7 @@ pub async fn build_pieces(
                                 component_kind = "sink",
                                 component_type = typetag,
                                 ?component_name,
+                                ?component_scope
                             );
                             Err(())
                         }
@@ -276,12 +281,12 @@ pub async fn build_pieces(
                 Ok(TaskOutput::Healthcheck)
             }
         };
-        let healthcheck_task = Task::new(name, typetag, healthcheck_task);
+        let healthcheck_task = Task::new(scope.clone(), typetag, healthcheck_task);
 
-        inputs.insert(name.clone(), (tx, sink_inputs.clone()));
-        healthchecks.insert(name.clone(), healthcheck_task);
-        tasks.insert(name.clone(), task);
-        detach_triggers.insert(name.clone(), trigger);
+        inputs.insert(scope.clone(), (tx, sink_inputs.clone()));
+        healthchecks.insert(scope.clone(), healthcheck_task);
+        tasks.insert(scope.clone(), task);
+        detach_triggers.insert(scope.clone(), trigger);
     }
 
     if errors.is_empty() {

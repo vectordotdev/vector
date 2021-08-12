@@ -5,7 +5,7 @@ use crate::{
         metrics::{self, IntoSourceMetrics},
         sort,
     },
-    config::DataType,
+    config::{ComponentScope, DataType},
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
@@ -30,7 +30,7 @@ impl From<DataType> for SourceOutputType {
 
 #[derive(Debug, Clone)]
 pub struct Data {
-    pub name: String,
+    pub scope: ComponentScope,
     pub component_type: String,
     pub output_type: DataType,
 }
@@ -47,7 +47,7 @@ pub struct Source(pub Data);
 
 impl Source {
     pub fn get_name(&self) -> &str {
-        self.0.name.as_str()
+        self.0.scope.name()
     }
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
@@ -92,7 +92,7 @@ impl Source {
     /// Transform outputs
     pub async fn transforms(&self) -> Vec<transform::Transform> {
         state::filter_components(|(_name, components)| match components {
-            Component::Transform(t) if t.0.inputs.contains(&self.0.name) => Some(t.clone()),
+            Component::Transform(t) if t.0.inputs.contains(&self.0.scope) => Some(t.clone()),
             _ => None,
         })
     }
@@ -100,7 +100,7 @@ impl Source {
     /// Sink outputs
     pub async fn sinks(&self) -> Vec<sink::Sink> {
         state::filter_components(|(_name, components)| match components {
-            Component::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
+            Component::Sink(s) if s.0.inputs.contains(&self.0.scope) => Some(s.clone()),
             _ => None,
         })
     }
@@ -149,17 +149,17 @@ mod tests {
     fn source_fixtures() -> Vec<Source> {
         vec![
             Source(Data {
-                name: "gen1".to_string(),
+                scope: ComponentScope::public("gen1"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                name: "gen2".to_string(),
+                scope: ComponentScope::public("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                name: "gen3".to_string(),
+                scope: ComponentScope::public("gen3"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -224,17 +224,17 @@ mod tests {
     fn sort_component_type_asc() {
         let mut sources = vec![
             Source(Data {
-                name: "gen1".to_string(),
+                scope: ComponentScope::public("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                name: "gen2".to_string(),
+                scope: ComponentScope::public("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                name: "gen3".to_string(),
+                scope: ComponentScope::public("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -255,17 +255,17 @@ mod tests {
     fn sort_component_type_desc() {
         let mut sources = vec![
             Source(Data {
-                name: "gen1".to_string(),
+                scope: ComponentScope::public("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                name: "gen2".to_string(),
+                scope: ComponentScope::public("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                name: "gen3".to_string(),
+                scope: ComponentScope::public("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -286,17 +286,17 @@ mod tests {
     fn sort_output_type_asc() {
         let mut sources = vec![
             Source(Data {
-                name: "gen1".to_string(),
+                scope: ComponentScope::public("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                name: "gen2".to_string(),
+                scope: ComponentScope::public("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                name: "gen3".to_string(),
+                scope: ComponentScope::public("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -317,17 +317,17 @@ mod tests {
     fn sort_output_type_desc() {
         let mut sources = vec![
             Source(Data {
-                name: "gen1".to_string(),
+                scope: ComponentScope::public("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                name: "gen2".to_string(),
+                scope: ComponentScope::public("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                name: "gen3".to_string(),
+                scope: ComponentScope::public("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),

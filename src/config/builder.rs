@@ -2,8 +2,8 @@
 use super::api;
 use super::Pipelines;
 use super::{
-    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
-    SourceOuter, TestDefinition, TransformOuter, Resource
+    compiler, provider, ComponentScope, Config, HealthcheckOptions, Resource, SinkConfig,
+    SinkInner, SinkOuter, SourceConfig, SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -52,9 +52,27 @@ impl From<Config> for ConfigBuilder {
             #[cfg(feature = "api")]
             api: c.api,
             healthchecks: c.healthchecks,
-            sources: c.sources,
-            sinks: c.sinks,
-            transforms: c.transforms,
+            sources: c
+                .sources
+                .into_iter()
+                // TODO change for pipelines
+                .filter(|(scope, _)| scope.is_public())
+                .map(|(scope, item)| (scope.into_name(), item))
+                .collect(),
+            sinks: c
+                .sinks
+                .into_iter()
+                // TODO change for pipelines
+                .filter(|(scope, _)| scope.is_public())
+                .map(|(scope, item)| (scope.into_name(), item.into_public()))
+                .collect(),
+            transforms: c
+                .transforms
+                .into_iter()
+                // TODO change for pipelines
+                .filter(|(scope, _)| scope.is_public())
+                .map(|(scope, item)| (scope.into_name(), item.into_public()))
+                .collect(),
             provider: None,
             tests: c.tests,
         }
@@ -62,6 +80,35 @@ impl From<Config> for ConfigBuilder {
 }
 
 impl ConfigBuilder {
+    pub fn into_config(
+        self,
+        pipelines: Pipelines,
+        expansions: IndexMap<String, Vec<String>>,
+    ) -> Config {
+        Config {
+            global: self.global,
+            #[cfg(feature = "api")]
+            api: self.api,
+            healthchecks: self.healthchecks,
+            sources: self
+                .sources
+                .into_iter()
+                .map(|(name, item)| (ComponentScope::Public { name }, item))
+                .collect(),
+            sinks: self
+                .sinks
+                .into_iter()
+                .map(|(name, item)| (ComponentScope::Public { name }, item.into_scoped()))
+                .collect(),
+            transforms: self
+                .transforms
+                .into_iter()
+                .map(|(name, item)| (ComponentScope::Public { name }, item.into_scoped()))
+                .collect(),
+            tests: self.tests,
+            expansions,
+        }
+    }
     pub fn build(self, pipelines: Pipelines) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings(pipelines)?;
 
@@ -90,7 +137,7 @@ impl ConfigBuilder {
         sink: S,
     ) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
-        let sink = SinkOuter::new(inputs, Box::new(sink));
+        let sink = SinkInner::new(inputs, Box::new(sink));
 
         self.sinks.insert(name.into(), sink);
     }
@@ -270,7 +317,7 @@ impl ConfigBuilder {
         let sink_resources = self
             .sinks
             .iter()
-            .map(|(name, config)| (name, config.resources(name)));
+            .map(|(name, config)| (name, config.inner.resources(name)));
 
         let conflicting_components = Resource::conflicts(source_resources.chain(sink_resources));
 

@@ -26,21 +26,7 @@ pub fn compile(
     }
 
     if errors.is_empty() {
-        Ok((
-            Config {
-                global: builder.global,
-                #[cfg(feature = "api")]
-                api: builder.api,
-                healthchecks: builder.healthchecks,
-                sources: builder.sources,
-                sinks: builder.sinks,
-                transforms: builder.transforms,
-                tests: builder.tests,
-                pipelines,
-                expansions,
-            },
-            warnings,
-        ))
+        Ok((builder.into_config(pipelines, expansions), warnings))
     } else {
         Err(errors)
     }
@@ -152,8 +138,8 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
-            TransformConfig,
+            ComponentScope, DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig,
+            SourceContext, TransformConfig,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
@@ -238,12 +224,36 @@ mod test {
             .build(Default::default())
             .expect("build should succeed");
 
-        assert_eq!(config.transforms["foos"].inputs, vec!["foo1", "foo2"]);
-        assert_eq!(config.sinks["baz"].inputs, vec!["foos", "bar"]);
         assert_eq!(
-            config.sinks["quux"].inputs,
-            vec!["foo1", "foo2", "bar", "foos"]
+            config.transforms[ComponentScope::public("foos")].inputs,
+            vec![
+                ComponentScope::public("foo1"),
+                ComponentScope::public("foo2")
+            ]
         );
-        assert_eq!(config.sinks["quix"].inputs, vec!["foo1", "foo2", "foos"]);
+        assert_eq!(
+            config.sinks[ComponentScope::public("baz")].inputs,
+            vec![
+                ComponentScope::public("foos"),
+                ComponentScope::public("bar")
+            ]
+        );
+        assert_eq!(
+            config.sinks[ComponentScope::public("quux")].inputs,
+            vec![
+                ComponentScope::public("foo1"),
+                ComponentScope::public("foo2"),
+                ComponentScope::public("bar"),
+                ComponentScope::public("foos")
+            ]
+        );
+        assert_eq!(
+            config.sinks[ComponentScope::public("quix")].inputs,
+            vec![
+                ComponentScope::public("foo1"),
+                ComponentScope::public("foo2"),
+                ComponentScope::public("foos")
+            ]
+        );
     }
 }

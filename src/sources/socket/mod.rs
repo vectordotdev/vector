@@ -6,8 +6,8 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     tls::MaybeTlsSettings,
 };
@@ -161,7 +161,9 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{log_schema, GlobalOptions, SinkContext, SourceConfig, SourceContext},
+        config::{
+            log_schema, ComponentScope, GlobalOptions, SinkContext, SourceConfig, SourceContext,
+        },
         event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
@@ -511,7 +513,7 @@ mod test {
 
         let server = SocketConfig::from(UdpConfig::from_address(address))
             .build(SourceContext {
-                name: source_name.into(),
+                scope: ComponentScope::public(source_name),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,

@@ -1,3 +1,4 @@
+use crate::config::ComponentScope;
 use crate::event::Event;
 use futures::{channel::mpsc, future, stream::Fuse, Sink, Stream, StreamExt};
 use std::{
@@ -9,19 +10,19 @@ use std::{
 pub type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
 
 pub enum ControlMessage {
-    Add(String, RouterSink),
-    Remove(String),
-    /// Will stop accepting events until Some with given name is replaced.
-    Replace(String, Option<RouterSink>),
+    Add(ComponentScope, RouterSink),
+    Remove(ComponentScope),
+    /// Will stop accepting events until Some with given scope is replaced.
+    Replace(ComponentScope, Option<RouterSink>),
 }
 
 impl fmt::Debug for ControlMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ControlMessage::")?;
         match self {
-            Self::Add(name, _) => write!(f, "Add({:?})", name),
-            Self::Remove(name) => write!(f, "Remove({:?})", name),
-            Self::Replace(name, _) => write!(f, "Replace({:?})", name),
+            Self::Add(scope, _) => write!(f, "Add({:?})", scope),
+            Self::Remove(scope) => write!(f, "Remove({:?})", scope),
+            Self::Replace(scope, _) => write!(f, "Replace({:?})", scope),
         }
     }
 }
@@ -29,7 +30,7 @@ impl fmt::Debug for ControlMessage {
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
-    sinks: Vec<(String, Option<Pin<RouterSink>>)>,
+    sinks: Vec<(ComponentScope, Option<Pin<RouterSink>>)>,
     i: usize,
     control_channel: Fuse<mpsc::UnboundedReceiver<ControlMessage>>,
 }
@@ -47,17 +48,17 @@ impl Fanout {
         (fanout, control_tx)
     }
 
-    pub fn add(&mut self, name: String, sink: RouterSink) {
+    pub fn add(&mut self, scope: ComponentScope, sink: RouterSink) {
         assert!(
-            !self.sinks.iter().any(|(n, _)| n == &name),
-            "Duplicate output name in fanout"
+            !self.sinks.iter().any(|(n, _)| n == &scope),
+            "Duplicate output scope in fanout"
         );
 
-        self.sinks.push((name, Some(sink.into())));
+        self.sinks.push((scope, Some(sink.into())));
     }
 
-    fn remove(&mut self, name: &str) {
-        let i = self.sinks.iter().position(|(n, _)| n == name);
+    fn remove(&mut self, scope: &ComponentScope) {
+        let i = self.sinks.iter().position(|(n, _)| n == scope);
         let i = i.expect("Didn't find output in fanout");
 
         let (_name, removed) = self.sinks.remove(i);
@@ -71,8 +72,8 @@ impl Fanout {
         }
     }
 
-    fn replace(&mut self, name: String, sink: Option<RouterSink>) {
-        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &name) {
+    fn replace(&mut self, scope: ComponentScope, sink: Option<RouterSink>) {
+        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &scope) {
             *existing = sink.map(Into::into);
         } else {
             panic!("Tried to replace a sink that's not already present");
@@ -82,9 +83,9 @@ impl Fanout {
     pub fn process_control_messages(&mut self, cx: &mut Context<'_>) {
         while let Poll::Ready(Some(message)) = Pin::new(&mut self.control_channel).poll_next(cx) {
             match message {
-                ControlMessage::Add(name, sink) => self.add(name, sink),
-                ControlMessage::Remove(name) => self.remove(&name),
-                ControlMessage::Replace(name, sink) => self.replace(name, sink),
+                ControlMessage::Add(scope, sink) => self.add(scope, sink),
+                ControlMessage::Remove(scope) => self.remove(&scope),
+                ControlMessage::Replace(scope, sink) => self.replace(scope, sink),
             }
         }
     }
@@ -191,6 +192,7 @@ impl Sink<Event> for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
+    use crate::config::ComponentScope;
     use crate::{event::Event, test_util::collect_ready};
     use futures::{channel::mpsc, stream, FutureExt, Sink, SinkExt, StreamExt};
     use std::{
@@ -208,8 +210,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a);
-        fanout.add("b".to_string(), tx_b);
+        fanout.add(ComponentScope::public("a"), tx_a);
+        fanout.add(ComponentScope::public("b"), tx_b);
 
         let recs = make_events(2);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -230,9 +232,9 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a);
-        fanout.add("b".to_string(), tx_b);
-        fanout.add("c".to_string(), tx_c);
+        fanout.add(ComponentScope::public("a"), tx_a);
+        fanout.add(ComponentScope::public("b"), tx_b);
+        fanout.add(ComponentScope::public("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -259,8 +261,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a);
-        fanout.add("b".to_string(), tx_b);
+        fanout.add(ComponentScope::public("a"), tx_a);
+        fanout.add(ComponentScope::public("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -269,7 +271,7 @@ mod tests {
 
         let (tx_c, rx_c) = mpsc::unbounded();
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
-        fanout.add("c".to_string(), tx_c);
+        fanout.add(ComponentScope::public("c"), tx_c);
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -287,8 +289,8 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a);
-        fanout.add("b".to_string(), tx_b);
+        fanout.add(ComponentScope::public("a"), tx_a);
+        fanout.add(ComponentScope::public("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -317,9 +319,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a);
-        fanout.add("b".to_string(), tx_b);
-        fanout.add("c".to_string(), tx_c);
+        fanout.add(ComponentScope::public("a"), tx_a);
+        fanout.add(ComponentScope::public("b"), tx_b);
+        fanout.add(ComponentScope::public("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -352,9 +354,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a);
-        fanout.add("b".to_string(), tx_b);
-        fanout.add("c".to_string(), tx_c);
+        fanout.add(ComponentScope::public("a"), tx_a);
+        fanout.add(ComponentScope::public("b"), tx_b);
+        fanout.add(ComponentScope::public("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -387,9 +389,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a);
-        fanout.add("b".to_string(), tx_b);
-        fanout.add("c".to_string(), tx_c);
+        fanout.add(ComponentScope::public("a"), tx_a);
+        fanout.add(ComponentScope::public("b"), tx_b);
+        fanout.add(ComponentScope::public("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -431,8 +433,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a1);
-        fanout.add("b".to_string(), tx_b);
+        fanout.add(ComponentScope::public("a"), tx_a1);
+        fanout.add(ComponentScope::public("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -459,8 +461,8 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add("a".to_string(), tx_a1);
-        fanout.add("b".to_string(), tx_b);
+        fanout.add(ComponentScope::public("a"), tx_a1);
+        fanout.add(ComponentScope::public("b"), tx_b);
 
         let recs = make_events(3);
 

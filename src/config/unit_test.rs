@@ -1,4 +1,4 @@
-use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
+use super::{ComponentScope, Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
 use crate::config::{self, ConfigPath, GlobalOptions, TransformConfig};
 use crate::{
     conditions::Condition,
@@ -23,18 +23,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
     let expansions = super::compiler::expand_macros(&mut builder)?;
 
     // Don't let this escape since it's not validated
-    let config = Config {
-        global: builder.global,
-        #[cfg(feature = "api")]
-        api: builder.api,
-        healthchecks: builder.healthchecks,
-        sources: builder.sources,
-        sinks: builder.sinks,
-        transforms: builder.transforms,
-        tests: builder.tests,
-        pipelines: Default::default(),
-        expansions,
-    };
+    let config = builder.into_config(Default::default(), expansions);
 
     for test in &config.tests {
         match build_unit_test(test, &config).await {
@@ -58,21 +47,21 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
 
 pub struct UnitTest {
     pub name: String,
-    inputs: Vec<(Vec<String>, Event)>,
-    transforms: IndexMap<String, UnitTestTransform>,
+    inputs: Vec<(Vec<ComponentScope>, Event)>,
+    transforms: IndexMap<ComponentScope, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
-    no_outputs_from: Vec<String>,
+    no_outputs_from: Vec<ComponentScope>,
     globals: GlobalOptions,
 }
 
 struct UnitTestTransform {
     transform: Transform,
     config: Box<dyn TransformConfig>,
-    next: Vec<String>,
+    next: Vec<ComponentScope>,
 }
 
 struct UnitTestCheck {
-    extract_from: String,
+    extract_from: ComponentScope,
     conditions: Vec<Box<dyn Condition>>,
 }
 
@@ -291,11 +280,11 @@ fn links_to_a_leaf(
 /// Reduces a collection of transforms into a set that only contains those that
 /// link between our root (test input) and a set of leaves (test outputs).
 fn reduce_transforms(
-    roots: Vec<String>,
-    leaves: &IndexMap<String, ()>,
-    transform_outputs: &mut IndexMap<String, IndexMap<String, ()>>,
+    roots: Vec<ComponentScope>,
+    leaves: &IndexMap<ComponentScope, ()>,
+    transform_outputs: &mut IndexMap<ComponentScope, IndexMap<ComponentScope, ()>>,
 ) {
-    let mut link_checked: IndexMap<String, bool> = IndexMap::new();
+    let mut link_checked: IndexMap<ComponentScope, bool> = IndexMap::new();
 
     if roots
         .iter()
@@ -361,7 +350,7 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
 fn build_inputs(
     config: &Config,
     definition: &TestDefinition,
-) -> Result<Vec<(Vec<String>, Event)>, Vec<String>> {
+) -> Result<Vec<(Vec<ComponentScope>, Event)>, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
 
@@ -403,7 +392,7 @@ async fn build_unit_test(
 
     // Maps transform names with their output targets (transforms that use it as
     // an input).
-    let mut transform_outputs: IndexMap<String, IndexMap<String, ()>> = config
+    let mut transform_outputs: IndexMap<ComponentScope, IndexMap<ComponentScope, ()>> = config
         .transforms
         .iter()
         .map(|(k, _)| (k.clone(), IndexMap::new()))
@@ -412,7 +401,7 @@ async fn build_unit_test(
     config.transforms.iter().for_each(|(k, t)| {
         t.inputs.iter().for_each(|i| {
             if let Some(outputs) = transform_outputs.get_mut(i) {
-                outputs.insert(k.to_string(), ());
+                outputs.insert(k.clone(), ());
             }
         })
     });
@@ -421,7 +410,7 @@ async fn build_unit_test(
         for target in input_target {
             if !transform_outputs.contains_key(target) {
                 errors.push(format!(
-                    "inputs[{}]: unable to locate target transform '{}'",
+                    "inputs[{}]: unable to locate target transform {:?}",
                     i, target
                 ));
             }
@@ -431,7 +420,7 @@ async fn build_unit_test(
         return Err(errors);
     }
 
-    let mut leaves: IndexMap<String, ()> = IndexMap::new();
+    let mut leaves: IndexMap<ComponentScope, ()> = IndexMap::new();
     definition.outputs.iter().for_each(|o| {
         leaves.insert(o.extract_from.clone(), ());
     });
@@ -453,13 +442,13 @@ async fn build_unit_test(
     );
 
     // Build reduced transforms.
-    let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
-    for (name, transform_config) in &config.transforms {
-        if let Some(outputs) = transform_outputs.remove(name) {
+    let mut transforms: IndexMap<ComponentScope, UnitTestTransform> = IndexMap::new();
+    for (scope, transform_config) in &config.transforms {
+        if let Some(outputs) = transform_outputs.remove(scope) {
             match transform_config.inner.build(&config.global).await {
                 Ok(transform) => {
                     transforms.insert(
-                        name.clone(),
+                        scope.clone(),
                         UnitTestTransform {
                             transform,
                             config: transform_config.inner.clone(),
@@ -469,8 +458,8 @@ async fn build_unit_test(
                 }
                 Err(err) => {
                     errors.push(format!(
-                        "failed to build transform '{}': {:#}",
-                        name,
+                        "failed to build transform {:?}: {:#}",
+                        scope,
                         anyhow::anyhow!(err)
                     ));
                 }
@@ -487,12 +476,12 @@ async fn build_unit_test(
             let targets = inputs.iter().map(|(i, _)| i).flatten().collect::<Vec<_>>();
             if targets.len() == 1 {
                 errors.push(format!(
-                    "unable to complete topology between target transform '{}' and output target '{}'",
+                    "unable to complete topology between target transform {:?} and output target {:?}",
                     targets.first().unwrap(), o.extract_from
                 ));
             } else {
                 errors.push(format!(
-                    "unable to complete topology between target transforms {:?} and output target '{}'",
+                    "unable to complete topology between target transforms {:?} and output target {:?}",
                     targets, o.extract_from
                 ));
             }
