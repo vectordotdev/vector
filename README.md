@@ -9,7 +9,7 @@
   </strong>
 </p>
 <p align="center">
-  <img src="docs/static/img/diagram.svg" alt="Vector">
+  <img src="website/static/img/diagram.svg" alt="Vector">
 </p>
 
 ## What is Vector?
