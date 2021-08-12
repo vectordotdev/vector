@@ -81,21 +81,21 @@ impl EwmaVar {
 /// Simple unweighted arithmetic mean
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Mean {
-    sum: f64,
+    mean: f64,
     count: usize,
 }
 
 impl Mean {
     /// Update the and return the current average
     pub fn update(&mut self, point: f64) {
-        self.sum += point;
         self.count += 1;
+        self.mean += (point - self.mean) / self.count as f64;
     }
 
     pub fn average(&self) -> Option<f64> {
         match self.count {
             0 => None,
-            _ => Some(self.sum / self.count as f64),
+            _ => Some(self.mean),
         }
     }
 }
@@ -149,8 +149,6 @@ mod tests {
         assert_eq!(mean.average(), Some(1.0));
         mean.update(4.0);
         assert_eq!(mean.average(), Some(2.0));
-        assert_eq!(mean.count, 3);
-        assert_eq!(mean.sum, 6.0);
     }
 
     #[test]
