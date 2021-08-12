@@ -279,7 +279,7 @@ mod tests {
             log.insert("f\\.z", 1);
             log.insert("g\\.z", 1);
             log.insert("h", btreemap! {});
-            log.insert("i", vec![]);
+            log.insert("i", Vec::<Value>::new());
         }
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
