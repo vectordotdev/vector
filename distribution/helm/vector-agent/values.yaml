@@ -6,6 +6,14 @@
 # commonLabels:
 #   app.kubernetes.io/component: agent
 
+secrets:
+  generic: {}
+    # Each Key/Value will be added to a Secret resource
+    # Values should be entered base64 encoded (examples below are "REPLACE_ME" encoded)
+    # NOTE: Don't commit unencrypted secrets to git!
+    # awsAccessKeyId: "UkVQTEFDRV9NRQo="
+    # awsSecretAccessKey: "UkVQTEFDRV9NRQo="
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -132,6 +140,11 @@ securityContext: {}
 
 # Extra env vars to pass to the `vector` container.
 env: []
+  # - name: AWS_ACCESS_KEY_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: vector-agent
+  #       key: awsAcessKeyId
 
 # Extra arguments to pass to the `vector` container.
 args: []
