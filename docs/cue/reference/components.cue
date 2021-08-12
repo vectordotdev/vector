@@ -850,7 +850,7 @@ components: {
 				inputs: {
 					description: """
 						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
-						IDs. Wildcards (`*`) are supported but _must_ be the last character in the ID.
+						IDs. Wildcards (`*`) are supported.
 
 						See [configuration](\(urls.vector_configuration)) for more info.
 						"""
