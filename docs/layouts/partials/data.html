@@ -956,7 +956,7 @@
 
         <div class="mt-3 no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
           {{ range . }}
-          {{ template "vrl-data-example" . }}
+          {{ template "vrl-data-example" (dict "name" $k "ctx" .) }}
           {{ end }}
         </div>
       </div>
@@ -1670,17 +1670,16 @@
 {{ end }}
 
 {{ define "vrl-data-example" }}
+{{ $id := printf "%s-example-%s" .name (urlize .ctx.title) }}
 <div class="py-3 px-5">
-  {{ with .title }}
-  <span class="font-bold text-base">
-    {{ . }}
-  </span>
+  {{ with .ctx.title }}
+  {{ partial "heading.html" (dict "text" . "level" 5 "id" $id "bold" true) }}
   {{ end }}
 
-  <div>
-    {{ with .input }}
-    <div class="mt-2">
-      <span class="text-base">
+  <div class="mt-3 flex flex-col space-y-2.5">
+    {{ with .ctx.input }}
+    <div>
+      <span class="font-semibold text-gray-600 dark:text-gray-300">
         Vector event
       </span>
 
@@ -1690,9 +1689,9 @@
     </div>
     {{ end }}
 
-    {{ with .source }}
-    <div class="mt-2">
-      <span class="text-base">
+    {{ with .ctx.source }}
+    <div>
+      <span class="font-semibold text-gray-600 dark:text-gray-300">
         VRL program
       </span>
 
@@ -1702,9 +1701,9 @@
     </div>
     {{ end }}
 
-    {{ with .return }}
-    <div class="mt-2">
-      <span class="text-base">
+    {{ with .ctx.return }}
+    <div>
+      <span class="font-semibold text-gray-600 dark:text-gray-300">
         Resulting event
       </span>
 
