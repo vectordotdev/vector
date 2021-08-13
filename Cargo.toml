@@ -402,7 +402,7 @@ api-client = [
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file"]
-enrichment-tables-file = [ "csv" ]
+enrichment-tables-file = [ "csv", "seahash" ]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -779,6 +779,12 @@ name = "remap"
 harness = false
 test = true
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "enrichment_tables_file"
+harness = false
+test = true
+required-features = ["enrichment-tables-file"]
 
 [[bench]]
 name = "languages"

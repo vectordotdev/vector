@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use super::EnrichmentTable;
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
@@ -43,11 +43,7 @@ impl EnrichmentTableConfig for FileConfig {
             }
         };
 
-        Ok(Box::new(File {
-            data,
-            headers,
-            indexes: Vec::new(),
-        }))
+        Ok(Box::new(File::new(IndexingStrategy::Hash, data, headers)))
     }
 }
 
@@ -57,13 +53,28 @@ inventory::submit! {
 
 impl_generate_config_from_default!(FileConfig);
 
-struct File {
+pub enum IndexingStrategy {
+    None,
+    Hash,
+}
+
+pub struct File {
+    strategy: IndexingStrategy,
     data: Vec<Vec<String>>,
     headers: Vec<String>,
-    indexes: Vec<Vec<String>>,
+    indexes: Vec<(Vec<String>, HashMap<u64, Vec<usize>>)>,
 }
 
 impl File {
+    pub fn new(strategy: IndexingStrategy, data: Vec<Vec<String>>, headers: Vec<String>) -> Self {
+        Self {
+            strategy,
+            data,
+            headers,
+            indexes: Vec::new(),
+        }
+    }
+
     fn column_index(&self, col: &str) -> Option<usize> {
         self.headers.iter().position(|header| header == col)
     }
@@ -84,23 +95,106 @@ impl File {
             .map(|(header, col)| (header.clone(), col.clone()))
             .collect()
     }
+
+    /// Creates an index with the given fields.
+    /// Uses seahash to create a hash of the data that is stored in a hashmap.
+    fn index_data(&self, index: Vec<&str>) -> HashMap<u64, Vec<usize>> {
+        let fieldidx = self
+            .headers
+            .iter()
+            .enumerate()
+            .filter(|(_, col)| {
+                let onk: &str = col.as_ref();
+                index.contains(&onk)
+            })
+            .map(|(idx, _)| idx)
+            .collect::<Vec<_>>();
+
+        let mut index = HashMap::new();
+
+        for (idx, row) in self.data.iter().enumerate() {
+            let mut hash = Vec::new();
+            for idx in &fieldidx {
+                hash.extend(row[*idx].bytes());
+                hash.push(0_u8);
+            }
+
+            let key = seahash::hash(&hash);
+
+            let entry = index.entry(key).or_insert(Vec::new());
+            entry.push(idx);
+        }
+
+        index
+    }
 }
 
 impl EnrichmentTable for File {
     fn find_table_row(&self, criteria: BTreeMap<&str, String>) -> Option<BTreeMap<String, String>> {
-        // Sequential scan
-        let results = self
-            .data
-            .iter()
-            .find(|row| self.row_equals(&criteria, *row))
-            .map(|row| self.add_columns(row));
+        match self.strategy {
+            IndexingStrategy::None => {
+                // Sequential scan
+                let mut found = self
+                    .data
+                    .iter()
+                    .filter(|row| self.row_equals(&criteria, *row))
+                    .map(|row| self.add_columns(row));
 
-        results
+                let result = found.next();
+
+                if found.next().is_some() {
+                    // More than one row has been found.
+                    None
+                } else {
+                    result
+                }
+            }
+            IndexingStrategy::Hash => {
+                // Hash lookup
+                let mut fields = criteria
+                    .iter()
+                    .map(|(field, _)| *field)
+                    .collect::<Vec<&str>>();
+
+                fields.sort();
+
+                let hash = criteria.iter().fold(Vec::new(), |mut hash, (_, value)| {
+                    hash.extend(value.bytes());
+                    hash.push(0_u8);
+                    hash
+                });
+
+                let key = seahash::hash(&hash);
+
+                self.indexes
+                    .iter()
+                    .find(|(ifields, _)| {
+                        // Find the correct index to use based on the fields we are searching.
+                        ifields
+                            .iter()
+                            .zip(fields.iter())
+                            .all(|(left, right)| left == right)
+                    })
+                    .and_then(|(_, index)| {
+                        // Lookup the index
+                        index.get(&key)
+                    })
+                    .and_then(|rows| {
+                        if rows.len() == 1 {
+                            Some(self.add_columns(&self.data[rows[0]]))
+                        } else {
+                            None
+                        }
+                    })
+            }
+        }
     }
 
     fn add_index(&mut self, fields: Vec<&str>) {
-        self.indexes
-            .push(fields.iter().map(ToString::to_string).collect());
+        let mut indexfields: Vec<String> = fields.iter().map(|field| field.to_string()).collect();
+        indexfields.sort();
+
+        self.indexes.push((indexfields, self.index_data(fields)));
     }
 }
 
@@ -122,14 +216,40 @@ mod tests {
 
     #[test]
     fn finds_row() {
-        let file = File {
-            data: vec![
+        let file = File::new(
+            IndexingStrategy::None,
+            vec![
                 vec!["zip".to_string(), "zup".to_string()],
                 vec!["zirp".to_string(), "zurp".to_string()],
             ],
-            headers: vec!["field1".to_string(), "field2".to_string()],
-            indexes: vec![],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let condition = btreemap! {
+            "field1" => "zirp"
         };
+
+        assert_eq!(
+            Some(btreemap! {
+                "field1" => "zirp",
+                "field2" => "zurp",
+            }),
+            file.find_table_row(condition)
+        );
+    }
+
+    #[test]
+    fn finds_row_with_index() {
+        let mut file = File::new(
+            IndexingStrategy::Hash,
+            vec![
+                vec!["zip".to_string(), "zup".to_string()],
+                vec!["zirp".to_string(), "zurp".to_string()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        file.add_index(vec!["field1"]);
 
         let condition = btreemap! {
             "field1" => "zirp"
@@ -146,14 +266,34 @@ mod tests {
 
     #[test]
     fn doesnt_find_row() {
-        let file = File {
-            data: vec![
+        let file = File::new(
+            IndexingStrategy::None,
+            vec![
                 vec!["zip".to_string(), "zup".to_string()],
                 vec!["zirp".to_string(), "zurp".to_string()],
             ],
-            headers: vec!["field1".to_string(), "field2".to_string()],
-            indexes: vec![],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let condition = btreemap! {
+            "field1" => "zorp"
         };
+
+        assert_eq!(None, file.find_table_row(condition));
+    }
+
+    #[test]
+    fn doesnt_find_row_with_index() {
+        let mut file = File::new(
+            IndexingStrategy::Hash,
+            vec![
+                vec!["zip".to_string(), "zup".to_string()],
+                vec!["zirp".to_string(), "zurp".to_string()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        file.add_index(vec!["field1"]);
 
         let condition = btreemap! {
             "field1" => "zorp"
