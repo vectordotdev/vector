@@ -7,7 +7,7 @@ use crate::{
     buffers,
     config::{DataType, ProxyConfig, SinkContext, SourceContext},
     event::Event,
-    internal_events::{EventIn, EventOut, EventZeroIn},
+    internal_events::{EventIn, EventOut},
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
@@ -87,7 +87,6 @@ pub async fn build_pieces(
         // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
         let server = async {
-            emit!(EventZeroIn);
             match future::try_select(server, force_shutdown_tripwire.unit_error().boxed()).await {
                 Ok(_) => {
                     debug!("Finished.");
