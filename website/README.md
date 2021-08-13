@@ -24,9 +24,9 @@ vector.dev is built by and hosted on the [Netlify] platform. [Deploy previews] a
 
 #### Branches
 
-The [`website`][website_branch] branch is used to build the "production" site at https://vector.dev. If you want to update the production site, make sure to target your changes to that branch.
+The current Vector release branch (`vX.X`, for example `v0.15`) branch is used to build the "production" site at https://vector.dev. All changes should be targeted to `master`. If you want to release a website change outside of the normal release cadence, you can cherry-pick the commit to the release branch.
 
-The `master` branch, on the other hand, often contains unreleased, "nightly" changes to Vector that we don't yet want reflected in the website. The nightly version of the site is available at https://master.vector.dev. This version of the site may be useful for Vector users taking advantage of not-yet-released features. The `master` and `website` branches should be synced
+The `master` branch, on the other hand, often contains unreleased, "nightly" changes to Vector that we don't yet want reflected on the website. The nightly version of the site is available at https://master.vector.dev. This version of the site may be useful for Vector users taking advantage of not-yet-released features.
 
 ### Static site generator
 
@@ -175,5 +175,4 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 [typography]: https://github.com/tailwindlabs/tailwindcss-typography
 [vector]: https://vector.dev
 [vrl]: https://vrl.dev
-[website_branch]: https://github.com/timberio/vector/tree/website
 [yarn]: https://yarnpkg.com
