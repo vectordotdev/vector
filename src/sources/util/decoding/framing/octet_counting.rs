@@ -1,6 +1,23 @@
+use crate::sources::util::decoding::{BoxedFramer, BytesDecoder, FramingConfig};
 use bytes::{Buf, Bytes, BytesMut};
+use serde::{Deserialize, Serialize};
 use std::io;
 use tokio_util::codec::{LinesCodec, LinesCodecError};
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct OctetCountingDecoderConfig {
+    max_length: Option<usize>,
+}
+
+#[typetag::serde(name = "octet_counting")]
+impl FramingConfig for OctetCountingDecoderConfig {
+    fn build(&self) -> BoxedFramer {
+        Box::new(BytesDecoder::new(match self.max_length {
+            Some(max_length) => OctetCountingDecoder::new_with_max_length(max_length),
+            None => OctetCountingDecoder::new(),
+        }))
+    }
+}
 
 /// Decodes according to `Octet Counting` in https://tools.ietf.org/html/rfc6587
 #[derive(Clone, Debug)]

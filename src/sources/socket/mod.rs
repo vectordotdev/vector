@@ -80,7 +80,7 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let decoding = config.decoding();
+                let decoding = config.decoding().clone();
                 let tcp = Arc::new(tcp::RawTcpSource::new(
                     config.clone(),
                     Box::new(move || decoding.build()),
@@ -132,7 +132,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoding = config.decoding;
+                let decoding = config.decoding.clone();
                 let build_decoder = move || decoding.build();
                 Ok(unix::unix_stream(
                     config.path,
@@ -174,7 +174,7 @@ mod test {
         event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
-        sources::util::decoding::{DecodingConfig, FramingConfig},
+        sources::util::decoding::{DecodingConfig, NewlineDelimitedDecoderConfig},
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
@@ -265,10 +265,7 @@ mod test {
 
         let mut config = TcpConfig::from_address(addr.into());
         config.set_decoding(DecodingConfig::new(
-            Some(FramingConfig::CharacterDelimited {
-                delimiter: '\n',
-                max_length: Some(10),
-            }),
+            Some(Box::new(NewlineDelimitedDecoderConfig::new(Some(10)))),
             None,
         ));
 

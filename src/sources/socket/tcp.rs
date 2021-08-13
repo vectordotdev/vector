@@ -28,7 +28,7 @@ pub struct TcpConfig {
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
     #[serde(flatten)]
-    #[getset(get_copy = "pub", set = "pub")]
+    #[getset(get = "pub", set = "pub")]
     decoding: DecodingConfig,
 }
 

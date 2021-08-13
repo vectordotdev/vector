@@ -29,7 +29,7 @@ pub struct UdpConfig {
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
     #[serde(flatten)]
-    #[get_copy = "pub"]
+    #[get = "pub"]
     decoding: DecodingConfig,
 }
 

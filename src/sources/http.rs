@@ -107,7 +107,7 @@ impl HttpSource for SimpleHttpSource {
 #[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoding = self.decoding;
+        let decoding = self.decoding.clone();
         let source = Arc::new(SimpleHttpSource {
             build_decoder: Box::new(move || decoding.build()),
             headers: self.headers.clone(),
@@ -164,7 +164,7 @@ mod tests {
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
-        sources::util::decoding::ParserConfig,
+        sources::util::decoding::JsonParserConfig,
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -376,7 +376,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 
@@ -417,7 +417,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 
@@ -461,7 +461,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 
@@ -504,7 +504,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 
@@ -560,7 +560,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 
@@ -599,7 +599,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 
@@ -675,7 +675,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 
@@ -707,7 +707,7 @@ mod tests {
             false,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 
@@ -756,7 +756,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(None, Some(ParserConfig::Json)),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 

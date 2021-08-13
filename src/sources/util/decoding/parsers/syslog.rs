@@ -1,12 +1,23 @@
-use super::Parser;
-use crate::internal_events::SyslogConvertUtf8Error;
 use crate::{
     config::log_schema,
     event::{Event, Value},
+    internal_events::SyslogConvertUtf8Error,
+    sources::util::decoding::{BoxedParser, Parser, ParserConfig},
 };
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
+use serde::{Deserialize, Serialize};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct SyslogParserConfig;
+
+#[typetag::serde(name = "syslog")]
+impl ParserConfig for SyslogParserConfig {
+    fn build(&self) -> BoxedParser {
+        Box::new(SyslogParser)
+    }
+}
 
 pub struct SyslogParser;
 

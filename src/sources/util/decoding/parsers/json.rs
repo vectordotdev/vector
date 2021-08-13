@@ -1,8 +1,28 @@
-use super::Parser;
-use crate::{config::log_schema, event::Event};
+use crate::{
+    config::log_schema,
+    event::Event,
+    sources::util::decoding::{BoxedParser, Parser, ParserConfig},
+};
 use bytes::Bytes;
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct JsonParserConfig;
+
+impl JsonParserConfig {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[typetag::serde(name = "json")]
+impl ParserConfig for JsonParserConfig {
+    fn build(&self) -> BoxedParser {
+        Box::new(JsonParser)
+    }
+}
 
 pub struct JsonParser;
 
