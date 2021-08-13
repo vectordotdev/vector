@@ -5,7 +5,6 @@
 
 .dark, .light
   #toc
-    overflow-y: scroll
     padding-top: $y-padding
     padding-bottom: $y-padding
     line-height: 110%
@@ -29,6 +28,9 @@
     & > .toc-list
       overflow: hidden
       position: relative
+
+      & > li:not(:first-child)
+        margin-top: $h2-top-margin
 
       li
         list-style: none

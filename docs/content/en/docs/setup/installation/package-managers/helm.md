@@ -52,9 +52,9 @@ VALUES
 Install Vector:
 
 ```shell
-helm install timberio/vector-agent \
+helm install vector timberio/vector-agent \
   --namespace vector \
-  --create-namespace vector \
+  --create-namespace \
   --values values.yaml
 ```
 

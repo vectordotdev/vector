@@ -95,7 +95,7 @@ components: transforms: aws_ec2_metadata: {
 	}
 
 	input: {
-		logs:    true
+		logs: true
 		metrics: {
 			counter:      true
 			distribution: true
@@ -130,6 +130,14 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["i-096fba6d03d36d262"]
+					syntax: "literal"
+				}
+			}
+			"instance-type": {
+				description: "The `instance-type` of the current EC2 instance."
+				required:    true
+				type: string: {
+					examples: ["m4.large"]
 					syntax: "literal"
 				}
 			}

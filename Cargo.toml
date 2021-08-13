@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.15.2"
+version = "0.16.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -127,9 +127,9 @@ opentelemetry = { version = "0.15.0", default-features = false, features = ["tra
 opentelemetry-datadog = { version = "0.3.1", default-features = false, features = ["reqwest-client"] }
 
 # Metrics
-metrics = { version = "0.16.0", default-features = false, features = ["std"] }
-metrics-tracing-context = { version = "0.6.0", default-features = false }
-metrics-util = { version = "0.9.1", default-features = false, features = ["std"] }
+metrics = { version = "0.17.0", default-features = false, features = ["std"] }
+metrics-tracing-context = { version = "0.8.0", default-features = false }
+metrics-util = { version = "0.10.0", default-features = false, features = ["std"] }
 
 # Aws
 rusoto_cloudwatch = { version = "0.47.0", optional = true }
@@ -250,7 +250,7 @@ pulsar = { version = "3.0.1", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.1", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.20.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.21.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 # make sure to update the external docs when the Lua version changes
 rlua = { version = "0.17.0", default-features = true, optional = true }

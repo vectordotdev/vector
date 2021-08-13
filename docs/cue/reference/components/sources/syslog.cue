@@ -156,9 +156,7 @@ components: sources: syslog: {
 			title:         "Syslog Eve"
 			configuration: {}
 			input: """
-				```text
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)
-				```
 				"""
 			output: log: {
 				severity:    "notice"

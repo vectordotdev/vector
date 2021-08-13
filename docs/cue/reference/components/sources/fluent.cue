@@ -111,11 +111,7 @@ components: sources: fluent: {
 			title: "Dummy message from fluentd"
 			configuration: {}
 			input: """
-				```text
 				2021-05-20 16:23:03.021497000 -0400 dummy: {"message":"dummy"}
-				```
-
-				(this is the fluentd stdout encoding of the dummy message)
 				"""
 			output: log: {
 				host:      _values.remote_host
@@ -128,11 +124,7 @@ components: sources: fluent: {
 			title: "Dummy message from fluent-bit"
 			configuration: {}
 			input: """
-				```text
 				dummy.0: [1621541848.161827000, {"message"=>"dummy"}]
-				```
-
-				(this is the fluent-bit stdout encoding of the dummy message)
 				"""
 			output: log: {
 				host:      _values.remote_host

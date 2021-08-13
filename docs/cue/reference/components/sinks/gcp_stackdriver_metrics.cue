@@ -172,7 +172,7 @@ components: sinks: gcp_stackdriver_metrics: {
 			policies: [
 				{
 					_action: "timeSeries.create"
-					required_for: ["healthcheck", "write"]
+					required_for: ["healthcheck", "operation"]
 				},
 			]
 		},

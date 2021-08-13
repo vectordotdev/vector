@@ -32,8 +32,23 @@
 /.github/workflows/**/k8s* @timberio/vector-kubernetes
 
 #
-# docs
+# vector.dev (website and documentation)
 #
+
+/docs/content/ @timberio/vector-website
+/docs/assets/ @timberio/vector-website
+/docs/data/ @timberio/vector-website
+/docs/layouts/ @timberio/vector-website
+/docs/scripts/ @timberio/vector-website
+/docs/static/ @timberio/vector-website
+/docs/Makefile @timberio/vector-website
+/docs/README.md @timberio/vector-website
+/docs/*.js @timberio/vector-website
+/docs/*.json @timberio/vector-website
+/docs/*.lock @timberio/vector-website
+/docs/*.netlify @timberio/vector-website
+/docs/*.toml @timberio/vector-website
+/docs/*.yml @timberio/vector-website
 
 /docs/cue/reference/components/sinks.cue @timberio/vector-integrations
 /docs/cue/reference/components/sinks/ @timberio/vector-integrations
