@@ -329,19 +329,19 @@ leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "l
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default = ["api", "api-client", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default-cmake = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
-default-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
-default-no-api-client = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
-default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all"]
+default-msvc = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog"]
+default-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog"]
+default-no-api-client = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog"]
+default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog"]
 disk-buffer = ["vector_core/disk-buffer"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
-all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
+all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datadog"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
@@ -637,6 +637,9 @@ sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
+
+# Datadog integration
+datadog = ["sources-internal_metrics", "sinks-datadog"]
 
 # Identifies that the build is a nightly build
 nightly = []

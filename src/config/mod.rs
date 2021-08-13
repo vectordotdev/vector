@@ -22,6 +22,8 @@ pub mod api;
 mod builder;
 mod compiler;
 pub mod component;
+#[cfg(feature = "datadog")]
+pub mod datadog;
 mod diff;
 pub mod format;
 mod loading;
