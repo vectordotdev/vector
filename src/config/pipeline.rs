@@ -2,7 +2,7 @@ use super::format::{deserialize, Format};
 use super::TransformOuter;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, DirEntry};
 use std::path::Path;
 
 #[derive(Deserialize, Serialize, Debug)]
