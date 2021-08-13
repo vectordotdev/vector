@@ -138,12 +138,17 @@ inputs = ["foo#baz"]
 # ...
 ```
 
-In order to avoid internal conflicts with the pipeline components `id`s, the components `id`s internal representation will be changed to the following `enum`
+In order to avoid internal conflicts with the pipeline components `id`s, the components `id`s internal representation will be changed to the following `struct`
 
 ```rust
-enum ComponentId {
-  Global { name: String },
-  Pipeline { pipeline_id: String, name: String },
+struct ComponentId {
+    name: String,
+    scope: ComponentScope,
+}
+
+enum ComponentScope {
+    Global,
+    Pipeline(String),
 }
 ```
 
