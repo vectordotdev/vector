@@ -281,7 +281,9 @@ impl HttpSink for LokiSink {
 async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}ready", config.endpoint.uri);
 
-    let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let mut req = http::Request::get(uri)
+        .body(hyper::Body::empty())
+        .expect("Building request never fails.");
 
     if let Some(auth) = &config.auth {
         auth.apply(&mut req);
@@ -292,7 +294,7 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
     let status = match fetch_status("ready", &config, &client).await? {
         // Issue https://github.com/timberio/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
-            warn!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
+            debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
             fetch_status("", &config, &client).await?
         }
         status => status,
