@@ -174,6 +174,8 @@ mod push;
 mod redact;
 #[cfg(feature = "replace")]
 mod replace;
+#[cfg(feature = "reverse_dns")]
+mod reverse_dns;
 #[cfg(feature = "round")]
 mod round;
 #[cfg(feature = "sha1")]
@@ -399,6 +401,8 @@ pub use r#match::Match;
 pub use redact::Redact;
 #[cfg(feature = "replace")]
 pub use replace::Replace;
+#[cfg(feature = "reverse_dns")]
+pub use reverse_dns::ReverseDns;
 #[cfg(feature = "round")]
 pub use round::Round;
 #[cfg(feature = "sha2")]
@@ -628,6 +632,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Redact),
         #[cfg(feature = "replace")]
         Box::new(Replace),
+        #[cfg(feature = "reverse_dns")]
+        Box::new(ReverseDns),
         #[cfg(feature = "round")]
         Box::new(Round),
         #[cfg(feature = "sha1")]
