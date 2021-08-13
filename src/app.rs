@@ -140,7 +140,7 @@ impl Application {
                         SubCommand::Tap(t) => tap::cmd(&t).await,
                         SubCommand::Validate(v) => validate::validate(&v, color).await,
                         #[cfg(feature = "vrl-cli")]
-                        SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),
+                        SubCommand::Vrl(s) => vrl_cli::cmd(&s),
                     };
 
                     return Err(code);

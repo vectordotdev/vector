@@ -18,7 +18,7 @@ pub struct Opts {
     #[structopt(name = "PROGRAM")]
     program: Option<String>,
 
-    /// The file containing the event object(s) to handle. JSON events should be one per line..
+    /// The file containing the event object(s) to handle. JSON events should be one per line.
     #[structopt(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
@@ -32,20 +32,13 @@ pub struct Opts {
     print_object: bool,
 
     /// The timezone used to parse dates.
-    #[structopt(short = "tz", long)]
-    timezone: Option<String>,
+    ///
+    /// Defaults to local timezone if unset.
+    #[structopt(default_value = "local", short = "tz", long)]
+    timezone: TimeZone,
 }
 
 impl Opts {
-    fn timezone(&self) -> Result<TimeZone, Error> {
-        if let Some(ref tz) = self.timezone {
-            TimeZone::parse(tz)
-                .ok_or_else(|| Error::Parse(format!("unable to parse timezone: {}", tz)))
-        } else {
-            Ok(TimeZone::default())
-        }
-    }
-
     fn read_program(&self) -> Result<String, Error> {
         match self.program.as_ref() {
             Some(source) => Ok(source.to_owned()),
@@ -59,7 +52,8 @@ impl Opts {
     fn read_into_objects(&self) -> Result<Vec<Value>, Error> {
         let input = match self.input_file.as_ref() {
             Some(path) => read(File::open(path)?),
-            None => read(io::stdin()),
+            None if termion::is_tty(&std::io::stdin()) => Ok("".to_owned()),
+            None => read (io::stdin()),
         }?;
 
         match input.as_str() {
@@ -69,10 +63,6 @@ impl Opts {
                 .map(|line| Ok(serde_to_vrl(serde_json::from_str(line)?)))
                 .collect::<Result<Vec<Value>, Error>>(),
         }
-    }
-
-    fn should_open_repl(&self) -> bool {
-        self.program.is_none() && self.program_file.is_none()
     }
 }
 
@@ -87,42 +77,56 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 }
 
 fn run(opts: &Opts) -> Result<(), Error> {
-    let tz = opts.timezone()?;
-    // Run the REPL if no program or program file is specified
-    if opts.should_open_repl() {
-        // If an input file is provided, use that for the REPL objects, otherwise provide a
-        // generic default object.
-        let repl_objects = if opts.input_file.is_some() {
-            opts.read_into_objects()?
-        } else {
-            default_objects()
-        };
+    if opts.program.is_none() && opts.program_file.is_none() {
+        let mut tty_guard = None;
 
-        repl(repl_objects, &tz)
-    } else {
-        let objects = opts.read_into_objects()?;
-        let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+        let input = match &opts.input_file {
+            Some(path) => read(File::open(path)?),
+            None if !termion::is_tty(&std::io::stdin()) => {
+                let data = read(io::stdin());
 
-        for mut object in objects {
-            let result = execute(&mut object, &program, &tz).map(|v| {
-                if opts.print_object {
-                    object.to_string()
-                } else {
-                    v.to_string()
-                }
-            });
+                // Reconnect stdin to a tty, so that we can take user input in the REPL.
+                //
+                // Without this, stdio points to a piped stream, which can't accept any user input
+                // and instantly terminates the REPL.
+                let tty = termion::get_tty()?;
+                tty_guard.insert(stdio_override::StdinOverride::override_raw(tty)?);
 
-            match result {
-                Ok(ok) => println!("{}", ok),
-                Err(err) => eprintln!("{}", err),
+                data
             }
-        }
+            None => Ok(String::new()),
+        }?;
 
-        Ok(())
+        let objects = input
+            .lines()
+            .map(|line| Ok(serde_to_vrl(serde_json::from_str(line)?)))
+            .collect::<Result<Vec<Value>, Error>>()?;
+
+        return repl(objects, &opts.timezone);
     }
+
+    let objects = opts.read_into_objects()?;
+    let source = opts.read_program()?;
+    let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+        Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+    })?;
+
+    for mut object in objects {
+        let result = execute(&mut object, &program, &opts.timezone).map(|v| {
+            if opts.print_object {
+                object.to_string()
+            } else {
+                v.to_string()
+            }
+        });
+
+        match result {
+            Ok(ok) => println!("{}", ok),
+            Err(err) => eprintln!("{}", err),
+        }
+    }
+
+    Ok(())
 }
 
 fn repl(objects: Vec<Value>, timezone: &TimeZone) -> Result<(), Error> {
@@ -170,8 +174,4 @@ fn read<R: Read>(mut reader: R) -> Result<String, Error> {
     reader.read_to_string(&mut buffer)?;
 
     Ok(buffer)
-}
-
-fn default_objects() -> Vec<Value> {
-    vec![Value::Object(BTreeMap::new())]
 }

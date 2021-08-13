@@ -1,7 +1,7 @@
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
-use std::fmt::Debug;
+use std::{fmt::Debug, str::FromStr};
 
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
@@ -9,6 +9,17 @@ pub enum TimeZone {
     #[derivative(Default)]
     Local,
     Named(Tz),
+}
+
+impl FromStr for TimeZone {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "" | "local" => Ok(Self::Local),
+            _ => s.parse::<Tz>().map(Self::Named),
+        }
+    }
 }
 
 /// This is a wrapper trait to allow `TimeZone` types to be passed generically.
