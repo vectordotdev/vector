@@ -101,7 +101,7 @@ impl Batch for Buffer {
         // number of bytes written instead.
         let new_bytes = self.num_bytes + item.len();
         if self.is_empty() && item.len() > self.settings.bytes {
-            err_event_too_large(item.len())
+            err_event_too_large(item.len(), self.settings.bytes)
         } else if self.num_items >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {

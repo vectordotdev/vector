@@ -44,7 +44,7 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let new_bytes = self.bytes + item.encoded_length();
         if self.is_empty() && item.encoded_length() > self.settings.bytes {
-            err_event_too_large(item.encoded_length())
+            err_event_too_large(item.encoded_length(), self.settings.bytes)
         } else if self.num_items() >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {

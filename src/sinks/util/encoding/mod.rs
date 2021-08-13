@@ -164,6 +164,7 @@ mod tests {
     use super::*;
     use crate::config::log_schema;
     use indoc::indoc;
+    use shared::btreemap;
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
@@ -277,6 +278,8 @@ mod tests {
             log.insert("e[1]", 1);
             log.insert("f\\.z", 1);
             log.insert("g\\.z", 1);
+            log.insert("h", btreemap! {});
+            log.insert("i", Vec::<Value>::new());
         }
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
@@ -289,7 +292,9 @@ mod tests {
         assert!(!event.as_mut_log().contains("c[0].x"));
         assert!(!event.as_mut_log().contains("d"));
         assert!(!event.as_mut_log().contains("e"));
-        assert!(!event.as_mut_log().contains("f\\.z"));
+        assert!(!event.as_mut_log().contains("f"));
+        assert!(!event.as_mut_log().contains("h"));
+        assert!(!event.as_mut_log().contains("i"));
     }
 
     const TOML_TIMESTAMP_FORMAT: &str = indoc! {r#"
