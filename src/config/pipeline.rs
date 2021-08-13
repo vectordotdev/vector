@@ -22,28 +22,34 @@ pub struct Pipeline {
 
 impl Pipeline {
     pub fn load_from_folder(folder: &Path) -> Result<IndexMap<String, Self>, Vec<String>> {
-        let entries = fs::read_dir(folder)
+        let mut index = IndexMap::new();
+        let mut errors = Vec::new();
+        fs::read_dir(folder)
             .map_err(|err| {
                 vec![format!(
                     "Could not list folder content: {:?}, {}",
                     folder, err
                 )]
             })?
-            .map(|entry| entry.unwrap().path())
-            .filter(|entry| entry.is_file())
-            .map(|entry| Self::load_from_file(&entry));
-        let mut index = IndexMap::new();
-        let mut errors = Vec::new();
-        for entry in entries {
-            match entry {
+            .filter_map(|entry| match entry {
+                Ok(item) => {
+                    let path = item.path();
+                    if path.is_file() {
+                        Some(Self::load_from_file(&path))
+                    } else {
+                        None
+                    }
+                }
+                Err(err) => Some(Err(err.to_string())),
+            })
+            .for_each(|res| match res {
                 Ok((id, pipeline)) => {
                     index.insert(id, pipeline);
                 }
                 Err(err) => {
                     errors.push(err);
                 }
-            };
-        }
+            });
         if errors.is_empty() {
             Ok(index)
         } else {
