@@ -1,7 +1,10 @@
 use crate::{
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
-    sources::util::{decoding::DecodingConfig, SocketListenAddr, TcpSource},
+    sources::util::{
+        decoding::{self, DecodingConfig},
+        SocketListenAddr, TcpSource,
+    },
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -67,13 +70,16 @@ impl TcpConfig {
     }
 }
 
-pub struct RawTcpSource<D: tokio_util::codec::Decoder<Item = (Event, usize)>> {
+pub struct RawTcpSource {
     config: TcpConfig,
-    build_decoder: Box<dyn Fn() -> D + Send + Sync>,
+    build_decoder: Box<dyn Fn() -> decoding::Decoder + Send + Sync>,
 }
 
-impl<D: tokio_util::codec::Decoder<Item = (Event, usize)>> RawTcpSource<D> {
-    pub fn new(config: TcpConfig, build_decoder: Box<dyn Fn() -> D + Send + Sync>) -> Self {
+impl RawTcpSource {
+    pub fn new(
+        config: TcpConfig,
+        build_decoder: Box<dyn Fn() -> decoding::Decoder + Send + Sync>,
+    ) -> Self {
         Self {
             config,
             build_decoder,
@@ -81,18 +87,10 @@ impl<D: tokio_util::codec::Decoder<Item = (Event, usize)>> RawTcpSource<D> {
     }
 }
 
-impl<D> TcpSource for RawTcpSource<D>
-where
-    D: tokio_util::codec::Decoder<Item = (Event, usize)> + Send + Sync + 'static,
-    D::Error: From<std::io::Error>
-        + crate::sources::util::TcpError
-        + std::fmt::Debug
-        + std::fmt::Display
-        + Send,
-{
-    type Error = D::Error;
+impl TcpSource for RawTcpSource {
+    type Error = decoding::Error;
     type Item = Event;
-    type Decoder = D;
+    type Decoder = decoding::Decoder;
 
     fn build_decoder(&self) -> Self::Decoder {
         (self.build_decoder)()
