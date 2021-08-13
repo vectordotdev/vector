@@ -5,6 +5,7 @@ use crate::{
         metrics::{self, IntoTransformMetrics},
         sort,
     },
+    config::ComponentId,
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
@@ -12,9 +13,9 @@ use std::cmp;
 
 #[derive(Debug, Clone)]
 pub struct Data {
-    pub name: String,
+    pub id: ComponentId,
     pub component_type: String,
-    pub inputs: Vec<String>,
+    pub inputs: Vec<ComponentId>,
 }
 
 #[derive(Debug, Clone)]
@@ -22,7 +23,7 @@ pub struct Transform(pub Data);
 
 impl Transform {
     pub fn get_name(&self) -> &str {
-        self.0.name.as_str()
+        self.0.id.name.as_str()
     }
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
@@ -63,7 +64,7 @@ impl Transform {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match state::component_by_name(name) {
+            .filter_map(|id| match state::component_by_id(id) {
                 Some(Component::Source(s)) => Some(s),
                 _ => None,
             })
@@ -73,7 +74,7 @@ impl Transform {
     /// Transform outputs
     pub async fn transforms(&self) -> Vec<Transform> {
         state::filter_components(|(_name, components)| match components {
-            Component::Transform(t) if t.0.inputs.contains(&self.0.name) => Some(t.clone()),
+            Component::Transform(t) if t.0.inputs.contains(&self.0.id) => Some(t.clone()),
             _ => None,
         })
     }
@@ -81,14 +82,16 @@ impl Transform {
     /// Sink outputs
     pub async fn sinks(&self) -> Vec<sink::Sink> {
         state::filter_components(|(_name, components)| match components {
-            Component::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
+            Component::Sink(s) if s.0.inputs.contains(&self.0.id) => Some(s.clone()),
             _ => None,
         })
     }
 
     /// Transform metrics
     pub async fn metrics(&self) -> metrics::TransformMetrics {
-        metrics::by_component_name(&self.0.name).into_transform_metrics(self.get_component_type())
+        // TODO use id for metrics
+        metrics::by_component_name(&self.0.id.name)
+            .into_transform_metrics(self.get_component_type())
     }
 }
 
@@ -124,17 +127,17 @@ mod tests {
     fn transform_fixtures() -> Vec<Transform> {
         vec![
             Transform(Data {
-                name: "parse_json".to_string(),
+                id: ComponentId::global("parse_json"),
                 component_type: "json".to_string(),
                 inputs: vec![],
             }),
             Transform(Data {
-                name: "field_adder".to_string(),
+                id: ComponentId::global("field_adder"),
                 component_type: "add_fields".to_string(),
                 inputs: vec![],
             }),
             Transform(Data {
-                name: "append".to_string(),
+                id: ComponentId::global("append"),
                 component_type: "concat".to_string(),
                 inputs: vec![],
             }),

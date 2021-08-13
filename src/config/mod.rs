@@ -72,17 +72,61 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct ComponentId {
+    pub name: String,
+}
+
+impl ComponentId {
+    pub fn global<S: ToString>(name: S) -> Self {
+        Self {
+            name: name.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WithInputs<Input, Inner> {
+    pub inputs: Vec<Input>,
+    #[serde(flatten)]
+    pub inner: Inner,
+}
+
+impl<Inner> WithInputs<String, Inner> {
+    pub fn input_ids(&self) -> Vec<ComponentId> {
+        self.inputs.iter().map(ComponentId::global).collect()
+    }
+}
+
+impl<Inner> From<WithInputs<String, Inner>> for WithInputs<ComponentId, Inner> {
+    fn from(value: WithInputs<String, Inner>) -> WithInputs<ComponentId, Inner> {
+        WithInputs {
+            inputs: value.inputs.into_iter().map(ComponentId::global).collect(),
+            inner: value.inner,
+        }
+    }
+}
+
+impl<Inner> From<WithInputs<ComponentId, Inner>> for WithInputs<String, Inner> {
+    fn from(value: WithInputs<ComponentId, Inner>) -> WithInputs<String, Inner> {
+        WithInputs {
+            inputs: value.inputs.into_iter().map(|item| item.name).collect(),
+            inner: value.inner,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, SourceOuter>,
-    pub sinks: IndexMap<String, SinkOuter>,
-    pub transforms: IndexMap<String, TransformOuter>,
+    pub sources: IndexMap<ComponentId, SourceOuter>,
+    pub sinks: IndexMap<ComponentId, SinkWithId>,
+    pub transforms: IndexMap<ComponentId, TransformWithId>,
     tests: Vec<TestDefinition>,
-    expansions: IndexMap<String, Vec<String>>,
+    expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -172,7 +216,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub name: String,
+    pub id: ComponentId,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -183,14 +227,14 @@ pub struct SourceContext {
 impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
-        name: &str,
+        id: &ComponentId,
         out: Pipeline,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(name);
+        let (shutdown_signal, _) = shutdown.register_source(id);
         (
             Self {
-                name: name.into(),
+                id: id.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -204,7 +248,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            name: "default".into(),
+            id: ComponentId::global("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
@@ -218,10 +262,11 @@ pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
 
 inventory::collect!(SourceDescription);
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter {
-    pub inputs: Vec<String>,
+pub type SinkWithId = WithInputs<ComponentId, SinkInner>;
+pub type SinkOuter = WithInputs<String, SinkInner>;
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SinkInner {
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
 
@@ -243,15 +288,17 @@ pub struct SinkOuter {
     pub inner: Box<dyn SinkConfig>,
 }
 
-impl SinkOuter {
-    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> Self {
+impl SinkInner {
+    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> SinkOuter {
         SinkOuter {
-            buffer: Default::default(),
-            healthcheck: SinkHealthcheckOptions::default(),
-            healthcheck_uri: None,
-            inner,
             inputs,
-            proxy: Default::default(),
+            inner: SinkInner {
+                buffer: Default::default(),
+                healthcheck: SinkHealthcheckOptions::default(),
+                healthcheck_uri: None,
+                inner,
+                proxy: Default::default(),
+            },
         }
     }
 
@@ -367,12 +414,8 @@ pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 
 inventory::collect!(SinkDescription);
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter {
-    pub inputs: Vec<String>,
-    #[serde(flatten)]
-    pub inner: Box<dyn TransformConfig>,
-}
+pub type TransformWithId = WithInputs<ComponentId, Box<dyn TransformConfig>>;
+pub type TransformOuter = WithInputs<String, Box<dyn TransformConfig>>;
 
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
@@ -474,7 +517,7 @@ pub struct TestDefinition {
     #[serde(default)]
     pub outputs: Vec<TestOutput>,
     #[serde(default)]
-    pub no_outputs_from: Vec<String>,
+    pub no_outputs_from: Vec<ComponentId>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -489,7 +532,7 @@ pub enum TestInputValue {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestInput {
-    pub insert_at: String,
+    pub insert_at: ComponentId,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
     pub value: Option<String>,
@@ -504,7 +547,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
-    pub extract_from: String,
+    pub extract_from: ComponentId,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -516,11 +559,11 @@ impl Config {
     /// Expand a logical component name (i.e. from the config file) into the names of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &str) -> Vec<String> {
+    pub fn get_inputs(&self, identifier: &ComponentId) -> Vec<ComponentId> {
         self.expansions
             .get(identifier)
             .cloned()
-            .unwrap_or_else(|| vec![String::from(identifier)])
+            .unwrap_or_else(|| vec![identifier.clone()])
     }
 }
 

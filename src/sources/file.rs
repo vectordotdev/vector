@@ -210,7 +210,8 @@ impl SourceConfig for FileConfig {
         // other
         let data_dir = cx
             .globals
-            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.name)?;
+            // TODO make a data subdir with prefix if not global
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.id.name)?;
 
         // Clippy rule, because async_trait?
         #[allow(clippy::suspicious_else_formatting)]

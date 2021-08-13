@@ -16,7 +16,7 @@ mod test;
 
 use crate::{
     buffers::{self, EventStream},
-    config::{Config, ConfigDiff},
+    config::{ComponentId, Config, ConfigDiff},
     event::Event,
     topology::{
         builder::Pieces,
@@ -73,7 +73,7 @@ pub async fn start_validated(
 pub async fn build_or_log_errors(
     config: &Config,
     diff: &ConfigDiff,
-    buffers: HashMap<String, BuiltBuffer>,
+    buffers: HashMap<ComponentId, BuiltBuffer>,
 ) -> Option<Pieces> {
     match builder::build_pieces(config, diff, buffers).await {
         Err(errors) => {
@@ -86,7 +86,7 @@ pub async fn build_or_log_errors(
     }
 }
 
-pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String, Task)> {
+pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(ComponentId, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
         .filter_map(|name| {

@@ -1,6 +1,7 @@
 use super::{ShutdownRx, ShutdownTx};
 use crate::topology::fanout::ControlChannel;
 use crate::{
+    config::ComponentId,
     event::{Event, LogEvent},
     topology::{fanout, WatchRx},
 };
@@ -161,7 +162,7 @@ impl TapController {
 }
 
 /// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
-fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: String) -> ShutdownTx {
+fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: ComponentId) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
@@ -171,9 +172,9 @@ fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: String) -> Shutdown
             .await
             .is_err()
         {
-            debug!(message = "Couldn't disconnect sink.", sink_id = ?sink_id);
+            debug!(message = "Couldn't disconnect sink.", sink_id = ?sink_id.name);
         } else {
-            debug!(message = "Disconnected sink.", sink_id = ?sink_id);
+            debug!(message = "Disconnected sink.", sink_id = ?sink_id.name);
         }
     });
 
@@ -243,10 +244,11 @@ async fn tap_handler(
                             // getting involved in config diffing at this point.
                             let id = Uuid::new_v4().to_string();
                             let sink = TapSink::new(tx.clone(), name.to_string());
+                            let component_id = ComponentId::global(&id);
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(id.clone(), Box::new(sink)))
+                                .send(fanout::ControlMessage::Add(component_id.clone(), Box::new(sink)))
                                 .await
                             {
                                 Ok(_) => {
@@ -258,7 +260,7 @@ async fn tap_handler(
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
                                     sinks
-                                        .insert(name.to_string(), shutdown_trigger(control_tx.clone(), id));
+                                        .insert(name.to_string(), shutdown_trigger(control_tx.clone(), component_id));
                                 }
                                 Err(err) => {
                                     error!(

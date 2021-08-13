@@ -1,4 +1,5 @@
 use super::{sink, source, transform, Component};
+use crate::config::ComponentId;
 use lazy_static::lazy_static;
 use std::{
     collections::{HashMap, HashSet},
@@ -8,12 +9,12 @@ use std::{
 pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
 
 lazy_static! {
-    pub static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
+    pub static ref COMPONENTS: Arc<RwLock<HashMap<ComponentId, Component>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
 /// Filter components with the provided `map_func`
-pub fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T>) -> Vec<T> {
+pub fn filter_components<T>(map_func: impl Fn((&ComponentId, &Component)) -> Option<T>) -> Vec<T> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
@@ -24,7 +25,7 @@ pub fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T
 
 /// Returns all components
 pub fn get_components() -> Vec<Component> {
-    filter_components(|(_name, components)| Some(components.clone()))
+    filter_components(|(_id, components)| Some(components.clone()))
 }
 
 /// Filters components, and returns a clone of sources
@@ -51,22 +52,22 @@ pub fn get_sinks() -> Vec<sink::Sink> {
     })
 }
 
-/// Returns the current component names as a HashSet
-pub fn get_component_names() -> HashSet<String> {
+/// Returns the current component ids as a HashSet
+pub fn get_component_ids() -> HashSet<ComponentId> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
         .keys()
         .cloned()
-        .collect::<HashSet<String>>()
+        .collect::<HashSet<ComponentId>>()
 }
 
-/// Gets a component by name
-pub fn component_by_name(name: &str) -> Option<Component> {
-    Some(COMPONENTS.read().expect(INVARIANT).get(name)?.clone())
+/// Gets a component by id
+pub fn component_by_id(id: &ComponentId) -> Option<Component> {
+    Some(COMPONENTS.read().expect(INVARIANT).get(id)?.clone())
 }
 
 /// Overwrites component state with new components.
-pub fn update(new_components: HashMap<String, Component>) {
+pub fn update(new_components: HashMap<ComponentId, Component>) {
     *COMPONENTS.write().expect(INVARIANT) = new_components
 }

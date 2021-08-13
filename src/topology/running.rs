@@ -6,7 +6,7 @@ use crate::topology::{
 };
 use crate::{
     buffers,
-    config::{Config, ConfigDiff, HealthcheckOptions, Resource},
+    config::{ComponentId, Config, ConfigDiff, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::TaskOutput},
@@ -25,12 +25,12 @@ use tracing::Instrument;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<String, buffers::BufferInputCloner<Event>>,
-    outputs: HashMap<String, ControlChannel>,
-    source_tasks: HashMap<String, TaskHandle>,
-    tasks: HashMap<String, TaskHandle>,
+    inputs: HashMap<ComponentId, buffers::BufferInputCloner<Event>>,
+    outputs: HashMap<ComponentId, ControlChannel>,
+    source_tasks: HashMap<ComponentId, TaskHandle>,
+    tasks: HashMap<ComponentId, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
-    detach_triggers: HashMap<String, DisabledTrigger>,
+    detach_triggers: HashMap<ComponentId, DisabledTrigger>,
     pub(crate) config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
@@ -81,15 +81,15 @@ impl RunningTopology {
         let mut wait_handles = Vec::new();
         // We need a Vec here since source components have two tasks. One for
         // pump in self.tasks, and the other for source in self.source_tasks.
-        let mut check_handles = HashMap::<String, Vec<_>>::new();
+        let mut check_handles = HashMap::<ComponentId, Vec<_>>::new();
 
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
-        for (name, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
+        for (id, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
             let task = task.map(|_result| ()).shared();
 
             wait_handles.push(task.clone());
-            check_handles.entry(name).or_default().push(task);
+            check_handles.entry(id).or_default().push(task);
         }
 
         // If we reach this, we will forcefully shutdown the sources.
@@ -106,11 +106,15 @@ impl RunningTopology {
                 retain(handles, |handle| handle.peek().is_none());
                 !handles.is_empty()
             });
-            let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
+            let remaining_components = check_handles2
+                .keys()
+                .map(|item| item.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ");
 
             error!(
               message = "Failed to gracefully shut down in time. Killing components.",
-                components = ?remaining_components.join(", ")
+                components = ?remaining_components
             );
         };
 
@@ -124,7 +128,11 @@ impl RunningTopology {
                     retain(handles, |handle| handle.peek().is_none());
                     !handles.is_empty()
                 });
-                let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
+                let remaining_components = check_handles
+                    .keys()
+                    .map(|item| item.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ");
 
                 let time_remaining = match deadline.checked_duration_since(Instant::now()) {
                     Some(remaining) => format!("{} seconds left", remaining.as_secs()),
@@ -132,7 +140,7 @@ impl RunningTopology {
                 };
 
                 info!(
-                    message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
+                    message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components, time_remaining = ?time_remaining
                 );
             }
         };
@@ -252,7 +260,7 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_config: &Config,
-    ) -> HashMap<String, BuiltBuffer> {
+    ) -> HashMap<ComponentId, BuiltBuffer> {
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -268,20 +276,20 @@ impl RunningTopology {
         }
 
         let deadline = Instant::now() + timeout;
-        for name in &diff.sources.to_remove {
-            info!(message = "Removing source.", name = ?name);
+        for id in &diff.sources.to_remove {
+            info!(message = "Removing source.", name = ?id.name);
 
-            let previous = self.tasks.remove(name).unwrap();
+            let previous = self.tasks.remove(id).unwrap();
             drop(previous); // detach and forget
 
-            self.remove_outputs(name);
+            self.remove_outputs(id);
             source_shutdown_complete_futures
-                .push(self.shutdown_coordinator.shutdown_source(name, deadline));
+                .push(self.shutdown_coordinator.shutdown_source(id, deadline));
         }
-        for name in &diff.sources.to_change {
-            self.remove_outputs(name);
+        for id in &diff.sources.to_change {
+            self.remove_outputs(id);
             source_shutdown_complete_futures
-                .push(self.shutdown_coordinator.shutdown_source(name, deadline));
+                .push(self.shutdown_coordinator.shutdown_source(id, deadline));
         }
 
         // Wait for the shutdowns to complete
@@ -297,21 +305,21 @@ impl RunningTopology {
         futures::future::join_all(source_shutdown_complete_futures).await;
 
         // Second pass now that all sources have shut down for final cleanup.
-        for name in diff.sources.removed_and_changed() {
-            if let Some(task) = self.source_tasks.remove(name) {
+        for id in diff.sources.removed_and_changed() {
+            if let Some(task) = self.source_tasks.remove(id) {
                 task.await.unwrap().unwrap();
             }
         }
 
         // Transforms
-        for name in &diff.transforms.to_remove {
-            info!(message = "Removing transform.", name = ?name);
+        for id in &diff.transforms.to_remove {
+            info!(message = "Removing transform.", name = ?id.name);
 
-            let previous = self.tasks.remove(name).unwrap();
+            let previous = self.tasks.remove(id).unwrap();
             drop(previous); // detach and forget
 
-            self.remove_inputs(name).await;
-            self.remove_outputs(name);
+            self.remove_inputs(id).await;
+            self.remove_outputs(id);
         }
 
         // Sinks
@@ -321,18 +329,24 @@ impl RunningTopology {
         // conflicts in their resource usage. So if we combine their
         // resources, all found conflicts are between
         // to be removed and to be added components.
-        let remove_sink = diff
-            .sinks
-            .removed_and_changed()
-            .map(|name| (name, self.config.sinks[name].resources(name)));
-        let add_source = diff
-            .sources
-            .changed_and_added()
-            .map(|name| (name, new_config.sources[name].inner.resources()));
-        let add_sink = diff
-            .sinks
-            .changed_and_added()
-            .map(|name| (name, new_config.sinks[name].resources(name)));
+        let remove_sink = diff.sinks.removed_and_changed().filter_map(|id| {
+            self.config
+                .sinks
+                .get(id)
+                .map(|sink| (id, sink.inner.resources(&id.name)))
+        });
+        let add_source = diff.sources.changed_and_added().filter_map(|id| {
+            new_config
+                .sources
+                .get(id)
+                .map(|source| (id, source.inner.resources()))
+        });
+        let add_sink = diff.sinks.changed_and_added().filter_map(|id| {
+            new_config
+                .sinks
+                .get(id)
+                .map(|sink| (id, sink.inner.resources(&id.name)))
+        });
         let conflicts = Resource::conflicts(
             remove_sink.map(|(key, value)| ((true, key), value)).chain(
                 add_sink
@@ -347,7 +361,7 @@ impl RunningTopology {
         let conflicting_sinks = conflicts
             .into_iter()
             .filter(|&(existing_sink, _)| existing_sink)
-            .map(|(_, name)| name.clone());
+            .map(|(_, id)| id.clone());
 
         // Buffer reuse
         // We can reuse buffers whose configuration wasn't changed.
@@ -355,7 +369,10 @@ impl RunningTopology {
             .sinks
             .to_change
             .iter()
-            .filter(|&name| self.config.sinks[name].buffer == new_config.sinks[name].buffer)
+            .filter(|&id| {
+                self.config.sinks.get(id).map(|item| &item.inner.buffer)
+                    == new_config.sinks.get(id).map(|item| &item.inner.buffer)
+            })
             .cloned()
             .collect::<HashSet<_>>();
 
@@ -366,31 +383,31 @@ impl RunningTopology {
         // First pass
 
         // Detach removed sinks
-        for name in &diff.sinks.to_remove {
-            info!(message = "Removing sink.", name = ?name);
-            self.remove_inputs(name).await;
+        for id in &diff.sinks.to_remove {
+            info!(message = "Removing sink.", name = ?id.name);
+            self.remove_inputs(id).await;
         }
 
         // Detach changed sinks
-        for name in &diff.sinks.to_change {
-            if reuse_buffers.contains(name) {
+        for id in &diff.sinks.to_change {
+            if reuse_buffers.contains(id) {
                 self.detach_triggers
-                    .remove(name)
+                    .remove(id)
                     .unwrap()
                     .into_inner()
                     .cancel();
-            } else if wait_for_sinks.contains(name) {
-                self.detach_inputs(name).await;
+            } else if wait_for_sinks.contains(id) {
+                self.detach_inputs(id).await;
             }
         }
 
         // Second pass for final cleanup
 
         // Cleanup removed
-        for name in &diff.sinks.to_remove {
-            let previous = self.tasks.remove(name).unwrap();
-            if wait_for_sinks.contains(name) {
-                debug!(message = "Waiting for sink to shutdown.", %name);
+        for id in &diff.sinks.to_remove {
+            let previous = self.tasks.remove(id).unwrap();
+            if wait_for_sinks.contains(id) {
+                debug!(message = "Waiting for sink to shutdown.", name = ?id.name);
                 previous.await.unwrap().unwrap();
             } else {
                 drop(previous); // detach and forget
@@ -399,20 +416,20 @@ impl RunningTopology {
 
         // Cleanup changed and collect buffers to be reused
         let mut buffers = HashMap::new();
-        for name in &diff.sinks.to_change {
-            if wait_for_sinks.contains(name) {
-                let previous = self.tasks.remove(name).unwrap();
-                debug!(message = "Waiting for sink to shutdown.", %name);
+        for id in &diff.sinks.to_change {
+            if wait_for_sinks.contains(id) {
+                let previous = self.tasks.remove(id).unwrap();
+                debug!(message = "Waiting for sink to shutdown.", name = ?id.name);
                 let buffer = previous.await.unwrap().unwrap();
 
-                if reuse_buffers.contains(name) {
-                    let tx = self.inputs.remove(name).unwrap();
+                if reuse_buffers.contains(id) {
+                    let tx = self.inputs.remove(id).unwrap();
                     let (rx, acker) = match buffer {
                         TaskOutput::Sink(rx, acker) => (rx, acker),
                         _ => unreachable!(),
                     };
 
-                    buffers.insert(name.clone(), (tx, Arc::new(Mutex::new(Some(rx))), acker));
+                    buffers.insert(id.clone(), (tx, Arc::new(Mutex::new(Some(rx))), acker));
                 }
             }
         }
@@ -423,39 +440,45 @@ impl RunningTopology {
     /// Rewires topology
     pub(crate) async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         // Sources
-        for name in diff.sources.changed_and_added() {
-            self.setup_outputs(name, new_pieces).await;
+        for id in diff.sources.changed_and_added() {
+            self.setup_outputs(id, new_pieces).await;
         }
 
         // Transforms
         // Make sure all transform outputs are set up before another transform
         // might try use it as an input
-        for name in diff.transforms.changed_and_added() {
-            self.setup_outputs(name, new_pieces).await;
+        for id in diff.transforms.changed_and_added() {
+            self.setup_outputs(id, new_pieces).await;
         }
 
-        for name in &diff.transforms.to_change {
-            self.replace_inputs(name, new_pieces).await;
+        for id in &diff.transforms.to_change {
+            self.replace_inputs(id, new_pieces).await;
         }
 
-        for name in &diff.transforms.to_add {
-            self.setup_inputs(name, new_pieces).await;
+        for id in &diff.transforms.to_add {
+            self.setup_inputs(id, new_pieces).await;
         }
 
         // Sinks
-        for name in &diff.sinks.to_change {
-            self.replace_inputs(name, new_pieces).await;
+        for id in &diff.sinks.to_change {
+            self.replace_inputs(id, new_pieces).await;
         }
 
-        for name in &diff.sinks.to_add {
-            self.setup_inputs(name, new_pieces).await;
+        for id in &diff.sinks.to_add {
+            self.setup_inputs(id, new_pieces).await;
         }
 
         // Broadcast changes to subscribers.
         if !self.watch.0.is_closed() {
+            // TODO handle sending ids
             self.watch
                 .0
-                .send(self.outputs.clone())
+                .send(
+                    self.outputs
+                        .iter()
+                        .map(|item| (item.0.name.clone(), item.1.clone()))
+                        .collect::<HashMap<_, _>>(),
+                )
                 .expect("Couldn't broadcast config changes.");
         }
     }
@@ -463,41 +486,41 @@ impl RunningTopology {
     /// Starts new and changed pieces of topology.
     pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
         // Sources
-        for name in &diff.sources.to_change {
-            info!(message = "Rebuilding source.", name = ?name);
-            self.spawn_source(name, &mut new_pieces);
+        for id in &diff.sources.to_change {
+            info!(message = "Rebuilding source.", name = ?id.name);
+            self.spawn_source(id, &mut new_pieces);
         }
 
-        for name in &diff.sources.to_add {
-            info!(message = "Starting source.", name = ?name);
-            self.spawn_source(name, &mut new_pieces);
+        for id in &diff.sources.to_add {
+            info!(message = "Starting source.", name = ?id.name);
+            self.spawn_source(id, &mut new_pieces);
         }
 
         // Transforms
-        for name in &diff.transforms.to_change {
-            info!(message = "Rebuilding transform.", name = ?name);
-            self.spawn_transform(name, &mut new_pieces);
+        for id in &diff.transforms.to_change {
+            info!(message = "Rebuilding transform.", name = ?id.name);
+            self.spawn_transform(id, &mut new_pieces);
         }
 
-        for name in &diff.transforms.to_add {
-            info!(message = "Starting transform.", name = ?name);
-            self.spawn_transform(name, &mut new_pieces);
+        for id in &diff.transforms.to_add {
+            info!(message = "Starting transform.", name = ?id.name);
+            self.spawn_transform(id, &mut new_pieces);
         }
 
         // Sinks
-        for name in &diff.sinks.to_change {
-            info!(message = "Rebuilding sink.", name = ?name);
-            self.spawn_sink(name, &mut new_pieces);
+        for id in &diff.sinks.to_change {
+            info!(message = "Rebuilding sink.", name = ?id.name);
+            self.spawn_sink(id, &mut new_pieces);
         }
 
-        for name in &diff.sinks.to_add {
-            info!(message = "Starting sink.", name = ?name);
-            self.spawn_sink(name, &mut new_pieces);
+        for id in &diff.sinks.to_add {
+            info!(message = "Starting sink.", name = ?id.name);
+            self.spawn_sink(id, &mut new_pieces);
         }
     }
 
-    fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
-        let task = new_pieces.tasks.remove(name).unwrap();
+    fn spawn_sink(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+        let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "sink",
             component_kind = "sink",
@@ -506,13 +529,13 @@ impl RunningTopology {
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
-        if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
+        if let Some(previous) = self.tasks.insert(id.clone(), spawned) {
             drop(previous); // detach and forget
         }
     }
 
-    fn spawn_transform(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
-        let task = new_pieces.tasks.remove(name).unwrap();
+    fn spawn_transform(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+        let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "transform",
             component_kind = "transform",
@@ -521,13 +544,13 @@ impl RunningTopology {
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
-        if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
+        if let Some(previous) = self.tasks.insert(id.clone(), spawned) {
             drop(previous); // detach and forget
         }
     }
 
-    fn spawn_source(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
-        let task = new_pieces.tasks.remove(name).unwrap();
+    fn spawn_source(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+        let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "source",
             component_kind = "source",
@@ -536,29 +559,29 @@ impl RunningTopology {
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task);
-        if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
+        if let Some(previous) = self.tasks.insert(id.clone(), spawned) {
             drop(previous); // detach and forget
         }
 
         self.shutdown_coordinator
-            .takeover_source(name, &mut new_pieces.shutdown_coordinator);
+            .takeover_source(id, &mut new_pieces.shutdown_coordinator);
 
-        let source_task = new_pieces.source_tasks.remove(name).unwrap();
+        let source_task = new_pieces.source_tasks.remove(id).unwrap();
         let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
         self.source_tasks
-            .insert(name.to_string(), tokio::spawn(source_task));
+            .insert(id.clone(), tokio::spawn(source_task));
     }
 
-    fn remove_outputs(&mut self, name: &str) {
-        self.outputs.remove(name);
+    fn remove_outputs(&mut self, id: &ComponentId) {
+        self.outputs.remove(id);
     }
 
-    async fn remove_inputs(&mut self, name: &str) {
-        self.inputs.remove(name);
-        self.detach_triggers.remove(name);
+    async fn remove_inputs(&mut self, id: &ComponentId) {
+        self.inputs.remove(id);
+        self.detach_triggers.remove(id);
 
-        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
-        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        let sink_inputs = self.config.sinks.get(id).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(id).map(|t| &t.inputs);
 
         let inputs = sink_inputs.or(trans_inputs);
 
@@ -566,43 +589,43 @@ impl RunningTopology {
             for input in inputs {
                 if let Some(output) = self.outputs.get_mut(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
-                    let _ = output.send(ControlMessage::Remove(name.to_string())).await;
+                    let _ = output.send(ControlMessage::Remove(id.clone())).await;
                 }
             }
         }
     }
 
-    async fn setup_outputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
-        let mut output = new_pieces.outputs.remove(name).unwrap();
+    async fn setup_outputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+        let mut output = new_pieces.outputs.remove(id).unwrap();
 
-        for (sink_name, sink) in &self.config.sinks {
-            if sink.inputs.iter().any(|i| i == name) {
+        for (sink_id, sink) in &self.config.sinks {
+            if sink.inputs.iter().any(|i| i == id) {
                 // Sink may have been removed with the new config so it may not
                 // be present.
-                if let Some(input) = self.inputs.get(sink_name) {
+                if let Some(input) = self.inputs.get(sink_id) {
                     let _ = output
-                        .send(ControlMessage::Add(sink_name.clone(), input.get()))
+                        .send(ControlMessage::Add(sink_id.clone(), input.get()))
                         .await;
                 }
             }
         }
-        for (transform_name, transform) in &self.config.transforms {
-            if transform.inputs.iter().any(|i| i == name) {
+        for (transform_id, transform) in &self.config.transforms {
+            if transform.inputs.iter().any(|i| i == id) {
                 // Transform may have been removed with the new config so it may
                 // not be present.
-                if let Some(input) = self.inputs.get(transform_name) {
+                if let Some(input) = self.inputs.get(transform_id) {
                     let _ = output
-                        .send(ControlMessage::Add(transform_name.clone(), input.get()))
+                        .send(ControlMessage::Add(transform_id.clone(), input.get()))
                         .await;
                 }
             }
         }
 
-        self.outputs.insert(name.to_string(), output);
+        self.outputs.insert(id.clone(), output);
     }
 
-    async fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
-        let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
+    async fn setup_inputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+        let (tx, inputs) = new_pieces.inputs.remove(id).unwrap();
 
         for input in inputs {
             // This can only fail if we are disconnected, which is a valid situation.
@@ -610,22 +633,22 @@ impl RunningTopology {
                 .outputs
                 .get_mut(&input)
                 .unwrap()
-                .send(ControlMessage::Add(name.to_string(), tx.get()))
+                .send(ControlMessage::Add(id.clone(), tx.get()))
                 .await;
         }
 
-        self.inputs.insert(name.to_string(), tx);
-        new_pieces.detach_triggers.remove(name).map(|trigger| {
-            self.detach_triggers
-                .insert(name.to_string(), trigger.into())
-        });
+        self.inputs.insert(id.clone(), tx);
+        new_pieces
+            .detach_triggers
+            .remove(id)
+            .map(|trigger| self.detach_triggers.insert(id.clone(), trigger.into()));
     }
 
-    async fn replace_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
-        let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
+    async fn replace_inputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+        let (tx, inputs) = new_pieces.inputs.remove(id).unwrap();
 
-        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
-        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        let sink_inputs = self.config.sinks.get(id).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(id).map(|t| &t.inputs);
         let old_inputs = sink_inputs
             .or(trans_inputs)
             .unwrap()
@@ -641,7 +664,7 @@ impl RunningTopology {
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get_mut(input) {
                 // This can only fail if we are disconnected, which is a valid situation.
-                let _ = output.send(ControlMessage::Remove(name.to_string())).await;
+                let _ = output.send(ControlMessage::Remove(id.clone())).await;
             }
         }
 
@@ -651,7 +674,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Add(name.to_string(), tx.get()))
+                .send(ControlMessage::Add(id.clone(), tx.get()))
                 .await;
         }
 
@@ -661,23 +684,23 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(name.to_string(), Some(tx.get())))
+                .send(ControlMessage::Replace(id.clone(), Some(tx.get())))
                 .await;
         }
 
-        self.inputs.insert(name.to_string(), tx);
-        new_pieces.detach_triggers.remove(name).map(|trigger| {
-            self.detach_triggers
-                .insert(name.to_string(), trigger.into())
-        });
+        self.inputs.insert(id.clone(), tx);
+        new_pieces
+            .detach_triggers
+            .remove(id)
+            .map(|trigger| self.detach_triggers.insert(id.clone(), trigger.into()));
     }
 
-    async fn detach_inputs(&mut self, name: &str) {
-        self.inputs.remove(name);
-        self.detach_triggers.remove(name);
+    async fn detach_inputs(&mut self, id: &ComponentId) {
+        self.inputs.remove(id);
+        self.detach_triggers.remove(id);
 
-        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
-        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        let sink_inputs = self.config.sinks.get(id).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(id).map(|t| &t.inputs);
         let old_inputs = sink_inputs.or(trans_inputs).unwrap();
 
         for input in old_inputs {
@@ -687,7 +710,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(name.to_string(), None))
+                .send(ControlMessage::Replace(id.clone(), None))
                 .await;
         }
     }

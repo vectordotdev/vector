@@ -94,7 +94,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let sink_resources = config
         .sinks
         .iter()
-        .map(|(name, config)| (name, config.resources(name)));
+        .map(|(name, config)| (name, config.inner.resources(name)));
 
     let conflicting_components = Resource::conflicts(source_resources.chain(sink_resources));
 
@@ -282,7 +282,7 @@ impl From<&ConfigBuilder> for Graph {
         }
 
         for (name, config) in config.sinks.iter() {
-            graph.add_sink(name, config.inner.input_type(), config.inputs.clone());
+            graph.add_sink(name, config.inner.inner.input_type(), config.inputs.clone());
         }
 
         graph

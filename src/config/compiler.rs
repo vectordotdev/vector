@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, validation, Config, ExpandType, TransformOuter};
+use super::{builder::ConfigBuilder, validation, ComponentId, Config, ExpandType, TransformOuter};
 use indexmap::IndexMap;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -22,6 +22,24 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    let sources = builder
+        .sources
+        .into_iter()
+        .map(|(key, value)| (ComponentId::global(key), value))
+        .collect();
+
+    let transforms = builder
+        .transforms
+        .into_iter()
+        .map(|(key, value)| (ComponentId::global(key), value.into()))
+        .collect();
+
+    let sinks = builder
+        .sinks
+        .into_iter()
+        .map(|(key, value)| (ComponentId::global(key), value.into()))
+        .collect();
+
     if errors.is_empty() {
         Ok((
             Config {
@@ -29,9 +47,9 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
                 #[cfg(feature = "api")]
                 api: builder.api,
                 healthchecks: builder.healthchecks,
-                sources: builder.sources,
-                sinks: builder.sinks,
-                transforms: builder.transforms,
+                sources,
+                sinks,
+                transforms,
                 tests: builder.tests,
                 expansions,
             },
@@ -46,7 +64,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 /// configs. Performs those expansions and records the relevant metadata.
 pub(super) fn expand_macros(
     config: &mut ConfigBuilder,
-) -> Result<IndexMap<String, Vec<String>>, Vec<String>> {
+) -> Result<IndexMap<ComponentId, Vec<ComponentId>>, Vec<String>> {
     let mut expanded_transforms = IndexMap::new();
     let mut expansions = IndexMap::new();
     let mut errors = Vec::new();
@@ -84,6 +102,14 @@ pub(super) fn expand_macros(
         }
     }
     config.transforms = expanded_transforms;
+
+    let expansions = expansions
+        .into_iter()
+        .map(|(key, value)| {
+            let values = value.iter().map(ComponentId::global).collect();
+            (ComponentId::global(key), values)
+        })
+        .collect();
 
     if !errors.is_empty() {
         Err(errors)
@@ -232,12 +258,46 @@ mod test {
 
         let config = builder.build().expect("build should succeed");
 
-        assert_eq!(config.transforms["foos"].inputs, vec!["foo1", "foo2"]);
-        assert_eq!(config.sinks["baz"].inputs, vec!["foos", "bar"]);
         assert_eq!(
-            config.sinks["quux"].inputs,
-            vec!["foo1", "foo2", "bar", "foos"]
+            config
+                .transforms
+                .get(&ComponentId::global("foos"))
+                .map(|item| item.inputs.clone())
+                .unwrap(),
+            vec![ComponentId::global("foo1"), ComponentId::global("foo2")]
         );
-        assert_eq!(config.sinks["quix"].inputs, vec!["foo1", "foo2", "foos"]);
+        assert_eq!(
+            config
+                .sinks
+                .get(&ComponentId::global("baz"))
+                .map(|item| item.inputs.clone())
+                .unwrap(),
+            vec![ComponentId::global("foos"), ComponentId::global("bar")]
+        );
+        assert_eq!(
+            config
+                .sinks
+                .get(&ComponentId::global("quux"))
+                .map(|item| item.inputs.clone())
+                .unwrap(),
+            vec![
+                ComponentId::global("foo1"),
+                ComponentId::global("foo2"),
+                ComponentId::global("bar"),
+                ComponentId::global("foos")
+            ]
+        );
+        assert_eq!(
+            config
+                .sinks
+                .get(&ComponentId::global("quix"))
+                .map(|item| item.inputs.clone())
+                .unwrap(),
+            vec![
+                ComponentId::global("foo1"),
+                ComponentId::global("foo2"),
+                ComponentId::global("foos")
+            ]
+        );
     }
 }

@@ -14,8 +14,8 @@ use crate::kubernetes as k8s;
 use crate::kubernetes::hash_value::HashKey;
 use crate::{
     config::{
-        DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig, SourceContext,
-        SourceDescription,
+        ComponentId, DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig,
+        SourceContext, SourceDescription,
     },
     shutdown::ShutdownSignal,
     sources,
@@ -166,7 +166,7 @@ const COMPONENT_NAME: &str = "kubernetes_logs";
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Source::new(self, &cx.globals, &cx.name, &cx.proxy)?;
+        let source = Source::new(self, &cx.globals, &cx.id, &cx.proxy)?;
         Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
@@ -205,7 +205,7 @@ impl Source {
     fn new(
         config: &Config,
         globals: &GlobalOptions,
-        name: &str,
+        id: &ComponentId,
         proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
@@ -217,7 +217,7 @@ impl Source {
         };
         let client = k8s::client::Client::new(k8s_config, proxy)?;
 
-        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), name)?;
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), &id.name)?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = prepare_exclude_paths(config)?;

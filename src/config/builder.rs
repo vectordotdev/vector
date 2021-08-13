@@ -1,7 +1,7 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
+    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkInner, SinkOuter, SourceConfig,
     SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
@@ -50,9 +50,21 @@ impl From<Config> for ConfigBuilder {
             #[cfg(feature = "api")]
             api: c.api,
             healthchecks: c.healthchecks,
-            sources: c.sources,
-            sinks: c.sinks,
-            transforms: c.transforms,
+            sources: c
+                .sources
+                .into_iter()
+                .map(|(id, value)| (id.name, value))
+                .collect(),
+            sinks: c
+                .sinks
+                .into_iter()
+                .map(|(id, value)| (id.name, value.into()))
+                .collect(),
+            transforms: c
+                .transforms
+                .into_iter()
+                .map(|(id, value)| (id.name, value.into()))
+                .collect(),
             provider: None,
             tests: c.tests,
         }
@@ -85,7 +97,7 @@ impl ConfigBuilder {
         sink: S,
     ) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
-        let sink = SinkOuter::new(inputs, Box::new(sink));
+        let sink = SinkInner::new(inputs, Box::new(sink));
 
         self.sinks.insert(name.into(), sink);
     }

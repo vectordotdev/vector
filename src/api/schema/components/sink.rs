@@ -5,6 +5,7 @@ use crate::{
         metrics::{self, IntoSinkMetrics},
         sort,
     },
+    config::ComponentId,
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
@@ -12,9 +13,9 @@ use std::cmp;
 
 #[derive(Debug, Clone)]
 pub struct Data {
-    pub name: String,
+    pub id: ComponentId,
     pub component_type: String,
-    pub inputs: Vec<String>,
+    pub inputs: Vec<ComponentId>,
 }
 
 #[derive(Debug, Clone)]
@@ -22,7 +23,7 @@ pub struct Sink(pub Data);
 
 impl Sink {
     pub fn get_name(&self) -> &str {
-        self.0.name.as_str()
+        self.0.id.name.as_str()
     }
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
@@ -88,7 +89,7 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match state::component_by_name(name) {
+            .filter_map(|id| match state::component_by_id(id) {
                 Some(Component::Source(s)) => Some(s),
                 _ => None,
             })
@@ -100,7 +101,7 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match state::component_by_name(name) {
+            .filter_map(|id| match state::component_by_id(id) {
                 Some(Component::Transform(t)) => Some(t),
                 _ => None,
             })
@@ -120,17 +121,17 @@ mod tests {
     fn sink_fixtures() -> Vec<Sink> {
         vec![
             Sink(Data {
-                name: "webserver".to_string(),
+                id: ComponentId::global("webserver"),
                 component_type: "http".to_string(),
                 inputs: vec![],
             }),
             Sink(Data {
-                name: "db".to_string(),
+                id: ComponentId::global("db"),
                 component_type: "clickhouse".to_string(),
                 inputs: vec![],
             }),
             Sink(Data {
-                name: "zip_drive".to_string(),
+                id: ComponentId::global("zip_drive"),
                 component_type: "file".to_string(),
                 inputs: vec![],
             }),

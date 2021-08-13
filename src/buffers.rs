@@ -1,4 +1,4 @@
-use crate::config::Resource;
+use crate::config::{ComponentId, Resource};
 use crate::event::Event;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,7 @@ impl BufferConfig {
     pub fn build(
         &self,
         data_dir: &Option<PathBuf>,
-        sink_name: &str,
+        sink_id: &ComponentId,
     ) -> Result<(BufferInputCloner<Event>, EventStream, Acker), String> {
         let variant = match &self {
             BufferConfig::Memory {
@@ -65,7 +65,9 @@ impl BufferConfig {
                     .as_ref()
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
                     .to_path_buf(),
-                name: sink_name.to_string(),
+                // TODO find a better representation
+                // although sinks are only global for now
+                name: sink_id.name.clone(),
             },
         };
         build(variant)

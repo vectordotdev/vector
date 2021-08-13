@@ -5,10 +5,11 @@ pub mod transform;
 
 use crate::{
     api::schema::{
-        components::state::component_by_name,
+        components::state::component_by_id,
         filter::{self, filter_items},
         relay, sort,
     },
+    config::ComponentId,
     config::Config,
     filter_check,
 };
@@ -41,9 +42,9 @@ pub enum ComponentKind {
 impl Component {
     fn get_name(&self) -> &str {
         match self {
-            Component::Source(c) => c.0.name.as_str(),
-            Component::Transform(c) => c.0.name.as_str(),
-            Component::Sink(c) => c.0.name.as_str(),
+            Component::Source(c) => c.0.id.name.as_str(),
+            Component::Transform(c) => c.0.id.name.as_str(),
+            Component::Sink(c) => c.0.id.name.as_str(),
         }
     }
 
@@ -203,9 +204,11 @@ impl ComponentsQuery {
         .await
     }
 
-    /// Gets a configured component by name
-    async fn component_by_name(&self, name: String) -> Option<Component> {
-        component_by_name(&name)
+    /// Gets a configured component by id
+    async fn component_by_id(&self, name: String) -> Option<Component> {
+        // TODO use component id as parameter
+        let id = ComponentId::global(name);
+        component_by_id(&id)
     }
 }
 
@@ -249,11 +252,11 @@ pub fn update_config(config: &Config) {
     let mut new_components = HashMap::new();
 
     // Sources
-    for (name, source) in config.sources.iter() {
+    for (id, source) in config.sources.iter() {
         new_components.insert(
-            name.to_owned(),
+            id.clone(),
             Component::Source(source::Source(source::Data {
-                name: name.to_owned(),
+                id: id.clone(),
                 component_type: source.inner.source_type().to_string(),
                 output_type: source.inner.output_type(),
             })),
@@ -261,11 +264,11 @@ pub fn update_config(config: &Config) {
     }
 
     // Transforms
-    for (name, transform) in config.transforms.iter() {
+    for (id, transform) in config.transforms.iter() {
         new_components.insert(
-            name.to_string(),
+            id.clone(),
             Component::Transform(transform::Transform(transform::Data {
-                name: name.to_owned(),
+                id: id.clone(),
                 component_type: transform.inner.transform_type().to_string(),
                 inputs: transform.inputs.clone(),
             })),
@@ -273,39 +276,39 @@ pub fn update_config(config: &Config) {
     }
 
     // Sinks
-    for (name, sink) in config.sinks.iter() {
+    for (id, sink) in config.sinks.iter() {
         new_components.insert(
-            name.to_string(),
+            id.clone(),
             Component::Sink(sink::Sink(sink::Data {
-                name: name.to_owned(),
-                component_type: sink.inner.sink_type().to_string(),
+                id: id.clone(),
+                component_type: sink.inner.inner.sink_type().to_string(),
                 inputs: sink.inputs.clone(),
             })),
         );
     }
 
     // Get the names of existing components
-    let existing_component_names = state::get_component_names();
-    let new_component_names = new_components
+    let existing_component_ids = state::get_component_ids();
+    let new_component_ids = new_components
         .iter()
-        .map(|(name, _)| name.clone())
-        .collect::<HashSet<String>>();
+        .map(|(id, _)| id.clone())
+        .collect::<HashSet<ComponentId>>();
 
     // Publish all components that have been removed
-    existing_component_names
-        .difference(&new_component_names)
-        .for_each(|name| {
+    existing_component_ids
+        .difference(&new_component_ids)
+        .for_each(|id| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
-                state::component_by_name(name).expect("Couldn't get component by name"),
+                state::component_by_id(id).expect("Couldn't get component by name"),
             ));
         });
 
     // Publish all components that have been added
-    new_component_names
-        .difference(&existing_component_names)
-        .for_each(|name| {
+    new_component_ids
+        .difference(&existing_component_ids)
+        .for_each(|id| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
-                new_components.get(name).unwrap().clone(),
+                new_components.get(id).unwrap().clone(),
             ));
         });
 
@@ -316,35 +319,41 @@ pub fn update_config(config: &Config) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{api::schema::sort, config::DataType};
+    use crate::{
+        api::schema::sort,
+        config::{ComponentId, DataType},
+    };
 
     /// Generate component fixes for use with tests
     fn component_fixtures() -> Vec<Component> {
         vec![
             Component::Source(source::Source(source::Data {
-                name: "gen1".to_string(),
+                id: ComponentId::global("gen1"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                name: "gen2".to_string(),
+                id: ComponentId::global("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                name: "gen3".to_string(),
+                id: ComponentId::global("gen3"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Transform(transform::Transform(transform::Data {
-                name: "parse_json".to_string(),
+                id: ComponentId::global("parse_json"),
                 component_type: "json".to_string(),
-                inputs: vec!["gen1".to_string(), "gen2".to_string()],
+                inputs: vec![ComponentId::global("gen1"), ComponentId::global("gen2")],
             })),
             Component::Sink(sink::Sink(sink::Data {
-                name: "devnull".to_string(),
+                id: ComponentId::global("devnull"),
                 component_type: "blackhole".to_string(),
-                inputs: vec!["gen3".to_string(), "parse_json".to_string()],
+                inputs: vec![
+                    ComponentId::global("gen3"),
+                    ComponentId::global("parse_json"),
+                ],
             })),
         ]
     }
@@ -466,37 +475,43 @@ mod tests {
     fn components_sort_multi() {
         let mut components = vec![
             Component::Sink(sink::Sink(sink::Data {
-                name: "a".to_string(),
+                id: ComponentId::global("a"),
                 component_type: "blackhole".to_string(),
-                inputs: vec!["gen3".to_string(), "parse_json".to_string()],
+                inputs: vec![
+                    ComponentId::global("gen3"),
+                    ComponentId::global("parse_json"),
+                ],
             })),
             Component::Sink(sink::Sink(sink::Data {
-                name: "b".to_string(),
+                id: ComponentId::global("b"),
                 component_type: "blackhole".to_string(),
-                inputs: vec!["gen3".to_string(), "parse_json".to_string()],
+                inputs: vec![
+                    ComponentId::global("gen3"),
+                    ComponentId::global("parse_json"),
+                ],
             })),
             Component::Transform(transform::Transform(transform::Data {
-                name: "c".to_string(),
+                id: ComponentId::global("c"),
                 component_type: "json".to_string(),
-                inputs: vec!["gen1".to_string(), "gen2".to_string()],
+                inputs: vec![ComponentId::global("gen1"), ComponentId::global("gen2")],
             })),
             Component::Source(source::Source(source::Data {
-                name: "e".to_string(),
+                id: ComponentId::global("e"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                name: "d".to_string(),
+                id: ComponentId::global("d"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                name: "g".to_string(),
+                id: ComponentId::global("g"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                name: "f".to_string(),
+                id: ComponentId::global("f"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
