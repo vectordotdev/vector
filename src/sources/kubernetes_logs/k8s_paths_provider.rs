@@ -116,18 +116,18 @@ const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers"
 
 fn extract_excluded_containers_for_pod(pod: &Pod) -> impl Iterator<Item = &str> {
     let metadata = &pod.metadata;
-
-    metadata
-        .annotations
-        .iter()
-        .filter_map(|(key, value)| {
-            if key != CONTAINER_EXCLUSION_ANNOTATION_KEY {
-                return None;
-            }
-            Some(value)
-        })
-        .flat_map(|containers| containers.split(','))
-        .map(|container| container.trim())
+    metadata.annotations.iter().flat_map(|annotations| {
+        annotations
+            .iter()
+            .filter_map(|(key, value)| {
+                if key != CONTAINER_EXCLUSION_ANNOTATION_KEY {
+                    return None;
+                }
+                Some(value)
+            })
+            .flat_map(|containers| containers.split(','))
+            .map(|container| container.trim())
+    })
 }
 
 fn build_container_exclusion_patterns<'a>(
@@ -276,12 +276,14 @@ mod tests {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
-                        annotations: vec![(
-                            "kubernetes.io/config.mirror".to_owned(),
-                            "sandbox0-config-hashsum".to_owned(),
-                        )]
-                        .into_iter()
-                        .collect(),
+                        annotations: Some(
+                            vec![(
+                                "kubernetes.io/config.mirror".to_owned(),
+                                "sandbox0-config-hashsum".to_owned(),
+                            )]
+                            .into_iter()
+                            .collect(),
+                        ),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -307,7 +309,7 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: vec![].into_iter().collect(),
+                        annotations: Some(vec![].into_iter().collect()),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -318,12 +320,11 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: vec![(
-                            "some-other-annotation".to_owned(),
-                            "some value".to_owned(),
-                        )]
-                        .into_iter()
-                        .collect(),
+                        annotations: Some(
+                            vec![("some-other-annotation".to_owned(), "some value".to_owned())]
+                                .into_iter()
+                                .collect(),
+                        ),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -334,12 +335,14 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: vec![(
-                            super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
-                            "container1,container4".to_owned(),
-                        )]
-                        .into_iter()
-                        .collect(),
+                        annotations: Some(
+                            vec![(
+                                super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
+                                "container1,container4".to_owned(),
+                            )]
+                            .into_iter()
+                            .collect(),
+                        ),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -350,12 +353,14 @@ mod tests {
             (
                 Pod {
                     metadata: ObjectMeta {
-                        annotations: vec![(
-                            super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
-                            "container1, container4".to_owned(),
-                        )]
-                        .into_iter()
-                        .collect(),
+                        annotations: Some(
+                            vec![(
+                                super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
+                                "container1, container4".to_owned(),
+                            )]
+                            .into_iter()
+                            .collect(),
+                        ),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -381,12 +386,14 @@ mod tests {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
-                        annotations: vec![(
-                            super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
-                            "excluded1,excluded2".to_owned(),
-                        )]
-                        .into_iter()
-                        .collect(),
+                        annotations: Some(
+                            vec![(
+                                super::CONTAINER_EXCLUSION_ANNOTATION_KEY.to_owned(),
+                                "excluded1,excluded2".to_owned(),
+                            )]
+                            .into_iter()
+                            .collect(),
+                        ),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
