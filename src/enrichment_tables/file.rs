@@ -7,8 +7,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 struct FileConfig {
     filename: String,
+    encoding: String,
+    #[serde(default = "crate::serde::default_true")]
     include_headers: bool,
+    #[serde(default = "default_delimiter")]
     delimiter: char,
+}
+
+fn default_delimiter() -> char {
+    ','
 }
 
 #[async_trait::async_trait]
@@ -18,6 +25,10 @@ impl EnrichmentTableConfig for FileConfig {
         &self,
         _globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn super::EnrichmentTable + Send + Sync>> {
+        if self.encoding != "csv" {
+            return Err("Only csv encoding is currently supported.".into());
+        }
+
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(self.include_headers)
             .delimiter(self.delimiter as u8)
