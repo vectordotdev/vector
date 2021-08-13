@@ -8,7 +8,7 @@ use crate::{
     sources,
     tls::TlsConfig,
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -53,9 +53,9 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogAgentSource {
+        let source = Arc::new(DatadogAgentSource {
             store_api_key: self.store_api_key,
-        };
+        });
         // We accept /v1/input & /v1/input/<API_KEY>
         source.run(self.address, "/v1/input", false, &self.tls, &self.auth, cx)
     }
@@ -92,7 +92,7 @@ struct LogMsg {
 }
 
 fn decode_body(
-    body: Bytes,
+    body: BytesMut,
     api_key: Option<Arc<str>>,
     events: &mut Vec<Event>,
 ) -> Result<(), ErrorMessage> {
@@ -131,7 +131,7 @@ fn decode_body(
 impl HttpSource for DatadogAgentSource {
     fn build_events(
         &self,
-        body: Bytes,
+        body: BytesMut,
         header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
         request_path: &str,
@@ -176,7 +176,7 @@ mod tests {
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use bytes::Bytes;
+    use bytes::{Bytes, BytesMut};
     use futures::Stream;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
@@ -204,7 +204,9 @@ mod tests {
     #[test]
     fn test_decode_body() {
         fn inner(msgs: Vec<LogMsg>) -> TestResult {
-            let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
+            let messages = serde_json::to_string(&msgs).unwrap();
+            let mut body = BytesMut::new();
+            body.extend_from_slice(messages.as_bytes());
             let api_key = None;
 
             let mut events = Vec::with_capacity(msgs.len());

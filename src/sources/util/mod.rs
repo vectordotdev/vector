@@ -1,7 +1,10 @@
-#[cfg(any(feature = "sources-http"))]
-mod body_decoding;
 #[cfg(any(
+    feature = "sources-aws_s3",
+    feature = "sources-datadog",
+    feature = "sources-heroku_logs",
+    feature = "sources-http",
     feature = "sources-kafka",
+    feature = "sources-prometheus",
     feature = "sources-socket",
     feature = "sources-statsd",
     feature = "sources-stdin",
@@ -21,7 +24,12 @@ pub mod multiline_config;
 mod tcp;
 #[cfg(any(
     all(feature = "sources-utils-tls", feature = "listenfd"),
+    feature = "sources-aws_s3",
+    feature = "sources-datadog",
+    feature = "sources-heroku_logs",
+    feature = "sources-http",
     feature = "sources-kafka",
+    feature = "sources-prometheus",
     feature = "sources-socket",
     feature = "sources-statsd",
     feature = "sources-stdin",
@@ -34,8 +42,6 @@ mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
 mod unix_stream;
 
-#[cfg(any(feature = "sources-http"))]
-pub(crate) use self::body_decoding::{decode_body, Encoding};
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) use self::http::add_query_parameters;
 #[cfg(feature = "sources-prometheus")]
@@ -48,7 +54,12 @@ pub use multiline_config::MultilineConfig;
 pub use tcp::{SocketListenAddr, TcpSource};
 #[cfg(any(
     all(feature = "sources-utils-tls", feature = "listenfd"),
+    feature = "sources-aws_s3",
+    feature = "sources-datadog",
+    feature = "sources-heroku_logs",
+    feature = "sources-http",
     feature = "sources-kafka",
+    feature = "sources-prometheus",
     feature = "sources-socket",
     feature = "sources-statsd",
     feature = "sources-stdin",

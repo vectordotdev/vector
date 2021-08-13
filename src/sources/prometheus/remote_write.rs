@@ -9,11 +9,11 @@ use crate::{
     },
     tls::TlsConfig,
 };
-use bytes::Bytes;
+use bytes::BytesMut;
 use prometheus_parser::proto;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use warp::http::{HeaderMap, StatusCode};
 
 const SOURCE_NAME: &str = "prometheus_remote_write";
@@ -46,7 +46,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = RemoteWriteSource;
+        let source = Arc::new(RemoteWriteSource);
         source.run(self.address, "", true, &self.tls, &self.auth, cx)
     }
 
@@ -63,7 +63,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 struct RemoteWriteSource;
 
 impl RemoteWriteSource {
-    fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+    fn decode_body(&self, body: BytesMut) -> Result<Vec<Event>, ErrorMessage> {
         let request = proto::WriteRequest::decode(body).map_err(|error| {
             emit!(PrometheusRemoteWriteParseError {
                 error: error.clone()
@@ -85,7 +85,7 @@ impl RemoteWriteSource {
 impl HttpSource for RemoteWriteSource {
     fn build_events(
         &self,
-        mut body: Bytes,
+        mut body: BytesMut,
         header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
         _full_path: &str,

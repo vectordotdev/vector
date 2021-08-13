@@ -4,11 +4,11 @@ mod parsers;
 
 use crate::{event::Event, internal_events::DecoderParseFailed, sources::util::TcpError};
 use bytes::{Bytes, BytesMut};
-pub use config::{DecodingConfig, FramingConfig};
+pub use config::{DecodingConfig, FramingConfig, ParserConfig};
 pub use framing::OctetCountingDecoder;
-pub use parsers::BytesParser;
 #[cfg(feature = "sources-syslog")]
 pub use parsers::SyslogParser;
+pub use parsers::{BytesParser, JsonParser};
 use std::sync::Arc;
 use tokio_util::codec::LinesCodecError;
 

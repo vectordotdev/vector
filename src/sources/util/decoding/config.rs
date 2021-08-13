@@ -45,6 +45,7 @@ pub enum ParserConfig {
     Bytes,
     #[cfg(feature = "sources-syslog")]
     Syslog,
+    Json,
 }
 
 #[derive(Debug, Copy, Clone, Default, Deserialize, Serialize)]
@@ -72,6 +73,7 @@ impl DecodingConfig {
             Some(ParserConfig::Bytes) | None => Box::new(super::BytesParser),
             #[cfg(feature = "sources-syslog")]
             Some(ParserConfig::Syslog) => Box::new(super::SyslogParser),
+            Some(ParserConfig::Json) => Box::new(super::JsonParser),
         };
 
         Decoder::new(framer, parser)

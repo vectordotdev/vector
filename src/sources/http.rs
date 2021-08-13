@@ -5,21 +5,23 @@ use crate::{
     },
     event::{Event, Value},
     sources::util::{
-        add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        add_query_parameters,
+        decoding::{self, DecodingConfig},
+        ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
     tls::TlsConfig,
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use tokio_util::codec::Decoder;
 
 use warp::http::{HeaderMap, HeaderValue};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct SimpleHttpConfig {
     address: SocketAddr,
-    #[serde(default)]
-    encoding: Encoding,
     #[serde(default)]
     headers: Vec<String>,
     #[serde(default)]
@@ -32,6 +34,8 @@ pub struct SimpleHttpConfig {
     path: String,
     #[serde(default = "default_path_key")]
     path_key: String,
+    #[serde(flatten)]
+    decoding: DecodingConfig,
 }
 
 inventory::submit! {
@@ -42,7 +46,6 @@ impl GenerateConfig for SimpleHttpConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:8080".parse().unwrap(),
-            encoding: Default::default(),
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
@@ -50,6 +53,7 @@ impl GenerateConfig for SimpleHttpConfig {
             path_key: "path".to_string(),
             path: "/".to_string(),
             strict_path: true,
+            decoding: Default::default(),
         })
         .unwrap()
     }
@@ -63,9 +67,8 @@ fn default_path_key() -> String {
     "path".to_string()
 }
 
-#[derive(Clone)]
 struct SimpleHttpSource {
-    encoding: Encoding,
+    build_decoder: Box<dyn Fn() -> decoding::Decoder + Send + Sync>,
     headers: Vec<String>,
     query_parameters: Vec<String>,
     path_key: String,
@@ -74,23 +77,29 @@ struct SimpleHttpSource {
 impl HttpSource for SimpleHttpSource {
     fn build_events(
         &self,
-        body: Bytes,
+        mut body: BytesMut,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        decode_body(body, self.encoding)
-            .map(|events| add_headers(events, &self.headers, header_map))
-            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
-            .map(|events| add_path(events, self.path_key.as_str(), request_path))
-            .map(|mut events| {
-                // Add source type
-                let key = log_schema().source_type_key();
-                for event in &mut events {
-                    event.as_mut_log().try_insert(key, Bytes::from("http"));
-                }
-                events
-            })
+        let mut decoder = (self.build_decoder)();
+        let mut events = Vec::new();
+
+        while let Ok(Some((event, _byte_size))) = decoder.decode_eof(&mut body) {
+            events.push(event);
+        }
+
+        add_headers(&mut events, &self.headers, header_map);
+        add_query_parameters(&mut events, &self.query_parameters, query_parameters);
+        add_path(&mut events, self.path_key.as_str(), request_path);
+
+        for event in &mut events {
+            event
+                .as_mut_log()
+                .try_insert(log_schema().source_type_key(), Bytes::from("http"));
+        }
+
+        Ok(events)
     }
 }
 
@@ -98,12 +107,13 @@ impl HttpSource for SimpleHttpSource {
 #[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = SimpleHttpSource {
-            encoding: self.encoding,
+        let decoding = self.decoding;
+        let source = Arc::new(SimpleHttpSource {
+            build_decoder: Box::new(move || decoding.build()),
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),
             path_key: self.path_key.clone(),
-        };
+        });
         source.run(
             self.address,
             self.path.as_str(),
@@ -127,21 +137,15 @@ impl SourceConfig for SimpleHttpConfig {
     }
 }
 
-fn add_path(mut events: Vec<Event>, key: &str, path: &str) -> Vec<Event> {
+fn add_path(events: &mut [Event], key: &str, path: &str) {
     for event in events.iter_mut() {
         event
             .as_mut_log()
             .insert(key, Value::from(path.to_string()));
     }
-
-    events
 }
 
-fn add_headers(
-    mut events: Vec<Event>,
-    headers_config: &[String],
-    headers: HeaderMap,
-) -> Vec<Event> {
+fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderMap) {
     for header_name in headers_config {
         let value = headers.get(header_name).map(HeaderValue::as_bytes);
 
@@ -152,16 +156,15 @@ fn add_headers(
             );
         }
     }
-
-    events
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Encoding, SimpleHttpConfig};
+    use super::*;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
+        sources::util::decoding::ParserConfig,
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -182,7 +185,6 @@ mod tests {
     }
 
     async fn source(
-        encoding: Encoding,
         headers: Vec<String>,
         query_parameters: Vec<String>,
         path_key: &str,
@@ -190,6 +192,7 @@ mod tests {
         strict_path: bool,
         status: EventStatus,
         acknowledgements: bool,
+        decoding: DecodingConfig,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
@@ -200,7 +203,6 @@ mod tests {
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,
-                encoding,
                 headers,
                 query_parameters,
                 tls: None,
@@ -208,6 +210,7 @@ mod tests {
                 strict_path,
                 path_key,
                 path,
+                decoding,
             }
             .build(context)
             .await
@@ -291,7 +294,6 @@ mod tests {
         let body = "test body\n\ntest body 2";
 
         let (rx, addr) = source(
-            Encoding::default(),
             vec![],
             vec![],
             "http_path",
@@ -299,6 +301,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            Default::default(),
         )
         .await;
 
@@ -330,7 +333,6 @@ mod tests {
         let body = "test body\n\ntest body 2\n";
 
         let (rx, addr) = source(
-            Encoding::default(),
             vec![],
             vec![],
             "http_path",
@@ -338,6 +340,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            Default::default(),
         )
         .await;
 
@@ -362,45 +365,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn http_multiline_text3() {
-        trace_init();
-
-        //same as above test but with a binary encoding
-        let body = "test body\n\ntest body 2\n";
-
-        let (rx, addr) = source(
-            Encoding::Binary,
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-        )
-        .await;
-
-        let mut events = spawn_ok_collect_n(send(addr, body), rx, 1).await;
-
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key()],
-                "test body\n\ntest body 2\n".into()
-            );
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
-        }
-    }
-
-    #[tokio::test]
     async fn http_json_parsing() {
         trace_init();
 
         let (rx, addr) = source(
-            Encoding::Json,
             vec![],
             vec![],
             "http_path",
@@ -408,6 +376,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -441,7 +410,6 @@ mod tests {
         trace_init();
 
         let (rx, addr) = source(
-            Encoding::Json,
             vec![],
             vec![],
             "http_path",
@@ -449,6 +417,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -485,7 +454,6 @@ mod tests {
         trace_init();
 
         let (rx, addr) = source(
-            Encoding::Json,
             vec![],
             vec![],
             "http_path",
@@ -493,6 +461,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -528,7 +497,6 @@ mod tests {
         trace_init();
 
         let (rx, addr) = source(
-            Encoding::Ndjson,
             vec![],
             vec![],
             "http_path",
@@ -536,6 +504,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -580,7 +549,6 @@ mod tests {
         headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
 
         let (rx, addr) = source(
-            Encoding::Ndjson,
             vec![
                 "User-Agent".to_string(),
                 "Upgrade-Insecure-Requests".to_string(),
@@ -592,6 +560,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -619,7 +588,6 @@ mod tests {
     async fn http_query() {
         trace_init();
         let (rx, addr) = source(
-            Encoding::Ndjson,
             vec![],
             vec![
                 "source".to_string(),
@@ -631,6 +599,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -672,7 +641,6 @@ mod tests {
         headers.insert("Content-Encoding", "gzip, deflate".parse().unwrap());
 
         let (rx, addr) = source(
-            Encoding::default(),
             vec![],
             vec![],
             "http_path",
@@ -680,6 +648,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            Default::default(),
         )
         .await;
 
@@ -699,7 +668,6 @@ mod tests {
     async fn http_path() {
         trace_init();
         let (rx, addr) = source(
-            Encoding::Ndjson,
             vec![],
             vec![],
             "vector_http_path",
@@ -707,6 +675,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -731,7 +700,6 @@ mod tests {
     async fn http_path_no_restriction() {
         trace_init();
         let (rx, addr) = source(
-            Encoding::Ndjson,
             vec![],
             vec![],
             "vector_http_path",
@@ -739,6 +707,7 @@ mod tests {
             false,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -780,7 +749,6 @@ mod tests {
     async fn http_wrong_path() {
         trace_init();
         let (_rx, addr) = source(
-            Encoding::Ndjson,
             vec![],
             vec![],
             "vector_http_path",
@@ -788,6 +756,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
+            DecodingConfig::new(None, Some(ParserConfig::Json)),
         )
         .await;
 
@@ -802,7 +771,6 @@ mod tests {
         trace_init();
 
         let (rx, addr) = source(
-            Encoding::default(),
             vec![],
             vec![],
             "http_path",
@@ -810,6 +778,7 @@ mod tests {
             true,
             EventStatus::Failed,
             true,
+            Default::default(),
         )
         .await;
 
@@ -828,7 +797,6 @@ mod tests {
         trace_init();
 
         let (rx, addr) = source(
-            Encoding::default(),
             vec![],
             vec![],
             "http_path",
@@ -836,6 +804,7 @@ mod tests {
             true,
             EventStatus::Failed,
             false,
+            Default::default(),
         )
         .await;
 

@@ -8,7 +8,7 @@ use crate::{
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
 };
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -16,6 +16,7 @@ use std::{
     io::{BufRead, BufReader},
     net::SocketAddr,
     str::FromStr,
+    sync::Arc,
 };
 
 use warp::http::{HeaderMap, StatusCode};
@@ -57,13 +58,16 @@ struct LogplexSource {
 impl HttpSource for LogplexSource {
     fn build_events(
         &self,
-        body: Bytes,
+        body: BytesMut,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        decode_message(body, header_map)
-            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
+        let mut events = decode_message(body, header_map)?;
+
+        add_query_parameters(&mut events, &self.query_parameters, query_parameters);
+
+        Ok(events)
     }
 }
 
@@ -71,9 +75,9 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = LogplexSource {
+        let source = Arc::new(LogplexSource {
             query_parameters: self.query_parameters.clone(),
-        };
+        });
         source.run(self.address, "events", true, &self.tls, &self.auth, cx)
     }
 
@@ -114,7 +118,7 @@ impl SourceConfig for LogplexCompatConfig {
     }
 }
 
-fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
+fn decode_message(body: BytesMut, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
     // Deal with headers
     let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
         Ok(v) => v,
@@ -165,7 +169,7 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     )
 }
 
-fn body_to_events(body: Bytes) -> Vec<Event> {
+fn body_to_events(body: BytesMut) -> Vec<Event> {
     let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {

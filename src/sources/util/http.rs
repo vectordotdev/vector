@@ -5,7 +5,7 @@ use crate::{
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::{DeflateDecoder, MultiGzDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
@@ -24,10 +24,10 @@ use warp::{
 
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) fn add_query_parameters(
-    mut events: Vec<Event>,
+    events: &mut [Event],
     query_parameters_config: &[String],
     query_parameters: HashMap<String, String>,
-) -> Vec<Event> {
+) {
     for query_parameter_name in query_parameters_config {
         let value = query_parameters.get(query_parameter_name);
         for event in events.iter_mut() {
@@ -37,8 +37,6 @@ pub(crate) fn add_query_parameters(
             );
         }
     }
-
-    events
 }
 
 #[derive(Serialize, Debug)]
@@ -127,7 +125,7 @@ impl HttpSourceAuth {
     }
 }
 
-pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
+pub fn decode(header: &Option<String>, mut body: BytesMut) -> Result<BytesMut, ErrorMessage> {
     if let Some(encodings) = header {
         for encoding in encodings.rsplit(',').map(str::trim) {
             body = match encoding {
@@ -137,19 +135,30 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
                     MultiGzDecoder::new(body.reader())
                         .read_to_end(&mut decoded)
                         .map_err(|error| handle_decode_error(encoding, error))?;
-                    decoded.into()
+                    // TODO: Read into `BytesMut` directly instead of copying.
+                    let mut buf = BytesMut::new();
+                    buf.extend_from_slice(&decoded);
+                    buf
                 }
                 "deflate" => {
                     let mut decoded = Vec::new();
                     DeflateDecoder::new(body.reader())
                         .read_to_end(&mut decoded)
                         .map_err(|error| handle_decode_error(encoding, error))?;
-                    decoded.into()
+                    // TODO: Read into `BytesMut` directly instead of copying.
+                    let mut buf = BytesMut::new();
+                    buf.extend_from_slice(&decoded);
+                    buf
                 }
-                "snappy" => SnappyDecoder::new()
-                    .decompress_vec(&body)
-                    .map_err(|error| handle_decode_error(encoding, error))?
-                    .into(),
+                "snappy" => {
+                    let decoded = SnappyDecoder::new()
+                        .decompress_vec(&body)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    // TODO: Read into `BytesMut` directly instead of copying.
+                    let mut buf = BytesMut::new();
+                    buf.extend_from_slice(&decoded);
+                    buf
+                }
                 encoding => {
                     return Err(ErrorMessage::new(
                         StatusCode::UNSUPPORTED_MEDIA_TYPE,
@@ -175,17 +184,17 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 }
 
 #[async_trait]
-pub trait HttpSource: Clone + Send + Sync + 'static {
+pub trait HttpSource: Send + Sync + 'static {
     fn build_events(
         &self,
-        body: Bytes,
+        body: BytesMut,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
-        self,
+        self: Arc<Self>,
         address: SocketAddr,
         path: &str,
         strict_path: bool,
@@ -234,12 +243,22 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           query_parameters: HashMap<String, String>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
 
+                        // TODO: Can we avoid copying here?
+                        let body = {
+                            let mut buf = BytesMut::new();
+                            buf.extend_from_slice(&body);
+                            buf
+                        };
+
+                        let source = Arc::clone(&self);
+
                         let events = auth
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
                                 let body_len = body.len();
-                                self.build_events(body, headers, query_parameters, path.as_str())
+                                source
+                                    .build_events(body, headers, query_parameters, path.as_str())
                                     .map(|events| (events, body_len))
                             });
 
