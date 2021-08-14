@@ -80,6 +80,9 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
+use shadow_rs::shadow;
+shadow!(built_info);
+
 pub use pipeline::Pipeline;
 
 pub use vector_core::{event, mapping, metrics, Error, Result};
@@ -98,25 +101,20 @@ pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
     let build_string = match build_desc {
-        Some(desc) => format!("{} {}", built_info::TARGET, desc),
-        None => built_info::TARGET.into(),
+        Some(desc) => format!("{} {}", built_info::BUILD_TARGET, desc),
+        None => built_info::BUILD_TARGET.into(),
     };
 
     // We do not add 'debug' to the BUILD_DESC unless the caller has flagged on line
     // or full debug symbols. See the Cargo Book profiling section for value meaning:
     // https://doc.rust-lang.org/cargo/reference/profiles.html#debug
-    let build_string = match built_info::DEBUG {
+    let build_string = match built_info::BUILD_RUST_CHANNEL {
         "1" => format!("{} debug=line", build_string),
         "2" | "true" => format!("{} debug=full", build_string),
         _ => build_string,
     };
 
     format!("{} ({})", pkg_version, build_string)
-}
-
-#[allow(unused)]
-pub mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
 pub fn get_hostname() -> std::io::Result<String> {

@@ -7,7 +7,7 @@ use structopt::StructOpt;
 use crate::cli::handle_config_errors;
 use crate::config;
 
-const DEFAULT_SERVICE_NAME: &str = crate::built_info::PKG_NAME;
+const DEFAULT_SERVICE_NAME: &str = crate::built_info::PROJECT_NAME;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
