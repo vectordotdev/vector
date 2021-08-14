@@ -360,7 +360,7 @@ mod tests {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
             let delay = Arc::new(AtomicBool::new(true));
             tower::service_fn(move |req: PartitionInnerBuffer<_, _>| {
                 let (req, _) = req.into_parts();
