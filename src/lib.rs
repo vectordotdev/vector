@@ -80,16 +80,19 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
+use shadow_rs::shadow;
+shadow!(built_info);
+
 pub use pipeline::Pipeline;
 
 pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
-    let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
+        let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
 
     #[cfg(not(feature = "nightly"))]
-    let pkg_version = built_info::PKG_VERSION;
+        let pkg_version = built_info::PKG_VERSION;
 
     pkg_version
 }
@@ -98,8 +101,8 @@ pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
     let build_string = match build_desc {
-        Some(desc) => format!("{} {}", built_info::TARGET, desc),
-        None => built_info::TARGET.into(),
+        Some(desc) => format!("{} {}", built_info::BUILD_TARGET, desc),
+        None => built_info::BUILD_TARGET.into(),
     };
 
     // We do not add 'debug' to the BUILD_DESC unless the caller has flagged on line
@@ -112,11 +115,6 @@ pub fn get_version() -> String {
     };
 
     format!("{} ({})", pkg_version, build_string)
-}
-
-#[allow(unused)]
-pub mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
 pub fn get_hostname() -> std::io::Result<String> {
