@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use vrl::prelude::*;
+use vrl::{prelude::*, IndexHandle};
 #[derive(Clone, Copy, Debug)]
 pub struct FindTableRow;
 impl Function for FindTableRow {
@@ -30,7 +30,11 @@ impl Function for FindTableRow {
         let table = arguments.required_enrichment_table("table")?;
         let condition = arguments.required_object("condition")?;
 
-        Ok(Box::new(FindTableRowFn { table, condition }))
+        Ok(Box::new(FindTableRowFn {
+            table,
+            condition,
+            index: None,
+        }))
     }
 }
 
@@ -38,6 +42,7 @@ impl Function for FindTableRow {
 pub struct FindTableRowFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
+    index: Option<IndexHandle>,
 }
 
 impl Expression for FindTableRowFn {
@@ -58,7 +63,7 @@ impl Expression for FindTableRowFn {
             .as_ref()
             .ok_or("enrichment tables not loaded")?;
 
-        match tables.find_table_row(&self.table, condition)? {
+        match tables.find_table_row(&self.table, condition, self.index)? {
             None => Err("data not found".into()),
             Some(data) => Ok(Value::Object(
                 data.into_iter()
@@ -69,7 +74,7 @@ impl Expression for FindTableRowFn {
     }
 
     fn update_state(
-        &self,
+        &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
         match state.get_enrichment_tables_mut() {
@@ -112,6 +117,7 @@ mod tests {
             &self,
             table: &str,
             criteria: BTreeMap<&str, String>,
+            index: Option<IndexHandle>,
         ) -> std::result::Result<Option<BTreeMap<String, String>>, String> {
             assert_eq!(table, "table");
             assert_eq!(
@@ -120,6 +126,7 @@ mod tests {
                     "field" => "value".to_string(),
                 }
             );
+            assert_eq!(index, Some(IndexHandle(999)));
 
             Ok(Some(btreemap! {
                 "field".to_string() => "value".to_string(),
@@ -127,11 +134,15 @@ mod tests {
             }))
         }
 
-        fn add_index(&mut self, table: &str, fields: Vec<&str>) -> std::result::Result<(), String> {
+        fn add_index(
+            &mut self,
+            table: &str,
+            fields: Vec<&str>,
+        ) -> std::result::Result<IndexHandle, String> {
             assert_eq!("table", table);
             assert_eq!(vec!["field"], fields);
 
-            Ok(())
+            Ok(IndexHandle(999))
         }
     }
 
@@ -142,6 +153,7 @@ mod tests {
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
             },
+            index: Some(IndexHandle(999)),
         };
 
         let tz = TimeZone::default();
@@ -170,11 +182,13 @@ mod tests {
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
             },
+            index: None,
         };
 
         let enrichment_tables = Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTables>;
         let mut compiler = state::Compiler::new_with_enrichment_tables(enrichment_tables);
 
         assert_eq!(Ok(()), func.update_state(&mut compiler));
+        assert_eq!(Some(IndexHandle(999)), func.index);
     }
 }

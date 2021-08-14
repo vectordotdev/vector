@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::collections::BTreeMap;
-use vector::enrichment_tables::{file::File, file::IndexingStrategy, EnrichmentTable};
+use vector::enrichment_tables::{file::File, EnrichmentTable};
 
 criterion_group!(
     name = benches;
@@ -12,37 +12,28 @@ criterion_main!(benches);
 fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     let mut group = c.benchmark_group("enrichment_tables_file");
 
-    let setup = |strategy| {
-        (
-            {
-                let mut file = File::new(
-                    strategy,
-                    (0..1000)
-                        .map(|idx| vec![format!("field{}", idx)])
-                        .collect::<Vec<_>>(),
-                    vec!["field".to_string()],
-                );
-                file.add_index(vec!["field"]);
-                file
-            },
-            {
-                let mut condition = BTreeMap::new();
-                condition.insert("field", "field999".to_string());
-                condition
-            },
-            {
-                let mut result = BTreeMap::new();
-                result.insert("field".to_string(), "field999".to_string());
-                result
-            },
-        )
+    let setup = || {
+        let mut file = File::new(
+            (0..1000)
+                .map(|idx| vec![format!("field{}", idx)])
+                .collect::<Vec<_>>(),
+            vec!["field".to_string()],
+        );
+        let index = file.add_index(vec!["field"]).unwrap();
+        let mut condition = BTreeMap::new();
+        condition.insert("field", "field999".to_string());
+
+        let mut result = BTreeMap::new();
+        result.insert("field".to_string(), "field999".to_string());
+
+        (file, index, condition, result)
     };
 
     group.bench_function("enrichment_tables/file_noindex", |b| {
         b.iter_batched(
-            || setup(IndexingStrategy::None),
-            |(file, condition, expected)| {
-                assert_eq!(Some(expected), file.find_table_row(condition))
+            || setup(),
+            |(file, _index, condition, expected)| {
+                assert_eq!(Some(expected), file.find_table_row(condition, None))
             },
             BatchSize::SmallInput,
         );
@@ -50,11 +41,11 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
 
     group.bench_function("enrichment_tables/file_hashindex", |b| {
         b.iter_batched(
-            || setup(IndexingStrategy::Hash),
-            |(file, condition, expected)| {
+            || setup(),
+            |(file, index, condition, expected)| {
                 let mut result = BTreeMap::new();
                 result.insert("field".to_string(), "field999".to_string());
-                assert_eq!(Some(expected), file.find_table_row(condition))
+                assert_eq!(Some(expected), file.find_table_row(condition, Some(index)))
             },
             BatchSize::SmallInput,
         );

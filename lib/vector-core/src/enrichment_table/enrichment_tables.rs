@@ -1,4 +1,4 @@
-use super::EnrichmentTable;
+use super::{EnrichmentTable, IndexHandle};
 use arc_swap::ArcSwap;
 #[cfg(feature = "vrl")]
 use std::collections::BTreeMap;
@@ -115,12 +115,13 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
         &'a self,
         table: &str,
         criteria: BTreeMap<&str, String>,
+        index: Option<IndexHandle>,
     ) -> Result<Option<BTreeMap<String, String>>, String> {
         let tables = self.tables.load_full();
         if let Some(ref tables) = *tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => Ok(table.find_table_row(criteria)),
+                Some(table) => Ok(table.find_table_row(criteria, index)),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -133,17 +134,14 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
-    fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String> {
+    fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<IndexHandle, String> {
         let mut locked = self.loading.lock().unwrap();
 
         match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => {
-                    table.add_index(fields);
-                    Ok(())
-                }
+                Some(table) => table.add_index(fields),
             },
         }
     }
@@ -182,13 +180,15 @@ mod tests {
         fn find_table_row(
             &self,
             _criteria: BTreeMap<&str, String>,
+            _index: Option<vrl_core::IndexHandle>,
         ) -> Option<BTreeMap<String, String>> {
             Some(self.data.clone())
         }
 
-        fn add_index(&mut self, fields: Vec<&str>) {
+        fn add_index(&mut self, fields: Vec<&str>) -> Result<vrl_core::IndexHandle, String> {
             let mut indexes = self.indexes.lock().unwrap();
             indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
+            Ok(IndexHandle(indexes.len() - 1))
         }
     }
 
@@ -211,7 +211,7 @@ mod tests {
         let dummy = DummyEnrichmentTable::new_with_index(indexes.clone());
         tables.insert("dummy1".to_string(), Box::new(dummy));
         let mut tables = super::EnrichmentTables::new(tables);
-        assert_eq!(Ok(()), tables.add_index("dummy1", vec!["erk"]));
+        assert_eq!(Ok(IndexHandle(1)), tables.add_index("dummy1", vec!["erk"]));
 
         let indexes = indexes.lock().unwrap();
         assert_eq!(vec!["erk".to_string()], *indexes[0]);
@@ -230,7 +230,8 @@ mod tests {
                 "dummy1",
                 btreemap! {
                     "thing" => "thang"
-                }
+                },
+                None
             )
         );
     }
@@ -265,7 +266,8 @@ mod tests {
                 "dummy1",
                 btreemap! {
                     "thing" => "thang"
-                }
+                },
+                None
             )
         );
     }
@@ -291,7 +293,8 @@ mod tests {
                 "dummy1",
                 btreemap! {
                     "thing" => "thang"
-                }
+                },
+                None
             )
         );
     }

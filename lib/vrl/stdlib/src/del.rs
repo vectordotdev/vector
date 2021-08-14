@@ -127,7 +127,7 @@ impl Expression for DelFn {
     }
 
     fn update_state(
-        &self,
+        &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
         self.query.delete_type_def(state);
