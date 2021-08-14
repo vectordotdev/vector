@@ -364,7 +364,6 @@ mod tests {
             let delay = Arc::new(AtomicBool::new(true));
             tower::service_fn(move |req: PartitionInnerBuffer<_, _>| {
                 let (req, _) = req.into_parts();
-                let sent_requests = Arc::clone(&sent_requests);
                 if delay.swap(false, AcqRel) {
                     // Error on first request
                     future::err::<(), _>(std::io::Error::new(std::io::ErrorKind::Other, "")).boxed()
