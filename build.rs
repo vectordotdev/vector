@@ -34,7 +34,23 @@ fn main() {
     shadow_rs::new_hook(hook).unwrap();
 }
 
-fn hook(mut file: &File) -> SdResult<()> {
+fn hook(file: &File) -> SdResult<()> {
+    append_build_debug(file)?;
+    append_build_desc(file)?;
+    Ok(())
+}
+
+fn append_build_debug(mut file: &File) -> SdResult<()> {
+    let hook_const: String = format!(
+        r#"/// Level of debug info for Vector.
+    pub const DEBUG: &str = "{}";"#,
+        std::env::var("DEBUG")?
+    );
+    writeln!(&mut file, "{}", hook_const)?;
+    Ok(())
+}
+
+fn append_build_desc(mut file: &File) -> SdResult<()> {
     let build_desc = std::env::var("VECTOR_BUILD_DESC")
         .map(|x| format!(r#""Some(\"{}\")""#, x))
         .unwrap_or("None".to_string());

@@ -10,7 +10,7 @@ impl InternalEvent for VectorStarted {
         info!(
             target: "vector",
             message = "Vector has started.",
-            debug = built_info::BUILD_RUST_CHANNEL,
+            debug = built_info::DEBUG,
             version = built_info::PKG_VERSION,
             arch = built_info::BUILD_TARGET_ARCH,
             build_id = built_info::VECTOR_BUILD_DESC.unwrap_or("none"),

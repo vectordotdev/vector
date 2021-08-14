@@ -108,7 +108,7 @@ pub fn get_version() -> String {
     // We do not add 'debug' to the BUILD_DESC unless the caller has flagged on line
     // or full debug symbols. See the Cargo Book profiling section for value meaning:
     // https://doc.rust-lang.org/cargo/reference/profiles.html#debug
-    let build_string = match built_info::BUILD_RUST_CHANNEL {
+    let build_string = match built_info::DEBUG {
         "1" => format!("{} debug=line", build_string),
         "2" | "true" => format!("{} debug=full", build_string),
         _ => build_string,
