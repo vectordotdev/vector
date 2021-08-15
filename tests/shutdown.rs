@@ -328,8 +328,7 @@ fn timely_shutdown_http() {
     test_timely_shutdown(source_vector(
         r#"
     type = "http"
-    address = "${VECTOR_TEST_ADDRESS}"
-    encoding = "text""#,
+    address = "${VECTOR_TEST_ADDRESS}""#,
     ));
 }
 
