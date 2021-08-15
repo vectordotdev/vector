@@ -4,7 +4,7 @@ use vector::enrichment_tables::{file::File, EnrichmentTable};
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().noise_threshold(0.02);
+    config = Criterion::default().noise_threshold(0.02).sample_size(10);
     targets = benchmark_enrichment_tables_file
 );
 criterion_main!(benches);
@@ -12,26 +12,45 @@ criterion_main!(benches);
 fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     let mut group = c.benchmark_group("enrichment_tables_file");
 
-    let setup = || {
+    let setup = |size| {
         let mut file = File::new(
-            (0..1000)
-                .map(|idx| vec![format!("field{}", idx)])
+            // Data
+            (0..size)
+                .map(|row| {
+                    // Add 10 columns
+                    (0..10)
+                        .map(|col| format!("data-{}-{}", col, row))
+                        .collect::<Vec<_>>()
+                })
                 .collect::<Vec<_>>(),
-            vec!["field".to_string()],
+            // Headers
+            (0..10)
+                .map(|header| format!("field-{}", header))
+                .collect::<Vec<_>>(),
         );
-        let index = file.add_index(vec!["field"]).unwrap();
-        let mut condition = BTreeMap::new();
-        condition.insert("field", "field999".to_string());
 
-        let mut result = BTreeMap::new();
-        result.insert("field".to_string(), "field999".to_string());
+        // Search on the first and last field.
+        let index = file.add_index(vec!["field-0", "field-9"]).unwrap();
+
+        let mut condition = BTreeMap::new();
+        condition.insert("field-0", format!("data-0-{}", size - 1));
+        condition.insert("field-9", format!("data-9-{}", size - 1));
+
+        let result = (0..10)
+            .map(|idx| {
+                (
+                    format!("field-{}", idx),
+                    format!("data-{}-{}", idx, size - 1),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
 
         (file, index, condition, result)
     };
 
-    group.bench_function("enrichment_tables/file_noindex", |b| {
+    group.bench_function("enrichment_tables/file_noindex_10", |b| {
         b.iter_batched(
-            || setup(),
+            || setup(10),
             |(file, _index, condition, expected)| {
                 assert_eq!(Some(expected), file.find_table_row(condition, None))
             },
@@ -39,12 +58,70 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         );
     });
 
-    group.bench_function("enrichment_tables/file_hashindex", |b| {
+    group.bench_function("enrichment_tables/file_hashindex_10", |b| {
         b.iter_batched(
-            || setup(),
+            || setup(10),
             |(file, index, condition, expected)| {
-                let mut result = BTreeMap::new();
-                result.insert("field".to_string(), "field999".to_string());
+                assert_eq!(Some(expected), file.find_table_row(condition, Some(index)))
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/file_noindex_1_000", |b| {
+        b.iter_batched(
+            || setup(1_000),
+            |(file, _index, condition, expected)| {
+                assert_eq!(Some(expected), file.find_table_row(condition, None))
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/file_hashindex_1_000", |b| {
+        b.iter_batched(
+            || setup(1_000),
+            |(file, index, condition, expected)| {
+                assert_eq!(Some(expected), file.find_table_row(condition, Some(index)))
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/file_noindex_10_000", |b| {
+        b.iter_batched(
+            || setup(10_000),
+            |(file, _index, condition, expected)| {
+                assert_eq!(Some(expected), file.find_table_row(condition, None))
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/file_hashindex_10_000", |b| {
+        b.iter_batched(
+            || setup(10_000),
+            |(file, index, condition, expected)| {
+                assert_eq!(Some(expected), file.find_table_row(condition, Some(index)))
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/file_noindex_1_000_000", |b| {
+        b.iter_batched(
+            || setup(1_000_000),
+            |(file, _index, condition, expected)| {
+                assert_eq!(Some(expected), file.find_table_row(condition, None))
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/file_hashindex_1_000_000", |b| {
+        b.iter_batched(
+            || setup(1_000_000),
+            |(file, index, condition, expected)| {
                 assert_eq!(Some(expected), file.find_table_row(condition, Some(index)))
             },
             BatchSize::SmallInput,

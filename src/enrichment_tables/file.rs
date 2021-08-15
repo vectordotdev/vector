@@ -67,9 +67,7 @@ impl_generate_config_from_default!(FileConfig);
 pub struct File {
     data: Vec<Vec<String>>,
     headers: Vec<String>,
-    // Indexes are tuple of the position within the header of the fields to a hashmap of the hash
-    // of those fields to the index of the row found in the data.
-    indexes: Vec<(Vec<usize>, BTreeMap<u64, Vec<usize>>)>,
+    indexes: Vec<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>>,
 }
 
 impl File {
@@ -104,7 +102,11 @@ impl File {
 
     /// Creates an index with the given fields.
     /// Uses seahash to create a hash of the data that is stored in a hashmap.
-    fn index_data(&self, index: Vec<&str>) -> (Vec<usize>, BTreeMap<u64, Vec<usize>>) {
+    fn index_data(
+        &self,
+        index: Vec<&str>,
+    ) -> HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher> {
+        // Get the positions of the fields we are indexing
         let fieldidx = self
             .headers
             .iter()
@@ -118,7 +120,7 @@ impl File {
             })
             .collect::<Vec<_>>();
 
-        let mut index = BTreeMap::new();
+        let mut index = HashMap::with_hasher(hash_hasher::HashBuildHasher::default());
 
         for (idx, row) in self.data.iter().enumerate() {
             let mut hash = seahash::SeaHasher::default();
@@ -133,7 +135,7 @@ impl File {
             entry.push(idx);
         }
 
-        (fieldidx, index)
+        index
     }
 }
 
@@ -179,7 +181,7 @@ impl EnrichmentTable for File {
 
                 let key = hash.finish();
 
-                self.indexes[handle].1.get(&key).and_then(|rows| {
+                self.indexes[handle].get(&key).and_then(|rows| {
                     if rows.len() == 1 {
                         Some(self.add_columns(&self.data[rows[0]]))
                     } else {

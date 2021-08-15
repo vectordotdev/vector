@@ -218,6 +218,7 @@ flate2 = { version = "1.0.20", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 grok = { version = "1.1.0", default-features = false, optional = true }
+hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.4", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
@@ -402,7 +403,7 @@ api-client = [
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file"]
-enrichment-tables-file = [ "csv", "seahash" ]
+enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
