@@ -1,4 +1,4 @@
-use crate::sources::util::decoding::{BoxedFramer, Error, FramingConfig};
+use crate::sources::util::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::{cmp, io, usize};
@@ -57,9 +57,9 @@ impl CharacterDelimitedCodec {
 
 impl Decoder for CharacterDelimitedCodec {
     type Item = Bytes;
-    type Error = Error;
+    type Error = BoxedFramingError;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
         loop {
             // Determine how far into the buffer we'll search for a newline. If
             // there's no max_length set, we'll read to the end of the buffer.
@@ -127,7 +127,7 @@ impl Decoder for CharacterDelimitedCodec {
         }
     }
 
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Error> {
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
         let frame = match self.decode(buf)? {
             Some(frame) => Some(frame),
             None if !buf.is_empty() && !self.is_discarding => {

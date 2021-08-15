@@ -2,43 +2,71 @@ mod config;
 mod framing;
 mod parsers;
 
-use crate::{event::Event, internal_events::DecoderParseFailed, sources::util::TcpError};
+use crate::{
+    event::Event,
+    internal_events::{DecoderFramingFailed, DecoderParseFailed},
+    sources::util::TcpError,
+};
 use bytes::{Bytes, BytesMut};
 pub use config::{DecodingConfig, FramingConfig, ParserConfig};
 use dyn_clone::DynClone;
 pub use framing::*;
 pub use parsers::*;
-use std::sync::Arc;
 use tokio_util::codec::LinesCodecError;
 
 pub trait Framer:
-    tokio_util::codec::Decoder<Item = Bytes, Error = Error> + DynClone + Send + Sync
+    tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError> + DynClone + Send + Sync
 {
 }
 
 impl<Decoder> Framer for Decoder where
-    Decoder: tokio_util::codec::Decoder<Item = Bytes, Error = Error> + Clone + Send + Sync
+    Decoder:
+        tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError> + Clone + Send + Sync
 {
 }
 
 dyn_clone::clone_trait_object!(Framer);
 
 pub trait Parser: DynClone + Send + Sync {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event>;
+    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>>;
 }
 
 dyn_clone::clone_trait_object!(Parser);
 
-pub trait DecoderError: std::error::Error + TcpError + Send + Sync {}
+pub trait FramingError: std::error::Error + TcpError + Send + Sync {}
+
+pub type BoxedFramingError = Box<dyn FramingError>;
+
+impl std::error::Error for BoxedFramingError {}
+
+impl FramingError for std::io::Error {}
+
+impl FramingError for LinesCodecError {}
+
+impl From<std::io::Error> for BoxedFramingError {
+    fn from(error: std::io::Error) -> Self {
+        Box::new(error)
+    }
+}
+
+impl From<LinesCodecError> for BoxedFramingError {
+    fn from(error: LinesCodecError) -> Self {
+        Box::new(error)
+    }
+}
 
 #[derive(Debug)]
-pub struct Error {
-    error: Arc<dyn DecoderError>,
+pub enum Error {
+    FramingError(BoxedFramingError),
+    ParsingError(crate::Error),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "{}", self.error)
+        match self {
+            Self::FramingError(error) => write!(formatter, "FramingError({})", error),
+            Self::ParsingError(error) => write!(formatter, "ParsingError({})", error),
+        }
     }
 }
 
@@ -46,27 +74,16 @@ impl std::error::Error for Error {}
 
 impl TcpError for Error {
     fn is_fatal(&self) -> bool {
-        self.error.is_fatal()
+        match self {
+            Self::FramingError(error) => error.is_fatal(),
+            Self::ParsingError(_) => false,
+        }
     }
 }
-
-impl DecoderError for std::io::Error {}
-
-impl DecoderError for LinesCodecError {}
 
 impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
-        Self {
-            error: Arc::new(error),
-        }
-    }
-}
-
-impl From<LinesCodecError> for Error {
-    fn from(error: LinesCodecError) -> Self {
-        Self {
-            error: Arc::new(error),
-        }
+        Self::FramingError(Box::new(error))
     }
 }
 
@@ -91,33 +108,43 @@ impl tokio_util::codec::Decoder for Decoder {
     type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        self.framer.decode(buf).map(|result| {
-            result.and_then(|frame| {
-                let byte_size = frame.len();
-                match self.parser.parse(frame) {
-                    Ok(event) => Some((event, byte_size)),
-                    Err(error) => {
-                        emit!(DecoderParseFailed { error });
-                        None
-                    }
+        let frame = self.framer.decode(buf).map_err(|error| {
+            emit!(DecoderFramingFailed { error: &error });
+            Error::FramingError(error)
+        })?;
+
+        if let Some(frame) = frame {
+            let byte_size = frame.len();
+            match self.parser.parse(frame) {
+                Ok(event) => Ok(Some((event, byte_size))),
+                Err(error) => {
+                    emit!(DecoderParseFailed { error: &error });
+                    Err(Error::ParsingError(error))
                 }
-            })
-        })
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        self.framer.decode_eof(buf).map(|result| {
-            result.and_then(|frame| {
-                let byte_size = frame.len();
-                match self.parser.parse(frame) {
-                    Ok(event) => Some((event, byte_size)),
-                    Err(error) => {
-                        emit!(DecoderParseFailed { error });
-                        None
-                    }
+        let frame = self.framer.decode_eof(buf).map_err(|error| {
+            emit!(DecoderFramingFailed { error: &error });
+            Error::FramingError(error)
+        })?;
+
+        if let Some(frame) = frame {
+            let byte_size = frame.len();
+            match self.parser.parse(frame) {
+                Ok(event) => Ok(Some((event, byte_size))),
+                Err(error) => {
+                    emit!(DecoderParseFailed { error: &error });
+                    Err(Error::ParsingError(error))
                 }
-            })
-        })
+            }
+        } else {
+            Ok(None)
+        }
     }
 }
 

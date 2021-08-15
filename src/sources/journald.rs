@@ -253,7 +253,7 @@ impl JournaldSource {
     /// Return `true` if should restart `journalctl`.
     async fn run_stream<'a>(
         &'a mut self,
-        mut stream: BoxStream<'static, Result<Bytes, decoding::Error>>,
+        mut stream: BoxStream<'static, Result<Bytes, Box<dyn decoding::FramingError>>>,
         checkpointer: &'a mut Checkpointer,
         cursor: &'a mut Option<String>,
     ) -> bool {
@@ -339,7 +339,7 @@ type StartJournalctlFn = Box<
     dyn Fn(
             &Option<String>, // cursor
         ) -> crate::Result<(
-            BoxStream<'static, Result<Bytes, decoding::Error>>,
+            BoxStream<'static, Result<Bytes, Box<dyn decoding::FramingError>>>,
             StopJournalctlFn,
         )> + Send
         + Sync,
@@ -350,7 +350,7 @@ type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 fn start_journalctl(
     command: &mut Command,
 ) -> crate::Result<(
-    BoxStream<'static, Result<Bytes, decoding::Error>>,
+    BoxStream<'static, Result<Bytes, Box<dyn decoding::FramingError>>>,
     StopJournalctlFn,
 )> {
     let mut child = command.spawn().context(JournalctlSpawn)?;
@@ -603,10 +603,7 @@ mod tests {
         task::{Context, Poll},
     };
     use tempfile::tempdir;
-    use tokio::{
-        io,
-        time::{sleep, timeout, Duration},
-    };
+    use tokio::time::{sleep, timeout, Duration};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -622,7 +619,7 @@ mod tests {
     }
 
     impl FakeJournal {
-        fn next(&mut self) -> Option<Result<Bytes, decoding::Error>> {
+        fn next(&mut self) -> Option<Result<Bytes, Box<dyn decoding::FramingError>>> {
             let mut line = String::new();
             match self.reader.read_line(&mut line) {
                 Ok(0) => None,
@@ -636,7 +633,7 @@ mod tests {
     }
 
     impl Stream for FakeJournal {
-        type Item = Result<Bytes, decoding::Error>;
+        type Item = Result<Bytes, Box<dyn decoding::FramingError>>;
 
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
             Poll::Ready(Pin::into_inner(self).next())
@@ -647,7 +644,7 @@ mod tests {
         fn new(
             checkpoint: &Option<String>,
         ) -> (
-            BoxStream<'static, Result<Bytes, decoding::Error>>,
+            BoxStream<'static, Result<Bytes, Box<dyn decoding::FramingError>>>,
             StopJournalctlFn,
         ) {
             let cursor = Cursor::new(FAKE_JOURNAL);

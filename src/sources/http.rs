@@ -12,6 +12,7 @@ use crate::{
     tls::TlsConfig,
 };
 use bytes::{Bytes, BytesMut};
+use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
 use tokio_util::codec::Decoder;
@@ -86,8 +87,17 @@ impl HttpSource for SimpleHttpSource {
         let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
 
-        while let Ok(Some((next, _byte_size))) = decoder.decode_eof(&mut body) {
-            events.extend(next.into_iter());
+        loop {
+            match decoder.decode_eof(&mut body) {
+                Ok(Some((next, _byte_size))) => events.extend(next.into_iter()),
+                Ok(None) => break,
+                Err(error) => {
+                    return Err(ErrorMessage::new(
+                        StatusCode::BAD_REQUEST,
+                        format!("Failed decoding body: {}", error),
+                    ))
+                }
+            }
         }
 
         add_headers(&mut events, &self.headers, header_map);

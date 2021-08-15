@@ -37,6 +37,19 @@ mod console;
 mod datadog_events;
 #[cfg(feature = "sinks-datadog")]
 mod datadog_logs;
+#[cfg(any(
+    feature = "sources-aws_s3",
+    feature = "sources-datadog",
+    feature = "sources-heroku_logs",
+    feature = "sources-http",
+    feature = "sources-kafka",
+    feature = "sources-prometheus",
+    feature = "sources-socket",
+    feature = "sources-statsd",
+    feature = "sources-stdin",
+    feature = "sources-syslog",
+    feature = "sources-vector",
+))]
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
@@ -172,6 +185,19 @@ pub use self::console::*;
 pub use self::datadog_events::*;
 #[cfg(feature = "sinks-datadog")]
 pub use self::datadog_logs::*;
+#[cfg(any(
+    feature = "sources-aws_s3",
+    feature = "sources-datadog",
+    feature = "sources-heroku_logs",
+    feature = "sources-http",
+    feature = "sources-kafka",
+    feature = "sources-prometheus",
+    feature = "sources-socket",
+    feature = "sources-statsd",
+    feature = "sources-stdin",
+    feature = "sources-syslog",
+    feature = "sources-vector",
+))]
 pub use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;

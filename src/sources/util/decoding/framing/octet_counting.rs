@@ -1,4 +1,4 @@
-use crate::sources::util::decoding::{BoxedFramer, Error, FramingConfig};
+use crate::sources::util::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Buf, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -204,7 +204,7 @@ impl Default for OctetCountingDecoder {
 
 impl tokio_util::codec::Decoder for OctetCountingDecoder {
     type Item = Bytes;
-    type Error = Error;
+    type Error = BoxedFramingError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(ret) = self.checked_decode(src) {

@@ -1,4 +1,4 @@
-use crate::sources::util::decoding::{BoxedFramer, Error, FramingConfig};
+use crate::sources::util::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{Decoder, LinesCodec};
@@ -45,7 +45,7 @@ impl Default for NewlineDelimitedCodec {
 
 impl Decoder for NewlineDelimitedCodec {
     type Item = Bytes;
-    type Error = Error;
+    type Error = BoxedFramingError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.0
