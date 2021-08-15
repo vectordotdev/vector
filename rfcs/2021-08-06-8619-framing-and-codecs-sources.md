@@ -44,30 +44,21 @@ pub struct DecodingConfig {
 ```
 
 while the framing method and parser used to deserialize into a structured event
-can be selected from an enum:
+are selected via `typetag`ed traits:
 
 ```rust
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum FramingConfig {
-    NewlineDelimited,
-    CharacterDelimited {
-        delimiter: char,
-        max_length: Option<usize>,
-    },
-    OctetCounting {
-        max_length: Option<usize>,
-    },
-    ...
+pub type BoxedFramer = Box<dyn Framer + Send + Sync>;
+
+pub type BoxedParser = Box<dyn Parser + Send + Sync + 'static>;
+
+#[typetag::serde(tag = "method")]
+pub trait FramingConfig: Debug + DynClone + Send + Sync {
+    fn build(&self) -> BoxedFramer;
 }
 
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ParserConfig {
-    Bytes,
-    Json {
-        ...
-    },
-    Syslog,
-    ...
+#[typetag::serde(tag = "codec")]
+pub trait ParserConfig: Debug + DynClone + Send + Sync {
+    fn build(&self) -> BoxedParser;
 }
 ```
 
