@@ -249,8 +249,8 @@ impl Decoder for FluentDecoder {
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if let Some((frame, byte_size)) = self.unread_frames.pop_front() {
-            return Ok(Some((frame, byte_size)));
+        if let Some(item) = self.unread_frames.pop_front() {
+            return Ok(Some(item));
         }
 
         if src.is_empty() {
