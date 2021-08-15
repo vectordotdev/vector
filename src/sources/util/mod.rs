@@ -1,18 +1,3 @@
-#[cfg(any(
-    feature = "sources-aws_s3",
-    feature = "sources-datadog",
-    feature = "sources-heroku_logs",
-    feature = "sources-http",
-    feature = "sources-journald",
-    feature = "sources-kafka",
-    feature = "sources-prometheus",
-    feature = "sources-socket",
-    feature = "sources-statsd",
-    feature = "sources-stdin",
-    feature = "sources-syslog",
-    feature = "sources-vector",
-))]
-pub mod decoding;
 mod encoding_config;
 #[cfg(any(feature = "sources-file", feature = "sources-kafka"))]
 pub(crate) mod finalizer;
@@ -25,18 +10,7 @@ pub mod multiline_config;
 mod tcp;
 #[cfg(any(
     all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "sources-aws_s3",
-    feature = "sources-datadog",
-    feature = "sources-heroku_logs",
-    feature = "sources-http",
-    feature = "sources-journald",
-    feature = "sources-kafka",
-    feature = "sources-prometheus",
-    feature = "sources-socket",
-    feature = "sources-statsd",
-    feature = "sources-stdin",
-    feature = "sources-syslog",
-    feature = "sources-vector",
+    feature = "codec"
 ))]
 mod tcp_error;
 #[cfg(all(unix, feature = "sources-socket"))]
@@ -56,18 +30,7 @@ pub use multiline_config::MultilineConfig;
 pub use tcp::{SocketListenAddr, TcpSource};
 #[cfg(any(
     all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "sources-aws_s3",
-    feature = "sources-datadog",
-    feature = "sources-heroku_logs",
-    feature = "sources-http",
-    feature = "sources-journald",
-    feature = "sources-kafka",
-    feature = "sources-prometheus",
-    feature = "sources-socket",
-    feature = "sources-statsd",
-    feature = "sources-stdin",
-    feature = "sources-syslog",
-    feature = "sources-vector",
+    feature = "codec",
 ))]
 pub use tcp_error::TcpError;
 #[cfg(all(unix, feature = "sources-socket",))]

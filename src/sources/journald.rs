@@ -1,9 +1,9 @@
 use crate::{
+    codec::{BoxedFramingError, CharacterDelimitedCodec},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
-    sources::util::decoding::{self, CharacterDelimitedCodec},
     Pipeline,
 };
 use bytes::Bytes;
@@ -253,7 +253,7 @@ impl JournaldSource {
     /// Return `true` if should restart `journalctl`.
     async fn run_stream<'a>(
         &'a mut self,
-        mut stream: BoxStream<'static, Result<Bytes, Box<dyn decoding::FramingError>>>,
+        mut stream: BoxStream<'static, Result<Bytes, BoxedFramingError>>,
         checkpointer: &'a mut Checkpointer,
         cursor: &'a mut Option<String>,
     ) -> bool {
@@ -339,7 +339,7 @@ type StartJournalctlFn = Box<
     dyn Fn(
             &Option<String>, // cursor
         ) -> crate::Result<(
-            BoxStream<'static, Result<Bytes, Box<dyn decoding::FramingError>>>,
+            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
             StopJournalctlFn,
         )> + Send
         + Sync,
@@ -350,7 +350,7 @@ type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 fn start_journalctl(
     command: &mut Command,
 ) -> crate::Result<(
-    BoxStream<'static, Result<Bytes, Box<dyn decoding::FramingError>>>,
+    BoxStream<'static, Result<Bytes, BoxedFramingError>>,
     StopJournalctlFn,
 )> {
     let mut child = command.spawn().context(JournalctlSpawn)?;
@@ -619,7 +619,7 @@ mod tests {
     }
 
     impl FakeJournal {
-        fn next(&mut self) -> Option<Result<Bytes, Box<dyn decoding::FramingError>>> {
+        fn next(&mut self) -> Option<Result<Bytes, BoxedFramingError>> {
             let mut line = String::new();
             match self.reader.read_line(&mut line) {
                 Ok(0) => None,
@@ -633,7 +633,7 @@ mod tests {
     }
 
     impl Stream for FakeJournal {
-        type Item = Result<Bytes, Box<dyn decoding::FramingError>>;
+        type Item = Result<Bytes, BoxedFramingError>;
 
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
             Poll::Ready(Pin::into_inner(self).next())
@@ -644,7 +644,7 @@ mod tests {
         fn new(
             checkpoint: &Option<String>,
         ) -> (
-            BoxStream<'static, Result<Bytes, Box<dyn decoding::FramingError>>>,
+            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
             StopJournalctlFn,
         ) {
             let cursor = Cursor::new(FAKE_JOURNAL);

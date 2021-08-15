@@ -1,7 +1,7 @@
 use crate::{
+    codec::{BoxedParser, Parser, ParserConfig},
     config::log_schema,
     event::Event,
-    sources::util::decoding::{BoxedParser, Parser, ParserConfig},
 };
 use bytes::Bytes;
 use chrono::Utc;

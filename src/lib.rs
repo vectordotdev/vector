@@ -36,6 +36,8 @@ pub mod api;
 pub mod app;
 pub mod async_read;
 pub mod buffers;
+#[cfg(feature = "codec")]
+pub mod codec;
 pub mod encoding_transcode;
 pub mod graph;
 pub mod heartbeat;

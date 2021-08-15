@@ -1,14 +1,11 @@
 use crate::{
+    codec::{self, DecodingConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{Event, Value},
-    sources::util::{
-        add_query_parameters,
-        decoding::{self, DecodingConfig},
-        ErrorMessage, HttpSource, HttpSourceAuthConfig,
-    },
+    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
 };
 use bytes::{Bytes, BytesMut};
@@ -70,7 +67,7 @@ fn default_path_key() -> String {
 
 #[derive(Clone)]
 struct SimpleHttpSource {
-    decoder: decoding::Decoder,
+    decoder: codec::Decoder,
     headers: Vec<String>,
     query_parameters: Vec<String>,
     path_key: String,
@@ -173,9 +170,9 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 mod tests {
     use super::*;
     use crate::{
+        codec::JsonParserConfig,
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
-        sources::util::decoding::JsonParserConfig,
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };

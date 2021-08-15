@@ -1,6 +1,6 @@
 use crate::{
+    codec::{BoxedParser, Parser, ParserConfig},
     event::Event,
-    sources::util::decoding::{BoxedParser, Parser, ParserConfig},
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};

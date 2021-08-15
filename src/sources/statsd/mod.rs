@@ -1,13 +1,11 @@
 use crate::udp;
 use crate::{
+    codec::{self, CharacterDelimitedCodec, Parser},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
-    sources::util::{
-        decoding::{self, CharacterDelimitedCodec, Parser},
-        SocketListenAddr, TcpSource,
-    },
+    sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -177,7 +175,7 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let codec = decoding::Decoder::new(
+    let codec = codec::Decoder::new(
         Box::new(CharacterDelimitedCodec::new(b'\n')),
         Box::new(StatsdParser),
     );
@@ -205,12 +203,12 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = decoding::Error;
+    type Error = codec::Error;
     type Item = Vec<Event>;
-    type Decoder = decoding::Decoder;
+    type Decoder = codec::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        decoding::Decoder::new(
+        codec::Decoder::new(
             Box::new(CharacterDelimitedCodec::new(b'\n')),
             Box::new(StatsdParser),
         )

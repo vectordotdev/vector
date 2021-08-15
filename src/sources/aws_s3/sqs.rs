@@ -1,4 +1,5 @@
 use crate::{
+    codec::{BoxedFramingError, CharacterDelimitedCodec},
     config::log_schema,
     event::Event,
     internal_events::aws_s3::source::{
@@ -8,7 +9,6 @@ use crate::{
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
-    sources::util::decoding::{self, CharacterDelimitedCodec},
     Pipeline,
 };
 use bytes::Bytes;
@@ -103,7 +103,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to read all of s3://{}/{}: {}", bucket, key, source))]
     ReadObject {
-        source: Box<dyn decoding::FramingError>,
+        source: BoxedFramingError,
         bucket: String,
         key: String,
     },
@@ -406,7 +406,7 @@ impl IngestorProcess {
                 // prefer duplicate lines over message loss. Future work could include recording
                 // the offset of the object that has been read, but this would only be relevant in
                 // the case that the same vector instance processes the same message.
-                let mut read_error: Option<Box<dyn decoding::FramingError>> = None;
+                let mut read_error: Option<BoxedFramingError> = None;
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
                     FramedRead::new(object_reader, CharacterDelimitedCodec::new(b'\n'))
                         .map(|res| {

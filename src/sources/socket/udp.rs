@@ -1,9 +1,9 @@
 use crate::{
+    codec::DecodingConfig,
     config::log_schema,
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
-    sources::util::decoding::DecodingConfig,
     sources::Source,
     udp, Pipeline,
 };

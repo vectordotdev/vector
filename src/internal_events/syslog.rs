@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::sources::util::decoding;
+use crate::codec;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ impl InternalEvent for SyslogEventReceived {
 
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
-    pub error: decoding::Error,
+    pub error: codec::Error,
 }
 
 impl InternalEvent for SyslogUdpReadError {

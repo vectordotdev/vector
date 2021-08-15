@@ -1,13 +1,11 @@
 use crate::{
+    codec::{self, DecodingConfig},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{BatchNotifier, Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
-    sources::util::{
-        decoding::{self, DecodingConfig},
-        finalizer::OrderedFinalizer,
-    },
+    sources::util::finalizer::OrderedFinalizer,
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};
@@ -148,7 +146,7 @@ async fn kafka_source(
     partition_key: String,
     offset_key: String,
     headers_key: String,
-    mut decoder: decoding::Decoder,
+    mut decoder: codec::Decoder,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
     acknowledgements: bool,
@@ -367,8 +365,8 @@ mod integration_test {
     use super::test::*;
     use super::*;
     use crate::{
+        codec::{BytesCodec, BytesParser, Decoder},
         shutdown::ShutdownSignal,
-        sources::util::decoding::{BytesCodec, BytesParser, Decoder},
         test_util::{collect_n, random_string},
         Pipeline,
     };
@@ -383,7 +381,7 @@ mod integration_test {
     use std::time::Duration;
     use vector_core::event::EventStatus;
 
-    fn default_decoder() -> decoding::Decoder {
+    fn default_decoder() -> codec::Decoder {
         Decoder::new(Box::new(BytesCodec::new()), Box::new(BytesParser))
     }
 

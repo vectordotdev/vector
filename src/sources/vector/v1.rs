@@ -1,12 +1,10 @@
 use crate::{
+    codec::{self, LengthDelimitedCodec, Parser},
     config::{DataType, GenerateConfig, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
-        util::{
-            decoding::{self, LengthDelimitedCodec, Parser},
-            SocketListenAddr, TcpSource,
-        },
+        util::{SocketListenAddr, TcpSource},
         Source,
     },
     tcp::TcpKeepaliveConfig,
@@ -101,12 +99,12 @@ impl Parser for VectorParser {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
-    type Error = decoding::Error;
+    type Error = codec::Error;
     type Item = Vec<Event>;
-    type Decoder = decoding::Decoder;
+    type Decoder = codec::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        decoding::Decoder::new(
+        codec::Decoder::new(
             Box::new(LengthDelimitedCodec::new()),
             Box::new(VectorParser),
         )

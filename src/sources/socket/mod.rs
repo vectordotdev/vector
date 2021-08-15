@@ -167,11 +167,11 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
+        codec::{DecodingConfig, NewlineDelimitedDecoderConfig},
         config::{log_schema, GlobalOptions, SinkContext, SourceConfig, SourceContext},
         event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
-        sources::util::decoding::{DecodingConfig, NewlineDelimitedDecoderConfig},
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },

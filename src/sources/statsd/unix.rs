@@ -1,10 +1,8 @@
 use super::StatsdParser;
 use crate::{
+    codec::{Decoder, NewlineDelimitedCodec},
     shutdown::ShutdownSignal,
-    sources::util::{
-        build_unix_stream_source,
-        decoding::{Decoder, NewlineDelimitedCodec},
-    },
+    sources::util::build_unix_stream_source,
     sources::Source,
     Pipeline,
 };

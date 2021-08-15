@@ -1,10 +1,8 @@
 use crate::{
+    codec::{self, DecodingConfig},
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
-    sources::util::{
-        decoding::{self, DecodingConfig},
-        SocketListenAddr, TcpSource,
-    },
+    sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -73,19 +71,19 @@ impl TcpConfig {
 #[derive(Clone)]
 pub struct RawTcpSource {
     config: TcpConfig,
-    decoder: decoding::Decoder,
+    decoder: codec::Decoder,
 }
 
 impl RawTcpSource {
-    pub fn new(config: TcpConfig, decoder: decoding::Decoder) -> Self {
+    pub fn new(config: TcpConfig, decoder: codec::Decoder) -> Self {
         Self { config, decoder }
     }
 }
 
 impl TcpSource for RawTcpSource {
-    type Error = decoding::Error;
+    type Error = codec::Error;
     type Item = Vec<Event>;
-    type Decoder = decoding::Decoder;
+    type Decoder = codec::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
         self.decoder.clone()

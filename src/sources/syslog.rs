@@ -1,9 +1,8 @@
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
-#[cfg(unix)]
-use crate::sources::util::decoding::Decoder;
 use crate::udp;
 use crate::{
+    codec::{self, OctetCountingDecoder, SyslogParser},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -11,16 +10,15 @@ use crate::{
     event::Event,
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
-    sources::util::{
-        decoding::{self, OctetCountingDecoder, SyslogParser},
-        SocketListenAddr, TcpSource,
-    },
+    sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use bytes::Bytes;
 use chrono::Utc;
+#[cfg(unix)]
+use codec::Decoder;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -189,12 +187,12 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = decoding::Error;
+    type Error = codec::Error;
     type Item = Vec<Event>;
-    type Decoder = decoding::Decoder;
+    type Decoder = codec::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        decoding::Decoder::new(
+        codec::Decoder::new(
             Box::new(OctetCountingDecoder::new_with_max_length(self.max_length)),
             Box::new(SyslogParser),
         )
@@ -239,7 +237,7 @@ pub fn udp(
 
         let _ = UdpFramed::new(
             socket,
-            decoding::Decoder::new(
+            codec::Decoder::new(
                 Box::new(OctetCountingDecoder::new_with_max_length(max_length)),
                 Box::new(SyslogParser),
             ),
@@ -311,7 +309,7 @@ fn enrich_syslog_event(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::Event, sources::util::decoding::Parser};
+    use crate::{codec::Parser, config::log_schema, event::Event};
     use chrono::{DateTime, Datelike, TimeZone};
     use shared::assert_event_data_eq;
 

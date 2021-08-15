@@ -1,8 +1,8 @@
 use crate::{
+    codec::DecodingConfig,
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
-    sources::util::decoding::DecodingConfig,
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};

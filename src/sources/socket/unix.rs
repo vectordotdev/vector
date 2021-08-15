@@ -1,9 +1,10 @@
 use crate::{
+    codec::DecodingConfig,
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
     shutdown::ShutdownSignal,
     sources::{
-        util::{build_unix_datagram_source, build_unix_stream_source, decoding::DecodingConfig},
+        util::{build_unix_datagram_source, build_unix_stream_source},
         Source,
     },
     Pipeline,
