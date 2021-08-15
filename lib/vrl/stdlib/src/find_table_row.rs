@@ -63,14 +63,12 @@ impl Expression for FindTableRowFn {
             .as_ref()
             .ok_or("enrichment tables not loaded")?;
 
-        match tables.find_table_row(&self.table, condition, self.index)? {
-            None => Err("data not found".into()),
-            Some(data) => Ok(Value::Object(
-                data.into_iter()
-                    .map(|(key, value)| (key, Value::from(value)))
-                    .collect(),
-            )),
-        }
+        let data = tables.find_table_row(&self.table, condition, self.index)?;
+        Ok(Value::Object(
+            data.into_iter()
+                .map(|(key, value)| (key, Value::from(value)))
+                .collect(),
+        ))
     }
 
     fn update_state(
@@ -84,7 +82,11 @@ impl Expression for FindTableRowFn {
                     .iter()
                     .map(|(field, _)| field.as_ref())
                     .collect::<Vec<_>>();
-                table.add_index(&self.table, fields)?;
+                let index = table.add_index(&self.table, fields)?;
+
+                // Store the index to use while searching.
+                self.index = Some(index);
+
                 Ok(())
             }
             // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
@@ -118,7 +120,7 @@ mod tests {
             table: &str,
             criteria: BTreeMap<&str, String>,
             index: Option<IndexHandle>,
-        ) -> std::result::Result<Option<BTreeMap<String, String>>, String> {
+        ) -> std::result::Result<BTreeMap<String, String>, String> {
             assert_eq!(table, "table");
             assert_eq!(
                 criteria,
@@ -128,10 +130,10 @@ mod tests {
             );
             assert_eq!(index, Some(IndexHandle(999)));
 
-            Ok(Some(btreemap! {
+            Ok(btreemap! {
                 "field".to_string() => "value".to_string(),
                 "field2".to_string() => "value2".to_string(),
-            }))
+            })
         }
 
         fn add_index(
@@ -177,7 +179,7 @@ mod tests {
 
     #[test]
     fn add_indexes() {
-        let func = FindTableRowFn {
+        let mut func = FindTableRowFn {
             table: "table".to_string(),
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),

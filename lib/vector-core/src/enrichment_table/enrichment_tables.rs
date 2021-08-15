@@ -116,12 +116,12 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
         table: &str,
         criteria: BTreeMap<&str, String>,
         index: Option<IndexHandle>,
-    ) -> Result<Option<BTreeMap<String, String>>, String> {
+    ) -> Result<BTreeMap<String, String>, String> {
         let tables = self.tables.load_full();
         if let Some(ref tables) = *tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => Ok(table.find_table_row(criteria, index)),
+                Some(table) => table.find_table_row(criteria, index),
             }
         } else {
             Err("finish_load not called".to_string())

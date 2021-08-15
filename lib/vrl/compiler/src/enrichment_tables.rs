@@ -11,7 +11,7 @@ pub trait EnrichmentTables: DynClone {
         table: &str,
         criteria: BTreeMap<&str, String>,
         index: Option<IndexHandle>,
-    ) -> Result<Option<BTreeMap<String, String>>, String>;
+    ) -> Result<BTreeMap<String, String>, String>;
     fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<IndexHandle, String>;
 }
 
@@ -31,8 +31,8 @@ impl EnrichmentTables for EmptyEnrichmentTables {
         _table: &str,
         _criteria: BTreeMap<&str, String>,
         _index: Option<IndexHandle>,
-    ) -> Result<Option<BTreeMap<String, String>>, String> {
-        Ok(None)
+    ) -> Result<BTreeMap<String, String>, String> {
+        Err("no data found".to_string())
     }
 
     fn add_index(&mut self, _table: &str, _fields: Vec<&str>) -> Result<IndexHandle, String> {

@@ -11,6 +11,10 @@ pub trait EnrichmentTable: std::fmt::Debug {
         &self,
         criteria: BTreeMap<&str, String>,
         index: Option<IndexHandle>,
-    ) -> Option<BTreeMap<String, String>>;
+    ) -> Result<BTreeMap<String, String>, String>;
+
+    /// Add an index to the data. It is the callers responsibility to pass the correct IndexHandle
+    /// when searching the data, for performance reasons the enrichment table will not be
+    /// responsible for checking that the index matches the fields being searched.
     fn add_index(&mut self, fields: Vec<&str>) -> Result<IndexHandle, String>;
 }

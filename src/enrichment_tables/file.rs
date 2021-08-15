@@ -83,8 +83,8 @@ impl File {
         self.headers.iter().position(|header| header == col)
     }
 
-    fn row_equals(&self, criteria: &BTreeMap<&str, String>, row: &[String]) -> bool {
-        criteria
+    fn row_equals(&self, condition: &BTreeMap<&str, String>, row: &[String]) -> bool {
+        condition
             .iter()
             .all(|(col, value)| match self.column_index(col) {
                 None => false,
@@ -101,7 +101,8 @@ impl File {
     }
 
     /// Creates an index with the given fields.
-    /// Uses seahash to create a hash of the data that is stored in a hashmap.
+    /// Uses seahash to create a hash of the data that is used as the key in a hashmap lookup to
+    /// the index of the row in the data.
     fn index_data(
         &self,
         index: Vec<&str>,
@@ -120,7 +121,10 @@ impl File {
             })
             .collect::<Vec<_>>();
 
-        let mut index = HashMap::with_hasher(hash_hasher::HashBuildHasher::default());
+        let mut index = HashMap::with_capacity_and_hasher(
+            self.data.len(),
+            hash_hasher::HashBuildHasher::default(),
+        );
 
         for (idx, row) in self.data.iter().enumerate() {
             let mut hash = seahash::SeaHasher::default();
@@ -135,6 +139,8 @@ impl File {
             entry.push(idx);
         }
 
+        index.shrink_to_fit();
+
         index
     }
 }
@@ -142,14 +148,14 @@ impl File {
 impl EnrichmentTable for File {
     fn find_table_row(
         &self,
-        criteria: BTreeMap<&str, String>,
+        condition: BTreeMap<&str, String>,
         index: Option<IndexHandle>,
-    ) -> Option<BTreeMap<String, String>> {
+    ) -> Result<BTreeMap<String, String>, String> {
         match index {
             None => {
-                // Sequential scan
+                // No index has been passed so we need to do a Sequential Scan.
                 let mut found = self.data.iter().filter_map(|row| {
-                    if self.row_equals(&criteria, &*row) {
+                    if self.row_equals(&condition, &*row) {
                         Some(self.add_columns(row))
                     } else {
                         None
@@ -160,17 +166,19 @@ impl EnrichmentTable for File {
 
                 if found.next().is_some() {
                     // More than one row has been found.
-                    None
+                    Err("more than one row found".to_string())
                 } else {
-                    result
+                    result.ok_or("no rows found".to_string())
                 }
             }
             Some(IndexHandle(handle)) => {
-                // Hash lookup
+                // The index to use has been passed, we can use this to search the data.
+                // We are assuming that the caller has passed an index that represents the fields
+                // being passed in the condition.
                 let mut hash = seahash::SeaHasher::default();
 
                 for field in self.headers.iter() {
-                    match criteria.get(field as &str) {
+                    match condition.get(field as &str) {
                         Some(value) => {
                             hash.write(value.as_bytes());
                             hash.write_u8(0);
@@ -181,19 +189,27 @@ impl EnrichmentTable for File {
 
                 let key = hash.finish();
 
-                self.indexes[handle].get(&key).and_then(|rows| {
-                    if rows.len() == 1 {
-                        Some(self.add_columns(&self.data[rows[0]]))
-                    } else {
-                        None
-                    }
-                })
+                self.indexes[handle]
+                    .get(&key)
+                    .ok_or("no rows found".to_string())
+                    .and_then(|rows| {
+                        // Ensure we have exactly one result.
+                        if rows.len() == 1 {
+                            Ok(self.add_columns(&self.data[rows[0]]))
+                        } else if rows.is_empty() {
+                            Err("no rows found".to_string())
+                        } else {
+                            Err(format!("{} rows found", rows.len()))
+                        }
+                    })
             }
         }
     }
 
     fn add_index(&mut self, fields: Vec<&str>) -> Result<IndexHandle, String> {
         self.indexes.push(self.index_data(fields));
+
+        // The returned index handle is the position of the index in our list of indexes.
         Ok(IndexHandle(self.indexes.len() - 1))
     }
 }
@@ -245,7 +261,7 @@ mod tests {
         };
 
         assert_eq!(
-            Some(btreemap! {
+            Ok(btreemap! {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
@@ -270,7 +286,7 @@ mod tests {
         };
 
         assert_eq!(
-            Some(btreemap! {
+            Ok(btreemap! {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
@@ -292,7 +308,10 @@ mod tests {
             "field1" => "zorp"
         };
 
-        assert_eq!(None, file.find_table_row(condition, None));
+        assert_eq!(
+            Err("no rows found".to_string()),
+            file.find_table_row(condition, None)
+        );
     }
 
     #[test]
@@ -311,6 +330,9 @@ mod tests {
             "field1" => "zorp"
         };
 
-        assert_eq!(None, file.find_table_row(condition, Some(handle)));
+        assert_eq!(
+            Err("no rows found".to_string()),
+            file.find_table_row(condition, Some(handle))
+        );
     }
 }
