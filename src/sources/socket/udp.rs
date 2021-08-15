@@ -1,7 +1,7 @@
 use crate::{
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
+    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::util::decoding::DecodingConfig,
     sources::Source,
@@ -59,7 +59,7 @@ pub fn udp<D>(
     out: Pipeline,
 ) -> Source
 where
-    D: Decoder<Item = (Event, usize)> + Send + 'static,
+    D: Decoder<Item = (Vec<Event>, usize)> + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
@@ -97,20 +97,24 @@ where
 
                     let mut payload = buf.split_to(byte_size);
 
-                    while let Ok(Some((mut event, byte_size))) = decoder.decode_eof(&mut payload) {
-                        if let Event::Log(ref mut log) = event {
-                            log.insert(log_schema().source_type_key(), Bytes::from("socket"));
-                            log.insert(host_key.clone(), address.to_string());
-                        }
+                    while let Ok(Some((events, byte_size))) = decoder.decode_eof(&mut payload) {
+                        emit!(SocketEventsReceived { mode: SocketMode::Udp, count: events.len(), byte_size });
 
-                        emit!(SocketEventReceived { byte_size, mode: SocketMode::Udp });
+                        for mut event in events {
+                            if let Event::Log(ref mut log) = event {
+                                log.insert(log_schema().source_type_key(), Bytes::from("socket"));
+                                log.insert(host_key.clone(), address.to_string());
+                            }
 
-                        tokio::select!{
-                            result = out.send(event) => {match result {
-                                Ok(()) => { },
-                                Err(()) => return Ok(()),
-                            }}
-                            _ = &mut shutdown => return Ok(()),
+                            tokio::select! {
+                                result = out.send(event) => {
+                                    match result {
+                                        Ok(()) => {},
+                                        Err(()) => return Ok(()),
+                                    }
+                                }
+                                _ = &mut shutdown => return Ok(()),
+                            }
                         }
                     }
                 }

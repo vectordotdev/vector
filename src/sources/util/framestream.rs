@@ -1,7 +1,7 @@
 use crate::{
     event::Event,
     internal_events::{
-        SocketEventReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteFailed,
+        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteFailed,
     },
     shutdown::ShutdownSignal,
     sources::Source,
@@ -155,9 +155,10 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
-                emit!(SocketEventReceived {
-                    byte_size: frame.len(),
+                emit!(SocketEventsReceived {
                     mode: SocketMode::Unix,
+                    count: 1,
+                    byte_size: frame.len(),
                 });
                 Some(frame) //return data frame
             } else {

@@ -86,8 +86,8 @@ impl HttpSource for SimpleHttpSource {
         let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
 
-        while let Ok(Some((event, _byte_size))) = decoder.decode_eof(&mut body) {
-            events.push(event);
+        while let Ok(Some((next, _byte_size))) = decoder.decode_eof(&mut body) {
+            events.extend(next.into_iter());
         }
 
         add_headers(&mut events, &self.headers, header_map);

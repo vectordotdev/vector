@@ -204,36 +204,40 @@ async fn kafka_source(
                 let msg_partition = msg.partition();
                 let msg_offset = msg.offset();
 
-                while let Ok(Some((mut event, _))) = decoder.decode_eof(&mut payload) {
-                    if let Event::Log(ref mut log) = event {
-                        log.insert(log_schema().timestamp_key(), timestamp);
-                        // Add source type
-                        log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
-                        log.insert(&key_field, msg_key.clone());
-                        log.insert(&topic_key, Value::from(msg_topic.clone()));
-                        log.insert(&partition_key, Value::from(msg_partition));
-                        log.insert(&offset_key, Value::from(msg_offset));
-                        log.insert(&headers_key, Value::from(headers_map.clone()));
-                    }
-
-                    match &mut finalizer {
-                        Some(finalizer) => {
-                            let (batch, receiver) = BatchNotifier::new_with_receiver();
-                            let event = event.with_batch_notifier(&batch);
-
-                            match out.send(event).await {
-                                Err(error) => error!(message = "Error sending to sink.", %error),
-                                Ok(_) => finalizer.add((&msg).into(), receiver),
-                            }
+                while let Ok(Some((events, _))) = decoder.decode_eof(&mut payload) {
+                    for mut event in events {
+                        if let Event::Log(ref mut log) = event {
+                            log.insert(log_schema().timestamp_key(), timestamp);
+                            // Add source type
+                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
+                            log.insert(&key_field, msg_key.clone());
+                            log.insert(&topic_key, Value::from(msg_topic.clone()));
+                            log.insert(&partition_key, Value::from(msg_partition));
+                            log.insert(&offset_key, Value::from(msg_offset));
+                            log.insert(&headers_key, Value::from(headers_map.clone()));
                         }
-                        None => match out.send(event).await {
-                            Err(error) => error!(message = "Error sending to sink.", %error),
-                            Ok(_) => {
-                                if let Err(error) = consumer.store_offset(&msg) {
-                                    emit!(KafkaOffsetUpdateFailed { error });
+
+                        match &mut finalizer {
+                            Some(finalizer) => {
+                                let (batch, receiver) = BatchNotifier::new_with_receiver();
+                                let event = event.with_batch_notifier(&batch);
+
+                                match out.send(event).await {
+                                    Err(error) => {
+                                        error!(message = "Error sending to sink.", %error)
+                                    }
+                                    Ok(_) => finalizer.add((&msg).into(), receiver),
                                 }
                             }
-                        },
+                            None => match out.send(event).await {
+                                Err(error) => error!(message = "Error sending to sink.", %error),
+                                Ok(_) => {
+                                    if let Err(error) = consumer.store_offset(&msg) {
+                                        emit!(KafkaOffsetUpdateFailed { error });
+                                    }
+                                }
+                            },
+                        }
                     }
                 }
             }

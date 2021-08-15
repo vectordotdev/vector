@@ -1,6 +1,6 @@
 use crate::{
     event::Event,
-    internal_events::{SocketEventReceived, SocketMode},
+    internal_events::{SocketEventsReceived, SocketMode},
     sources::util::{
         decoding::{self, DecodingConfig},
         SocketListenAddr, TcpSource,
@@ -84,27 +84,31 @@ impl RawTcpSource {
 
 impl TcpSource for RawTcpSource {
     type Error = decoding::Error;
-    type Item = Event;
+    type Item = Vec<Event>;
     type Decoder = decoding::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
         self.decoder.clone()
     }
 
-    fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize) {
-        event.as_mut_log().insert(
-            crate::config::log_schema().source_type_key(),
-            Bytes::from("socket"),
-        );
-
-        let host_key = (self.config.host_key.clone())
-            .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
-
-        event.as_mut_log().insert(host_key, host);
-
-        emit!(SocketEventReceived {
+    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
+        emit!(SocketEventsReceived {
+            mode: SocketMode::Tcp,
+            count: events.len(),
             byte_size,
-            mode: SocketMode::Tcp
         });
+
+        for event in events {
+            let log = event.as_mut_log();
+            log.insert(
+                crate::config::log_schema().source_type_key(),
+                Bytes::from("socket"),
+            );
+
+            let host_key = (self.config.host_key.clone())
+                .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
+
+            log.insert(host_key, host.clone());
+        }
     }
 }

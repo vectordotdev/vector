@@ -143,9 +143,14 @@ impl SourceConfig for SyslogConfig {
                     Box::new(SyslogParser),
                 );
 
-                let handle_event =
-                    move |event: &mut Event, host: Option<Bytes>, byte_size: usize| {
-                        enrich_syslog_event(event, &host_key, host, byte_size);
+                let handle_events =
+                    move |events: &mut [Event], host: Option<Bytes>, byte_size: usize| {
+                        assert_eq!(
+                            events.len(),
+                            1,
+                            "Syslog decoder must produce exactly one event per frame"
+                        );
+                        enrich_syslog_event(&mut events[0], &host_key, host, byte_size);
                     };
 
                 Ok(build_unix_stream_source(
@@ -153,7 +158,7 @@ impl SourceConfig for SyslogConfig {
                     decoder,
                     cx.shutdown,
                     cx.out,
-                    handle_event,
+                    handle_events,
                 ))
             }
         }
@@ -185,7 +190,7 @@ struct SyslogTcpSource {
 
 impl TcpSource for SyslogTcpSource {
     type Error = decoding::Error;
-    type Item = Event;
+    type Item = Vec<Event>;
     type Decoder = decoding::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
@@ -195,8 +200,13 @@ impl TcpSource for SyslogTcpSource {
         )
     }
 
-    fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize) {
-        enrich_syslog_event(event, &self.host_key, Some(host), byte_size);
+    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
+        assert_eq!(
+            events.len(),
+            1,
+            "Syslog decoder must produce exactly one event per frame"
+        );
+        enrich_syslog_event(&mut events[0], &self.host_key, Some(host), byte_size);
     }
 }
 
@@ -239,7 +249,13 @@ pub fn udp(
             let host_key = host_key.clone();
             async move {
                 match result {
-                    Ok(((mut event, byte_size), received_from)) => {
+                    Ok(((events, byte_size), received_from)) => {
+                        assert_eq!(
+                            events.len(),
+                            1,
+                            "Syslog decoder must produce exactly one event per frame"
+                        );
+                        let mut event = events[0].clone();
                         let received_from = received_from.ip().to_string().into();
                         enrich_syslog_event(&mut event, &host_key, Some(received_from), byte_size);
                         Some(Ok(event))
@@ -433,9 +449,11 @@ mod test {
         byte_size: usize,
     ) -> Event {
         let parser = SyslogParser;
-        let mut event = parser
+        let events = parser
             .parse(Bytes::copy_from_slice(line.as_bytes()))
             .unwrap();
+        assert_eq!(events.len(), 1);
+        let mut event = events[0].clone();
         enrich_syslog_event(&mut event, host_key, default_host, byte_size);
         event
     }

@@ -86,9 +86,9 @@ impl VectorConfig {
 struct VectorParser;
 
 impl Parser for VectorParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
+    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
         match proto::EventWrapper::decode(bytes) {
-            Ok(wrapper) => Ok(wrapper.into()),
+            Ok(wrapper) => Ok(vec![wrapper.into()]),
             Err(error) => {
                 emit!(VectorProtoDecodeError { error: &error });
                 Err(Box::new(error))
@@ -102,7 +102,7 @@ struct VectorSource;
 
 impl TcpSource for VectorSource {
     type Error = decoding::Error;
-    type Item = Event;
+    type Item = Vec<Event>;
     type Decoder = decoding::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
@@ -112,7 +112,12 @@ impl TcpSource for VectorSource {
         )
     }
 
-    fn handle_event(&self, _event: &mut Event, _host: Bytes, byte_size: usize) {
+    fn handle_events(&self, events: &mut [Event], _host: Bytes, byte_size: usize) {
+        assert_eq!(
+            events.len(),
+            1,
+            "Vector decoder must produce exactly one event per frame"
+        );
         emit!(VectorEventReceived { byte_size });
     }
 }

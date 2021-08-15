@@ -1,4 +1,4 @@
-use crate::sources::util::decoding::{BoxedFramer, Error, FramingConfig};
+use crate::sources::util::decoding::{BoxedFramer, FramingConfig, FramingError};
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;

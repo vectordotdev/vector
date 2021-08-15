@@ -25,7 +25,7 @@ impl ParserConfig for BytesParserConfig {
 pub struct BytesParser;
 
 impl Parser for BytesParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
-        Ok(bytes.into())
+    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
+        Ok(vec![bytes.into()])
     }
 }

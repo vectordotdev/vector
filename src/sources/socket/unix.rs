@@ -1,6 +1,6 @@
 use crate::{
     event::Event,
-    internal_events::{SocketEventReceived, SocketMode},
+    internal_events::{SocketEventsReceived, SocketMode},
     shutdown::ShutdownSignal,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source, decoding::DecodingConfig},
@@ -48,7 +48,7 @@ pub(super) fn unix_datagram<D>(
     out: Pipeline,
 ) -> Source
 where
-    D: Decoder<Item = (Event, usize)> + Send + 'static,
+    D: Decoder<Item = (Vec<Event>, usize)> + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     build_unix_datagram_source(
@@ -57,19 +57,23 @@ where
         decoder,
         shutdown,
         out,
-        move |event, host, byte_size| {
-            let log = event.as_mut_log();
-            log.insert(
-                crate::config::log_schema().source_type_key(),
-                Bytes::from("socket"),
-            );
-            if let Some(host) = host {
-                log.insert(&host_key, host);
-            }
-            emit!(SocketEventReceived {
+        move |events, host, byte_size| {
+            emit!(SocketEventsReceived {
+                mode: SocketMode::Unix,
+                count: events.len(),
                 byte_size,
-                mode: SocketMode::Unix
             });
+
+            for event in events {
+                let log = event.as_mut_log();
+                log.insert(
+                    crate::config::log_schema().source_type_key(),
+                    Bytes::from("socket"),
+                );
+                if let Some(host) = host.clone() {
+                    log.insert(&host_key, host);
+                }
+            }
         },
     )
 }
@@ -83,7 +87,7 @@ pub(super) fn unix_stream<D>(
     out: Pipeline,
 ) -> Source
 where
-    D: Decoder<Item = (Event, usize)> + Clone + Send + 'static,
+    D: Decoder<Item = (Vec<Event>, usize)> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     build_unix_stream_source(
@@ -91,19 +95,23 @@ where
         decoder,
         shutdown,
         out,
-        move |event, host, byte_size| {
-            let log = event.as_mut_log();
-            log.insert(
-                crate::config::log_schema().source_type_key(),
-                Bytes::from("socket"),
-            );
-            if let Some(host) = host {
-                log.insert(&host_key, host);
-            }
-            emit!(SocketEventReceived {
+        move |events, host, byte_size| {
+            emit!(SocketEventsReceived {
+                mode: SocketMode::Unix,
+                count: events.len(),
                 byte_size,
-                mode: SocketMode::Unix
             });
+
+            for event in events {
+                let log = event.as_mut_log();
+                log.insert(
+                    crate::config::log_schema().source_type_key(),
+                    Bytes::from("socket"),
+                );
+                if let Some(host) = host.clone() {
+                    log.insert(&host_key, host);
+                }
+            }
         },
     )
 }

@@ -87,8 +87,8 @@ impl Decoder {
 }
 
 impl tokio_util::codec::Decoder for Decoder {
-    type Item = (Event, usize);
-    type Error = self::Error;
+    type Item = (Vec<Event>, usize);
+    type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.framer.decode(buf).map(|result| {
@@ -136,37 +136,37 @@ mod tests {
         let mut input = BytesMut::from("foo\nbar\nbaz");
 
         let mut events = Vec::new();
-        while let Some(event) = decoder.decode_eof(&mut input).unwrap() {
-            events.push(event);
+        while let Some(next) = decoder.decode_eof(&mut input).unwrap() {
+            events.push(next);
         }
 
         assert_eq!(events.len(), 3);
+        assert_eq!(events[0].0.len(), 1);
         assert_eq!(
-            events[0].0.as_log()[log_schema().message_key()],
+            events[0].0[0].as_log()[log_schema().message_key()],
             "foo".into()
         );
-        assert!(events[0]
-            .0
+        assert!(events[0].0[0]
             .as_log()
             .get(log_schema().timestamp_key())
             .is_some());
         assert_eq!(events[0].1, 3);
+        assert_eq!(events[1].0.len(), 1);
         assert_eq!(
-            events[1].0.as_log()[log_schema().message_key()],
+            events[1].0[0].as_log()[log_schema().message_key()],
             "bar".into()
         );
-        assert!(events[1]
-            .0
+        assert!(events[1].0[0]
             .as_log()
             .get(log_schema().timestamp_key())
             .is_some());
         assert_eq!(events[1].1, 3);
+        assert_eq!(events[2].0.len(), 1);
         assert_eq!(
-            events[2].0.as_log()[log_schema().message_key()],
+            events[2].0[0].as_log()[log_schema().message_key()],
             "baz".into()
         );
-        assert!(events[2]
-            .0
+        assert!(events[2].0[0]
             .as_log()
             .get(log_schema().timestamp_key())
             .is_some());

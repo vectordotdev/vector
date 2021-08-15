@@ -110,16 +110,18 @@ where
 
             let mut bytes = BytesMut::from(line.as_bytes());
 
-            while let Ok(Some((mut event, _))) = decoder.decode_eof(&mut bytes) {
-                let log = event.as_mut_log();
+            while let Ok(Some((events, _))) = decoder.decode_eof(&mut bytes) {
+                for mut event in events {
+                    let log = event.as_mut_log();
 
-                log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                    log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
 
-                if let Some(hostname) = &hostname {
-                    log.insert(&host_key, hostname.clone());
+                    if let Some(hostname) = &hostname {
+                        log.insert(&host_key, hostname.clone());
+                    }
+
+                    let _ = out.send(event).await;
                 }
-
-                let _ = out.send(event).await;
             }
         }
 

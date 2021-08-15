@@ -28,13 +28,26 @@ impl ParserConfig for JsonParserConfig {
 pub struct JsonParser;
 
 impl Parser for JsonParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
+    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
         let json: serde_json::Value = serde_json::from_slice(&bytes)
             .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
-        let mut event: Event = json.try_into()?;
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
-        Ok(event)
+
+        let mut events = match json {
+            serde_json::Value::Array(values) => values
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<Event>, _>>()?,
+            _ => vec![json.try_into()?],
+        };
+
+        let timestamp = Utc::now();
+
+        for event in &mut events {
+            event
+                .as_mut_log()
+                .insert(log_schema().timestamp_key(), timestamp);
+        }
+
+        Ok(events)
     }
 }

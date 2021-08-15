@@ -88,11 +88,13 @@ impl TcpSource for FluentSource {
         FluentDecoder::new()
     }
 
-    fn handle_event(&self, event: &mut Event, host: Bytes, _byte_size: usize) {
-        let log = event.as_mut_log();
+    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
+        for event in events {
+            let log = event.as_mut_log();
 
-        if !log.contains(log_schema().host_key()) {
-            log.insert(log_schema().host_key(), host);
+            if !log.contains(log_schema().host_key()) {
+                log.insert(log_schema().host_key(), host.clone());
+            }
         }
     }
 }
@@ -345,6 +347,12 @@ struct FluentFrame {
 impl From<FluentFrame> for Event {
     fn from(frame: FluentFrame) -> Event {
         LogEvent::from(frame).into()
+    }
+}
+
+impl From<FluentFrame> for Vec<Event> {
+    fn from(frame: FluentFrame) -> Vec<Event> {
+        vec![frame.into()]
     }
 }
 

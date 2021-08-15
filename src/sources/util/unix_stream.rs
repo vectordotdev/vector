@@ -29,10 +29,10 @@ pub fn build_unix_stream_source<D>(
     decoder: D,
     shutdown: ShutdownSignal,
     out: Pipeline,
-    handle_event: impl Fn(&mut Event, Option<Bytes>, usize) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
 ) -> Source
 where
-    D: Decoder<Item = (Event, usize)> + Clone + Send + 'static,
+    D: Decoder<Item = (Vec<Event>, usize)> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
@@ -67,7 +67,7 @@ where
                 None
             };
 
-            let handle_event = handle_event.clone();
+            let handle_events = handle_events.clone();
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
             let decoder = decoder.clone();
@@ -75,9 +75,9 @@ where
             let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder).filter_map(move |result| {
                 ready(match result {
-                    Ok((mut event, byte_size)) => {
-                        handle_event(&mut event, received_from.clone(), byte_size);
-                        Some(Ok(event))
+                    Ok((mut events, byte_size)) => {
+                        handle_events(&mut events, received_from.clone(), byte_size);
+                        Some(events)
                     }
                     Err(error) => {
                         emit!(UnixSocketError {
@@ -94,7 +94,11 @@ where
             tokio::spawn(
                 async move {
                     let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
-                    let _ = out.send_all(&mut stream).await;
+                    while let Some(events) = stream.next().await {
+                        for event in events {
+                            let _ = out.send(event).await;
+                        }
+                    }
                     info!("Finished sending.");
 
                     let socket: &mut UnixStream = stream.get_mut().get_mut().get_mut();

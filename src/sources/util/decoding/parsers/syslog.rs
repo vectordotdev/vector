@@ -23,7 +23,7 @@ impl ParserConfig for SyslogParserConfig {
 pub struct SyslogParser;
 
 impl Parser for SyslogParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
+    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
         let bytes: &[u8] = &bytes;
         let line = std::str::from_utf8(bytes).map_err(|error| {
             emit!(SyslogConvertUtf8Error { error });
@@ -35,7 +35,7 @@ impl Parser for SyslogParser {
 
         insert_fields_from_syslog(&mut event, parsed);
 
-        Ok(event)
+        Ok(vec![event])
     }
 }
 

@@ -100,22 +100,25 @@ impl TcpSource for LogstashSource {
         Bytes::from(bytes)
     }
 
-    fn handle_event(&self, event: &mut Event, host: Bytes, _byte_size: usize) {
-        let log = event.as_mut_log();
-        if log.get(log_schema().host_key()).is_none() {
-            log.insert(log_schema().host_key(), host);
-        }
-        if log.get(log_schema().timestamp_key()).is_none() {
-            // attempt to parse @timestamp if it exists; otherwise set to receipt time
-            let timestamp = log
-                .get("@timestamp")
-                .and_then(|timestamp| {
-                    self.timestamp_converter
-                        .convert::<Value>(timestamp.as_bytes())
-                        .ok()
-                })
-                .unwrap_or_else(|| Value::from(chrono::Utc::now()));
-            log.insert(log_schema().timestamp_key(), timestamp);
+    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
+        let now = Value::from(chrono::Utc::now());
+        for event in events {
+            let log = event.as_mut_log();
+            if log.get(log_schema().host_key()).is_none() {
+                log.insert(log_schema().host_key(), host.clone());
+            }
+            if log.get(log_schema().timestamp_key()).is_none() {
+                // attempt to parse @timestamp if it exists; otherwise set to receipt time
+                let timestamp = log
+                    .get("@timestamp")
+                    .and_then(|timestamp| {
+                        self.timestamp_converter
+                            .convert::<Value>(timestamp.as_bytes())
+                            .ok()
+                    })
+                    .unwrap_or_else(|| now.clone());
+                log.insert(log_schema().timestamp_key(), timestamp);
+            }
         }
     }
 }
@@ -499,6 +502,12 @@ impl From<LogstashEventFrame> for Event {
             .map(|(key, value)| (key, Value::from(value)))
             .collect::<BTreeMap<_, _>>()
             .into()
+    }
+}
+
+impl From<LogstashEventFrame> for Vec<Event> {
+    fn from(frame: LogstashEventFrame) -> Self {
+        vec![frame.into()]
     }
 }
 

@@ -140,11 +140,11 @@ impl SourceConfig for StatsdConfig {
 pub struct StatsdParser;
 
 impl Parser for StatsdParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
+    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
         let line = String::from_utf8_lossy(&bytes);
 
         match parse(&line) {
-            Ok(metric) => Ok(Event::Metric(metric)),
+            Ok(metric) => Ok(vec![Event::Metric(metric)]),
             Err(error) => {
                 emit!(StatsdInvalidRecord {
                     error: &error,
@@ -184,10 +184,12 @@ async fn statsd_udp(
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
-            Ok(((metrics, _byte_size), _sock)) => {
-                if let Err(error) = out.send(metrics).await {
-                    error!(message = "Error sending metric.", %error);
-                    break;
+            Ok(((events, _byte_size), _sock)) => {
+                for metrics in events {
+                    if let Err(error) = out.send(metrics).await {
+                        error!(message = "Error sending metric.", %error);
+                        break;
+                    }
                 }
             }
             Err(error) => {
@@ -204,7 +206,7 @@ struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
     type Error = decoding::Error;
-    type Item = Event;
+    type Item = Vec<Event>;
     type Decoder = decoding::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
@@ -214,7 +216,12 @@ impl TcpSource for StatsdTcpSource {
         )
     }
 
-    fn handle_event(&self, _event: &mut Event, _host: Bytes, byte_size: usize) {
+    fn handle_events(&self, events: &mut [Event], _host: Bytes, byte_size: usize) {
+        assert_eq!(
+            events.len(),
+            1,
+            "Statsd decoder must produce exactly one event per frame"
+        );
         emit!(StatsdEventReceived { byte_size });
     }
 }

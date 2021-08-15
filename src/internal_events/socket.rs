@@ -20,14 +20,15 @@ impl SocketMode {
 }
 
 #[derive(Debug)]
-pub(crate) struct SocketEventReceived {
+pub(crate) struct SocketEventsReceived {
     pub mode: SocketMode,
+    pub count: usize,
     pub byte_size: usize,
 }
 
-impl InternalEvent for SocketEventReceived {
+impl InternalEvent for SocketEventsReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.", byte_size = %self.byte_size, mode = self.mode.as_str());
+        trace!(message = "Received events.", mode = self.mode.as_str(), count = %self.count, byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {

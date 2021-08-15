@@ -58,16 +58,12 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
     type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
-    type Item: Into<Event> + Send;
+    type Item: Into<Vec<Event>> + Send;
     type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(&self, item: Self::Item) -> Event {
-        item.into()
-    }
-
-    fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize);
+    fn handle_events(&self, event: &mut [Event], host: Bytes, byte_size: usize);
 
     fn build_ack(&self, _item: &Self::Item) -> Bytes {
         Bytes::new()
@@ -237,22 +233,22 @@ async fn handle_stream<T>(
             res = reader.next() => {
                 match res {
                     Some(Ok((item, byte_size))) => {
-                        let host = host.clone();
                         let ack = source.build_ack(&item);
-                        let mut event = source.build_event(item);
-                        source.handle_event(&mut event, host, byte_size);
-
-                        match out.send(event).await {
-                            Ok(_) => {
-                                let stream = reader.get_mut();
-                                if let Err(error) = stream.write_all(&ack).await {
-                                    emit!(TcpSendAckError { error });
+                        let mut events = item.into();
+                        source.handle_events(&mut events, host.clone(), byte_size);
+                        for event in events {
+                            match out.send(event).await {
+                                Ok(_) => {
+                                    let stream = reader.get_mut();
+                                    if let Err(error) = stream.write_all(&ack).await {
+                                        emit!(TcpSendAckError { error });
+                                        break;
+                                    }
+                                }
+                                Err(_) => {
+                                    warn!("Failed to send event.");
                                     break;
                                 }
-                            }
-                            Err(_) => {
-                                warn!("Failed to send event.");
-                                break;
                             }
                         }
                     }
