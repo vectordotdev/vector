@@ -101,6 +101,41 @@ impl Decoder {
     pub fn new(framer: BoxedFramer, parser: BoxedParser) -> Self {
         Self { framer, parser }
     }
+
+    fn decode(
+        &mut self,
+        buf: &mut BytesMut,
+        decode_frame: impl Fn(
+            &mut BoxedFramer,
+            &mut BytesMut,
+        ) -> Result<Option<Bytes>, BoxedFramingError>,
+    ) -> Result<Option<(Vec<Event>, usize)>, Error> {
+        loop {
+            let frame = decode_frame(&mut self.framer, buf).map_err(|error| {
+                emit!(DecoderFramingFailed { error: &error });
+                Error::FramingError(error)
+            })?;
+
+            break if let Some(frame) = frame {
+                let byte_size = frame.len();
+
+                // Skip zero-sized frames.
+                if byte_size == 0 {
+                    continue;
+                }
+
+                match self.parser.parse(frame) {
+                    Ok(event) => Ok(Some((event, byte_size))),
+                    Err(error) => {
+                        emit!(DecoderParseFailed { error: &error });
+                        Err(Error::ParsingError(error))
+                    }
+                }
+            } else {
+                Ok(None)
+            };
+        }
+    }
 }
 
 impl tokio_util::codec::Decoder for Decoder {
@@ -108,43 +143,11 @@ impl tokio_util::codec::Decoder for Decoder {
     type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let frame = self.framer.decode(buf).map_err(|error| {
-            emit!(DecoderFramingFailed { error: &error });
-            Error::FramingError(error)
-        })?;
-
-        if let Some(frame) = frame {
-            let byte_size = frame.len();
-            match self.parser.parse(frame) {
-                Ok(event) => Ok(Some((event, byte_size))),
-                Err(error) => {
-                    emit!(DecoderParseFailed { error: &error });
-                    Err(Error::ParsingError(error))
-                }
-            }
-        } else {
-            Ok(None)
-        }
+        self.decode(buf, |framer, buf| framer.decode(buf))
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let frame = self.framer.decode_eof(buf).map_err(|error| {
-            emit!(DecoderFramingFailed { error: &error });
-            Error::FramingError(error)
-        })?;
-
-        if let Some(frame) = frame {
-            let byte_size = frame.len();
-            match self.parser.parse(frame) {
-                Ok(event) => Ok(Some((event, byte_size))),
-                Err(error) => {
-                    emit!(DecoderParseFailed { error: &error });
-                    Err(Error::ParsingError(error))
-                }
-            }
-        } else {
-            Ok(None)
-        }
+        self.decode(buf, |framer, buf| framer.decode_eof(buf))
     }
 }
 
