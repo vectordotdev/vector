@@ -1,4 +1,4 @@
-use crate::sources::util::decoding::{BoxedFramer, BytesDecoder, FramingConfig};
+use crate::sources::util::decoding::{BoxedFramer, Error, FramingConfig};
 use bytes::{Buf, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -12,10 +12,10 @@ pub struct OctetCountingDecoderConfig {
 #[typetag::serde(name = "octet_counting")]
 impl FramingConfig for OctetCountingDecoderConfig {
     fn build(&self) -> BoxedFramer {
-        Box::new(BytesDecoder::new(match self.max_length {
+        Box::new(match self.max_length {
             Some(max_length) => OctetCountingDecoder::new_with_max_length(max_length),
             None => OctetCountingDecoder::new(),
-        }))
+        })
     }
 }
 
@@ -204,7 +204,7 @@ impl Default for OctetCountingDecoder {
 
 impl tokio_util::codec::Decoder for OctetCountingDecoder {
     type Item = Bytes;
-    type Error = LinesCodecError;
+    type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(ret) = self.checked_decode(src) {
@@ -215,6 +215,7 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
                 .decode(src)
                 .map(|line| line.map(|line| line.into()))
         }
+        .map_err(Into::into)
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -226,6 +227,7 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
                 .decode_eof(buf)
                 .map(|line| line.map(|line| line.into()))
         }
+        .map_err(Into::into)
     }
 }
 

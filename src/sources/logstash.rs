@@ -17,7 +17,6 @@ use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
     io::{self, Read},
-    sync::Arc,
 };
 use tokio_util::codec::Decoder;
 
@@ -49,9 +48,9 @@ impl GenerateConfig for LogstashConfig {
 #[typetag::serde(name = "logstash")]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = Arc::new(LogstashSource {
+        let source = LogstashSource {
             timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone),
-        });
+        };
         let shutdown_secs = 30;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         source.run(
@@ -88,7 +87,7 @@ impl TcpSource for LogstashSource {
     type Item = LogstashEventFrame;
     type Decoder = LogstashDecoder;
 
-    fn build_decoder(&self) -> Self::Decoder {
+    fn decoder(&self) -> Self::Decoder {
         LogstashDecoder::new()
     }
 

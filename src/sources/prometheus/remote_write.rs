@@ -13,7 +13,7 @@ use bytes::BytesMut;
 use prometheus_parser::proto;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr};
 use warp::http::{HeaderMap, StatusCode};
 
 const SOURCE_NAME: &str = "prometheus_remote_write";
@@ -46,7 +46,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Arc::new(RemoteWriteSource);
+        let source = RemoteWriteSource;
         source.run(self.address, "", true, &self.tls, &self.auth, cx)
     }
 

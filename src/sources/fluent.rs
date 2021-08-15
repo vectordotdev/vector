@@ -18,7 +18,6 @@ use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryInto,
     io::{self, Read},
-    sync::Arc,
 };
 use tokio_util::codec::Decoder;
 
@@ -50,7 +49,7 @@ impl GenerateConfig for FluentConfig {
 #[typetag::serde(name = "fluent")]
 impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = Arc::new(FluentSource {});
+        let source = FluentSource {};
         let shutdown_secs = 30;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         source.run(
@@ -85,7 +84,7 @@ impl TcpSource for FluentSource {
     type Item = FluentFrame;
     type Decoder = FluentDecoder;
 
-    fn build_decoder(&self) -> Self::Decoder {
+    fn decoder(&self) -> Self::Decoder {
         FluentDecoder::new()
     }
 

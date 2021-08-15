@@ -24,6 +24,7 @@ impl ParserConfig for JsonParserConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct JsonParser;
 
 impl Parser for JsonParser {

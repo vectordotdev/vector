@@ -4,7 +4,7 @@ use crate::{
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
         util::{
-            decoding::{self, BytesDecoder},
+            decoding::{self, LengthDelimitedCodec, Parser},
             SocketListenAddr, TcpSource,
         },
         Source,
@@ -16,8 +16,6 @@ use bytes::Bytes;
 use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio_util::codec::LengthDelimitedCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
@@ -58,7 +56,7 @@ impl GenerateConfig for VectorConfig {
 
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let vector = Arc::new(VectorSource);
+        let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(
             self.address,
@@ -84,9 +82,10 @@ impl VectorConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 struct VectorParser;
 
-impl decoding::Parser for VectorParser {
+impl Parser for VectorParser {
     fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
         match proto::EventWrapper::decode(bytes) {
             Ok(wrapper) => Ok(wrapper.into()),
@@ -106,9 +105,9 @@ impl TcpSource for VectorSource {
     type Item = Event;
     type Decoder = decoding::Decoder;
 
-    fn build_decoder(&self) -> Self::Decoder {
+    fn decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(
-            Box::new(BytesDecoder::new(LengthDelimitedCodec::new())),
+            Box::new(LengthDelimitedCodec::new()),
             Box::new(VectorParser),
         )
     }

@@ -12,7 +12,7 @@ use crate::{
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
     sources::util::{
-        decoding::{self, BytesDecoder, OctetCountingDecoder, SyslogParser},
+        decoding::{self, OctetCountingDecoder, SyslogParser},
         SocketListenAddr, TcpSource,
     },
     tcp::TcpKeepaliveConfig,
@@ -23,9 +23,9 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::{net::SocketAddr, sync::Arc};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
 
@@ -108,10 +108,10 @@ impl SourceConfig for SyslogConfig {
                 tls,
                 receive_buffer_bytes,
             } => {
-                let source = Arc::new(SyslogTcpSource {
+                let source = SyslogTcpSource {
                     max_length: self.max_length,
                     host_key,
-                });
+                };
                 let shutdown_secs = 30;
                 let tls = MaybeTlsSettings::from_config(&tls, true)?;
                 source.run(
@@ -138,14 +138,10 @@ impl SourceConfig for SyslogConfig {
             #[cfg(unix)]
             Mode::Unix { path } => {
                 let max_length = self.max_length;
-                let build_decoder = move || {
-                    Decoder::new(
-                        Box::new(BytesDecoder::new(
-                            OctetCountingDecoder::new_with_max_length(max_length),
-                        )),
-                        Box::new(SyslogParser),
-                    )
-                };
+                let decoder = Decoder::new(
+                    Box::new(OctetCountingDecoder::new_with_max_length(max_length)),
+                    Box::new(SyslogParser),
+                );
 
                 let handle_event =
                     move |event: &mut Event, host: Option<Bytes>, byte_size: usize| {
@@ -154,7 +150,7 @@ impl SourceConfig for SyslogConfig {
 
                 Ok(build_unix_stream_source(
                     path,
-                    build_decoder,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                     handle_event,
@@ -192,11 +188,9 @@ impl TcpSource for SyslogTcpSource {
     type Item = Event;
     type Decoder = decoding::Decoder;
 
-    fn build_decoder(&self) -> Self::Decoder {
+    fn decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(
-            Box::new(BytesDecoder::new(
-                OctetCountingDecoder::new_with_max_length(self.max_length),
-            )),
+            Box::new(OctetCountingDecoder::new_with_max_length(self.max_length)),
             Box::new(SyslogParser),
         )
     }
@@ -236,9 +230,7 @@ pub fn udp(
         let _ = UdpFramed::new(
             socket,
             decoding::Decoder::new(
-                Box::new(BytesDecoder::new(
-                    OctetCountingDecoder::new_with_max_length(max_length),
-                )),
+                Box::new(OctetCountingDecoder::new_with_max_length(max_length)),
                 Box::new(SyslogParser),
             ),
         )

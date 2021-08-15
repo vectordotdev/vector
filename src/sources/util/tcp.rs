@@ -13,7 +13,7 @@ use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use socket2::SockRef;
-use std::{fmt, io, mem::drop, net::SocketAddr, sync::Arc, time::Duration};
+use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -54,14 +54,14 @@ async fn make_listener(
         },
     }
 }
-pub trait TcpSource: Send + Sync + 'static {
+pub trait TcpSource: Clone + Send + Sync + 'static {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
     type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
     type Item: Into<Event> + Send;
     type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
-    fn build_decoder(&self) -> Self::Decoder;
+    fn decoder(&self) -> Self::Decoder;
 
     fn build_event(&self, item: Self::Item) -> Event {
         item.into()
@@ -74,7 +74,7 @@ pub trait TcpSource: Send + Sync + 'static {
     }
 
     fn run(
-        self: Arc<Self>,
+        self,
         addr: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
@@ -117,7 +117,7 @@ pub trait TcpSource: Send + Sync + 'static {
                 .for_each(move |connection| {
                     let shutdown_signal = shutdown_signal.clone();
                     let tripwire = tripwire.clone();
-                    let source = Arc::clone(&self);
+                    let source = self.clone();
                     let out = out.clone();
                     let connection_gauge = connection_gauge.clone();
 
@@ -176,12 +176,12 @@ pub trait TcpSource: Send + Sync + 'static {
     }
 }
 
-async fn handle_stream<T: ?Sized>(
+async fn handle_stream<T>(
     mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
-    source: Arc<T>,
+    source: T,
     mut tripwire: BoxFuture<'static, ()>,
     host: Bytes,
     mut out: impl Sink<Event> + Send + 'static + Unpin,
@@ -213,7 +213,7 @@ async fn handle_stream<T: ?Sized>(
         }
     }
 
-    let mut reader = FramedRead::new(socket, source.build_decoder());
+    let mut reader = FramedRead::new(socket, source.decoder());
 
     loop {
         tokio::select! {

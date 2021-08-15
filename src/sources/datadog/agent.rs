@@ -53,9 +53,9 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Arc::new(DatadogAgentSource {
+        let source = DatadogAgentSource {
             store_api_key: self.store_api_key,
-        });
+        };
         // We accept /v1/input & /v1/input/<API_KEY>
         source.run(self.address, "/v1/input", false, &self.tls, &self.auth, cx)
     }

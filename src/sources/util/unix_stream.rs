@@ -26,13 +26,13 @@ use tracing_futures::Instrument;
 /// messages in the syslog source).
 pub fn build_unix_stream_source<D>(
     listen_path: PathBuf,
-    build_decoder: impl Fn() -> D + Send + Sync + 'static,
+    decoder: D,
     shutdown: ShutdownSignal,
     out: Pipeline,
     handle_event: impl Fn(&mut Event, Option<Bytes>, usize) + Clone + Send + Sync + 'static,
 ) -> Source
 where
-    D: Decoder<Item = (Event, usize)> + Send + 'static,
+    D: Decoder<Item = (Event, usize)> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
@@ -70,7 +70,7 @@ where
             let handle_event = handle_event.clone();
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
-            let decoder = build_decoder();
+            let decoder = decoder.clone();
 
             let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder).filter_map(move |result| {

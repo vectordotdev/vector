@@ -70,20 +70,15 @@ impl TcpConfig {
     }
 }
 
+#[derive(Clone)]
 pub struct RawTcpSource {
     config: TcpConfig,
-    build_decoder: Box<dyn Fn() -> decoding::Decoder + Send + Sync>,
+    decoder: decoding::Decoder,
 }
 
 impl RawTcpSource {
-    pub fn new(
-        config: TcpConfig,
-        build_decoder: Box<dyn Fn() -> decoding::Decoder + Send + Sync>,
-    ) -> Self {
-        Self {
-            config,
-            build_decoder,
-        }
+    pub fn new(config: TcpConfig, decoder: decoding::Decoder) -> Self {
+        Self { config, decoder }
     }
 }
 
@@ -92,8 +87,8 @@ impl TcpSource for RawTcpSource {
     type Item = Event;
     type Decoder = decoding::Decoder;
 
-    fn build_decoder(&self) -> Self::Decoder {
-        (self.build_decoder)()
+    fn decoder(&self) -> Self::Decoder {
+        self.decoder.clone()
     }
 
     fn handle_event(&self, event: &mut Event, host: Bytes, byte_size: usize) {

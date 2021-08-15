@@ -184,7 +184,7 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 }
 
 #[async_trait]
-pub trait HttpSource: Send + Sync + 'static {
+pub trait HttpSource: Clone + Send + Sync + 'static {
     fn build_events(
         &self,
         body: BytesMut,
@@ -194,7 +194,7 @@ pub trait HttpSource: Send + Sync + 'static {
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
-        self: Arc<Self>,
+        self,
         address: SocketAddr,
         path: &str,
         strict_path: bool,
@@ -250,7 +250,7 @@ pub trait HttpSource: Send + Sync + 'static {
                             buf
                         };
 
-                        let source = Arc::clone(&self);
+                        let source = self.clone();
 
                         let events = auth
                             .is_valid(&auth_header)

@@ -19,6 +19,7 @@ impl ParserConfig for SyslogParserConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SyslogParser;
 
 impl Parser for SyslogParser {

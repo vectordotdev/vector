@@ -1,7 +1,11 @@
+mod bytes;
 mod character_delimited;
+mod length_delimited;
 mod newline_delimited;
 mod octet_counting;
 
-pub use character_delimited::CharacterDelimitedDecoderConfig;
-pub use newline_delimited::NewlineDelimitedDecoderConfig;
-pub use octet_counting::{OctetCountingDecoder, OctetCountingDecoderConfig};
+pub use self::bytes::{BytesCodec, BytesDecoderConfig};
+pub use self::character_delimited::{CharacterDelimitedCodec, CharacterDelimitedDecoderConfig};
+pub use self::length_delimited::{LengthDelimitedCodec, LengthDelimitedDecoderConfig};
+pub use self::newline_delimited::{NewlineDelimitedCodec, NewlineDelimitedDecoderConfig};
+pub use self::octet_counting::{OctetCountingDecoder, OctetCountingDecoderConfig};

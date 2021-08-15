@@ -12,7 +12,7 @@ use crate::{
     tls::MaybeTlsSettings,
 };
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when https://github.com/serde-rs/serde/issues/1358 is addressed
@@ -81,10 +81,7 @@ impl SourceConfig for SocketConfig {
         match self.mode.clone() {
             Mode::Tcp(config) => {
                 let decoding = config.decoding().clone();
-                let tcp = Arc::new(tcp::RawTcpSource::new(
-                    config.clone(),
-                    Box::new(move || decoding.build()),
-                ));
+                let tcp = tcp::RawTcpSource::new(config.clone(), decoding.build());
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
                     config.address(),
@@ -133,12 +130,12 @@ impl SourceConfig for SocketConfig {
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
                 let decoding = config.decoding.clone();
-                let build_decoder = move || decoding.build();
+                let decoder = decoding.build();
                 Ok(unix::unix_stream(
                     config.path,
                     config.max_length,
                     host_key,
-                    build_decoder,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))

@@ -364,7 +364,7 @@ mod integration_test {
     use super::*;
     use crate::{
         shutdown::ShutdownSignal,
-        sources::util::decoding::BytesDecoder,
+        sources::util::decoding::{BytesCodec, BytesParser, Decoder},
         test_util::{collect_n, random_string},
         Pipeline,
     };
@@ -377,14 +377,10 @@ mod integration_test {
         util::Timeout,
     };
     use std::time::Duration;
-    use tokio_util::codec::BytesCodec;
     use vector_core::event::EventStatus;
 
     fn default_decoder() -> decoding::Decoder {
-        decoding::Decoder::new(
-            Box::new(BytesDecoder::new(BytesCodec::new())),
-            Box::new(decoding::BytesParser),
-        )
+        Decoder::new(Box::new(BytesCodec::new()), Box::new(BytesParser))
     }
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {

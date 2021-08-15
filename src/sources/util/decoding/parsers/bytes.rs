@@ -21,6 +21,7 @@ impl ParserConfig for BytesParserConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BytesParser;
 
 impl Parser for BytesParser {

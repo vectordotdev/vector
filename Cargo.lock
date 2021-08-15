@@ -1177,16 +1177,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codec"
-version = "0.1.0"
-dependencies = [
- "bytes 1.0.1",
- "serde_json",
- "tokio-util",
- "tracing 0.1.26",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8251,7 +8241,6 @@ dependencies = [
  "cfg-if 1.0.0",
  "chrono",
  "cidr-utils",
- "codec",
  "colored",
  "criterion",
  "crossterm",

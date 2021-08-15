@@ -5,7 +5,7 @@ use crate::{
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{
-        decoding::{self, BytesDecoder},
+        decoding::{self, CharacterDelimitedCodec, Parser},
         SocketListenAddr, TcpSource,
     },
     tcp::TcpKeepaliveConfig,
@@ -13,13 +13,9 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use codec::CharacterDelimitedCodec;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
-use std::{
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    sync::Arc,
-};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
 
@@ -106,7 +102,7 @@ impl SourceConfig for StatsdConfig {
             }
             StatsdConfig::Tcp(config) => {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
-                let source = Arc::new(StatsdTcpSource);
+                let source = StatsdTcpSource;
                 source.run(
                     config.address,
                     config.keepalive,
@@ -140,9 +136,10 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct StatsdParser;
 
-impl decoding::Parser for StatsdParser {
+impl Parser for StatsdParser {
     fn parse(&self, bytes: Bytes) -> crate::Result<Event> {
         let line = String::from_utf8_lossy(&bytes);
 
@@ -181,7 +178,7 @@ async fn statsd_udp(
     );
 
     let codec = decoding::Decoder::new(
-        Box::new(BytesDecoder::new(CharacterDelimitedCodec::new(b'\n'))),
+        Box::new(CharacterDelimitedCodec::new(b'\n')),
         Box::new(StatsdParser),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
@@ -210,9 +207,9 @@ impl TcpSource for StatsdTcpSource {
     type Item = Event;
     type Decoder = decoding::Decoder;
 
-    fn build_decoder(&self) -> Self::Decoder {
+    fn decoder(&self) -> Self::Decoder {
         decoding::Decoder::new(
-            Box::new(BytesDecoder::new(CharacterDelimitedCodec::new(b'\n'))),
+            Box::new(CharacterDelimitedCodec::new(b'\n')),
             Box::new(StatsdParser),
         )
     }

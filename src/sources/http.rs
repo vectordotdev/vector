@@ -13,7 +13,7 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr};
 use tokio_util::codec::Decoder;
 
 use warp::http::{HeaderMap, HeaderValue};
@@ -67,8 +67,9 @@ fn default_path_key() -> String {
     "path".to_string()
 }
 
+#[derive(Clone)]
 struct SimpleHttpSource {
-    build_decoder: Box<dyn Fn() -> decoding::Decoder + Send + Sync>,
+    decoder: decoding::Decoder,
     headers: Vec<String>,
     query_parameters: Vec<String>,
     path_key: String,
@@ -82,7 +83,7 @@ impl HttpSource for SimpleHttpSource {
         query_parameters: HashMap<String, String>,
         request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        let mut decoder = (self.build_decoder)();
+        let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
 
         while let Ok(Some((event, _byte_size))) = decoder.decode_eof(&mut body) {
@@ -108,12 +109,12 @@ impl HttpSource for SimpleHttpSource {
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoding = self.decoding.clone();
-        let source = Arc::new(SimpleHttpSource {
-            build_decoder: Box::new(move || decoding.build()),
+        let source = SimpleHttpSource {
+            decoder: decoding.build(),
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),
             path_key: self.path_key.clone(),
-        });
+        };
         source.run(
             self.address,
             self.path.as_str(),

@@ -78,17 +78,17 @@ pub(super) fn unix_stream<D>(
     path: PathBuf,
     _max_length: usize,
     host_key: String,
-    build_decoder: impl Fn() -> D + Send + Sync + 'static,
+    decoder: D,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source
 where
-    D: Decoder<Item = (Event, usize)> + Send + 'static,
+    D: Decoder<Item = (Event, usize)> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     build_unix_stream_source(
         path,
-        build_decoder,
+        decoder,
         shutdown,
         out,
         move |event, host, byte_size| {

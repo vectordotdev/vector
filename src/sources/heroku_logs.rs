@@ -16,7 +16,6 @@ use std::{
     io::{BufRead, BufReader},
     net::SocketAddr,
     str::FromStr,
-    sync::Arc,
 };
 
 use warp::http::{HeaderMap, StatusCode};
@@ -75,9 +74,9 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = Arc::new(LogplexSource {
+        let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
-        });
+        };
         source.run(self.address, "events", true, &self.tls, &self.auth, cx)
     }
 
