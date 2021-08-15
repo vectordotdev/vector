@@ -63,39 +63,45 @@ pub trait ParserConfig: Debug + DynClone + Send + Sync {
 ```
 
 The `DecodingConfig` exposes a `build` method to create a Vector `Decoder` which
-implements the `tokio_util::codec::Decoder<Item = (Event, usize)>` trait. That
-way we can produce `Event`s from `ByteMut` by repeated calls to
-`decode`/`decode_eof` either on a byte stream or a byte message. The additional
-`usize` item conveys how many bytes were read to produce the particular `Event`,
-so that this information can be passed along to e.g. the internal event log.
+implements the `tokio_util::codec::Decoder` trait with
+`Item = (SmallVec<[Event; 1]>, usize)`. That way we can produce `Event`s from
+`ByteMut` by repeated calls to `decode`/`decode_eof` either on a byte stream or
+a byte message. The additional `usize` item conveys how many bytes were read to
+produce the particular `SmallVec<[Event; 1]>`, so that this information can be
+passed along to e.g. the internal event log.
 
 Internally, the `Decoder` holds a framer and a parser:
 
 ```rust
+#[derive(Clone)]
 pub struct Decoder {
-    framer: Box<dyn tokio_util::codec::Decoder<Item = Bytes> + Send + Sync>,
-    parser: Box<dyn Parser + Send + Sync>,
+    framer: BoxedFramer,
+    parser: BoxedParser,
 }
 ```
 
-with the `Parser` trait being defined as:
+with the `Framer` trait being defined as:
 
 ```rust
-pub trait Parser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Event>;
+pub trait Framer: tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError> + DynClone + Send + Sync {}
+```
+
+and the `Parser` trait being defined as:
+
+```rust
+pub trait Parser: DynClone + Send + Sync {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>>;
 }
 ```
 
 Ideally, implementations for `Parser` can be shared/derived from VRL's `parse_*`
 functions.
 
-Consequently, the `FramingConfig` exposes a `build` method to create a
-`Box<dyn tokio_util::codec::Decoder<Item = Bytes> + Send + Sync>` and the
-`ParserConfig` to create a `Box<dyn Parser + Send + Sync>` which are placed into
-the `Decoder`.
-
 The `Decoder` calls its framer repeatedly to produce byte frames, then calls the
-parser to create an `Event` and returns.
+parser to create an `SmallVec<[Event; 1]>` and returns. It returns a `SmallVec`
+rather than an `Event` directly, since one byte frame can potentially hold
+multiple events, e.g. when parsing a JSON array. However, we optimize the most
+common case of emitting one event by not requiring heap allocations for it.
 
 Sources which want to expose framing/decoding functionality to the user can
 embed `DecodingConfig` in their config, build the `Decoder` and apply it to the
