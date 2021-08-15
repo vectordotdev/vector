@@ -100,6 +100,12 @@ impl SinkConfig for LokiConfig {
             return Err("`labels` must include at least one label.".into());
         }
 
+        for label in self.labels.keys() {
+            if !valid_label_name(label) {
+                return Err(format!("Invalid label name {:?}", label.get_ref()).into());
+            }
+        }
+
         if self.request.concurrency.is_some() {
             warn!("Option `request.concurrency` is not supported.");
         }
@@ -322,6 +328,21 @@ async fn fetch_status(
     Ok(client.send(req).await?.status())
 }
 
+fn valid_label_name(label: &Template) -> bool {
+    label.is_dynamic() || {
+        // Loki follows prometheus on this
+        // [a-zA-Z_][a-zA-Z0-9_]*
+        let label_trim = label.get_ref().trim();
+        let mut label_chars = label_trim.chars();
+        if let Some(ch) = label_chars.next() {
+            (ch.is_ascii_alphabetic() || ch == '_')
+                && label_chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+        } else {
+            false
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,6 +352,7 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use futures::StreamExt;
+    use std::convert::TryInto;
 
     #[test]
     fn generate_config() {
@@ -467,6 +489,21 @@ mod tests {
         healthcheck(config, client)
             .await
             .expect("healthcheck failed");
+    }
+
+    #[test]
+    fn valid_label_names() {
+        assert!(valid_label_name(&"name".try_into().unwrap()));
+        assert!(valid_label_name(&" name ".try_into().unwrap()));
+        assert!(valid_label_name(&"bee_bop".try_into().unwrap()));
+        assert!(valid_label_name(&"a09b".try_into().unwrap()));
+
+        assert!(!valid_label_name(&"0ab".try_into().unwrap()));
+        assert!(!valid_label_name(&"*".try_into().unwrap()));
+        assert!(!valid_label_name(&"".try_into().unwrap()));
+        assert!(!valid_label_name(&" ".try_into().unwrap()));
+
+        assert!(valid_label_name(&"{{field}}".try_into().unwrap()));
     }
 }
 
