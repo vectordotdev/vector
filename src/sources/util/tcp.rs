@@ -12,6 +12,7 @@ use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
+use smallvec::SmallVec;
 use socket2::SockRef;
 use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
@@ -58,7 +59,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
     type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
-    type Item: Into<Vec<Event>> + Send;
+    type Item: Into<SmallVec<[Event; 1]>> + Send;
     type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;

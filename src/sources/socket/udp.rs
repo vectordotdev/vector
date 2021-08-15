@@ -11,6 +11,7 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio_util::codec::Decoder;
@@ -59,7 +60,7 @@ pub fn udp<D>(
     out: Pipeline,
 ) -> Source
 where
-    D: Decoder<Item = (Vec<Event>, usize)> + Send + 'static,
+    D: Decoder<Item = (SmallVec<[Event; 1]>, usize)> + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));

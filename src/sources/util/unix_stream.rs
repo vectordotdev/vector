@@ -9,6 +9,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
+use smallvec::SmallVec;
 use std::{fs::remove_file, future::ready, path::PathBuf, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
@@ -32,7 +33,7 @@ pub fn build_unix_stream_source<D>(
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
 ) -> Source
 where
-    D: Decoder<Item = (Vec<Event>, usize)> + Clone + Send + 'static,
+    D: Decoder<Item = (SmallVec<[Event; 1]>, usize)> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));

@@ -14,6 +14,7 @@ use bytes::Bytes;
 use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
@@ -84,9 +85,9 @@ impl VectorConfig {
 struct VectorParser;
 
 impl Parser for VectorParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         match proto::EventWrapper::decode(bytes) {
-            Ok(wrapper) => Ok(vec![wrapper.into()]),
+            Ok(wrapper) => Ok(smallvec![wrapper.into()]),
             Err(error) => {
                 emit!(VectorProtoDecodeError { error: &error });
                 Err(Box::new(error))
@@ -100,7 +101,7 @@ struct VectorSource;
 
 impl TcpSource for VectorSource {
     type Error = codec::Error;
-    type Item = Vec<Event>;
+    type Item = SmallVec<[Event; 1]>;
     type Decoder = codec::Decoder;
 
     fn decoder(&self) -> Self::Decoder {

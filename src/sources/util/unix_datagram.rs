@@ -8,6 +8,7 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
+use smallvec::SmallVec;
 use std::{fs::remove_file, path::PathBuf};
 use tokio::net::UnixDatagram;
 use tokio_util::codec::Decoder;
@@ -26,7 +27,7 @@ pub fn build_unix_datagram_source<D>(
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
 ) -> Source
 where
-    D: Decoder<Item = (Vec<Event>, usize)> + Send + 'static,
+    D: Decoder<Item = (SmallVec<[Event; 1]>, usize)> + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     Box::pin(async move {
@@ -56,7 +57,7 @@ async fn listen<D>(
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
 ) -> Result<(), ()>
 where
-    D: Decoder<Item = (Vec<Event>, usize)> + Send + 'static,
+    D: Decoder<Item = (SmallVec<[Event; 1]>, usize)> + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));

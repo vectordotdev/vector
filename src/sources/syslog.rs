@@ -21,6 +21,7 @@ use chrono::Utc;
 use codec::Decoder;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
@@ -188,7 +189,7 @@ struct SyslogTcpSource {
 
 impl TcpSource for SyslogTcpSource {
     type Error = codec::Error;
-    type Item = Vec<Event>;
+    type Item = SmallVec<[Event; 1]>;
     type Decoder = codec::Decoder;
 
     fn decoder(&self) -> Self::Decoder {

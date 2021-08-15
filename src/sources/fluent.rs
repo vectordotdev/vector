@@ -14,6 +14,7 @@ use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryInto,
@@ -350,9 +351,9 @@ impl From<FluentFrame> for Event {
     }
 }
 
-impl From<FluentFrame> for Vec<Event> {
-    fn from(frame: FluentFrame) -> Vec<Event> {
-        vec![frame.into()]
+impl From<FluentFrame> for SmallVec<[Event; 1]> {
+    fn from(frame: FluentFrame) -> Self {
+        smallvec![frame.into()]
     }
 }
 

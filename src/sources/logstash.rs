@@ -12,6 +12,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -505,9 +506,9 @@ impl From<LogstashEventFrame> for Event {
     }
 }
 
-impl From<LogstashEventFrame> for Vec<Event> {
+impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
     fn from(frame: LogstashEventFrame) -> Self {
-        vec![frame.into()]
+        smallvec![frame.into()]
     }
 }
 

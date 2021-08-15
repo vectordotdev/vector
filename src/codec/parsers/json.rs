@@ -6,6 +6,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use std::convert::TryInto;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -28,7 +29,7 @@ impl ParserConfig for JsonParserConfig {
 pub struct JsonParser;
 
 impl Parser for JsonParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let json: serde_json::Value = serde_json::from_slice(&bytes)
             .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
 
@@ -36,8 +37,8 @@ impl Parser for JsonParser {
             serde_json::Value::Array(values) => values
                 .into_iter()
                 .map(TryInto::try_into)
-                .collect::<Result<Vec<Event>, _>>()?,
-            _ => vec![json.try_into()?],
+                .collect::<Result<SmallVec<[Event; 1]>, _>>()?,
+            _ => smallvec![json.try_into()?],
         };
 
         let timestamp = Utc::now();

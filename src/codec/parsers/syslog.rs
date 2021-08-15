@@ -7,6 +7,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -23,7 +24,7 @@ impl ParserConfig for SyslogParserConfig {
 pub struct SyslogParser;
 
 impl Parser for SyslogParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let bytes: &[u8] = &bytes;
         let line = std::str::from_utf8(bytes).map_err(|error| {
             emit!(SyslogConvertUtf8Error { error });
@@ -35,7 +36,7 @@ impl Parser for SyslogParser {
 
         insert_fields_from_syslog(&mut event, parsed);
 
-        Ok(vec![event])
+        Ok(smallvec![event])
     }
 }
 

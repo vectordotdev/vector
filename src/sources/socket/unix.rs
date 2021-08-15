@@ -11,6 +11,7 @@ use crate::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use std::path::PathBuf;
 use tokio_util::codec::Decoder;
 
@@ -49,7 +50,7 @@ pub(super) fn unix_datagram<D>(
     out: Pipeline,
 ) -> Source
 where
-    D: Decoder<Item = (Vec<Event>, usize)> + Send + 'static,
+    D: Decoder<Item = (SmallVec<[Event; 1]>, usize)> + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     build_unix_datagram_source(
@@ -88,7 +89,7 @@ pub(super) fn unix_stream<D>(
     out: Pipeline,
 ) -> Source
 where
-    D: Decoder<Item = (Vec<Event>, usize)> + Clone + Send + 'static,
+    D: Decoder<Item = (SmallVec<[Event; 1]>, usize)> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     build_unix_stream_source(

@@ -9,6 +9,7 @@ use crate::{
 use bytes::Bytes;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct TcpConfig {
@@ -82,7 +83,7 @@ impl RawTcpSource {
 
 impl TcpSource for RawTcpSource {
     type Error = codec::Error;
-    type Item = Vec<Event>;
+    type Item = SmallVec<[Event; 1]>;
     type Decoder = codec::Decoder;
 
     fn decoder(&self) -> Self::Decoder {

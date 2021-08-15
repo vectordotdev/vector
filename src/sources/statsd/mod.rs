@@ -13,6 +13,7 @@ use crate::{
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
@@ -138,11 +139,11 @@ impl SourceConfig for StatsdConfig {
 pub struct StatsdParser;
 
 impl Parser for StatsdParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let line = String::from_utf8_lossy(&bytes);
 
         match parse(&line) {
-            Ok(metric) => Ok(vec![Event::Metric(metric)]),
+            Ok(metric) => Ok(smallvec![Event::Metric(metric)]),
             Err(error) => {
                 emit!(StatsdInvalidRecord {
                     error: &error,
@@ -204,7 +205,7 @@ struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
     type Error = codec::Error;
-    type Item = Vec<Event>;
+    type Item = SmallVec<[Event; 1]>;
     type Decoder = codec::Decoder;
 
     fn decoder(&self) -> Self::Decoder {

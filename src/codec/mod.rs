@@ -12,6 +12,7 @@ pub use config::{DecodingConfig, FramingConfig, ParserConfig};
 use dyn_clone::DynClone;
 pub use framing::*;
 pub use parsers::*;
+use smallvec::SmallVec;
 use tokio_util::codec::LinesCodecError;
 
 pub trait Framer:
@@ -28,7 +29,7 @@ impl<Decoder> Framer for Decoder where
 dyn_clone::clone_trait_object!(Framer);
 
 pub trait Parser: DynClone + Send + Sync {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>>;
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>>;
 }
 
 dyn_clone::clone_trait_object!(Parser);
@@ -109,7 +110,7 @@ impl Decoder {
             &mut BoxedFramer,
             &mut BytesMut,
         ) -> Result<Option<Bytes>, BoxedFramingError>,
-    ) -> Result<Option<(Vec<Event>, usize)>, Error> {
+    ) -> Result<Option<(SmallVec<[Event; 1]>, usize)>, Error> {
         loop {
             let frame = decode_frame(&mut self.framer, buf).map_err(|error| {
                 emit!(DecoderFramingFailed { error: &error });
@@ -139,7 +140,7 @@ impl Decoder {
 }
 
 impl tokio_util::codec::Decoder for Decoder {
-    type Item = (Vec<Event>, usize);
+    type Item = (SmallVec<[Event; 1]>, usize);
     type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {

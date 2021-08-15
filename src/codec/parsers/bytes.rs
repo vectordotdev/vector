@@ -4,6 +4,7 @@ use crate::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct BytesParserConfig;
@@ -25,7 +26,7 @@ impl ParserConfig for BytesParserConfig {
 pub struct BytesParser;
 
 impl Parser for BytesParser {
-    fn parse(&self, bytes: Bytes) -> crate::Result<Vec<Event>> {
-        Ok(vec![bytes.into()])
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        Ok(smallvec![bytes.into()])
     }
 }
