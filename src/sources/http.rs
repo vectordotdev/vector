@@ -521,7 +521,9 @@ mod tests {
 
         let mut events = spawn_collect_n(
             async move {
-                assert_eq!(400, send(addr, r#"[{"key":"value"}]"#).await); //one object per line
+                // Technically, the NDJSON spec disallows writing JSON without a trailing newline.
+                // We'll be lenient in parsing and accept it anyway.
+                assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
 
                 assert_eq!(
                     200,
@@ -529,10 +531,18 @@ mod tests {
                 );
             },
             rx,
-            2,
+            3,
         )
         .await;
 
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key"], "value".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
+        }
         {
             let event = events.remove(0);
             let log = event.as_log();
