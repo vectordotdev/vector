@@ -211,7 +211,7 @@ goal:
 
 ```coffee
 data = parse_json(.message) ??
-       parse_nginx_log(.message) ?? 
+       parse_nginx_log(.message) ??
        parse_apache_log(.message) ??
        { "error": "invalid data format" }
 ```
