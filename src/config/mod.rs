@@ -72,7 +72,7 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ComponentId {
     pub name: String,
 }
@@ -82,6 +82,12 @@ impl ComponentId {
         Self {
             name: name.to_string(),
         }
+    }
+}
+
+impl std::fmt::Debug for ComponentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.name)
     }
 }
 
