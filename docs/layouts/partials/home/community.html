@@ -5,7 +5,7 @@
     {{ partial "home/heading.html" (dict "title" $comm.title) }}
 
     {{/* Project stats */}}
-    <div class="mt-4 md:mt-6 inline-flex divide-x dark:divide-gray-600 w-full">
+    <div class="mt-4 md:mt-6 inline-flex divide-x dark:divide-gray-600 w-full lg:w-8/12 xl:w-6/12">
       {{ range $index, $stat := $comm.stats }}
       <div class="flex flex-col px-1 sm:px-6 lg:px-8 py-2 {{ if eq $index 0 }}pl-0{{ else if eq $index 3 }}pr-0{{ end }} max-w-fourth flex-grow">
         <span class="text-xl sm:text-3xl md:text-4xl lg:text-4.5xl font-light dark:text-gray-100">
