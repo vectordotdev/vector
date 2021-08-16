@@ -48,7 +48,7 @@ components: sources: kubernetes_logs: {
 		}
 		requirements: [
 			"""
-				[Kubernetes](\(urls.kubernetes)) version `>= 1.14` is required.
+				[Kubernetes](\(urls.kubernetes)) version `\(services.kubernetes.versions)` is required.
 				""",
 		]
 		warnings: []
