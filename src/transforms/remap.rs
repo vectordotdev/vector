@@ -8,8 +8,10 @@ use crate::{
 
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
+use std::fs::File;
+use std::io::{Read, self};
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -64,7 +66,16 @@ impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Self> {
         let source = match (&config.source, &config.file) {
             (Some(source), None) => source.to_owned(),
-            (None, Some(path)) => std::fs::read_to_string(path)?,
+            (None, Some(path)) => {
+                let mut buffer = String::new();
+
+                File::open(path)
+                    .with_context(|| FileOpenFailed { path })?
+                    .read_to_string(&mut buffer)
+                    .with_context(|| FileReadFailed { path })?;
+
+                    buffer
+            }
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
 
@@ -134,10 +145,21 @@ impl FunctionTransform for Remap {
     }
 }
 
-#[derive(Debug, Snafu, PartialEq, Eq)]
+#[derive(Debug, Snafu)]
 pub enum BuildError {
     #[snafu(display("must provide exactly one of `source` or `file` configuration"))]
     SourceAndOrFile,
+
+    #[snafu(display("Could not open vrl program {:?}: {}", path, source))]
+    FileOpenFailed {
+        path: PathBuf,
+        source: io::Error,
+    },
+    #[snafu(display("Could not read vrl program {:?}: {}", path, source))]
+    FileReadFailed {
+        path: PathBuf,
+        source: io::Error,
+    },
 }
 
 #[cfg(test)]
@@ -168,7 +190,10 @@ mod tests {
         };
 
         let err = Remap::new(config).unwrap_err().to_string();
-        assert_eq!(&err, "must provide exactly one of `source` or `file` configuration")
+        assert_eq!(
+            &err,
+            "must provide exactly one of `source` or `file` configuration"
+        )
     }
 
     #[test]
@@ -180,7 +205,10 @@ mod tests {
         };
 
         let err = Remap::new(config).unwrap_err().to_string();
-        assert_eq!(&err, "must provide exactly one of `source` or `file` configuration")
+        assert_eq!(
+            &err,
+            "must provide exactly one of `source` or `file` configuration"
+        )
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {
@@ -197,11 +225,13 @@ mod tests {
         let metadata = event.metadata().clone();
 
         let conf = RemapConfig {
-            source: Some(r#"  .foo = "bar"
+            source: Some(
+                r#"  .foo = "bar"
   .bar = "baz"
   .copy = .copy_from
 "#
-            .to_string()),
+                .to_string(),
+            ),
             file: None,
             timezone: TimeZone::default(),
             drop_on_error: true,
@@ -231,10 +261,12 @@ mod tests {
         let metadata = event.metadata().clone();
 
         let conf = RemapConfig {
-            source: Some(indoc! {r#"
+            source: Some(
+                indoc! {r#"
                 . = .events
             "#}
-            .to_owned()),
+                .to_owned(),
+            ),
             file: None,
             timezone: TimeZone::default(),
             drop_on_error: true,
@@ -392,11 +424,13 @@ mod tests {
         let metadata = metric.metadata().clone();
 
         let conf = RemapConfig {
-            source: Some(r#".tags.host = "zoobub"
+            source: Some(
+                r#".tags.host = "zoobub"
                        .name = "zork"
                        .namespace = "zerk"
                        .kind = "incremental""#
-                .to_string()),
+                    .to_string(),
+            ),
             file: None,
             timezone: TimeZone::default(),
             drop_on_error: true,

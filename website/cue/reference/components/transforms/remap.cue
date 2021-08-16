@@ -70,6 +70,8 @@ components: transforms: "remap": {
 		file: {
 			description: """
 				File path to the [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
+				
+				If a relative path is provided, its root is the current working directory.
 
 				Required if `source` is missing.
 				"""
