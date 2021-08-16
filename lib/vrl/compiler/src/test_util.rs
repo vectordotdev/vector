@@ -1,4 +1,4 @@
-/// Create a boxed [`Expression`] trait object from a given [`Value`].
+/// Create a boxed [`Expression`][crate::Expression] trait object from a given `Value`.
 ///
 /// Supports the same format as the [`value`] macro.
 #[macro_export]

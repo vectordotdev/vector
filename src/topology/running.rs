@@ -56,7 +56,7 @@ impl RunningTopology {
     /// The future returned by this function will finish once all the sources in
     /// this topology have finished. This allows the caller to wait for or
     /// detect that the sources in the topology are no longer
-    /// producing. [`vector::Application`], as an example, uses this as a
+    /// producing. [`Application`][crate::app::Application], as an example, uses this as a
     /// shutdown signal.
     pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
