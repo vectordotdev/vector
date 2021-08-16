@@ -98,7 +98,7 @@ impl SourceConfig for JournaldConfig {
 
         let data_dir = cx
             .globals
-            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.name)?;
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.id)?;
 
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
             (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),

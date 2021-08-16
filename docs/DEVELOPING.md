@@ -394,7 +394,7 @@ times:
 
    ```sh
    cargo watch -s clear -s \
-     'cargo test --lib --no-default-features --features=<component type>-<component name> <component type>::<component name>'
+     'cargo test --lib --no-default-features --features=<component type>-<component id> <component type>::<component id>'
    ```
 
    For example, if the component is `add_fields` transform, the command above

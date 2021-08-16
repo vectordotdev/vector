@@ -20,14 +20,14 @@ pub enum OutputEventsPayload {
 impl From<TapPayload> for OutputEventsPayload {
     fn from(t: TapPayload) -> Self {
         match t {
-            TapPayload::Log(name, ev) => Self::Log(Log::new(&name, ev)),
-            TapPayload::Notification(name, n) => match n {
+            TapPayload::Log(component_id, ev) => Self::Log(Log::new(&component_id, ev)),
+            TapPayload::Notification(component_id, n) => match n {
                 TapNotification::Matched => Self::Notification(EventNotification::new(
-                    &name,
+                    &component_id,
                     EventNotificationType::Matched,
                 )),
                 TapNotification::NotMatched => Self::Notification(EventNotification::new(
-                    &name,
+                    &component_id,
                     EventNotificationType::NotMatched,
                 )),
             },

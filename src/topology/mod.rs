@@ -89,12 +89,7 @@ pub async fn build_or_log_errors(
 pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
-        .filter_map(|name| {
-            pieces
-                .healthchecks
-                .remove(&name)
-                .map(move |task| (name, task))
-        })
+        .filter_map(|id| pieces.healthchecks.remove(&id).map(move |task| (id, task)))
         .collect()
 }
 

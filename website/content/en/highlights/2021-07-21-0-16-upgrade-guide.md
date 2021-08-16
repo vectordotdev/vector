@@ -10,10 +10,11 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.16.0 release includes two **breaking changes**:
+Vector's 0.16.0 release includes three **breaking changes**:
 
+1. [Component name field renamed to ID](#name-to-id)
 1. [Datadog Log sink encoding option removed](#encoding)
-2. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
+1. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
 
 And one **deprecation**:
 
@@ -22,6 +23,31 @@ And one **deprecation**:
 We cover them below to help you upgrade quickly:
 
 [##](##) Upgrade Guide
+
+### Component name field renamed to ID {#name-to-id}
+
+Historically we've referred to the component ID field as `name` in some places, `id` in others. We've decided to
+standardize on `ID` as we feel this is more closer to the intention of the field: an unchanging identifier for
+components.
+
+For example, with the component config:
+
+```toml
+[transforms.parse_nginx]
+type = "remap"
+inputs = []
+source = ""
+```
+
+The `parse_nginx` part of the config is now only referred to as `ID` in the documentation.
+
+We have preserved compatibility with existing usages of `component_name` for the `internal_metrics` sources by keeping
+`component_name` and adding `component_id` as a new tag. Howover, wwe recommend switching usages over to `component_id`
+as we will be removing `component_name` in the future: if you were grouping by this tag in your metrics queries, or
+referring to it in a `remap` or `lua` transform, you should update it to refer to `component_id`.
+
+Within the GraphQL API, all references to `name` for `Component`s has been updated to be `componentId`. This is used
+over simply `Id` as `Id` has special semantics within the GraphQL ecosystem and we may add support for this field later.
 
 ### Datadog Log sink encoding option removed {#encoding}
 
