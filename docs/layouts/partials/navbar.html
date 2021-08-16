@@ -28,7 +28,7 @@
           <div class="flex space-x-4">
             {{ range $menu }}
             {{ $isActive := hasPrefix $here .URL }}
-            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm text-normal font-normal">
+            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm text-normal font-normal" {{ if .Params.flyout }}@mouseover="flyout = true"{{ end }}>
               <span class="dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
                 {{ .Name }}
               </span>
@@ -53,12 +53,12 @@
 
 
         {{/* Search bar */}}
-        <div class="w-64 max-w-full">
+        <div class="max-w-xxs flex-grow">
           <label for="search" class="sr-only">
             Search
           </label>
 
-          {{/* Targeted by the global site search in assets/js/site-search.tsx */}}
+          {{/* Targeted by the global site search in assets/js/search.tsx */}}
           <div id="site-search"></div>
         </div>
       </div>
