@@ -108,7 +108,7 @@ pub fn get_controller() -> crate::Result<&'static Controller> {
 }
 
 /// Take a snapshot of all gathered metrics and expose them as metric
-/// [`Event`]s.
+/// [`Event`](crate::event::Event)s.
 pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Metric> {
     let mut metrics: Vec<Metric> = Vec::new();
     controller.registry.visit(|_kind, (key, handle)| {

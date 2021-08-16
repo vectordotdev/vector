@@ -304,7 +304,7 @@ impl From<MetricValue> for vrl_core::Value {
 pub enum StatisticKind {
     Histogram,
     /// Corresponds to DataDog's Distribution Metric
-    /// https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
+    /// <https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition>
     Summary,
 }
 
