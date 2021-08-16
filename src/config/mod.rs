@@ -125,7 +125,7 @@ pub struct Config {
     pub sources: IndexMap<ComponentId, SourceOuter>,
     pub sinks: IndexMap<ComponentId, SinkWithId>,
     pub transforms: IndexMap<ComponentId, TransformWithId>,
-    tests: Vec<TestDefinition>,
+    tests: Vec<TestDefinition<ComponentId>>,
     expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }
 
@@ -509,15 +509,47 @@ impl Display for Resource {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition {
+pub struct TestDefinition<Id> {
     pub name: String,
-    pub input: Option<TestInput>,
+    pub input: Option<TestInput<Id>>,
     #[serde(default)]
-    pub inputs: Vec<TestInput>,
+    pub inputs: Vec<TestInput<Id>>,
     #[serde(default)]
-    pub outputs: Vec<TestOutput>,
+    pub outputs: Vec<TestOutput<Id>>,
     #[serde(default)]
-    pub no_outputs_from: Vec<ComponentId>,
+    pub no_outputs_from: Vec<Id>,
+}
+
+impl From<TestDefinition<String>> for TestDefinition<ComponentId> {
+    fn from(value: TestDefinition<String>) -> Self {
+        Self {
+            name: value.name,
+            input: value.input.map(Into::into),
+            inputs: value.inputs.into_iter().map(Into::into).collect(),
+            outputs: value.outputs.into_iter().map(Into::into).collect(),
+            no_outputs_from: value
+                .no_outputs_from
+                .into_iter()
+                .map(ComponentId::global)
+                .collect(),
+        }
+    }
+}
+
+impl From<TestDefinition<ComponentId>> for TestDefinition<String> {
+    fn from(value: TestDefinition<ComponentId>) -> Self {
+        Self {
+            name: value.name,
+            input: value.input.map(Into::into),
+            inputs: value.inputs.into_iter().map(Into::into).collect(),
+            outputs: value.outputs.into_iter().map(Into::into).collect(),
+            no_outputs_from: value
+                .no_outputs_from
+                .into_iter()
+                .map(|item| item.name)
+                .collect(),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -531,13 +563,37 @@ pub enum TestInputValue {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestInput {
-    pub insert_at: ComponentId,
+pub struct TestInput<Id> {
+    pub insert_at: Id,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
     pub value: Option<String>,
     pub log_fields: Option<IndexMap<String, TestInputValue>>,
     pub metric: Option<Metric>,
+}
+
+impl From<TestInput<String>> for TestInput<ComponentId> {
+    fn from(value: TestInput<String>) -> Self {
+        Self {
+            insert_at: ComponentId::global(value.insert_at),
+            type_str: value.type_str,
+            value: value.value,
+            log_fields: value.log_fields,
+            metric: value.metric,
+        }
+    }
+}
+
+impl From<TestInput<ComponentId>> for TestInput<String> {
+    fn from(value: TestInput<ComponentId>) -> Self {
+        Self {
+            insert_at: value.insert_at.name,
+            type_str: value.type_str,
+            value: value.value,
+            log_fields: value.log_fields,
+            metric: value.metric,
+        }
+    }
 }
 
 fn default_test_input_type() -> String {
@@ -546,9 +602,27 @@ fn default_test_input_type() -> String {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestOutput {
-    pub extract_from: ComponentId,
+pub struct TestOutput<Id> {
+    pub extract_from: Id,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
+}
+
+impl From<TestOutput<String>> for TestOutput<ComponentId> {
+    fn from(value: TestOutput<String>) -> Self {
+        Self {
+            extract_from: ComponentId::global(value.extract_from),
+            conditions: value.conditions,
+        }
+    }
+}
+
+impl From<TestOutput<ComponentId>> for TestOutput<String> {
+    fn from(value: TestOutput<ComponentId>) -> Self {
+        Self {
+            extract_from: value.extract_from.name,
+            conditions: value.conditions,
+        }
+    }
 }
 
 impl Config {

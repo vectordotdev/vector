@@ -27,7 +27,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
     #[serde(default)]
-    pub tests: Vec<TestDefinition>,
+    pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
@@ -66,7 +66,7 @@ impl From<Config> for ConfigBuilder {
                 .map(|(id, value)| (id.name, value.into()))
                 .collect(),
             provider: None,
-            tests: c.tests,
+            tests: c.tests.into_iter().map(Into::into).collect(),
         }
     }
 }

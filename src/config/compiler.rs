@@ -50,7 +50,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
                 sources,
                 sinks,
                 transforms,
-                tests: builder.tests,
+                tests: builder.tests.into_iter().map(Into::into).collect(),
                 expansions,
             },
             warnings,
