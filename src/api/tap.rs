@@ -226,45 +226,45 @@ async fn tap_handler(
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
-                for (id, mut control_tx) in outputs.iter() {
+                for (component_id, mut control_tx) in outputs.iter() {
                     match patterns
                         .iter()
-                        .filter(|pattern| pattern.matches_glob(id))
+                        .filter(|pattern| pattern.matches_glob(component_id))
                         .collect_vec()
                     {
                         found if !found.is_empty() => {
                             debug!(
                                 message="Component matched.",
-                                component_id = ?id, patterns = ?patterns, matched = ?found
+                                ?component_id, ?patterns, matched = ?found
                             );
 
                             // (Re)connect the sink. This is necessary because a sink may be
                             // reconfigured with the same id as a previous, and we are not
                             // getting involved in config diffing at this point.
-                            let id = Uuid::new_v4().to_string();
-                            let sink = TapSink::new(tx.clone(), id.to_string());
+                            let sink_id = Uuid::new_v4().to_string();
+                            let sink = TapSink::new(tx.clone(), component_id.to_string());
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(id.clone(), Box::new(sink)))
+                                .send(fanout::ControlMessage::Add(sink_id.clone(), Box::new(sink)))
                                 .await
                             {
                                 Ok(_) => {
                                     debug!(
-                                        message = "Sink connected.",
-                                        sink_id = ?id, component_id = ?id,
+                                        message = "Sink connected.", ?sink_id, ?component_id,
                                     );
 
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
                                     sinks
-                                        .insert(id.to_string(), shutdown_trigger(control_tx.clone(), id));
+                                        .insert(component_id.to_string(), shutdown_trigger(control_tx.clone(), sink_id));
                                 }
-                                Err(err) => {
+                                Err(error) => {
                                     error!(
                                         message = "Couldn't connect sink.",
-                                        error = ?err,
-                                        component_id = ?id, id = ?id
+                                        ?error,
+                                        ?component_id,
+                                        ?sink_id,
                                     );
                                 }
                             }
@@ -273,8 +273,7 @@ async fn tap_handler(
                         }
                         _ => {
                             debug!(
-                                message="Component not matched.",
-                                component_id = ?id, patterns = ?patterns
+                                message="Component not matched.", ?component_id, ?patterns
                             );
                         }
                     }
