@@ -1177,6 +1177,11 @@ components: {
 			}
 		}
 
+		telemetry: metrics: {
+			// Default metrics for each component
+			utilization: components.sources.internal_metrics.output.metrics.utilization
+		}
+
 		how_it_works: {
 			state: {
 				title: "State"
