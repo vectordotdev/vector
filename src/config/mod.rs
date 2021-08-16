@@ -641,7 +641,7 @@ mod test {
                           inputs = [ "in" ]
 
                         [[tests]]
-                          id = "check_simple_log"
+                          name = "check_simple_log"
                           [tests.input]
                             insert_at = "foo"
                             type = "raw"
