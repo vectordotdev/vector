@@ -9,9 +9,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::path::PathBuf;
 use std::fs::File;
-use std::io::{Read, self};
+use std::io::{self, Read};
+use std::path::PathBuf;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -74,7 +74,7 @@ impl Remap {
                     .read_to_string(&mut buffer)
                     .with_context(|| FileReadFailed { path })?;
 
-                    buffer
+                buffer
             }
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
@@ -151,15 +151,9 @@ pub enum BuildError {
     SourceAndOrFile,
 
     #[snafu(display("Could not open vrl program {:?}: {}", path, source))]
-    FileOpenFailed {
-        path: PathBuf,
-        source: io::Error,
-    },
+    FileOpenFailed { path: PathBuf, source: io::Error },
     #[snafu(display("Could not read vrl program {:?}: {}", path, source))]
-    FileReadFailed {
-        path: PathBuf,
-        source: io::Error,
-    },
+    FileReadFailed { path: PathBuf, source: io::Error },
 }
 
 #[cfg(test)]
