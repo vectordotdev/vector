@@ -8642,6 +8642,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term 0.12.1",
  "chrono",
+ "chrono-tz",
  "glob 0.3.0",
  "prettydiff",
  "regex",
