@@ -19,7 +19,7 @@ pub enum Value {
 impl Value {
     pub fn to_string_lossy(&self) -> String {
         match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
             Value::Boolean(b) => format!("{}", b),
