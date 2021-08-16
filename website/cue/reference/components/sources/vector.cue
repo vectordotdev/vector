@@ -85,6 +85,20 @@ components: sources: vector: {
 				unit:    "seconds"
 			}
 		}
+		version: {
+			description: "Source API version. Specifying this version ensures that Vector does not break backward compatibility."
+			common:      true
+			required:    false
+			warnings: ["Ensure you use the same version for both the source and sink."]
+			type: string: {
+				enum: {
+					"1": "Vector source API version 1"
+					"2": "Vector source API version 2"
+				}
+				default: "1"
+				syntax:  "literal"
+			}
+		}
 	}
 
 	output: {

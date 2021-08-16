@@ -89,6 +89,20 @@ components: sinks: vector: {
 				syntax: "literal"
 			}
 		}
+		version: {
+			description: "Sink API version. Specifying this version ensures that Vector does not break backward compatibility."
+			common:      true
+			required:    false
+			warnings: ["Ensure you use the same version for both the sink and source."]
+			type: string: {
+				enum: {
+					"1": "Vector sink API version 1"
+					"2": "Vector sink API version 2"
+				}
+				default: "1"
+				syntax:  "literal"
+			}
+		}
 	}
 
 	how_it_works: components.sources.vector.how_it_works
