@@ -906,8 +906,8 @@ components: sources: internal_metrics: {
 			}
 		}
 		utilization: {
-			description:       "A ratio from 0 to 1 of the load on a component. A value of 0 would indicate a completely idle component that is simply waiting for input. A value of 1 would indicate a that is never idle. This value is updated evry 5 seconds."
-			type:              "guage"
+			description:       "A ratio from 0 to 1 of the load on a component. A value of 0 would indicate a completely idle component that is simply waiting for input. A value of 1 would indicate a that is never idle. This value is updated every 5 seconds."
+			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
