@@ -28,7 +28,7 @@ pub enum Token<S> {
     StringLiteral(StringLiteral<S>),
     Identifier(S),
     ExtendedIdentifier(S),
-    InvalidToken(char),
+    Invalid(char),
 }
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -82,7 +82,7 @@ impl<'input> Iterator for Lexer<'input> {
 
                     ch if ch.is_whitespace() => continue,
 
-                    ch => Some(Ok(self.token(start, InvalidToken(ch)))),
+                    ch => Some(Ok(self.token(start, Invalid(ch)))),
                 };
 
                 return result;
