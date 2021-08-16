@@ -1,5 +1,9 @@
-mod config;
-mod framing;
+//! A collection of codecs that can be used to transform between bytes streams /
+//! byte messages, byte frames and structured events.
+
+#![deny(missing_docs)]
+
+mod framers;
 mod parsers;
 
 use crate::{
@@ -8,57 +12,19 @@ use crate::{
     sources::util::TcpError,
 };
 use bytes::{Bytes, BytesMut};
-pub use config::{DecodingConfig, FramingConfig, ParserConfig};
-use dyn_clone::DynClone;
-pub use framing::*;
+pub use framers::*;
 pub use parsers::*;
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use tokio_util::codec::LinesCodecError;
 
-pub trait Framer:
-    tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError> + DynClone + Send + Sync
-{
-}
-
-impl<Decoder> Framer for Decoder where
-    Decoder:
-        tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError> + Clone + Send + Sync
-{
-}
-
-dyn_clone::clone_trait_object!(Framer);
-
-pub trait Parser: DynClone + Send + Sync {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>>;
-}
-
-dyn_clone::clone_trait_object!(Parser);
-
-pub trait FramingError: std::error::Error + TcpError + Send + Sync {}
-
-pub type BoxedFramingError = Box<dyn FramingError>;
-
-impl std::error::Error for BoxedFramingError {}
-
-impl FramingError for std::io::Error {}
-
-impl FramingError for LinesCodecError {}
-
-impl From<std::io::Error> for BoxedFramingError {
-    fn from(error: std::io::Error) -> Self {
-        Box::new(error)
-    }
-}
-
-impl From<LinesCodecError> for BoxedFramingError {
-    fn from(error: LinesCodecError) -> Self {
-        Box::new(error)
-    }
-}
-
+/// An error that occurred while decoding structured events from a byte stream /
+/// byte messages.
 #[derive(Debug)]
 pub enum Error {
+    /// The error occurred while producing byte frames from the byte stream /
+    /// byte messages.
     FramingError(BoxedFramingError),
+    /// The error occurred while parsing structured events from a byte frame.
     ParsingError(crate::Error),
 }
 
@@ -88,21 +54,26 @@ impl From<std::io::Error> for Error {
     }
 }
 
-pub type BoxedFramer = Box<dyn Framer + Send + Sync>;
-
-pub type BoxedParser = Box<dyn Parser + Send + Sync + 'static>;
-
 #[derive(Clone)]
+/// A decoder that can decode structured events from a byte stream / byte
+/// messages.
 pub struct Decoder {
     framer: BoxedFramer,
     parser: BoxedParser,
 }
 
 impl Decoder {
+    /// Creates a new `Decoder` with the specified `Framer` to produce byte
+    /// frames from the byte stream / byte messages and `Parser` to parse
+    /// structured events from a byte frame.
     pub fn new(framer: BoxedFramer, parser: BoxedParser) -> Self {
         Self { framer, parser }
     }
 
+    /// Method to combine framing and parsing, such that an incoming byte stream
+    /// / byte messages are transformed directly to structured events.
+    ///
+    /// Zero-byte frames are skipped without parsing.
     fn decode(
         &mut self,
         buf: &mut BytesMut,
@@ -112,6 +83,7 @@ impl Decoder {
         ) -> Result<Option<Bytes>, BoxedFramingError>,
     ) -> Result<Option<(SmallVec<[Event; 1]>, usize)>, Error> {
         loop {
+            // Frame bytes from the incoming byte stream / byte messages.
             let frame = decode_frame(&mut self.framer, buf).map_err(|error| {
                 emit!(DecoderFramingFailed { error: &error });
                 Error::FramingError(error)
@@ -125,6 +97,7 @@ impl Decoder {
                     continue;
                 }
 
+                // Parse structured events from the byte frame.
                 match self.parser.parse(frame) {
                     Ok(event) => Ok(Some((event, byte_size))),
                     Err(error) => {
@@ -149,6 +122,43 @@ impl tokio_util::codec::Decoder for Decoder {
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.decode(buf, |framer, buf| framer.decode_eof(buf))
+    }
+}
+
+/// Config used to build a `Decoder`.
+///
+/// Usually used in source configs via `#[serde(flatten)]`.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DecodingConfig {
+    framing: Option<Box<dyn FramingConfig>>,
+    decoding: Option<Box<dyn ParserConfig>>,
+}
+
+impl DecodingConfig {
+    /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
+    /// `ParserConfig`.
+    pub fn new(
+        framing: Option<Box<dyn FramingConfig>>,
+        decoding: Option<Box<dyn ParserConfig>>,
+    ) -> Self {
+        Self { framing, decoding }
+    }
+
+    /// Builds a `Decoder` from the provided configuration.
+    pub fn build(&self) -> Decoder {
+        // Build the framer or use a newline delimited decoder if not provided.
+        let framer: BoxedFramer = match &self.framing {
+            Some(config) => config.build(),
+            None => NewlineDelimitedDecoderConfig::new(None).build(),
+        };
+
+        // Build the parser or use a plain byte parser if not provided.
+        let parser: BoxedParser = match &self.decoding {
+            Some(config) => config.build(),
+            None => BytesParserConfig::new().build(),
+        };
+
+        Decoder::new(framer, parser)
     }
 }
 

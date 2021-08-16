@@ -1,3 +1,6 @@
+// TODO.
+#![allow(missing_docs)]
+
 use crate::{
     codec::{BoxedParser, Parser, ParserConfig},
     config::log_schema,

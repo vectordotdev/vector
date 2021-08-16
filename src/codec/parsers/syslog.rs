@@ -1,3 +1,6 @@
+// TODO.
+#![allow(missing_docs)]
+
 use crate::{
     codec::{BoxedParser, Parser, ParserConfig},
     config::log_schema,
@@ -40,8 +43,12 @@ impl Parser for SyslogParser {
     }
 }
 
-/// Function used to resolve the year for syslog messages that don't include the year.
-/// If the current month is January, and the syslog message is for December, it will take the previous year.
+/// Function used to resolve the year for syslog messages that don't include the
+/// year.
+///
+/// If the current month is January, and the syslog message is for December, it
+/// will take the previous year.
+///
 /// Otherwise, take the current year.
 fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
     let now = Utc::now();

@@ -1,3 +1,6 @@
+// TODO.
+#![allow(missing_docs)]
+
 use crate::codec::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};

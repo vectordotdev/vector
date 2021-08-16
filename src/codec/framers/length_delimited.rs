@@ -1,3 +1,6 @@
+// TODO.
+#![allow(missing_docs)]
+
 use crate::codec::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
@@ -30,14 +33,15 @@ impl Default for LengthDelimitedCodec {
 
 impl Clone for LengthDelimitedCodec {
     fn clone(&self) -> Self {
-        // This is an awful implementation for `Clone` since it resets the internal state. However,
-        // it works for our use case because we generally only clone a codec that has not been
-        // mutated yet.
+        // This is an awful implementation for `Clone` since it resets the
+        // internal state. However, it works for our use case because we
+        // generally only clone a codec that has not been mutated yet.
         //
-        // Ideally, `tokio_util::codec::LengthDelimitedCodec` should implement `Clone` and it
-        // doesn't look like it was a deliberate decision to leave out the implementation. All of
-        // its internal fields implement `Clone`, so adding an implementation for `Clone` could be
-        // contributed to the upstream repo easily by adding it to the `derive` macro.
+        // Ideally, `tokio_util::codec::LengthDelimitedCodec` should implement
+        // `Clone` and it doesn't look like it was a deliberate decision to
+        // leave out the implementation. All of its internal fields implement
+        // `Clone`, so adding an implementation for `Clone` could be contributed
+        // to the upstream repo easily by adding it to the `derive` macro.
         Self::new()
     }
 }
