@@ -856,6 +856,10 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
 
+.PHONY: check-stdlib-features
+check-stdlib-features: ## Ensure VRL stdlib features build
+	${MAYBE_ENVIRONMENT_EXEC} env RUSTFLAGS="-D warnings" cargo hack check --each-feature --package vrl-stdlib --exclude-features default
+
 ##@ Utility
 
 .PHONY: build-ci-docker-images
