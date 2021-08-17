@@ -8,7 +8,7 @@ use heim::units::time::second;
 use shared::btreemap;
 
 impl HostMetricsConfig {
-    pub(super) async fn cpu_metrics(&self) -> Vec<Metric> {
+    pub async fn cpu_metrics(&self) -> Vec<Metric> {
         match heim::cpu::times().await {
             Ok(times) => {
                 times
