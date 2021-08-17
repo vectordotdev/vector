@@ -7,7 +7,6 @@ use heim::memory::os::linux::MemoryExt;
 use heim::memory::os::macos::MemoryExt;
 #[cfg(not(target_os = "windows"))]
 use heim::memory::os::SwapExt;
-#[cfg(not(target_os = "windows"))]
 use heim::units::information::byte;
 use shared::btreemap;
 

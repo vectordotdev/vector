@@ -6,7 +6,6 @@ use futures::{stream, StreamExt};
 use heim::net::os::linux::IoCountersExt;
 #[cfg(target_os = "windows")]
 use heim::net::os::windows::IoCountersExt;
-#[cfg(not(target_os = "windows"))]
 use heim::units::information::byte;
 use serde::{Deserialize, Serialize};
 use shared::btreemap;
@@ -100,15 +99,14 @@ impl HostMetricsConfig {
     }
 }
 
-#[cfg(test)]
+// The Windows CI environment produces zero network metrics, causing
+// these tests to always fail.
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::super::tests::{all_counters, assert_filtered_metrics, count_tag};
     use super::super::HostMetricsConfig;
     use super::NetworkConfig;
 
-    // The Windows CI environment produces zero network metrics, causing
-    // this to always fail.
-    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn generates_network_metrics() {
         let metrics = HostMetricsConfig::default().network_metrics().await;
@@ -124,9 +122,6 @@ mod tests {
         assert_eq!(count_tag(&metrics, "device"), metrics.len());
     }
 
-    // The Windows CI environment produces zero network metrics, causing
-    // this to always fail.
-    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn network_metrics_filters_on_device() {
         assert_filtered_metrics("device", |devices| async {

@@ -11,8 +11,6 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures::{stream, SinkExt, StreamExt};
 use glob::{Pattern, PatternError};
-#[cfg(target_os = "windows")]
-use heim::net::os::windows::IoCountersExt;
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
 use heim::{units::time::second, Error};
@@ -20,6 +18,7 @@ use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
+#[cfg(unix)]
 use shared::btreemap;
 use std::collections::BTreeMap;
 use std::fmt;

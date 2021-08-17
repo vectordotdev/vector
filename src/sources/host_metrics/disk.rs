@@ -4,7 +4,6 @@ use chrono::Utc;
 use futures::{stream, StreamExt};
 #[cfg(target_os = "macos")]
 use heim::memory::os::macos::MemoryExt;
-#[cfg(not(target_os = "windows"))]
 use heim::units::information::byte;
 use serde::{Deserialize, Serialize};
 use shared::btreemap;
