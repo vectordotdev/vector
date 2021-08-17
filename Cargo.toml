@@ -224,7 +224,7 @@ hyper = { version = "0.14.11", default-features = false, features = ["stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 infer = { version = "0.5.0", default-features = false, optional = true}
-indexmap = { version = "1.7.0", default-features = false, features = ["serde"] }
+indexmap = { version = "=1.6.2", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.13.0", default-features = true, features = ["api", "v1_16"], optional = true }
@@ -239,7 +239,9 @@ mlua = { version = "0.6.2", default-features = false, features = ["lua54", "send
 mongodb = { version = "2.0.0-beta.3", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.9.18", default-features = false, optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
-nom = { version = "6.1.2", default-features = false, optional = true }
+#https://github.com/wyyerd/pulsar-rs/issues/167
+nom = { version="=7.0.0-alpha1", default-features = false, features=["alloc"], optional = true}
+#nom = { version = "6.1.2", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
 once_cell = { version = "1.8", default-features = false }

@@ -19,7 +19,7 @@ futures = { version = "0.3.16", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "1.7.0", default-features = false, features = ["serde"] }
+indexmap = { version = "=1.6.2", default-features = false, features = ["serde"] }
 lazy_static = { version = "1.4.0", default-features = false }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.0", default-features = false, features = ["std"]}
