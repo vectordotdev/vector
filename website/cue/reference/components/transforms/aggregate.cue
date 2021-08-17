@@ -66,7 +66,7 @@ components: transforms: aggregate: {
 
 	examples: [
 		{
-			title: "Aggregate over 15 seconds"
+			title: "Aggregate over 5 seconds"
 			input: [
 				{
 					metric: {
