@@ -14,7 +14,7 @@ use std::{collections::HashMap, sync::Mutex};
 /// This is loaded at config load time, the actual loading is performed by the implementation of
 /// the `EnrichmentTable` trait. Next, the tables are passed through Vectors `Transform` components,
 /// particularly the `Remap` transform. These Transforms are able to determine which fields we will
-/// want to lookup whilst Vector is running. They can notify the tables of these fields no that the
+/// want to lookup whilst Vector is running. They can notify the tables of these fields so that the
 /// data can be indexed.
 ///
 /// During this phase, the data needs to be mutated and shared around a number of potential
@@ -92,7 +92,7 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
         let tables = self.tables.load();
         (*tables).as_ref().as_ref().map_or_else(
             || {
-                // We are still loading, so we much access the mutex to get the table list.
+                // We are still loading, so we must access the mutex to get the table list.
                 let locked = self.loading.lock().unwrap();
                 match *locked {
                     Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
