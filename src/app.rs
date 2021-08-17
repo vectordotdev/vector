@@ -14,12 +14,10 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-#[cfg(feature = "api-client")]
-use crate::tap;
-#[cfg(feature = "api-client")]
-use crate::top;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
+#[cfg(feature = "api-client")]
+use crate::{tap, top};
 
 #[cfg(windows)]
 use crate::service;

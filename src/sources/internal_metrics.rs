@@ -17,6 +17,16 @@ pub struct InternalMetricsConfig {
     #[derivative(Default(value = "2"))]
     scrape_interval_secs: u64,
     tags: TagsConfig,
+    namespace: Option<String>,
+}
+
+impl InternalMetricsConfig {
+    fn default_namespace<T: Into<String>>(namespace: T) -> Self {
+        Self {
+            namespace: Some(namespace.into()),
+            ..Self::default()
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -43,6 +53,7 @@ impl SourceConfig for InternalMetricsConfig {
             );
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
+        let namespace = self.namespace.clone();
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None
@@ -56,6 +67,7 @@ impl SourceConfig for InternalMetricsConfig {
                 .as_deref()
                 .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
         Ok(Box::pin(run(
+            namespace,
             host_key,
             pid_key,
             get_controller()?,
@@ -75,6 +87,7 @@ impl SourceConfig for InternalMetricsConfig {
 }
 
 async fn run(
+    namespace: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
@@ -93,6 +106,12 @@ async fn run(
         let metrics = capture_metrics(controller);
 
         out.send_all(&mut stream::iter(metrics).map(|mut metric| {
+            // A metric starts out with a default "vector" namespace, but will be overridden
+            // if an explicit namespace is provided to this source.
+            if namespace.is_some() {
+                metric = metric.with_namespace(namespace.as_ref());
+            }
+
             if let Some(host_key) = host_key {
                 if let Ok(hostname) = &hostname {
                     metric.insert_tag(host_key.to_owned(), hostname.to_owned());
