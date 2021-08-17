@@ -56,8 +56,7 @@ pub async fn start_validated(
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
-    let mut running_topology =
-        RunningTopology::new(config, abort_tx, pieces.enrichment_tables.clone());
+    let mut running_topology = RunningTopology::new(config, abort_tx);
 
     if !running_topology
         .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)

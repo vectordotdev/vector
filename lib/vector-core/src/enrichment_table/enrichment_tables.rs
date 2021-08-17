@@ -1,87 +1,74 @@
+//! `EnrichmentTables` manages the collection of `EnrichmentTable`s loaded into Vector.
+//! Enrichment Tables go through two stages.
+//!
+//! ## 1. Writing
+//!
+//! The  tables are loaded. There are two elements that need loading. The first is the actual data.
+//! This is loaded at config load time, the actual loading is performed by the implementation of
+//! the `EnrichmentTable` trait. Next, the tables are passed through Vectors `Transform` components,
+//! particularly the `Remap` transform. These Transforms are able to determine which fields we will
+//! want to lookup whilst Vector is running. They can notify the tables of these fields so that the
+//! data can be indexed.
+//!
+//! During this phase, the data is loaded within a single thread, so can be loaded directly into a
+//! `HashMap`.
+//!
+//! ## 2. Reading
+//!
+//! Once all the data has been loaded we can move to the next stage. This is signified by calling
+//! the `finish_load` method. At this point all the data is swapped into the `ArcSwap` of the `tables`
+//! field. `ArcSwap` provides lock-free read-only access to the data. From this point on we have fast,
+//! efficient read-only access and can no longer add indexes or otherwise mutate the data.
+//!
+//! This data within the `ArcSwap` is accessed through the `EnrichmentTableSearch` struct. Any
+//! transform that needs access to this can call `EnrichmentTables::as_search`. This returns a
+//! cheaply clonable struct that implements `vrl:EnrichmentTableSearch` through with the enrichment
+//! tables can be searched.
+//!
 use super::EnrichmentTable;
 use arc_swap::ArcSwap;
 #[cfg(feature = "vrl")]
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::{collections::HashMap, sync::Mutex};
 
-/// The Enrichment Tables manages the collection of `EnrichmentTable`s loaded into Vector.
-/// Enrichment Tables go through two stages.
-///
-/// ## 1. Writing
-///
-/// The  tables are loaded. There are two elements that need loading. The first is the actual data.
-/// This is loaded at config load time, the actual loading is performed by the implementation of
-/// the `EnrichmentTable` trait. Next, the tables are passed through Vectors `Transform` components,
-/// particularly the `Remap` transform. These Transforms are able to determine which fields we will
-/// want to lookup whilst Vector is running. They can notify the tables of these fields so that the
-/// data can be indexed.
-///
-/// During this phase, the data needs to be mutated and shared around a number of potential
-/// different components. Also, performance is not absolutely critical at this phase. Thus, the
-/// data is stored within a `Mutex` - stored in the `loading` field of this struct.
-///
-/// ## 2. Reading
-///
-/// Once all the data has been loaded we can move to the next stage. This is signified by calling
-/// the `finish_load` method. At this point all the data is swapped out of the `Mutex` in the loading
-/// field into the `ArcSwap` of the `tables` field. `ArcSwap` provides lock-free read-only access
-/// to the data. From this point on we have fast, efficient read-only access and can no longer add
-/// indexes or otherwise mutate the data .
-///
-/// Cloning this object is designed to be cheap. The underlying data will be shared by all clones.
-///
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct EnrichmentTables {
-    loading: Arc<Mutex<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
+    loading: Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
     tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
 }
 
 impl EnrichmentTables {
     pub fn new(tables: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>) -> Self {
         Self {
-            loading: Arc::new(Mutex::new(Some(tables))),
+            loading: Some(tables),
             tables: Arc::new(ArcSwap::default()),
         }
     }
 
-    /// Swap the data out of the `Mutex` into the `ArcSwap`.
+    /// Swap the data out of the `HashTable` into the `ArcSwap`.
     /// From this point we can no longer add indexes to the tables, but are now allowed to read the
     /// data.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the Mutex is poisoned.
-    pub fn finish_load(&self) {
-        let mut tables_lock = self.loading.lock().unwrap();
-        let tables = tables_lock.take();
+    pub fn finish_load(&mut self) {
+        let tables = self.loading.take();
         self.tables.swap(Arc::new(tables));
+    }
+
+    /// Returns a cheaply clonable struct through that provides lock free read access to the
+    /// enrichment tables.
+    pub fn as_search(&self) -> EnrichmentTableSearch {
+        EnrichmentTableSearch(self.tables.clone())
     }
 }
 
 impl std::fmt::Debug for EnrichmentTables {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let tables = self.tables.load();
-        match **tables {
-            Some(ref tables) => {
-                let mut tables = tables.iter().fold(String::from("("), |mut s, (key, _)| {
-                    s.push_str(key);
-                    s.push_str(", ");
-                    s
-                });
-
-                tables.truncate(std::cmp::max(tables.len(), 0));
-                tables.push(')');
-
-                write!(f, "EnrichmentTables {}", tables)
-            }
-            None => write!(f, "EnrichmentTables loading"),
-        }
+        fmt_enrichment_table(f, "EnrichmentTables", &self.tables)
     }
 }
 
 #[cfg(feature = "vrl")]
-impl vrl_core::EnrichmentTables for EnrichmentTables {
+impl vrl_core::EnrichmentTableSetup for EnrichmentTables {
     /// Return a list of the available tables. This will work regardless of which mode we are in.
     /// If we are in the writing stage, this will acquire a lock to retrieve the tables.
     ///
@@ -93,32 +80,13 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
         (*tables).as_ref().as_ref().map_or_else(
             || {
                 // We are still loading, so we must access the mutex to get the table list.
-                let locked = self.loading.lock().unwrap();
-                match *locked {
+                match self.loading {
                     Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
                     None => Vec::new(),
                 }
             },
             |tables| tables.iter().map(|(key, _)| key.clone()).collect(),
         )
-    }
-
-    /// Search the given table to find the data.
-    /// If we are in the writing stage, this function will return an error.
-    fn find_table_row(
-        &self,
-        table: &str,
-        criteria: BTreeMap<String, String>,
-    ) -> Result<Option<Vec<String>>, String> {
-        let tables = self.tables.load();
-        if let Some(ref tables) = **tables {
-            match tables.get(table) {
-                None => Err(format!("table {} not loaded", table)),
-                Some(table) => Ok(table.find_table_row(criteria).cloned()),
-            }
-        } else {
-            Err("finish_load not called".to_string())
-        }
     }
 
     /// Adds an index to the given Enrichment Table.
@@ -128,9 +96,7 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
     ///
     /// Panics if the Mutex is poisoned.
     fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String> {
-        let mut locked = self.loading.lock().unwrap();
-
-        match *locked {
+        match self.loading {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
                 None => Err(format!("table {} not loaded", table)),
@@ -143,15 +109,72 @@ impl vrl_core::EnrichmentTables for EnrichmentTables {
     }
 }
 
+/// Provides read only access to the enrichment tables via the `vrl::EnrichmentTableSearch` trait.
+/// Cloning this object is designed to be cheap. The underlying data will be shared by all clones.
+#[derive(Clone)]
+pub struct EnrichmentTableSearch(
+    Arc<ArcSwap<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
+);
+
+impl vrl_core::EnrichmentTableSearch for EnrichmentTableSearch {
+    /// Search the given table to find the data.
+    /// If we are in the writing stage, this function will return an error.
+    fn find_table_row(
+        &self,
+        table: &str,
+        criteria: BTreeMap<String, String>,
+    ) -> Result<Option<Vec<String>>, String> {
+        let tables = self.0.load();
+        if let Some(ref tables) = **tables {
+            match tables.get(table) {
+                None => Err(format!("table {} not loaded", table)),
+                Some(table) => Ok(table.find_table_row(criteria).cloned()),
+            }
+        } else {
+            Err("finish_load not called".to_string())
+        }
+    }
+}
+
+impl std::fmt::Debug for EnrichmentTableSearch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt_enrichment_table(f, "EnrichmentTableSearch", &self.0)
+    }
+}
+
+/// Provide some fairly rudimentary debug output for enrichment tables.
+fn fmt_enrichment_table(
+    f: &mut std::fmt::Formatter<'_>,
+    name: &'static str,
+    tables: &Arc<ArcSwap<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
+) -> std::fmt::Result {
+    let tables = tables.load();
+    match **tables {
+        Some(ref tables) => {
+            let mut tables = tables.iter().fold(String::from("("), |mut s, (key, _)| {
+                s.push_str(key);
+                s.push_str(", ");
+                s
+            });
+
+            tables.truncate(std::cmp::max(tables.len(), 0));
+            tables.push(')');
+
+            write!(f, "{} {}", name, tables)
+        }
+        None => write!(f, "{} loading", name),
+    }
+}
+
 #[cfg(all(feature = "vrl", test))]
 mod tests {
     use super::*;
     use shared::btreemap;
     use std::collections::BTreeMap;
-    use std::sync::Arc;
-    use vrl_core::EnrichmentTables;
+    use std::sync::{Arc, Mutex};
+    use vrl_core::{EnrichmentTableSearch, EnrichmentTableSetup};
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct DummyEnrichmentTable {
         data: Vec<String>,
         indexes: Arc<Mutex<Vec<Vec<String>>>>,
@@ -179,8 +202,10 @@ mod tests {
         }
 
         fn add_index(&mut self, fields: Vec<&str>) {
-            let mut indexes = self.indexes.lock().unwrap();
-            indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
+            self.indexes
+                .lock()
+                .unwrap()
+                .push(fields.iter().map(|s| (*s).to_string()).collect());
         }
     }
 
@@ -214,7 +239,7 @@ mod tests {
         let mut tables: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let tables = super::EnrichmentTables::new(tables);
+        let tables = super::EnrichmentTables::new(tables).as_search();
 
         assert_eq!(
             Err("finish_load not called".to_string()),
@@ -246,36 +271,14 @@ mod tests {
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
 
-        let tables = super::EnrichmentTables::new(tables);
+        let mut tables = super::EnrichmentTables::new(tables);
+        let tables_search = tables.as_search();
+
         tables.finish_load();
 
         assert_eq!(
             Ok(Some(vec!["result".to_string()])),
-            tables.find_table_row(
-                "dummy1",
-                btreemap! {
-                    "thing" => "thang"
-                }
-            )
-        );
-    }
-
-    #[test]
-    /// All cloned objects should share the same underlying state.
-    fn can_find_table_row_after_finish_cloned_objects() {
-        let mut tables1: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>> = HashMap::new();
-        tables1.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
-
-        let tables1 = super::EnrichmentTables::new(tables1);
-        let tables2 = tables1.clone();
-
-        // Call finish_load on tables1
-        tables1.finish_load();
-
-        // find_table_row now works on tables2
-        assert_eq!(
-            Ok(Some(vec!["result".to_string()])),
-            tables2.find_table_row(
+            tables_search.find_table_row(
                 "dummy1",
                 btreemap! {
                     "thing" => "thang"

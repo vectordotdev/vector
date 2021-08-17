@@ -1,6 +1,6 @@
 pub mod enrichment_tables;
 
-pub use enrichment_tables::EnrichmentTables;
+pub use enrichment_tables::{EnrichmentTableSearch, EnrichmentTables};
 
 use std::collections::BTreeMap;
 

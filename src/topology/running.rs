@@ -22,7 +22,6 @@ use tokio::{
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
-use vector_core::enrichment_table::EnrichmentTables;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -35,15 +34,10 @@ pub struct RunningTopology {
     pub(crate) config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
-    enrichment_tables: EnrichmentTables,
 }
 
 impl RunningTopology {
-    pub fn new(
-        config: Config,
-        abort_tx: mpsc::UnboundedSender<()>,
-        enrichment_tables: EnrichmentTables,
-    ) -> Self {
+    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<()>) -> Self {
         Self {
             inputs: HashMap::new(),
             outputs: HashMap::new(),
@@ -54,7 +48,6 @@ impl RunningTopology {
             tasks: HashMap::new(),
             abort_tx,
             watch: watch::channel(HashMap::new()),
-            enrichment_tables,
         }
     }
 
