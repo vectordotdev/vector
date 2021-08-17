@@ -181,6 +181,11 @@ impl ReduceValueMerger for LongestArrayMerger {
             if a.len() > self.v.len() {
                 self.v = a;
             }
+        } else {
+            Err(format!(
+                "expected array value, found: '{}'",
+                v.to_string_lossy()
+            ))
         }
         Ok(())
     }
@@ -210,6 +215,11 @@ impl ReduceValueMerger for ShortestArrayMerger {
             if a.len() < self.v.len() {
                 self.v = a;
             }
+        } else {
+            Err(format!(
+                "expected array value, found: '{}'",
+                v.to_string_lossy()
+            ))
         }
         Ok(())
     }
