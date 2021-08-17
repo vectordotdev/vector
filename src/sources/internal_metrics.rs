@@ -218,14 +218,13 @@ mod tests {
         assert_eq!(Some(&labels), output["quux"].tags());
     }
 
-    #[tokio::test]
-    async fn default_namespace() {
+    async fn event_from_config(config: InternalMetricsConfig) -> Event {
         let _ = crate::metrics::init();
 
         let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
-            InternalMetricsConfig::default()
+            config
                 .build(SourceContext::new_test(sender))
                 .await
                 .unwrap()
@@ -233,16 +232,16 @@ mod tests {
                 .unwrap()
         });
 
-        let event = time::timeout(time::Duration::from_millis(100), recv.next())
+        time::timeout(time::Duration::from_millis(100), recv.next())
             .await
             .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream");
+            .expect("failed to get metrics from a stream")
+    }
 
-        match event {
-            Event::Metric(metric) => {
-                assert_eq!(metric.namespace(), Some("vector"));
-            }
-            _ => panic!("not a metric"),
-        }
+    #[tokio::test]
+    async fn default_namespace() {
+        let event = event_from_config(InternalMetricsConfig::default()).await;
+
+        assert_eq!(event.as_metric().namespace(), Some("vector"));
     }
 }
