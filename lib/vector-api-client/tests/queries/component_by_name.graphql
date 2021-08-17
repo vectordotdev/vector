@@ -1,6 +1,0 @@
-query ComponentByNameQuery($name: String!) {
-    componentByName(name: $name) {
-        __typename
-        name
-    }
-}

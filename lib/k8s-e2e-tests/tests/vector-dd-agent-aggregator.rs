@@ -1,10 +1,7 @@
 use indoc::indoc;
 use k8s_e2e_tests::*;
-use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use k8s_test_framework::{lock, namespace, test_pod, vector::Config as VectorConfig};
 use serde_json::Value;
-
-const HELM_CHART_VECTOR_AGGREGATOR: &str = "vector-aggregator";
 
 const HELM_VALUES_DDOG_AGG_TOPOLOGY: &str = indoc! {r#"
     service:
@@ -76,9 +73,10 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let _vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGGREGATOR,
+            "vector-aggregator",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, false),
@@ -97,7 +95,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let _datadog_agent = framework
-        .external_chart(
+        .helm_chart(
             &datadog_namespace,
             "datadog",
             "https://helm.datadoghq.com",

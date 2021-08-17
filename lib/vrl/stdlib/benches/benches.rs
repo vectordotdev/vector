@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
+use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
 use shared::btreemap;
@@ -1393,7 +1393,7 @@ bench_function! {
         want: Ok(value!({
             "severity": "info",
             "facility": "local7",
-            "timestamp": (Local.ymd(2020, 12, 28).and_hms_milli(16, 49, 7, 0).with_timezone(&Utc)),
+            "timestamp": (Utc.ymd(2020, 12, 28).and_hms_milli(16, 49, 7, 0)),
             "hostname": "plertrood-thinkpad-x220",
             "appname": "nginx",
             "message": r#"127.0.0.1 - - [28/Dec/2019:16:49:07 +0000] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:71.0) Gecko/20100101 Firefox/71.0""#,

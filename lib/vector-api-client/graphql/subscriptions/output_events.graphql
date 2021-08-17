@@ -1,15 +1,15 @@
 subscription OutputEventsSubscription(
-    $componentNames: [String!]!, $limit: Int!, $interval: Int!, $encoding: EventEncodingType!){
-    outputEvents(componentNames: $componentNames, limit: $limit, interval: $interval) {
+    $componentIds: [String!]!, $limit: Int!, $interval: Int!, $encoding: EventEncodingType!){
+    outputEvents(componentIds: $componentIds, limit: $limit, interval: $interval) {
         __typename
         ... on Log {
-            componentName
+            componentId
             message
             timestamp
             string(encoding: $encoding)
         }
         ... on EventNotification {
-            componentName
+            componentId
             notification
         }
     }

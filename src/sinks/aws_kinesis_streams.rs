@@ -146,11 +146,7 @@ impl KinesisService {
             .events(500)
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            timeout_secs: Some(30),
-            ..Default::default()
-        });
-
+        let request = config.request.unwrap_with(&TowerRequestConfig::default());
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
 

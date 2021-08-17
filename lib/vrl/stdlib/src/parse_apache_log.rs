@@ -288,7 +288,7 @@ mod tests {
 
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::default(),
+            tz: shared::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
         log_line_valid_empty {

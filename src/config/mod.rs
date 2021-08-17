@@ -173,7 +173,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub name: String,
+    pub id: String,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -184,14 +184,14 @@ pub struct SourceContext {
 impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
-        name: &str,
+        id: &str,
         out: Pipeline,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(name);
+        let (shutdown_signal, _) = shutdown.register_source(id);
         (
             Self {
-                name: name.into(),
+                id: id.into(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -205,7 +205,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            name: "default".into(),
+            id: "default".into(),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
@@ -256,9 +256,9 @@ impl SinkOuter {
         }
     }
 
-    pub fn resources(&self, name: &str) -> Vec<Resource> {
+    pub fn resources(&self, id: &str) -> Vec<Resource> {
         let mut resources = self.inner.resources();
-        resources.append(&mut self.buffer.resources(name));
+        resources.append(&mut self.buffer.resources(id));
         resources
     }
 
@@ -539,7 +539,7 @@ impl Config {
         Default::default()
     }
 
-    /// Expand a logical component name (i.e. from the config file) into the names of the
+    /// Expand a logical component id (i.e. from the config file) into the ids of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
     pub fn get_inputs(&self, identifier: &str) -> Vec<String> {
@@ -731,8 +731,8 @@ mod test {
                 .unwrap()
             ),
             Err(vec![
-                "duplicate source name found: in".into(),
-                "duplicate sink name found: out".into(),
+                "duplicate source id found: in".into(),
+                "duplicate sink id found: out".into(),
             ])
         );
     }
