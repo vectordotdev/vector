@@ -186,7 +186,9 @@ mod tests {
             ..Default::default()
         };
 
-        let err = Remap::new(config).unwrap_err().to_string();
+        let err = Remap::new(config, Default::default())
+            .unwrap_err()
+            .to_string();
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` configuration"
@@ -201,7 +203,9 @@ mod tests {
             ..Default::default()
         };
 
-        let err = Remap::new(config).unwrap_err().to_string();
+        let err = Remap::new(config, Default::default())
+            .unwrap_err()
+            .to_string();
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` configuration"
