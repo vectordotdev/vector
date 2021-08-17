@@ -263,11 +263,14 @@ impl RetryLogic for VectorGrpcRetryLogic {
     type Response = ();
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
+        use tonic::Code::*;
+
         match err {
-            Error::Request { source } => !matches!(
-                source.code(),
-                tonic::Code::Unknown | tonic::Code::Internal | tonic::Code::PermissionDenied
-            ),
+            Error::Request { source } => match source.code() {
+                Unknown if source.message().contains("tcp connect error") => true,
+                Unknown | Internal | PermissionDenied => false,
+                _ => true,
+            },
             _ => true,
         }
     }
