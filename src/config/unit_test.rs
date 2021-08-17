@@ -189,7 +189,7 @@ impl UnitTest {
             if let Some((inputs, outputs)) = results.get(&check.extract_from) {
                 if check.conditions.is_empty() {
                     inspections.push(format!(
-                        "check transform {:?} payloads (events encoded as JSON):\n{}\n{}",
+                        "check transform '{}' payloads (events encoded as JSON):\n{}\n{}",
                         check.extract_from,
                         events_to_string(" input", inputs),
                         events_to_string("output", outputs),
@@ -224,7 +224,7 @@ impl UnitTest {
                     .collect::<Vec<_>>();
                 if !failed_conditions.is_empty() {
                     errors.push(format!(
-                        "check transform {:?} failed conditions:\n  {}\npayloads (events encoded as JSON):\n{}\n{}",
+                        "check transform '{}' failed conditions:\n  {}\npayloads (events encoded as JSON):\n{}\n{}",
                         check.extract_from,
                         failed_conditions.join("\n  "),
                         events_to_string(" input", inputs),
@@ -239,7 +239,7 @@ impl UnitTest {
                 }
             } else {
                 errors.push(format!(
-                    "check transform {:?} failed: received zero resulting events.",
+                    "check transform '{}' failed: received zero resulting events.",
                     check.extract_from,
                 ));
             }
@@ -249,7 +249,7 @@ impl UnitTest {
             if let Some((inputs, outputs)) = results.get(tform) {
                 if !outputs.is_empty() {
                     errors.push(format!(
-                        "check transform {:?} failed: expected no outputs.\npayloads (events encoded as JSON):\n{}\n{}",
+                        "check transform '{}' failed: expected no outputs.\npayloads (events encoded as JSON):\n{}\n{}",
                         tform,
                         events_to_string(" input", inputs),
                         events_to_string("output", outputs),

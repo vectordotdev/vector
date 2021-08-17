@@ -204,10 +204,15 @@ impl ComponentsQuery {
         .await
     }
 
+    /// Gets a configured component by name
+    async fn component_by_name(&self, name: String) -> Option<Component> {
+        let id = ComponentId::global(name);
+        component_by_id(&id)
+    }
+
     /// Gets a configured component by id
-    async fn component_by_id(&self, name: String) -> Option<Component> {
-        // TODO use component id as parameter
-        let id = ComponentId::from(name);
+    async fn component_by_id(&self, id: String) -> Option<Component> {
+        let id = ComponentId::from(id);
         component_by_id(&id)
     }
 }
@@ -287,7 +292,7 @@ pub fn update_config(config: &Config) {
         );
     }
 
-    // Get the names of existing components
+    // Get the ids of existing components
     let existing_component_ids = state::get_component_ids();
     let new_component_ids = new_components
         .iter()
@@ -299,7 +304,7 @@ pub fn update_config(config: &Config) {
         .difference(&new_component_ids)
         .for_each(|id| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
-                state::component_by_id(id).expect("Couldn't get component by name"),
+                state::component_by_id(id).expect("Couldn't get component by id"),
             ));
         });
 

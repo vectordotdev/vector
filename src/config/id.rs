@@ -7,6 +7,14 @@ pub struct ComponentId {
     pub name: String,
 }
 
+impl ComponentId {
+    pub fn global<T: Into<String>>(name: T) -> Self {
+        Self {
+            name: name.into(),
+        }
+    }
+}
+
 impl From<String> for ComponentId {
     fn from(name: String) -> Self {
         Self { name }
