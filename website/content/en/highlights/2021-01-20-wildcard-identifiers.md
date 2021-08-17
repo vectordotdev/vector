@@ -1,6 +1,6 @@
 ---
 date: "2021-01-20"
-title: "Wildcards are now supported in component names"
+title: "Wildcards are now supported in component IDs"
 description: "Wildcards allow for dynamic Vector topologies"
 authors: ["binarylogic"]
 featured: false
@@ -12,7 +12,7 @@ badges:
   domains: ["topology"]
 ---
 
-[PR 6170][pr_6170] introduced wildcards when referencing component names in the `inputs` option. This allows you to build
+[PR 6170][pr_6170] introduced wildcards when referencing component IDs in the `inputs` option. This allows you to build
 dynamic topologies. This feature comes with one limitation: the wildcard must be at the end of the string.
 
 ```toml

@@ -395,12 +395,12 @@ Aug 25 10:29:19.708  INFO vector::topology::builder: Healthcheck: Passed.
 { "foo": "bar" }
 {"foo":"bar"}
 123
-Aug 25 10:29:29.478 ERROR transform{name=transform0 type=wasm}: vector::wasm: WASM plugin errored: Was provided 123, not an object
+Aug 25 10:29:29.478 ERROR transform{id=transform0 type=wasm}: vector::wasm: WASM plugin errored: Was provided 123, not an object
 { "foo":
 "bar" }
 {"foo":"bar"}
 Aug 25 10:29:38.135  INFO vector::shutdown: All sources have finished.
-Aug 25 10:29:38.135  INFO source{name=source0 type=stdin}: vector::sources::stdin: finished sending
+Aug 25 10:29:38.135  INFO source{id=source0 type=stdin}: vector::sources::stdin: finished sending
 Aug 25 10:29:38.135  INFO vector: Shutting down.
 ```
 

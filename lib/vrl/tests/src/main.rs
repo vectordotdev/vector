@@ -1,5 +1,6 @@
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
+use chrono_tz::Tz;
 use glob::glob;
 use shared::TimeZone;
 use std::str::FromStr;
@@ -40,7 +41,7 @@ impl Cmd {
         if let Some(ref tz) = self.timezone {
             TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {}", tz))
         } else {
-            TimeZone::default()
+            TimeZone::Named(Tz::UTC)
         }
     }
 }

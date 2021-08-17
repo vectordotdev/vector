@@ -1,6 +1,6 @@
 subscription ComponentEventsOutTotalsSubscription($interval: Int!) {
     componentEventsOutTotals(interval: $interval) {
-        name
+        componentId
         metric {
             eventsOutTotal
         }

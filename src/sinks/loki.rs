@@ -3,7 +3,7 @@
 //! This sink provides downstream support for `Loki` via
 //! the v1 http json endpoint.
 //!
-//! https://github.com/grafana/loki/blob/master/docs/api.md
+//! <https://github.com/grafana/loki/blob/master/docs/api.md>
 //!
 //! This sink does not use `PartitionBatching` but elects to do
 //! stream multiplexing by organizing the streams in the `build_request`
@@ -281,7 +281,9 @@ impl HttpSink for LokiSink {
 async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}ready", config.endpoint.uri);
 
-    let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let mut req = http::Request::get(uri)
+        .body(hyper::Body::empty())
+        .expect("Building request never fails.");
 
     if let Some(auth) = &config.auth {
         auth.apply(&mut req);
@@ -289,11 +291,35 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 
     let res = client.send(req).await?;
 
-    if res.status() != http::StatusCode::OK {
-        return Err(format!("A non-successful status returned: {}", res.status()).into());
+    let status = match fetch_status("ready", &config, &client).await? {
+        // Issue https://github.com/timberio/vector/issues/6463
+        http::StatusCode::NOT_FOUND => {
+            debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
+            fetch_status("", &config, &client).await?
+        }
+        status => status,
+    };
+
+    match status {
+        http::StatusCode::OK => Ok(()),
+        _ => Err(format!("A non-successful status returned: {}", res.status()).into()),
+    }
+}
+
+async fn fetch_status(
+    endpoint: &str,
+    config: &LokiConfig,
+    client: &HttpClient,
+) -> crate::Result<http::StatusCode> {
+    let uri = format!("{}{}", config.endpoint.uri, endpoint);
+
+    let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
+
+    if let Some(auth) = &config.auth {
+        auth.apply(&mut req);
     }
 
-    Ok(())
+    Ok(client.send(req).await?.status())
 }
 
 #[cfg(test)]
@@ -420,6 +446,27 @@ mod tests {
             )),
             output[0].0.headers.get("authorization")
         );
+    }
+
+    #[tokio::test]
+    async fn healthcheck_grafana_cloud() {
+        test_util::trace_init();
+        let (config, _cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://logs-prod-us-central1.grafana.net"
+            encoding = "json"
+            labels = {test_name = "placeholder"}
+        "#,
+        )
+        .unwrap();
+
+        let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+
+        healthcheck(config, client)
+            .await
+            .expect("healthcheck failed");
     }
 }
 

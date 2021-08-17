@@ -97,7 +97,7 @@ impl MetricsSubscription {
                 m.into_iter()
                     .map(|(m, throughput)| {
                         ComponentProcessedEventsThroughput::new(
-                            m.tag_value("component_name").unwrap(),
+                            m.tag_value("component_id").unwrap(),
                             throughput as i64,
                         )
                     })
@@ -147,7 +147,7 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentEventsInThroughput::new(
-                        m.tag_value("component_name").unwrap(),
+                        m.tag_value("component_id").unwrap(),
                         throughput as i64,
                     )
                 })
@@ -193,7 +193,7 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentEventsOutThroughput::new(
-                        m.tag_value("component_name").unwrap(),
+                        m.tag_value("component_id").unwrap(),
                         throughput as i64,
                     )
                 })
@@ -251,7 +251,7 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentProcessedBytesThroughput::new(
-                        m.tag_value("component_name").unwrap(),
+                        m.tag_value("component_id").unwrap(),
                         throughput as i64,
                     )
                 })
