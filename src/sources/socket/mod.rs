@@ -372,10 +372,10 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
-        let source_name = ComponentId::from("tcp_shutdown_simple");
+        let source_id = ComponentId::from("tcp_shutdown_simple");
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_name, tx);
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
 
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
@@ -395,7 +395,7 @@ mod test {
 
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(&source_name, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -409,10 +409,10 @@ mod test {
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
         let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
-        let source_name = ComponentId::from("tcp_shutdown_infinite_stream");
+        let source_id = ComponentId::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_name, tx);
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
 
         // Start TCP Source
         let server = SocketConfig::from({
@@ -454,7 +454,7 @@ mod test {
         }
 
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(&source_name, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -775,13 +775,13 @@ mod test {
     }
 
     #[cfg(unix)]
-    fn parses_unix_config(name: &str) -> SocketConfig {
+    fn parses_unix_config(mode: &str) -> SocketConfig {
         toml::from_str::<SocketConfig>(&format!(
             r#"
                mode = "{}"
                path = "/does/not/exist"
             "#,
-            name
+            mode
         ))
         .unwrap()
     }

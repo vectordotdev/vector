@@ -41,7 +41,7 @@ pub trait Target: std::fmt::Debug {
 
     /// Get a value for a given path, or `None` if no value is found.
     ///
-    /// See [`Object::insert`] for more details.
+    /// See [`Target::insert`] for more details.
     fn get(&self, path: &LookupBuf) -> Result<Option<Value>, String>;
 
     /// Remove the given path from the object.

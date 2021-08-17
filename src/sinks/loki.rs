@@ -3,7 +3,7 @@
 //! This sink provides downstream support for `Loki` via
 //! the v1 http json endpoint.
 //!
-//! https://github.com/grafana/loki/blob/master/docs/api.md
+//! <https://github.com/grafana/loki/blob/master/docs/api.md>
 //!
 //! This sink does not use `PartitionBatching` but elects to do
 //! stream multiplexing by organizing the streams in the `build_request`

@@ -2,12 +2,12 @@ query ComponentLinksQuery($after: String, $before: String, $first: Int, $last: I
     sources(after: $after, before: $before, first: $first, last: $last) {
         edges {
             node {
-                name
+                componentId
                 transforms {
-                    name
+                    componentId
                 }
                 sinks {
-                    name
+                    componentId
                 }
             }
         }
@@ -15,15 +15,15 @@ query ComponentLinksQuery($after: String, $before: String, $first: Int, $last: I
     transforms(after: $after, before: $before, first: $first, last: $last) {
         edges {
             node {
-                name
+                componentId
                 sources {
-                    name
+                    componentId
                 }
                 transforms {
-                    name
+                    componentId
                 }
                 sinks {
-                    name
+                    componentId
                 }
             }
         }
@@ -31,12 +31,12 @@ query ComponentLinksQuery($after: String, $before: String, $first: Int, $last: I
     sinks(after: $after, before: $before, first: $first, last: $last) {
         edges {
             node {
-                name
+                componentId
                 sources {
-                    name
+                    componentId
                 }
                 transforms {
-                    name
+                    componentId
                 }
             }
         }

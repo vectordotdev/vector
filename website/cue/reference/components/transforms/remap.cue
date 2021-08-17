@@ -48,8 +48,11 @@ components: transforms: "remap": {
 		source: {
 			description: """
 				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
+
+				Required if `file` is missing.
 				"""
-			required:    true
+			common:      true
+			required:    false
 			type: string: {
 				examples: [
 					"""
@@ -60,7 +63,26 @@ components: transforms: "remap": {
 						.new_name = del(.old_name)
 						""",
 				]
-				syntax: "remap_program"
+				syntax:  "remap_program"
+				default: null
+			}
+		}
+		file: {
+			description: """
+				File path to the [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
+				
+				If a relative path is provided, its root is the current working directory.
+
+				Required if `source` is missing.
+				"""
+			common:      true
+			required:    false
+			type: string: {
+				examples: [
+					"./my/program.vrl",
+				]
+				syntax:  "literal"
+				default: null
 			}
 		}
 		drop_on_error: {

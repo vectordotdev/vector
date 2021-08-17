@@ -124,7 +124,7 @@ pub struct Config {
 }
 
 inventory::submit! {
-    SourceDescription::new::<Config>(COMPONENT_NAME)
+    SourceDescription::new::<Config>(COMPONENT_ID)
 }
 
 impl GenerateConfig for Config {
@@ -160,7 +160,7 @@ impl Default for Config {
     }
 }
 
-const COMPONENT_NAME: &str = "kubernetes_logs";
+const COMPONENT_ID: &str = "kubernetes_logs";
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kubernetes_logs")]
@@ -179,7 +179,7 @@ impl SourceConfig for Config {
     }
 
     fn source_type(&self) -> &'static str {
-        COMPONENT_NAME
+        COMPONENT_ID
     }
 }
 
@@ -496,7 +496,7 @@ fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>
     // Add source type.
     event.insert(
         crate::config::log_schema().source_type_key(),
-        COMPONENT_NAME.to_owned(),
+        COMPONENT_ID.to_owned(),
     );
 
     // Add file.

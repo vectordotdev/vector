@@ -351,24 +351,9 @@ mod test {
     fn paths_detects_cycles() {
         let mut graph = Graph::default();
         graph.add_source(ComponentId::from("in"), DataType::Log);
-        graph.add_transform(
-            "one",
-            DataType::Log,
-            DataType::Log,
-            vec!["in", "three"],
-        );
-        graph.add_transform(
-            "two",
-            DataType::Log,
-            DataType::Log,
-            vec!["one"],
-        );
-        graph.add_transform(
-            "three",
-            DataType::Log,
-            DataType::Log,
-            vec!["two"],
-        );
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
         graph.add_sink("out", DataType::Log, vec!["three"]);
 
         assert_eq!(
@@ -380,24 +365,9 @@ mod test {
 
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
-        graph.add_transform(
-            "one",
-            DataType::Log,
-            DataType::Log,
-            vec!["in", "three"],
-        );
-        graph.add_transform(
-            "two",
-            DataType::Log,
-            DataType::Log,
-            vec!["one"],
-        );
-        graph.add_transform(
-            "three",
-            DataType::Log,
-            DataType::Log,
-            vec!["two"],
-        );
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
         graph.add_sink("out", DataType::Log, vec!["two"]);
 
         assert_eq!(
@@ -436,24 +406,9 @@ mod test {
     fn paths_doesnt_detect_noncycles() {
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
-        graph.add_transform(
-            "one",
-            DataType::Log,
-            DataType::Log,
-            vec!["in"],
-        );
-        graph.add_transform(
-            "two",
-            DataType::Log,
-            DataType::Log,
-            vec!["in"],
-        );
-        graph.add_transform(
-            "three",
-            DataType::Log,
-            DataType::Log,
-            vec!["one", "two"],
-        );
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["in"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["one", "two"]);
         graph.add_sink("out", DataType::Log, vec!["three"]);
 
         graph.paths().unwrap();

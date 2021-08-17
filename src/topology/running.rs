@@ -56,7 +56,7 @@ impl RunningTopology {
     /// The future returned by this function will finish once all the sources in
     /// this topology have finished. This allows the caller to wait for or
     /// detect that the sources in the topology are no longer
-    /// producing. [`vector::Application`], as an example, uses this as a
+    /// producing. [`Application`][crate::app::Application], as an example, uses this as a
     /// shutdown signal.
     pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
@@ -102,7 +102,7 @@ impl RunningTopology {
         let timeout = async move {
             sleep_until(deadline).await;
             // Remove all tasks that have shutdown.
-            check_handles2.retain(|_name, handles| {
+            check_handles2.retain(|_id, handles| {
                 retain(handles, |handle| handle.peek().is_none());
                 !handles.is_empty()
             });
@@ -124,7 +124,7 @@ impl RunningTopology {
             loop {
                 interval.tick().await;
                 // Remove all tasks that have shutdown.
-                check_handles.retain(|_name, handles| {
+                check_handles.retain(|_id, handles| {
                     retain(handles, |handle| handle.peek().is_none());
                     !handles.is_empty()
                 });
@@ -277,7 +277,7 @@ impl RunningTopology {
 
         let deadline = Instant::now() + timeout;
         for id in &diff.sources.to_remove {
-            info!(message = "Removing source.", name = ?id.name);
+            info!(message = "Removing source.", id = ?id);
 
             let previous = self.tasks.remove(id).unwrap();
             drop(previous); // detach and forget
@@ -313,7 +313,7 @@ impl RunningTopology {
 
         // Transforms
         for id in &diff.transforms.to_remove {
-            info!(message = "Removing transform.", name = ?id.name);
+            info!(message = "Removing transform.", id = ?id);
 
             let previous = self.tasks.remove(id).unwrap();
             drop(previous); // detach and forget
@@ -329,24 +329,18 @@ impl RunningTopology {
         // conflicts in their resource usage. So if we combine their
         // resources, all found conflicts are between
         // to be removed and to be added components.
-        let remove_sink = diff.sinks.removed_and_changed().filter_map(|id| {
-            self.config
-                .sinks
-                .get(id)
-                .map(|sink| (id, sink.resources(id)))
-        });
-        let add_source = diff.sources.changed_and_added().filter_map(|id| {
-            new_config
-                .sources
-                .get(id)
-                .map(|source| (id, source.inner.resources()))
-        });
-        let add_sink = diff.sinks.changed_and_added().filter_map(|id| {
-            new_config
-                .sinks
-                .get(id)
-                .map(|sink| (id, sink.resources(id)))
-        });
+        let remove_sink = diff
+            .sinks
+            .removed_and_changed()
+            .map(|id| (id, self.config.sinks[id].resources(id)));
+        let add_source = diff
+            .sources
+            .changed_and_added()
+            .map(|id| (id, new_config.sources[id].inner.resources()));
+        let add_sink = diff
+            .sinks
+            .changed_and_added()
+            .map(|id| (id, new_config.sinks[id].resources(id)));
         let conflicts = Resource::conflicts(
             remove_sink.map(|(key, value)| ((true, key), value)).chain(
                 add_sink
@@ -369,10 +363,7 @@ impl RunningTopology {
             .sinks
             .to_change
             .iter()
-            .filter(|&id| {
-                self.config.sinks.get(id).map(|item| &item.buffer)
-                    == new_config.sinks.get(id).map(|item| &item.buffer)
-            })
+            .filter(|&id| self.config.sinks[id].buffer == new_config.sinks[id].buffer)
             .cloned()
             .collect::<HashSet<_>>();
 
@@ -384,7 +375,7 @@ impl RunningTopology {
 
         // Detach removed sinks
         for id in &diff.sinks.to_remove {
-            info!(message = "Removing sink.", name = ?id.name);
+            info!(message = "Removing sink.", id = ?id);
             self.remove_inputs(id).await;
         }
 
@@ -407,7 +398,7 @@ impl RunningTopology {
         for id in &diff.sinks.to_remove {
             let previous = self.tasks.remove(id).unwrap();
             if wait_for_sinks.contains(id) {
-                debug!(message = "Waiting for sink to shutdown.", name = ?id);
+                debug!(message = "Waiting for sink to shutdown.", %id);
                 previous.await.unwrap().unwrap();
             } else {
                 drop(previous); // detach and forget
@@ -419,7 +410,7 @@ impl RunningTopology {
         for id in &diff.sinks.to_change {
             if wait_for_sinks.contains(id) {
                 let previous = self.tasks.remove(id).unwrap();
-                debug!(message = "Waiting for sink to shutdown.", name = ?id);
+                debug!(message = "Waiting for sink to shutdown.", %id);
                 let buffer = previous.await.unwrap().unwrap();
 
                 if reuse_buffers.contains(id) {
@@ -487,34 +478,34 @@ impl RunningTopology {
     pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
         // Sources
         for id in &diff.sources.to_change {
-            info!(message = "Rebuilding source.", name = ?id);
+            info!(message = "Rebuilding source.", id = ?id);
             self.spawn_source(id, &mut new_pieces);
         }
 
         for id in &diff.sources.to_add {
-            info!(message = "Starting source.", name = ?id);
+            info!(message = "Starting source.", id = ?id);
             self.spawn_source(id, &mut new_pieces);
         }
 
         // Transforms
         for id in &diff.transforms.to_change {
-            info!(message = "Rebuilding transform.", name = ?id);
+            info!(message = "Rebuilding transform.", id = ?id);
             self.spawn_transform(id, &mut new_pieces);
         }
 
         for id in &diff.transforms.to_add {
-            info!(message = "Starting transform.", name = ?id);
+            info!(message = "Starting transform.", id = ?id);
             self.spawn_transform(id, &mut new_pieces);
         }
 
         // Sinks
         for id in &diff.sinks.to_change {
-            info!(message = "Rebuilding sink.", name = ?id);
+            info!(message = "Rebuilding sink.", id = ?id);
             self.spawn_sink(id, &mut new_pieces);
         }
 
         for id in &diff.sinks.to_add {
-            info!(message = "Starting sink.", name = ?id);
+            info!(message = "Starting sink.", id = ?id);
             self.spawn_sink(id, &mut new_pieces);
         }
     }
@@ -523,9 +514,11 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "sink",
+            component_id = %task.id(),
             component_kind = "sink",
-            component_name = %task.name(),
             component_type = %task.typetag(),
+            // maintained for compatibility
+            component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
@@ -539,8 +532,10 @@ impl RunningTopology {
         let span = error_span!(
             "transform",
             component_kind = "transform",
-            component_name = %task.name(),
+            component_id = %task.id(),
             component_type = %task.typetag(),
+            // maintained for compatibility
+            component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
@@ -554,8 +549,10 @@ impl RunningTopology {
         let span = error_span!(
             "source",
             component_kind = "source",
-            component_name = %task.name(),
+            component_id = %task.id(),
             component_type = %task.typetag(),
+            // maintained for compatibility
+            component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task);

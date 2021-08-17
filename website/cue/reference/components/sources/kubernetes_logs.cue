@@ -46,7 +46,11 @@ components: sources: kubernetes_logs: {
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
 		}
-		requirements: []
+		requirements: [
+			"""
+				[Kubernetes](\(urls.kubernetes)) version `\(services.kubernetes.versions)` is required.
+				""",
+		]
 		warnings: []
 		notices: []
 	}

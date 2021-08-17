@@ -74,37 +74,6 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
     }
 }
 
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct WithInputs<Input, Inner> {
-//     pub inputs: Vec<Input>,
-//     #[serde(flatten)]
-//     pub inner: Inner,
-// }
-
-// impl<Inner> WithInputs<String, Inner> {
-//     pub fn input_ids(&self) -> Vec<ComponentId> {
-//         self.inputs.iter().map(ComponentId::from).collect()
-//     }
-// }
-
-// impl<Inner> From<WithInputs<String, Inner>> for WithInputs<ComponentId, Inner> {
-//     fn from(value: WithInputs<String, Inner>) -> WithInputs<ComponentId, Inner> {
-//         WithInputs {
-//             inputs: value.inputs.into_iter().map(ComponentId::from).collect(),
-//             inner: value.inner,
-//         }
-//     }
-// }
-
-// impl<Inner> From<WithInputs<ComponentId, Inner>> for WithInputs<String, Inner> {
-//     fn from(value: WithInputs<ComponentId, Inner>) -> WithInputs<String, Inner> {
-//         WithInputs {
-//             inputs: value.inputs.into_iter().map(|item| item.name).collect(),
-//             inner: value.inner,
-//         }
-//     }
-// }
-
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
@@ -253,7 +222,6 @@ inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
-    #[serde(default)]
     pub inputs: Vec<ComponentId>,
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
@@ -290,7 +258,7 @@ impl SinkOuter {
 
     pub fn resources(&self, id: &ComponentId) -> Vec<Resource> {
         let mut resources = self.inner.resources();
-        resources.append(&mut self.buffer.resources(&id.name));
+        resources.append(&mut self.buffer.resources(&id.to_string()));
         resources
     }
 
@@ -400,17 +368,16 @@ pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 
 inventory::collect!(SinkDescription);
 
-pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
-
-inventory::collect!(TransformDescription);
-
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
-    #[serde(default)]
     pub inputs: Vec<ComponentId>,
     #[serde(flatten)]
     pub inner: Box<dyn TransformConfig>,
 }
+
+pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
+
+inventory::collect!(TransformDescription);
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -547,7 +514,7 @@ impl Config {
         Default::default()
     }
 
-    /// Expand a logical component name (i.e. from the config file) into the names of the
+    /// Expand a logical component id (i.e. from the config file) into the ids of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
     pub fn get_inputs(&self, identifier: &ComponentId) -> Vec<ComponentId> {
@@ -739,8 +706,8 @@ mod test {
                 .unwrap()
             ),
             Err(vec![
-                "duplicate source name found: in".into(),
-                "duplicate sink name found: out".into(),
+                "duplicate source id found: in".into(),
+                "duplicate sink id found: out".into(),
             ])
         );
     }

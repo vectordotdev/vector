@@ -83,7 +83,7 @@ impl HumanFormatter for i64 {
 }
 
 static HEADER: [&str; 7] = [
-    "Name",
+    "ID",
     "Kind",
     "Type",
     "Events In",
@@ -146,7 +146,7 @@ impl<'a> Widgets<'a> {
 
         // Data columns
         let items = state.iter().map(|(_, r)| {
-            let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
+            let mut data = vec![r.id.clone(), r.kind.clone(), r.component_type.clone()];
 
             let formatted_metrics = [
                 match r.events_in_total {

@@ -71,7 +71,7 @@ pub async fn build_pieces(
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
-                errors.push(format!("Source {:?}: {}", id, error));
+                errors.push(format!("Source \"{}\": {}", id, error));
                 continue;
             }
             Ok(server) => server,
@@ -115,7 +115,7 @@ pub async fn build_pieces(
         let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(&config.global).await {
             Err(error) => {
-                errors.push(format!("Transform {:?}: {}", id, error));
+                errors.push(format!("Transform \"{}\": {}", id, error));
                 continue;
             }
             Ok(transform) => transform,
@@ -186,7 +186,7 @@ pub async fn build_pieces(
             let buffer = sink.buffer.build(&config.global.data_dir, id);
             match buffer {
                 Err(error) => {
-                    errors.push(format!("Sink {:?}: {}", id, error));
+                    errors.push(format!("Sink \"{}\": {}", id, error));
                     continue;
                 }
                 Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into()))), acker),
@@ -202,7 +202,7 @@ pub async fn build_pieces(
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
-                errors.push(format!("Sink {:?}: {}", id, error));
+                errors.push(format!("Sink \"{}\": {}", id, error));
                 continue;
             }
             Ok(built) => built,
@@ -237,9 +237,10 @@ pub async fn build_pieces(
                 TaskOutput::Sink(rx, acker)
             })
         };
+
         let task = Task::new(id.clone(), typetag, sink);
 
-        let component_name = id.name.clone();
+        let component_id = id.to_string();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -255,7 +256,9 @@ pub async fn build_pieces(
                                 %error,
                                 component_kind = "sink",
                                 component_type = typetag,
-                                ?component_name,
+                                %component_id,
+                                // maintained for compatibility
+                                component_name = %component_id,
                             );
                             Err(())
                         }
@@ -264,7 +267,9 @@ pub async fn build_pieces(
                                 msg = "Healthcheck: timeout.",
                                 component_kind = "sink",
                                 component_type = typetag,
-                                ?component_name,
+                                %component_id,
+                                // maintained for compatibility
+                                component_name = %component_id,
                             );
                             Err(())
                         }
@@ -275,6 +280,7 @@ pub async fn build_pieces(
                 Ok(TaskOutput::Healthcheck)
             }
         };
+
         let healthcheck_task = Task::new(id.clone(), typetag, healthcheck_task);
 
         inputs.insert(id.clone(), (tx, sink_inputs.clone()));

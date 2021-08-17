@@ -85,14 +85,6 @@ pub(super) fn expand_macros(
     }
     config.transforms = expanded_transforms;
 
-    // let expansions = expansions
-    //     .into_iter()
-    //     .map(|(key, value)| {
-    //         let values = value.iter().map(ComponentId::from).collect();
-    //         (ComponentId::from(key), values)
-    //     })
-    //     .collect();
-
     if !errors.is_empty() {
         Err(errors)
     } else {
@@ -109,12 +101,12 @@ fn expand_globs(config: &mut ConfigBuilder) {
         .cloned()
         .collect::<Vec<ComponentId>>();
 
-    for (name, transform) in config.transforms.iter_mut() {
-        expand_globs_inner(&mut transform.inputs, name, &candidates);
+    for (id, transform) in config.transforms.iter_mut() {
+        expand_globs_inner(&mut transform.inputs, id, &candidates);
     }
 
-    for (name, sink) in config.sinks.iter_mut() {
-        expand_globs_inner(&mut sink.inputs, name, &candidates);
+    for (id, sink) in config.sinks.iter_mut() {
+        expand_globs_inner(&mut sink.inputs, id, &candidates);
     }
 }
 
@@ -140,11 +132,11 @@ fn expand_globs_inner(inputs: &mut Vec<ComponentId>, id: &ComponentId, candidate
         let matcher = glob::Pattern::new(&raw_input.to_string())
             .map(InputMatcher::Pattern)
             .unwrap_or_else(|error| {
-                warn!(message = "Invalid glob pattern for input.", component_name = ?id, %error);
+                warn!(message = "Invalid glob pattern for input.", component_id = ?id, %error);
                 InputMatcher::String(raw_input.to_string())
             });
         for input in candidates {
-            if matcher.matches(&id.to_string()) && input != id {
+            if matcher.matches(&input.to_string()) && input != id {
                 inputs.push(input.clone())
             }
         }

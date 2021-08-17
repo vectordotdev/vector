@@ -65,9 +65,7 @@ impl BufferConfig {
                     .as_ref()
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
                     .to_path_buf(),
-                // TODO find a better representation
-                // although sinks are only global for now
-                name: sink_id.name.clone(),
+                id: sink_id.to_string(),
             },
         };
         build(variant)
@@ -75,11 +73,11 @@ impl BufferConfig {
 
     /// Resources that the sink is using.
     #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
-    pub fn resources(&self, sink_name: &str) -> Vec<Resource> {
+    pub fn resources(&self, sink_id: &str) -> Vec<Resource> {
         match self {
             BufferConfig::Memory { .. } => Vec::new(),
             #[cfg(feature = "disk-buffer")]
-            BufferConfig::Disk { .. } => vec![Resource::DiskBuffer(sink_name.to_string())],
+            BufferConfig::Disk { .. } => vec![Resource::DiskBuffer(sink_id.to_string())],
         }
     }
 }

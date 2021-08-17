@@ -31,7 +31,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         sources: builder.sources,
         sinks: builder.sinks,
         transforms: builder.transforms,
-        tests: builder.tests.into_iter().map(Into::into).collect(),
+        tests: builder.tests,
         expansions,
     };
 
@@ -420,7 +420,7 @@ async fn build_unit_test(
         for target in input_target {
             if !transform_outputs.contains_key(target) {
                 errors.push(format!(
-                    "inputs[{}]: unable to locate target transform {:?}",
+                    "inputs[{}]: unable to locate target transform '{}'",
                     i, target
                 ));
             }
@@ -468,7 +468,7 @@ async fn build_unit_test(
                 }
                 Err(err) => {
                     errors.push(format!(
-                        "failed to build transform {:?}: {:#}",
+                        "failed to build transform '{}': {:#}",
                         id,
                         anyhow::anyhow!(err)
                     ));
@@ -486,12 +486,12 @@ async fn build_unit_test(
             let targets = inputs.iter().map(|(i, _)| i).flatten().collect::<Vec<_>>();
             if targets.len() == 1 {
                 errors.push(format!(
-                    "unable to complete topology between target transform {:?} and output target {:?}",
+                    "unable to complete topology between target transform '{}' and output target '{}'",
                     targets.first().unwrap(), o.extract_from
                 ));
             } else {
                 errors.push(format!(
-                    "unable to complete topology between target transforms {:?} and output target {:?}",
+                    "unable to complete topology between target transforms {:?} and output target '{}'",
                     targets, o.extract_from
                 ));
             }

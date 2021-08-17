@@ -5,7 +5,7 @@ pub mod transform;
 
 use crate::{
     api::schema::{
-        components::state::component_by_id,
+        components::state::component_by_component_id,
         filter::{self, filter_items},
         relay, sort,
     },
@@ -23,7 +23,7 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
-    field(name = "name", type = "String"),
+    field(name = "component_id", type = "String"),
     field(name = "component_type", type = "String")
 )]
 pub enum Component {
@@ -40,11 +40,11 @@ pub enum ComponentKind {
 }
 
 impl Component {
-    fn get_name(&self) -> &str {
+    fn get_component_id(&self) -> &str {
         match self {
-            Component::Source(c) => c.0.id.name.as_str(),
-            Component::Transform(c) => c.0.id.name.as_str(),
-            Component::Sink(c) => c.0.id.name.as_str(),
+            Component::Source(c) => c.0.component_id.name.as_str(),
+            Component::Transform(c) => c.0.component_id.name.as_str(),
+            Component::Sink(c) => c.0.component_id.name.as_str(),
         }
     }
 
@@ -59,7 +59,7 @@ impl Component {
 
 #[derive(Default, InputObject)]
 pub struct ComponentsFilter {
-    name: Option<Vec<filter::StringFilter>>,
+    component_id: Option<Vec<filter::StringFilter>>,
     component_kind: Option<Vec<filter::EqualityFilter<ComponentKind>>>,
     or: Option<Vec<Self>>,
 }
@@ -67,9 +67,9 @@ pub struct ComponentsFilter {
 impl filter::CustomFilter<Component> for ComponentsFilter {
     fn matches(&self, component: &Component) -> bool {
         filter_check!(
-            self.name
-                .as_ref()
-                .map(|f| f.iter().all(|f| f.filter_value(component.get_name()))),
+            self.component_id.as_ref().map(|f| f
+                .iter()
+                .all(|f| f.filter_value(component.get_component_id()))),
             self.component_kind.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(component.get_component_kind())))
@@ -84,14 +84,16 @@ impl filter::CustomFilter<Component> for ComponentsFilter {
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum ComponentsSortFieldName {
-    Name,
+    ComponentId,
     ComponentKind,
 }
 
 impl sort::SortableByField<ComponentsSortFieldName> for Component {
     fn sort(&self, rhs: &Self, field: &ComponentsSortFieldName) -> cmp::Ordering {
         match field {
-            ComponentsSortFieldName::Name => Ord::cmp(self.get_name(), rhs.get_name()),
+            ComponentsSortFieldName::ComponentId => {
+                Ord::cmp(self.get_component_id(), rhs.get_component_id())
+            }
             ComponentsSortFieldName::ComponentKind => {
                 Ord::cmp(&self.get_component_kind(), &rhs.get_component_kind())
             }
@@ -204,16 +206,10 @@ impl ComponentsQuery {
         .await
     }
 
-    /// Gets a configured component by name
-    async fn component_by_name(&self, name: String) -> Option<Component> {
-        let id = ComponentId::global(name);
-        component_by_id(&id)
-    }
-
-    /// Gets a configured component by id
-    async fn component_by_id(&self, id: String) -> Option<Component> {
-        let id = ComponentId::from(id);
-        component_by_id(&id)
+    /// Gets a configured component by component_id
+    async fn component_by_component_id(&self, component_id: String) -> Option<Component> {
+        let id = ComponentId::from(component_id);
+        component_by_component_id(&id)
     }
 }
 
@@ -257,11 +253,11 @@ pub fn update_config(config: &Config) {
     let mut new_components = HashMap::new();
 
     // Sources
-    for (id, source) in config.sources.iter() {
+    for (component_id, source) in config.sources.iter() {
         new_components.insert(
-            id.clone(),
+            component_id.clone(),
             Component::Source(source::Source(source::Data {
-                id: id.clone(),
+                component_id: component_id.clone(),
                 component_type: source.inner.source_type().to_string(),
                 output_type: source.inner.output_type(),
             })),
@@ -269,11 +265,11 @@ pub fn update_config(config: &Config) {
     }
 
     // Transforms
-    for (id, transform) in config.transforms.iter() {
+    for (component_id, transform) in config.transforms.iter() {
         new_components.insert(
-            id.clone(),
+            component_id.clone(),
             Component::Transform(transform::Transform(transform::Data {
-                id: id.clone(),
+                component_id: component_id.clone(),
                 component_type: transform.inner.transform_type().to_string(),
                 inputs: transform.inputs.clone(),
             })),
@@ -281,39 +277,40 @@ pub fn update_config(config: &Config) {
     }
 
     // Sinks
-    for (id, sink) in config.sinks.iter() {
+    for (component_id, sink) in config.sinks.iter() {
         new_components.insert(
-            id.clone(),
+            component_id.clone(),
             Component::Sink(sink::Sink(sink::Data {
-                id: id.clone(),
+                component_id: component_id.clone(),
                 component_type: sink.inner.sink_type().to_string(),
                 inputs: sink.inputs.clone(),
             })),
         );
     }
 
-    // Get the ids of existing components
+    // Get the component_ids of existing components
     let existing_component_ids = state::get_component_ids();
     let new_component_ids = new_components
         .iter()
-        .map(|(id, _)| id.clone())
+        .map(|(component_id, _)| component_id.clone())
         .collect::<HashSet<ComponentId>>();
 
     // Publish all components that have been removed
     existing_component_ids
         .difference(&new_component_ids)
-        .for_each(|id| {
+        .for_each(|component_id| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
-                state::component_by_id(id).expect("Couldn't get component by id"),
+                state::component_by_component_id(component_id)
+                    .expect("Couldn't get component by id"),
             ));
         });
 
     // Publish all components that have been added
     new_component_ids
         .difference(&existing_component_ids)
-        .for_each(|id| {
+        .for_each(|component_id| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
-                new_components.get(id).unwrap().clone(),
+                new_components.get(component_id).unwrap().clone(),
             ));
         });
 
@@ -333,27 +330,27 @@ mod tests {
     fn component_fixtures() -> Vec<Component> {
         vec![
             Component::Source(source::Source(source::Data {
-                id: ComponentId::from("gen1"),
+                component_id: ComponentId::from("gen1"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::from("gen2"),
+                component_id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::from("gen3"),
+                component_id: ComponentId::from("gen3"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Transform(transform::Transform(transform::Data {
-                id: ComponentId::from("parse_json"),
+                component_id: ComponentId::from("parse_json"),
                 component_type: "json".to_string(),
                 inputs: vec![ComponentId::from("gen1"), ComponentId::from("gen2")],
             })),
             Component::Sink(sink::Sink(sink::Data {
-                id: ComponentId::from("devnull"),
+                component_id: ComponentId::from("devnull"),
                 component_type: "blackhole".to_string(),
                 inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
             })),
@@ -363,7 +360,7 @@ mod tests {
     #[test]
     fn components_filter_contains() {
         let filter = ComponentsFilter {
-            name: Some(vec![filter::StringFilter {
+            component_id: Some(vec![filter::StringFilter {
                 contains: Some("gen".to_string()),
                 ..Default::default()
             }]),
@@ -378,12 +375,12 @@ mod tests {
     #[test]
     fn components_filter_equals_or() {
         let filter = ComponentsFilter {
-            name: Some(vec![filter::StringFilter {
+            component_id: Some(vec![filter::StringFilter {
                 equals: Some("gen1".to_string()),
                 ..Default::default()
             }]),
             or: Some(vec![ComponentsFilter {
-                name: Some(vec![filter::StringFilter {
+                component_id: Some(vec![filter::StringFilter {
                     equals: Some("devnull".to_string()),
                     ..Default::default()
                 }]),
@@ -400,7 +397,7 @@ mod tests {
     #[test]
     fn components_filter_and() {
         let filter = ComponentsFilter {
-            name: Some(vec![filter::StringFilter {
+            component_id: Some(vec![filter::StringFilter {
                 equals: Some("gen1".to_string()),
                 ..Default::default()
             }]),
@@ -419,7 +416,7 @@ mod tests {
     #[test]
     fn components_filter_and_or() {
         let filter = ComponentsFilter {
-            name: Some(vec![filter::StringFilter {
+            component_id: Some(vec![filter::StringFilter {
                 equals: Some("gen1".to_string()),
                 ..Default::default()
             }]),
@@ -445,15 +442,15 @@ mod tests {
     fn components_sort_asc() {
         let mut components = component_fixtures();
         let fields = vec![sort::SortField::<ComponentsSortFieldName> {
-            field: ComponentsSortFieldName::Name,
+            field: ComponentsSortFieldName::ComponentId,
             direction: sort::Direction::Asc,
         }];
         sort::by_fields(&mut components, &fields);
 
         let expectations = ["devnull", "gen1", "gen2", "gen3", "parse_json"];
 
-        for (i, name) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_name(), *name);
+        for (i, component_id) in expectations.iter().enumerate() {
+            assert_eq!(components[i].get_component_id(), *component_id);
         }
     }
 
@@ -461,15 +458,15 @@ mod tests {
     fn components_sort_desc() {
         let mut components = component_fixtures();
         let fields = vec![sort::SortField::<ComponentsSortFieldName> {
-            field: ComponentsSortFieldName::Name,
+            field: ComponentsSortFieldName::ComponentId,
             direction: sort::Direction::Desc,
         }];
         sort::by_fields(&mut components, &fields);
 
         let expectations = ["parse_json", "gen3", "gen2", "gen1", "devnull"];
 
-        for (i, name) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_name(), *name);
+        for (i, component_id) in expectations.iter().enumerate() {
+            assert_eq!(components[i].get_component_id(), *component_id);
         }
     }
 
@@ -477,37 +474,37 @@ mod tests {
     fn components_sort_multi() {
         let mut components = vec![
             Component::Sink(sink::Sink(sink::Data {
-                id: ComponentId::from("a"),
+                component_id: ComponentId::from("a"),
                 component_type: "blackhole".to_string(),
                 inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
             })),
             Component::Sink(sink::Sink(sink::Data {
-                id: ComponentId::from("b"),
+                component_id: ComponentId::from("b"),
                 component_type: "blackhole".to_string(),
                 inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
             })),
             Component::Transform(transform::Transform(transform::Data {
-                id: ComponentId::from("c"),
+                component_id: ComponentId::from("c"),
                 component_type: "json".to_string(),
                 inputs: vec![ComponentId::from("gen1"), ComponentId::from("gen2")],
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::from("e"),
+                component_id: ComponentId::from("e"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::from("d"),
+                component_id: ComponentId::from("d"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::from("g"),
+                component_id: ComponentId::from("g"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::from("f"),
+                component_id: ComponentId::from("f"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
@@ -519,15 +516,15 @@ mod tests {
                 direction: sort::Direction::Asc,
             },
             sort::SortField::<ComponentsSortFieldName> {
-                field: ComponentsSortFieldName::Name,
+                field: ComponentsSortFieldName::ComponentId,
                 direction: sort::Direction::Asc,
             },
         ];
         sort::by_fields(&mut components, &fields);
 
         let expectations = ["d", "e", "f", "g", "c", "a", "b"];
-        for (i, name) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_name(), *name);
+        for (i, component_id) in expectations.iter().enumerate() {
+            assert_eq!(components[i].get_component_id(), *component_id);
         }
     }
 }

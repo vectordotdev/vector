@@ -3,7 +3,7 @@ query ComponentsQuery($first: Int!) {
         edges {
             node {
                 __typename
-                name
+                componentId
                 componentType
                 ... on Source {
                     metrics {

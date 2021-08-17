@@ -150,7 +150,7 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 [alpine]: https://alpinejs.dev
 [atomic-algolia]: https://github.com/chrisdmacrae/atomic-algolia
 [components]: https://vector.dev/components
-[cue]: https://cue-lang.org
+[cue]: https://cuelang.org
 [deploy previews]: https://docs.netlify.com/site-deploys/deploy-previews
 [directory structure]: https://gohugo.io/getting-started/directory-structure
 [esbuild]: https://github.com/evanw/esbuild

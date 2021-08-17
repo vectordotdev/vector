@@ -39,7 +39,7 @@ impl Task {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub fn id(&self) -> &str {
         &self.id.name
     }
 
@@ -60,7 +60,7 @@ impl Future for Task {
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
-            .field("name", &self.id.name)
+            .field("id", &self.id.name)
             .field("typetag", &self.typetag)
             .finish()
     }

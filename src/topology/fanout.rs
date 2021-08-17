@@ -12,7 +12,7 @@ pub type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
 pub enum ControlMessage {
     Add(ComponentId, RouterSink),
     Remove(ComponentId),
-    /// Will stop accepting events until Some with given name is replaced.
+    /// Will stop accepting events until Some with given id is replaced.
     Replace(ComponentId, Option<RouterSink>),
 }
 
