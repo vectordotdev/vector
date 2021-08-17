@@ -47,7 +47,7 @@ components: sources: internal_metrics: {
 
 	configuration: {
 		namespace: {
-			description: "The namespace prefixed to a metric's name."
+			description: "The namespace of the metric."
 			common:      false
 			required:    false
 			type: string: {
