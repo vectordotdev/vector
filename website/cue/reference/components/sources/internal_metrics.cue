@@ -48,6 +48,7 @@ components: sources: internal_metrics: {
 	configuration: {
 		namespace: {
 			description: "Overrides the default namespace where not provided"
+			common:      false
 			required:    false
 			type: string: {
 				default: "vector"
