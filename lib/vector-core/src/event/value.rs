@@ -27,6 +27,7 @@ impl Eq for Value {}
 
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
         match self {
             Value::Array(v) => {
                 v.hash(state);
@@ -39,10 +40,12 @@ impl Hash for Value {
             }
             Value::Float(v) => {
                 if v.is_finite() {
-                    format!("{}", v).hash(state);
-                } else {
-                    "NaN".hash(state)
-                }
+                    let trunc: u64 = unsafe { std::mem::transmute(v.trunc()) };
+                    if trunc == 0 {
+                        v.is_sign_negative().hash(state);
+                    }
+                    trunc.hash(state);
+                } //else covered by discriminant hash
             }
             Value::Integer(v) => {
                 v.hash(state);
@@ -50,7 +53,9 @@ impl Hash for Value {
             Value::Map(v) => {
                 v.hash(state);
             }
-            Value::Null => {}
+            Value::Null => {
+                //covered by discriminant hash
+            }
             Value::Timestamp(v) => {
                 v.hash(state);
             }

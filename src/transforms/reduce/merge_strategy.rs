@@ -592,7 +592,7 @@ mod test {
         assert!(get_value_merger("foo".into(), &MergeStrategy::Unique).is_ok());
 
         assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
-        assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(42.into(), &MergeStrategy::Sum).is_ok());
         assert!(get_value_merger(42.into(), &MergeStrategy::Min).is_ok());
         assert!(get_value_merger(42.into(), &MergeStrategy::Max).is_ok());
@@ -604,7 +604,7 @@ mod test {
         assert!(get_value_merger(42.into(), &MergeStrategy::Unique).is_ok());
 
         assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
-        assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Sum).is_ok());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Min).is_ok());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Max).is_ok());
@@ -616,6 +616,7 @@ mod test {
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Unique).is_ok());
 
         assert!(get_value_merger(true.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(true.into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(true.into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::Min).is_err());
@@ -627,7 +628,7 @@ mod test {
         assert!(get_value_merger(true.into(), &MergeStrategy::Unique).is_ok());
 
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
-        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Min).is_err());
@@ -640,6 +641,7 @@ mod test {
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Unique).is_ok());
 
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Min).is_err());
@@ -651,7 +653,7 @@ mod test {
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Unique).is_ok());
 
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Discard).is_ok());
-        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Min).is_err());
@@ -663,7 +665,7 @@ mod test {
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Unique).is_ok());
 
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Discard).is_ok());
-        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Min).is_err());
@@ -680,6 +682,10 @@ mod test {
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Discard),
             Ok("foo".into())
+        );
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::Retain),
+            Ok("bar".into())
         );
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Array),
@@ -788,7 +794,7 @@ mod test {
             panic!("Not array");
         }
         let v = merge(v, 34.into(), &MergeStrategy::Unique).unwrap();
-        if let Value::Array(mut v) = v {
+        if let Value::Array(v) = v {
             let v: Vec<_> = v
                 .into_iter()
                 .map(|i| {
