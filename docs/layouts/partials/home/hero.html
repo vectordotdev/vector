@@ -37,8 +37,10 @@
     <div class="mt-6 md:mt-8 lg:mt-10 inline-flex space-x-2">
       {{ range $links }}
       <a href="{{ .URL }}" class="uppercase font-semibold text-xs md:text-sm tracking-tight shadow-sm py-1 px-3.5 rounded-full hover:shadow bg-gray-200 text-dark hover:bg-primary hover:text-dark dark:bg-primary dark:hover:bg-purple-v">
-        <div class="flex items-center space-x-2">
-          <ion-icon name="{{ .Params.ionicon }}"></ion-icon>
+        <div class="flex items-center space-x-2 flex-wrap sm:flex-nowrap justify-center h-full">
+          <div class="text-sm">
+            <ion-icon name="{{ .Params.ionicon }}"></ion-icon>
+          </div>
 
           <span>
             {{ .Name }}
