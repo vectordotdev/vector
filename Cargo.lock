@@ -4455,10 +4455,11 @@ dependencies = [
 
 [[package]]
 name = "nom"
-version = "7.0.0-alpha1"
+version = "7.0.0-alpha2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd43cd1e53168596e629accc602ada1297f5125fed588d62cf8be81175b46002"
+checksum = "39881f3ef37da4bfa8ce3478d840baaed5fdfc6560c0b91006924ec191a756bf"
 dependencies = [
+ "lexical-core",
  "memchr",
  "version_check 0.9.3",
 ]
@@ -5302,7 +5303,7 @@ name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
  "indexmap",
- "nom 6.1.2",
+ "nom 7.0.0-alpha2",
  "num_enum",
  "prost",
  "prost-build",
@@ -5409,7 +5410,7 @@ dependencies = [
  "futures-timer",
  "log",
  "native-tls",
- "nom 7.0.0-alpha1",
+ "nom 7.0.0-alpha2",
  "pem",
  "prost",
  "prost-build",
@@ -6767,7 +6768,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "derivative 2.2.0",
- "nom 6.1.2",
+ "nom 7.0.0-alpha2",
  "serde",
  "snafu",
  "tracing 0.1.26",
@@ -8336,7 +8337,7 @@ dependencies = [
  "mongodb",
  "nix 0.22.1",
  "no-proxy",
- "nom 6.1.2",
+ "nom 7.0.0-alpha2",
  "notify",
  "num-format",
  "num_cpus",
@@ -8641,7 +8642,7 @@ dependencies = [
  "lazy_static",
  "lookup",
  "md-5",
- "nom 6.1.2",
+ "nom 7.0.0-alpha2",
  "percent-encoding",
  "regex",
  "roxmltree",
