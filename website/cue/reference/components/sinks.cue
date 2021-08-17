@@ -537,8 +537,8 @@ components: sinks: [Name=string]: {
 						{
 							title: "Static concurrency"
 							body: """
-								If Adaptive Request Concurrency is not for you, you can manually
-								set static concurrency limits with `request.concurrency` option:
+								If Adaptive Request Concurrency is not for you, you can manually set static concurrency
+								limits by specifying an integer for `request.concurrency`:
 
 								```toml title="vector.toml"
 								[sinks.my-sink]
