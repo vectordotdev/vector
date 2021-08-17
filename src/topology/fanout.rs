@@ -209,8 +209,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a);
-        fanout.add(ComponentId::global("b"), tx_b);
+        fanout.add(ComponentId::from("a"), tx_a);
+        fanout.add(ComponentId::from("b"), tx_b);
 
         let recs = make_events(2);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -231,9 +231,9 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a);
-        fanout.add(ComponentId::global("b"), tx_b);
-        fanout.add(ComponentId::global("c"), tx_c);
+        fanout.add(ComponentId::from("a"), tx_a);
+        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentId::from("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -260,8 +260,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a);
-        fanout.add(ComponentId::global("b"), tx_b);
+        fanout.add(ComponentId::from("a"), tx_a);
+        fanout.add(ComponentId::from("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -270,7 +270,7 @@ mod tests {
 
         let (tx_c, rx_c) = mpsc::unbounded();
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
-        fanout.add(ComponentId::global("c"), tx_c);
+        fanout.add(ComponentId::from("c"), tx_c);
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -288,8 +288,8 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a);
-        fanout.add(ComponentId::global("b"), tx_b);
+        fanout.add(ComponentId::from("a"), tx_a);
+        fanout.add(ComponentId::from("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -297,7 +297,7 @@ mod tests {
         fanout.send(recs[1].clone()).await.unwrap();
 
         fanout_control
-            .send(ControlMessage::Remove(ComponentId::global("b")))
+            .send(ControlMessage::Remove(ComponentId::from("b")))
             .await
             .unwrap();
 
@@ -318,9 +318,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a);
-        fanout.add(ComponentId::global("b"), tx_b);
-        fanout.add(ComponentId::global("c"), tx_c);
+        fanout.add(ComponentId::from("a"), tx_a);
+        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentId::from("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -329,7 +329,7 @@ mod tests {
         sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
         fanout_control
-            .send(ControlMessage::Remove(ComponentId::global("c")))
+            .send(ControlMessage::Remove(ComponentId::from("c")))
             .await
             .unwrap();
 
@@ -353,9 +353,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a);
-        fanout.add(ComponentId::global("b"), tx_b);
-        fanout.add(ComponentId::global("c"), tx_c);
+        fanout.add(ComponentId::from("a"), tx_a);
+        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentId::from("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -364,7 +364,7 @@ mod tests {
         sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
         fanout_control
-            .send(ControlMessage::Remove(ComponentId::global("b")))
+            .send(ControlMessage::Remove(ComponentId::from("b")))
             .await
             .unwrap();
 
@@ -388,9 +388,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a);
-        fanout.add(ComponentId::global("b"), tx_b);
-        fanout.add(ComponentId::global("c"), tx_c);
+        fanout.add(ComponentId::from("a"), tx_a);
+        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentId::from("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -400,7 +400,7 @@ mod tests {
         // The send_all task will be blocked on sending rec1 because of b right now.
 
         fanout_control
-            .send(ControlMessage::Remove(ComponentId::global("a")))
+            .send(ControlMessage::Remove(ComponentId::from("a")))
             .await
             .unwrap();
 
@@ -432,8 +432,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a1);
-        fanout.add(ComponentId::global("b"), tx_b);
+        fanout.add(ComponentId::from("a"), tx_a1);
+        fanout.add(ComponentId::from("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -442,7 +442,7 @@ mod tests {
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
-        fanout.replace(ComponentId::global("a"), Some(tx_a2));
+        fanout.replace(ComponentId::from("a"), Some(tx_a2));
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -460,8 +460,8 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::global("a"), tx_a1);
-        fanout.add(ComponentId::global("b"), tx_b);
+        fanout.add(ComponentId::from("a"), tx_a1);
+        fanout.add(ComponentId::from("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -470,16 +470,13 @@ mod tests {
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
-        fanout.replace(ComponentId::global("a"), None);
+        fanout.replace(ComponentId::from("a"), None);
 
         futures::join!(
             async {
                 sleep(Duration::from_millis(100)).await;
                 fanout_control
-                    .send(ControlMessage::Replace(
-                        ComponentId::global("a"),
-                        Some(tx_a2),
-                    ))
+                    .send(ControlMessage::Replace(ComponentId::from("a"), Some(tx_a2)))
                     .await
                     .unwrap();
             },
@@ -536,7 +533,7 @@ mod tests {
         let mut rx_channels = vec![];
 
         for (i, mode) in modes.iter().enumerate() {
-            let id = ComponentId::global(format!("{}", i));
+            let id = ComponentId::from(format!("{}", i));
             match *mode {
                 Some(when) => {
                     let tx = AlwaysErrors { when };

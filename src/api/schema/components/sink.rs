@@ -121,17 +121,17 @@ mod tests {
     fn sink_fixtures() -> Vec<Sink> {
         vec![
             Sink(Data {
-                id: ComponentId::global("webserver"),
+                id: ComponentId::from("webserver"),
                 component_type: "http".to_string(),
                 inputs: vec![],
             }),
             Sink(Data {
-                id: ComponentId::global("db"),
+                id: ComponentId::from("db"),
                 component_type: "clickhouse".to_string(),
                 inputs: vec![],
             }),
             Sink(Data {
-                id: ComponentId::global("zip_drive"),
+                id: ComponentId::from("zip_drive"),
                 component_type: "file".to_string(),
                 inputs: vec![],
             }),

@@ -311,7 +311,7 @@ mod test {
     #[tokio::test]
     async fn shutdown_coordinator_shutdown_source_clean() {
         let mut shutdown = SourceShutdownCoordinator::default();
-        let id = ComponentId::global("test");
+        let id = ComponentId::from("test");
 
         let (shutdown_signal, _) = shutdown.register_source(&id);
 
@@ -327,7 +327,7 @@ mod test {
     #[tokio::test]
     async fn shutdown_coordinator_shutdown_source_force() {
         let mut shutdown = SourceShutdownCoordinator::default();
-        let id = ComponentId::global("test");
+        let id = ComponentId::from("test");
 
         let (_shutdown_signal, force_shutdown_tripwire) = shutdown.register_source(&id);
 

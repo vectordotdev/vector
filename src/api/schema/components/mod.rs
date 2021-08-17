@@ -207,7 +207,7 @@ impl ComponentsQuery {
     /// Gets a configured component by id
     async fn component_by_id(&self, name: String) -> Option<Component> {
         // TODO use component id as parameter
-        let id = ComponentId::global(name);
+        let id = ComponentId::from(name);
         component_by_id(&id)
     }
 }
@@ -281,7 +281,7 @@ pub fn update_config(config: &Config) {
             id.clone(),
             Component::Sink(sink::Sink(sink::Data {
                 id: id.clone(),
-                component_type: sink.inner.inner.sink_type().to_string(),
+                component_type: sink.inner.sink_type().to_string(),
                 inputs: sink.inputs.clone(),
             })),
         );
@@ -328,32 +328,29 @@ mod tests {
     fn component_fixtures() -> Vec<Component> {
         vec![
             Component::Source(source::Source(source::Data {
-                id: ComponentId::global("gen1"),
+                id: ComponentId::from("gen1"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::global("gen2"),
+                id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::global("gen3"),
+                id: ComponentId::from("gen3"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Transform(transform::Transform(transform::Data {
-                id: ComponentId::global("parse_json"),
+                id: ComponentId::from("parse_json"),
                 component_type: "json".to_string(),
-                inputs: vec![ComponentId::global("gen1"), ComponentId::global("gen2")],
+                inputs: vec![ComponentId::from("gen1"), ComponentId::from("gen2")],
             })),
             Component::Sink(sink::Sink(sink::Data {
-                id: ComponentId::global("devnull"),
+                id: ComponentId::from("devnull"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![
-                    ComponentId::global("gen3"),
-                    ComponentId::global("parse_json"),
-                ],
+                inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
             })),
         ]
     }
@@ -475,43 +472,37 @@ mod tests {
     fn components_sort_multi() {
         let mut components = vec![
             Component::Sink(sink::Sink(sink::Data {
-                id: ComponentId::global("a"),
+                id: ComponentId::from("a"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![
-                    ComponentId::global("gen3"),
-                    ComponentId::global("parse_json"),
-                ],
+                inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
             })),
             Component::Sink(sink::Sink(sink::Data {
-                id: ComponentId::global("b"),
+                id: ComponentId::from("b"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![
-                    ComponentId::global("gen3"),
-                    ComponentId::global("parse_json"),
-                ],
+                inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
             })),
             Component::Transform(transform::Transform(transform::Data {
-                id: ComponentId::global("c"),
+                id: ComponentId::from("c"),
                 component_type: "json".to_string(),
-                inputs: vec![ComponentId::global("gen1"), ComponentId::global("gen2")],
+                inputs: vec![ComponentId::from("gen1"), ComponentId::from("gen2")],
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::global("e"),
+                id: ComponentId::from("e"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::global("d"),
+                id: ComponentId::from("d"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::global("g"),
+                id: ComponentId::from("g"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                id: ComponentId::global("f"),
+                id: ComponentId::from("f"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),

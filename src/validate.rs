@@ -224,7 +224,6 @@ async fn validate_healthchecks(
                     .sinks
                     .get(&id)
                     .expect("Sink not present")
-                    .inner
                     .healthcheck()
                     .enabled
                 {

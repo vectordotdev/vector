@@ -333,7 +333,7 @@ impl RunningTopology {
             self.config
                 .sinks
                 .get(id)
-                .map(|sink| (id, sink.inner.resources(&id.name)))
+                .map(|sink| (id, sink.resources(id)))
         });
         let add_source = diff.sources.changed_and_added().filter_map(|id| {
             new_config
@@ -345,7 +345,7 @@ impl RunningTopology {
             new_config
                 .sinks
                 .get(id)
-                .map(|sink| (id, sink.inner.resources(&id.name)))
+                .map(|sink| (id, sink.resources(id)))
         });
         let conflicts = Resource::conflicts(
             remove_sink.map(|(key, value)| ((true, key), value)).chain(
@@ -370,8 +370,8 @@ impl RunningTopology {
             .to_change
             .iter()
             .filter(|&id| {
-                self.config.sinks.get(id).map(|item| &item.inner.buffer)
-                    == new_config.sinks.get(id).map(|item| &item.inner.buffer)
+                self.config.sinks.get(id).map(|item| &item.buffer)
+                    == new_config.sinks.get(id).map(|item| &item.buffer)
             })
             .cloned()
             .collect::<HashSet<_>>();

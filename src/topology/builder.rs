@@ -174,7 +174,6 @@ pub async fn build_pieces(
         .filter(|(id, _)| diff.sinks.contains_new(id))
     {
         let sink_inputs = &sink.inputs;
-        let sink = &sink.inner;
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 

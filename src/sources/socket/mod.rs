@@ -372,7 +372,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
-        let source_name = ComponentId::global("tcp_shutdown_simple");
+        let source_name = ComponentId::from("tcp_shutdown_simple");
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
         let (cx, mut shutdown) = SourceContext::new_shutdown(&source_name, tx);
@@ -409,7 +409,7 @@ mod test {
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
         let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
-        let source_name = ComponentId::global("tcp_shutdown_infinite_stream");
+        let source_name = ComponentId::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
         let (cx, mut shutdown) = SourceContext::new_shutdown(&source_name, tx);
@@ -502,7 +502,7 @@ mod test {
     async fn init_udp(sender: Pipeline) -> SocketAddr {
         let (addr, _handle) = init_udp_inner(
             sender,
-            &ComponentId::global("default"),
+            &ComponentId::from("default"),
             ShutdownSignal::noop(),
         )
         .await;
@@ -616,7 +616,7 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_simple() {
         let (tx, rx) = Pipeline::new_test();
-        let source_id = ComponentId::global("udp_shutdown_simple");
+        let source_id = ComponentId::from("udp_shutdown_simple");
 
         let mut shutdown = SourceShutdownCoordinator::default();
         let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
@@ -642,7 +642,7 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_infinite_stream() {
         let (tx, rx) = Pipeline::new_test();
-        let source_id = ComponentId::global("udp_shutdown_infinite_stream");
+        let source_id = ComponentId::from("udp_shutdown_infinite_stream");
 
         let mut shutdown = SourceShutdownCoordinator::default();
         let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;

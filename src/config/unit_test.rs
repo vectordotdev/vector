@@ -28,21 +28,9 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         #[cfg(feature = "api")]
         api: builder.api,
         healthchecks: builder.healthchecks,
-        sources: builder
-            .sources
-            .into_iter()
-            .map(|(key, value)| (ComponentId::global(key), value))
-            .collect(),
-        sinks: builder
-            .sinks
-            .into_iter()
-            .map(|(key, value)| (ComponentId::global(key), value.into()))
-            .collect(),
-        transforms: builder
-            .transforms
-            .into_iter()
-            .map(|(key, value)| (ComponentId::global(key), value.into()))
-            .collect(),
+        sources: builder.sources,
+        sinks: builder.sinks,
+        transforms: builder.transforms,
         tests: builder.tests.into_iter().map(Into::into).collect(),
         expansions,
     };
@@ -330,10 +318,7 @@ fn reduce_transforms(
     });
 }
 
-fn build_input(
-    config: &Config,
-    input: &TestInput<ComponentId>,
-) -> Result<(Vec<ComponentId>, Event), String> {
+fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<ComponentId>, Event), String> {
     let target = config.get_inputs(&input.insert_at);
 
     match input.type_str.as_ref() {
@@ -374,7 +359,7 @@ fn build_input(
 
 fn build_inputs(
     config: &Config,
-    definition: &TestDefinition<ComponentId>,
+    definition: &TestDefinition,
 ) -> Result<Vec<(Vec<ComponentId>, Event)>, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
@@ -402,7 +387,7 @@ fn build_inputs(
 }
 
 async fn build_unit_test(
-    definition: &TestDefinition<ComponentId>,
+    definition: &TestDefinition,
     config: &Config,
 ) -> Result<UnitTest, Vec<String>> {
     let mut errors = vec![];

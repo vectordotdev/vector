@@ -1,8 +1,8 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkInner, SinkOuter, SourceConfig,
-    SourceOuter, TestDefinition, TransformOuter,
+    compiler, provider, ComponentId, Config, HealthcheckOptions, SinkConfig, SinkOuter,
+    SourceConfig, SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -21,13 +21,13 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub sources: IndexMap<String, SourceOuter>,
+    pub sources: IndexMap<ComponentId, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<String, SinkOuter>,
+    pub sinks: IndexMap<ComponentId, SinkOuter>,
     #[serde(default)]
-    pub transforms: IndexMap<String, TransformOuter>,
+    pub transforms: IndexMap<ComponentId, TransformOuter>,
     #[serde(default)]
-    pub tests: Vec<TestDefinition<String>>,
+    pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
@@ -50,21 +50,9 @@ impl From<Config> for ConfigBuilder {
             #[cfg(feature = "api")]
             api: c.api,
             healthchecks: c.healthchecks,
-            sources: c
-                .sources
-                .into_iter()
-                .map(|(id, value)| (id.name, value))
-                .collect(),
-            sinks: c
-                .sinks
-                .into_iter()
-                .map(|(id, value)| (id.name, value.into()))
-                .collect(),
-            transforms: c
-                .transforms
-                .into_iter()
-                .map(|(id, value)| (id.name, value.into()))
-                .collect(),
+            sources: c.sources,
+            sinks: c.sinks,
+            transforms: c.transforms,
             provider: None,
             tests: c.tests.into_iter().map(Into::into).collect(),
         }
@@ -87,7 +75,8 @@ impl ConfigBuilder {
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, name: T, source: S) {
-        self.sources.insert(name.into(), SourceOuter::new(source));
+        self.sources
+            .insert(ComponentId::from(name.into()), SourceOuter::new(source));
     }
 
     pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
@@ -96,10 +85,13 @@ impl ConfigBuilder {
         inputs: &[&str],
         sink: S,
     ) {
-        let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
-        let sink = SinkInner::new(inputs, Box::new(sink));
+        let inputs = inputs
+            .iter()
+            .map(ComponentId::from)
+            .collect::<Vec<_>>();
+        let sink = SinkOuter::new(inputs, Box::new(sink));
 
-        self.sinks.insert(name.into(), sink);
+        self.sinks.insert(ComponentId::from(name.into()), sink);
     }
 
     pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
@@ -108,13 +100,17 @@ impl ConfigBuilder {
         inputs: &[&str],
         transform: T,
     ) {
-        let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
+        let inputs = inputs
+            .iter()
+            .map(|value| ComponentId::from(value.to_string()))
+            .collect::<Vec<_>>();
         let transform = TransformOuter {
             inner: Box::new(transform),
             inputs,
         };
 
-        self.transforms.insert(name.into(), transform);
+        self.transforms
+            .insert(ComponentId::from(name.into()), transform);
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {

@@ -127,17 +127,17 @@ mod tests {
     fn transform_fixtures() -> Vec<Transform> {
         vec![
             Transform(Data {
-                id: ComponentId::global("parse_json"),
+                id: ComponentId::from("parse_json"),
                 component_type: "json".to_string(),
                 inputs: vec![],
             }),
             Transform(Data {
-                id: ComponentId::global("field_adder"),
+                id: ComponentId::from("field_adder"),
                 component_type: "add_fields".to_string(),
                 inputs: vec![],
             }),
             Transform(Data {
-                id: ComponentId::global("append"),
+                id: ComponentId::from("append"),
                 component_type: "concat".to_string(),
                 inputs: vec![],
             }),

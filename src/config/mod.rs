@@ -24,6 +24,7 @@ mod compiler;
 pub mod component;
 mod diff;
 pub mod format;
+mod id;
 mod loading;
 pub mod provider;
 mod unit_test;
@@ -34,6 +35,7 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
+pub use id::ComponentId;
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
@@ -72,55 +74,36 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct ComponentId {
-    pub name: String,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct WithInputs<Input, Inner> {
+//     pub inputs: Vec<Input>,
+//     #[serde(flatten)]
+//     pub inner: Inner,
+// }
 
-impl ComponentId {
-    pub fn global<S: ToString>(name: S) -> Self {
-        Self {
-            name: name.to_string(),
-        }
-    }
-}
+// impl<Inner> WithInputs<String, Inner> {
+//     pub fn input_ids(&self) -> Vec<ComponentId> {
+//         self.inputs.iter().map(ComponentId::from).collect()
+//     }
+// }
 
-impl std::fmt::Debug for ComponentId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.name)
-    }
-}
+// impl<Inner> From<WithInputs<String, Inner>> for WithInputs<ComponentId, Inner> {
+//     fn from(value: WithInputs<String, Inner>) -> WithInputs<ComponentId, Inner> {
+//         WithInputs {
+//             inputs: value.inputs.into_iter().map(ComponentId::from).collect(),
+//             inner: value.inner,
+//         }
+//     }
+// }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WithInputs<Input, Inner> {
-    pub inputs: Vec<Input>,
-    #[serde(flatten)]
-    pub inner: Inner,
-}
-
-impl<Inner> WithInputs<String, Inner> {
-    pub fn input_ids(&self) -> Vec<ComponentId> {
-        self.inputs.iter().map(ComponentId::global).collect()
-    }
-}
-
-impl<Inner> From<WithInputs<String, Inner>> for WithInputs<ComponentId, Inner> {
-    fn from(value: WithInputs<String, Inner>) -> WithInputs<ComponentId, Inner> {
-        WithInputs {
-            inputs: value.inputs.into_iter().map(ComponentId::global).collect(),
-            inner: value.inner,
-        }
-    }
-}
-
-impl<Inner> From<WithInputs<ComponentId, Inner>> for WithInputs<String, Inner> {
-    fn from(value: WithInputs<ComponentId, Inner>) -> WithInputs<String, Inner> {
-        WithInputs {
-            inputs: value.inputs.into_iter().map(|item| item.name).collect(),
-            inner: value.inner,
-        }
-    }
-}
+// impl<Inner> From<WithInputs<ComponentId, Inner>> for WithInputs<String, Inner> {
+//     fn from(value: WithInputs<ComponentId, Inner>) -> WithInputs<String, Inner> {
+//         WithInputs {
+//             inputs: value.inputs.into_iter().map(|item| item.name).collect(),
+//             inner: value.inner,
+//         }
+//     }
+// }
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -129,9 +112,9 @@ pub struct Config {
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<ComponentId, SourceOuter>,
-    pub sinks: IndexMap<ComponentId, SinkWithId>,
-    pub transforms: IndexMap<ComponentId, TransformWithId>,
-    tests: Vec<TestDefinition<ComponentId>>,
+    pub sinks: IndexMap<ComponentId, SinkOuter>,
+    pub transforms: IndexMap<ComponentId, TransformOuter>,
+    tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }
 
@@ -254,7 +237,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            id: ComponentId::global("default"),
+            id: ComponentId::from("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
@@ -268,11 +251,10 @@ pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
 
 inventory::collect!(SourceDescription);
 
-pub type SinkWithId = WithInputs<ComponentId, SinkInner>;
-pub type SinkOuter = WithInputs<String, SinkInner>;
-
 #[derive(Deserialize, Serialize, Debug)]
-pub struct SinkInner {
+pub struct SinkOuter {
+    #[serde(default)]
+    pub inputs: Vec<ComponentId>,
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
 
@@ -294,23 +276,21 @@ pub struct SinkInner {
     pub inner: Box<dyn SinkConfig>,
 }
 
-impl SinkInner {
-    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> SinkOuter {
+impl SinkOuter {
+    pub fn new(inputs: Vec<ComponentId>, inner: Box<dyn SinkConfig>) -> SinkOuter {
         SinkOuter {
             inputs,
-            inner: SinkInner {
-                buffer: Default::default(),
-                healthcheck: SinkHealthcheckOptions::default(),
-                healthcheck_uri: None,
-                inner,
-                proxy: Default::default(),
-            },
+            buffer: Default::default(),
+            healthcheck: SinkHealthcheckOptions::default(),
+            healthcheck_uri: None,
+            inner,
+            proxy: Default::default(),
         }
     }
 
-    pub fn resources(&self, name: &str) -> Vec<Resource> {
+    pub fn resources(&self, id: &ComponentId) -> Vec<Resource> {
         let mut resources = self.inner.resources();
-        resources.append(&mut self.buffer.resources(name));
+        resources.append(&mut self.buffer.resources(&id.name));
         resources
     }
 
@@ -420,12 +400,17 @@ pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 
 inventory::collect!(SinkDescription);
 
-pub type TransformWithId = WithInputs<ComponentId, Box<dyn TransformConfig>>;
-pub type TransformOuter = WithInputs<String, Box<dyn TransformConfig>>;
-
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct TransformOuter {
+    #[serde(default)]
+    pub inputs: Vec<ComponentId>,
+    #[serde(flatten)]
+    pub inner: Box<dyn TransformConfig>,
+}
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -515,47 +500,15 @@ impl Display for Resource {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition<Id> {
+pub struct TestDefinition {
     pub name: String,
-    pub input: Option<TestInput<Id>>,
+    pub input: Option<TestInput>,
     #[serde(default)]
-    pub inputs: Vec<TestInput<Id>>,
+    pub inputs: Vec<TestInput>,
     #[serde(default)]
-    pub outputs: Vec<TestOutput<Id>>,
+    pub outputs: Vec<TestOutput>,
     #[serde(default)]
-    pub no_outputs_from: Vec<Id>,
-}
-
-impl From<TestDefinition<String>> for TestDefinition<ComponentId> {
-    fn from(value: TestDefinition<String>) -> Self {
-        Self {
-            name: value.name,
-            input: value.input.map(Into::into),
-            inputs: value.inputs.into_iter().map(Into::into).collect(),
-            outputs: value.outputs.into_iter().map(Into::into).collect(),
-            no_outputs_from: value
-                .no_outputs_from
-                .into_iter()
-                .map(ComponentId::global)
-                .collect(),
-        }
-    }
-}
-
-impl From<TestDefinition<ComponentId>> for TestDefinition<String> {
-    fn from(value: TestDefinition<ComponentId>) -> Self {
-        Self {
-            name: value.name,
-            input: value.input.map(Into::into),
-            inputs: value.inputs.into_iter().map(Into::into).collect(),
-            outputs: value.outputs.into_iter().map(Into::into).collect(),
-            no_outputs_from: value
-                .no_outputs_from
-                .into_iter()
-                .map(|item| item.name)
-                .collect(),
-        }
-    }
+    pub no_outputs_from: Vec<ComponentId>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -569,37 +522,13 @@ pub enum TestInputValue {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestInput<Id> {
-    pub insert_at: Id,
+pub struct TestInput {
+    pub insert_at: ComponentId,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
     pub value: Option<String>,
     pub log_fields: Option<IndexMap<String, TestInputValue>>,
     pub metric: Option<Metric>,
-}
-
-impl From<TestInput<String>> for TestInput<ComponentId> {
-    fn from(value: TestInput<String>) -> Self {
-        Self {
-            insert_at: ComponentId::global(value.insert_at),
-            type_str: value.type_str,
-            value: value.value,
-            log_fields: value.log_fields,
-            metric: value.metric,
-        }
-    }
-}
-
-impl From<TestInput<ComponentId>> for TestInput<String> {
-    fn from(value: TestInput<ComponentId>) -> Self {
-        Self {
-            insert_at: value.insert_at.name,
-            type_str: value.type_str,
-            value: value.value,
-            log_fields: value.log_fields,
-            metric: value.metric,
-        }
-    }
 }
 
 fn default_test_input_type() -> String {
@@ -608,27 +537,9 @@ fn default_test_input_type() -> String {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestOutput<Id> {
-    pub extract_from: Id,
+pub struct TestOutput {
+    pub extract_from: ComponentId,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
-}
-
-impl From<TestOutput<String>> for TestOutput<ComponentId> {
-    fn from(value: TestOutput<String>) -> Self {
-        Self {
-            extract_from: ComponentId::global(value.extract_from),
-            conditions: value.conditions,
-        }
-    }
-}
-
-impl From<TestOutput<ComponentId>> for TestOutput<String> {
-    fn from(value: TestOutput<ComponentId>) -> Self {
-        Self {
-            extract_from: value.extract_from.name,
-            conditions: value.conditions,
-        }
-    }
 }
 
 impl Config {
@@ -654,7 +565,7 @@ impl Config {
     feature = "transforms-json_parser"
 ))]
 mod test {
-    use super::{builder::ConfigBuilder, format, load_from_str, Format};
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentId, Format};
     use indoc::indoc;
     use std::path::PathBuf;
 
@@ -783,9 +694,9 @@ mod test {
         );
 
         assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
-        assert!(config.sources.contains_key("in"));
-        assert!(config.sinks.contains_key("out"));
-        assert!(config.transforms.contains_key("foo"));
+        assert!(config.sources.contains_key(&ComponentId::from("in")));
+        assert!(config.sinks.contains_key(&ComponentId::from("out")));
+        assert!(config.transforms.contains_key(&ComponentId::from("foo")));
         assert_eq!(config.tests.len(), 1);
     }
 
@@ -861,7 +772,7 @@ mod test {
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
         assert!(config.global.proxy.no_proxy.matches("localhost"));
-        let source = config.sources.get("in").unwrap();
+        let source = config.sources.get(&ComponentId::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3128".into()));
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));

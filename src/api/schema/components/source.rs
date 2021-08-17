@@ -150,17 +150,17 @@ mod tests {
     fn source_fixtures() -> Vec<Source> {
         vec![
             Source(Data {
-                id: ComponentId::global("gen1"),
+                id: ComponentId::from("gen1"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                id: ComponentId::global("gen2"),
+                id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                id: ComponentId::global("gen3"),
+                id: ComponentId::from("gen3"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -225,17 +225,17 @@ mod tests {
     fn sort_component_type_asc() {
         let mut sources = vec![
             Source(Data {
-                id: ComponentId::global("gen1"),
+                id: ComponentId::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                id: ComponentId::global("gen2"),
+                id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                id: ComponentId::global("gen3"),
+                id: ComponentId::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -256,17 +256,17 @@ mod tests {
     fn sort_component_type_desc() {
         let mut sources = vec![
             Source(Data {
-                id: ComponentId::global("gen1"),
+                id: ComponentId::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                id: ComponentId::global("gen2"),
+                id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                id: ComponentId::global("gen3"),
+                id: ComponentId::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -287,17 +287,17 @@ mod tests {
     fn sort_output_type_asc() {
         let mut sources = vec![
             Source(Data {
-                id: ComponentId::global("gen1"),
+                id: ComponentId::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                id: ComponentId::global("gen2"),
+                id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                id: ComponentId::global("gen3"),
+                id: ComponentId::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -318,17 +318,17 @@ mod tests {
     fn sort_output_type_desc() {
         let mut sources = vec![
             Source(Data {
-                id: ComponentId::global("gen1"),
+                id: ComponentId::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                id: ComponentId::global("gen2"),
+                id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                id: ComponentId::global("gen3"),
+                id: ComponentId::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),

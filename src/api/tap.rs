@@ -244,7 +244,7 @@ async fn tap_handler(
                             // getting involved in config diffing at this point.
                             let id = Uuid::new_v4().to_string();
                             let sink = TapSink::new(tx.clone(), name.to_string());
-                            let component_id = ComponentId::global(&id);
+                            let component_id = ComponentId::from(id.clone());
 
                             // Attempt to connect the sink.
                             match control_tx

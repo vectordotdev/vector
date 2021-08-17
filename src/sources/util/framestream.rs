@@ -715,7 +715,7 @@ mod test {
         JoinHandle<Result<(), ()>>,
         SourceShutdownCoordinator,
     ) {
-        let source_id = ComponentId::global(source_id);
+        let source_id = ComponentId::from(source_id);
         let socket_path = frame_handler.socket_path();
         let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(&source_id);
@@ -800,7 +800,7 @@ mod test {
     async fn signal_shutdown(source_name: &str, shutdown: &mut SourceShutdownCoordinator) {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let id = ComponentId::global(source_name);
+        let id = ComponentId::from(source_name);
         let shutdown_complete = shutdown.shutdown_source(&id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
