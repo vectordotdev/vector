@@ -21,7 +21,7 @@ use std::{
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
-use vector_core::enrichment_table::EnrichmentTables;
+use vector_core::enrichment;
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner<Event>, Vec<String>)>,
@@ -31,7 +31,7 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
-    pub enrichment_tables: EnrichmentTables,
+    pub enrichment_tables: enrichment::Tables,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -122,7 +122,7 @@ pub async fn build_pieces(
         source_tasks.insert(id.clone(), server);
     }
 
-    let enrichment_tables = EnrichmentTables::new(enrichment_tables);
+    let enrichment_tables = enrichment::Tables::new(enrichment_tables);
 
     let mut context = TransformContext {
         globals: config.global.clone(),

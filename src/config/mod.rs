@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    conditions, enrichment_tables,
+    conditions,
     event::Metric,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
@@ -16,6 +16,7 @@ use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 pub use vector_core::config::GlobalOptions;
+use vector_core::enrichment;
 pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
 
 pub mod api;
@@ -397,7 +398,7 @@ pub trait EnrichmentTableConfig: core::fmt::Debug + Send + Sync + dyn_clone::Dyn
     async fn build(
         &self,
         globals: &GlobalOptions,
-    ) -> crate::Result<Box<dyn enrichment_tables::EnrichmentTable + Send + Sync>>;
+    ) -> crate::Result<Box<dyn enrichment::Table + Send + Sync>>;
 }
 
 pub type EnrichmentTableDescription = ComponentDescription<Box<dyn EnrichmentTableConfig>>;

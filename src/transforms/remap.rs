@@ -12,7 +12,7 @@ use snafu::{ResultExt, Snafu};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use vector_core::enrichment_table::{EnrichmentTableSearch, EnrichmentTables};
+use vector_core::enrichment;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -61,11 +61,11 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
-    enrichment_tables: EnrichmentTableSearch,
+    enrichment_tables: enrichment::TableSearch,
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig, enrichment_tables: &EnrichmentTables) -> crate::Result<Self> {
+    pub fn new(config: RemapConfig, enrichment_tables: &enrichment::Tables) -> crate::Result<Self> {
         let source = match (&config.source, &config.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {

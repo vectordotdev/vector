@@ -1,5 +1,8 @@
 use dyn_clone::DynClone;
-use std::collections::BTreeMap;
+
+pub enum Condition {
+    Equals { field: String, value: String },
+}
 
 pub trait EnrichmentTableSetup {
     fn get_tables(&self) -> Vec<String>;
@@ -10,7 +13,7 @@ pub trait EnrichmentTableSearch: DynClone {
     fn find_table_row(
         &self,
         table: &str,
-        criteria: BTreeMap<String, String>,
+        criteria: Vec<Condition>,
     ) -> Result<Option<Vec<String>>, String>;
 }
 
@@ -34,7 +37,7 @@ impl EnrichmentTableSearch for EmptyEnrichmentTables {
     fn find_table_row(
         &self,
         _table: &str,
-        _criteria: BTreeMap<String, String>,
+        _criteria: Vec<Condition>,
     ) -> Result<Option<Vec<String>>, String> {
         Ok(None)
     }

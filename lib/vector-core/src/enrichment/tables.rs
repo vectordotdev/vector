@@ -1,4 +1,4 @@
-//! `EnrichmentTables` manages the collection of `EnrichmentTable`s loaded into Vector.
+//! Enrichment `Tables` manages the collection of `Table`s loaded into Vector.
 //! Enrichment Tables go through two stages.
 //!
 //! ## 1. Writing
@@ -20,26 +20,23 @@
 //! field. `ArcSwap` provides lock-free read-only access to the data. From this point on we have fast,
 //! efficient read-only access and can no longer add indexes or otherwise mutate the data.
 //!
-//! This data within the `ArcSwap` is accessed through the `EnrichmentTableSearch` struct. Any
-//! transform that needs access to this can call `EnrichmentTables::as_search`. This returns a
-//! cheaply clonable struct that implements `vrl:EnrichmentTableSearch` through with the enrichment
-//! tables can be searched.
+//! This data within the `ArcSwap` is accessed through the `TableSearch` struct. Any transform that
+//! needs access to this can call `Tables::as_search`. This returns a cheaply clonable struct that
+//! implements `vrl:EnrichmentTableSearch` through with the enrichment tables can be searched.
 //!
-use super::EnrichmentTable;
+use super::Table;
 use arc_swap::ArcSwap;
-#[cfg(feature = "vrl")]
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(Default)]
-pub struct EnrichmentTables {
-    loading: Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>,
-    tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
+pub struct Tables {
+    loading: Option<HashMap<String, Box<dyn Table + Send + Sync>>>,
+    tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
 }
 
-impl EnrichmentTables {
-    pub fn new(tables: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>) -> Self {
+impl Tables {
+    pub fn new(tables: HashMap<String, Box<dyn Table + Send + Sync>>) -> Self {
         Self {
             loading: Some(tables),
             tables: Arc::new(ArcSwap::default()),
@@ -56,19 +53,19 @@ impl EnrichmentTables {
 
     /// Returns a cheaply clonable struct through that provides lock free read access to the
     /// enrichment tables.
-    pub fn as_search(&self) -> EnrichmentTableSearch {
-        EnrichmentTableSearch(self.tables.clone())
+    pub fn as_search(&self) -> TableSearch {
+        TableSearch(self.tables.clone())
     }
 }
 
-impl std::fmt::Debug for EnrichmentTables {
+impl std::fmt::Debug for Tables {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt_enrichment_table(f, "EnrichmentTables", &self.tables)
     }
 }
 
 #[cfg(feature = "vrl")]
-impl vrl_core::EnrichmentTableSetup for EnrichmentTables {
+impl vrl_core::EnrichmentTableSetup for Tables {
     /// Return a list of the available tables. This will work regardless of which mode we are in.
     /// If we are in the writing stage, this will acquire a lock to retrieve the tables.
     ///
@@ -101,7 +98,7 @@ impl vrl_core::EnrichmentTableSetup for EnrichmentTables {
             Some(ref mut tables) => match tables.get_mut(table) {
                 None => Err(format!("table {} not loaded", table)),
                 Some(table) => {
-                    table.add_index(fields);
+                    table.add_index(&fields);
                     Ok(())
                 }
             },
@@ -112,17 +109,15 @@ impl vrl_core::EnrichmentTableSetup for EnrichmentTables {
 /// Provides read only access to the enrichment tables via the `vrl::EnrichmentTableSearch` trait.
 /// Cloning this object is designed to be cheap. The underlying data will be shared by all clones.
 #[derive(Clone)]
-pub struct EnrichmentTableSearch(
-    Arc<ArcSwap<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
-);
+pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>);
 
-impl vrl_core::EnrichmentTableSearch for EnrichmentTableSearch {
+impl vrl_core::EnrichmentTableSearch for TableSearch {
     /// Search the given table to find the data.
     /// If we are in the writing stage, this function will return an error.
     fn find_table_row(
         &self,
         table: &str,
-        criteria: BTreeMap<String, String>,
+        criteria: Vec<vrl_core::Condition>,
     ) -> Result<Option<Vec<String>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
@@ -136,7 +131,7 @@ impl vrl_core::EnrichmentTableSearch for EnrichmentTableSearch {
     }
 }
 
-impl std::fmt::Debug for EnrichmentTableSearch {
+impl std::fmt::Debug for TableSearch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt_enrichment_table(f, "EnrichmentTableSearch", &self.0)
     }
@@ -146,7 +141,7 @@ impl std::fmt::Debug for EnrichmentTableSearch {
 fn fmt_enrichment_table(
     f: &mut std::fmt::Formatter<'_>,
     name: &'static str,
-    tables: &Arc<ArcSwap<Option<HashMap<String, Box<dyn EnrichmentTable + Send + Sync>>>>>,
+    tables: &Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
 ) -> std::fmt::Result {
     let tables = tables.load();
     match **tables {
@@ -169,8 +164,6 @@ fn fmt_enrichment_table(
 #[cfg(all(feature = "vrl", test))]
 mod tests {
     use super::*;
-    use shared::btreemap;
-    use std::collections::BTreeMap;
     use std::sync::{Arc, Mutex};
     use vrl_core::{EnrichmentTableSearch, EnrichmentTableSetup};
 
@@ -196,12 +189,12 @@ mod tests {
         }
     }
 
-    impl EnrichmentTable for DummyEnrichmentTable {
-        fn find_table_row(&self, _criteria: BTreeMap<String, String>) -> Option<&Vec<String>> {
+    impl Table for DummyEnrichmentTable {
+        fn find_table_row(&self, _criteria: Vec<vrl_core::Condition>) -> Option<&Vec<String>> {
             Some(&self.data)
         }
 
-        fn add_index(&mut self, fields: Vec<&str>) {
+        fn add_index(&mut self, fields: &[&str]) {
             self.indexes
                 .lock()
                 .unwrap()
@@ -211,11 +204,11 @@ mod tests {
 
     #[test]
     fn tables_loaded() {
-        let mut tables: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>> = HashMap::new();
+        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
         tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
 
-        let tables = super::EnrichmentTables::new(tables);
+        let tables = super::Tables::new(tables);
         let mut result = tables.get_tables();
         result.sort();
         assert_eq!(vec!["dummy1", "dummy2"], result);
@@ -223,11 +216,11 @@ mod tests {
 
     #[test]
     fn can_add_indexes() {
-        let mut tables: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>> = HashMap::new();
+        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let indexes = Arc::new(Mutex::new(Vec::new()));
         let dummy = DummyEnrichmentTable::new_with_index(indexes.clone());
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let mut tables = super::EnrichmentTables::new(tables);
+        let mut tables = super::Tables::new(tables);
         assert_eq!(Ok(()), tables.add_index("dummy1", vec!["erk"]));
 
         let indexes = indexes.lock().unwrap();
@@ -236,28 +229,29 @@ mod tests {
 
     #[test]
     fn can_not_find_table_row_before_finish() {
-        let mut tables: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>> = HashMap::new();
+        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let tables = super::EnrichmentTables::new(tables).as_search();
+        let tables = super::Tables::new(tables).as_search();
 
         assert_eq!(
             Err("finish_load not called".to_string()),
             tables.find_table_row(
                 "dummy1",
-                btreemap! {
-                    "thing" => "thang"
-                }
+                vec![vrl_core::Condition::Equals {
+                    field: "thing".to_string(),
+                    value: "thang".to_string(),
+                }]
             )
         );
     }
 
     #[test]
     fn can_not_add_indexes_after_finish() {
-        let mut tables: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>> = HashMap::new();
+        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let mut tables = super::EnrichmentTables::new(tables);
+        let mut tables = super::Tables::new(tables);
         tables.finish_load();
         assert_eq!(
             Err("finish_load has been called".to_string()),
@@ -267,11 +261,11 @@ mod tests {
 
     #[test]
     fn can_find_table_row_after_finish() {
-        let mut tables: HashMap<String, Box<dyn EnrichmentTable + Send + Sync>> = HashMap::new();
+        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
 
-        let mut tables = super::EnrichmentTables::new(tables);
+        let mut tables = super::Tables::new(tables);
         let tables_search = tables.as_search();
 
         tables.finish_load();
@@ -280,9 +274,10 @@ mod tests {
             Ok(Some(vec!["result".to_string()])),
             tables_search.find_table_row(
                 "dummy1",
-                btreemap! {
-                    "thing" => "thang"
-                }
+                vec![vrl_core::Condition::Equals {
+                    field: "thing".to_string(),
+                    value: "thang".to_string(),
+                }]
             )
         );
     }

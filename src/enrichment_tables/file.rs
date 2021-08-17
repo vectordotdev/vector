@@ -1,7 +1,7 @@
-use super::EnrichmentTable;
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
+use vector_core::enrichment::{Condition, Table};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 struct FileConfig;
@@ -12,7 +12,7 @@ impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,
         _globals: &crate::config::GlobalOptions,
-    ) -> crate::Result<Box<dyn super::EnrichmentTable + Send + Sync>> {
+    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         trace!("Building file enrichment table.");
         Ok(Box::new(File {
             data: vec![vec!["field1".to_string(), "field2".to_string()]],
@@ -32,16 +32,13 @@ struct File {
     indexes: Vec<Vec<String>>,
 }
 
-impl EnrichmentTable for File {
-    fn find_table_row<'a>(
-        &self,
-        _criteria: std::collections::BTreeMap<String, String>,
-    ) -> Option<&Vec<String>> {
+impl Table for File {
+    fn find_table_row<'a>(&self, _criteria: Vec<Condition>) -> Option<&Vec<String>> {
         trace!("Searching enrichment table.");
         Some(&self.data[0])
     }
 
-    fn add_index(&mut self, fields: Vec<&str>) {
+    fn add_index(&mut self, fields: &[&str]) {
         self.indexes
             .push(fields.iter().map(ToString::to_string).collect());
     }

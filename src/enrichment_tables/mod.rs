@@ -1,3 +1,3 @@
-pub use vector_core::enrichment_table::EnrichmentTable;
+// pub use vector_core::enrichment::Table;
 
 pub mod file;

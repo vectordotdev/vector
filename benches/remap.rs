@@ -43,13 +43,15 @@ fn benchmark_remap(c: &mut Criterion) {
 
     group.bench_function("add_fields/remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
-            Remap::new(RemapConfig {
-                source: Some(
-                    indoc! {r#".foo = "bar"
-                    .bar = "baz"
-                    .copy = string!(.copy_from)
-                "#}
-                    .to_string(),
+            Remap::new(
+                RemapConfig {
+                    source: Some(
+                        indoc! {r#".foo = "bar"
+                            .bar = "baz"
+                            .copy = string!(.copy_from)
+                        "#}
+                        .to_string(),
+                    ),
                     file: None,
                     timezone: TimeZone::default(),
                     drop_on_error: true,
@@ -115,7 +117,7 @@ fn benchmark_remap(c: &mut Criterion) {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(
                 RemapConfig {
-                    source: ".bar = parse_json!(string!(.foo))".to_owned(),
+                    source: Some(".bar = parse_json!(string!(.foo))".to_owned()),
                     file: None,
                     timezone: TimeZone::default(),
                     drop_on_error: true,
