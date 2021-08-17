@@ -244,4 +244,18 @@ mod tests {
 
         assert_eq!(event.as_metric().namespace(), Some("vector"));
     }
+
+    #[tokio::test]
+    async fn namespace() {
+        let namespace = "totally_custom";
+
+        let config = InternalMetricsConfig {
+            namespace: Some(namespace.to_owned()),
+            ..InternalMetricsConfig::default()
+        };
+
+        let event = event_from_config(config).await;
+
+        assert_eq!(event.as_metric().namespace(), Some(namespace));
+    }
 }
