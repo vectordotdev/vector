@@ -57,7 +57,7 @@ fn benchmark_remap(c: &mut Criterion) {
                     drop_on_error: true,
                     drop_on_abort: true,
                 },
-                Default::default(),
+                &Default::default(),
             )
             .unwrap(),
         );
@@ -123,7 +123,7 @@ fn benchmark_remap(c: &mut Criterion) {
                     drop_on_error: true,
                     drop_on_abort: true,
                 },
-                Default::default(),
+                &Default::default(),
             )
             .unwrap(),
         );
@@ -196,7 +196,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 timezone: TimeZone::default(),
                 drop_on_error: true,
                 drop_on_abort: true,
-            }, Default::default())
+            }, &Default::default())
             .unwrap(),
         );
 
