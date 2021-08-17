@@ -62,7 +62,8 @@ impl HostMetricsConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{tests::*, *};
+    use super::super::tests::{all_counters, count_name, count_tag};
+    use super::super::HostMetricsConfig;
 
     #[tokio::test]
     async fn generates_cpu_metrics() {
