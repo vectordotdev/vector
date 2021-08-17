@@ -21,7 +21,10 @@ pub struct InternalMetricsConfig {
 }
 
 impl InternalMetricsConfig {
-    fn default_namespace<T: Into<String>>(namespace: T) -> Self {
+    // TODO: Remove this annotation once it's actually being used.
+    #[allow(dead_code)]
+    /// Override the default namespace.
+    fn namespace<T: Into<String>>(namespace: T) -> Self {
         Self {
             namespace: Some(namespace.into()),
             ..Self::default()
@@ -130,14 +133,21 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
-    use crate::event::metric::{Metric, MetricValue};
-    use crate::metrics::{capture_metrics, get_controller};
+    use super::*;
+    use crate::{
+        event::{
+            metric::{Metric, MetricValue},
+            Event,
+        },
+        metrics::{capture_metrics, get_controller},
+        Pipeline,
+    };
     use metrics::{counter, gauge, histogram};
     use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::InternalMetricsConfig>();
+        crate::test_util::test_generate_config::<InternalMetricsConfig>();
     }
 
     #[test]
@@ -206,5 +216,33 @@ mod tests {
         let mut labels = BTreeMap::new();
         labels.insert(String::from("host"), String::from("foo"));
         assert_eq!(Some(&labels), output["quux"].tags());
+    }
+
+    #[tokio::test]
+    async fn default_namespace() {
+        let _ = crate::metrics::init();
+
+        let (sender, mut recv) = Pipeline::new_test();
+
+        tokio::spawn(async move {
+            InternalMetricsConfig::default()
+                .build(SourceContext::new_test(sender))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+        });
+
+        let event = time::timeout(time::Duration::from_millis(100), recv.next())
+            .await
+            .expect("fetch metrics timeout")
+            .expect("failed to get metrics from a stream");
+
+        match event {
+            Event::Metric(metric) => {
+                assert_eq!(metric.namespace(), Some("vector"));
+            }
+            _ => panic!("not a metric"),
+        }
     }
 }
