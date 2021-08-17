@@ -38,8 +38,8 @@ components: sinks: http: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				headers:                    true
+				enabled: true
+				headers: true
 			}
 			tls: {
 				enabled:                true

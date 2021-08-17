@@ -38,10 +38,10 @@ components: sinks: gcp_cloud_storage: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				concurrency:                25
-				rate_limit_num:             1000
-				headers:                    false
+				enabled:        true
+				concurrency:    25
+				rate_limit_num: 1000
+				headers:        false
 			}
 			tls: {
 				enabled:                true
