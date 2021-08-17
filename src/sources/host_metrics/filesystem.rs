@@ -2,8 +2,6 @@ use super::{filter_result, FilterList, HostMetricsConfig};
 use crate::event::metric::Metric;
 use chrono::Utc;
 use futures::{stream, StreamExt};
-#[cfg(target_os = "macos")]
-use heim::memory::os::macos::MemoryExt;
 use heim::units::information::byte;
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
