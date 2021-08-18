@@ -5,40 +5,38 @@ use std::fmt;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentId {
-    pub name: String,
+    pub id: String,
 }
 
 impl ComponentId {
-    pub fn global<T: Into<String>>(name: T) -> Self {
-        Self { name: name.into() }
+    pub fn global<T: Into<String>>(id: T) -> Self {
+        Self { id: id.into() }
     }
 }
 
 impl From<String> for ComponentId {
-    fn from(name: String) -> Self {
-        Self { name }
+    fn from(id: String) -> Self {
+        Self { id }
     }
 }
 
 impl From<&str> for ComponentId {
-    fn from(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-        }
+    fn from(id: &str) -> Self {
+        Self { id: id.to_string() }
     }
 }
 
 impl<T: ToString> From<&T> for ComponentId {
     fn from(value: &T) -> Self {
         Self {
-            name: value.to_string(),
+            id: value.to_string(),
         }
     }
 }
 
 impl fmt::Display for ComponentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.name.fmt(f)
+        self.id.fmt(f)
     }
 }
 
@@ -53,7 +51,7 @@ impl Serialize for ComponentId {
 
 impl Ord for ComponentId {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.name.cmp(&other.name)
+        self.id.cmp(&other.id)
     }
 }
 
@@ -96,7 +94,7 @@ mod tests {
     #[test]
     fn deserialize_string() {
         let result: ComponentId = serde_json::from_str("\"foo\"").unwrap();
-        assert_eq!(result.name, "foo");
+        assert_eq!(result.id, "foo");
     }
 
     #[test]
