@@ -330,7 +330,10 @@ async fn fetch_status(
 
 fn valid_label_name(label: &Template) -> bool {
     label.is_dynamic() || {
-        // Loki follows prometheus on this
+        // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
+        // Although that isn't explicitly said anywhere besides what's in the code.
+        // The closest mention is in section about Parser Expression https://grafana.com/docs/loki/latest/logql/
+        //
         // [a-zA-Z_][a-zA-Z0-9_]*
         let label_trim = label.get_ref().trim();
         let mut label_chars = label_trim.chars();
