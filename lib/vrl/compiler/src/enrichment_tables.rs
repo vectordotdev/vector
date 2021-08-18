@@ -5,7 +5,7 @@ pub enum Condition {
 }
 
 pub trait EnrichmentTableSetup {
-    fn get_tables(&self) -> Vec<String>;
+    fn table_ids(&self) -> Vec<String>;
     fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String>;
 }
 
@@ -24,7 +24,7 @@ dyn_clone::clone_trait_object!(EnrichmentTableSearch);
 pub struct EmptyEnrichmentTables;
 
 impl EnrichmentTableSetup for EmptyEnrichmentTables {
-    fn get_tables(&self) -> Vec<String> {
+    fn table_ids(&self) -> Vec<String> {
         Vec::new()
     }
 

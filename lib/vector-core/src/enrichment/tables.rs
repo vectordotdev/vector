@@ -29,10 +29,15 @@ use arc_swap::ArcSwap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-#[derive(Default)]
 pub struct Tables {
     loading: Option<HashMap<String, Box<dyn Table + Send + Sync>>>,
     tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
+}
+
+impl Default for Tables {
+    fn default() -> Self {
+        Self::new(HashMap::new())
+    }
 }
 
 impl Tables {
@@ -72,7 +77,7 @@ impl vrl_core::EnrichmentTableSetup for Tables {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned in write mode.
-    fn get_tables(&self) -> Vec<String> {
+    fn table_ids(&self) -> Vec<String> {
         let tables = self.tables.load();
         (*tables).as_ref().as_ref().map_or_else(
             || {
@@ -209,7 +214,7 @@ mod tests {
         tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
 
         let tables = super::Tables::new(tables);
-        let mut result = tables.get_tables();
+        let mut result = tables.table_ids();
         result.sort();
         assert_eq!(vec!["dummy1", "dummy2"], result);
     }

@@ -89,6 +89,7 @@ pub fn add_fields(criterion: &mut Criterion) {
                     drop_on_abort: true,
                 })
                 .unwrap(),
+                &Default::default(),
             ),
         ),
         (
