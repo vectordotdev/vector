@@ -162,7 +162,7 @@ rmp-serde = { version = "0.15.5", default-features = false, optional = true }
 
 # Messagepack
 
-rmpv = { version = "0.4.7", default-features = false, features = ["with-serde"], optional = true }
+rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
 prost = { version = "0.8", default-features = false, features = ["std"]  }
