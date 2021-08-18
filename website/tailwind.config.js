@@ -43,14 +43,14 @@ module.exports = {
               'text-decoration': 'none',
               code: {
                 color: theme('colors.primary-dark'),
-                '&:not(.language-toml)': {
+                '&:not([class^="language-"])': {
                   color: theme('colors.inherit')
                 },
               },
             },
             code: {
               color: theme('colors.primary-dark', 'currentColor'),
-              '&:not(.language-toml)': {
+              '&:not([class^="language-"])': {
                 color: theme('colors.dark', 'currentColor'),
                 'background-color': theme('colors.gray.100'),
                 'border-radius': '4px',
@@ -104,7 +104,7 @@ module.exports = {
             },
             code: {
               color: theme('colors.primary', 'currentColor'),
-              '&:not(.language-toml)': {
+              '&:not([class^="language-"])': {
                 color: theme('colors.gray.100'),
                 'background-color': theme('colors.gray.700'),
               }
@@ -113,7 +113,7 @@ module.exports = {
             'p, h1, h2, h3, h4, h5, h6': {
               color: theme('colors.gray.100')
             },
-            'a, a code, a code:not(.language-toml)': {
+            'a, a code, a code:not([class^="language-"])': {
                 color: theme('colors.primary', 'currentColor'),
                 'text-decoration': 'none',
                 '&:hover, &:active': {
@@ -123,7 +123,7 @@ module.exports = {
             'a': {
               '&:hover': {
                 'code': {
-                  '&:not(.language-toml)': {
+                  '&:not([class^="language-"])': {
                     color: theme('colors.inherit')
                   }
                 }
