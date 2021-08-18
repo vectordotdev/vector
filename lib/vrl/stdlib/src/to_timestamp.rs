@@ -164,7 +164,7 @@ mod tests {
         let mut runtime_state = vrl::state::Runtime::default();
         let tz = TimeZone::default();
         let enrichment_tables =
-            Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTables>);
+            Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTableSearch>);
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, &enrichment_tables);
         let f = ToTimestampFn {
             value: Box::new(Literal::Integer(9999999999999)),
@@ -179,7 +179,7 @@ mod tests {
         let mut runtime_state = vrl::state::Runtime::default();
         let tz = TimeZone::default();
         let enrichment_tables =
-            Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTables>);
+            Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTableSearch>);
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, &enrichment_tables);
         let f = ToTimestampFn {
             value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),

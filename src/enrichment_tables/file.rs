@@ -1,8 +1,8 @@
-use super::{EnrichmentTable, IndexHandle};
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hasher;
+use vector_core::enrichment::{Condition, IndexHandle, Table};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 struct FileConfig {
@@ -24,7 +24,7 @@ impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,
         _globals: &crate::config::GlobalOptions,
-    ) -> crate::Result<Box<dyn super::EnrichmentTable + Send + Sync>> {
+    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         if self.encoding != "csv" {
             return Err("Only csv encoding is currently supported.".into());
         }
@@ -83,13 +83,13 @@ impl File {
         self.headers.iter().position(|header| header == col)
     }
 
-    fn row_equals(&self, condition: &BTreeMap<&str, String>, row: &[String]) -> bool {
-        condition
-            .iter()
-            .all(|(col, value)| match self.column_index(col) {
+    fn row_equals(&self, condition: &[Condition], row: &[String]) -> bool {
+        condition.iter().all(|condition| match condition {
+            Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
                 Some(idx) => row[idx] == *value,
-            })
+            },
+        })
     }
 
     fn add_columns(&self, row: &[String]) -> BTreeMap<String, String> {
@@ -103,10 +103,7 @@ impl File {
     /// Creates an index with the given fields.
     /// Uses seahash to create a hash of the data that is used as the key in a hashmap lookup to
     /// the index of the row in the data.
-    fn index_data(
-        &self,
-        index: Vec<&str>,
-    ) -> HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher> {
+    fn index_data(&self, index: &[&str]) -> HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher> {
         // Get the positions of the fields we are indexing
         let fieldidx = self
             .headers
@@ -135,7 +132,7 @@ impl File {
 
             let key = hash.finish();
 
-            let entry = index.entry(key).or_insert(Vec::new());
+            let entry = index.entry(key).or_insert_with(Vec::new);
             entry.push(idx);
         }
 
@@ -145,10 +142,10 @@ impl File {
     }
 }
 
-impl EnrichmentTable for File {
+impl Table for File {
     fn find_table_row(
         &self,
-        condition: BTreeMap<&str, String>,
+        condition: Vec<Condition>,
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, String>, String> {
         match index {
@@ -168,7 +165,7 @@ impl EnrichmentTable for File {
                     // More than one row has been found.
                     Err("more than one row found".to_string())
                 } else {
-                    result.ok_or("no rows found".to_string())
+                    result.ok_or_else(|| "no rows found".to_string())
                 }
             }
             Some(IndexHandle(handle)) => {
@@ -177,13 +174,14 @@ impl EnrichmentTable for File {
                 // being passed in the condition.
                 let mut hash = seahash::SeaHasher::default();
 
-                for field in self.headers.iter() {
-                    match condition.get(field as &str) {
-                        Some(value) => {
+                for header in self.headers.iter() {
+                    if let Some(Condition::Equals { value, .. }) = condition.iter().find(|condition|
+                    {
+                        matches!(condition, Condition::Equals { field, .. } if field == header)
+                    })
+                    {
                             hash.write(value.as_bytes());
                             hash.write_u8(0);
-                        }
-                        None => (),
                     }
                 }
 
@@ -191,7 +189,7 @@ impl EnrichmentTable for File {
 
                 self.indexes[handle]
                     .get(&key)
-                    .ok_or("no rows found".to_string())
+                    .ok_or_else(|| "no rows found".to_string())
                     .and_then(|rows| {
                         // Ensure we have exactly one result.
                         if rows.len() == 1 {
@@ -206,7 +204,7 @@ impl EnrichmentTable for File {
         }
     }
 
-    fn add_index(&mut self, fields: Vec<&str>) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
         self.indexes.push(self.index_data(fields));
 
         // The returned index handle is the position of the index in our list of indexes.
@@ -256,8 +254,9 @@ mod tests {
             vec!["field1".to_string(), "field2".to_string()],
         );
 
-        let condition = btreemap! {
-            "field1" => "zirp"
+        let condition = Condition::Equals {
+            field: "field1".to_string(),
+            value: "zirp".to_string(),
         };
 
         assert_eq!(
@@ -265,7 +264,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(condition, None)
+            file.find_table_row(vec![condition], None)
         );
     }
 
@@ -279,10 +278,11 @@ mod tests {
             vec!["field1".to_string(), "field2".to_string()],
         );
 
-        let handle = file.add_index(vec!["field1"]).unwrap();
+        let handle = file.add_index(&["field1"]).unwrap();
 
-        let condition = btreemap! {
-            "field1" => "zirp"
+        let condition = Condition::Equals {
+            field: "field1".to_string(),
+            value: "zirp".to_string(),
         };
 
         assert_eq!(
@@ -290,7 +290,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(condition, Some(handle))
+            file.find_table_row(vec![condition], Some(handle))
         );
     }
 
@@ -304,13 +304,14 @@ mod tests {
             vec!["field1".to_string(), "field2".to_string()],
         );
 
-        let condition = btreemap! {
-            "field1" => "zorp"
+        let condition = Condition::Equals {
+            field: "field1".to_string(),
+            value: "zorp".to_string(),
         };
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(condition, None)
+            file.find_table_row(vec![condition], None)
         );
     }
 
@@ -324,15 +325,16 @@ mod tests {
             vec!["field1".to_string(), "field2".to_string()],
         );
 
-        let handle = file.add_index(vec!["field1"]).unwrap();
+        let handle = file.add_index(&["field1"]).unwrap();
 
-        let condition = btreemap! {
-            "field1" => "zorp"
+        let condition = Condition::Equals {
+            field: "field1".to_string(),
+            value: "zorp".to_string(),
         };
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(condition, Some(handle))
+            file.find_table_row(vec![condition], Some(handle))
         );
     }
 }

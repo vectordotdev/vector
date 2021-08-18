@@ -169,7 +169,10 @@ impl Batch for LokiBuffer {
         let event_len = event.encoded.get().len();
 
         if self.is_empty() && WRAPPER_OVERHEAD + labels_len + event_len > self.settings.bytes {
-            err_event_too_large(WRAPPER_OVERHEAD + labels_len + event_len)
+            err_event_too_large(
+                WRAPPER_OVERHEAD + labels_len + event_len,
+                self.settings.bytes,
+            )
         } else if self.num_items >= self.settings.events
             || self.num_bytes + event_len + 1 > self.settings.bytes
         {

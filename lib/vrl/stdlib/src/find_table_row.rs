@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
-use vrl::{prelude::*, IndexHandle};
+use vrl::{prelude::*, Condition, IndexHandle};
+
 #[derive(Clone, Copy, Debug)]
 pub struct FindTableRow;
+
 impl Function for FindTableRow {
     fn identifier(&self) -> &'static str {
         "find_table_row"
@@ -51,12 +53,12 @@ impl Expression for FindTableRowFn {
             .condition
             .iter()
             .map(|(key, value)| {
-                Ok((
-                    key.as_ref(),
-                    value.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(),
-                ))
+                Ok(Condition::Equals {
+                    field: key.to_string(),
+                    value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(),
+                })
             })
-            .collect::<Result<BTreeMap<&str, String>>>()?;
+            .collect::<Result<Vec<Condition>>>()?;
 
         let tables = ctx
             .get_enrichment_tables()
@@ -64,25 +66,21 @@ impl Expression for FindTableRowFn {
             .ok_or("enrichment tables not loaded")?;
 
         let data = tables.find_table_row(&self.table, condition, self.index)?;
-        Ok(Value::Object(
-            data.into_iter()
-                .map(|(key, value)| (key, Value::from(value)))
-                .collect(),
-        ))
+        Ok(Value::Object(data))
     }
 
     fn update_state(
         &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        match state.get_enrichment_tables_mut() {
+        match state.get_enrichment_tables() {
             Some(ref mut table) => {
                 let fields = self
                     .condition
                     .iter()
                     .map(|(field, _)| field.as_ref())
                     .collect::<Vec<_>>();
-                let index = table.add_index(&self.table, fields)?;
+                let index = table.add_index(&self.table, &fields)?;
 
                 // Store the index to use while searching.
                 self.index = Some(index);
@@ -105,28 +103,42 @@ impl Expression for FindTableRowFn {
 mod tests {
     use super::*;
     use shared::{btreemap, TimeZone};
-    use vrl::EnrichmentTables;
+    use vrl::{Condition, EnrichmentTableSearch, EnrichmentTableSetup};
 
     #[derive(Clone)]
     struct DummyEnrichmentTable;
 
-    impl EnrichmentTables for DummyEnrichmentTable {
-        fn get_tables(&self) -> Vec<String> {
+    impl EnrichmentTableSetup for DummyEnrichmentTable {
+        fn table_ids(&self) -> Vec<String> {
             vec!["table".to_string()]
         }
 
+        fn add_index(
+            &mut self,
+            table: &str,
+            fields: &[&str],
+        ) -> std::result::Result<IndexHandle, String> {
+            assert_eq!("table", table);
+            assert_eq!(vec!["field"], fields);
+
+            Ok(IndexHandle(999))
+        }
+    }
+
+    impl EnrichmentTableSearch for DummyEnrichmentTable {
         fn find_table_row(
             &self,
             table: &str,
-            criteria: BTreeMap<&str, String>,
+            condition: Vec<Condition>,
             index: Option<IndexHandle>,
-        ) -> std::result::Result<BTreeMap<String, String>, String> {
+        ) -> std::result::Result<BTreeMap<String, Value>, String> {
             assert_eq!(table, "table");
             assert_eq!(
-                criteria,
-                btreemap! {
-                    "field" => "value".to_string(),
-                }
+                condition,
+                vec![Condition::Equals {
+                    field: "field".to_string(),
+                    value: "value".to_string(),
+                }]
             );
             assert_eq!(index, Some(IndexHandle(999)));
 
@@ -134,17 +146,6 @@ mod tests {
                 "field".to_string() => "value".to_string(),
                 "field2".to_string() => "value2".to_string(),
             })
-        }
-
-        fn add_index(
-            &mut self,
-            table: &str,
-            fields: Vec<&str>,
-        ) -> std::result::Result<IndexHandle, String> {
-            assert_eq!("table", table);
-            assert_eq!(vec!["field"], fields);
-
-            Ok(IndexHandle(999))
         }
     }
 
@@ -160,7 +161,7 @@ mod tests {
 
         let tz = TimeZone::default();
         let enrichment_tables =
-            Some(Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTables>);
+            Some(Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTableSearch>);
 
         let mut object: Value = BTreeMap::new().into();
         let mut runtime_state = vrl::state::Runtime::default();
@@ -187,8 +188,8 @@ mod tests {
             index: None,
         };
 
-        let enrichment_tables = Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTables>;
-        let mut compiler = state::Compiler::new_with_enrichment_tables(enrichment_tables);
+        let mut compiler =
+            state::Compiler::new_with_enrichment_tables(Box::new(DummyEnrichmentTable));
 
         assert_eq!(Ok(()), func.update_state(&mut compiler));
         assert_eq!(Some(IndexHandle(999)), func.index);

@@ -154,8 +154,8 @@ impl<B> BatchSettings<B> {
     }
 }
 
-pub(super) fn err_event_too_large<T>(length: usize) -> PushResult<T> {
-    error!(message = "Event larger than batch size, dropping.", length = %length, internal_log_rate_secs = 1);
+pub(super) fn err_event_too_large<T>(length: usize, max_length: usize) -> PushResult<T> {
+    error!(message = "Event larger than batch max_bytes, dropping.", batch_max_bytes = %max_length, length = %length, internal_log_rate_secs = 1);
     PushResult::Ok(false)
 }
 

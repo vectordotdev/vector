@@ -24,7 +24,7 @@ pub struct LaneConfig {
 impl TransformConfig for LaneConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Lane::new(
-            self.condition.build(context.enrichment_tables.clone())?,
+            self.condition.build(&context.enrichment_tables)?,
         )))
     }
 

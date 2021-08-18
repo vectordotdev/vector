@@ -33,27 +33,30 @@ impl From<Metric> for ErrorsTotal {
 }
 
 pub struct ComponentErrorsTotal {
-    name: String,
+    component_id: String,
     metric: Metric,
 }
 
 impl ComponentErrorsTotal {
     /// Returns a new `ComponentErrorsTotal` struct, which is a GraphQL type. The
-    /// component name is hoisted for clear field resolution in the resulting payload
+    /// component id is hoisted for clear field resolution in the resulting payload
     pub fn new(metric: Metric) -> Self {
-        let name = metric.tag_value("component_name").expect(
-            "Returned a metric without a `component_name`, which shouldn't happen. Please report.",
+        let component_id = metric.tag_value("component_id").expect(
+            "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
 
-        Self { name, metric }
+        Self {
+            component_id,
+            metric,
+        }
     }
 }
 
 #[Object]
 impl ComponentErrorsTotal {
-    /// Component name
-    async fn name(&self) -> &str {
-        &self.name
+    /// Component id
+    async fn component_id(&self) -> &str {
+        &self.component_id
     }
 
     /// Errors processed metric

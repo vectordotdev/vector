@@ -2,7 +2,8 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    enrichment_tables::EmptyEnrichmentTables, enrichment_tables::EnrichmentTables,
+    enrichment_tables::Condition, enrichment_tables::EmptyEnrichmentTables,
+    enrichment_tables::EnrichmentTableSearch, enrichment_tables::EnrichmentTableSetup,
     enrichment_tables::IndexHandle, function, state, type_def::Index, value, Context, Expression,
     Function, Program, Target, Value,
 };
@@ -12,11 +13,10 @@ pub use runtime::{Runtime, RuntimeResult, Terminate};
 /// Compile a given source into the final [`Program`].
 pub fn compile(
     source: &str,
-    enrichment_tables: Box<dyn EnrichmentTables>,
+    enrichment_tables: Box<dyn EnrichmentTableSetup>,
     fns: &[Box<dyn Function>],
 ) -> compiler::Result {
     let mut state = state::Compiler::new_with_enrichment_tables(enrichment_tables);
-
     compile_with_state(source, fns, &mut state)
 }
 

@@ -1,11 +1,11 @@
-use crate::{enrichment_tables::EnrichmentTables, state::Runtime, Target};
+use crate::{enrichment_tables::EnrichmentTableSearch, state::Runtime, Target};
 use shared::TimeZone;
 
 pub struct Context<'a> {
     target: &'a mut dyn Target,
     state: &'a mut Runtime,
     timezone: &'a TimeZone,
-    enrichment_tables: &'a Option<Box<dyn EnrichmentTables>>,
+    enrichment_tables: &'a Option<Box<dyn EnrichmentTableSearch>>,
 }
 
 impl<'a> Context<'a> {
@@ -14,7 +14,7 @@ impl<'a> Context<'a> {
         target: &'a mut dyn Target,
         state: &'a mut Runtime,
         timezone: &'a TimeZone,
-        enrichment_tables: &'a Option<Box<dyn EnrichmentTables>>,
+        enrichment_tables: &'a Option<Box<dyn EnrichmentTableSearch>>,
     ) -> Self {
         Self {
             target,
@@ -44,7 +44,7 @@ impl<'a> Context<'a> {
         &mut self.state
     }
 
-    pub fn get_enrichment_tables(&self) -> &Option<Box<dyn EnrichmentTables>> {
+    pub fn get_enrichment_tables(&self) -> &Option<Box<dyn EnrichmentTableSearch>> {
         self.enrichment_tables
     }
 

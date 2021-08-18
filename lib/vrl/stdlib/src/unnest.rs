@@ -427,7 +427,7 @@ mod tests {
             let mut object = object.clone();
             let mut runtime_state = vrl::state::Runtime::default();
             let enrichment_tables =
-                Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTables>);
+                Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTableSearch>);
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, &enrichment_tables);
 
             let typedef = func.type_def(&compiler);

@@ -1,4 +1,4 @@
-/// Create a boxed [`Expression`] trait object from a given [`Value`].
+/// Create a boxed [`Expression`][crate::Expression] trait object from a given `Value`.
 ///
 /// Supports the same format as the [`value`] macro.
 #[macro_export]
@@ -53,9 +53,9 @@ macro_rules! bench_function {
                     let mut compiler_state = $crate::state::Compiler::default();
                     let mut runtime_state = $crate::state::Runtime::default();
                     let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
-                    let tz = shared::TimeZone::default();
+                    let tz = shared::TimeZone::Named(chrono_tz::Tz::UTC);
                     let enrichment_tables =
-                        Some(Box::new($crate::enrichment_tables::EmptyEnrichmentTables) as Box<dyn $crate::enrichment_tables::EnrichmentTables>);
+                        Some(Box::new($crate::enrichment_tables::EmptyEnrichmentTables) as Box<dyn $crate::enrichment_tables::EnrichmentTableSearch>);
                     let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz, &enrichment_tables);
 
                     b.iter(|| {
@@ -73,7 +73,7 @@ macro_rules! bench_function {
 macro_rules! test_function {
 
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr,  $(,)* })+) => {
-        test_function!($name => $func; before_each => {} $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: shared::TimeZone::default(), })+);
+        test_function!($name => $func; before_each => {} $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: shared::TimeZone::Named(chrono_tz::Tz::UTC), })+);
     };
 
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr, tz: $tz:expr,  $(,)* })+) => {
@@ -81,7 +81,7 @@ macro_rules! test_function {
     };
 
     ($name:tt => $func:path; before_each => $before:block $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr,  $(,)* })+) => {
-        test_function!($name => $func; before_each => $before $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: shared::TimeZone::default(), })+);
+        test_function!($name => $func; before_each => $before $($case { args: $args, want: $(Ok($ok))? $(Err($err))?, tdef: $tdef, tz: shared::TimeZone::Named(chrono_tz::Tz::UTC), })+);
     };
 
     ($name:tt => $func:path; before_each => $before:block $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))?, tdef: $tdef:expr, tz: $tz:expr,  $(,)* })+) => {
@@ -97,7 +97,7 @@ macro_rules! test_function {
                         let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
                         let tz = $tz;
                         let enrichment_tables =
-                            Some(Box::new($crate::enrichment_tables::EmptyEnrichmentTables) as Box<dyn $crate::enrichment_tables::EnrichmentTables>);
+                            Some(Box::new($crate::enrichment_tables::EmptyEnrichmentTables) as Box<dyn $crate::enrichment_tables::EnrichmentTableSearch>);
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz, &enrichment_tables);
 
                         let got_value = expression.resolve(&mut ctx)

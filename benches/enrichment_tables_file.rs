@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::collections::BTreeMap;
-use vector::enrichment_tables::{file::File, EnrichmentTable};
+use vector::enrichment_tables::{file::File, Condition, Table};
 
 criterion_group!(
     name = benches;
@@ -30,11 +30,18 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         );
 
         // Search on the first and last field.
-        let index = file.add_index(vec!["field-0", "field-9"]).unwrap();
+        let index = file.add_index(&["field-0", "field-9"]).unwrap();
 
-        let mut condition = BTreeMap::new();
-        condition.insert("field-0", format!("data-0-{}", size - 1));
-        condition.insert("field-9", format!("data-9-{}", size - 1));
+        let condition = vec![
+            Condition::Equals {
+                field: "field-0".to_string(),
+                value: format!("data-0-{}", size - 1),
+            },
+            Condition::Equals {
+                field: "field-9".to_string(),
+                value: format!("data-9-{}", size - 1),
+            },
+        ];
 
         let result = (0..10)
             .map(|idx| {
