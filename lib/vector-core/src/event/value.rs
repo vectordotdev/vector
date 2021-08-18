@@ -1342,9 +1342,18 @@ mod test {
             assert_eq!(hash(Value::Float(1.2)), hash(Value::Float(1.4)));
             assert_ne!(hash(Value::Float(1.2)), hash(Value::Float(-1.2)));
             assert_ne!(hash(Value::Float(-0.0)), hash(Value::Float(0.0)));
-            assert_ne!(hash(Value::Float(f64::NEG_INFINITY)), hash(Value::Float(f64::INFINITY)));
-            assert_eq!(hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])), hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])));
-            assert_ne!(hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])), hash(Value::Array(vec![Value::Integer(1), Value::Boolean(true)])));
+            assert_ne!(
+                hash(Value::Float(f64::NEG_INFINITY)),
+                hash(Value::Float(f64::INFINITY))
+            );
+            assert_eq!(
+                hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
+                hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)]))
+            );
+            assert_ne!(
+                hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
+                hash(Value::Array(vec![Value::Integer(1), Value::Boolean(true)]))
+            );
         }
     }
 
