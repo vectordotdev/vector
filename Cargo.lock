@@ -8337,7 +8337,7 @@ dependencies = [
  "mongodb",
  "nix 0.22.1",
  "no-proxy",
- "nom 7.0.0-alpha1",
+ "nom 6.1.2",
  "notify",
  "num-format",
  "num_cpus",
