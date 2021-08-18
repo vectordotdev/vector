@@ -22,8 +22,8 @@ pub struct Data {
 pub struct Transform(pub Data);
 
 impl Transform {
-    pub fn get_component_id(&self) -> &str {
-        self.0.component_id.name.as_str()
+    pub fn get_component_id(&self) -> String {
+        self.0.component_id.to_string()
     }
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
@@ -40,7 +40,7 @@ impl sort::SortableByField<TransformsSortFieldName> for Transform {
     fn sort(&self, rhs: &Self, field: &TransformsSortFieldName) -> cmp::Ordering {
         match field {
             TransformsSortFieldName::ComponentId => {
-                Ord::cmp(self.get_component_id(), rhs.get_component_id())
+                Ord::cmp(&self.get_component_id(), &rhs.get_component_id())
             }
             TransformsSortFieldName::ComponentType => {
                 Ord::cmp(self.get_component_type(), rhs.get_component_type())
@@ -52,7 +52,7 @@ impl sort::SortableByField<TransformsSortFieldName> for Transform {
 #[Object]
 impl Transform {
     /// Transform component_id
-    pub async fn component_id(&self) -> &str {
+    pub async fn component_id(&self) -> String {
         self.get_component_id()
     }
 
@@ -110,7 +110,7 @@ impl filter::CustomFilter<Transform> for TransformsFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(transform.get_component_id()))),
+                .all(|f| f.filter_value(&transform.get_component_id()))),
             self.component_type.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(transform.get_component_type())))

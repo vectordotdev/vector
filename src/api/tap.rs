@@ -172,9 +172,9 @@ fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: ComponentId) -> Shu
             .await
             .is_err()
         {
-            debug!(message = "Couldn't disconnect sink.", sink_id = ?sink_id.name);
+            debug!(message = "Couldn't disconnect sink.", ?sink_id);
         } else {
-            debug!(message = "Disconnected sink.", sink_id = ?sink_id.name);
+            debug!(message = "Disconnected sink.", ?sink_id);
         }
     });
 

@@ -40,11 +40,11 @@ pub enum ComponentKind {
 }
 
 impl Component {
-    fn get_component_id(&self) -> &str {
+    fn get_component_id(&self) -> String {
         match self {
-            Component::Source(c) => c.0.component_id.name.as_str(),
-            Component::Transform(c) => c.0.component_id.name.as_str(),
-            Component::Sink(c) => c.0.component_id.name.as_str(),
+            Component::Source(c) => c.0.component_id.to_string(),
+            Component::Transform(c) => c.0.component_id.to_string(),
+            Component::Sink(c) => c.0.component_id.to_string(),
         }
     }
 
@@ -69,7 +69,7 @@ impl filter::CustomFilter<Component> for ComponentsFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(component.get_component_id()))),
+                .all(|f| f.filter_value(&component.get_component_id()))),
             self.component_kind.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(component.get_component_kind())))
@@ -92,7 +92,7 @@ impl sort::SortableByField<ComponentsSortFieldName> for Component {
     fn sort(&self, rhs: &Self, field: &ComponentsSortFieldName) -> cmp::Ordering {
         match field {
             ComponentsSortFieldName::ComponentId => {
-                Ord::cmp(self.get_component_id(), rhs.get_component_id())
+                Ord::cmp(&self.get_component_id(), &rhs.get_component_id())
             }
             ComponentsSortFieldName::ComponentKind => {
                 Ord::cmp(&self.get_component_kind(), &rhs.get_component_kind())

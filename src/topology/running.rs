@@ -108,7 +108,7 @@ impl RunningTopology {
             });
             let remaining_components = check_handles2
                 .keys()
-                .map(|item| item.name.clone())
+                .map(|item| item.to_string())
                 .collect::<Vec<_>>()
                 .join(", ");
 
@@ -130,7 +130,7 @@ impl RunningTopology {
                 });
                 let remaining_components = check_handles
                     .keys()
-                    .map(|item| item.name.clone())
+                    .map(|item| item.to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
 
