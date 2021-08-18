@@ -56,9 +56,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     };
 
     group.bench_function("enrichment_tables/file_noindex_10", |b| {
+        let (file, _index, condition, expected) = setup(10);
         b.iter_batched(
-            || setup(10),
-            |(file, _index, condition, expected)| {
+            || (&file, condition.clone(), expected.clone()),
+            |(file, condition, expected)| {
                 assert_eq!(Ok(expected), file.find_table_row(condition, None))
             },
             BatchSize::SmallInput,
@@ -66,8 +67,9 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_hashindex_10", |b| {
+        let (file, index, condition, expected) = setup(10);
         b.iter_batched(
-            || setup(10),
+            || (&file, index.clone(), condition.clone(), expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
             },
@@ -76,9 +78,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_noindex_1_000", |b| {
+        let (file, _index, condition, expected) = setup(1_000);
         b.iter_batched(
-            || setup(1_000),
-            |(file, _index, condition, expected)| {
+            || (&file, condition.clone(), expected.clone()),
+            |(file, condition, expected)| {
                 assert_eq!(Ok(expected), file.find_table_row(condition, None))
             },
             BatchSize::SmallInput,
@@ -86,28 +89,9 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_hashindex_1_000", |b| {
+        let (file, index, condition, expected) = setup(1_000);
         b.iter_batched(
-            || setup(1_000),
-            |(file, index, condition, expected)| {
-                assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
-            },
-            BatchSize::SmallInput,
-        );
-    });
-
-    group.bench_function("enrichment_tables/file_noindex_10_000", |b| {
-        b.iter_batched(
-            || setup(10_000),
-            |(file, _index, condition, expected)| {
-                assert_eq!(Ok(expected), file.find_table_row(condition, None))
-            },
-            BatchSize::SmallInput,
-        );
-    });
-
-    group.bench_function("enrichment_tables/file_hashindex_10_000", |b| {
-        b.iter_batched(
-            || setup(10_000),
+            || (&file, index.clone(), condition.clone(), expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
             },
@@ -116,9 +100,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_noindex_1_000_000", |b| {
+        let (file, _index, condition, expected) = setup(1_000_000);
         b.iter_batched(
-            || setup(1_000_000),
-            |(file, _index, condition, expected)| {
+            || (&file, condition.clone(), expected.clone()),
+            |(file, condition, expected)| {
                 assert_eq!(Ok(expected), file.find_table_row(condition, None))
             },
             BatchSize::SmallInput,
@@ -126,8 +111,9 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_hashindex_1_000_000", |b| {
+        let (file, index, condition, expected) = setup(1_000_000);
         b.iter_batched(
-            || setup(1_000_000),
+            || (&file, index.clone(), condition.clone(), expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
             },

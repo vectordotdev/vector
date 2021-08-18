@@ -6,7 +6,7 @@ use crate::Value;
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IndexHandle(pub usize);
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Condition {
     Equals { field: String, value: String },
 }
