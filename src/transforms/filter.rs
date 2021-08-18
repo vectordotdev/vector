@@ -32,7 +32,7 @@ impl GenerateConfig for FilterConfig {
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Filter::new(
-            self.condition.build(context.enrichment_tables.clone())?,
+            self.condition.build(&context.enrichment_tables)?,
         )))
     }
 
@@ -89,7 +89,7 @@ mod test {
     #[test]
     fn passes_metadata() {
         let mut filter = Filter {
-            condition: IsLogConfig {}.build(Default::default()).unwrap(),
+            condition: IsLogConfig {}.build(&Default::default()).unwrap(),
         };
         let event = Event::from("message");
         let metadata = event.metadata().clone();

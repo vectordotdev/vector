@@ -14,7 +14,7 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-use vector_core::enrichment_table::EnrichmentTables;
+use vector_core::enrichment;
 
 mod merge_strategy;
 
@@ -53,7 +53,7 @@ impl_generate_config_from_default!(ReduceConfig);
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self, context.enrichment_tables.clone()).map(Transform::task)
+        Reduce::new(self, &context.enrichment_tables).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -156,7 +156,10 @@ pub struct Reduce {
 }
 
 impl Reduce {
-    pub fn new(config: &ReduceConfig, enrichment_tables: EnrichmentTables) -> crate::Result<Self> {
+    pub fn new(
+        config: &ReduceConfig,
+        enrichment_tables: &enrichment::Tables,
+    ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
         }
@@ -164,12 +167,12 @@ impl Reduce {
         let ends_when = config
             .ends_when
             .as_ref()
-            .map(|c| c.build(enrichment_tables.clone()))
+            .map(|c| c.build(enrichment_tables))
             .transpose()?;
         let starts_when = config
             .starts_when
             .as_ref()
-            .map(|c| c.build(enrichment_tables.clone()))
+            .map(|c| c.build(enrichment_tables))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
 

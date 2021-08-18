@@ -43,7 +43,7 @@ impl TransformConfig for SampleConfig {
             self.key_field.clone(),
             self.exclude
                 .as_ref()
-                .map(|condition| condition.build(context.enrichment_tables.clone()))
+                .map(|condition| condition.build(&context.enrichment_tables))
                 .transpose()?,
         )))
     }
@@ -154,7 +154,7 @@ mod tests {
         VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
         }
-        .build(Default::default())
+        .build(&Default::default())
         .unwrap()
     }
 

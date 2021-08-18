@@ -12,7 +12,7 @@ pub use runtime::{Runtime, RuntimeResult, Terminate};
 /// Compile a given source into the final [`Program`].
 pub fn compile(
     source: &str,
-    enrichment_tables: Box<dyn EnrichmentTables>,
+    enrichment_tables: Box<dyn EnrichmentTableSetup>,
     fns: &[Box<dyn Function>],
 ) -> compiler::Result {
     let mut state = state::Compiler::new_with_enrichment_tables(enrichment_tables);

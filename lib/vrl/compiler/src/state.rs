@@ -1,4 +1,4 @@
-use crate::enrichment_tables::EnrichmentTables;
+use crate::enrichment_tables::EnrichmentTableSetup;
 use crate::expression::assignment;
 use crate::type_def::Field;
 use crate::value::Kind;
@@ -17,7 +17,7 @@ pub struct Compiler {
     // stored internal variable type definitions
     variables: HashMap<Ident, assignment::Details>,
 
-    enrichment_tables: Option<Box<dyn EnrichmentTables>>,
+    enrichment_tables: Option<Box<dyn EnrichmentTableSetup>>,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -47,13 +47,13 @@ impl Compiler {
     }
 
     /// Enrichment tables are added to the compiler state as an object of name => enrichment_table.
-    pub fn new_with_enrichment_tables(enrichment_tables: Box<dyn EnrichmentTables>) -> Self {
+    pub fn new_with_enrichment_tables(enrichment_tables: Box<dyn EnrichmentTableSetup>) -> Self {
         let mut new = Self::default();
 
         let mut tables = BTreeMap::new();
         let mut type_def = BTreeMap::new();
 
-        for table in enrichment_tables.get_tables() {
+        for table in enrichment_tables.table_ids() {
             tables.insert(table.clone(), Value::EnrichmentTable(table.clone()));
             type_def.insert(
                 Field::from(table),
@@ -120,7 +120,7 @@ impl Compiler {
         self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
-    pub fn get_enrichment_tables_mut(&mut self) -> &mut Option<Box<dyn EnrichmentTables>> {
+    pub fn get_enrichment_tables(&mut self) -> &mut Option<Box<dyn EnrichmentTableSetup>> {
         &mut self.enrichment_tables
     }
 }

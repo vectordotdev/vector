@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 use serde::{Deserialize, Serialize};
 use shared::btreemap;

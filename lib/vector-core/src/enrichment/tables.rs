@@ -26,11 +26,12 @@
 //!
 use super::Table;
 use arc_swap::ArcSwap;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, Mutex};
 
+#[derive(Clone)]
 pub struct Tables {
-    loading: Option<HashMap<String, Box<dyn Table + Send + Sync>>>,
+    loading: Arc<Mutex<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
     tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
 }
 
@@ -43,7 +44,7 @@ impl Default for Tables {
 impl Tables {
     pub fn new(tables: HashMap<String, Box<dyn Table + Send + Sync>>) -> Self {
         Self {
-            loading: Some(tables),
+            loading: Arc::new(Mutex::new(Some(tables))),
             tables: Arc::new(ArcSwap::default()),
         }
     }
@@ -51,8 +52,13 @@ impl Tables {
     /// Swap the data out of the `HashTable` into the `ArcSwap`.
     /// From this point we can no longer add indexes to the tables, but are now allowed to read the
     /// data.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned.
     pub fn finish_load(&mut self) {
-        let tables = self.loading.take();
+        let mut tables_lock = self.loading.lock().unwrap();
+        let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
     }
 
@@ -82,7 +88,8 @@ impl vrl_core::EnrichmentTableSetup for Tables {
         (*tables).as_ref().as_ref().map_or_else(
             || {
                 // We are still loading, so we must access the mutex to get the table list.
-                match self.loading {
+                let locked = self.loading.lock().unwrap();
+                match *locked {
                     Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
                     None => Vec::new(),
                 }
@@ -98,7 +105,9 @@ impl vrl_core::EnrichmentTableSetup for Tables {
     ///
     /// Panics if the Mutex is poisoned.
     fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String> {
-        match self.loading {
+        let mut locked = self.loading.lock().unwrap();
+
+        match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
                 None => Err(format!("table {} not loaded", table)),
@@ -123,12 +132,19 @@ impl vrl_core::EnrichmentTableSearch for TableSearch {
         &self,
         table: &str,
         criteria: Vec<vrl_core::Condition>,
-    ) -> Result<Option<Vec<String>>, String> {
+    ) -> Result<Option<BTreeMap<String, vrl_core::Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => Ok(table.find_table_row(criteria).cloned()),
+                Some(table) => Ok(table.find_table_row(criteria).map(|table| {
+                    table
+                        .iter()
+                        .map(|(key, value)| {
+                            (key.to_string(), vrl_core::Value::from(value.as_str()))
+                        })
+                        .collect()
+                })),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -169,34 +185,37 @@ fn fmt_enrichment_table(
 #[cfg(all(feature = "vrl", test))]
 mod tests {
     use super::*;
+    use shared::btreemap;
     use std::sync::{Arc, Mutex};
     use vrl_core::{EnrichmentTableSearch, EnrichmentTableSetup};
 
     #[derive(Debug, Clone)]
     struct DummyEnrichmentTable {
-        data: Vec<String>,
+        data: BTreeMap<String, String>,
         indexes: Arc<Mutex<Vec<Vec<String>>>>,
     }
 
     impl DummyEnrichmentTable {
         fn new() -> Self {
-            Self {
-                data: vec!["result".to_string()],
-                indexes: Arc::new(Mutex::new(Vec::new())),
-            }
+            Self::new_with_index(Arc::new(Mutex::new(Vec::new())))
         }
 
         fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
             Self {
-                data: vec!["result".to_string()],
+                data: btreemap! {
+                    "field".to_string() => "result".to_string()
+                },
                 indexes,
             }
         }
     }
 
     impl Table for DummyEnrichmentTable {
-        fn find_table_row(&self, _criteria: Vec<vrl_core::Condition>) -> Option<&Vec<String>> {
-            Some(&self.data)
+        fn find_table_row(
+            &self,
+            _criteria: Vec<vrl_core::Condition>,
+        ) -> Option<BTreeMap<String, String>> {
+            Some(self.data.clone())
         }
 
         fn add_index(&mut self, fields: &[&str]) {
@@ -276,7 +295,9 @@ mod tests {
         tables.finish_load();
 
         assert_eq!(
-            Ok(Some(vec!["result".to_string()])),
+            Ok(Some(btreemap! {
+                "field".to_string() => vrl_core::Value::from("result")
+            })),
             tables_search.find_table_row(
                 "dummy1",
                 vec![vrl_core::Condition::Equals {

@@ -126,7 +126,7 @@ impl Expression for DelFn {
         TypeDef::new().unknown()
     }
 
-    fn update_state(
+    fn update_state<'a>(
         &self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
@@ -194,7 +194,7 @@ mod tests {
         ];
         let tz = TimeZone::default();
         let enrichment_tables =
-            Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTables>);
+            Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTableSearch>);
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let mut runtime_state = vrl::state::Runtime::default();

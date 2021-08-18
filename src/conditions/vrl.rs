@@ -6,7 +6,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
-use vector_core::enrichment_table::EnrichmentTables;
+use vector_core::enrichment;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Value};
 
@@ -23,7 +23,7 @@ impl_generate_config_from_default!(VrlConfig);
 
 #[typetag::serde(name = "vrl")]
 impl ConditionConfig for VrlConfig {
-    fn build(&self, enrichment_tables: EnrichmentTables) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, enrichment_tables: &enrichment::Tables) -> crate::Result<Box<dyn Condition>> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
         //     allow_any: false,
@@ -58,7 +58,7 @@ impl ConditionConfig for VrlConfig {
         Ok(Box::new(Vrl {
             program,
             source: self.source.clone(),
-            enrichment_tables,
+            enrichment_tables: enrichment_tables.as_search(),
         }))
     }
 }
@@ -69,7 +69,7 @@ impl ConditionConfig for VrlConfig {
 pub struct Vrl {
     pub(super) program: Program,
     pub(super) source: String,
-    pub(super) enrichment_tables: EnrichmentTables,
+    pub(super) enrichment_tables: enrichment::TableSearch,
 }
 
 impl Vrl {
@@ -223,13 +223,13 @@ mod test {
 
             assert_eq!(
                 config
-                    .build(Default::default())
+                    .build(&Default::default())
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
                 build
             );
 
-            if let Ok(cond) = config.build(Default::default()) {
+            if let Ok(cond) = config.build(&Default::default()) {
                 assert_eq!(
                     cond.check_with_context(&event),
                     check.map_err(|e| e.to_string())

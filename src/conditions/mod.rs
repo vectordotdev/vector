@@ -11,7 +11,7 @@ pub mod vrl;
 
 pub use self::vrl::VrlConfig;
 pub use check_fields::CheckFieldsConfig;
-use vector_core::enrichment_table::EnrichmentTables;
+use vector_core::enrichment;
 
 pub trait Condition: Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
@@ -31,7 +31,7 @@ dyn_clone::clone_trait_object!(Condition);
 
 #[typetag::serde(tag = "type")]
 pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    fn build(&self, enrichment_tables: EnrichmentTables) -> crate::Result<Box<dyn Condition>>;
+    fn build(&self, enrichment_tables: &enrichment::Tables) -> crate::Result<Box<dyn Condition>>;
 }
 
 dyn_clone::clone_trait_object!(ConditionConfig);
@@ -67,7 +67,10 @@ pub enum AnyCondition {
 }
 
 impl AnyCondition {
-    pub fn build(&self, enrichment_tables: EnrichmentTables) -> crate::Result<Box<dyn Condition>> {
+    pub fn build(
+        &self,
+        enrichment_tables: &enrichment::Tables,
+    ) -> crate::Result<Box<dyn Condition>> {
         match self {
             AnyCondition::String(s) => VrlConfig { source: s.clone() }.build(enrichment_tables),
             AnyCondition::Map(m) => m.build(enrichment_tables),

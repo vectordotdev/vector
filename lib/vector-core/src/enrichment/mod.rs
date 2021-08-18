@@ -1,5 +1,7 @@
 pub mod tables;
 
+use std::collections::BTreeMap;
+
 pub use tables::{TableSearch, Tables};
 pub use vrl_core::Condition;
 
@@ -8,7 +10,7 @@ pub use vrl_core::Condition;
 pub trait Table: std::fmt::Debug {
     /// Search the enrichment table data with the given condition.
     /// All fields within the data must match (AND).
-    fn find_table_row(&self, condition: Vec<Condition>) -> Option<&Vec<String>>;
+    fn find_table_row(&self, condition: Vec<Condition>) -> Option<BTreeMap<String, String>>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.

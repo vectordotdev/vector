@@ -1,27 +1,25 @@
 use crate::Value;
 use dyn_clone::DynClone;
+use std::collections::BTreeMap;
 
+#[derive(Debug, PartialEq)]
 pub enum Condition {
     Equals { field: String, value: String },
 }
 
-pub trait EnrichmentTableSetup {
+pub trait EnrichmentTableSetup: DynClone {
     fn table_ids(&self) -> Vec<String>;
     fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String>;
 }
+
+dyn_clone::clone_trait_object!(EnrichmentTableSetup);
 
 pub trait EnrichmentTableSearch: DynClone {
     fn find_table_row(
         &self,
         table: &str,
-<<<<<<< HEAD
-        criteria: BTreeMap<&str, String>,
-    ) -> Result<Option<BTreeMap<String, Value>>, String>;
-    fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String>;
-=======
         criteria: Vec<Condition>,
-    ) -> Result<Option<Vec<String>>, String>;
->>>>>>> enrichment_tables
+    ) -> Result<Option<BTreeMap<String, Value>>, String>;
 }
 
 dyn_clone::clone_trait_object!(EnrichmentTableSearch);
@@ -44,13 +42,8 @@ impl EnrichmentTableSearch for EmptyEnrichmentTables {
     fn find_table_row(
         &self,
         _table: &str,
-<<<<<<< HEAD
-        _criteria: BTreeMap<&str, String>,
-    ) -> Result<Option<BTreeMap<String, Value>>, String> {
-=======
         _criteria: Vec<Condition>,
-    ) -> Result<Option<Vec<String>>, String> {
->>>>>>> enrichment_tables
+    ) -> Result<Option<BTreeMap<String, Value>>, String> {
         Ok(None)
     }
 }

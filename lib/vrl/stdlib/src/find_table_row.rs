@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use vrl::prelude::*;
+use vrl::{prelude::*, Condition};
 #[derive(Clone, Copy, Debug)]
 pub struct FindTableRow;
 impl Function for FindTableRow {
@@ -46,12 +46,12 @@ impl Expression for FindTableRowFn {
             .condition
             .iter()
             .map(|(key, value)| {
-                Ok((
-                    key.as_ref(),
-                    value.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(),
-                ))
+                Ok(Condition::Equals {
+                    field: key.to_string(),
+                    value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(),
+                })
             })
-            .collect::<Result<BTreeMap<&str, String>>>()?;
+            .collect::<Result<Vec<Condition>>>()?;
 
         let tables = ctx
             .get_enrichment_tables()
@@ -68,7 +68,7 @@ impl Expression for FindTableRowFn {
         &self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        match state.get_enrichment_tables_mut() {
+        match state.get_enrichment_tables() {
             Some(ref mut table) => {
                 let fields = self
                     .condition
@@ -94,33 +94,14 @@ impl Expression for FindTableRowFn {
 mod tests {
     use super::*;
     use shared::{btreemap, TimeZone};
-    use vrl::EnrichmentTables;
+    use vrl::{Condition, EnrichmentTableSearch, EnrichmentTableSetup};
 
     #[derive(Clone)]
     struct DummyEnrichmentTable;
 
-    impl EnrichmentTables for DummyEnrichmentTable {
-        fn get_tables(&self) -> Vec<String> {
+    impl EnrichmentTableSetup for DummyEnrichmentTable {
+        fn table_ids(&self) -> Vec<String> {
             vec!["table".to_string()]
-        }
-
-        fn find_table_row(
-            &self,
-            table: &str,
-            criteria: BTreeMap<&str, String>,
-        ) -> std::result::Result<Option<BTreeMap<String, Value>>, String> {
-            assert_eq!(table, "table");
-            assert_eq!(
-                criteria,
-                btreemap! {
-                    "field" => "value".to_string(),
-                }
-            );
-
-            Ok(Some(btreemap! {
-                "field" => Value::from("value"),
-                "field2" => Value::from("value2"),
-            }))
         }
 
         fn add_index(&mut self, table: &str, fields: Vec<&str>) -> std::result::Result<(), String> {
@@ -128,6 +109,28 @@ mod tests {
             assert_eq!(vec!["field"], fields);
 
             Ok(())
+        }
+    }
+
+    impl EnrichmentTableSearch for DummyEnrichmentTable {
+        fn find_table_row(
+            &self,
+            table: &str,
+            condition: Vec<Condition>,
+        ) -> std::result::Result<Option<BTreeMap<String, Value>>, String> {
+            assert_eq!(table, "table");
+            assert_eq!(
+                condition,
+                vec![Condition::Equals {
+                    field: "field".to_string(),
+                    value: "value".to_string(),
+                }]
+            );
+
+            Ok(Some(btreemap! {
+                "field" => Value::from("value"),
+                "field2" => Value::from("value2"),
+            }))
         }
     }
 
@@ -142,7 +145,7 @@ mod tests {
 
         let tz = TimeZone::default();
         let enrichment_tables =
-            Some(Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTables>);
+            Some(Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTableSearch>);
 
         let mut object: Value = BTreeMap::new().into();
         let mut runtime_state = vrl::state::Runtime::default();
@@ -168,8 +171,8 @@ mod tests {
             },
         };
 
-        let enrichment_tables = Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTables>;
-        let mut compiler = state::Compiler::new_with_enrichment_tables(enrichment_tables);
+        let mut compiler =
+            state::Compiler::new_with_enrichment_tables(Box::new(DummyEnrichmentTable));
 
         assert_eq!(Ok(()), func.update_state(&mut compiler));
     }
