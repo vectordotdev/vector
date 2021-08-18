@@ -1,5 +1,5 @@
 use lookup::LookupBuf;
-use parsing::value::Value;
+use vrl_compiler::Value;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GrokPattern {

@@ -1,7 +1,8 @@
 use crate::ast::*;
 use crate::lexer::*;
-use parsing::value::Value;
 use lookup::{LookupBuf, SegmentBuf, FieldBuf};
+use ordered_float::NotNan;
+use vrl_compiler::Value;
 grammar<'err, 'input>(input: &'input str);
 
 extern {
@@ -13,7 +14,7 @@ extern {
         "extended identifier" => Token::ExtendedIdentifier(<&'input str>),
         "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
         "integer literal" => Token::IntegerLiteral(<i64>),
-        "float literal" => Token::FloatLiteral(<f64>),
+        "float literal" => Token::FloatLiteral(<NotNan<f64>>),
 
         "null" => Token::Null,
         "true" => Token::True,
@@ -85,7 +86,7 @@ Literal: Value = {
 };
 
 Integer: i64 = "integer literal";
-Float: f64 = "float literal";
+Float: NotNan<f64> = "float literal";
 String: String = "string literal" => <>.unescape();
 ExtendedIdentifier: &'input str = "extended identifier";
 Identifier: &'input str = "identifier";

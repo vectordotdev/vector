@@ -23,7 +23,7 @@ mod tests {
     use crate::ast::FunctionArgument;
 
     use lookup::{LookupBuf, SegmentBuf};
-    use parsing::value::Value;
+    use vrl_compiler::Value;
 
     fn from_path_segments(path_segments: Vec<&str>) -> LookupBuf {
         LookupBuf::from_segments(

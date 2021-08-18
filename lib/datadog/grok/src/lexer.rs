@@ -1,3 +1,4 @@
+use ordered_float::NotNan;
 use std::{iter::Peekable, str::CharIndices};
 
 use crate::lexer::StringLiteral::Escaped;
@@ -24,7 +25,7 @@ pub enum Token<S> {
     Sign(S),
 
     IntegerLiteral(i64),
-    FloatLiteral(f64),
+    FloatLiteral(NotNan<f64>),
     StringLiteral(StringLiteral<S>),
     Identifier(S),
     ExtendedIdentifier(S),
