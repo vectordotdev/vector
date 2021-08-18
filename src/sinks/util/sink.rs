@@ -373,9 +373,9 @@ where
                     let (batch, finalizers) = batch.finish();
                     let future = tokio::spawn(this.service.call(batch, batch_size, finalizers));
 
-                    this.in_flight.as_mut().map(|map| {
-                        map.insert(partition.clone(), future.map(|_| ()).fuse().boxed())
-                    });
+                    if let Some(map) = this.in_flight.as_mut() {
+                        map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());
+                    }
 
                     batch_consumed = true;
                 } else {
@@ -391,18 +391,10 @@ where
                 if in_flight.len() > this.partitions.len() {
                     // There is at least one in flight future without a partition to check it
                     // so we will do it here.
-                    let mut remove = Vec::new();
-                    for (partition, req) in in_flight.iter_mut() {
-                        if !this.partitions.contains_key(partition)
-                            && matches!(req.poll_unpin(cx), Poll::Ready(()))
-                        {
-                            remove.push(partition.clone());
-                        }
-                    }
-
-                    for partition in remove {
-                        in_flight.remove(&partition);
-                    }
+                    let partitions = this.partitions;
+                    in_flight.retain(|partition, req| {
+                        partitions.contains_key(partition) || req.poll_unpin(cx).is_pending()
+                    });
                 }
             }
 
