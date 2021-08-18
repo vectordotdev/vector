@@ -4070,7 +4070,7 @@ dependencies = [
  "metrics-util",
  "once_cell",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -4112,6 +4112,12 @@ dependencies = [
  "mime",
  "unicase",
 ]
+
+[[package]]
+name = "minimal-lexical"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6595bb28ed34f43c3fe088e48f6cfb2e033cab45f25a5384d5fdf564fbc8c4b2"
 
 [[package]]
 name = "minisign"
@@ -4456,11 +4462,12 @@ dependencies = [
 
 [[package]]
 name = "nom"
-version = "7.0.0-alpha1"
+version = "7.0.0-alpha3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd43cd1e53168596e629accc602ada1297f5125fed588d62cf8be81175b46002"
+checksum = "afb043391c8ebfbf60c4c92f6929b9cc830ed9e3bbf7d156e24ab731e3257d97"
 dependencies = [
  "memchr",
+ "minimal-lexical",
  "version_check 0.9.3",
 ]
 
@@ -5303,7 +5310,7 @@ name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
  "indexmap",
- "nom 6.1.2",
+ "nom 7.0.0-alpha3",
  "num_enum",
  "prost",
  "prost-build",
@@ -5410,7 +5417,7 @@ dependencies = [
  "futures-timer",
  "log",
  "native-tls",
- "nom 7.0.0-alpha1",
+ "nom 7.0.0-alpha3",
  "pem",
  "prost",
  "prost-build",
@@ -6768,7 +6775,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "derivative 2.2.0",
- "nom 6.1.2",
+ "nom 7.0.0-alpha3",
  "serde",
  "snafu",
  "tracing 0.1.26",
@@ -7752,7 +7759,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.15",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
@@ -7786,9 +7793,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9ff14f98b1a4b289c6248a023c1c2fa1491062964e9fed67ab29c4e4da4a052"
+checksum = "2ca517f43f0fb96e0c3072ed5c275fe5eece87e8cb52f4a77b69226d3b1c9df8"
 dependencies = [
  "lazy_static",
 ]
@@ -7823,7 +7830,7 @@ dependencies = [
  "dashmap",
  "mock_instant",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -7835,7 +7842,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
@@ -7846,7 +7853,7 @@ checksum = "c47440f2979c4cd3138922840eec122e3c0ba2148bc290f756bd7fd60fc97fff"
 dependencies = [
  "opentelemetry",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -7857,7 +7864,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
@@ -7877,7 +7884,7 @@ dependencies = [
  "smallvec",
  "thread_local",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-log",
  "tracing-serde",
 ]
@@ -8337,7 +8344,7 @@ dependencies = [
  "mongodb",
  "nix 0.22.1",
  "no-proxy",
- "nom 6.1.2",
+ "nom 7.0.0-alpha3",
  "notify",
  "num-format",
  "num_cpus",
@@ -8411,7 +8418,7 @@ dependencies = [
  "tower-layer",
  "tower-test",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -8516,7 +8523,7 @@ dependencies = [
  "tokio-test",
  "toml",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
@@ -8642,7 +8649,7 @@ dependencies = [
  "lazy_static",
  "lookup",
  "md-5",
- "nom 6.1.2",
+ "nom 7.0.0-alpha3",
  "percent-encoding",
  "regex",
  "roxmltree",
