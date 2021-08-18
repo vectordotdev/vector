@@ -1,5 +1,5 @@
 [build]
-base = "docs"
+base = "website"
 publish = "public"
 
 # Reinstate this when we figure out how to target this better

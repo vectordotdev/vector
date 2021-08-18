@@ -7,24 +7,22 @@ use crate::{
         EncodedLength, ServiceBuilderExt, TowerRequestConfig, VecBuffer,
     },
     sinks::{Healthcheck, VectorSink},
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
 };
 use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
+use hyper::client::HttpConnector;
+use hyper_openssl::HttpsConnector;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::path::PathBuf;
 use std::task::{Context, Poll};
-use tonic::{
-    transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
-    IntoRequest,
-};
+use tonic::{body::BoxBody, IntoRequest};
 use tower::ServiceBuilder;
 
-type Client = proto::Client<Channel>;
+type Client = proto::Client<HyperSvc>;
 type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
 
-// TODO: rename
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
@@ -34,15 +32,7 @@ pub struct VectorConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
-    pub tls: Option<GrpcTlsConfig>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct GrpcTlsConfig {
-    ca_file: PathBuf,
-    crt_file: PathBuf,
-    key_file: PathBuf,
+    tls: Option<TlsConfig>,
 }
 
 impl GenerateConfig for VectorConfig {
@@ -84,38 +74,76 @@ fn default_http(address: &str) -> crate::Result<Uri> {
     }
 }
 
+fn new_client(
+    tls_settings: &MaybeTlsSettings,
+) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector>, BoxBody>> {
+    let mut http = HttpConnector::new();
+    http.enforce_http(false);
+
+    let tls = tls_connector_builder(tls_settings)?;
+    let mut https = HttpsConnector::with_connector(http, tls)?;
+
+    let settings = tls_settings.tls().cloned();
+    https.set_callback(move |c, _uri| {
+        if let Some(settings) = &settings {
+            settings.apply_connect_configuration(c);
+        }
+
+        Ok(())
+    });
+
+    Ok(hyper::Client::builder().http2_only(true).build(https))
+}
+
+#[derive(Clone)]
+struct HyperSvc {
+    uri: Uri,
+    client: hyper::Client<HttpsConnector<HttpConnector>, BoxBody>,
+}
+
+impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
+    type Response = hyper::Response<hyper::Body>;
+    type Error = hyper::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
+        let uri = Uri::builder()
+            .scheme(self.uri.scheme().unwrap().clone())
+            .authority(self.uri.authority().unwrap().clone())
+            .path_and_query(req.uri().path_and_query().unwrap().clone())
+            .build()
+            .unwrap();
+
+        *req.uri_mut() = uri;
+
+        Box::pin(self.client.request(req))
+    }
+}
+
 impl VectorConfig {
     pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = Endpoint::from(default_http(&self.address)?);
-        let endpoint = match &self.tls {
-            Some(tls) => {
-                let host = get_authority(&self.address)?;
-                let ca = Certificate::from_pem(tokio::fs::read(&tls.ca_file).await?);
-                let crt = tokio::fs::read(&tls.crt_file).await?;
-                let key = tokio::fs::read(&tls.key_file).await?;
-                let identity = Identity::from_pem(crt, key);
+        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let uri = default_http(&self.address)?;
 
-                let tls_config = ClientTlsConfig::new()
-                    .identity(identity)
-                    .ca_certificate(ca)
-                    .domain_name(host);
+        let client = new_client(&tls)?;
 
-                endpoint.tls_config(tls_config)?
-            }
-            None => endpoint,
-        };
-
-        let client = proto::Client::new(endpoint.connect_lazy()?);
-
-        let healthcheck_client = if let Some(uri) = cx.healthcheck.uri.clone() {
-            let endpoint = Endpoint::from(uri.uri);
-            proto::Client::new(endpoint.connect_lazy()?)
-        } else {
-            client.clone()
-        };
+        let healthcheck_uri = cx
+            .healthcheck
+            .uri
+            .clone()
+            .map(|uri| uri.uri)
+            .unwrap_or_else(|| uri.clone());
+        let healthcheck_client = proto::Client::new(HyperSvc {
+            uri: healthcheck_uri,
+            client: client.clone(),
+        });
 
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck.clone());
-
+        let client = proto::Client::new(HyperSvc { uri, client });
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch = BatchSettings::default()
             .events(1000)
@@ -164,13 +192,6 @@ async fn healthcheck(mut client: Client, options: SinkHealthcheckOptions) -> cra
     }
 
     Err(Box::new(Error::Health))
-}
-
-fn get_authority(url: &str) -> Result<String, Error> {
-    url.parse::<Uri>()
-        .ok()
-        .and_then(|uri| uri.authority().map(ToString::to_string))
-        .ok_or(Error::NoHost)
 }
 
 impl tower::Service<Vec<EventWrapper>> for Client {
@@ -243,7 +264,10 @@ impl RetryLogic for VectorGrpcRetryLogic {
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
         match err {
-            Error::Request { source } => !matches!(source.code(), tonic::Code::Unknown),
+            Error::Request { source } => !matches!(
+                source.code(),
+                tonic::Code::Unknown | tonic::Code::Internal | tonic::Code::PermissionDenied
+            ),
             _ => true,
         }
     }
@@ -306,7 +330,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // This test hangs, possibly an infinite retry loop
     async fn acknowledges_error() {
         let num_lines = 10;
 
@@ -318,28 +341,15 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+        let (_, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
         tokio::spawn(server);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+        let (_, events) = random_lines_with_stream(8, num_lines, Some(batch));
 
         sink.run(events).await.unwrap();
         drop(trigger);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
-
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
-            assert_eq!(
-                "application/grpc",
-                parts.headers.get("content-type").unwrap().to_str().unwrap()
-            );
-        })
-        .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     async fn get_received(

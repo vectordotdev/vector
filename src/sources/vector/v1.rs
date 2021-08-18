@@ -228,7 +228,7 @@ mod test {
 
         let server = config
             .build(SourceContext {
-                name: "default".into(),
+                id: "default".into(),
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,
@@ -266,7 +266,7 @@ mod test {
 
         let server = config
             .build(SourceContext {
-                name: "default".into(),
+                id: "default".into(),
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,

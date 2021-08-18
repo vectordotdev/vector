@@ -165,3 +165,22 @@ pub mod source {
         }
     }
 }
+
+#[cfg(feature = "sinks-aws_s3")]
+pub mod sink {
+    use metrics::counter;
+
+    use crate::internal_events::InternalEvent;
+
+    pub struct S3EventsSent {
+        pub byte_size: usize,
+    }
+
+    impl InternalEvent for S3EventsSent {
+        fn emit_logs(&self) {}
+
+        fn emit_metrics(&self) {
+            counter!("processed_bytes_total", self.byte_size as u64);
+        }
+    }
+}

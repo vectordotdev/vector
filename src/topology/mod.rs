@@ -56,8 +56,7 @@ pub async fn start_validated(
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
-    let mut running_topology =
-        RunningTopology::new(config, abort_tx, pieces.enrichment_tables.clone());
+    let mut running_topology = RunningTopology::new(config, abort_tx);
 
     if !running_topology
         .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
@@ -90,12 +89,7 @@ pub async fn build_or_log_errors(
 pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
-        .filter_map(|name| {
-            pieces
-                .healthchecks
-                .remove(&name)
-                .map(move |task| (name, task))
-        })
+        .filter_map(|id| pieces.healthchecks.remove(&id).map(move |task| (id, task)))
         .collect()
 }
 
