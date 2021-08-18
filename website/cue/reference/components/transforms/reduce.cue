@@ -129,7 +129,7 @@ components: transforms: reduce: {
 								sum:            "Sum all numeric values."
 								max:            "The maximum of all numeric values."
 								min:            "The minimum of all numeric values."
-								unique:         "Create an array of all the unique values."
+								flat_unique:    "Create a flattened array of all the unique values."
 							}
 							syntax: "literal"
 						}
