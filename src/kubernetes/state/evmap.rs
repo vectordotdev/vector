@@ -163,12 +163,14 @@ mod tests {
         let pod = Pod {
             metadata: ObjectMeta {
                 uid: Some("uid".to_owned()),
-                annotations: vec![(
-                    "kubernetes.io/config.mirror".to_owned(),
-                    "config-hashsum".to_owned(),
-                )]
-                .into_iter()
-                .collect(),
+                annotations: Some(
+                    vec![(
+                        "kubernetes.io/config.mirror".to_owned(),
+                        "config-hashsum".to_owned(),
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
                 ..ObjectMeta::default()
             },
             ..Pod::default()

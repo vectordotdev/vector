@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -97,11 +97,7 @@ impl SinkConfig for HecSinkConfig {
             .bytes(bytesize::mib(1u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(10),
-            rate_limit_num: Some(10),
-            ..Default::default()
-        });
+        let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 

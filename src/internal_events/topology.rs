@@ -11,15 +11,6 @@ impl InternalEvent for EventIn {
 }
 
 #[derive(Debug)]
-pub struct EventZeroIn;
-
-impl InternalEvent for EventZeroIn {
-    fn emit_metrics(&self) {
-        counter!("events_in_total", 0);
-    }
-}
-
-#[derive(Debug)]
 pub struct EventOut {
     pub count: usize,
 }

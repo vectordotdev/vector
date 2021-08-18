@@ -78,11 +78,12 @@ pub fn add_fields(criterion: &mut Criterion) {
             "remap",
             Transform::function(
                 vector::transforms::remap::Remap::new(vector::transforms::remap::RemapConfig {
-                    source: indoc! {r#"
+                    source: Some(indoc! {r#"
                         .test_key = "test_value"
                         .test_key2 = "test_value2"
                     "#}
-                    .to_string(),
+                    .to_string()),
+                    file: None,
                     timezone: shared::TimeZone::default(),
                     drop_on_error: true,
                     drop_on_abort: true,

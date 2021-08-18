@@ -133,7 +133,7 @@ where
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!("Request timed out.");
+                    warn!("Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.");
                     Some(self.build_retry())
                 } else {
                     error!(

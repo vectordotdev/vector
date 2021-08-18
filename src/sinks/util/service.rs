@@ -66,7 +66,7 @@ pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
     #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
     pub concurrency: T, // 1024
     /// The same as concurrency but with old deprecated name.
-    /// Alias couldn't be used because of https://github.com/serde-rs/serde/issues/1504
+    /// Alias couldn't be used because of <https://github.com/serde-rs/serde/issues/1504>
     #[serde(default)]
     #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
     pub in_flight_limit: T, // 1024

@@ -11,7 +11,7 @@ pub type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
 pub enum ControlMessage {
     Add(String, RouterSink),
     Remove(String),
-    /// Will stop accepting events until Some with given name is replaced.
+    /// Will stop accepting events until Some with given id is replaced.
     Replace(String, Option<RouterSink>),
 }
 
@@ -19,9 +19,9 @@ impl fmt::Debug for ControlMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ControlMessage::")?;
         match self {
-            Self::Add(name, _) => write!(f, "Add({:?})", name),
-            Self::Remove(name) => write!(f, "Remove({:?})", name),
-            Self::Replace(name, _) => write!(f, "Replace({:?})", name),
+            Self::Add(id, _) => write!(f, "Add({:?})", id),
+            Self::Remove(id) => write!(f, "Remove({:?})", id),
+            Self::Replace(id, _) => write!(f, "Replace({:?})", id),
         }
     }
 }
@@ -47,20 +47,20 @@ impl Fanout {
         (fanout, control_tx)
     }
 
-    pub fn add(&mut self, name: String, sink: RouterSink) {
+    pub fn add(&mut self, id: String, sink: RouterSink) {
         assert!(
-            !self.sinks.iter().any(|(n, _)| n == &name),
-            "Duplicate output name in fanout"
+            !self.sinks.iter().any(|(n, _)| n == &id),
+            "Duplicate output id in fanout"
         );
 
-        self.sinks.push((name, Some(sink.into())));
+        self.sinks.push((id, Some(sink.into())));
     }
 
-    fn remove(&mut self, name: &str) {
-        let i = self.sinks.iter().position(|(n, _)| n == name);
+    fn remove(&mut self, id: &str) {
+        let i = self.sinks.iter().position(|(n, _)| n == id);
         let i = i.expect("Didn't find output in fanout");
 
-        let (_name, removed) = self.sinks.remove(i);
+        let (_id, removed) = self.sinks.remove(i);
 
         if let Some(mut removed) = removed {
             tokio::spawn(future::poll_fn(move |cx| removed.as_mut().poll_close(cx)));
@@ -71,8 +71,8 @@ impl Fanout {
         }
     }
 
-    fn replace(&mut self, name: String, sink: Option<RouterSink>) {
-        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &name) {
+    fn replace(&mut self, id: String, sink: Option<RouterSink>) {
+        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &id) {
             *existing = sink.map(Into::into);
         } else {
             panic!("Tried to replace a sink that's not already present");
@@ -82,9 +82,9 @@ impl Fanout {
     pub fn process_control_messages(&mut self, cx: &mut Context<'_>) {
         while let Poll::Ready(Some(message)) = Pin::new(&mut self.control_channel).poll_next(cx) {
             match message {
-                ControlMessage::Add(name, sink) => self.add(name, sink),
-                ControlMessage::Remove(name) => self.remove(&name),
-                ControlMessage::Replace(name, sink) => self.replace(name, sink),
+                ControlMessage::Add(id, sink) => self.add(id, sink),
+                ControlMessage::Remove(id) => self.remove(&id),
+                ControlMessage::Replace(id, sink) => self.replace(id, sink),
             }
         }
     }
@@ -532,17 +532,17 @@ mod tests {
         let mut rx_channels = vec![];
 
         for (i, mode) in modes.iter().enumerate() {
-            let name = format!("{}", i);
+            let id = format!("{}", i);
             match *mode {
                 Some(when) => {
                     let tx = AlwaysErrors { when };
                     let tx = Box::new(tx.sink_map_err(|_| ()));
-                    fanout.add(name, tx);
+                    fanout.add(id, tx);
                 }
                 None => {
                     let (tx, rx) = mpsc::channel(0);
                     let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
-                    fanout.add(name, tx);
+                    fanout.add(id, tx);
                     rx_channels.push(rx);
                 }
             }

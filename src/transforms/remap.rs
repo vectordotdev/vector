@@ -5,8 +5,13 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     Result,
 };
+
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
+use snafu::{ResultExt, Snafu};
+use std::fs::File;
+use std::io::{self, Read};
+use std::path::PathBuf;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -14,7 +19,8 @@ use vrl::{Program, Runtime, Terminate};
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct RemapConfig {
-    pub source: String,
+    pub source: Option<String>,
+    pub file: Option<PathBuf>,
     #[serde(default)]
     pub timezone: TimeZone,
     pub drop_on_error: bool,
@@ -58,11 +64,23 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Self> {
-        let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
-            Formatter::new(&config.source, diagnostics)
-                .colored()
-                .to_string()
-        })?;
+        let source = match (&config.source, &config.file) {
+            (Some(source), None) => source.to_owned(),
+            (None, Some(path)) => {
+                let mut buffer = String::new();
+
+                File::open(path)
+                    .with_context(|| FileOpenFailed { path })?
+                    .read_to_string(&mut buffer)
+                    .with_context(|| FileReadFailed { path })?;
+
+                buffer
+            }
+            _ => return Err(Box::new(BuildError::SourceAndOrFile)),
+        };
+
+        let program = vrl::compile(&source, &vrl_stdlib::all())
+            .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         Ok(Remap {
             program,
@@ -127,6 +145,17 @@ impl FunctionTransform for Remap {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display("must provide exactly one of `source` or `file` configuration"))]
+    SourceAndOrFile,
+
+    #[snafu(display("Could not open vrl program {:?}: {}", path, source))]
+    FileOpenFailed { path: PathBuf, source: io::Error },
+    #[snafu(display("Could not read vrl program {:?}: {}", path, source))]
+    FileReadFailed { path: PathBuf, source: io::Error },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +175,36 @@ mod tests {
         crate::test_util::test_generate_config::<RemapConfig>();
     }
 
+    #[test]
+    fn config_missing_source_and_file() {
+        let config = RemapConfig {
+            source: None,
+            file: None,
+            ..Default::default()
+        };
+
+        let err = Remap::new(config).unwrap_err().to_string();
+        assert_eq!(
+            &err,
+            "must provide exactly one of `source` or `file` configuration"
+        )
+    }
+
+    #[test]
+    fn config_both_source_and_file() {
+        let config = RemapConfig {
+            source: Some("".to_owned()),
+            file: Some("".into()),
+            ..Default::default()
+        };
+
+        let err = Remap::new(config).unwrap_err().to_string();
+        assert_eq!(
+            &err,
+            "must provide exactly one of `source` or `file` configuration"
+        )
+    }
+
     fn get_field_string(event: &Event, field: &str) -> String {
         event.as_log().get(field).unwrap().to_string_lossy()
     }
@@ -160,11 +219,14 @@ mod tests {
         let metadata = event.metadata().clone();
 
         let conf = RemapConfig {
-            source: r#"  .foo = "bar"
+            source: Some(
+                r#"  .foo = "bar"
   .bar = "baz"
   .copy = .copy_from
 "#
-            .to_string(),
+                .to_string(),
+            ),
+            file: None,
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
@@ -193,10 +255,13 @@ mod tests {
         let metadata = event.metadata().clone();
 
         let conf = RemapConfig {
-            source: indoc! {r#"
+            source: Some(
+                indoc! {r#"
                 . = .events
             "#}
-            .to_owned(),
+                .to_owned(),
+            ),
+            file: None,
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
@@ -221,11 +286,12 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: Some(formatdoc! {r#"
                 .foo = "foo"
                 .not_an_int = int!(.bar)
                 .baz = 12
-            "#},
+            "#}),
+            file: None,
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
@@ -248,11 +314,12 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: Some(formatdoc! {r#"
                 .foo = "foo"
                 .not_an_int = int!(.bar)
                 .baz = 12
-            "#},
+            "#}),
+            file: None,
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
@@ -271,10 +338,11 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: Some(formatdoc! {r#"
                 .foo = "foo"
                 .baz = 12
-            "#},
+            "#}),
+            file: None,
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
@@ -297,11 +365,12 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: Some(formatdoc! {r#"
                 .foo = "foo"
                 abort
                 .baz = 12
-            "#},
+            "#}),
+            file: None,
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
@@ -324,11 +393,12 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: Some(formatdoc! {r#"
                 .foo = "foo"
                 abort
                 .baz = 12
-            "#},
+            "#}),
+            file: None,
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: true,
@@ -348,11 +418,14 @@ mod tests {
         let metadata = metric.metadata().clone();
 
         let conf = RemapConfig {
-            source: r#".tags.host = "zoobub"
+            source: Some(
+                r#".tags.host = "zoobub"
                        .name = "zork"
                        .namespace = "zerk"
                        .kind = "incremental""#
-                .to_string(),
+                    .to_string(),
+            ),
+            file: None,
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,

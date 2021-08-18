@@ -49,6 +49,7 @@ scopes:
   - observability # Anything related to monitoring/observing Vector
   - parsing # Anything related to parsing within Vector
   - performance # Anything related to Vector's performance
+  - pipelines # Anything related to Vector's pipelines
   - platforms # Anything related to Vector's supported platforms
   - privacy # Anything related to privacy/compliance
   - processing # Anything related to processing Vector's events (parsing, merging, reducing, etc.)

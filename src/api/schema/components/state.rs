@@ -24,7 +24,7 @@ pub fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T
 
 /// Returns all components
 pub fn get_components() -> Vec<Component> {
-    filter_components(|(_name, components)| Some(components.clone()))
+    filter_components(|(_component_id, components)| Some(components.clone()))
 }
 
 /// Filters components, and returns a clone of sources
@@ -51,8 +51,8 @@ pub fn get_sinks() -> Vec<sink::Sink> {
     })
 }
 
-/// Returns the current component names as a HashSet
-pub fn get_component_names() -> HashSet<String> {
+/// Returns the current component component_ids as a HashSet
+pub fn get_component_ids() -> HashSet<String> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
@@ -61,9 +61,15 @@ pub fn get_component_names() -> HashSet<String> {
         .collect::<HashSet<String>>()
 }
 
-/// Gets a component by name
-pub fn component_by_name(name: &str) -> Option<Component> {
-    Some(COMPONENTS.read().expect(INVARIANT).get(name)?.clone())
+/// Gets a component by component_id
+pub fn component_by_component_id(component_id: &str) -> Option<Component> {
+    Some(
+        COMPONENTS
+            .read()
+            .expect(INVARIANT)
+            .get(component_id)?
+            .clone(),
+    )
 }
 
 /// Overwrites component state with new components.

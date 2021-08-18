@@ -1,11 +1,8 @@
 use indoc::formatdoc;
 use k8s_e2e_tests::*;
-use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use k8s_test_framework::{
     lock, namespace, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
-
-const HELM_CHART_VECTOR: &str = "vector";
 
 fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: &str) -> String {
     if is_multinode() {
@@ -182,9 +179,10 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     let agent_override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR,
+            "vector",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![&helm_values_stdout_sink(
                     &aggregator_override_name,
@@ -290,9 +288,10 @@ async fn logs_haproxy() -> Result<(), Box<dyn std::error::Error>> {
     let agent_override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR,
+            "vector",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![&helm_values_haproxy(
                     &aggregator_override_name,
