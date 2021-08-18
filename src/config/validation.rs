@@ -55,25 +55,25 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let sink_inputs = config
         .sinks
         .iter()
-        .map(|(name, sink)| ("sink", name.clone(), sink.inputs.clone()));
+        .map(|(id, sink)| ("sink", id.clone(), sink.inputs.clone()));
     let transform_inputs = config
         .transforms
         .iter()
-        .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
-    for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
+        .map(|(id, transform)| ("transform", id.clone(), transform.inputs.clone()));
+    for (output_type, id, inputs) in sink_inputs.chain(transform_inputs) {
         if inputs.is_empty() {
             errors.push(format!(
-                "{} {:?} has no inputs",
+                "{} \"{}\" has no inputs",
                 capitalize(output_type),
-                name
+                id
             ));
         }
 
         for input in inputs {
             if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
                 errors.push(format!(
-                    "Input {:?} for {} {:?} doesn't exist.",
-                    input, output_type, name
+                    "Input \"{}\" for {} \"{}\" doesn't exist.",
+                    input, output_type, id
                 ));
             }
         }
@@ -132,7 +132,7 @@ pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
                 .any(|(_, sink)| sink.inputs.contains(&name))
         {
             warnings.push(format!(
-                "{} {:?} has no consumers",
+                "{} \"{}\" has no consumers",
                 capitalize(input_type),
                 name
             ));

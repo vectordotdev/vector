@@ -492,7 +492,7 @@ async fn build_unit_test(
             } else {
                 errors.push(format!(
                     "unable to complete topology between target transforms {:?} and output target '{}'",
-                    targets, o.extract_from
+                    targets.iter().map(|item| item.to_string()).collect::<Vec<_>>(), o.extract_from
                 ));
             }
         }
