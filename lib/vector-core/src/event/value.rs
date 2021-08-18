@@ -41,14 +41,15 @@ impl Hash for Value {
             Value::Float(v) => {
                 // This hashes floats with the following rules:
                 // * NaNs hash as equal (covered by above discriminant hash)
+                // * Positive and negative infinity has to different values
                 // * -0 and +0 hash to different values
                 // * otherwise transmute to u64 and hash
                 if v.is_finite() {
+                    v.is_sign_negative().hash(state);
                     let trunc: u64 = unsafe { std::mem::transmute(v.trunc()) };
-                    if trunc == 0 {
-                        v.is_sign_negative().hash(state);
-                    }
                     trunc.hash(state);
+                } else if !v.is_nan() {
+                    v.is_sign_negative().hash(state);
                 } //else covered by discriminant hash
             }
             Value::Integer(v) => {
@@ -1339,8 +1340,9 @@ mod test {
             assert_ne!(hash(Value::Integer(0)), hash(Value::Integer(1)));
             assert_ne!(hash(Value::Boolean(true)), hash(Value::Integer(2)));
             assert_eq!(hash(Value::Float(1.2)), hash(Value::Float(1.4)));
+            assert_ne!(hash(Value::Float(1.2)), hash(Value::Float(-1.2)));
             assert_ne!(hash(Value::Float(-0.0)), hash(Value::Float(0.0)));
-            assert_eq!(hash(Value::Float(f64::NEG_INFINITY)), hash(Value::Float(f64::INFINITY)));
+            assert_ne!(hash(Value::Float(f64::NEG_INFINITY)), hash(Value::Float(f64::INFINITY)));
             assert_eq!(hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])), hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])));
             assert_ne!(hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])), hash(Value::Array(vec![Value::Integer(1), Value::Boolean(true)])));
         }

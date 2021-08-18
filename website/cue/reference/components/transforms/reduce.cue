@@ -120,8 +120,8 @@ components: transforms: reduce: {
 						type: string: {
 							enum: {
 								array:          "Each value is appended to an array."
-								longest:        "Retains the longest array seen"
-								shortest:       "Retains the shortest array seen"
+								longest_array:  "Retains the longest array seen"
+								shortest_array: "Retains the shortest array seen"
 								concat:         "Concatenate each string value (delimited with a space)."
 								concat_newline: "Concatenate each string value (delimited with a newline)."
 								discard:        "Discard all but the first value found."
