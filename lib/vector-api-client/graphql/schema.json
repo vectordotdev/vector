@@ -88,7 +88,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -247,9 +247,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -290,9 +290,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -333,9 +333,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -376,9 +376,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -419,9 +419,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -522,9 +522,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -565,9 +565,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -608,9 +608,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -651,9 +651,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -695,7 +695,7 @@
             {
               "defaultValue": null,
               "description": null,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -798,7 +798,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "NAME"
+              "name": "COMPONENT_ID"
             },
             {
               "deprecationReason": null,
@@ -1018,9 +1018,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Name of the component associated with the notification",
+              "description": "Id of the component associated with the notification",
               "isDeprecated": false,
-              "name": "componentName",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -2115,9 +2115,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Name of the component associated with the log event",
+              "description": "Id of the component associated with the log event",
               "isDeprecated": false,
-              "name": "componentName",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3112,7 +3112,7 @@
                 {
                   "defaultValue": null,
                   "description": null,
-                  "name": "name",
+                  "name": "componentId",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -3125,9 +3125,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Gets a configured component by name",
+              "description": "Gets a configured component by component_id",
               "isDeprecated": false,
-              "name": "componentByName",
+              "name": "componentByComponentId",
               "type": {
                 "kind": "INTERFACE",
                 "name": "Component",
@@ -3164,9 +3164,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Sink name",
+              "description": "Sink component_id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3445,7 +3445,7 @@
             {
               "defaultValue": null,
               "description": null,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -3548,7 +3548,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "NAME"
+              "name": "COMPONENT_ID"
             },
             {
               "deprecationReason": null,
@@ -3571,9 +3571,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Source name",
+              "description": "Source component_id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3933,7 +3933,7 @@
             {
               "defaultValue": null,
               "description": null,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -4054,7 +4054,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "NAME"
+              "name": "COMPONENT_ID"
             },
             {
               "deprecationReason": null,
@@ -4166,7 +4166,7 @@
                 {
                   "defaultValue": null,
                   "description": null,
-                  "name": "componentNames",
+                  "name": "componentIds",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -5088,9 +5088,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Transform name",
+              "description": "Transform component_id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -5393,7 +5393,7 @@
             {
               "defaultValue": null,
               "description": null,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -5496,7 +5496,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "NAME"
+              "name": "COMPONENT_ID"
             },
             {
               "deprecationReason": null,

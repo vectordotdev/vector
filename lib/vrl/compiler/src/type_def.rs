@@ -38,11 +38,11 @@ use std::{
 pub struct TypeDef {
     /// True, if an expression can return an error.
     ///
-    /// Some expressions are infallible (e.g. the [`Literal`] expression, or any
+    /// Some expressions are infallible (e.g. the [`Literal`][crate::expression::Literal] expression, or any
     /// custom function designed to be infallible).
     pub fallible: bool,
 
-    /// The [`value::Kind`]s this definition represents.
+    /// The [`value::Kind`][crate::value::Kind]s this definition represents.
     ///
     /// This is wrapped in a [`TypeKind`] enum, such that we encode details
     /// about potential inner kinds for collections (arrays or objects).
