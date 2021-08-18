@@ -97,7 +97,7 @@ impl SinkConfig for LokiConfig {
         if self.labels.is_empty() {
             return Err("`labels` must include at least one label.".into());
         }
-       
+
         for label in self.labels.keys() {
             if !valid_label_name(label) {
                 return Err(format!("Invalid label name {:?}", label.get_ref()).into());
