@@ -4070,7 +4070,7 @@ dependencies = [
  "metrics-util",
  "once_cell",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -4700,9 +4700,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.35"
+version = "0.10.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "549430950c79ae24e6d02e0b7404534ecf311d94cc9f861e9e4020187d13d885"
+checksum = "8d9facdb76fec0b73c406f125d44d86fdad818d66fef0531eec9233ca425ff4a"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -4729,9 +4729,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.65"
+version = "0.9.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a7907e3bfa08bb85105209cdfcb6c63d109f8f6c1ed6ca318fff5c1853fbc1d"
+checksum = "1996d2d305e561b70d1ee0c53f1542833f4e1ac6ce9a6708b6ff2738ca67dc82"
 dependencies = [
  "autocfg 1.0.1",
  "cc",
@@ -6020,9 +6020,9 @@ dependencies = [
 
 [[package]]
 name = "rmpv"
-version = "0.4.7"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c760afe11955e16121e36485b6b828326c3f0eaff1c31758d96dbeb5cf09fd5"
+checksum = "de8813b3a2f95c5138fe5925bfb8784175d88d6bff059ba8ce090aa891319754"
 dependencies = [
  "num-traits",
  "rmp",
@@ -6685,9 +6685,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.8.17"
+version = "0.8.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15654ed4ab61726bf918a39cb8d98a2e2995b002387807fa6ba58fdf7f59bb23"
+checksum = "039ba818c784248423789eec090aab9fb566c7b94d6ebbfa1814a9fd52c8afb2"
 dependencies = [
  "dtoa",
  "linked-hash-map",
@@ -7752,7 +7752,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.15",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
@@ -7786,9 +7786,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9ff14f98b1a4b289c6248a023c1c2fa1491062964e9fed67ab29c4e4da4a052"
+checksum = "2ca517f43f0fb96e0c3072ed5c275fe5eece87e8cb52f4a77b69226d3b1c9df8"
 dependencies = [
  "lazy_static",
 ]
@@ -7823,7 +7823,7 @@ dependencies = [
  "dashmap",
  "mock_instant",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -7835,7 +7835,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
@@ -7846,7 +7846,7 @@ checksum = "c47440f2979c4cd3138922840eec122e3c0ba2148bc290f756bd7fd60fc97fff"
 dependencies = [
  "opentelemetry",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -7857,7 +7857,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
@@ -7877,7 +7877,7 @@ dependencies = [
  "smallvec",
  "thread_local",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-log",
  "tracing-serde",
 ]
@@ -8411,7 +8411,7 @@ dependencies = [
  "tower-layer",
  "tower-test",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -8516,7 +8516,7 @@ dependencies = [
  "tokio-test",
  "toml",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
