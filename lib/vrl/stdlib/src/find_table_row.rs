@@ -41,7 +41,11 @@ impl Function for FindTableRow {
             })
             .unwrap_or_else(Vec::new);
 
-        let table = arguments.required_enum("table", &tables)?.to_string();
+        let table = arguments
+            .required_enum("table", &tables)?
+            .try_bytes_utf8_lossy()
+            .expect("table is not valid utf8")
+            .into_owned();
         let condition = arguments.required_object("condition")?;
 
         Ok(Box::new(FindTableRowFn {
@@ -67,7 +71,7 @@ impl Expression for FindTableRowFn {
             .map(|(key, value)| {
                 Ok(Condition::Equals {
                     field: key.to_string(),
-                    value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(),
+                    value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned(),
                 })
             })
             .collect::<Result<Vec<Condition>>>()?;

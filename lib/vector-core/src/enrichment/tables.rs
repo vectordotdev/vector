@@ -110,7 +110,7 @@ impl vrl_core::EnrichmentTableSetup for TableRegistry {
         match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
-                None => Err(format!("table {} not loaded", table)),
+                None => Err(format!("table '{}' not loaded", table)),
                 Some(table) => table.add_index(fields),
             },
         }
