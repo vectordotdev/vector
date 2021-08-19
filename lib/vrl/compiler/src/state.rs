@@ -98,7 +98,11 @@ impl Compiler {
         self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
-    pub fn get_enrichment_tables(&mut self) -> &mut Option<Box<dyn EnrichmentTableSetup>> {
+    pub fn get_enrichment_tables(&self) -> &Option<Box<dyn EnrichmentTableSetup>> {
+        &self.enrichment_tables
+    }
+
+    pub fn get_enrichment_tables_mut(&mut self) -> &mut Option<Box<dyn EnrichmentTableSetup>> {
         &mut self.enrichment_tables
     }
 }
