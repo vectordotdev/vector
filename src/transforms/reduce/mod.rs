@@ -158,7 +158,7 @@ pub struct Reduce {
 impl Reduce {
     pub fn new(
         config: &ReduceConfig,
-        enrichment_tables: &enrichment::Tables,
+        enrichment_tables: &enrichment::TableRegistry,
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());

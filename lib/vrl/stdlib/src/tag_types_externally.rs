@@ -109,7 +109,6 @@ fn tag_type_externally(value: Value) -> Value {
         ),
         value @ Value::Timestamp(_) => (Some("timestamp"), value),
         value @ Value::Regex(_) => (Some("regex"), value),
-        value @ Value::EnrichmentTable(_) => (Some("enrichment_table"), value),
         Value::Null => (None, Value::Null),
     };
 

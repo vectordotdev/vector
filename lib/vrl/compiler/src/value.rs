@@ -28,7 +28,6 @@ pub enum Value {
     Array(Vec<Value>),
     Timestamp(DateTime<Utc>),
     Regex(Regex),
-    EnrichmentTable(String),
     Null,
 }
 
@@ -68,7 +67,6 @@ impl fmt::Display for Value {
                 write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
             Value::Regex(regex) => write!(f, "r'{}'", regex.to_string()),
-            Value::EnrichmentTable(_) => write!(f, "<enrichment_table>"),
             Value::Null => write!(f, "null"),
         }
     }

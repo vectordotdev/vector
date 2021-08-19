@@ -32,7 +32,6 @@ use std::sync::{Arc, Mutex};
 #[derive(Clone)]
 pub struct TableRegistry {
     loading: Arc<Mutex<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
-    loading: Option<HashMap<String, Box<dyn Table + Send + Sync>>>,
     tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
 }
 

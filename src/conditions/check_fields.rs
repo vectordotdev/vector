@@ -524,7 +524,10 @@ impl CheckFieldsConfig {
 
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
-    fn build(&self, _enrichment_tables: &enrichment::Tables) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        _enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         warn!(message = "The `check_fields` condition is deprecated, use `vrl` instead.",);
         build_predicates(&self.predicates)
             .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })

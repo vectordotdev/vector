@@ -27,7 +27,12 @@ impl Function for FindTableRow {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let table = arguments.required_enrichment_table("table")?;
+        let table = arguments
+            .required_literal("table")?
+            .to_value()
+            .try_bytes_utf8_lossy()
+            .unwrap()
+            .to_string();
         let condition = arguments.required_object("condition")?;
 
         Ok(Box::new(FindTableRowFn { table, condition }))

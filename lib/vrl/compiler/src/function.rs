@@ -129,26 +129,6 @@ impl ArgumentList {
         Ok(required(self.optional_literal(keyword)?))
     }
 
-    pub fn optional_enrichment_table(
-        &mut self,
-        keyword: &'static str,
-    ) -> Result<Option<String>, Error> {
-        self.optional_expr(keyword)
-            .map(|expr| match expr.as_value() {
-                Some(Value::EnrichmentTable(table)) => Ok(table),
-                _ => Err(Error::UnexpectedExpression {
-                    keyword,
-                    expected: "enrichment_table",
-                    expr,
-                }),
-            })
-            .transpose()
-    }
-
-    pub fn required_enrichment_table(&mut self, keyword: &'static str) -> Result<String, Error> {
-        Ok(required(self.optional_enrichment_table(keyword)?))
-    }
-
     pub fn optional_enum(
         &mut self,
         keyword: &'static str,

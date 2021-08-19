@@ -18,7 +18,10 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 
 #[typetag::serde(name = "datadog_search")]
 impl ConditionConfig for DatadogSearchConfig {
-    fn build(&self, enrichment_tables: &enrichment::Tables) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         let config = VrlConfig {
             source: format!(
                 r#"match_datadog_query(., "{}")"#,

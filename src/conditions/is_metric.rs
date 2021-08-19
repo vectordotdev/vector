@@ -19,7 +19,10 @@ impl_generate_config_from_default!(IsMetricConfig);
 
 #[typetag::serde(name = "is_metric")]
 impl ConditionConfig for IsMetricConfig {
-    fn build(&self, _enrichment_tables: &enrichment::Tables) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        _enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         Ok(Box::new(IsMetric {}))
     }
 }

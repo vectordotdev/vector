@@ -31,7 +31,10 @@ dyn_clone::clone_trait_object!(Condition);
 
 #[typetag::serde(tag = "type")]
 pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    fn build(&self, enrichment_tables: &enrichment::Tables) -> crate::Result<Box<dyn Condition>>;
+    fn build(
+        &self,
+        enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>>;
 }
 
 dyn_clone::clone_trait_object!(ConditionConfig);
@@ -69,7 +72,7 @@ pub enum AnyCondition {
 impl AnyCondition {
     pub fn build(
         &self,
-        enrichment_tables: &enrichment::Tables,
+        enrichment_tables: &enrichment::TableRegistry,
     ) -> crate::Result<Box<dyn Condition>> {
         match self {
             AnyCondition::String(s) => VrlConfig { source: s.clone() }.build(enrichment_tables),

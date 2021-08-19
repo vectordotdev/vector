@@ -45,7 +45,6 @@ impl Value {
             }
             Timestamp(v) => Literal::from(v).into(),
             Regex(v) => Literal::from(v).into(),
-            EnrichmentTable(v) => Literal::from(v).into(),
             Null => Literal::from(()).into(),
         }
     }

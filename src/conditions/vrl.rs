@@ -23,7 +23,10 @@ impl_generate_config_from_default!(VrlConfig);
 
 #[typetag::serde(name = "vrl")]
 impl ConditionConfig for VrlConfig {
-    fn build(&self, enrichment_tables: &enrichment::Tables) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
         //     allow_any: false,
