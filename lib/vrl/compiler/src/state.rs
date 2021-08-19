@@ -1,9 +1,7 @@
 use crate::enrichment_tables::EnrichmentTableSetup;
 use crate::expression::assignment;
-use crate::type_def::Field;
-use crate::value::Kind;
 use crate::{parser::ast::Ident, TypeDef, Value};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 /// The state held by the compiler.
 ///
@@ -48,30 +46,10 @@ impl Compiler {
 
     /// Enrichment tables are added to the compiler state as an object of name => enrichment_table.
     pub fn new_with_enrichment_tables(enrichment_tables: Box<dyn EnrichmentTableSetup>) -> Self {
-        let mut new = Self::default();
-
-        let mut tables = BTreeMap::new();
-        let mut type_def = BTreeMap::new();
-
-        for table in enrichment_tables.table_ids() {
-            tables.insert(table.clone(), Value::EnrichmentTable(table.clone()));
-            type_def.insert(
-                Field::from(table),
-                TypeDef::new().add_scalar(Kind::EnrichmentTable),
-            );
+        Self {
+            enrichment_tables: Some(enrichment_tables),
+            ..Default::default()
         }
-
-        new.insert_variable(
-            Ident::new("enrichment_tables".to_string()),
-            assignment::Details {
-                type_def: TypeDef::new().add_object(type_def),
-                value: Some(Value::Object(tables)),
-            },
-        );
-
-        new.enrichment_tables = Some(enrichment_tables);
-
-        new
     }
 
     pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
@@ -120,7 +98,11 @@ impl Compiler {
         self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
-    pub fn get_enrichment_tables(&mut self) -> &mut Option<Box<dyn EnrichmentTableSetup>> {
+    pub fn get_enrichment_tables(&self) -> &Option<Box<dyn EnrichmentTableSetup>> {
+        &self.enrichment_tables
+    }
+
+    pub fn get_enrichment_tables_mut(&mut self) -> &mut Option<Box<dyn EnrichmentTableSetup>> {
         &mut self.enrichment_tables
     }
 }

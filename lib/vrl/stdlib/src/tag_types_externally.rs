@@ -44,7 +44,7 @@ impl Function for TagTypesExternally {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(TagTypesExternallyFn { value }))
@@ -109,7 +109,6 @@ fn tag_type_externally(value: Value) -> Value {
         ),
         value @ Value::Timestamp(_) => (Some("timestamp"), value),
         value @ Value::Regex(_) => (Some("regex"), value),
-        value @ Value::EnrichmentTable(_) => (Some("enrichment_table"), value),
         Value::Null => (None, Value::Null),
     };
 

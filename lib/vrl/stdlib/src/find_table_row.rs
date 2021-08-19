@@ -28,8 +28,20 @@ impl Function for FindTableRow {
         &[]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let table = arguments.required_enrichment_table("table")?;
+    fn compile(&self, state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+        let tables = state
+            .get_enrichment_tables()
+            .as_ref()
+            .map(|tables| {
+                tables
+                    .table_ids()
+                    .into_iter()
+                    .map(Value::from)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(Vec::new);
+
+        let table = arguments.required_enum("table", &tables)?.to_string();
         let condition = arguments.required_object("condition")?;
 
         Ok(Box::new(FindTableRowFn {
@@ -73,7 +85,7 @@ impl Expression for FindTableRowFn {
         &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        match state.get_enrichment_tables() {
+        match state.get_enrichment_tables_mut() {
             Some(ref mut table) => {
                 let fields = self
                     .condition

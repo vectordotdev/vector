@@ -39,7 +39,7 @@ pub trait Function: Sync + fmt::Debug {
     ///
     /// At runtime, the `Expression` returned by this function is executed and
     /// resolved to its final [`Value`].
-    fn compile(&self, arguments: ArgumentList) -> Compiled;
+    fn compile(&self, state: &super::State, arguments: ArgumentList) -> Compiled;
 
     /// An optional list of parameters the function accepts.
     ///
@@ -127,26 +127,6 @@ impl ArgumentList {
 
     pub fn required_literal(&mut self, keyword: &'static str) -> Result<Literal, Error> {
         Ok(required(self.optional_literal(keyword)?))
-    }
-
-    pub fn optional_enrichment_table(
-        &mut self,
-        keyword: &'static str,
-    ) -> Result<Option<String>, Error> {
-        self.optional_expr(keyword)
-            .map(|expr| match expr.as_value() {
-                Some(Value::EnrichmentTable(table)) => Ok(table),
-                _ => Err(Error::UnexpectedExpression {
-                    keyword,
-                    expected: "enrichment_table",
-                    expr,
-                }),
-            })
-            .transpose()
-    }
-
-    pub fn required_enrichment_table(&mut self, keyword: &'static str) -> Result<String, Error> {
-        Ok(required(self.optional_enrichment_table(keyword)?))
     }
 
     pub fn optional_enum(

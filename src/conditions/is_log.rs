@@ -19,7 +19,10 @@ impl_generate_config_from_default!(IsLogConfig);
 
 #[typetag::serde(name = "is_log")]
 impl ConditionConfig for IsLogConfig {
-    fn build(&self, _enrichment_tables: &enrichment::Tables) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        _enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         Ok(Box::new(IsLog {}))
     }
 }

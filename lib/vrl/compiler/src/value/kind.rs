@@ -247,7 +247,6 @@ impl From<&Value> for Kind {
             Value::Array(_) => Kind::Array,
             Value::Timestamp(_) => Kind::Timestamp,
             Value::Regex(_) => Kind::Regex,
-            Value::EnrichmentTable(_) => Kind::EnrichmentTable,
             Value::Null => Kind::Null,
         }
     }

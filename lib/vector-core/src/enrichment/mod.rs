@@ -2,7 +2,7 @@ pub mod tables;
 
 use std::collections::BTreeMap;
 
-pub use tables::{TableSearch, Tables};
+pub use tables::{TableRegistry, TableSearch};
 pub use vrl_core::{Condition, IndexHandle};
 
 /// Enrichment tables represent additional data sources that can be used to enrich the event data

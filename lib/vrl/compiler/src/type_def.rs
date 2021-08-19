@@ -99,9 +99,6 @@ impl From<Kind> for KindInfo {
         if kind.contains_regex() {
             set.insert(TypeKind::Regex);
         }
-        if kind.contains_enrichment_table() {
-            set.insert(TypeKind::EnrichmentTable);
-        }
         if kind.contains_null() {
             set.insert(TypeKind::Null);
         }
@@ -452,7 +449,6 @@ pub enum TypeKind {
     Boolean,
     Timestamp,
     Regex,
-    EnrichmentTable,
     Null,
     Array(BTreeMap<Index, KindInfo>),
     Object(BTreeMap<Field, KindInfo>),
@@ -470,7 +466,6 @@ impl TypeKind {
             Boolean => Kind::Boolean,
             Timestamp => Kind::Timestamp,
             Regex => Kind::Regex,
-            EnrichmentTable => Kind::EnrichmentTable,
             Null => Kind::Null,
             Array(_) => Kind::Array,
             Object(_) => Kind::Object,

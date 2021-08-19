@@ -345,7 +345,6 @@ fn vrl_value_to_json_value(value: Value) -> serde_json::Value {
             .collect::<serde_json::Value>(),
         Value::Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
         Value::Regex(v) => v.to_string().into(),
-        Value::EnrichmentTable(v) => v.into(),
         Value::Null => Null,
     }
 }
