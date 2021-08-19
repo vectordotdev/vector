@@ -33,6 +33,7 @@ inventory::submit! {
 
 impl_generate_config_from_default!(FileConfig);
 
+#[derive(Clone)]
 struct File {
     data: Vec<BTreeMap<String, String>>,
     indexes: Vec<Vec<String>>,

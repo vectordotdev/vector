@@ -9,7 +9,7 @@ pub enum Condition<'a> {
 
 pub trait EnrichmentTableSetup: DynClone {
     fn table_ids(&self) -> Vec<String>;
-    fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String>;
+    fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<(), String>;
 }
 
 dyn_clone::clone_trait_object!(EnrichmentTableSetup);
@@ -33,7 +33,7 @@ impl EnrichmentTableSetup for EmptyEnrichmentTables {
         Vec::new()
     }
 
-    fn add_index(&mut self, _table: &str, _fields: Vec<&str>) -> Result<(), String> {
+    fn add_index(&mut self, _table: &str, _fields: &[&str]) -> Result<(), String> {
         Ok(())
     }
 }

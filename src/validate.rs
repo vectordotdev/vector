@@ -212,7 +212,7 @@ async fn validate_healthchecks(
     // We are running health checks in serial so it's easier for the users
     // to parse which errors/warnings/etc. belong to which healthcheck.
     let mut validated = true;
-    for (name, healthcheck) in healthchecks {
+    for (id, healthcheck) in healthchecks {
         let mut failed = |error| {
             validated = false;
             fmt.error(error);
@@ -222,23 +222,22 @@ async fn validate_healthchecks(
             Ok(Ok(_)) => {
                 if config
                     .sinks
-                    .get(&name)
+                    .get(&id)
                     .expect("Sink not present")
                     .healthcheck()
                     .enabled
                 {
-                    fmt.success(format!("Health check `{}`", name.as_str()));
+                    fmt.success(format!("Health check \"{}\"", id));
                 } else {
-                    fmt.warning(format!("Health check disabled for `{}`", name));
+                    fmt.warning(format!("Health check disabled for \"{}\"", id));
                     validated &= !opts.deny_warnings;
                 }
             }
-            Ok(Err(())) => failed(format!("Health check for `{}` failed", name.as_str())),
-            Err(error) if error.is_cancelled() => failed(format!(
-                "Health check for `{}` was cancelled",
-                name.as_str()
-            )),
-            Err(_) => failed(format!("Health check for `{}` panicked", name.as_str())),
+            Ok(Err(())) => failed(format!("Health check for \"{}\" failed", id)),
+            Err(error) if error.is_cancelled() => {
+                failed(format!("Health check for \"{}\" was cancelled", id))
+            }
+            Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
         }
     }
 

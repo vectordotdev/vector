@@ -30,8 +30,8 @@ components: sinks: gcp_pubsub: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				headers:                    false
+				enabled: true
+				headers: false
 			}
 			tls: {
 				enabled:                true
@@ -145,7 +145,7 @@ components: sinks: gcp_pubsub: {
 				},
 				{
 					_action: "topics.publish"
-					required_for: ["write"]
+					required_for: ["operation"]
 				},
 			]
 		},

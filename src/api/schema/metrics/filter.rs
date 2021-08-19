@@ -1,5 +1,6 @@
 use super::{EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal};
 use crate::{
+    config::ComponentId,
     event::{Metric, MetricValue},
     metrics::{capture_metrics, get_controller, Controller},
 };
@@ -144,9 +145,12 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 }
 
 /// Return Vec<Metric> based on a component id tag.
-pub fn by_component_id(component_id: &str) -> Vec<Metric> {
+pub fn by_component_id(component_id: &ComponentId) -> Vec<Metric> {
     capture_metrics(&GLOBAL_CONTROLLER)
-        .filter_map(|m| m.tag_matches("component_id", component_id).then(|| m))
+        .filter_map(|m| {
+            m.tag_matches("component_id", component_id.as_str())
+                .then(|| m)
+        })
         .collect()
 }
 

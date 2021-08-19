@@ -46,6 +46,15 @@ components: sources: internal_metrics: {
 	}
 
 	configuration: {
+		namespace: {
+			description: "The namespace of the metric."
+			common:      false
+			required:    false
+			type: string: {
+				default: "vector"
+				syntax:  "literal"
+			}
+		}
 		scrape_interval_secs: {
 			description: "The interval between metric gathering, in seconds."
 			common:      true

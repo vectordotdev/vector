@@ -143,6 +143,14 @@ components: transforms: aws_ec2_metadata: {
 					syntax: "literal"
 				}
 			}
+			"instance-type": {
+				description: "The `instance-type` of the current EC2 instance."
+				required:    true
+				type: string: {
+					examples: ["m4.large"]
+					syntax: "literal"
+				}
+			}
 			"local-hostname": {
 				description: "The `local-hostname` of the current EC2 instance."
 				required:    true
