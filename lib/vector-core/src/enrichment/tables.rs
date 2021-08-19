@@ -128,16 +128,16 @@ pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send +
 impl vrl_core::EnrichmentTableSearch for TableSearch {
     /// Search the given table to find the data.
     /// If we are in the writing stage, this function will return an error.
-    fn find_table_row(
+    fn find_table_row<'a>(
         &self,
         table: &str,
-        criteria: Vec<vrl_core::Condition>,
+        condition: &'a [vrl_core::Condition<'a>],
     ) -> Result<Option<BTreeMap<String, vrl_core::Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => Ok(table.find_table_row(criteria).map(|table| {
+                Some(table) => Ok(table.find_table_row(condition).map(|table| {
                     table
                         .iter()
                         .map(|(key, value)| {
@@ -213,7 +213,7 @@ mod tests {
     impl Table for DummyEnrichmentTable {
         fn find_table_row(
             &self,
-            _criteria: Vec<vrl_core::Condition>,
+            _criteria: &[vrl_core::Condition],
         ) -> Option<BTreeMap<String, String>> {
             Some(self.data.clone())
         }
@@ -262,8 +262,8 @@ mod tests {
             Err("finish_load not called".to_string()),
             tables.find_table_row(
                 "dummy1",
-                vec![vrl_core::Condition::Equals {
-                    field: "thing".to_string(),
+                &[vrl_core::Condition::Equals {
+                    field: "thing",
                     value: "thang".to_string(),
                 }]
             )
@@ -300,8 +300,8 @@ mod tests {
             })),
             tables_search.find_table_row(
                 "dummy1",
-                vec![vrl_core::Condition::Equals {
-                    field: "thing".to_string(),
+                &[vrl_core::Condition::Equals {
+                    field: "thing",
                     value: "thang".to_string(),
                 }]
             )

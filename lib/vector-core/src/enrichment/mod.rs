@@ -10,7 +10,10 @@ pub use vrl_core::Condition;
 pub trait Table: std::fmt::Debug {
     /// Search the enrichment table data with the given condition.
     /// All fields within the data must match (AND).
-    fn find_table_row(&self, condition: Vec<Condition>) -> Option<BTreeMap<String, String>>;
+    fn find_table_row<'a>(
+        &self,
+        condition: &'a [Condition<'a>],
+    ) -> Option<BTreeMap<String, String>>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.

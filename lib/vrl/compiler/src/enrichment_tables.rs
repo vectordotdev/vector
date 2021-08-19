@@ -3,8 +3,8 @@ use dyn_clone::DynClone;
 use std::collections::BTreeMap;
 
 #[derive(Debug, PartialEq)]
-pub enum Condition {
-    Equals { field: String, value: String },
+pub enum Condition<'a> {
+    Equals { field: &'a str, value: String },
 }
 
 pub trait EnrichmentTableSetup: DynClone {
@@ -15,10 +15,10 @@ pub trait EnrichmentTableSetup: DynClone {
 dyn_clone::clone_trait_object!(EnrichmentTableSetup);
 
 pub trait EnrichmentTableSearch: DynClone {
-    fn find_table_row(
-        &self,
+    fn find_table_row<'a>(
+        &'a self,
         table: &str,
-        criteria: Vec<Condition>,
+        criteria: &'a [Condition<'a>],
     ) -> Result<Option<BTreeMap<String, Value>>, String>;
 }
 
@@ -39,10 +39,10 @@ impl EnrichmentTableSetup for EmptyEnrichmentTables {
 }
 
 impl EnrichmentTableSearch for EmptyEnrichmentTables {
-    fn find_table_row(
+    fn find_table_row<'a>(
         &self,
         _table: &str,
-        _criteria: Vec<Condition>,
+        _criteria: &'a [Condition<'a>],
     ) -> Result<Option<BTreeMap<String, Value>>, String> {
         Ok(None)
     }

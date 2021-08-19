@@ -39,7 +39,10 @@ struct File {
 }
 
 impl Table for File {
-    fn find_table_row<'a>(&self, _criteria: Vec<Condition>) -> Option<BTreeMap<String, String>> {
+    fn find_table_row<'a>(
+        &self,
+        _criteria: &'a [Condition<'a>],
+    ) -> Option<BTreeMap<String, String>> {
         trace!("Searching enrichment table.");
         Some(self.data[0].clone())
     }

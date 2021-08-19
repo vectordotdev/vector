@@ -59,7 +59,7 @@ impl Expression for FindTableRowFn {
             .iter()
             .map(|(key, value)| {
                 Ok(Condition::Equals {
-                    field: key.to_string(),
+                    field: key,
                     value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(),
                 })
             })
@@ -70,7 +70,7 @@ impl Expression for FindTableRowFn {
             .as_ref()
             .ok_or("enrichment tables not loaded")?;
 
-        match tables.find_table_row(&self.table, condition)? {
+        match tables.find_table_row(&self.table, &condition)? {
             None => Err("data not found".into()),
             Some(data) => Ok(Value::Object(data)),
         }
@@ -125,16 +125,16 @@ mod tests {
     }
 
     impl EnrichmentTableSearch for DummyEnrichmentTable {
-        fn find_table_row(
+        fn find_table_row<'a>(
             &self,
             table: &str,
-            condition: Vec<Condition>,
+            condition: &'a [Condition<'a>],
         ) -> std::result::Result<Option<BTreeMap<String, Value>>, String> {
             assert_eq!(table, "table");
             assert_eq!(
                 condition,
                 vec![Condition::Equals {
-                    field: "field".to_string(),
+                    field: "field",
                     value: "value".to_string(),
                 }]
             );
