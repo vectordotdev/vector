@@ -63,8 +63,8 @@ anything other than Vector itself). Backward incompatble changes will trigger
 a major version increment.
 
 * [CLI]
-  * The root [`vector` command] and its input/output.
-  * The [`vector validate` subcommand] and its input/output.
+  * The root [`vector` command], its input/output.
+  * The [`vector validate` subcommand], the exit codes.
 * [Data model]
   * As exposed in the source of the [`lua` transform]
   * As exposed in the output of the [`vector` sink]
@@ -88,13 +88,13 @@ API. Breaking changes in these areas will *not* trigger a major version
 increment.
 
 * [CLI]
-  * The [`vector generate` subcommand] and its input/output.
-  * The [`vector graph` subcommand] and its input/output.
-  * The [`vector help` subcommand] and its input/output.
-  * The [`vector list` subcommand] and its input/output.
-  * The [`vector tap` subcommand] and its input/output.
-  * The [`vector top` subcommand] and its input/output.
-  * The [`vector vrl` subcommand] and its input/output.
+  * The [`vector generate` subcommand], its input/output.
+  * The [`vector graph` subcommand], its input/output.
+  * The [`vector help` subcommand], its input/output.
+  * The [`vector list` subcommand], its input/output.
+  * The [`vector tap` subcommand], its input/output.
+  * The [`vector top` subcommand], its input/output.
+  * The [`vector vrl` subcommand], its input/output.
 * [Installation workflows]
 
 ## Releases
