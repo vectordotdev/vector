@@ -20,7 +20,7 @@ bytes = { version = "1.0.0", default-features = false }
 strum_macros = { version = "0.21", default-features = false }
 tracing = { version = "0.1.26", default-features = false }
 snafu = { version = "0.6", default-features = false }
-ordered-float = { version = "2", default-features = false } 
+ordered-float = { version = "2", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }
