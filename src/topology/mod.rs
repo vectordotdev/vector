@@ -41,7 +41,7 @@ type BuiltBuffer = (
     buffers::Acker,
 );
 
-type Outputs = HashMap<String, fanout::ControlChannel>;
+type Outputs = HashMap<ComponentId, fanout::ControlChannel>;
 
 // Watcher types for topology changes. These are currently specific to receiving
 // `Outputs`. This could be expanded in the future to send an enum of types if,

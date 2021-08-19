@@ -461,13 +461,12 @@ impl RunningTopology {
 
         // Broadcast changes to subscribers.
         if !self.watch.0.is_closed() {
-            // TODO handle sending ids
             self.watch
                 .0
                 .send(
                     self.outputs
                         .iter()
-                        .map(|item| (item.0.to_string(), item.1.clone()))
+                        .map(|item| (item.0.clone(), item.1.clone()))
                         .collect::<HashMap<_, _>>(),
                 )
                 .expect("Couldn't broadcast config changes.");
