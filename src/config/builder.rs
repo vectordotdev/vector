@@ -118,6 +118,10 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
+        if cfg!(feature = "datadog") {
+            self.datadog = with.datadog;
+        }
+
         self.provider = with.provider;
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {

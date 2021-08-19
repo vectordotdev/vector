@@ -10,18 +10,33 @@ use serde::{Deserialize, Serialize};
 static INTERNAL_METRICS_NAME: &'static str = "#datadog_internal_metrics";
 static DATADOG_METRICS_NAME: &'static str = "#datadog_sink";
 
-#[derive(Default, Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
+    #[serde(default = "default_api_key")]
     pub api_key: Option<String>,
 }
 
-/// By default, the Datadog feature is enabled where an API key is provided.
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            enabled: default_enabled(),
+            api_key: default_api_key(),
+        }
+    }
+}
+
+/// By default, the Datadog feature is enabled.
 fn default_enabled() -> bool {
     true
+}
+
+/// By default, no API key is provided.
+fn default_api_key() -> Option<String> {
+    None
 }
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
