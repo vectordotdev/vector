@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 // in default TOML configurations, but could clash in JSON config so this isn't fool-proof.
 // TODO: Refactor for component scope once https://github.com/timberio/vector/pull/8654 lands.
 static INTERNAL_METRICS_NAME: &'static str = "#datadog_internal_metrics";
-static DATADOG_METRICS_NAME: &'static str = "#datadog_sink";
+static DATADOG_METRICS_NAME: &'static str = "#datadog_metrics";
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(default, deny_unknown_fields)]
