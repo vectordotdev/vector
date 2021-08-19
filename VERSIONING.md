@@ -69,6 +69,7 @@ a major version increment.
   * As exposed in the source of the [`lua` transform]
   * As exposed in the output of the [`vector` sink]
 * [GraphQL API]
+* [VRL]
 
 
 #### Intended for *private* consumption
@@ -217,3 +218,4 @@ here. Each minor release bump will include an upgrade guide in the
 [`vector top` subcommand]: https://vector.dev/docs/reference/cli/#top
 [`vector validate` subcommand]: https://vector.dev/docs/reference/cli/#validate
 [`vector vrl` subcommand]: https://vector.dev/docs/reference/cli/#vrl
+[VRL]: https://vector.dev/docs/reference/vrl/
