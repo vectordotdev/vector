@@ -291,7 +291,7 @@ impl SourceShutdownCoordinator {
                 true
             } else {
                 error!(
-                    "Source \"{}\" failed to shutdown before deadline. Forcing shutdown.",
+                    "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
                     id,
                 );
                 shutdown_force_trigger.into_inner().cancel();
