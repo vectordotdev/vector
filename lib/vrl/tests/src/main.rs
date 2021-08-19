@@ -5,7 +5,9 @@ use glob::glob;
 use shared::TimeZone;
 use std::str::FromStr;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, EmptyEnrichmentTables, Runtime, Terminate, Value};
+use vrl::{
+    diagnostic::Formatter, enrichment::EmptyEnrichmentTables, state, Runtime, Terminate, Value,
+};
 
 use vrl_tests::{docs, Test};
 

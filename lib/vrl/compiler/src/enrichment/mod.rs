@@ -7,14 +7,14 @@ pub enum Condition<'a> {
     Equals { field: &'a str, value: String },
 }
 
-pub trait EnrichmentTableSetup: DynClone {
+pub trait TableSetup: DynClone {
     fn table_ids(&self) -> Vec<String>;
     fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<(), String>;
 }
 
-dyn_clone::clone_trait_object!(EnrichmentTableSetup);
+dyn_clone::clone_trait_object!(TableSetup);
 
-pub trait EnrichmentTableSearch: DynClone {
+pub trait TableSearch: DynClone {
     fn find_table_row<'a>(
         &'a self,
         table: &str,
@@ -22,13 +22,13 @@ pub trait EnrichmentTableSearch: DynClone {
     ) -> Result<Option<BTreeMap<String, Value>>, String>;
 }
 
-dyn_clone::clone_trait_object!(EnrichmentTableSearch);
+dyn_clone::clone_trait_object!(TableSearch);
 
 /// Create a empty enrichment for situations when we don't have any tables loaded.
 #[derive(Clone, Debug)]
 pub struct EmptyEnrichmentTables;
 
-impl EnrichmentTableSetup for EmptyEnrichmentTables {
+impl TableSetup for EmptyEnrichmentTables {
     fn table_ids(&self) -> Vec<String> {
         Vec::new()
     }
@@ -38,7 +38,7 @@ impl EnrichmentTableSetup for EmptyEnrichmentTables {
     }
 }
 
-impl EnrichmentTableSearch for EmptyEnrichmentTables {
+impl TableSearch for EmptyEnrichmentTables {
     fn find_table_row<'a>(
         &self,
         _table: &str,

@@ -106,7 +106,7 @@ impl std::fmt::Debug for TableRegistry {
 }
 
 #[cfg(feature = "vrl")]
-impl vrl_core::EnrichmentTableSetup for TableRegistry {
+impl vrl_core::enrichment::TableSetup for TableRegistry {
     /// Return a list of the available tables that we can write to.
     /// This only works in the writing stage and will acquire a lock to retrieve the tables.
     ///
@@ -148,13 +148,13 @@ impl vrl_core::EnrichmentTableSetup for TableRegistry {
 #[derive(Clone, Default)]
 pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>);
 
-impl vrl_core::EnrichmentTableSearch for TableSearch {
+impl vrl_core::enrichment::TableSearch for TableSearch {
     /// Search the given table to find the data.
     /// If we are in the writing stage, this function will return an error.
     fn find_table_row<'a>(
         &self,
         table: &str,
-        condition: &'a [vrl_core::Condition<'a>],
+        condition: &'a [vrl_core::enrichment::Condition<'a>],
     ) -> Result<Option<BTreeMap<String, vrl_core::Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
@@ -210,7 +210,7 @@ mod tests {
     use super::*;
     use shared::btreemap;
     use std::sync::{Arc, Mutex};
-    use vrl_core::{EnrichmentTableSearch, EnrichmentTableSetup};
+    use vrl_core::enrichment::{TableSearch, TableSetup};
 
     #[derive(Debug, Clone)]
     struct DummyEnrichmentTable {
@@ -236,7 +236,7 @@ mod tests {
     impl Table for DummyEnrichmentTable {
         fn find_table_row(
             &self,
-            _criteria: &[vrl_core::Condition],
+            _criteria: &[vrl_core::enrichment::Condition],
         ) -> Option<BTreeMap<String, String>> {
             Some(self.data.clone())
         }
@@ -289,7 +289,7 @@ mod tests {
             Err("finish_load not called".to_string()),
             tables.find_table_row(
                 "dummy1",
-                &[vrl_core::Condition::Equals {
+                &[vrl_core::enrichment::Condition::Equals {
                     field: "thing",
                     value: "thang".to_string(),
                 }]
@@ -329,7 +329,7 @@ mod tests {
             })),
             tables_search.find_table_row(
                 "dummy1",
-                &[vrl_core::Condition::Equals {
+                &[vrl_core::enrichment::Condition::Equals {
                     field: "thing",
                     value: "thang".to_string(),
                 }],

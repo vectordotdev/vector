@@ -8,7 +8,7 @@ use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use vrl::EmptyEnrichmentTables;
+use vrl::enrichment::EmptyEnrichmentTables;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
 #[derive(Debug, StructOpt)]

@@ -193,8 +193,8 @@ mod tests {
             ),
         ];
         let tz = TimeZone::default();
-        let enrichment_tables =
-            Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTableSearch>);
+        let enrichment_tables = Some(Box::new(vrl::enrichment::EmptyEnrichmentTables)
+            as Box<dyn vrl::enrichment::TableSearch>);
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let mut runtime_state = vrl::state::Runtime::default();

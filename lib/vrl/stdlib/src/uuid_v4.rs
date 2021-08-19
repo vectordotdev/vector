@@ -53,8 +53,8 @@ mod tests {
         let mut state = vrl::state::Runtime::default();
         let mut object: Value = map![].into();
         let tz = TimeZone::default();
-        let enrichment_tables =
-            Some(Box::new(vrl::EmptyEnrichmentTables) as Box<dyn vrl::EnrichmentTableSearch>);
+        let enrichment_tables = Some(Box::new(vrl::enrichment::EmptyEnrichmentTables)
+            as Box<dyn vrl::enrichment::TableSearch>);
         let mut ctx = Context::new(&mut object, &mut state, &tz, &enrichment_tables);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();
 

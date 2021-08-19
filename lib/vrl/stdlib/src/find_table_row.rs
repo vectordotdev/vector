@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use vrl::{prelude::*, Condition};
+use vrl::{enrichment::Condition, prelude::*};
 #[derive(Clone, Copy, Debug)]
 pub struct FindTableRow;
 impl Function for FindTableRow {
@@ -87,7 +87,7 @@ impl Expression for FindTableRowFn {
                     .iter()
                     .map(|(field, _)| field.as_ref())
                     .collect::<Vec<_>>();
-                table.add_index(&self.table, fields)?;
+                table.add_index(&self.table, &fields)?;
                 Ok(())
             }
             // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
@@ -106,17 +106,17 @@ impl Expression for FindTableRowFn {
 mod tests {
     use super::*;
     use shared::{btreemap, TimeZone};
-    use vrl::{Condition, EnrichmentTableSearch, EnrichmentTableSetup};
+    use vrl::enrichment;
 
     #[derive(Clone)]
     struct DummyEnrichmentTable;
 
-    impl EnrichmentTableSetup for DummyEnrichmentTable {
+    impl enrichment::TableSetup for DummyEnrichmentTable {
         fn table_ids(&self) -> Vec<String> {
             vec!["table".to_string()]
         }
 
-        fn add_index(&mut self, table: &str, fields: Vec<&str>) -> std::result::Result<(), String> {
+        fn add_index(&mut self, table: &str, fields: &[&str]) -> std::result::Result<(), String> {
             assert_eq!("table", table);
             assert_eq!(vec!["field"], fields);
 
@@ -124,7 +124,7 @@ mod tests {
         }
     }
 
-    impl EnrichmentTableSearch for DummyEnrichmentTable {
+    impl enrichment::TableSearch for DummyEnrichmentTable {
         fn find_table_row<'a>(
             &self,
             table: &str,
@@ -157,7 +157,7 @@ mod tests {
 
         let tz = TimeZone::default();
         let enrichment_tables =
-            Some(Box::new(DummyEnrichmentTable) as Box<dyn vrl::EnrichmentTableSearch>);
+            Some(Box::new(DummyEnrichmentTable) as Box<dyn vrl::enrichment::TableSearch>);
 
         let mut object: Value = BTreeMap::new().into();
         let mut runtime_state = vrl::state::Runtime::default();
