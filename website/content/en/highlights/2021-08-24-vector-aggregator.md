@@ -15,19 +15,35 @@ We are happy to announce our *vector-aggregator* chart is now publicly available
 we continue to iterate on and make improvements to the chart, we feel like it's in a good
 place to get wider feedback from the community.
 
-We have also created a dedicated Discord channel, #aggregator, for support and questions.
+We have also created a dedicated Discord channel, `#aggregator`, for support and questions.
+
+## Setup
 
 ```shell
 helm repo add vector https://helm.vector.dev
 helm repo update
-helm show values vector/vector-aggregator
 ```
 
 The chart will also be available from https://packages.timber.io/helm/latest
 for backward compatibility.
 
+## Installation
+
+```shell
+helm install vector vector/vector-aggregator \
+  --namespace vector \
+  --create-namespace
+```
+
 An installation with default values today will start a *vector-aggregator* listening on
-port `9000` with a [v2][highlight.v2] [`vector` source][sources.vector].
+port `9000` with a [`vector` source][sources.vector] configured with [v2][highlight.v2].
+
+You can review the default values at [timberio/helm-charts][default] or by running the following:
+
+```shell
+helm show values vector/vector-aggregator
+```
 
 [sources.vector]: /docs/reference/configuration/sources/vector/
 [highlight.v2]: /highlights/2021-07-21-0-16-upgrade-guide/#vector_source_sink
+[default]: https://github.com/timberio/helm-charts/blob/master/charts/vector-aggregator/values.yaml
