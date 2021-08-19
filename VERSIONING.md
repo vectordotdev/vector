@@ -53,7 +53,6 @@ a major version increment.
   * The [`vector validate` subcommand], the exit codes.
 * [Data model]
   * As exposed in the source of the [`lua` transform]
-  * As exposed in the output of the [`vector` sink]
 * [GraphQL API]
 * [VRL]
 
@@ -66,6 +65,8 @@ increment only if Vector itself is not compatbile with previous versions.
 
 * [Configuration schema]
 * [Data directory] and its contents
+* [Data model]
+  * As exposed in the output of the [`vector` sink]
 
 ### Areas that are *NOT* covered
 
