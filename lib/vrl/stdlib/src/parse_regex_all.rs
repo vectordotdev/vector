@@ -31,7 +31,7 @@ impl Function for ParseRegexAll {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
         let numeric_groups = arguments

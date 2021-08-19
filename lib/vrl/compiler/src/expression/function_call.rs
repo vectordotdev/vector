@@ -162,7 +162,7 @@ impl FunctionCall {
             })?;
 
         let expr = function
-            .compile(list)
+            .compile(state, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Asking for an infallible function to abort on error makes no sense.

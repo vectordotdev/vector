@@ -26,7 +26,7 @@ impl Function for FindTableRow {
         &[]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let table = arguments
             .required_literal("table")?
             .to_value()

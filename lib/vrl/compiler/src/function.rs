@@ -39,7 +39,7 @@ pub trait Function: Sync + fmt::Debug {
     ///
     /// At runtime, the `Expression` returned by this function is executed and
     /// resolved to its final [`Value`].
-    fn compile(&self, arguments: ArgumentList) -> Compiled;
+    fn compile(&self, state: &super::State, arguments: ArgumentList) -> Compiled;
 
     /// An optional list of parameters the function accepts.
     ///
