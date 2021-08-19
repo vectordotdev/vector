@@ -13,9 +13,9 @@ pub trait Table: std::fmt::Debug {
     ///
     /// # Errors
     /// Errors if no rows, or more than 1 row is found.
-    fn find_table_row(
+    fn find_table_row<'a>(
         &self,
-        condition: Vec<Condition>,
+        condition: &'a [Condition],
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, String>, String>;
 

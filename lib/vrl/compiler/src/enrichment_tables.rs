@@ -1,14 +1,13 @@
+use crate::Value;
 use dyn_clone::DynClone;
 use std::collections::BTreeMap;
-
-use crate::Value;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IndexHandle(pub usize);
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Condition {
-    Equals { field: String, value: String },
+pub enum Condition<'a> {
+    Equals { field: &'a str, value: String },
 }
 
 pub trait EnrichmentTableSetup: DynClone {
@@ -19,10 +18,10 @@ pub trait EnrichmentTableSetup: DynClone {
 dyn_clone::clone_trait_object!(EnrichmentTableSetup);
 
 pub trait EnrichmentTableSearch: DynClone {
-    fn find_table_row(
-        &self,
+    fn find_table_row<'a>(
+        &'a self,
         table: &str,
-        criteria: Vec<Condition>,
+        condition: &'a [Condition<'a>],
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, Value>, String>;
 }
@@ -44,10 +43,10 @@ impl EnrichmentTableSetup for EmptyEnrichmentTables {
 }
 
 impl EnrichmentTableSearch for EmptyEnrichmentTables {
-    fn find_table_row(
+    fn find_table_row<'a>(
         &self,
         _table: &str,
-        _condition: Vec<Condition>,
+        _condition: &'a [Condition<'a>],
         _index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, Value>, String> {
         Err("no data found".to_string())

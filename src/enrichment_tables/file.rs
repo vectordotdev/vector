@@ -154,16 +154,16 @@ impl File {
 }
 
 impl Table for File {
-    fn find_table_row(
+    fn find_table_row<'a>(
         &self,
-        condition: Vec<Condition>,
+        condition: &'a [Condition<'a>],
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, String>, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
                 let mut found = self.data.iter().filter_map(|row| {
-                    if self.row_equals(&condition, &*row) {
+                    if self.row_equals(condition, &*row) {
                         Some(self.add_columns(row))
                     } else {
                         None
@@ -268,7 +268,7 @@ mod tests {
         );
 
         let condition = Condition::Equals {
-            field: "field1".to_string(),
+            field: "field1",
             value: "zirp".to_string(),
         };
 
@@ -277,7 +277,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(vec![condition], None)
+            file.find_table_row(&[condition], None)
         );
     }
 
@@ -294,7 +294,7 @@ mod tests {
         let handle = file.add_index(&["field1"]).unwrap();
 
         let condition = Condition::Equals {
-            field: "field1".to_string(),
+            field: "field1",
             value: "zirp".to_string(),
         };
 
@@ -303,7 +303,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(vec![condition], Some(handle))
+            file.find_table_row(&[condition], Some(handle))
         );
     }
 
@@ -318,13 +318,13 @@ mod tests {
         );
 
         let condition = Condition::Equals {
-            field: "field1".to_string(),
+            field: "field1",
             value: "zorp".to_string(),
         };
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(vec![condition], None)
+            file.find_table_row(&[condition], None)
         );
     }
 
@@ -341,13 +341,13 @@ mod tests {
         let handle = file.add_index(&["field1"]).unwrap();
 
         let condition = Condition::Equals {
-            field: "field1".to_string(),
+            field: "field1",
             value: "zorp".to_string(),
         };
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(vec![condition], Some(handle))
+            file.find_table_row(&[condition], Some(handle))
         );
     }
 }

@@ -125,17 +125,17 @@ pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send +
 impl vrl_core::EnrichmentTableSearch for TableSearch {
     /// Search the given table to find the data.
     /// If we are in the writing stage, this function will return an error.
-    fn find_table_row(
+    fn find_table_row<'a>(
         &self,
         table: &str,
-        criteria: Vec<vrl_core::Condition>,
+        condition: &'a [vrl_core::Condition<'a>],
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_row(criteria, index).map(|table| {
+                Some(table) => table.find_table_row(condition, index).map(|table| {
                     table
                         .iter()
                         .map(|(key, value)| {
@@ -211,7 +211,7 @@ mod tests {
     impl Table for DummyEnrichmentTable {
         fn find_table_row(
             &self,
-            _condition: Vec<vrl_core::Condition>,
+            _condition: &[Condition],
             _index: Option<vrl_core::IndexHandle>,
         ) -> Result<BTreeMap<String, String>, String> {
             Ok(self.data.clone())
@@ -260,8 +260,8 @@ mod tests {
             Err("finish_load not called".to_string()),
             tables.find_table_row(
                 "dummy1",
-                vec![Condition::Equals {
-                    field: "thing".to_string(),
+                &[Condition::Equals {
+                    field: "thing",
                     value: "thang".to_string(),
                 }],
                 None
@@ -288,7 +288,7 @@ mod tests {
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
 
-        let mut tables = super::TableRegistry::new(tables);
+        let tables = super::TableRegistry::new(tables);
         let tables_search = tables.as_search();
 
         assert_eq!(
@@ -297,8 +297,8 @@ mod tests {
             }),
             tables_search.find_table_row(
                 "dummy1",
-                vec![Condition::Equals {
-                    field: "thing".to_string(),
+                &[Condition::Equals {
+                    field: "thing",
                     value: "thang".to_string(),
                 }],
                 None
