@@ -1,4 +1,4 @@
-use super::{Config, SinkOuter, SourceOuter};
+use super::{Config, SinkOuter, SourceOuter, ComponentId};
 use crate::{
     sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
 };
@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 // The '#' character here is being used to denote an internal name. It's 'unspeakable'
 // in default TOML configurations, but could clash in JSON config so this isn't fool-proof.
 // TODO: Refactor for component scope once https://github.com/timberio/vector/pull/8654 lands.
-static INTERNAL_METRICS_NAME: &'static str = "#datadog_internal_metrics";
-static DATADOG_METRICS_NAME: &'static str = "#datadog_metrics";
+static INTERNAL_METRICS_NAME: &str =;
+static DATADOG_METRICS_NAME: &str = ;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -50,23 +50,27 @@ pub fn attach(config: &mut Config) {
 
     info!("Datadog API key detected. Internal metrics will be sent to Datadog.");
 
+    let internal_metrics_id = ComponentId::from("#datadog_internal_metrics");
+    let datadog_metrics_id = ComponentId::from("#datadog_metrics");
+
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, due to the use of a custom namespace to
     // satisfy reporting to Datadog.
     let internal_metrics = InternalMetricsConfig::namespace("pipelines");
 
     config.sources.insert(
-        INTERNAL_METRICS_NAME.to_string(),
+        internal_metrics_id.clone(),
         SourceOuter::new(internal_metrics),
     );
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogConfig::from_api_key(api_key);
 
+
     config.sinks.insert(
-        DATADOG_METRICS_NAME.to_string(),
+        datadog_metrics_id,
         SinkOuter::new(
-            vec![INTERNAL_METRICS_NAME.to_string()],
+            vec![internal_metrics_id],
             Box::new(datadog_metrics),
         ),
     );
