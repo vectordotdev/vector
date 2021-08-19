@@ -17,7 +17,7 @@ remap: functions: to_timestamp: {
 	internal_failure_reasons: [
 		"When `value` is a `string`, it is not a valid timestamp format",
 		"When `value` is an `int`, it is not within the Unix timestamp range",
-		"When `value` is an `float`, it is not within the Unix timestamp range",
+		"When `value` is a `float`, it is not within the Unix timestamp range",
 	]
 	return: {
 		types: ["timestamp"]
