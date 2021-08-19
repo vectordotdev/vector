@@ -4,7 +4,8 @@ This document will cover how to track Vector's releases, how often
 we release, compatibility guarantees, how to release Vector, and more.
 
 Vector adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and
-the release process is dependent on the version change.
+the release process is dependent on the version change. See
+[VERSIONING](../VERSIONING.md) for more info.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
