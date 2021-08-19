@@ -4,7 +4,7 @@ This document covers Vector's versioning and what it means as a user of Vector.
 
 **Please note, Vector is currently in its pre-1.0 phase and quickly approaching
 1.0. Minor version increments can introduce breaking changes during this phase.
-Please see the [what to expect](#what-to-expect) section for more info.**
+Please see the [FAQ](#faq) section for more info.**
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
@@ -15,7 +15,10 @@ Please see the [what to expect](#what-to-expect) section for more info.**
       1. [Intended for *private* consumption](#intended-for-private-consumption)
    1. [Areas that are *NOT* covered](#areas-that-are-not-covered)
 1. [FAQ](#faq)
-   1. [Which release type should I be using?](#which-release-type-should-i-be-using)
+   1. [How often is Vector released?](#how-often-is-vector-released)
+   1. [How does Vector treat patch and minor versions?](#how-does-vector-treat-patch-and-minor-versions)
+   1. [How does Vector treat major versions \(breaking changes\)?](#how-does-vector-treat-major-versions-breaking-changes)
+   1. [How does Vector treat pre-1.0 versions?](#how-does-vector-treat-pre-10-versions)
    1. [Release cadence](#release-cadence)
 
 <!-- /MarkdownTOC -->
@@ -89,19 +92,36 @@ increment.
 
 ## FAQ
 
-### Which release type should I be using?
+### How often is Vector released?
 
-We always appreciate early feedback on Vector as we are developing it to help
-ensure the highest quality releases.
+Please see the [RELEASES policy].
 
-If you are able to, running the [nightly
-release](https://vector.dev/releases/nightly/download/) of Vector allows you to
-test out unreleased features and fixes and provide feedback to guide our
-development. We aim to keep nightly as stable as possible through integration
-testing, but there will occasionally be issues that slip through and are fixed
-for the next nightly release. For example, you could choose to run the nightly
-version in your development environments and save stable for production.
-Otherwise, the stable release is your best bet.
+### How does Vector treat patch and minor versions?
+
+As defined by [Semantic Versioning], you can expect no breaking changes. Users
+will be able to seamlessly upgrade without any action.
+
+### How does Vector treat major versions (breaking changes)?
+
+Major versions break backward compatibility. Vector takes breaking changes very
+seriously. We understand that Vector is a critical part of your infrastructure
+and breaking changes introduce downtime. We will make every effort necessary
+to avoid them. If we introduce them we will make the upgrade process as painless
+as possible. Every major release will come with a single, step-by-step upgrade
+guide in the [release notes].
+
+### How does Vector treat pre-1.0 versions?
+
+As defined by [Semantic Versioning]:
+
+> major version zero (0.y.z) is for initial development. Anything MAY change at
+> any time.
+
+And while this is true to the spec, Vector takes breaking changes *very*
+seriously during this phase. What's outlined in the
+[major versions](##major-versions-breaking-changes) section still holds true
+here. Each minor release bump will include an upgrade guide in the
+[release notes] if necessary.
 
 ### Release cadence
 
@@ -121,6 +141,7 @@ Otherwise, the stable release is your best bet.
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [release notes]: https://vector.dev/releases/
+[RELEASES policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 [`vector` command]: https://vector.dev/docs/reference/cli/#vector
 [`vector generate` subcommand]: https://vector.dev/docs/reference/cli/#generate
