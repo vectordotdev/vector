@@ -21,7 +21,7 @@
 //! efficient read-only access and can no longer add indexes or otherwise mutate the data.
 //!
 //! This data within the `ArcSwap` is accessed through the `TableSearch` struct. Any transform that
-//! needs access to this can call `TableRegistry::as_search`. This returns a cheaply clonable struct that
+//! needs access to this can call `TableRegistry::as_readonly`. This returns a cheaply clonable struct that
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables can be searched.
 //!
 use super::Table;
@@ -58,7 +58,7 @@ impl TableRegistry {
 
     /// Returns a cheaply clonable struct through that provides lock free read access to the
     /// enrichment tables.
-    pub fn as_search(&self) -> TableSearch {
+    pub fn as_readonly(&self) -> TableSearch {
         TableSearch(self.tables.clone())
     }
 }
@@ -113,7 +113,7 @@ impl vrl_core::EnrichmentTableSetup for TableRegistry {
 
 /// Provides read only access to the enrichment tables via the `vrl::EnrichmentTableSearch` trait.
 /// Cloning this object is designed to be cheap. The underlying data will be shared by all clones.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>);
 
 impl vrl_core::EnrichmentTableSearch for TableSearch {
@@ -237,7 +237,7 @@ mod tests {
         let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let tables = super::TableRegistry::new(tables).as_search();
+        let tables = super::TableRegistry::new(tables).as_readonly();
 
         assert_eq!(
             Err("finish_load not called".to_string()),
@@ -271,7 +271,7 @@ mod tests {
         tables.insert("dummy1".to_string(), Box::new(dummy));
 
         let mut tables = super::TableRegistry::new(tables);
-        let tables_search = tables.as_search();
+        let tables_search = tables.as_readonly();
 
         tables.finish_load();
 

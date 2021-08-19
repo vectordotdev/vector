@@ -16,7 +16,7 @@ pub enum ExpandType {
     Serial,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TransformContext {
     pub globals: GlobalOptions,
     pub enrichment_tables: enrichment::TableRegistry,
@@ -26,16 +26,7 @@ impl TransformContext {
     pub fn new_with_globals(globals: GlobalOptions) -> Self {
         Self {
             globals,
-            enrichment_tables: Default::default(),
-        }
-    }
-}
-
-impl Default for TransformContext {
-    fn default() -> Self {
-        TransformContext {
-            globals: Default::default(),
-            enrichment_tables: Default::default(),
+            ..Default::default()
         }
     }
 }
