@@ -1,28 +1,43 @@
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::cmp::{Ord, Ordering, PartialOrd};
-use std::fmt;
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+use std::{
+    cmp::{Ord, Ordering, PartialOrd},
+    fmt,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentId {
-    pub id: String,
+    value: String,
+    id: String,
 }
 
 impl ComponentId {
     pub fn global<T: Into<String>>(id: T) -> Self {
-        Self { id: id.into() }
+        let id = id.into();
+        Self {
+            id: id.clone(),
+            value: id,
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.value.as_str()
     }
 }
-
 impl From<String> for ComponentId {
-    fn from(id: String) -> Self {
-        Self { id }
+    fn from(value: String) -> Self {
+        Self {
+            id: value.clone(),
+            value,
+        }
     }
 }
 
 impl From<&str> for ComponentId {
-    fn from(id: &str) -> Self {
-        Self { id: id.to_string() }
+    fn from(value: &str) -> Self {
+        Self::from(value.to_string())
     }
 }
 
@@ -30,13 +45,14 @@ impl<T: ToString> From<&T> for ComponentId {
     fn from(value: &T) -> Self {
         Self {
             id: value.to_string(),
+            value: value.to_string(),
         }
     }
 }
 
 impl fmt::Display for ComponentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.id.fmt(f)
+        self.value.fmt(f)
     }
 }
 
@@ -51,7 +67,7 @@ impl Serialize for ComponentId {
 
 impl Ord for ComponentId {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
+        self.value.cmp(&other.value)
     }
 }
 

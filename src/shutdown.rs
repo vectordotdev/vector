@@ -131,14 +131,14 @@ impl SourceShutdownCoordinator {
             id.clone(),
             other.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
                 panic!(
-                    "Other ShutdownCoordinator didn't have a shutdown_begun_trigger for {:?}",
+                    "Other ShutdownCoordinator didn't have a shutdown_begun_trigger for \"{}\"",
                     id
                 )
             }),
         );
         if existing.is_some() {
             panic!(
-                "ShutdownCoordinator already has a shutdown_begin_trigger for source {:?}",
+                "ShutdownCoordinator already has a shutdown_begin_trigger for source \"{}\"",
                 id
             );
         }
@@ -147,14 +147,14 @@ impl SourceShutdownCoordinator {
             id.clone(),
             other.shutdown_force_triggers.remove(id).unwrap_or_else(|| {
                 panic!(
-                    "Other ShutdownCoordinator didn't have a shutdown_force_trigger for {:?}",
+                    "Other ShutdownCoordinator didn't have a shutdown_force_trigger for \"{}\"",
                     id
                 )
             }),
         );
         if existing.is_some() {
             panic!(
-                "ShutdownCoordinator already has a shutdown_force_trigger for source {:?}",
+                "ShutdownCoordinator already has a shutdown_force_trigger for source \"{}\"",
                 id
             );
         }
@@ -166,14 +166,14 @@ impl SourceShutdownCoordinator {
                 .remove(id)
                 .unwrap_or_else(|| {
                     panic!(
-                        "Other ShutdownCoordinator didn't have a shutdown_complete_tripwire for {:?}",
+                        "Other ShutdownCoordinator didn't have a shutdown_complete_tripwire for \"{}\"",
                         id
                     )
                 }),
         );
         if existing.is_some() {
             panic!(
-                "ShutdownCoordinator already has a shutdown_complete_tripwire for source {:?}",
+                "ShutdownCoordinator already has a shutdown_complete_tripwire for source \"{}\"",
                 id
             );
         }
@@ -196,13 +196,13 @@ impl SourceShutdownCoordinator {
             let shutdown_complete_tripwire =
                 shutdown_complete_tripwires.remove(&id).unwrap_or_else(|| {
                     panic!(
-                "shutdown_complete_tripwire for source {:?} not found in the ShutdownCoordinator",
+                "shutdown_complete_tripwire for source \"{}\" not found in the ShutdownCoordinator",
                 id
             )
                 });
             let shutdown_force_trigger = shutdown_force_triggers.remove(&id).unwrap_or_else(|| {
                 panic!(
-                    "shutdown_force_trigger for source {:?} not found in the ShutdownCoordinator",
+                    "shutdown_force_trigger for source \"{}\" not found in the ShutdownCoordinator",
                     id
                 )
             });
@@ -232,7 +232,7 @@ impl SourceShutdownCoordinator {
     ) -> impl Future<Output = bool> {
         let begin_shutdown_trigger = self.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
             panic!(
-                "shutdown_begun_trigger for source {:?} not found in the ShutdownCoordinator",
+                "shutdown_begun_trigger for source \"{}\" not found in the ShutdownCoordinator",
                 id
             )
         });
@@ -244,13 +244,13 @@ impl SourceShutdownCoordinator {
             .remove(id)
             .unwrap_or_else(|| {
                 panic!(
-                "shutdown_complete_tripwire for source {:?} not found in the ShutdownCoordinator",
+                "shutdown_complete_tripwire for source \"{}\" not found in the ShutdownCoordinator",
                 id
             )
             });
         let shutdown_force_trigger = self.shutdown_force_triggers.remove(id).unwrap_or_else(|| {
             panic!(
-                "shutdown_force_trigger for source {:?} not found in the ShutdownCoordinator",
+                "shutdown_force_trigger for source \"{}\" not found in the ShutdownCoordinator",
                 id
             )
         });
@@ -291,7 +291,7 @@ impl SourceShutdownCoordinator {
                 true
             } else {
                 error!(
-                    "Source {:?} failed to shutdown before deadline. Forcing shutdown.",
+                    "Source \"{}\" failed to shutdown before deadline. Forcing shutdown.",
                     id,
                 );
                 shutdown_force_trigger.into_inner().cancel();

@@ -43,7 +43,7 @@ impl filter::CustomFilter<Sink> for SinksFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(&sink.get_component_id().to_string()))),
+                .all(|f| f.filter_value(sink.get_component_id().as_str()))),
             self.component_type
                 .as_ref()
                 .map(|f| f.iter().all(|f| f.filter_value(sink.get_component_type())))
@@ -65,10 +65,9 @@ pub enum SinksSortFieldName {
 impl sort::SortableByField<SinksSortFieldName> for Sink {
     fn sort(&self, rhs: &Self, field: &SinksSortFieldName) -> cmp::Ordering {
         match field {
-            SinksSortFieldName::ComponentId => Ord::cmp(
-                &self.get_component_id().to_string(),
-                &rhs.get_component_id().to_string(),
-            ),
+            SinksSortFieldName::ComponentId => {
+                Ord::cmp(self.get_component_id(), rhs.get_component_id())
+            }
             SinksSortFieldName::ComponentType => {
                 Ord::cmp(self.get_component_type(), rhs.get_component_type())
             }
@@ -79,8 +78,8 @@ impl sort::SortableByField<SinksSortFieldName> for Sink {
 #[Object]
 impl Sink {
     /// Sink component_id
-    pub async fn component_id(&self) -> String {
-        self.get_component_id().to_string()
+    pub async fn component_id(&self) -> &str {
+        self.get_component_id().as_str()
     }
 
     /// Sink type
@@ -156,12 +155,8 @@ mod tests {
         }];
         sort::by_fields(&mut sinks, &fields);
 
-        for (i, component_id) in ["db", "webserver", "zip_drive"]
-            .iter()
-            .map(ComponentId::from)
-            .enumerate()
-        {
-            assert_eq!(sinks[i].get_component_id(), &component_id);
+        for (i, component_id) in ["db", "webserver", "zip_drive"].iter().enumerate() {
+            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -174,12 +169,8 @@ mod tests {
         }];
         sort::by_fields(&mut sinks, &fields);
 
-        for (i, component_id) in ["zip_drive", "webserver", "db"]
-            .iter()
-            .map(ComponentId::from)
-            .enumerate()
-        {
-            assert_eq!(sinks[i].get_component_id(), &component_id);
+        for (i, component_id) in ["zip_drive", "webserver", "db"].iter().enumerate() {
+            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -192,12 +183,8 @@ mod tests {
         }];
         sort::by_fields(&mut sinks, &fields);
 
-        for (i, component_id) in ["db", "zip_drive", "webserver"]
-            .iter()
-            .map(ComponentId::from)
-            .enumerate()
-        {
-            assert_eq!(sinks[i].get_component_id(), &component_id);
+        for (i, component_id) in ["db", "zip_drive", "webserver"].iter().enumerate() {
+            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -210,12 +197,8 @@ mod tests {
         }];
         sort::by_fields(&mut sinks, &fields);
 
-        for (i, component_id) in ["webserver", "zip_drive", "db"]
-            .iter()
-            .map(ComponentId::from)
-            .enumerate()
-        {
-            assert_eq!(sinks[i].get_component_id(), &component_id);
+        for (i, component_id) in ["webserver", "zip_drive", "db"].iter().enumerate() {
+            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
         }
     }
 }

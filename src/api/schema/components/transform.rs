@@ -22,8 +22,8 @@ pub struct Data {
 pub struct Transform(pub Data);
 
 impl Transform {
-    pub fn get_component_id(&self) -> String {
-        self.0.component_id.to_string()
+    pub fn get_component_id(&self) -> &ComponentId {
+        &self.0.component_id
     }
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
@@ -40,7 +40,7 @@ impl sort::SortableByField<TransformsSortFieldName> for Transform {
     fn sort(&self, rhs: &Self, field: &TransformsSortFieldName) -> cmp::Ordering {
         match field {
             TransformsSortFieldName::ComponentId => {
-                Ord::cmp(&self.get_component_id(), &rhs.get_component_id())
+                Ord::cmp(self.get_component_id(), rhs.get_component_id())
             }
             TransformsSortFieldName::ComponentType => {
                 Ord::cmp(self.get_component_type(), rhs.get_component_type())
@@ -52,8 +52,8 @@ impl sort::SortableByField<TransformsSortFieldName> for Transform {
 #[Object]
 impl Transform {
     /// Transform component_id
-    pub async fn component_id(&self) -> String {
-        self.get_component_id()
+    pub async fn component_id(&self) -> &str {
+        self.get_component_id().as_str()
     }
 
     /// Transform type
@@ -110,7 +110,7 @@ impl filter::CustomFilter<Transform> for TransformsFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(&transform.get_component_id()))),
+                .all(|f| f.filter_value(transform.get_component_id().as_str()))),
             self.component_type.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(transform.get_component_type())))
@@ -157,7 +157,7 @@ mod tests {
         sort::by_fields(&mut transforms, &fields);
 
         for (i, component_id) in ["append", "field_adder", "parse_json"].iter().enumerate() {
-            assert_eq!(transforms[i].get_component_id(), *component_id);
+            assert_eq!(transforms[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -171,7 +171,7 @@ mod tests {
         sort::by_fields(&mut transforms, &fields);
 
         for (i, component_id) in ["parse_json", "field_adder", "append"].iter().enumerate() {
-            assert_eq!(transforms[i].get_component_id(), *component_id);
+            assert_eq!(transforms[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -185,7 +185,7 @@ mod tests {
         sort::by_fields(&mut transforms, &fields);
 
         for (i, component_id) in ["field_adder", "append", "parse_json"].iter().enumerate() {
-            assert_eq!(transforms[i].get_component_id(), *component_id);
+            assert_eq!(transforms[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -199,7 +199,7 @@ mod tests {
         sort::by_fields(&mut transforms, &fields);
 
         for (i, component_id) in ["parse_json", "append", "field_adder"].iter().enumerate() {
-            assert_eq!(transforms[i].get_component_id(), *component_id);
+            assert_eq!(transforms[i].get_component_id().as_str(), *component_id);
         }
     }
 }

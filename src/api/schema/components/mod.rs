@@ -40,11 +40,11 @@ pub enum ComponentKind {
 }
 
 impl Component {
-    fn get_component_id(&self) -> String {
+    fn get_component_id(&self) -> &ComponentId {
         match self {
-            Component::Source(c) => c.0.component_id.to_string(),
-            Component::Transform(c) => c.0.component_id.to_string(),
-            Component::Sink(c) => c.0.component_id.to_string(),
+            Component::Source(c) => &c.0.component_id,
+            Component::Transform(c) => &c.0.component_id,
+            Component::Sink(c) => &c.0.component_id,
         }
     }
 
@@ -69,7 +69,7 @@ impl filter::CustomFilter<Component> for ComponentsFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(&component.get_component_id()))),
+                .all(|f| f.filter_value(component.get_component_id().as_str()))),
             self.component_kind.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(component.get_component_kind())))
@@ -450,7 +450,7 @@ mod tests {
         let expectations = ["devnull", "gen1", "gen2", "gen3", "parse_json"];
 
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id(), *component_id);
+            assert_eq!(components[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -466,7 +466,7 @@ mod tests {
         let expectations = ["parse_json", "gen3", "gen2", "gen1", "devnull"];
 
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id(), *component_id);
+            assert_eq!(components[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -524,7 +524,7 @@ mod tests {
 
         let expectations = ["d", "e", "f", "g", "c", "a", "b"];
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id(), *component_id);
+            assert_eq!(components[i].get_component_id().as_str(), *component_id);
         }
     }
 }
