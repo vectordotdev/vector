@@ -13,6 +13,7 @@ use crate::{
     Pipeline,
 };
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
     collections::HashMap,
@@ -22,6 +23,10 @@ use std::{
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
 use vector_core::enrichment;
+
+lazy_static! {
+    static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
+}
 
 pub struct Pieces {
     pub inputs: HashMap<ComponentId, (buffers::BufferInputCloner<Event>, Vec<ComponentId>)>,
@@ -122,11 +127,11 @@ pub async fn build_pieces(
         source_tasks.insert(id.clone(), server);
     }
 
-    let enrichment_tables = enrichment::TableRegistry::new(enrichment_tables);
+    ENRICHMENT_TABLES.load(enrichment_tables);
 
-    let mut context = TransformContext {
+    let context = TransformContext {
         globals: config.global.clone(),
-        enrichment_tables,
+        enrichment_tables: ENRICHMENT_TABLES.clone(),
     };
 
     // Build transforms
@@ -318,7 +323,7 @@ pub async fn build_pieces(
 
     // We should have all the data for the enrichment tables loaded now, so switch them over to
     // readonly.
-    context.enrichment_tables.finish_load();
+    ENRICHMENT_TABLES.finish_load();
 
     if errors.is_empty() {
         let pieces = Pieces {
@@ -329,7 +334,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables: context.enrichment_tables,
+            enrichment_tables: ENRICHMENT_TABLES.clone(),
         };
 
         Ok(pieces)

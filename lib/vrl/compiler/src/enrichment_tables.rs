@@ -6,7 +6,7 @@ pub enum Condition {
 
 pub trait EnrichmentTableSetup {
     fn table_ids(&self) -> Vec<String>;
-    fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String>;
+    fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<(), String>;
 }
 
 pub trait EnrichmentTableSearch: DynClone {
@@ -28,7 +28,7 @@ impl EnrichmentTableSetup for EmptyEnrichmentTables {
         Vec::new()
     }
 
-    fn add_index(&mut self, _table: &str, _fields: Vec<&str>) -> Result<(), String> {
+    fn add_index(&mut self, _table: &str, _fields: &[&str]) -> Result<(), String> {
         Ok(())
     }
 }

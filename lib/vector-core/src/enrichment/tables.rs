@@ -27,32 +27,68 @@
 use super::Table;
 use arc_swap::ArcSwap;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+#[derive(Clone, Default)]
 pub struct TableRegistry {
-    loading: Option<HashMap<String, Box<dyn Table + Send + Sync>>>,
+    loading: Arc<Mutex<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
     tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
 }
 
-impl Default for TableRegistry {
-    fn default() -> Self {
-        Self::new(HashMap::new())
-    }
-}
-
 impl TableRegistry {
-    pub fn new(tables: HashMap<String, Box<dyn Table + Send + Sync>>) -> Self {
-        Self {
-            loading: Some(tables),
-            tables: Arc::new(ArcSwap::default()),
+    /// Load the given Enrichment Tables into the registry.
+    ///
+    /// If there are no tables currently loaded into the registry, this is a simple operation, we
+    /// simply load the tables into the `loading` field.
+    ///
+    /// If there are tables that have already been loaded things get a bit more complicated. This
+    /// can occur when the config is reloaded. Vector will be currently running and transforming
+    /// events, thus the tables loaded into the `tables` field could be in active use. Since there
+    /// is no lock against these tables, we cannot mutate this list. We do need to have a full list
+    /// of tables in the `loading` field since there may be some transforms that will need to add
+    /// indexes to these tables during the reload.
+    ///
+    /// Our only option is to clone the data that is in `tables` and move it into the `loading`
+    /// field so it can be mutated. This could be a potentially expensive operation. For the period
+    /// whilst the config is reloading we could potentially have double the enrichment data loaded
+    /// into memory.
+    ///
+    /// Once loading is complete, the data is swapped out of `loading` and we return to a single
+    /// copy of the tables.
+    ///
+    /// TODO This function currently does nothing to reload the the underlying data should it have
+    /// changed in the enrichment source.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned.
+    pub fn load(&self, mut tables: HashMap<String, Box<dyn Table + Send + Sync>>) {
+        let mut loading = self.loading.lock().unwrap();
+        let existing = self.tables.load();
+        if let Some(existing) = &**existing {
+            // We already have some tables
+            tables.extend(
+                existing
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone())),
+            );
+        }
+        match *loading {
+            None => *loading = Some(tables),
+            Some(ref mut loading) => loading.extend(tables),
         }
     }
 
     /// Swap the data out of the `HashTable` into the `ArcSwap`.
     /// From this point we can no longer add indexes to the tables, but are now allowed to read the
     /// data.
-    pub fn finish_load(&mut self) {
-        let tables = self.loading.take();
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned.
+    pub fn finish_load(&self) {
+        let mut tables_lock = self.loading.lock().unwrap();
+        let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
     }
 
@@ -71,24 +107,18 @@ impl std::fmt::Debug for TableRegistry {
 
 #[cfg(feature = "vrl")]
 impl vrl_core::EnrichmentTableSetup for TableRegistry {
-    /// Return a list of the available tables. This will work regardless of which mode we are in.
-    /// If we are in the writing stage, this will acquire a lock to retrieve the tables.
+    /// Return a list of the available tables that we can write to.
+    /// This only works in the writing stage and will acquire a lock to retrieve the tables.
     ///
     /// # Panics
     ///
-    /// Panics if the Mutex is poisoned in write mode.
+    /// Panics if the Mutex is poisoned.
     fn table_ids(&self) -> Vec<String> {
-        let tables = self.tables.load();
-        (*tables).as_ref().as_ref().map_or_else(
-            || {
-                // We are still loading, so we must access the mutex to get the table list.
-                match self.loading {
-                    Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
-                    None => Vec::new(),
-                }
-            },
-            |tables| tables.iter().map(|(key, _)| key.clone()).collect(),
-        )
+        let locked = self.loading.lock().unwrap();
+        match *locked {
+            Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
+            None => Vec::new(),
+        }
     }
 
     /// Adds an index to the given Enrichment Table.
@@ -97,13 +127,15 @@ impl vrl_core::EnrichmentTableSetup for TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
-    fn add_index(&mut self, table: &str, fields: Vec<&str>) -> Result<(), String> {
-        match self.loading {
+    fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<(), String> {
+        let mut locked = self.loading.lock().unwrap();
+
+        match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
-                None => Err(format!("table {} not loaded", table)),
+                None => Err(format!("table '{}' not loaded", table)),
                 Some(table) => {
-                    table.add_index(&fields);
+                    table.add_index(fields);
                     Ok(())
                 }
             },
@@ -213,8 +245,9 @@ mod tests {
         tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
         tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
 
-        let tables = super::TableRegistry::new(tables);
-        let mut result = tables.table_ids();
+        let registry = super::TableRegistry::default();
+        registry.load(tables);
+        let mut result = registry.table_ids();
         result.sort();
         assert_eq!(vec!["dummy1", "dummy2"], result);
     }
@@ -225,8 +258,9 @@ mod tests {
         let indexes = Arc::new(Mutex::new(Vec::new()));
         let dummy = DummyEnrichmentTable::new_with_index(indexes.clone());
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let mut tables = super::TableRegistry::new(tables);
-        assert_eq!(Ok(()), tables.add_index("dummy1", vec!["erk"]));
+        let mut registry = super::TableRegistry::default();
+        registry.load(tables);
+        assert_eq!(Ok(()), registry.add_index("dummy1", &["erk"]));
 
         let indexes = indexes.lock().unwrap();
         assert_eq!(vec!["erk".to_string()], *indexes[0]);
@@ -237,7 +271,9 @@ mod tests {
         let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let tables = super::TableRegistry::new(tables).as_readonly();
+        let registry = super::TableRegistry::default();
+        registry.load(tables);
+        let tables = registry.as_readonly();
 
         assert_eq!(
             Err("finish_load not called".to_string()),
@@ -256,11 +292,12 @@ mod tests {
         let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let mut tables = super::TableRegistry::new(tables);
-        tables.finish_load();
+        let mut registry = super::TableRegistry::default();
+        registry.load(tables);
+        registry.finish_load();
         assert_eq!(
             Err("finish_load has been called".to_string()),
-            tables.add_index("dummy1", vec!["erk"])
+            registry.add_index("dummy1", &["erk"])
         );
     }
 
@@ -270,10 +307,11 @@ mod tests {
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
 
-        let mut tables = super::TableRegistry::new(tables);
-        let tables_search = tables.as_readonly();
+        let registry = super::TableRegistry::default();
+        registry.load(tables);
+        let tables_search = registry.as_readonly();
 
-        tables.finish_load();
+        registry.finish_load();
 
         assert_eq!(
             Ok(Some(vec!["result".to_string()])),
@@ -282,8 +320,34 @@ mod tests {
                 vec![vrl_core::Condition::Equals {
                     field: "thing".to_string(),
                     value: "thang".to_string(),
-                }]
+                }],
             )
         );
+    }
+
+    #[test]
+    fn can_reload() {
+        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
+
+        let registry = super::TableRegistry::default();
+        registry.load(tables);
+
+        assert_eq!(vec!["dummy1".to_string()], registry.table_ids());
+
+        registry.finish_load();
+
+        // After we finish load there are no tables in the list
+        assert!(registry.table_ids().is_empty());
+
+        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
+
+        // A load should put both tables back into the list.
+        registry.load(tables);
+        let mut table_ids = registry.table_ids();
+        table_ids.sort();
+
+        assert_eq!(vec!["dummy1".to_string(), "dummy2".to_string()], table_ids,);
     }
 }
