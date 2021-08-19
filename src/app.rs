@@ -258,6 +258,10 @@ impl Application {
                                 match config_builder.build().map_err(handle_config_errors) {
                                     Ok(mut new_config) => {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
+
+                                        #[cfg(feature = "datadog")]
+                                        config::datadog::attach(&mut new_config);
+
                                         match topology
                                             .reload_config_and_respawn(new_config)
                                             .await
@@ -289,6 +293,7 @@ impl Application {
                             SignalTo::ReloadFromDisk => {
                                 // Reload paths
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
+
                                 // Reload config
                                 let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
                                     .await
@@ -296,6 +301,10 @@ impl Application {
 
                                 if let Some(mut new_config) = new_config {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
+
+                                    #[cfg(feature = "datadog")]
+                                    config::datadog::attach(&mut new_config);
+
                                     match topology
                                         .reload_config_and_respawn(new_config)
                                         .await
