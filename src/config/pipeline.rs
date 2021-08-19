@@ -1,5 +1,7 @@
-use super::format::{deserialize, Format};
-use super::TransformOuter;
+use super::{
+    format::{deserialize, Format},
+    ComponentId, TransformOuter,
+};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -10,14 +12,14 @@ pub struct PipelineTransform {
     #[serde(flatten)]
     pub inner: TransformOuter,
     #[serde(default)]
-    pub outputs: Vec<String>,
+    pub outputs: Vec<ComponentId>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Pipeline {
     #[serde(default)]
-    pub transforms: IndexMap<String, PipelineTransform>,
+    pub transforms: IndexMap<ComponentId, PipelineTransform>,
 }
 
 impl Pipeline {
