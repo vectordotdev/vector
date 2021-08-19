@@ -27,6 +27,8 @@ pub mod clickhouse;
 pub mod console;
 #[cfg(feature = "sinks-datadog")]
 pub mod datadog;
+#[cfg(feature = "sinks-datadog_archives")]
+pub mod datadog_archives;
 #[cfg(feature = "sinks-elasticsearch")]
 pub mod elasticsearch;
 #[cfg(feature = "sinks-file")]

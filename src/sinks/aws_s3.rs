@@ -38,7 +38,7 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct S3Sink {
-    client: S3Client,
+    pub(crate) client: S3Client,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -50,7 +50,7 @@ pub struct S3SinkConfig {
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
     #[serde(flatten)]
-    options: S3Options,
+    pub(crate) options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
@@ -61,30 +61,30 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
-    assume_role: Option<String>,
+    pub(crate) assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct S3Options {
-    acl: Option<S3CannedAcl>,
-    grant_full_control: Option<String>,
-    grant_read: Option<String>,
-    grant_read_acp: Option<String>,
-    grant_write_acp: Option<String>,
-    server_side_encryption: Option<S3ServerSideEncryption>,
-    ssekms_key_id: Option<String>,
-    storage_class: Option<S3StorageClass>,
-    tags: Option<BTreeMap<String, String>>,
-    content_encoding: Option<String>, // inherit from compression value
-    content_type: Option<String>,     // default `text/x-log`
+pub(crate) struct S3Options {
+    pub(crate) acl: Option<S3CannedAcl>,
+    pub(crate) grant_full_control: Option<String>,
+    pub(crate) grant_read: Option<String>,
+    pub(crate) grant_read_acp: Option<String>,
+    pub(crate) grant_write_acp: Option<String>,
+    pub(crate) server_side_encryption: Option<S3ServerSideEncryption>,
+    pub(crate) ssekms_key_id: Option<String>,
+    pub(crate) storage_class: Option<S3StorageClass>,
+    pub(crate) tags: Option<BTreeMap<String, String>>,
+    pub(crate) content_encoding: Option<String>, // inherit from compression value
+    pub(crate) content_type: Option<String>,     // default `text/x-log`
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "kebab-case")]
-enum S3CannedAcl {
+pub(crate) enum S3CannedAcl {
     #[derivative(Default)]
     Private,
     PublicRead,
@@ -97,7 +97,7 @@ enum S3CannedAcl {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-enum S3ServerSideEncryption {
+pub(crate) enum S3ServerSideEncryption {
     #[serde(rename = "AES256")]
     Aes256,
     #[serde(rename = "aws:kms")]
@@ -107,7 +107,7 @@ enum S3ServerSideEncryption {
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, PartialEq, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum S3StorageClass {
+pub(crate) enum S3StorageClass {
     #[derivative(Default)]
     Standard,
     ReducedRedundancy,
@@ -331,7 +331,7 @@ impl Service<Request> for S3Sink {
     }
 }
 
-fn build_request(
+pub(crate) fn build_request(
     req: PartitionInnerBuffer<Vec<u8>, Bytes>,
     time_format: String,
     extension: Option<String>,
@@ -375,7 +375,7 @@ fn build_request(
 }
 
 #[derive(Debug, Clone)]
-struct Request {
+pub(crate) struct Request {
     body: Vec<u8>,
     bucket: String,
     key: String,
@@ -386,7 +386,7 @@ struct Request {
 impl Response for PutObjectOutput {}
 
 #[derive(Debug, Clone)]
-struct S3RetryLogic;
+pub(crate) struct S3RetryLogic;
 
 impl RetryLogic for S3RetryLogic {
     type Error = RusotoError<PutObjectError>;
