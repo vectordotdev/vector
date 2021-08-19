@@ -16,7 +16,6 @@ pub const ARRAY: u16 = 1 << 6;
 pub const TIMESTAMP: u16 = 1 << 7;
 pub const REGEX: u16 = 1 << 8;
 pub const NULL: u16 = 1 << 9;
-pub const ENRICHMENT_TABLE: u16 = 1 << 10;
 
 pub const ANY: u16 = BYTES | INTEGER | FLOAT | BOOLEAN | OBJECT | ARRAY | TIMESTAMP | REGEX | NULL;
 pub const SCALAR: u16 = BYTES | INTEGER | FLOAT | BOOLEAN | TIMESTAMP | REGEX | NULL;
@@ -32,7 +31,6 @@ bitflags::bitflags! {
         const Array = ARRAY;
         const Timestamp = TIMESTAMP;
         const Regex = REGEX;
-        const EnrichmentTable = ENRICHMENT_TABLE;
         const Null = NULL;
     }
 }
@@ -89,7 +87,6 @@ impl Kind {
             Kind::Timestamp => "\"timestamp\"",
             Kind::Regex => "\"regex\"",
             Kind::Null => "\"null\"",
-            Kind::EnrichmentTable => "\"enrichment_table\"",
             _ if self.is_all() => "\"unknown type\"",
             _ if self.is_empty() => "\"none\"",
             _ => "\"multiple\"",
@@ -107,7 +104,6 @@ impl Kind {
             Kind::Timestamp => "timestamp",
             Kind::Regex => "regex",
             Kind::Null => "null",
-            Kind::EnrichmentTable => "enrichment_table",
             _ if self.is_all() => "unknown type",
             _ if self.is_empty() => "none",
             _ => "multiple",
@@ -125,7 +121,6 @@ impl Kind {
                 | Kind::Array
                 | Kind::Timestamp
                 | Kind::Regex
-                | Kind::EnrichmentTable
                 | Kind::Null
         )
     }
@@ -224,7 +219,6 @@ impl_kind![
     (Array, array),
     (Timestamp, timestamp),
     (Regex, regex),
-    (EnrichmentTable, enrichment_table),
     (Null, null),
 ];
 

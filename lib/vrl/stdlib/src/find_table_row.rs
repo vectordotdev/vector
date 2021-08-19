@@ -11,7 +11,7 @@ impl Function for FindTableRow {
         &[
             Parameter {
                 keyword: "table",
-                kind: kind::ENRICHMENT_TABLE,
+                kind: kind::BYTES,
                 required: true,
             },
             Parameter {
