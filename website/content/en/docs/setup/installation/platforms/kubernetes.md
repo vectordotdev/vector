@@ -55,7 +55,7 @@ images:
   # Override the Vector image to avoid use of the sliding tag.
   - name: timberio/vector
     newName: timberio/vector
-    newTag: v{{< version >}}-debian
+    newTag: {{< version >}}-debian
 
 resources:
   # A namespace to keep the resources at.
