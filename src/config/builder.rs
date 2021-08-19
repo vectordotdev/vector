@@ -1,9 +1,8 @@
 #[cfg(feature = "api")]
 use super::api;
-use super::Pipelines;
 use super::{
-    compiler, provider, ComponentId, Config, HealthcheckOptions, SinkConfig, SinkOuter,
-    SourceConfig, SourceOuter, TestDefinition, TransformOuter,
+    compiler, pipeline::Pipelines, provider, ComponentId, Config, HealthcheckOptions, SinkConfig,
+    SinkOuter, SourceConfig, SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -30,6 +29,8 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    #[serde(default)]
+    pub pipelines: Pipelines,
 }
 
 impl Clone for ConfigBuilder {
@@ -56,13 +57,14 @@ impl From<Config> for ConfigBuilder {
             transforms: c.transforms,
             provider: None,
             tests: c.tests,
+            pipelines: c.pipelines,
         }
     }
 }
 
 impl ConfigBuilder {
-    pub fn build(self, pipelines: Pipelines) -> Result<Config, Vec<String>> {
-        let (config, warnings) = self.build_with_warnings(pipelines)?;
+    pub fn build(self) -> Result<Config, Vec<String>> {
+        let (config, warnings) = self.build_with_warnings()?;
 
         for warning in warnings {
             warn!("{}", warning);
@@ -71,11 +73,8 @@ impl ConfigBuilder {
         Ok(config)
     }
 
-    pub fn build_with_warnings(
-        self,
-        pipelines: Pipelines,
-    ) -> Result<(Config, Vec<String>), Vec<String>> {
-        compiler::compile(self, pipelines)
+    pub fn build_with_warnings(self) -> Result<(Config, Vec<String>), Vec<String>> {
+        compiler::compile(self)
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
@@ -112,6 +111,10 @@ impl ConfigBuilder {
 
         self.transforms
             .insert(ComponentId::from(id.into()), transform);
+    }
+
+    pub fn set_pipelines(&mut self, pipelines: Pipelines) {
+        self.pipelines = pipelines;
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {

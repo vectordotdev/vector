@@ -1,10 +1,7 @@
-use super::{builder::ConfigBuilder, validation, ComponentId, Config, ExpandType, Pipelines, TransformOuter};
+use super::{builder::ConfigBuilder, validation, ComponentId, Config, ExpandType, TransformOuter};
 use indexmap::IndexMap;
 
-pub fn compile(
-    mut builder: ConfigBuilder,
-    pipelines: Pipelines,
-) -> Result<(Config, Vec<String>), Vec<String>> {
+pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
     let expansions = expand_macros(&mut builder)?;
@@ -36,7 +33,7 @@ pub fn compile(
                 sinks: builder.sinks,
                 transforms: builder.transforms,
                 tests: builder.tests,
-                pipelines,
+                pipelines: builder.pipelines,
                 expansions,
             },
             warnings,
@@ -234,9 +231,7 @@ mod test {
         builder.add_sink("quix", &["*oo*"], MockSinkConfig);
         builder.add_sink("quux", &["*"], MockSinkConfig);
 
-        let config = builder
-            .build(Default::default())
-            .expect("build should succeed");
+        let config = builder.build().expect("build should succeed");
 
         assert_eq!(
             config

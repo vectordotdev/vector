@@ -139,13 +139,14 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     let pipelines = config::load_pipelines_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
-    let (builder, load_warnings) = config::load_builder_from_paths(&paths)
+    let (mut builder, load_warnings) = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
+    builder.set_pipelines(pipelines);
 
     // Build
     let (config, build_warnings) = builder
-        .build_with_warnings(pipelines)
+        .build_with_warnings()
         .map_err(&mut report_error)
         .ok()?;
 

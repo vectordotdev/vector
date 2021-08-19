@@ -111,15 +111,14 @@ async fn closed_source() {
         },
     );
 
-    let (mut topology, _crash) =
-        start_topology(old_config.build(Default::default()).unwrap(), false).await;
+    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
     trigger_old.cancel();
 
     topology.sources_finished().await;
 
     assert!(topology
-        .reload_config_and_respawn(new_config.build(Default::default()).unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap())
         .await
         .unwrap());
 }
@@ -174,10 +173,9 @@ async fn remove_sink() {
         },
     );
 
-    let (mut topology, _crash) =
-        start_topology(old_config.build(Default::default()).unwrap(), false).await;
+    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(new_config.build(Default::default()).unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap())
         .await
         .unwrap());
 }
@@ -240,10 +238,9 @@ async fn remove_transform() {
         },
     );
 
-    let (mut topology, _crash) =
-        start_topology(old_config.build(Default::default()).unwrap(), false).await;
+    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(new_config.build(Default::default()).unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap())
         .await
         .unwrap());
 }

@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+pub type Pipelines = IndexMap<String, Pipeline>;
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PipelineTransform {
     #[serde(flatten)]

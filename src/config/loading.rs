@@ -100,8 +100,9 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
 
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
     let pipelines = load_pipelines_from_paths(config_paths)?;
-    let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    let (config, build_warnings) = builder.build_with_warnings(pipelines)?;
+    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    builder.set_pipelines(pipelines);
+    let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
         warn!("{}", warning);
@@ -118,6 +119,7 @@ pub async fn load_from_paths_with_provider(
 ) -> Result<Config, Vec<String>> {
     let pipelines = load_pipelines_from_paths(config_paths)?;
     let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    builder.set_pipelines(pipelines);
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
@@ -127,7 +129,7 @@ pub async fn load_from_paths_with_provider(
         debug!(message = "Provider configured.", provider = ?provider.provider_type());
     }
 
-    let (new_config, build_warnings) = builder.build_with_warnings(pipelines)?;
+    let (new_config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
         warn!("{}", warning);
@@ -218,8 +220,10 @@ pub fn load_from_str(
     format: FormatHint,
     pipelines: IndexMap<String, Pipeline>,
 ) -> Result<Config, Vec<String>> {
-    let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
-    let (config, build_warnings) = builder.build_with_warnings(pipelines)?;
+    let (mut builder, load_warnings) =
+        load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
+    builder.set_pipelines(pipelines);
+    let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
         warn!("{}", warning);

@@ -46,8 +46,6 @@ pub use validation::warnings;
 pub use vector_core::config::proxy::ProxyConfig;
 pub use vector_core::config::{log_schema, LogSchema};
 
-pub type Pipelines = IndexMap<String, pipeline::Pipeline>;
-
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using
 /// configured log schema defaults.
