@@ -2,6 +2,7 @@ use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hasher;
+use tracing::trace;
 use vector_core::enrichment::{Condition, IndexHandle, Table};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
@@ -54,6 +55,12 @@ impl EnrichmentTableConfig for FileConfig {
             }
         };
 
+        trace!(
+            "Loaded enrichment file {} with headers {:?}",
+            self.filename,
+            headers
+        );
+
         Ok(Box::new(File::new(data, headers)))
     }
 }
@@ -87,7 +94,11 @@ impl File {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
-                Some(idx) => row[idx] == *value,
+                Some(idx) => row[idx]
+                    .chars()
+                    .flat_map(|c| c.to_lowercase())
+                    .zip(value.chars().flat_map(|c| c.to_lowercase()))
+                    .all(|(l, r)| l == r),
             },
         })
     }
@@ -126,7 +137,7 @@ impl File {
         for (idx, row) in self.data.iter().enumerate() {
             let mut hash = seahash::SeaHasher::default();
             for idx in &fieldidx {
-                hash.write(row[*idx].as_bytes());
+                hash.write(row[*idx].to_lowercase().as_bytes());
                 hash.write_u8(0);
             }
 
@@ -180,7 +191,7 @@ impl Table for File {
                         matches!(condition, Condition::Equals { field, .. } if field == header)
                     })
                     {
-                            hash.write(value.as_bytes());
+                            hash.write(value.to_lowercase().as_bytes());
                             hash.write_u8(0);
                     }
                 }
@@ -205,6 +216,8 @@ impl Table for File {
     }
 
     fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
+        trace!("Added index {:?}", fields);
+
         self.indexes.push(self.index_data(fields));
 
         // The returned index handle is the position of the index in our list of indexes.
