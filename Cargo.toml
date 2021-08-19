@@ -89,6 +89,7 @@ members = [
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
+  "lib/datadog/grok",
   "lib/datadog/search-syntax"
 ]
 
