@@ -12,7 +12,7 @@ Please see the [what to expect](#what-to-expect) section for more info.**
 1. [Public API](#public-api)
    1. [Areas that *are* covered](#areas-that-are-covered)
       1. [Intended for *public* consumption](#intended-for-public-consumption)
-      1. [Intedned for *private* consumption](#intedned-for-private-consumption)
+      1. [Intended for *private* consumption](#intended-for-private-consumption)
    1. [Areas are *NOT* covered](#areas-are-not-covered)
 1. [What to expect](#what-to-expect)
    1. [Patch and minor versions](#patch-and-minor-versions)
@@ -54,7 +54,7 @@ a major version increment.
   * The [`vector validate` subcommand] and its input/output.
 * [GraphQL API]
 
-#### Intedned for *private* consumption
+#### Intended for *private* consumption
 
 The following Vector areas are inteded for *private* consumption (consumption by
 Vector only). Backward incompatble changes will trigger a major version
