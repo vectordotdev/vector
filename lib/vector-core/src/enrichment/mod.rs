@@ -2,12 +2,13 @@ pub mod tables;
 
 use std::collections::BTreeMap;
 
+use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
 pub use vrl_core::{Condition, IndexHandle};
 
 /// Enrichment tables represent additional data sources that can be used to enrich the event data
 /// passing through Vector.
-pub trait Table: std::fmt::Debug {
+pub trait Table: DynClone {
     /// Search the enrichment table data with the given condition.
     /// All fields within the data must match (AND).
     ///
@@ -26,3 +27,5 @@ pub trait Table: std::fmt::Debug {
     /// Errors if the fields are not in the table.
     fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String>;
 }
+
+dyn_clone::clone_trait_object!(Table);

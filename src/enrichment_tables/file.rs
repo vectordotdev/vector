@@ -71,6 +71,7 @@ inventory::submit! {
 
 impl_generate_config_from_default!(FileConfig);
 
+#[derive(Clone)]
 pub struct File {
     data: Vec<Vec<String>>,
     headers: Vec<String>,
