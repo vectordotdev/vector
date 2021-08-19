@@ -31,7 +31,7 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
-    pub enrichment_tables: enrichment::Tables,
+    pub enrichment_tables: enrichment::TableRegistry,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -122,7 +122,7 @@ pub async fn build_pieces(
         source_tasks.insert(id.clone(), server);
     }
 
-    let enrichment_tables = enrichment::Tables::new(enrichment_tables);
+    let enrichment_tables = enrichment::TableRegistry::new(enrichment_tables);
 
     let mut context = TransformContext {
         globals: config.global.clone(),
