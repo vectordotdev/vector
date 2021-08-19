@@ -1,4 +1,4 @@
-use crate::config::Resource;
+use crate::config::{ComponentId, Resource};
 use crate::event::Event;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,7 @@ impl BufferConfig {
     pub fn build(
         &self,
         data_dir: &Option<PathBuf>,
-        sink_id: &str,
+        sink_id: &ComponentId,
     ) -> Result<(BufferInputCloner<Event>, EventStream, Acker), String> {
         let variant = match &self {
             BufferConfig::Memory {
