@@ -79,6 +79,8 @@ pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
+    #[cfg(feature = "datadog")]
+    pub datadog: datadog::Options,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<String, SourceOuter>,
     pub sinks: IndexMap<String, SinkOuter>,

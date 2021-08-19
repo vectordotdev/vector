@@ -173,11 +173,8 @@ impl Application {
                 config.healthchecks.set_require_healthy(require_healthy);
 
                 #[cfg(feature = "datadog")]
-                // Augment config with Datadog observability pipeline, as required.
-                if let Some(datadog_api_key) = config::datadog::get_api_key() {
-                    info!("Datadog API key detected. Internal metrics will be sent to Datadog.");
-                    config::datadog::init(&mut config, datadog_api_key);
-                }
+                // Augment config to enable observability within Datadog, if applicable.
+                config::datadog::attach(&mut config);
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())

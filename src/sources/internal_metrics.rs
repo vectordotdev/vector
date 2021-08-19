@@ -21,10 +21,8 @@ pub struct InternalMetricsConfig {
 }
 
 impl InternalMetricsConfig {
-    // TODO: Remove this annotation once it's actually being used.
-    #[allow(dead_code)]
     /// Override the default namespace.
-    fn namespace<T: Into<String>>(namespace: T) -> Self {
+    pub fn namespace<T: Into<String>>(namespace: T) -> Self {
         Self {
             namespace: Some(namespace.into()),
             ..Self::default()
