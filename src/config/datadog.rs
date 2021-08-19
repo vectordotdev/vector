@@ -1,14 +1,8 @@
-use super::{Config, SinkOuter, SourceOuter, ComponentId};
+use super::{ComponentId, Config, SinkOuter, SourceOuter};
 use crate::{
     sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
 };
 use serde::{Deserialize, Serialize};
-
-// The '#' character here is being used to denote an internal name. It's 'unspeakable'
-// in default TOML configurations, but could clash in JSON config so this isn't fool-proof.
-// TODO: Refactor for component scope once https://github.com/timberio/vector/pull/8654 lands.
-static INTERNAL_METRICS_NAME: &str =;
-static DATADOG_METRICS_NAME: &str = ;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -66,12 +60,8 @@ pub fn attach(config: &mut Config) {
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogConfig::from_api_key(api_key);
 
-
     config.sinks.insert(
         datadog_metrics_id,
-        SinkOuter::new(
-            vec![internal_metrics_id],
-            Box::new(datadog_metrics),
-        ),
+        SinkOuter::new(vec![internal_metrics_id], Box::new(datadog_metrics)),
     );
 }
