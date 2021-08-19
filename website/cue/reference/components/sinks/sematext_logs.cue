@@ -29,8 +29,8 @@ components: sinks: sematext_logs: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				headers:                    false
+				enabled: true
+				headers: false
 			}
 			tls: enabled: false
 			to: sinks._sematext.features.send.to

@@ -443,11 +443,11 @@ components: {
 
 	#IAM: {
 		#Policy: {
-			#RequiredFor: "write" | "healthcheck"
+			#RequiredFor: "operation" | "healthcheck"
 
 			// TODO: come up with a less janky URL generation scheme
 			_action:        !=""
-			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
+			required_for:   *["operation"] | [#RequiredFor, ...#RequiredFor]
 			docs_url:       !=""
 			required_when?: !=""
 
@@ -914,7 +914,7 @@ components: {
 				inputs: {
 					description: """
 						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
-						IDs. Wildcards (`*`) are supported but _must_ be the last character in the ID.
+						IDs. Wildcards (`*`) are supported.
 
 						See [configuration](\(urls.vector_configuration)) for more info.
 						"""

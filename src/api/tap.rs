@@ -1,6 +1,7 @@
 use super::{ShutdownRx, ShutdownTx};
 use crate::topology::fanout::ControlChannel;
 use crate::{
+    config::ComponentId,
     event::{Event, LogEvent},
     topology::{fanout, WatchRx},
 };
@@ -43,18 +44,18 @@ pub enum TapNotification {
 /// to be communicated back to the client to alert them about the status of the tap request.
 #[derive(Debug)]
 pub enum TapPayload {
-    Log(String, LogEvent),
-    Metric(String, LogEvent),
-    Notification(String, TapNotification),
+    Log(ComponentId, LogEvent),
+    Metric(ComponentId, LogEvent),
+    Notification(ComponentId, TapNotification),
 }
 
 impl TapPayload {
     pub fn matched(input_id: &str) -> Self {
-        Self::Notification(input_id.to_string(), TapNotification::Matched)
+        Self::Notification(ComponentId::from(input_id), TapNotification::Matched)
     }
 
     pub fn not_matched(input_id: &str) -> Self {
-        Self::Notification(input_id.to_string(), TapNotification::NotMatched)
+        Self::Notification(ComponentId::from(input_id), TapNotification::NotMatched)
     }
 }
 
@@ -62,12 +63,12 @@ impl TapPayload {
 /// `Event`s. If these are of type `Event::LogEvent`, they are relayed to the tap client.
 pub struct TapSink {
     tap_tx: TapSender,
-    component_id: String,
+    component_id: ComponentId,
     buffer: VecDeque<LogEvent>,
 }
 
 impl TapSink {
-    pub fn new(tap_tx: TapSender, component_id: String) -> Self {
+    pub fn new(tap_tx: TapSender, component_id: ComponentId) -> Self {
         Self {
             tap_tx,
             component_id,
@@ -161,7 +162,7 @@ impl TapController {
 }
 
 /// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
-fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: String) -> ShutdownTx {
+fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: ComponentId) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
@@ -171,9 +172,9 @@ fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: String) -> Shutdown
             .await
             .is_err()
         {
-            debug!(message = "Couldn't disconnect sink.", sink_id = ?sink_id);
+            debug!(message = "Couldn't disconnect sink.", ?sink_id);
         } else {
-            debug!(message = "Disconnected sink.", sink_id = ?sink_id);
+            debug!(message = "Disconnected sink.", ?sink_id);
         }
     });
 
@@ -204,7 +205,7 @@ async fn tap_handler(
 
     // Sinks register for the current tap. Contains the id of the matched component, and
     // a shutdown trigger for sending a remove control message when matching sinks change.
-    let mut sinks = HashMap::new();
+    let mut sinks: HashMap<ComponentId, _> = HashMap::new();
 
     loop {
         tokio::select! {
@@ -214,7 +215,7 @@ async fn tap_handler(
                 // round of matches when sending notifications.
                 let last_matches = patterns
                     .iter()
-                    .filter(|pattern| sinks.keys().any(|id: &String| pattern.matches_glob(id)))
+                    .filter(|pattern| sinks.keys().any(|id| pattern.matches_glob(id.as_str())))
                     .collect::<HashSet<_>>();
 
                 // Cache of matched patterns. A `HashSet` is used here to ignore repetition.
@@ -229,7 +230,7 @@ async fn tap_handler(
                 for (component_id, mut control_tx) in outputs.iter() {
                     match patterns
                         .iter()
-                        .filter(|pattern| pattern.matches_glob(component_id))
+                        .filter(|pattern| pattern.matches_glob(component_id.as_str()))
                         .collect_vec()
                     {
                         found if !found.is_empty() => {
@@ -242,11 +243,11 @@ async fn tap_handler(
                             // reconfigured with the same id as a previous, and we are not
                             // getting involved in config diffing at this point.
                             let sink_id = Uuid::new_v4().to_string();
-                            let sink = TapSink::new(tx.clone(), component_id.to_string());
+                            let sink = TapSink::new(tx.clone(), component_id.clone());
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(sink_id.clone(), Box::new(sink)))
+                                .send(fanout::ControlMessage::Add(ComponentId::from(&sink_id), Box::new(sink)))
                                 .await
                             {
                                 Ok(_) => {
@@ -257,7 +258,7 @@ async fn tap_handler(
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
                                     sinks
-                                        .insert(component_id.to_string(), shutdown_trigger(control_tx.clone(), sink_id));
+                                        .insert(component_id.clone(), shutdown_trigger(control_tx.clone(), ComponentId::global(&sink_id)));
                                 }
                                 Err(error) => {
                                     error!(
@@ -344,11 +345,11 @@ mod tests {
     async fn sink_log_events() {
         let pattern_matched = "tes*";
         let pattern_not_matched = "xyz";
-        let id = "test";
+        let id = ComponentId::global("test");
 
         let (mut fanout, control_tx) = fanout::Fanout::new();
         let mut outputs = HashMap::new();
-        outputs.insert(id.to_string(), control_tx);
+        outputs.insert(id.clone(), control_tx);
 
         let (watch_tx, watch_rx) = watch::channel(HashMap::new());
         let (sink_tx, mut sink_rx) = tokio_mpsc::channel(10);
@@ -370,12 +371,12 @@ mod tests {
         for notification in notifications.into_iter() {
             match notification {
                 Some(TapPayload::Notification(returned_id, TapNotification::Matched))
-                    if returned_id == pattern_matched =>
+                    if returned_id.as_str() == pattern_matched =>
                 {
                     continue
                 }
                 Some(TapPayload::Notification(returned_id, TapNotification::NotMatched))
-                    if returned_id == pattern_not_matched =>
+                    if returned_id.as_str() == pattern_not_matched =>
                 {
                     continue
                 }
@@ -387,7 +388,7 @@ mod tests {
         // to ensure the event handler has been initialized.
         let log_event = Event::new_empty_log();
         let metric_event = Event::from(Metric::new(
-            id,
+            id.as_str(),
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         ));

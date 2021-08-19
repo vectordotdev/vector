@@ -29,9 +29,9 @@ components: sinks: gcp_stackdriver_metrics: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				rate_limit_num:             1000
-				headers:                    false
+				enabled:        true
+				rate_limit_num: 1000
+				headers:        false
 			}
 			tls: {
 				enabled:                true
@@ -168,7 +168,7 @@ components: sinks: gcp_stackdriver_metrics: {
 			policies: [
 				{
 					_action: "timeSeries.create"
-					required_for: ["healthcheck", "write"]
+					required_for: ["healthcheck", "operation"]
 				},
 			]
 		},

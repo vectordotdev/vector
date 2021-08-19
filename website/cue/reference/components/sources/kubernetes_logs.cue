@@ -424,9 +424,7 @@ components: sources: kubernetes_logs: {
 			title: "Sample Output"
 			configuration: {}
 			input: """
-				```text
 				F1015 11:01:46.499073       1 main.go:39] error getting server version: Get \"https://10.96.0.1:443/version?timeout=32s\": dial tcp 10.96.0.1:443: connect: network is unreachable
-				```
 				"""
 			output: log: {
 				"file":                       "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log"

@@ -39,8 +39,8 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				headers:                    false
+				enabled: true
+				headers: false
 			}
 			tls: enabled: false
 			to: {
