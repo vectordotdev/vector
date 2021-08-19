@@ -2,8 +2,8 @@
 use super::api;
 use super::Pipelines;
 use super::{
-    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
-    SourceOuter, TestDefinition, TransformOuter,
+    compiler, provider, ComponentId, Config, HealthcheckOptions, SinkConfig, SinkOuter,
+    SourceConfig, SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -22,11 +22,11 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub sources: IndexMap<String, SourceOuter>,
+    pub sources: IndexMap<ComponentId, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<String, SinkOuter>,
+    pub sinks: IndexMap<ComponentId, SinkOuter>,
     #[serde(default)]
-    pub transforms: IndexMap<String, TransformOuter>,
+    pub transforms: IndexMap<ComponentId, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
@@ -79,7 +79,8 @@ impl ConfigBuilder {
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
-        self.sources.insert(id.into(), SourceOuter::new(source));
+        self.sources
+            .insert(ComponentId::from(id.into()), SourceOuter::new(source));
     }
 
     pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
@@ -88,10 +89,10 @@ impl ConfigBuilder {
         inputs: &[&str],
         sink: S,
     ) {
-        let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
+        let inputs = inputs.iter().map(ComponentId::from).collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
 
-        self.sinks.insert(id.into(), sink);
+        self.sinks.insert(ComponentId::from(id.into()), sink);
     }
 
     pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
@@ -100,13 +101,17 @@ impl ConfigBuilder {
         inputs: &[&str],
         transform: T,
     ) {
-        let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
+        let inputs = inputs
+            .iter()
+            .map(|value| ComponentId::from(value.to_string()))
+            .collect::<Vec<_>>();
         let transform = TransformOuter {
             inner: Box::new(transform),
             inputs,
         };
 
-        self.transforms.insert(id.into(), transform);
+        self.transforms
+            .insert(ComponentId::from(id.into()), transform);
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {

@@ -6,7 +6,7 @@ use crate::topology::{
 };
 use crate::{
     buffers,
-    config::{Config, ConfigDiff, HealthcheckOptions, Resource},
+    config::{ComponentId, Config, ConfigDiff, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::TaskOutput},
@@ -25,12 +25,12 @@ use tracing::Instrument;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<String, buffers::BufferInputCloner<Event>>,
-    outputs: HashMap<String, ControlChannel>,
-    source_tasks: HashMap<String, TaskHandle>,
-    tasks: HashMap<String, TaskHandle>,
+    inputs: HashMap<ComponentId, buffers::BufferInputCloner<Event>>,
+    outputs: HashMap<ComponentId, ControlChannel>,
+    source_tasks: HashMap<ComponentId, TaskHandle>,
+    tasks: HashMap<ComponentId, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
-    detach_triggers: HashMap<String, DisabledTrigger>,
+    detach_triggers: HashMap<ComponentId, DisabledTrigger>,
     pub(crate) config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
@@ -81,7 +81,7 @@ impl RunningTopology {
         let mut wait_handles = Vec::new();
         // We need a Vec here since source components have two tasks. One for
         // pump in self.tasks, and the other for source in self.source_tasks.
-        let mut check_handles = HashMap::<String, Vec<_>>::new();
+        let mut check_handles = HashMap::<ComponentId, Vec<_>>::new();
 
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
@@ -106,11 +106,15 @@ impl RunningTopology {
                 retain(handles, |handle| handle.peek().is_none());
                 !handles.is_empty()
             });
-            let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
+            let remaining_components = check_handles2
+                .keys()
+                .map(|item| item.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
 
             error!(
               message = "Failed to gracefully shut down in time. Killing components.",
-                components = ?remaining_components.join(", ")
+                components = ?remaining_components
             );
         };
 
@@ -124,7 +128,11 @@ impl RunningTopology {
                     retain(handles, |handle| handle.peek().is_none());
                     !handles.is_empty()
                 });
-                let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
+                let remaining_components = check_handles
+                    .keys()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
 
                 let time_remaining = match deadline.checked_duration_since(Instant::now()) {
                     Some(remaining) => format!("{} seconds left", remaining.as_secs()),
@@ -132,7 +140,7 @@ impl RunningTopology {
                 };
 
                 info!(
-                    message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
+                    message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components, time_remaining = ?time_remaining
                 );
             }
         };
@@ -252,7 +260,7 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_config: &Config,
-    ) -> HashMap<String, BuiltBuffer> {
+    ) -> HashMap<ComponentId, BuiltBuffer> {
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -455,7 +463,12 @@ impl RunningTopology {
         if !self.watch.0.is_closed() {
             self.watch
                 .0
-                .send(self.outputs.clone())
+                .send(
+                    self.outputs
+                        .iter()
+                        .map(|item| (item.0.clone(), item.1.clone()))
+                        .collect::<HashMap<_, _>>(),
+                )
                 .expect("Couldn't broadcast config changes.");
         }
     }
@@ -496,7 +509,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_sink(&mut self, id: &str, new_pieces: &mut builder::Pieces) {
+    fn spawn_sink(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "sink",
@@ -508,12 +521,12 @@ impl RunningTopology {
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
-        if let Some(previous) = self.tasks.insert(id.to_string(), spawned) {
+        if let Some(previous) = self.tasks.insert(id.clone(), spawned) {
             drop(previous); // detach and forget
         }
     }
 
-    fn spawn_transform(&mut self, id: &str, new_pieces: &mut builder::Pieces) {
+    fn spawn_transform(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "transform",
@@ -525,12 +538,12 @@ impl RunningTopology {
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
-        if let Some(previous) = self.tasks.insert(id.to_string(), spawned) {
+        if let Some(previous) = self.tasks.insert(id.clone(), spawned) {
             drop(previous); // detach and forget
         }
     }
 
-    fn spawn_source(&mut self, id: &str, new_pieces: &mut builder::Pieces) {
+    fn spawn_source(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "source",
@@ -542,7 +555,7 @@ impl RunningTopology {
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task);
-        if let Some(previous) = self.tasks.insert(id.to_string(), spawned) {
+        if let Some(previous) = self.tasks.insert(id.clone(), spawned) {
             drop(previous); // detach and forget
         }
 
@@ -552,14 +565,14 @@ impl RunningTopology {
         let source_task = new_pieces.source_tasks.remove(id).unwrap();
         let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
         self.source_tasks
-            .insert(id.to_string(), tokio::spawn(source_task));
+            .insert(id.clone(), tokio::spawn(source_task));
     }
 
-    fn remove_outputs(&mut self, id: &str) {
+    fn remove_outputs(&mut self, id: &ComponentId) {
         self.outputs.remove(id);
     }
 
-    async fn remove_inputs(&mut self, id: &str) {
+    async fn remove_inputs(&mut self, id: &ComponentId) {
         self.inputs.remove(id);
         self.detach_triggers.remove(id);
 
@@ -572,13 +585,13 @@ impl RunningTopology {
             for input in inputs {
                 if let Some(output) = self.outputs.get_mut(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
-                    let _ = output.send(ControlMessage::Remove(id.to_string())).await;
+                    let _ = output.send(ControlMessage::Remove(id.clone())).await;
                 }
             }
         }
     }
 
-    async fn setup_outputs(&mut self, id: &str, new_pieces: &mut builder::Pieces) {
+    async fn setup_outputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let mut output = new_pieces.outputs.remove(id).unwrap();
 
         for (sink_id, sink) in &self.config.sinks {
@@ -604,10 +617,10 @@ impl RunningTopology {
             }
         }
 
-        self.outputs.insert(id.to_string(), output);
+        self.outputs.insert(id.clone(), output);
     }
 
-    async fn setup_inputs(&mut self, id: &str, new_pieces: &mut builder::Pieces) {
+    async fn setup_inputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(id).unwrap();
 
         for input in inputs {
@@ -616,18 +629,18 @@ impl RunningTopology {
                 .outputs
                 .get_mut(&input)
                 .unwrap()
-                .send(ControlMessage::Add(id.to_string(), tx.get()))
+                .send(ControlMessage::Add(id.clone(), tx.get()))
                 .await;
         }
 
-        self.inputs.insert(id.to_string(), tx);
+        self.inputs.insert(id.clone(), tx);
         new_pieces
             .detach_triggers
             .remove(id)
-            .map(|trigger| self.detach_triggers.insert(id.to_string(), trigger.into()));
+            .map(|trigger| self.detach_triggers.insert(id.clone(), trigger.into()));
     }
 
-    async fn replace_inputs(&mut self, id: &str, new_pieces: &mut builder::Pieces) {
+    async fn replace_inputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(id).unwrap();
 
         let sink_inputs = self.config.sinks.get(id).map(|s| &s.inputs);
@@ -647,7 +660,7 @@ impl RunningTopology {
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get_mut(input) {
                 // This can only fail if we are disconnected, which is a valid situation.
-                let _ = output.send(ControlMessage::Remove(id.to_string())).await;
+                let _ = output.send(ControlMessage::Remove(id.clone())).await;
             }
         }
 
@@ -657,7 +670,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Add(id.to_string(), tx.get()))
+                .send(ControlMessage::Add(id.clone(), tx.get()))
                 .await;
         }
 
@@ -667,18 +680,18 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(id.to_string(), Some(tx.get())))
+                .send(ControlMessage::Replace(id.clone(), Some(tx.get())))
                 .await;
         }
 
-        self.inputs.insert(id.to_string(), tx);
+        self.inputs.insert(id.clone(), tx);
         new_pieces
             .detach_triggers
             .remove(id)
-            .map(|trigger| self.detach_triggers.insert(id.to_string(), trigger.into()));
+            .map(|trigger| self.detach_triggers.insert(id.clone(), trigger.into()));
     }
 
-    async fn detach_inputs(&mut self, id: &str) {
+    async fn detach_inputs(&mut self, id: &ComponentId) {
         self.inputs.remove(id);
         self.detach_triggers.remove(id);
 
@@ -693,7 +706,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(id.to_string(), None))
+                .send(ControlMessage::Replace(id.clone(), None))
                 .await;
         }
     }

@@ -22,7 +22,7 @@ And one **deprecation**:
 
 We cover them below to help you upgrade quickly:
 
-[##](##) Upgrade Guide
+## Upgrade guide
 
 ### Component name field renamed to ID {#name-to-id}
 

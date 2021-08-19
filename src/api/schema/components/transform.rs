@@ -5,6 +5,7 @@ use crate::{
         metrics::{self, IntoTransformMetrics},
         sort,
     },
+    config::ComponentId,
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
@@ -12,17 +13,17 @@ use std::cmp;
 
 #[derive(Debug, Clone)]
 pub struct Data {
-    pub component_id: String,
+    pub component_id: ComponentId,
     pub component_type: String,
-    pub inputs: Vec<String>,
+    pub inputs: Vec<ComponentId>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Transform(pub Data);
 
 impl Transform {
-    pub fn get_component_id(&self) -> &str {
-        self.0.component_id.as_str()
+    pub fn get_component_id(&self) -> &ComponentId {
+        &self.0.component_id
     }
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
@@ -52,7 +53,7 @@ impl sort::SortableByField<TransformsSortFieldName> for Transform {
 impl Transform {
     /// Transform component_id
     pub async fn component_id(&self) -> &str {
-        self.get_component_id()
+        self.get_component_id().as_str()
     }
 
     /// Transform type
@@ -109,7 +110,7 @@ impl filter::CustomFilter<Transform> for TransformsFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(transform.get_component_id()))),
+                .all(|f| f.filter_value(transform.get_component_id().as_str()))),
             self.component_type.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(transform.get_component_type())))
@@ -129,17 +130,17 @@ mod tests {
     fn transform_fixtures() -> Vec<Transform> {
         vec![
             Transform(Data {
-                component_id: "parse_json".to_string(),
+                component_id: ComponentId::from("parse_json"),
                 component_type: "json".to_string(),
                 inputs: vec![],
             }),
             Transform(Data {
-                component_id: "field_adder".to_string(),
+                component_id: ComponentId::from("field_adder"),
                 component_type: "add_fields".to_string(),
                 inputs: vec![],
             }),
             Transform(Data {
-                component_id: "append".to_string(),
+                component_id: ComponentId::from("append"),
                 component_type: "concat".to_string(),
                 inputs: vec![],
             }),
@@ -156,7 +157,7 @@ mod tests {
         sort::by_fields(&mut transforms, &fields);
 
         for (i, component_id) in ["append", "field_adder", "parse_json"].iter().enumerate() {
-            assert_eq!(transforms[i].get_component_id(), *component_id);
+            assert_eq!(transforms[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -170,7 +171,7 @@ mod tests {
         sort::by_fields(&mut transforms, &fields);
 
         for (i, component_id) in ["parse_json", "field_adder", "append"].iter().enumerate() {
-            assert_eq!(transforms[i].get_component_id(), *component_id);
+            assert_eq!(transforms[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -184,7 +185,7 @@ mod tests {
         sort::by_fields(&mut transforms, &fields);
 
         for (i, component_id) in ["field_adder", "append", "parse_json"].iter().enumerate() {
-            assert_eq!(transforms[i].get_component_id(), *component_id);
+            assert_eq!(transforms[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -198,7 +199,7 @@ mod tests {
         sort::by_fields(&mut transforms, &fields);
 
         for (i, component_id) in ["parse_json", "append", "field_adder"].iter().enumerate() {
-            assert_eq!(transforms[i].get_component_id(), *component_id);
+            assert_eq!(transforms[i].get_component_id().as_str(), *component_id);
         }
     }
 }

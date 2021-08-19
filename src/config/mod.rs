@@ -24,6 +24,7 @@ mod compiler;
 pub mod component;
 mod diff;
 pub mod format;
+mod id;
 mod loading;
 mod pipeline;
 pub mod provider;
@@ -35,6 +36,7 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
+pub use id::ComponentId;
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     load_pipelines_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
@@ -90,12 +92,12 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, SourceOuter>,
-    pub sinks: IndexMap<String, SinkOuter>,
-    pub transforms: IndexMap<String, TransformOuter>,
+    pub sources: IndexMap<ComponentId, SourceOuter>,
+    pub sinks: IndexMap<ComponentId, SinkOuter>,
+    pub transforms: IndexMap<ComponentId, TransformOuter>,
     pub pipelines: IndexMap<String, pipeline::Pipeline>,
     tests: Vec<TestDefinition>,
-    expansions: IndexMap<String, Vec<String>>,
+    expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -185,7 +187,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub id: String,
+    pub id: ComponentId,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -196,14 +198,14 @@ pub struct SourceContext {
 impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
-        id: &str,
+        id: &ComponentId,
         out: Pipeline,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(id);
         (
             Self {
-                id: id.into(),
+                id: id.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -217,7 +219,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            id: "default".into(),
+            id: ComponentId::from("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
@@ -233,8 +235,7 @@ inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
-    pub inputs: Vec<String>,
-
+    pub inputs: Vec<ComponentId>,
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
 
@@ -257,20 +258,20 @@ pub struct SinkOuter {
 }
 
 impl SinkOuter {
-    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> Self {
+    pub fn new(inputs: Vec<ComponentId>, inner: Box<dyn SinkConfig>) -> SinkOuter {
         SinkOuter {
+            inputs,
             buffer: Default::default(),
             healthcheck: SinkHealthcheckOptions::default(),
             healthcheck_uri: None,
             inner,
-            inputs,
             proxy: Default::default(),
         }
     }
 
-    pub fn resources(&self, id: &str) -> Vec<Resource> {
+    pub fn resources(&self, id: &ComponentId) -> Vec<Resource> {
         let mut resources = self.inner.resources();
-        resources.append(&mut self.buffer.resources(id));
+        resources.append(&mut self.buffer.resources(&id.to_string()));
         resources
     }
 
@@ -382,7 +383,7 @@ inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
-    pub inputs: Vec<String>,
+    pub inputs: Vec<ComponentId>,
     #[serde(flatten)]
     pub inner: Box<dyn TransformConfig>,
 }
@@ -487,7 +488,7 @@ pub struct TestDefinition {
     #[serde(default)]
     pub outputs: Vec<TestOutput>,
     #[serde(default)]
-    pub no_outputs_from: Vec<String>,
+    pub no_outputs_from: Vec<ComponentId>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -502,7 +503,7 @@ pub enum TestInputValue {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestInput {
-    pub insert_at: String,
+    pub insert_at: ComponentId,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
     pub value: Option<String>,
@@ -517,7 +518,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
-    pub extract_from: String,
+    pub extract_from: ComponentId,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -529,11 +530,11 @@ impl Config {
     /// Expand a logical component id (i.e. from the config file) into the ids of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &str) -> Vec<String> {
+    pub fn get_inputs(&self, identifier: &ComponentId) -> Vec<ComponentId> {
         self.expansions
             .get(identifier)
             .cloned()
-            .unwrap_or_else(|| vec![String::from(identifier)])
+            .unwrap_or_else(|| vec![identifier.clone()])
     }
 }
 
@@ -544,7 +545,7 @@ impl Config {
     feature = "transforms-json_parser"
 ))]
 mod test {
-    use super::{builder::ConfigBuilder, format, load_from_str, Format};
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentId, Format};
     use indoc::indoc;
     use std::path::PathBuf;
 
@@ -676,9 +677,9 @@ mod test {
         );
 
         assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
-        assert!(config.sources.contains_key("in"));
-        assert!(config.sinks.contains_key("out"));
-        assert!(config.transforms.contains_key("foo"));
+        assert!(config.sources.contains_key(&ComponentId::from("in")));
+        assert!(config.sinks.contains_key(&ComponentId::from("out")));
+        assert!(config.transforms.contains_key(&ComponentId::from("foo")));
         assert_eq!(config.tests.len(), 1);
     }
 
@@ -754,7 +755,7 @@ mod test {
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
         assert!(config.global.proxy.no_proxy.matches("localhost"));
-        let source = config.sources.get("in").unwrap();
+        let source = config.sources.get(&ComponentId::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3128".into()));
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));
