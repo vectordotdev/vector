@@ -11,18 +11,20 @@ badges:
   platforms: ["helm"]
 ---
 
-We are happy to announce that our [`vector-aggregator`][chart] chart is now publicly available. While
-we continue to iterate on and make improvements to the chart, we feel it is ready to get
+We are happy to announce that our [`vector-aggregator`][chart] chart is now publicly available.
+While we continue to iterate on and make improvements to the chart, we feel it is ready to get
 wider feedback from the community at large.
 
-We have also created a dedicated Discord channel, [#aggregator][discord], for support, questions, and feedback.
+We have also created a dedicated Discord channel, [#aggregator][discord], for support, questions,
+and feedback.
 
 ## What is an aggregator
 
-When Vector is run in an [aggregator role][aggregator], it is used for central processing, collecting data from
-multiple upstream sources and performing cross-host aggregation and analysis.
+When Vector is run in an [aggregator role][aggregator], it is used to transform and ship data
+collected by other agents.
 
-The `vector-aggregator` chart deploys Vector as a StatefulSet in Kubernetes environments.
+The `vector-aggregator` chart deploys Vector as a StatefulSet, with the option of installing a
+HAProxy Deployment for load balancing across multiple aggregators.
 
 ## Setup and installation
 
