@@ -76,7 +76,8 @@ impl DatadogAgentSource {
     fn new(store_api_key: bool) -> Self {
         Self {
             store_api_key,
-            api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??").expect("static regex always compiles"),
+            api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
+                .expect("static regex always compiles"),
             log_schema_source_type_key: log_schema().source_type_key(),
             log_schema_timestamp_key: log_schema().timestamp_key(),
         }
