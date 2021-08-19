@@ -13,7 +13,7 @@ Please see the [what to expect](#what-to-expect) section for more info.**
    1. [Areas that *are* covered](#areas-that-are-covered)
       1. [Intended for *public* consumption](#intended-for-public-consumption)
       1. [Intended for *private* consumption](#intended-for-private-consumption)
-   1. [Areas are *NOT* covered](#areas-are-not-covered)
+   1. [Areas that are *NOT* covered](#areas-that-are-not-covered)
 1. [What to expect](#what-to-expect)
    1. [Patch and minor versions](#patch-and-minor-versions)
    1. [Major versions \(breaking changes\)](#major-versions-breaking-changes)
@@ -63,7 +63,7 @@ increment only if Vector itself is not compatbile with previous versions.
 * [Configuration schema]
 * [Data directory] and it's contents
 
-### Areas are *NOT* covered
+### Areas that are *NOT* covered
 
 The following Vector areas are *not* covered in Vector's definition of Public
 API. Breaking changes in these areas will *not* trigger a major version
@@ -106,8 +106,9 @@ As defined by [Semantic Versioning]:
 
 And while this is true to the spec, Vector takes breaking changes *very*
 seriously during this phase. What's outlined in the
-[major versions](#major-versions) section still holds true here. Each minor
-release bump will include an upgrade guide in the [release notes] if necessary.
+[major versions](##major-versions-breaking-changes) section still holds true
+here. Each minor release bump will include an upgrade guide in the
+[release notes] if necessary.
 
 [CLI]: https://vector.dev/docs/reference/cli/
 [configuration schema]: https://vector.dev/docs/reference/configuration/
