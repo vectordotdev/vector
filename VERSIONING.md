@@ -65,7 +65,7 @@ Vector only). Backward incompatble changes will trigger a major version
 increment only if Vector itself is not compatbile with previous versions.
 
 * [Configuration schema]
-* [Data directory] and it's contents
+* [Data directory] and its contents
 
 ### Areas that are *NOT* covered
 
