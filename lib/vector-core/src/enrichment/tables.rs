@@ -1,4 +1,4 @@
-//! Enrichment `Tables` manages the collection of `Table`s loaded into Vector.
+//! The Enrichment `TableRegistry` manages the collection of `Table`s loaded into Vector.
 //! Enrichment Tables go through two stages.
 //!
 //! ## 1. Writing
@@ -21,7 +21,7 @@
 //! efficient read-only access and can no longer add indexes or otherwise mutate the data.
 //!
 //! This data within the `ArcSwap` is accessed through the `TableSearch` struct. Any transform that
-//! needs access to this can call `Tables::as_search`. This returns a cheaply clonable struct that
+//! needs access to this can call `TableRegistry::as_search`. This returns a cheaply clonable struct that
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables can be searched.
 //!
 use super::Table;
@@ -29,18 +29,18 @@ use arc_swap::ArcSwap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-pub struct Tables {
+pub struct TableRegistry {
     loading: Option<HashMap<String, Box<dyn Table + Send + Sync>>>,
     tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
 }
 
-impl Default for Tables {
+impl Default for TableRegistry {
     fn default() -> Self {
         Self::new(HashMap::new())
     }
 }
 
-impl Tables {
+impl TableRegistry {
     pub fn new(tables: HashMap<String, Box<dyn Table + Send + Sync>>) -> Self {
         Self {
             loading: Some(tables),
@@ -63,14 +63,14 @@ impl Tables {
     }
 }
 
-impl std::fmt::Debug for Tables {
+impl std::fmt::Debug for TableRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt_enrichment_table(f, "EnrichmentTables", &self.tables)
+        fmt_enrichment_table(f, "TableRegistry", &self.tables)
     }
 }
 
 #[cfg(feature = "vrl")]
-impl vrl_core::EnrichmentTableSetup for Tables {
+impl vrl_core::EnrichmentTableSetup for TableRegistry {
     /// Return a list of the available tables. This will work regardless of which mode we are in.
     /// If we are in the writing stage, this will acquire a lock to retrieve the tables.
     ///
@@ -213,7 +213,7 @@ mod tests {
         tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
         tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
 
-        let tables = super::Tables::new(tables);
+        let tables = super::TableRegistry::new(tables);
         let mut result = tables.table_ids();
         result.sort();
         assert_eq!(vec!["dummy1", "dummy2"], result);
@@ -225,7 +225,7 @@ mod tests {
         let indexes = Arc::new(Mutex::new(Vec::new()));
         let dummy = DummyEnrichmentTable::new_with_index(indexes.clone());
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let mut tables = super::Tables::new(tables);
+        let mut tables = super::TableRegistry::new(tables);
         assert_eq!(Ok(()), tables.add_index("dummy1", vec!["erk"]));
 
         let indexes = indexes.lock().unwrap();
@@ -237,7 +237,7 @@ mod tests {
         let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let tables = super::Tables::new(tables).as_search();
+        let tables = super::TableRegistry::new(tables).as_search();
 
         assert_eq!(
             Err("finish_load not called".to_string()),
@@ -256,7 +256,7 @@ mod tests {
         let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
-        let mut tables = super::Tables::new(tables);
+        let mut tables = super::TableRegistry::new(tables);
         tables.finish_load();
         assert_eq!(
             Err("finish_load has been called".to_string()),
@@ -270,7 +270,7 @@ mod tests {
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
 
-        let mut tables = super::Tables::new(tables);
+        let mut tables = super::TableRegistry::new(tables);
         let tables_search = tables.as_search();
 
         tables.finish_load();

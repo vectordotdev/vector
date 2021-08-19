@@ -19,7 +19,7 @@ pub enum ExpandType {
 #[derive(Debug)]
 pub struct TransformContext {
     pub globals: GlobalOptions,
-    pub enrichment_tables: enrichment::Tables,
+    pub enrichment_tables: enrichment::TableRegistry,
 }
 
 impl TransformContext {

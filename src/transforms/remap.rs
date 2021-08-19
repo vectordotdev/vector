@@ -65,7 +65,10 @@ pub struct Remap {
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig, enrichment_tables: &enrichment::Tables) -> crate::Result<Self> {
+    pub fn new(
+        config: RemapConfig,
+        enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Self> {
         let source = match (&config.source, &config.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
