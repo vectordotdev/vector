@@ -3,7 +3,7 @@ date: "2021-08-24"
 title: "Moving the Aggregator chart to public beta"
 description: "The Vector Aggregator Helm chart is now publicly available"
 authors: ["spencergilbert"]
-pr_numbers: [TODO]
+pr_numbers: [8801]
 release: "0.16.0"
 hide_on_release_notes: false
 badges:
