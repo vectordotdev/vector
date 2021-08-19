@@ -123,7 +123,8 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        if cfg!(feature = "datadog") {
+        #[cfg(feature = "datadog")]
+        {
             self.datadog = with.datadog;
         }
 
