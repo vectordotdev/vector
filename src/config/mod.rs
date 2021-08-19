@@ -84,7 +84,7 @@ pub struct Config {
     pub sources: IndexMap<ComponentId, SourceOuter>,
     pub sinks: IndexMap<ComponentId, SinkOuter>,
     pub transforms: IndexMap<ComponentId, TransformOuter>,
-    pub enrichment_tables: IndexMap<String, EnrichmentTableOuter>,
+    pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }

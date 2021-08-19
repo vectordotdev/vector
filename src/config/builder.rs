@@ -22,7 +22,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub enrichment_tables: IndexMap<String, EnrichmentTableOuter>,
+    pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
     #[serde(default)]
     pub sources: IndexMap<ComponentId, SourceOuter>,
     #[serde(default)]
@@ -84,7 +84,7 @@ impl ConfigBuilder {
         enrichment_table: E,
     ) {
         self.enrichment_tables.insert(
-            name.into(),
+            ComponentId::from(name.into()),
             EnrichmentTableOuter::new(Box::new(enrichment_table)),
         );
     }

@@ -65,7 +65,7 @@ pub async fn build_pieces(
                 continue;
             }
         };
-        enrichment_tables.insert(name.clone(), table);
+        enrichment_tables.insert(name.as_str().to_string(), table);
     }
 
     // Build sources
