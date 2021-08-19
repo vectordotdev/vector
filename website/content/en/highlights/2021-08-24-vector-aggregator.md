@@ -11,7 +11,7 @@ badges:
   platforms: ["helm"]
 ---
 
-We are happy to announce our *vector-aggregator* chart is now publicly available. While
+We are happy to announce that our `vector-aggregator` chart is now publicly available. While
 we continue to iterate on and make improvements to the chart, we feel it is ready to get
 wider feedback from the community at large.
 
@@ -35,7 +35,7 @@ helm install vector vector/vector-aggregator \
   --create-namespace
 ```
 
-An installation with default values today will start a *vector-aggregator* listening on
+An installation with default values today will start a `vector-aggregator` listening on
 port `9000` with a [`vector` source][sources.vector] configured with [v2][highlight.v2].
 
 You can review the default values at [timberio/helm-charts][default] or by running the following:
@@ -46,10 +46,10 @@ helm show values vector/vector-aggregator
 
 ## Looking Forward
 
-Our next steps involve improving the out of the box experience and reducing the configuration
-required to aggregate events from a number of common sources. We also are looking to provide
+Our next steps involve improving the out-of-the-box experience and reducing the configuration
+required to aggregate events from a number of common sources. We are also looking to provide
 a better experience integrating load balancing across multiple Aggregators with additional work
-on the bundled HAProxy.
+on the bundled HAProxy installation.
 
 [discord]: https://discord.gg/Ywcq9cWEPE
 [sources.vector]: /docs/reference/configuration/sources/vector/
