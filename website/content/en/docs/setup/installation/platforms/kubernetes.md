@@ -49,7 +49,7 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/timberio/vector/distribution/kubernetes/kubectl?ref=v{{< version >}}
+  - github.com/timberio/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
 
 images:
   # Override the Vector image to avoid use of the sliding tag.
