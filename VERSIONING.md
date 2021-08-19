@@ -54,8 +54,9 @@ a major version increment.
 * [Data model]
   * As exposed in the source of the [`lua` transform]
 * [GraphQL API]
+* Telemetry
+  * Vector's internal metrics as provided by the [`internal_metrics` source]
 * [VRL]
-
 
 #### Intended for *private* consumption
 
@@ -83,6 +84,8 @@ increment.
   * The [`vector top` subcommand], its input/output.
   * The [`vector vrl` subcommand], its input/output.
 * [Installation workflows]
+* Telemetry
+  * Vector's internal logs as provided through `STDOUT`, `STDERR`, and the [`internal_logs` source]
 
 ## FAQ
 
@@ -111,6 +114,8 @@ Otherwise, the stable release is your best bet.
 [Github repository]: https://github.com/timberio/vector
 [GraphQL API]: https://vector.dev/docs/reference/api/
 [Installation workflows]: https://vector.dev/docs/setup/installation/
+[`internal_logs_` source]: https://vector.dev/docs/reference/configuration/sources/internal_logs/
+[`internal_metrics` source]: https://vector.dev/docs/reference/configuration/sources/internal_metrics/
 [`lua` transform]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [`master` branch]: https://github.com/timberio/vector/tree/master
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
