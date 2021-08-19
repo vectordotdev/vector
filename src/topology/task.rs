@@ -1,4 +1,5 @@
 use crate::buffers::{Acker, EventStream};
+use crate::config::ComponentId;
 use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use std::{
@@ -21,25 +22,24 @@ pub enum TaskOutput {
 pub struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
-    id: String,
+    id: ComponentId,
     typetag: String,
 }
 
 impl Task {
-    pub fn new<S1, S2, Fut>(id: S1, typetag: S2, inner: Fut) -> Self
+    pub fn new<S, Fut>(id: ComponentId, typetag: S, inner: Fut) -> Self
     where
-        S1: Into<String>,
-        S2: Into<String>,
+        S: Into<String>,
         Fut: Future<Output = Result<TaskOutput, ()>> + Send + 'static,
     {
         Self {
             inner: inner.boxed(),
-            id: id.into(),
+            id,
             typetag: typetag.into(),
         }
     }
 
-    pub fn id(&self) -> &str {
+    pub fn id(&self) -> &ComponentId {
         &self.id
     }
 
@@ -60,7 +60,7 @@ impl Future for Task {
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
-            .field("id", &self.id)
+            .field("id", &self.id.to_string())
             .field("typetag", &self.typetag)
             .finish()
     }

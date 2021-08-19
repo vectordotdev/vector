@@ -1,5 +1,5 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{self, ConfigPath, GlobalOptions, TransformConfig};
+use crate::config::{self, ComponentId, ConfigPath, GlobalOptions, TransformConfig};
 use crate::{
     conditions::Condition,
     event::{Event, Value},
@@ -57,21 +57,21 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
 
 pub struct UnitTest {
     pub name: String,
-    inputs: Vec<(Vec<String>, Event)>,
-    transforms: IndexMap<String, UnitTestTransform>,
+    inputs: Vec<(Vec<ComponentId>, Event)>,
+    transforms: IndexMap<ComponentId, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
-    no_outputs_from: Vec<String>,
+    no_outputs_from: Vec<ComponentId>,
     globals: GlobalOptions,
 }
 
 struct UnitTestTransform {
     transform: Transform,
     config: Box<dyn TransformConfig>,
-    next: Vec<String>,
+    next: Vec<ComponentId>,
 }
 
 struct UnitTestCheck {
-    extract_from: String,
+    extract_from: ComponentId,
     conditions: Vec<Box<dyn Condition>>,
 }
 
@@ -102,10 +102,10 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
 }
 
 fn walk(
-    node: &str,
+    node: &ComponentId,
     mut inputs: Vec<Event>,
-    transforms: &mut IndexMap<String, UnitTestTransform>,
-    aggregated_results: &mut HashMap<String, (Vec<Event>, Vec<Event>)>,
+    transforms: &mut IndexMap<ComponentId, UnitTestTransform>,
+    aggregated_results: &mut HashMap<ComponentId, (Vec<Event>, Vec<Event>)>,
     globals: &GlobalOptions,
 ) {
     let mut results = Vec::new();
@@ -155,7 +155,7 @@ fn walk(
         inputs.append(&mut e_inputs);
         results.append(&mut e_results);
     }
-    aggregated_results.insert(node.into(), (inputs, results));
+    aggregated_results.insert(node.clone(), (inputs, results));
 }
 
 impl UnitTest {
@@ -233,7 +233,7 @@ impl UnitTest {
                 }
                 if outputs.is_empty() {
                     errors.push(format!(
-                        "check transform '{}' failed, no events received.",
+                        "check transform {:?} failed, no events received.",
                         check.extract_from,
                     ));
                 }
@@ -265,10 +265,10 @@ impl UnitTest {
 //------------------------------------------------------------------------------
 
 fn links_to_a_leaf(
-    target: &str,
-    leaves: &IndexMap<String, ()>,
-    link_checked: &mut IndexMap<String, bool>,
-    transform_outputs: &IndexMap<String, IndexMap<String, ()>>,
+    target: &ComponentId,
+    leaves: &IndexMap<ComponentId, ()>,
+    link_checked: &mut IndexMap<ComponentId, bool>,
+    transform_outputs: &IndexMap<ComponentId, IndexMap<ComponentId, ()>>,
 ) -> bool {
     if *link_checked.get(target).unwrap_or(&false) {
         return true;
@@ -290,11 +290,11 @@ fn links_to_a_leaf(
 /// Reduces a collection of transforms into a set that only contains those that
 /// link between our root (test input) and a set of leaves (test outputs).
 fn reduce_transforms(
-    roots: Vec<String>,
-    leaves: &IndexMap<String, ()>,
-    transform_outputs: &mut IndexMap<String, IndexMap<String, ()>>,
+    roots: Vec<ComponentId>,
+    leaves: &IndexMap<ComponentId, ()>,
+    transform_outputs: &mut IndexMap<ComponentId, IndexMap<ComponentId, ()>>,
 ) {
-    let mut link_checked: IndexMap<String, bool> = IndexMap::new();
+    let mut link_checked: IndexMap<ComponentId, bool> = IndexMap::new();
 
     if roots
         .iter()
@@ -306,19 +306,19 @@ fn reduce_transforms(
         transform_outputs.clear();
     }
 
-    transform_outputs.retain(|name, children| {
-        let linked = roots.contains(name) || *link_checked.get(name).unwrap_or(&false);
+    transform_outputs.retain(|id, children| {
+        let linked = roots.contains(id) || *link_checked.get(id).unwrap_or(&false);
         if linked {
             // Also remove all unlinked children.
-            children.retain(|child_name, _| {
-                roots.contains(child_name) || *link_checked.get(child_name).unwrap_or(&false)
+            children.retain(|child_id, _| {
+                roots.contains(child_id) || *link_checked.get(child_id).unwrap_or(&false)
             })
         }
         linked
     });
 }
 
-fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event), String> {
+fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<ComponentId>, Event), String> {
     let target = config.get_inputs(&input.insert_at);
 
     match input.type_str.as_ref() {
@@ -360,7 +360,7 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
 fn build_inputs(
     config: &Config,
     definition: &TestDefinition,
-) -> Result<Vec<(Vec<String>, Event)>, Vec<String>> {
+) -> Result<Vec<(Vec<ComponentId>, Event)>, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
 
@@ -402,7 +402,7 @@ async fn build_unit_test(
 
     // Maps transform names with their output targets (transforms that use it as
     // an input).
-    let mut transform_outputs: IndexMap<String, IndexMap<String, ()>> = config
+    let mut transform_outputs: IndexMap<ComponentId, IndexMap<ComponentId, ()>> = config
         .transforms
         .iter()
         .map(|(k, _)| (k.clone(), IndexMap::new()))
@@ -411,7 +411,7 @@ async fn build_unit_test(
     config.transforms.iter().for_each(|(k, t)| {
         t.inputs.iter().for_each(|i| {
             if let Some(outputs) = transform_outputs.get_mut(i) {
-                outputs.insert(k.to_string(), ());
+                outputs.insert(k.clone(), ());
             }
         })
     });
@@ -430,7 +430,7 @@ async fn build_unit_test(
         return Err(errors);
     }
 
-    let mut leaves: IndexMap<String, ()> = IndexMap::new();
+    let mut leaves: IndexMap<ComponentId, ()> = IndexMap::new();
     definition.outputs.iter().for_each(|o| {
         leaves.insert(o.extract_from.clone(), ());
     });
@@ -452,13 +452,13 @@ async fn build_unit_test(
     );
 
     // Build reduced transforms.
-    let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
-    for (name, transform_config) in &config.transforms {
-        if let Some(outputs) = transform_outputs.remove(name) {
+    let mut transforms: IndexMap<ComponentId, UnitTestTransform> = IndexMap::new();
+    for (id, transform_config) in &config.transforms {
+        if let Some(outputs) = transform_outputs.remove(id) {
             match transform_config.inner.build(&config.global).await {
                 Ok(transform) => {
                     transforms.insert(
-                        name.clone(),
+                        id.clone(),
                         UnitTestTransform {
                             transform,
                             config: transform_config.inner.clone(),
@@ -469,7 +469,7 @@ async fn build_unit_test(
                 Err(err) => {
                     errors.push(format!(
                         "failed to build transform '{}': {:#}",
-                        name,
+                        id,
                         anyhow::anyhow!(err)
                     ));
                 }
@@ -492,7 +492,7 @@ async fn build_unit_test(
             } else {
                 errors.push(format!(
                     "unable to complete topology between target transforms {:?} and output target '{}'",
-                    targets, o.extract_from
+                    targets.iter().map(|item| item.to_string()).collect::<Vec<_>>(), o.extract_from
                 ));
             }
         }
