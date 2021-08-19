@@ -1821,7 +1821,7 @@ dependencies = [
  "bytes 1.0.1",
  "derivative 2.2.0",
  "grok",
- "itertools 0.10.1",
+ "itertools",
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
