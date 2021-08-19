@@ -15,7 +15,7 @@ We are happy to announce our *vector-aggregator* chart is now publicly available
 we continue to iterate on and make improvements to the chart, we feel it is ready to get
 wider feedback from the community at large.
 
-We have also created a dedicated Discord channel, `#aggregator`, for support and questions.
+We have also created a dedicated Discord channel, [#aggregator][discord], for support and questions.
 
 ## Setup
 
@@ -51,6 +51,7 @@ required to aggregate events from a number of common sources. We also are lookin
 a better experience integrating load balancing across multiple Aggregators with additional work
 on the bundled HAProxy.
 
+[discord]: https://discord.gg/Ywcq9cWEPE
 [sources.vector]: /docs/reference/configuration/sources/vector/
 [highlight.v2]: /highlights/2021-07-21-0-16-upgrade-guide/#vector_source_sink
 [default]: https://github.com/timberio/helm-charts/blob/master/charts/vector-aggregator/values.yaml
