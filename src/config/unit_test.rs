@@ -27,6 +27,8 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         global: builder.global,
         #[cfg(feature = "api")]
         api: builder.api,
+        #[cfg(feature = "datadog")]
+        datadog: builder.datadog,
         healthchecks: builder.healthchecks,
         sources: builder.sources,
         sinks: builder.sinks,

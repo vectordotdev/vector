@@ -10,13 +10,17 @@ use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Display, Formatter};
-use std::hash::Hash;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-pub use vector_core::config::GlobalOptions;
-pub use vector_core::transform::{DataType, ExpandType, TransformConfig};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    net::SocketAddr,
+    path::PathBuf,
+};
+pub use vector_core::{
+    config::GlobalOptions,
+    transform::{DataType, ExpandType, TransformConfig},
+};
 
 pub mod api;
 mod builder;

@@ -1,14 +1,14 @@
 #[cfg(feature = "api")]
 use super::api;
+#[cfg(feature = "datadog")]
+use super::datadog;
 use super::{
     compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
     SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use vector_core::config::GlobalOptions;
-use vector_core::default_data_dir;
-use vector_core::transform::TransformConfig;
+use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -18,6 +18,9 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
+    #[cfg(feature = "datadog")]
+    #[serde(default)]
+    pub datadog: datadog::Options,
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
@@ -49,6 +52,8 @@ impl From<Config> for ConfigBuilder {
             global: c.global,
             #[cfg(feature = "api")]
             api: c.api,
+            #[cfg(feature = "datadog")]
+            datadog: c.datadog,
             healthchecks: c.healthchecks,
             sources: c.sources,
             sinks: c.sinks,
