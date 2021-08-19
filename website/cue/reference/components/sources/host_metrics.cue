@@ -83,9 +83,10 @@ components: sources: host_metrics: {
 			common:      true
 			required:    false
 			type: array: {
-				default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network"]
+				default: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network"]
 				items: type: string: {
 					enum: {
+						cgroups:    "Metrics related to Linux control groups."
 						cpu:        "Metrics related to CPU utilization."
 						disk:       "Metrics related to disk I/O utilization."
 						filesystem: "Metrics related to filesystem space utilization."
@@ -114,6 +115,72 @@ components: sources: host_metrics: {
 			type: uint: {
 				default: 15
 				unit:    "seconds"
+			}
+		}
+		cgroups: {
+			common:      false
+			description: #"Options for the "cgroups" metrics collector. This collector is only available on Linux systems, as the cgroups (control groups) system is only present on Linux."#
+			required:    false
+			type: object: options: {
+				base: {
+					common:      false
+					required:    false
+					description: "The base cgroup name to provide metrics for"
+					type: string: {
+						default: null
+						examples: ["/", "system.slice/snapd.service"]
+						syntax: "literal"
+					}
+				}
+				groups: {
+					common:      false
+					required:    false
+					description: "Lists of device name patterns to include or exclude."
+					type: object: options: {
+						includes: {
+							required: false
+							common:   false
+							description: """
+								The list of cgroup name patterns for which to gather metrics.
+								Defaults to including all cgroups.
+								The patterns are matched using [globbing](#globbing).
+								"""
+							type: array: {
+								default: ["*"]
+								items: type: string: {
+									examples: ["user.slice/*", "*.service"]
+									syntax: "literal"
+								}
+							}
+						}
+						excludes: {
+							required: false
+							common:   false
+							description: """
+								The list of cgroup name patterns for which to gather metrics.
+								Defaults to excluding no cgroups.
+								The patterns are matched using [globbing](#globbing).
+								"""
+							type: array: {
+								default: []
+								items: type: string: {
+									examples: ["user.slice/*", "*.service"]
+									syntax: "literal"
+								}
+							}
+						}
+					}
+				}
+				levels: {
+					common:      false
+					required:    false
+					description: "The number of levels of the cgroups hierarchy for which to report metrics. A value of `1` means just the root or named cgroup."
+					type: uint: {
+						unit:    null
+						default: 3
+						examples: [1, 3]
+					}
+				}
 			}
 		}
 		disk: {
@@ -366,6 +433,14 @@ components: sources: host_metrics: {
 			}
 		}
 
+		// Host cgroups
+		cgroups_cpu_usage:      _host & _cgroups_cpu & {description:    "The total amount CPU time used by this cgroup and its descendants, in seconds."}
+		cgroups_cpu_user:       _host & _cgroups_cpu & {description:    "The amount of CPU time spent in user space, in seconds."}
+		cgroups_cpu_system:     _host & _cgroups_cpu & {description:    "The amount of CPU time spent in system tasks, in seconds."}
+		cgroups_memory_current: _host & _cgroups_memory & {description: "The total amount of memory currently being used by the cgroup and its descendants, in bytes."}
+		cgroups_memory_anon:    _host & _cgroups_memory & {description: "The amount of memory used in anonymous mappings, in bytes."}
+		cgroups_memory_file:    _host & _cgroups_memory & {description: "The amount of memory used to cache filesystem data, including tmpfs and shared memory, in bytes."}
+
 		// Host disk
 		disk_read_bytes_total:       _host & _disk_counter & {description: "The accumulated number of bytes read in."}
 		disk_reads_completed_total:  _host & _disk_counter & {description: "The accumulated number of read operations completed."}
@@ -420,6 +495,26 @@ components: sources: host_metrics: {
 		// Helpers
 		_host: {
 			default_namespace: "host"
+		}
+
+		_cgroups_cpu: {
+			type: "counter"
+			tags: _host_metrics_tags & {
+				collector: examples: ["cgroups"]
+				cgroup: _cgroup_name
+			}
+		}
+		_cgroups_memory: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["cgroups"]
+				cgroup: _cgroup_name
+			}
+		}
+		_cgroup_name: {
+			description: "The control group name."
+			required:    true
+			examples: ["/", "user.slice", "system.slice/snapd.service"]
 		}
 
 		_disk_device: {
