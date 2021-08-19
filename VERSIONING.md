@@ -65,7 +65,11 @@ a major version increment.
 * [CLI]
   * The root [`vector` command] and its input/output.
   * The [`vector validate` subcommand] and its input/output.
+* [Data model]
+  * As exposed in the source of the [`lua` transform]
+  * As exposed in the output of the [`vector` sink]
 * [GraphQL API]
+
 
 #### Intended for *private* consumption
 
@@ -191,10 +195,12 @@ here. Each minor release bump will include an upgrade guide in the
 [CLI]: https://vector.dev/docs/reference/cli/
 [configuration schema]: https://vector.dev/docs/reference/configuration/
 [data directory]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
+[data model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/
 [Github repository]: https://github.com/timberio/vector
 [Github subscriptiond docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions
 [GraphQL API]: https://vector.dev/docs/reference/api/
 [Installation workflows]: https://vector.dev/docs/setup/installation/
+[`lua` transform]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [`master` branch]: https://github.com/timberio/vector/tree/master
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
@@ -206,6 +212,7 @@ here. Each minor release bump will include an upgrade guide in the
 [`vector help` subcommand]: https://vector.dev/docs/reference/cli/#help
 [`vector list` subcommand]: https://vector.dev/docs/reference/cli/#list
 [Vector public calendar]: https://calendar.vector.dev
+[`vector` sink]: https://vector.dev/docs/reference/configuration/sinks/vector/
 [`vector tap` subcommand]: https://vector.dev/docs/reference/cli/#tap
 [`vector top` subcommand]: https://vector.dev/docs/reference/cli/#top
 [`vector validate` subcommand]: https://vector.dev/docs/reference/cli/#validate
