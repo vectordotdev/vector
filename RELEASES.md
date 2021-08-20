@@ -16,7 +16,7 @@ This document covers Vector's releases and the relevant aspect for Vector users.
    1. [Nightly channel](#nightly-channel-2)
 1. [Guarantees](#guarantees)
 1. [FAQ](#faq)
-1. [Which release type should I be using?](#which-release-type-should-i-be-using)
+   1. [Which release type should I be using?](#which-release-type-should-i-be-using)
 
 <!-- /MarkdownTOC -->
 
@@ -71,9 +71,9 @@ Please head over to Vector's [download page].
 
 Please see the [versioning policy].
 
-# FAQ
+## FAQ
 
-## Which release type should I be using?
+### Which release type should I be using?
 
 We always appreciate early feedback on Vector as we are developing it to help
 ensure the highest quality releases.
