@@ -26,10 +26,15 @@ impl Default for Encoding {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
-struct FileConfig {
+#[derive(Deserialize, Serialize, Default, Debug, Eq, PartialEq, Clone)]
+struct FileC {
     path: PathBuf,
     encoding: Encoding,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
+struct FileConfig {
+    file: FileC,
 }
 
 fn default_delimiter() -> char {
@@ -46,12 +51,12 @@ impl EnrichmentTableConfig for FileConfig {
         let Encoding::Csv {
             include_headers,
             delimiter,
-        } = self.encoding;
+        } = self.file.encoding;
 
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(include_headers)
             .delimiter(delimiter as u8)
-            .from_path(&self.path)?;
+            .from_path(&self.file.path)?;
 
         let data = reader
             .records()
@@ -75,7 +80,7 @@ impl EnrichmentTableConfig for FileConfig {
 
         trace!(
             "Loaded enrichment file {} with headers {:?}.",
-            self.path.to_str().unwrap_or("path with invalid utf"),
+            self.file.path.to_str().unwrap_or("path with invalid utf"),
             headers
         );
 
@@ -231,8 +236,6 @@ impl Table for File {
     }
 
     fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
-        trace!(message = "Added index.", fields);
-
         self.indexes.push(self.index_data(fields));
 
         // The returned index handle is the position of the index in our list of indexes.

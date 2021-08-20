@@ -134,8 +134,8 @@ mod tests {
         const SAMPLE_TOML: &str = r#"
             [enrichment_tables.csv]
             type = "file"
-            path = "/tmp/file.csv"
-            encoding.type = "csv"
+            file.path = "/tmp/file.csv"
+            file.encoding.type = "csv"
             [sources.in]
             type = "socket"
             mode = "tcp"
@@ -178,9 +178,10 @@ mod tests {
                     r#"enrichment_tables:"#,
                     r#"  csv:"#,
                     r#"    type: "file""#,
-                    r#"    path: "/tmp/file.csv""#,
-                    r#"    encoding:"#,
-                    r#"      type: "csv""#,
+                    r#"    file:"#,
+                    r#"      path: "/tmp/file.csv""#,
+                    r#"      encoding:"#,
+                    r#"        type: "csv""#,
                     r#"sources:"#,
                     r#"  in:"#,
                     r#"    type: "socket""#,
@@ -208,9 +209,11 @@ mod tests {
                     "enrichment_tables": {
                         "csv": {
                             "type": "file",
-                            "path": "/tmp/file.csv",
-                            "encoding": {
-                              "type": "csv"
+                            "file": {
+                              "path": "/tmp/file.csv",
+                              "encoding": {
+                                "type": "csv"
+                              }
                             }
                         }
                     },
