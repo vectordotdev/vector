@@ -2,6 +2,7 @@ use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
 use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service;
+use crate::sinks::datadog::logs::sink::LogApi;
 use crate::sinks::datadog::ApiKey;
 use crate::sinks::datadog::Region;
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
@@ -18,6 +19,31 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::{sync::Arc, time::Duration};
+
+// What is important here? I have to have a solution that satisfies the
+// `BatchConfig` passed in. The final sink-type thing must fit into a
+// `VectorSink`. The `BatchConfig` has two important features:
+//
+// * `max_bytes` -- the total number of bytes to batch up before processing
+// * `timeout_secs` -- the total number of seconds to store events maximum before processing
+//
+// This sink does not obey `max_events`.
+//
+// Now, the datadog logs endpoint has some limitations to be aware of. First, a
+// payload is defined by API key. That is, ultimately, if I have events
+// associated with N API keys even if the sum of all the events is under the
+// logs API payload limit I have N payloads to get out. Also, a payload may be
+// no more than 5Mb and the interior array may have no more than 1000
+// members. There is no limit on the number of requests that can be made in a
+// given interval of time.
+//
+// Okay, so, for each API key buffer up to 1_000 events under that API _or_ in
+// the event of a timeout (global) _or_ in the event that the size of the
+// buffered events exceeds `max_bytes` (global) kick out a request to the
+// datadog API. We will take the byte size of the `Event` -- since that's what
+// impacts the user -- and NOT its serialized size. As such we'll have to take
+// care to avoid serialization that goes over the prescibed size limit to the
+// API.
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -124,16 +150,19 @@ impl DatadogLogsConfig {
             self.default_api_key.clone(),
         )
         .boxed();
-        let sink = PartitionHttpSink::new(
-            service,
-            PartitionBuffer::new(batch),
-            request_settings,
-            timeout,
-            client,
-            cx.acker(),
-        )
-        .sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
-        let sink = VectorSink::Sink(Box::new(sink));
+        // let sink = PartitionHttpSink::new(
+        //     service,
+        //     PartitionBuffer::new(batch),
+        //     request_settings,
+        //     timeout,
+        //     client,
+        //     cx.acker(),
+        // )
+        // .
+        // let sink = VectorSink::Sink(Box::new(sink));
+        let log_api = LogApi::new().build()?;
+        //.sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
+        let sink = VectorSink::Stream(Box::new(log_api));
 
         Ok((sink, healthcheck))
     }
