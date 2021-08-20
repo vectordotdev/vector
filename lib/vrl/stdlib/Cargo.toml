@@ -66,7 +66,6 @@ default = [
     "encode_percent",
     "ends_with",
     "exists",
-    "find_table_row",
     "flatten",
     "float",
     "floor",
@@ -75,6 +74,7 @@ default = [
     "format_timestamp",
     "get_env_var",
     "get_hostname",
+    "get_enrichment_table_record",
     "includes",
     "integer",
     "ip_aton",
@@ -180,7 +180,6 @@ encode_logfmt = ["encode_key_value"]
 encode_percent = ["percent-encoding"]
 ends_with = []
 exists = []
-find_table_row = []
 flatten = []
 float = []
 floor = []
@@ -189,6 +188,7 @@ format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
 get_env_var = []
 get_hostname = ["hostname"]
+get_enrichment_table_record = []
 includes = []
 integer = []
 ip_aton = []

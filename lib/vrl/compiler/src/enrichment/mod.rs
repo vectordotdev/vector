@@ -2,10 +2,10 @@ use crate::Value;
 use dyn_clone::DynClone;
 use std::collections::BTreeMap;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Condition<'a> {
     Equals { field: &'a str, value: String },
 }

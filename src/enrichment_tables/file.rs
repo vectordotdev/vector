@@ -5,14 +5,32 @@ use std::hash::Hasher;
 use tracing::trace;
 use vector_core::enrichment::{Condition, IndexHandle, Table};
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(tag = "type")]
+enum Encoding {
+    Csv {
+        #[serde(default = "crate::serde::default_true")]
+        include_headers: bool,
+        #[serde(default = "default_delimiter")]
+        delimiter: char,
+    },
+}
+
+impl Default for Encoding {
+    fn default() -> Self {
+        Self::Csv {
+            include_headers: true,
+            delimiter: default_delimiter(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
 struct FileConfig {
     filename: String,
-    encoding: String,
-    #[serde(default = "crate::serde::default_true")]
-    include_headers: bool,
-    #[serde(default = "default_delimiter")]
-    delimiter: char,
+
+    #[serde(default)]
+    encoding: Encoding,
 }
 
 fn default_delimiter() -> char {
@@ -26,42 +44,45 @@ impl EnrichmentTableConfig for FileConfig {
         &self,
         _globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        if self.encoding != "csv" {
-            return Err("Only csv encoding is currently supported.".into());
-        }
+        match self.encoding {
+            Encoding::Csv {
+                include_headers,
+                delimiter,
+            } => {
+                let mut reader = csv::ReaderBuilder::new()
+                    .has_headers(include_headers)
+                    .delimiter(delimiter as u8)
+                    .from_path(&self.filename)?;
 
-        let mut reader = csv::ReaderBuilder::new()
-            .has_headers(self.include_headers)
-            .delimiter(self.delimiter as u8)
-            .from_path(&self.filename)?;
+                let data = reader
+                    .records()
+                    .map(|row| Ok(row?.iter().map(|col| col.to_string()).collect::<Vec<_>>()))
+                    .collect::<crate::Result<Vec<_>>>()?;
 
-        let data = reader
-            .records()
-            .map(|row| Ok(row?.iter().map(|col| col.to_string()).collect::<Vec<_>>()))
-            .collect::<crate::Result<Vec<_>>>()?;
+                let headers = if include_headers {
+                    reader
+                        .headers()?
+                        .iter()
+                        .map(|col| col.to_string())
+                        .collect::<Vec<_>>()
+                } else {
+                    // If there are no headers in the datafile we make headers as the numerical index of
+                    // the column.
+                    match data.get(0) {
+                        Some(row) => (0..row.len()).map(|idx| idx.to_string()).collect(),
+                        None => Vec::new(),
+                    }
+                };
 
-        let headers = if self.include_headers {
-            reader
-                .headers()?
-                .iter()
-                .map(|col| col.to_string())
-                .collect::<Vec<_>>()
-        } else {
-            // If there are no headers in the datafile we make headers as the numerical index of
-            // the column.
-            match data.get(0) {
-                Some(row) => (0..row.len()).map(|idx| idx.to_string()).collect(),
-                None => Vec::new(),
+                trace!(
+                    "Loaded enrichment file {} with headers {:?}",
+                    self.filename,
+                    headers
+                );
+
+                Ok(Box::new(File::new(data, headers)))
             }
-        };
-
-        trace!(
-            "Loaded enrichment file {} with headers {:?}",
-            self.filename,
-            headers
-        );
-
-        Ok(Box::new(File::new(data, headers)))
+        }
     }
 }
 
