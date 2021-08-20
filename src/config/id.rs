@@ -50,6 +50,10 @@ impl ComponentId {
     pub fn into_pipeline(self, id: &str) -> Self {
         Self::pipeline(id, &self.id)
     }
+
+    pub fn is_global(&self) -> bool {
+        matches!(self.scope, ComponentScope::Global)
+    }
 }
 impl From<String> for ComponentId {
     fn from(value: String) -> Self {

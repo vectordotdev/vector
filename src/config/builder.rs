@@ -7,6 +7,7 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use vector_core::config::GlobalOptions;
 use vector_core::default_data_dir;
 use vector_core::transform::TransformConfig;
@@ -71,8 +72,22 @@ impl ConfigBuilder {
     // and add the output to the sources
     pub fn merge_pipelines(mut self) -> (Self, Vec<String>) {
         let mut errors = Vec::new();
+        let global_transforms = self
+            .transforms
+            .keys()
+            .chain(self.sources.keys())
+            .filter(|id| id.is_global())
+            .map(|id| id.id().to_string())
+            .collect::<HashSet<_>>();
         let pipeline_transforms = self.pipelines.into_scoped();
         for (component_id, pipeline_transform) in pipeline_transforms {
+            if global_transforms.contains(component_id.id()) {
+                errors.push(format!(
+                    "Component ID '{}' is already used.",
+                    component_id.id()
+                ));
+                continue;
+            }
             for input in pipeline_transform.outputs.iter() {
                 if let Some(transform) = self.transforms.get_mut(input) {
                     transform.inputs.push(component_id.clone());
@@ -278,5 +293,43 @@ mod tests {
         builder.set_pipelines(pipelines);
         let result = builder.build();
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn overlaping_transform_id() {
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "foo".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.bar]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        let mut builder = ConfigBuilder::from_toml(
+            r#"
+        [sources.logs]
+        type = "generator"
+        format = "syslog"
+
+        [transforms.bar]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+
+        [sinks.print]
+        inputs = ["bar"]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        builder.set_pipelines(pipelines);
+        let errors = builder.build().unwrap_err();
+        assert_eq!(errors[0], "Component ID 'bar' is already used.");
     }
 }
