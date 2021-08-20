@@ -290,7 +290,7 @@ pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
 #[cfg(feature = "get_enrichment_table_record")]
-pub use get_enrichment_table_record::FindTableRow;
+pub use get_enrichment_table_record::GetEnrichmentTableRecord;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]

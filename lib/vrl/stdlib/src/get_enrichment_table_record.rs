@@ -43,7 +43,7 @@ impl Function for GetEnrichmentTableRecord {
         let table = arguments.required_enum("table", &tables)?.to_string();
         let condition = arguments.required_object("condition")?;
 
-        Ok(Box::new(FindTableRowFn { table, condition }))
+        Ok(Box::new(GetEnrichmentTableRecordFn { table, condition }))
     }
 }
 
@@ -91,7 +91,7 @@ impl Expression for GetEnrichmentTableRecordFn {
                 Ok(())
             }
             // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
-            None => Err("enrichment tables aren't loaded".into()),
+            None => unreachable!("enrichment tables aren't loaded"),
         }
     }
 
