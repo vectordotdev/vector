@@ -23,7 +23,7 @@ impl ComponentId {
 }
 impl From<String> for ComponentId {
     fn from(value: String) -> Self {
-        Self { id: value.clone() }
+        Self { id: value }
     }
 }
 
