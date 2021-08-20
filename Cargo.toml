@@ -111,7 +111,7 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 # Tokio / Futures
 async-trait = "0.1.51"
 futures = { version = "0.3.16", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.9.0", default-features = false, features = ["full"] }
+tokio = { version = "1.10.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.7", default-features = false, features = ["codec", "time"] }
@@ -314,7 +314,7 @@ matches = "0.1.9"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.4", features = ["json"] }
 tempfile = "3.2.0"
-tokio = { version = "1.9.0", features = ["test-util"] }
+tokio = { version = "1.10.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
