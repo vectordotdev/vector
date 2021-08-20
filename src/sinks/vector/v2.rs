@@ -263,10 +263,21 @@ impl RetryLogic for VectorGrpcRetryLogic {
     type Response = ();
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
+        use tonic::Code::*;
+
         match err {
             Error::Request { source } => !matches!(
                 source.code(),
-                tonic::Code::Unknown | tonic::Code::Internal | tonic::Code::PermissionDenied
+                // List taken from
+                //
+                // <https://github.com/grpc/grpc/blob/ed1b20777c69bd47e730a63271eafc1b299f6ca0/doc/statuscodes.md>
+                NotFound
+                    | InvalidArgument
+                    | AlreadyExists
+                    | PermissionDenied
+                    | OutOfRange
+                    | Unimplemented
+                    | Unauthenticated
             ),
             _ => true,
         }
@@ -278,14 +289,17 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkContext,
-        sinks::util::test::build_test_server_status,
+        sinks::util::test::build_test_server_generic,
         test_util::{next_addr, random_lines_with_stream},
     };
-    use bytes::Bytes;
+    use bytes::{BufMut, Bytes, BytesMut};
     use futures::{channel::mpsc, StreamExt};
-    use http::{request::Parts, StatusCode};
+    use http::request::Parts;
     use hyper::Method;
     use vector_core::event::{BatchNotifier, BatchStatus};
+
+    // one byte for the compression flag plus four bytes for the length
+    const GRPC_HEADER_SIZE: usize = 5;
 
     #[test]
     fn generate_config() {
@@ -304,16 +318,23 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::OK);
+        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
         tokio::spawn(server);
 
-        let (batch, _receiver) = BatchNotifier::new_with_receiver();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
 
         sink.run(events).await.unwrap();
         drop(trigger);
-        // This check fails, ref https://github.com/timberio/vector/issues/7624
-        // assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
@@ -341,7 +362,14 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let (_, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+        let (_rx, trigger, server) = build_test_server_generic(in_addr, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "7") // permission denied
+                .header("content-type", "application/grpc")
+                .body(tonic::body::empty_body())
+                .unwrap()
+        });
+
         tokio::spawn(server);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -359,11 +387,7 @@ mod tests {
         rx.map(|(parts, body)| {
             assert_parts(parts);
 
-            // Remove the grpc header, which is:
-            // 1 bytes for compressed/not compressed
-            // 4 bytes for the message len
-            // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
-            let proto_body = body.slice(5..);
+            let proto_body = body.slice(GRPC_HEADER_SIZE..);
 
             let req = proto::PushEventsRequest::decode(proto_body).unwrap();
 
@@ -381,5 +405,38 @@ mod tests {
         .into_iter()
         .flatten()
         .collect()
+    }
+
+    // taken from <https://github.com/hyperium/tonic/blob/5aa8ae1fec27377cd4c2a41d309945d7e38087d0/examples/src/grpc-web/client.rs#L45-L75>
+    fn encode_body<T>(msg: T) -> Bytes
+    where
+        T: prost::Message,
+    {
+        let mut buf = BytesMut::with_capacity(1024);
+
+        // first skip past the header
+        // cannot write it yet since we don't know the size of the
+        // encoded message
+        buf.reserve(GRPC_HEADER_SIZE);
+        unsafe {
+            buf.advance_mut(GRPC_HEADER_SIZE);
+        }
+
+        // write the message
+        msg.encode(&mut buf).unwrap();
+
+        // now we know the size of encoded message and can write the
+        // header
+        let len = buf.len() - GRPC_HEADER_SIZE;
+        {
+            let mut buf = &mut buf[..GRPC_HEADER_SIZE];
+
+            // compression flag, 0 means "no compression"
+            buf.put_u8(0);
+
+            buf.put_u32(len as u32);
+        }
+
+        buf.split_to(len + GRPC_HEADER_SIZE).freeze()
     }
 }
