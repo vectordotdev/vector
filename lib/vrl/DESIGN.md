@@ -27,34 +27,28 @@ of VRL, the [language documentation][docs] exists for that audience.
 
 ## The Zen of VRL
 
-In the spirit of [The Zen of Python][PEP20].
+* **Safety and performance over ease of use.** VRL programs facilitate data
+  processing for mission critical production systems. They are run millions of
+  times per day for large Vector users and usually written once. Therefore,
+  safety and performance are prioritized over developer ease of use.
 
-- Beautiful is better than ugly.
-- Explicit is better than implicit.
-- Simple is better than complex.
-- Sparse is better than dense.
-- Readability trumps writing convenience.
-- Special cases aren't special enough to break the rules.
-- Although practicality beats purity.
-- Function calls over syntax.
-- Errors may never occur at run-time.
-- Unless explicitly marked as such.
-- There should be one — and preferably only one — obvious way to do it.
-- Performance matters.
-- Provide observability remapping solutions, nothing else.
-
-[PEP20]: https://www.python.org/dev/peps/pep-0020/
+* **The best VRL program is the one that most clearly expresses its output.**
+  VRL is an expression-oriented DSL designed to express data transformations. It
+  is not a programming language. Users should not sacrifice the clarity of their
+  data transformation for things like performance. The best VRL program is the
+  one that most clearly describes the intended output. There should be no
+  "tricks" to making VRL fast that takeaway from readability.
 
 ## Why VRL
 
-VRL exists to solve the need for a _simple_ and _performant_ **domain specific
+VRL exists to solve the need for a _safe_ and _performant_ **domain specific
 language** (DSL) to remap observability data.
 
 Its purpose is to hit a sweet spot between Turing complete languages such as
-Lua, and static transforms such as Vector's `rename_fields`. It should be
-flexible enough to cover most remapping use-cases, without requiring operators
-to write complex scripts that are difficult to reason about and incur
-a significant performance penalty.
+Lua, and static transforms such as Vector's old `rename_fields`. It should be
+flexible enough to cover most remapping use-cases, without requiring the
+flexibility and downsides of a full programming language, such as poor
+readability and performance.
 
 See the [introduction blog post][blog] for more details on the **why**.
 
@@ -76,9 +70,9 @@ dedicated software engineers, because their time is best spent elsewhere.
 
 As with everything, there are exceptions to the rule, and many people in this
 group _are_ highly skilled software engineers, but VRL must capture the largest
-possible segment of this group, and should therefor be limited in complexity.
+possible segment of this group, and should therefore be limited in complexity.
 
-Therefor, when extending the feature set of VRL, design **the feature for the
+Therefore, when extending the feature set of VRL, design **the feature for the
 intended target audience**, which will likely mean choosing different trade-offs
 than you'd make if you were to design the feature for your personal needs.
 
@@ -88,14 +82,37 @@ There are a number of features that we've so far rejected to implement in the
 language. This might change in the future, but there should be a good reason to
 do so.
 
-- modules (see: [#5507][]
+- modules (see: [#5507][])
+
+  So far, we've had no need to split up functions over multiple modules. The
+  function naming rules make it so that most functions are already grouped by
+  their logical usage patterns.
+
 - classes
+
+  Given that VRL is a simple DSL, and that any indirection in a program's source
+  can lead to confusion, we've decided against introducing the concept of
+  classes, and instead focused on the usage of function calls to solve operator
+  needs.
+
 - user-defined functions
-- `goto` statements
-- network calls (see [#4517][])
+
+  User-defined functions again produce indirection. While it _might_ be useful
+  to some extremely large use-cases, in most cases, allowing people to read
+  a program from top to bottom without having to jump around is more clear in
+  the context within which VRL is used (remapping).
+
+- network calls (see [#4517][] and [#8717][])
+
+  In order to avoid performance footguns, we want to ensure each function is as
+  performant as it can be, and there's no way to use functions in such a way
+  that performance of a VRL program tanks. We might introduce network calls at
+  some point, if we find a good caching solution to solve most of our concerns,
+  but so far we've avoided any network calls inside our stdlib.
 
 [#5507]: https://github.com/timberio/vector/issues/5507
 [#4517]: https://github.com/timberio/vector/issues/4517#issuecomment-754160338
+[#8717]: https://github.com/timberio/vector/pull/8717
 
 ## Conventions
 
@@ -121,21 +138,32 @@ do so.
 - Favor explicit verbose names over terse ones (e.g.
   `parse_aws_cloudwatch_log_subscription_message` over `parse_aws_cwl_msg`).
 
-- Use `parse_*` for string decoding functions (e.g. `parse_json` and
-  `parse_grok`).
+- Functions should be preceded with their function category for organization and
+  discovery.
 
-- Use `encode_*` for string encoding functions (e.g. `encode_base64`).
+  - Use `parse_*` for string to type decoding functions (e.g. `parse_json` and
+    `parse_grok`).
+  
+  - Use `decode_*` for string to string decoding functions (e.g.
+    `decode_base64`).
+  
+  - Use `encode_*` for string encoding functions (e.g. `encode_base64`).
+  
+  - Use `to_*` to convert from one type to another (e.g. `to_bool`).
 
-- Use `to_*` to convert from one type to another (e.g. `to_bool`).
-
-- Use `format_*` for string formatting functions (e.g. `format_timestamp` and
-  `format_number`).
+  - Use `is_*` to determine if the provided value is of a given type (e.g.
+    `is_string` or `is_json`).
+  
+  - Use `format_*` for string formatting functions (e.g. `format_timestamp` and
+    `format_number`).
 
 #### Return Types
 
 - Return boolean from `is_*` functions (e.g. `is_string`).
 
-- Return an error when `parse_*` functions fail to decode the string.
+- Return a string from `encode_*` functions (e.g. `encode_base64`).
+
+- Return an error whenever the function can fail at runtime.
 
 #### Mutability
 
@@ -179,12 +207,13 @@ limited, and additional exceptions should be well reasoned.
 
 - Argument naming follows the same conventions as function naming.
 
-- For one or more parameters, the first parameter must be the "target" of the
-  function (e.g. `parse_regex(target: <string>, pattern: <regex>)`).
+- For one or more parameters, the first parameter must be the "value" the
+  function is acting on (e.g. `parse_regex(value: <string>, pattern: <regex>)`).
 
-- The first parameter must therefor almost always be named `target`.
+- The first parameter must therefore almost always be named `value`.
 
-- TODO
+- The exception to this is when you're dealing with an actual VRL path (e.g.
+  `del(path)`) or in special cases such as `assert`.
 
 ### Errors
 
