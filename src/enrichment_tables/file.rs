@@ -88,7 +88,7 @@ impl EnrichmentTableConfig for FileConfig {
         };
 
         trace!(
-            "Loaded enrichment file {} with headers {:?}",
+            "Loaded enrichment file {} with headers {:?}.",
             path.to_str().unwrap_or("path with invalid utf"),
             headers
         );
