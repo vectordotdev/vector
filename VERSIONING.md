@@ -94,7 +94,7 @@ increment.
 
 ### How often is Vector released?
 
-Please see the [RELEASES policy].
+Please see the [release policy].
 
 ### How does Vector treat patch and minor versions?
 
@@ -141,7 +141,7 @@ here. Each minor release bump will include an upgrade guide in the
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [release notes]: https://vector.dev/releases/
-[RELEASES policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
+[release policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 [`vector` command]: https://vector.dev/docs/reference/cli/#vector
 [`vector generate` subcommand]: https://vector.dev/docs/reference/cli/#generate

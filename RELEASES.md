@@ -4,22 +4,23 @@ This document covers Vector's releases and the relevant aspect for Vector users.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Release channels](#release-channels)
+1. [Channels](#channels)
    1. [Stable channel](#stable-channel)
    1. [Nightly channel](#nightly-channel)
-1. [Release tracking](#release-tracking)
+1. [Tracking](#tracking)
    1. [Stable channel](#stable-channel-1)
    1. [Nightly channel](#nightly-channel-1)
-1. [Release downloading](#release-downloading)
-1. [Release cadence](#release-cadence)
+1. [Downloading](#downloading)
+1. [Cadence](#cadence)
    1. [Stable channel](#stable-channel-2)
    1. [Nightly channel](#nightly-channel-2)
+1. [Guarantees](#guarantees)
 1. [FAQ](#faq)
 1. [Which release type should I be using?](#which-release-type-should-i-be-using)
 
 <!-- /MarkdownTOC -->
 
-## Release channels
+## Channels
 
 ### Stable channel
 
@@ -32,7 +33,7 @@ The nightly channel is released nightly, based off of the current state of the
 [`master` branch]. No guarantees are made with this branch. It may include
 experimental or breaking changes.
 
-## Release tracking
+## Tracking
 
 ### Stable channel
 
@@ -50,11 +51,11 @@ experimental or breaking changes.
 
 Releases will appear in our [nightly artifact list] every night.
 
-## Release downloading
+## Downloading
 
 Please head over to Vector's [download page].
 
-## Release cadence
+## Cadence
 
 ### Stable channel
 
@@ -65,6 +66,10 @@ Please head over to Vector's [download page].
 ### Nightly channel
 
 * **Every night**
+
+## Guarantees
+
+Please see the [versioning policy].
 
 # FAQ
 
@@ -85,3 +90,4 @@ Otherwise, the stable release is your best bet.
 [Github repository]: https://github.com/timberio/vector
 [Github subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions
 [`master` branch]: https://github.com/timberio/vector/tree/master
+[versioning policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
