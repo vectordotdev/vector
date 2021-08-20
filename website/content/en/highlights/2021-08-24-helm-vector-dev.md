@@ -1,6 +1,6 @@
 ---
 date: "2021-08-24"
-title: "Introducing https://helm.vector.dev"
+title: "Introducing helm.vector.dev"
 description: "A new home for Vector's Helm charts"
 authors: ["spencergilbert"]
 pr_numbers: []

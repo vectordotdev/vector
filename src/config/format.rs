@@ -131,6 +131,8 @@ mod tests {
         }
 
         const SAMPLE_TOML: &str = r#"
+            [enrichment_tables.csv]
+            type = "file"
             [sources.in]
             type = "socket"
             mode = "tcp"
@@ -170,6 +172,9 @@ mod tests {
             (
                 // YAML is sensitive to leading whitespace and linebreaks.
                 concat_with_newlines!(
+                    r#"enrichment_tables:"#,
+                    r#"  csv:"#,
+                    r#"    type: "file""#,
                     r#"sources:"#,
                     r#"  in:"#,
                     r#"    type: "socket""#,
@@ -194,6 +199,11 @@ mod tests {
             (
                 r#"
                 {
+                    "enrichment_tables": {
+                        "csv": {
+                            "type": "file"
+                        }
+                    },
                     "sources": {
                         "in": {
                             "type": "socket",

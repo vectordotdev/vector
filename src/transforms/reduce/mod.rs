@@ -1,6 +1,6 @@
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     transforms::{TaskTransform, Transform},
@@ -51,7 +51,7 @@ impl_generate_config_from_default!(ReduceConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Reduce::new(self).map(Transform::task)
     }
 
@@ -317,7 +317,7 @@ group_by = [ "request_id" ]
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -379,7 +379,7 @@ merge_strategies.baz = "max"
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -431,7 +431,7 @@ group_by = [ "request_id" ]
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -490,7 +490,7 @@ merge_strategies.bar = "concat"
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let reduce = reduce.into_task();
