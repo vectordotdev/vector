@@ -72,6 +72,7 @@ default = [
     "format_int",
     "format_number",
     "format_timestamp",
+    "get_enrichment_table_record",
     "get_env_var",
     "get_hostname",
     "get_enrichment_table_record",
@@ -186,6 +187,7 @@ floor = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
+get_enrichment_table_record = []
 get_env_var = []
 get_hostname = ["hostname"]
 get_enrichment_table_record = []

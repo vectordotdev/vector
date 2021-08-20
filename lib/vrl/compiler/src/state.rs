@@ -56,7 +56,7 @@ impl Compiler {
         self.variables.get(ident)
     }
 
-    pub fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
+    pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
         self.variables.insert(ident, details);
     }
 
