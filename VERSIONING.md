@@ -55,6 +55,7 @@ a major version increment.
   * The root [`vector` command], its flags and exit code
   * The [`vector validate` subcommand], the flags exit codes
 * [Data model]
+  * As output in all sinks except the [`vector` sink]
   * As exposed in the source of the [`lua` transform]
 * [GraphQL API]
 * Telemetry
@@ -70,7 +71,7 @@ increment only if Vector itself is not compatbile with previous versions.
 * [Configuration schema]
 * [Data directory] and its contents
 * [Data model]
-  * As exposed in the output of the [`vector` sink]
+  * As output in the [`vector` sink]
 
 ### Areas that are *NOT* covered
 
