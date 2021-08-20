@@ -27,6 +27,7 @@ use crate::internal_events::{
     VectorStarted, VectorStopped,
 };
 
+#[cfg(feature = "datadog")]
 static DATADOG_OBSERVABILITY_MESSAGE: &str =
     "Datadog API key provided. Internal metrics will be sent to Datadog.";
 

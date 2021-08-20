@@ -106,7 +106,7 @@ mod tests {
         let mut config = Config::default();
 
         // Attaching config without an API enabled should avoid wiring up components.
-        assert_eq!(try_attach(&mut config), Err(AttachError::NotEnabled));
+        assert!(try_attach(&mut config).is_err());
 
         assert!(!config
             .sources
