@@ -21,7 +21,12 @@ and feedback.
 ## What is an aggregator
 
 When Vector is run in an [aggregator role][aggregator], it is used to transform and ship data
-collected by other agents.
+collected by other agents. The core benefit of having distinct agents and aggregators is that
+you can have a separation of concerns within an observability data processing pipeline. Agents
+can become much “thinner,” in some cases acting as pure pipes that collect from a source and
+ship downstream to aggregators, while aggregators perform the “thicker” work of ensuring that
+the data is scrubbed of sensitive information, properly formatted for downstream consumers,
+sampled to reduce volume, and more.
 
 The `vector-aggregator` chart deploys Vector as a StatefulSet, with the option of installing a
 HAProxy Deployment for load balancing across multiple aggregators.
