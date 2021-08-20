@@ -91,12 +91,6 @@ impl TableRegistry {
         let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
     }
-
-    /// Returns a cheaply clonable struct through that provides lock free read access to the
-    /// enrichment tables.
-    pub fn as_readonly(&self) -> TableSearch {
-        TableSearch(self.tables.clone())
-    }
 }
 
 impl std::fmt::Debug for TableRegistry {
@@ -141,6 +135,12 @@ impl vrl_core::enrichment::TableSetup for TableRegistry {
             },
         }
     }
+
+    /// Returns a cheaply clonable struct through that provides lock free read access to the
+    /// enrichment tables.
+    fn as_readonly(&self) -> Box<dyn vrl_core::enrichment::TableSearch + Send + Sync> {
+        Box::new(TableSearch(self.tables.clone()))
+    }
 }
 
 /// Provides read only access to the enrichment tables via the `vrl::EnrichmentTableSearch` trait.
@@ -163,9 +163,7 @@ impl vrl_core::enrichment::TableSearch for TableSearch {
                 Some(table) => Ok(table.find_table_row(condition).map(|table| {
                     table
                         .iter()
-                        .map(|(key, value)| {
-                            (key.to_string(), vrl_core::Value::from(value.as_str()))
-                        })
+                        .map(|(key, value)| (key.to_string(), value.as_str().into()))
                         .collect()
                 })),
             }
@@ -210,7 +208,7 @@ mod tests {
     use super::*;
     use shared::btreemap;
     use std::sync::{Arc, Mutex};
-    use vrl_core::enrichment::{TableSearch, TableSetup};
+    use vrl_core::enrichment::TableSetup;
 
     #[derive(Debug, Clone)]
     struct DummyEnrichmentTable {

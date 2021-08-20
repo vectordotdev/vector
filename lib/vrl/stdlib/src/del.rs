@@ -193,12 +193,14 @@ mod tests {
             ),
         ];
         let tz = TimeZone::default();
-        let enrichment_tables = Some(Box::new(vrl::enrichment::EmptyEnrichmentTables)
-            as Box<dyn vrl::enrichment::TableSearch>);
+        let enrichment_tables = Some(
+            &vrl::enrichment::EmptyEnrichmentTables
+                as &(dyn vrl::enrichment::TableSearch + Send + Sync),
+        );
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let mut runtime_state = vrl::state::Runtime::default();
-            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, &enrichment_tables);
+            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, enrichment_tables);
             let got = func
                 .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

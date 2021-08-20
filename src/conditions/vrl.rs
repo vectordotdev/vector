@@ -61,7 +61,6 @@ impl ConditionConfig for VrlConfig {
         Ok(Box::new(Vrl {
             program,
             source: self.source.clone(),
-            enrichment_tables: enrichment_tables.as_readonly(),
         }))
     }
 }
@@ -72,7 +71,6 @@ impl ConditionConfig for VrlConfig {
 pub struct Vrl {
     pub(super) program: Program,
     pub(super) source: String,
-    pub(super) enrichment_tables: enrichment::TableSearch,
 }
 
 impl Vrl {
@@ -92,12 +90,7 @@ impl Vrl {
         let mut target = VrlTarget::new(event.clone());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
-        Runtime::default().resolve(
-            &mut target,
-            &self.program,
-            &timezone,
-            &Some(Box::new(self.enrichment_tables.clone())),
-        )
+        Runtime::default().resolve(&mut target, &self.program, &timezone)
     }
 }
 

@@ -138,7 +138,7 @@ fn resolve(
     };
 
     runtime
-        .resolve(object, &program, timezone, &None)
+        .resolve(object, &program, timezone)
         .map_err(|err| err.to_string())
 }
 

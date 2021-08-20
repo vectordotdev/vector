@@ -138,12 +138,7 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let result = runtime.resolve(
-                    &mut test.object,
-                    &program,
-                    &timezone,
-                    &Some(Box::new(EmptyEnrichmentTables)),
-                );
+                let result = runtime.resolve(&mut test.object, &program, &timezone);
 
                 match result {
                     Ok(got) => {

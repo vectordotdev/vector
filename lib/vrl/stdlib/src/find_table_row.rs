@@ -67,7 +67,6 @@ impl Expression for FindTableRowFn {
 
         let tables = ctx
             .get_enrichment_tables()
-            .as_ref()
             .ok_or("enrichment tables not loaded")?;
 
         match tables.find_table_row(&self.table, &condition)? {
@@ -108,7 +107,7 @@ mod tests {
     use shared::{btreemap, TimeZone};
     use vrl::enrichment;
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     struct DummyEnrichmentTable;
 
     impl enrichment::TableSetup for DummyEnrichmentTable {
@@ -121,6 +120,10 @@ mod tests {
             assert_eq!(vec!["field"], fields);
 
             Ok(())
+        }
+
+        fn as_readonly(&self) -> Box<dyn enrichment::TableSearch + Send + Sync> {
+            Box::new(self.clone())
         }
     }
 
@@ -157,11 +160,11 @@ mod tests {
 
         let tz = TimeZone::default();
         let enrichment_tables =
-            Some(Box::new(DummyEnrichmentTable) as Box<dyn vrl::enrichment::TableSearch>);
+            Some(&DummyEnrichmentTable as &(dyn vrl::enrichment::TableSearch + Send + Sync));
 
         let mut object: Value = BTreeMap::new().into();
         let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, &enrichment_tables);
+        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, enrichment_tables);
 
         let got = func.resolve(&mut ctx);
 

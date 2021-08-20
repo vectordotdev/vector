@@ -10,11 +10,12 @@ pub enum Condition<'a> {
 pub trait TableSetup: DynClone {
     fn table_ids(&self) -> Vec<String>;
     fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<(), String>;
+    fn as_readonly(&self) -> Box<dyn TableSearch + Send + Sync>;
 }
 
 dyn_clone::clone_trait_object!(TableSetup);
 
-pub trait TableSearch: DynClone {
+pub trait TableSearch: DynClone + std::fmt::Debug {
     fn find_table_row<'a>(
         &'a self,
         table: &str,
@@ -35,6 +36,10 @@ impl TableSetup for EmptyEnrichmentTables {
 
     fn add_index(&mut self, _table: &str, _fields: &[&str]) -> Result<(), String> {
         Ok(())
+    }
+
+    fn as_readonly(&self) -> Box<dyn TableSearch + Send + Sync> {
+        Box::new(self.clone())
     }
 }
 
