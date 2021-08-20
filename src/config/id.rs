@@ -43,7 +43,7 @@ impl<T: ToString> From<&T> for ComponentId {
 
 impl fmt::Display for ComponentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.value.fmt(f)
+        self.id.fmt(f)
     }
 }
 
@@ -58,7 +58,7 @@ impl Serialize for ComponentId {
 
 impl Ord for ComponentId {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.value.cmp(&other.value)
+        self.id.cmp(&other.id)
     }
 }
 
