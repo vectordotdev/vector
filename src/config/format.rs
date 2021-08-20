@@ -118,6 +118,7 @@ mod tests {
     // Here we test that the deserializations from various formats match
     // the TOML format.
     #[cfg(all(
+        feature = "enrichment-tables-file",
         feature = "sources-socket",
         feature = "transforms-sample",
         feature = "sinks-socket"
@@ -133,6 +134,8 @@ mod tests {
         const SAMPLE_TOML: &str = r#"
             [enrichment_tables.csv]
             type = "file"
+            path = "/tmp/file.csv"
+            encoding.type = "csv"
             [sources.in]
             type = "socket"
             mode = "tcp"
@@ -175,6 +178,9 @@ mod tests {
                     r#"enrichment_tables:"#,
                     r#"  csv:"#,
                     r#"    type: "file""#,
+                    r#"    path: "/tmp/file.csv""#,
+                    r#"    encoding:"#,
+                    r#"      type: "csv""#,
                     r#"sources:"#,
                     r#"  in:"#,
                     r#"    type: "socket""#,
@@ -201,7 +207,11 @@ mod tests {
                 {
                     "enrichment_tables": {
                         "csv": {
-                            "type": "file"
+                            "type": "file",
+                            "path": "/tmp/file.csv",
+                            "encoding": {
+                              "type": "csv"
+                            }
                         }
                     },
                     "sources": {

@@ -26,21 +26,9 @@ impl Default for Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum Source {
-    File { path: PathBuf },
-}
-
-impl Default for Source {
-    fn default() -> Self {
-        Self::File { path: "".into() }
-    }
-}
-
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
 struct FileConfig {
-    source: Source,
+    path: PathBuf,
     encoding: Encoding,
 }
 
@@ -60,12 +48,10 @@ impl EnrichmentTableConfig for FileConfig {
             delimiter,
         } = self.encoding;
 
-        let Source::File { path } = &self.source;
-
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(include_headers)
             .delimiter(delimiter as u8)
-            .from_path(&path)?;
+            .from_path(&self.path)?;
 
         let data = reader
             .records()
@@ -89,7 +75,7 @@ impl EnrichmentTableConfig for FileConfig {
 
         trace!(
             "Loaded enrichment file {} with headers {:?}.",
-            path.to_str().unwrap_or("path with invalid utf"),
+            self.path.to_str().unwrap_or("path with invalid utf"),
             headers
         );
 
@@ -249,7 +235,7 @@ impl Table for File {
     }
 
     fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
-        trace!("Added index {:?}", fields);
+        trace!("Added index {:?}.", fields);
 
         self.indexes.push(self.index_data(fields));
 
