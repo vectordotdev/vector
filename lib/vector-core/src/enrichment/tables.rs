@@ -26,7 +26,7 @@
 //!
 use super::Table;
 use arc_swap::ArcSwap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Default)]
@@ -91,12 +91,6 @@ impl TableRegistry {
         let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
     }
-
-    /// Returns a cheaply clonable struct through that provides lock free read access to the
-    /// enrichment tables.
-    pub fn as_readonly(&self) -> TableSearch {
-        TableSearch(self.tables.clone())
-    }
 }
 
 impl std::fmt::Debug for TableRegistry {
@@ -106,7 +100,7 @@ impl std::fmt::Debug for TableRegistry {
 }
 
 #[cfg(feature = "vrl")]
-impl vrl_core::EnrichmentTableSetup for TableRegistry {
+impl vrl_core::enrichment::TableSetup for TableRegistry {
     /// Return a list of the available tables that we can write to.
     /// This only works in the writing stage and will acquire a lock to retrieve the tables.
     ///
@@ -141,6 +135,12 @@ impl vrl_core::EnrichmentTableSetup for TableRegistry {
             },
         }
     }
+
+    /// Returns a cheaply clonable struct through that provides lock free read access to the
+    /// enrichment tables.
+    fn as_readonly(&self) -> Box<dyn vrl_core::enrichment::TableSearch + Send + Sync> {
+        Box::new(TableSearch(self.tables.clone()))
+    }
 }
 
 /// Provides read only access to the enrichment tables via the `vrl::EnrichmentTableSearch` trait.
@@ -148,19 +148,24 @@ impl vrl_core::EnrichmentTableSetup for TableRegistry {
 #[derive(Clone, Default)]
 pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>);
 
-impl vrl_core::EnrichmentTableSearch for TableSearch {
+impl vrl_core::enrichment::TableSearch for TableSearch {
     /// Search the given table to find the data.
     /// If we are in the writing stage, this function will return an error.
-    fn find_table_row(
+    fn find_table_row<'a>(
         &self,
         table: &str,
-        criteria: Vec<vrl_core::Condition>,
-    ) -> Result<Option<Vec<String>>, String> {
+        condition: &'a [vrl_core::enrichment::Condition<'a>],
+    ) -> Result<Option<BTreeMap<String, vrl_core::Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => Ok(table.find_table_row(criteria).cloned()),
+                Some(table) => Ok(table.find_table_row(condition).map(|table| {
+                    table
+                        .iter()
+                        .map(|(key, value)| (key.to_string(), value.as_str().into()))
+                        .collect()
+                })),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -201,34 +206,37 @@ fn fmt_enrichment_table(
 #[cfg(all(feature = "vrl", test))]
 mod tests {
     use super::*;
+    use shared::btreemap;
     use std::sync::{Arc, Mutex};
-    use vrl_core::{EnrichmentTableSearch, EnrichmentTableSetup};
+    use vrl_core::enrichment::TableSetup;
 
     #[derive(Debug, Clone)]
     struct DummyEnrichmentTable {
-        data: Vec<String>,
+        data: BTreeMap<String, String>,
         indexes: Arc<Mutex<Vec<Vec<String>>>>,
     }
 
     impl DummyEnrichmentTable {
         fn new() -> Self {
-            Self {
-                data: vec!["result".to_string()],
-                indexes: Arc::new(Mutex::new(Vec::new())),
-            }
+            Self::new_with_index(Arc::new(Mutex::new(Vec::new())))
         }
 
         fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
             Self {
-                data: vec!["result".to_string()],
+                data: btreemap! {
+                    "field".to_string() => "result".to_string()
+                },
                 indexes,
             }
         }
     }
 
     impl Table for DummyEnrichmentTable {
-        fn find_table_row(&self, _criteria: Vec<vrl_core::Condition>) -> Option<&Vec<String>> {
-            Some(&self.data)
+        fn find_table_row(
+            &self,
+            _criteria: &[vrl_core::enrichment::Condition],
+        ) -> Option<BTreeMap<String, String>> {
+            Some(self.data.clone())
         }
 
         fn add_index(&mut self, fields: &[&str]) {
@@ -279,8 +287,8 @@ mod tests {
             Err("finish_load not called".to_string()),
             tables.find_table_row(
                 "dummy1",
-                vec![vrl_core::Condition::Equals {
-                    field: "thing".to_string(),
+                &[vrl_core::enrichment::Condition::Equals {
+                    field: "thing",
                     value: "thang".to_string(),
                 }]
             )
@@ -314,11 +322,13 @@ mod tests {
         registry.finish_load();
 
         assert_eq!(
-            Ok(Some(vec!["result".to_string()])),
+            Ok(Some(btreemap! {
+                "field".to_string() => vrl_core::Value::from("result")
+            })),
             tables_search.find_table_row(
                 "dummy1",
-                vec![vrl_core::Condition::Equals {
-                    field: "thing".to_string(),
+                &[vrl_core::enrichment::Condition::Equals {
+                    field: "thing",
                     value: "thang".to_string(),
                 }],
             )

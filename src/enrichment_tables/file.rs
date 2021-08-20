@@ -1,5 +1,8 @@
+use std::collections::BTreeMap;
+
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 use serde::{Deserialize, Serialize};
+use shared::btreemap;
 use tracing::trace;
 use vector_core::enrichment::{Condition, Table};
 
@@ -15,7 +18,10 @@ impl EnrichmentTableConfig for FileConfig {
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         trace!("Building file enrichment table.");
         Ok(Box::new(File {
-            data: vec![vec!["field1".to_string(), "field2".to_string()]],
+            data: vec![btreemap! {
+                "field1" => "thing1",
+                "field2" => "thing2",
+            }],
             indexes: Vec::new(),
         }))
     }
@@ -29,14 +35,17 @@ impl_generate_config_from_default!(FileConfig);
 
 #[derive(Clone)]
 struct File {
-    data: Vec<Vec<String>>,
+    data: Vec<BTreeMap<String, String>>,
     indexes: Vec<Vec<String>>,
 }
 
 impl Table for File {
-    fn find_table_row<'a>(&self, _criteria: Vec<Condition>) -> Option<&Vec<String>> {
+    fn find_table_row<'a>(
+        &self,
+        _criteria: &'a [Condition<'a>],
+    ) -> Option<BTreeMap<String, String>> {
         trace!("Searching enrichment table.");
-        Some(&self.data[0])
+        Some(self.data[0].clone())
     }
 
     fn add_index(&mut self, fields: &[&str]) {

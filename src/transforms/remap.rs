@@ -61,7 +61,6 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
-    enrichment_tables: enrichment::TableSearch,
 }
 
 impl Remap {
@@ -84,15 +83,18 @@ impl Remap {
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
 
-        let program = vrl::compile(&source, &vrl_stdlib::all())
-            .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
+        let program = vrl::compile(
+            &source,
+            Box::new(enrichment_tables.clone()),
+            &vrl_stdlib::all(),
+        )
+        .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         Ok(Remap {
             program,
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
-            enrichment_tables: enrichment_tables.as_readonly(),
         })
     }
 }

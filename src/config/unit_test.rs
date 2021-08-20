@@ -516,7 +516,7 @@ async fn build_unit_test(
                 .iter()
                 .enumerate()
             {
-                match cond_conf.build() {
+                match cond_conf.build(&Default::default()) {
                     Ok(c) => conditions.push(c),
                     Err(e) => errors.push(format!(
                         "failed to create test condition '{}': {}",

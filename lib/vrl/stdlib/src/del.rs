@@ -49,7 +49,7 @@ impl Function for Del {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let query = arguments.required_query("target")?;
 
         Ok(Box::new(DelFn { query }))
@@ -126,8 +126,12 @@ impl Expression for DelFn {
         TypeDef::new().unknown()
     }
 
-    fn update_state(&self, state: &mut state::Compiler) {
+    fn update_state<'a>(
+        &self,
+        state: &mut state::Compiler,
+    ) -> std::result::Result<(), ExpressionError> {
         self.query.delete_type_def(state);
+        Ok(())
     }
 }
 
@@ -192,7 +196,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let mut runtime_state = vrl::state::Runtime::default();
-            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, None);
             let got = func
                 .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

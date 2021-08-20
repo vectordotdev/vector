@@ -162,7 +162,7 @@ impl FunctionCall {
             })?;
 
         let expr = function
-            .compile(list)
+            .compile(state, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Asking for an infallible function to abort on error makes no sense.
@@ -176,7 +176,10 @@ impl FunctionCall {
         }
 
         // Update the state if necessary.
-        expr.update_state(state);
+        expr.update_state(state).map_err(|err| Error::UpdateState {
+            call_span,
+            error: err.to_string(),
+        })?;
 
         Ok(Self {
             abort_on_error,
@@ -398,6 +401,9 @@ pub enum Error {
 
     #[error("fallible argument")]
     FallibleArgument { expr_span: Span },
+
+    #[error("error updating state {}", error)]
+    UpdateState { call_span: Span, error: String },
 }
 
 impl DiagnosticError for Error {
@@ -413,6 +419,7 @@ impl DiagnosticError for Error {
             AbortInfallible { .. } => 620,
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
+            UpdateState { .. } => 640,
         }
     }
 
@@ -561,6 +568,11 @@ impl DiagnosticError for Error {
                     expr_span,
                 ),
             ],
+
+            UpdateState { call_span, error } => vec![Label::primary(
+                format!("an error occurred updating the compiler state: {}", error),
+                call_span,
+            )],
         }
     }
 
