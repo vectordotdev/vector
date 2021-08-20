@@ -206,6 +206,7 @@ bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.4", default-features = false }
+csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -218,6 +219,7 @@ flate2 = { version = "1.0.20", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 grok = { version = "1.1.0", default-features = false, optional = true }
+hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.4", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
@@ -331,14 +333,14 @@ leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "l
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default-cmake = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
-default-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
-default-no-api-client = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default-msvc = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
+default-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default-no-api-client = ["api", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
 default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all"]
 disk-buffer = ["vector_core/disk-buffer"]
 
@@ -399,6 +401,10 @@ api-client = [
   "vector_core/api",
   "vector-api-client",
 ]
+
+# Enrichment Tables
+enrichment-tables = ["enrichment-tables-file"]
+enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -775,6 +781,12 @@ name = "remap"
 harness = false
 test = true
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "enrichment_tables_file"
+harness = false
+test = true
+required-features = ["enrichment-tables-file"]
 
 [[bench]]
 name = "languages"

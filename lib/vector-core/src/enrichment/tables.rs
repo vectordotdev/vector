@@ -24,7 +24,7 @@
 //! needs access to this can call `TableRegistry::as_readonly`. This returns a cheaply clonable struct that
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables can be searched.
 //!
-use super::Table;
+use super::{IndexHandle, Table};
 use arc_swap::ArcSwap;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
@@ -121,17 +121,14 @@ impl vrl_core::enrichment::TableSetup for TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
-    fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<(), String> {
+    fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<IndexHandle, String> {
         let mut locked = self.loading.lock().unwrap();
 
         match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
                 None => Err(format!("table '{}' not loaded", table)),
-                Some(table) => {
-                    table.add_index(fields);
-                    Ok(())
-                }
+                Some(table) => table.add_index(fields),
             },
         }
     }
@@ -155,17 +152,18 @@ impl vrl_core::enrichment::TableSearch for TableSearch {
         &self,
         table: &str,
         condition: &'a [vrl_core::enrichment::Condition<'a>],
-    ) -> Result<Option<BTreeMap<String, vrl_core::Value>>, String> {
+        index: Option<IndexHandle>,
+    ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => Ok(table.find_table_row(condition).map(|table| {
+                Some(table) => table.find_table_row(condition, index).map(|table| {
                     table
                         .iter()
                         .map(|(key, value)| (key.to_string(), value.as_str().into()))
                         .collect()
-                })),
+                }),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -208,7 +206,7 @@ mod tests {
     use super::*;
     use shared::btreemap;
     use std::sync::{Arc, Mutex};
-    use vrl_core::enrichment::TableSetup;
+    use vrl_core::enrichment::{Condition, TableSetup};
 
     #[derive(Debug, Clone)]
     struct DummyEnrichmentTable {
@@ -234,16 +232,16 @@ mod tests {
     impl Table for DummyEnrichmentTable {
         fn find_table_row(
             &self,
-            _criteria: &[vrl_core::enrichment::Condition],
-        ) -> Option<BTreeMap<String, String>> {
-            Some(self.data.clone())
+            _condition: &[Condition],
+            _index: Option<vrl_core::enrichment::IndexHandle>,
+        ) -> Result<BTreeMap<String, String>, String> {
+            Ok(self.data.clone())
         }
 
-        fn add_index(&mut self, fields: &[&str]) {
-            self.indexes
-                .lock()
-                .unwrap()
-                .push(fields.iter().map(|s| (*s).to_string()).collect());
+        fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
+            let mut indexes = self.indexes.lock().unwrap();
+            indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
+            Ok(IndexHandle(indexes.len() - 1))
         }
     }
 
@@ -268,7 +266,7 @@ mod tests {
         tables.insert("dummy1".to_string(), Box::new(dummy));
         let mut registry = super::TableRegistry::default();
         registry.load(tables);
-        assert_eq!(Ok(()), registry.add_index("dummy1", &["erk"]));
+        assert_eq!(Ok(IndexHandle(0)), registry.add_index("dummy1", &["erk"]));
 
         let indexes = indexes.lock().unwrap();
         assert_eq!(vec!["erk".to_string()], *indexes[0]);
@@ -287,10 +285,11 @@ mod tests {
             Err("finish_load not called".to_string()),
             tables.find_table_row(
                 "dummy1",
-                &[vrl_core::enrichment::Condition::Equals {
+                &[Condition::Equals {
                     field: "thing",
                     value: "thang".to_string(),
-                }]
+                }],
+                None
             )
         );
     }
@@ -322,15 +321,16 @@ mod tests {
         registry.finish_load();
 
         assert_eq!(
-            Ok(Some(btreemap! {
-                "field".to_string() => vrl_core::Value::from("result")
-            })),
+            Ok(btreemap! {
+                "field" => "result"
+            }),
             tables_search.find_table_row(
                 "dummy1",
-                &[vrl_core::enrichment::Condition::Equals {
+                &[Condition::Equals {
                     field: "thing",
                     value: "thang".to_string(),
                 }],
+                None
             )
         );
     }

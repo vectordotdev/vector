@@ -69,7 +69,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
 
     /// Updates the state if necessary.
     /// By default it does nothing.
-    fn update_state(&self, _state: &mut crate::State) -> Result<(), ExpressionError> {
+    fn update_state(&mut self, _state: &mut crate::State) -> Result<(), ExpressionError> {
         Ok(())
     }
 

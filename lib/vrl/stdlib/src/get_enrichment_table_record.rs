@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use vrl::{enrichment::Condition, prelude::*};
+use vrl::{enrichment, prelude::*};
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetEnrichmentTableRecord;
@@ -40,10 +40,18 @@ impl Function for GetEnrichmentTableRecord {
             })
             .unwrap_or_else(Vec::new);
 
-        let table = arguments.required_enum("table", &tables)?.to_string();
+        let table = arguments
+            .required_enum("table", &tables)?
+            .try_bytes_utf8_lossy()
+            .expect("table is not valid utf8")
+            .into_owned();
         let condition = arguments.required_object("condition")?;
 
-        Ok(Box::new(GetEnrichmentTableRecordFn { table, condition }))
+        Ok(Box::new(GetEnrichmentTableRecordFn {
+            table,
+            condition,
+            index: None,
+        }))
     }
 }
 
@@ -51,6 +59,7 @@ impl Function for GetEnrichmentTableRecord {
 pub struct GetEnrichmentTableRecordFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
+    index: Option<enrichment::IndexHandle>,
 }
 
 impl Expression for GetEnrichmentTableRecordFn {
@@ -59,25 +68,23 @@ impl Expression for GetEnrichmentTableRecordFn {
             .condition
             .iter()
             .map(|(key, value)| {
-                Ok(Condition::Equals {
+                Ok(enrichment::Condition::Equals {
                     field: key,
-                    value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(),
+                    value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned(),
                 })
             })
-            .collect::<Result<Vec<Condition>>>()?;
+            .collect::<Result<Vec<enrichment::Condition>>>()?;
 
         let tables = ctx
             .get_enrichment_tables()
             .ok_or("enrichment tables not loaded")?;
 
-        match tables.find_table_row(&self.table, &condition)? {
-            None => Err("data not found".into()),
-            Some(data) => Ok(Value::Object(data)),
-        }
+        let data = tables.find_table_row(&self.table, &condition, self.index)?;
+        Ok(Value::Object(data))
     }
 
     fn update_state(
-        &self,
+        &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
         match state.get_enrichment_tables_mut() {
@@ -87,7 +94,11 @@ impl Expression for GetEnrichmentTableRecordFn {
                     .iter()
                     .map(|(field, _)| field.as_ref())
                     .collect::<Vec<_>>();
-                table.add_index(&self.table, &fields)?;
+                let index = table.add_index(&self.table, &fields)?;
+
+                // Store the index to use while searching.
+                self.index = Some(index);
+
                 Ok(())
             }
             // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
@@ -116,11 +127,15 @@ mod tests {
             vec!["table".to_string()]
         }
 
-        fn add_index(&mut self, table: &str, fields: &[&str]) -> std::result::Result<(), String> {
+        fn add_index(
+            &mut self,
+            table: &str,
+            fields: &[&str],
+        ) -> std::result::Result<enrichment::IndexHandle, String> {
             assert_eq!("table", table);
             assert_eq!(vec!["field"], fields);
 
-            Ok(())
+            Ok(enrichment::IndexHandle(999))
         }
 
         fn as_readonly(&self) -> Box<dyn enrichment::TableSearch + Send + Sync> {
@@ -132,21 +147,23 @@ mod tests {
         fn find_table_row<'a>(
             &self,
             table: &str,
-            condition: &'a [Condition<'a>],
-        ) -> std::result::Result<Option<BTreeMap<String, Value>>, String> {
+            condition: &'a [enrichment::Condition<'a>],
+            index: Option<enrichment::IndexHandle>,
+        ) -> std::result::Result<BTreeMap<String, Value>, String> {
             assert_eq!(table, "table");
             assert_eq!(
                 condition,
-                vec![Condition::Equals {
+                vec![enrichment::Condition::Equals {
                     field: "field",
                     value: "value".to_string(),
                 }]
             );
+            assert_eq!(index, Some(enrichment::IndexHandle(999)));
 
-            Ok(Some(btreemap! {
-                "field" => Value::from("value"),
-                "field2" => Value::from("value2"),
-            }))
+            Ok(btreemap! {
+                "field".to_string() => "value".to_string(),
+                "field2".to_string() => "value2".to_string(),
+            })
         }
     }
 
@@ -157,6 +174,7 @@ mod tests {
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
             },
+            index: Some(enrichment::IndexHandle(999)),
         };
 
         let tz = TimeZone::default();
@@ -174,16 +192,18 @@ mod tests {
 
     #[test]
     fn add_indexes() {
-        let func = GetEnrichmentTableRecordFn {
+        let mut func = GetEnrichmentTableRecordFn {
             table: "table".to_string(),
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
             },
+            index: None,
         };
 
         let mut compiler =
             state::Compiler::new_with_enrichment_tables(Box::new(DummyEnrichmentTable));
 
         assert_eq!(Ok(()), func.update_state(&mut compiler));
+        assert_eq!(Some(enrichment::IndexHandle(999)), func.index);
     }
 }

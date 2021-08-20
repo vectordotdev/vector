@@ -126,8 +126,8 @@ impl Expression for DelFn {
         TypeDef::new().unknown()
     }
 
-    fn update_state<'a>(
-        &self,
+    fn update_state(
+        &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
         self.query.delete_type_def(state);

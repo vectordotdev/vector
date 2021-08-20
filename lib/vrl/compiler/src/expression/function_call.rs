@@ -161,7 +161,7 @@ impl FunctionCall {
                 })
             })?;
 
-        let expr = function
+        let mut expr = function
             .compile(state, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
