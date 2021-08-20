@@ -14,6 +14,7 @@ of VRL, the [language documentation][docs] exists for that audience.
 * [Target Audience](#target-audience)
 * [Language Limits](#language-limits)
 * [Conventions](#conventions)
+  * [Syntax](#syntax)
   * [Functions](#functions)
     * [Composition](#composition)
     * [Naming](#naming)
@@ -115,6 +116,15 @@ do so.
 [#8717]: https://github.com/timberio/vector/pull/8717
 
 ## Conventions
+
+### Syntax
+
+Keep VRL as syntax-light as possible. The less symbols, the more readable a VRL
+program is.
+
+Use functions whenever possible, and only introduce new syntax if a common
+pattern warrants a more convenient syntax-based solution, or functions are too
+limited in their capability to solve the required need.
 
 ### Functions
 
