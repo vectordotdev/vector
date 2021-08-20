@@ -332,4 +332,48 @@ mod tests {
         let errors = builder.build().unwrap_err();
         assert_eq!(errors[0], "Component ID 'bar' is already used.");
     }
+
+    #[test]
+    fn overlaping_pipeline_transform_id() {
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "foo".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.remap]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        pipelines.insert(
+            "bar".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.remap]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        let mut builder = ConfigBuilder::from_toml(
+            r#"
+        [sources.logs]
+        type = "generator"
+        format = "syslog"
+
+        [sinks.print]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        builder.set_pipelines(pipelines);
+        let config = builder.build().unwrap();
+        assert_eq!(config.transforms.len(), 2);
+    }
 }
