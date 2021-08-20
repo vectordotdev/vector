@@ -227,7 +227,20 @@ limited, and additional exceptions should be well reasoned.
 
 ### Errors
 
-TODO
+- All errors are caught at compile-time by the compiler.
+
+- The only exception to this rule is if the operator explicitly allows
+  a function to fail the program at runtime (e.g. `safe_call()` vs
+  `unsafe_call!()`).
+
+- A function should be marked as "fallible" if its internal implementation can
+  fail.
+
+- A function _should not_ be marked as fallible if it receives the wrong
+  argument type. This is handled by the compiler.
+
+- Errors should contain explicit messages detailing what went wrong, and how the
+  operator can solve the problem.
 
 ## Patterns
 
@@ -254,5 +267,3 @@ data = parse_json(.message) ??
        parse_apache_log(.message) ??
        { "error": "invalid data format" }
 ```
-
-TODO
