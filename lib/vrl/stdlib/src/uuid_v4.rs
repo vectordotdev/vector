@@ -53,11 +53,7 @@ mod tests {
         let mut state = vrl::state::Runtime::default();
         let mut object: Value = map![].into();
         let tz = TimeZone::default();
-        let enrichment_tables = Some(
-            &vrl::enrichment::EmptyEnrichmentTables
-                as &(dyn vrl::enrichment::TableSearch + Send + Sync),
-        );
-        let mut ctx = Context::new(&mut object, &mut state, &tz, enrichment_tables);
+        let mut ctx = Context::new(&mut object, &mut state, &tz, None);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();
 
         assert!(matches!(&value, Value::Bytes(_)));

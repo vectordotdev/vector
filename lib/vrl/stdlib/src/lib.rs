@@ -38,8 +38,6 @@ mod encode_percent;
 mod ends_with;
 #[cfg(feature = "exists")]
 mod exists;
-#[cfg(feature = "find_table_row")]
-mod find_table_row;
 #[cfg(feature = "flatten")]
 mod flatten;
 #[cfg(feature = "float")]
@@ -52,6 +50,8 @@ mod format_int;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
+#[cfg(feature = "get_enrichment_table_record")]
+mod get_enrichment_table_record;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
@@ -277,8 +277,6 @@ pub use encode_percent::EncodePercent;
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
-#[cfg(feature = "find_table_row")]
-pub use find_table_row::FindTableRow;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
 #[cfg(feature = "float")]
@@ -291,6 +289,8 @@ pub use format_int::FormatInt;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
+#[cfg(feature = "get_enrichment_table_record")]
+pub use get_enrichment_table_record::FindTableRow;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
@@ -502,8 +502,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
-        #[cfg(feature = "find_table_row")]
-        Box::new(FindTableRow),
+        #[cfg(feature = "get_enrichment_table_record")]
+        Box::new(GetEnrichmentTableRecord),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "float")]

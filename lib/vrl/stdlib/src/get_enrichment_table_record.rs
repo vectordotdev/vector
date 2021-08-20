@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 use vrl::{enrichment::Condition, prelude::*};
+
 #[derive(Clone, Copy, Debug)]
-pub struct FindTableRow;
-impl Function for FindTableRow {
+pub struct GetEnrichmentTableRecord;
+impl Function for GetEnrichmentTableRecord {
     fn identifier(&self) -> &'static str {
-        "find_table_row"
+        "get_enrichment_table_record"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -47,12 +48,12 @@ impl Function for FindTableRow {
 }
 
 #[derive(Debug, Clone)]
-pub struct FindTableRowFn {
+pub struct GetEnrichmentTableRecordFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
 }
 
-impl Expression for FindTableRowFn {
+impl Expression for GetEnrichmentTableRecordFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self
             .condition
@@ -151,7 +152,7 @@ mod tests {
 
     #[test]
     fn find_table_row() {
-        let func = FindTableRowFn {
+        let func = GetEnrichmentTableRecordFn {
             table: "table".to_string(),
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
@@ -168,18 +169,12 @@ mod tests {
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(
-            Ok(Value::from(btreemap! {
-                "field" => Value::from("value"),
-                "field2" => Value::from("value2"),
-            })),
-            got
-        );
+        assert_eq!(Ok(value! ({ "field": "value", "field2": "value2" })), got);
     }
 
     #[test]
     fn add_indexes() {
-        let func = FindTableRowFn {
+        let func = GetEnrichmentTableRecordFn {
             table: "table".to_string(),
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
