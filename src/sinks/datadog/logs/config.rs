@@ -8,13 +8,13 @@ use crate::sinks::datadog::Region;
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::{
     batch::{Batch, BatchError},
-    http::{HttpSink, PartitionHttpSink},
-    BatchConfig, BatchSettings, Compression, JsonArrayBuffer, PartitionBuffer,
-    PartitionInnerBuffer, TowerRequestConfig,
+    http::HttpSink,
+    BatchConfig, BatchSettings, Compression, JsonArrayBuffer, PartitionInnerBuffer,
+    TowerRequestConfig,
 };
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
-use futures::{FutureExt, SinkExt};
+use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
