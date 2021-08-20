@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{Event, Value},
@@ -118,7 +119,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 

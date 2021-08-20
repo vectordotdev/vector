@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
@@ -46,8 +46,8 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
-        RegexParser::build(self, globals.timezone)
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        RegexParser::build(self, context.globals.timezone)
     }
 
     fn input_type(&self) -> DataType {
@@ -304,7 +304,7 @@ impl FunctionTransform for RegexParser {
 mod tests {
     use super::RegexParserConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
 
@@ -324,7 +324,7 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let parser = parser.as_function();

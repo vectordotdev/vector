@@ -87,8 +87,9 @@ pub fn add_fields(criterion: &mut Criterion) {
                     timezone: shared::TimeZone::default(),
                     drop_on_error: true,
                     drop_on_abort: true,
-                })
-                .unwrap(),
+                },
+                &Default::default())
+                .unwrap()
             ),
         ),
         (
