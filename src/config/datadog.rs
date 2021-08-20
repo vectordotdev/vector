@@ -7,6 +7,11 @@ use serde::{Deserialize, Serialize};
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 
+/// Error type for failed attempts to attach Datadog observability to a `Config`.
+pub enum AttachError {
+    NotEnabled,
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
@@ -47,11 +52,11 @@ fn default_reporting_interval_secs() -> u64 {
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
-pub fn try_attach(config: &mut Config) -> Result<(), ()> {
+pub fn try_attach(config: &mut Config) -> Result<(), AttachError> {
     // Return early if an API key is missing, or the feature isn't enabled.
     let api_key = match (&config.datadog.api_key, config.datadog.enabled) {
         (Some(api_key), true) => api_key.clone(),
-        _ => return Err(()),
+        _ => return Err(AttachError::NotEnabled),
     };
 
     let internal_metrics_id = ComponentId::from(INTERNAL_METRICS_KEY);
@@ -101,7 +106,7 @@ mod tests {
         let mut config = Config::default();
 
         // Attaching config without an API enabled should avoid wiring up components.
-        assert!(try_attach(&mut config).is_err());
+        assert_eq!(try_attach(&mut config), Err(AttachError::NotEnabled));
 
         assert!(!config
             .sources
