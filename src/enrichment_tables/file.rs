@@ -113,11 +113,7 @@ impl File {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
-                Some(idx) => row[idx]
-                    .chars()
-                    .flat_map(|c| c.to_lowercase())
-                    .zip(value.chars().flat_map(|c| c.to_lowercase()))
-                    .all(|(l, r)| l == r),
+                Some(idx) => row[idx].to_lowercase() == value.to_lowercase(),
             },
         })
     }
