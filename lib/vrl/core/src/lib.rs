@@ -15,6 +15,7 @@ pub fn compile(
     fns: &[Box<dyn Function>],
 ) -> compiler::Result {
     let mut state = state::Compiler::new_with_enrichment_tables(enrichment_tables);
+
     compile_with_state(source, fns, &mut state)
 }
 

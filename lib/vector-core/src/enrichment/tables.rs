@@ -222,7 +222,7 @@ mod tests {
         fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
             Self {
                 data: btreemap! {
-                    "field" => "result"
+                    "field".to_string() => "result".to_string()
                 },
                 indexes,
             }

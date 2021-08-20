@@ -17,7 +17,7 @@ pub trait Table: DynClone {
     /// Errors if no rows, or more than 1 row is found.
     fn find_table_row<'a>(
         &self,
-        condition: &'a [Condition],
+        condition: &'a [Condition<'a>],
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, String>, String>;
 
