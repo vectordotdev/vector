@@ -611,6 +611,16 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		redis_client_errors_total: {
+			description:       "The total number of errors from attempts to create redis client objects from URIs."
+			type:              "counter"
+			default_namespace: "vector"
+		}
+		redis_connection_errors_total: {
+			description:       "The total number of errors from attempts to establish a connection to a redis client."
+			type:              "counter"
+			default_namespace: "vector"
+		}
 		request_duration_seconds: {
 			description:       "The total request duration in seconds."
 			type:              "histogram"

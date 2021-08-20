@@ -341,6 +341,8 @@ urls: {
 	pulsar_protocol:                                          "https://pulsar.apache.org/docs/en/develop-binary-protocol/"
 	raspbian:                                                 "https://www.raspbian.org/"
 	rdkafka:                                                  "\(github)/edenhill/librdkafka"
+	redis:													  "https://redis.io/"
+	redis_rs:                                                 "https://github.com/mitsuhiko/redis-rs"
 	regex:                                                    "\(wikipedia)/wiki/Regular_expression"
 	regex_grouping_and_flags:                                 "https://docs.rs/regex/latest/regex/#grouping-and-flags"
 	regex_tester:                                             "https://rustexp.lpil.uk/"
