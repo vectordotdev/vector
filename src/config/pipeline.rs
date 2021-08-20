@@ -132,6 +132,11 @@ impl Pipeline {
             .map(|value| (filename, value))
             .map_err(|err| format!("Could not parse content: {:?}, {:?}", file, err))
     }
+
+    #[cfg(test)]
+    pub fn from_toml(input: &str) -> Self {
+        deserialize(input, Some(Format::Toml)).unwrap()
+    }
 }
 
 #[cfg(test)]

@@ -234,4 +234,49 @@ impl ConfigBuilder {
 
         Ok(())
     }
+
+    #[cfg(test)]
+    pub fn from_toml(input: &str) -> Self {
+        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
+            .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::pipeline::{Pipeline, Pipelines};
+    use crate::config::ConfigBuilder;
+    use indexmap::IndexMap;
+
+    #[test]
+    fn success() {
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "foo".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.bar]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        let mut builder = ConfigBuilder::from_toml(
+            r#"
+        [sources.logs]
+        type = "generator"
+        format = "syslog"
+
+        [sinks.print]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        builder.set_pipelines(pipelines);
+        let result = builder.build();
+        assert!(result.is_ok());
+    }
 }
