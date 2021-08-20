@@ -155,4 +155,12 @@ mod tests {
         let result = serde_json::to_string(&item).unwrap();
         assert_eq!(result, "\"foo\"");
     }
+
+    #[test]
+    fn from_pipeline() {
+        let item = ComponentId::from("foo#bar");
+        assert_eq!(item.id(), "bar");
+        assert_eq!(item.scope, ComponentScope::Pipeline("foo".into()));
+        assert_eq!(item.to_string(), "foo#bar");
+    }
 }
