@@ -231,7 +231,7 @@ impl Table for File {
     }
 
     fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
-        trace!("Added index {:?}.", fields);
+        trace!(message = "Added index.", fields);
 
         self.indexes.push(self.index_data(fields));
 
