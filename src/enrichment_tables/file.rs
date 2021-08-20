@@ -2,11 +2,12 @@ use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hasher;
+use std::path::PathBuf;
 use tracing::trace;
 use vector_core::enrichment::{Condition, IndexHandle, Table};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
     Csv {
         #[serde(default = "crate::serde::default_true")]
@@ -25,11 +26,21 @@ impl Default for Encoding {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum Source {
+    File { path: PathBuf },
+}
+
+impl Default for Source {
+    fn default() -> Self {
+        Self::File { path: "".into() }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
 struct FileConfig {
-    filename: String,
-
-    #[serde(default)]
+    source: Source,
     encoding: Encoding,
 }
 
@@ -44,45 +55,45 @@ impl EnrichmentTableConfig for FileConfig {
         &self,
         _globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        match self.encoding {
-            Encoding::Csv {
-                include_headers,
-                delimiter,
-            } => {
-                let mut reader = csv::ReaderBuilder::new()
-                    .has_headers(include_headers)
-                    .delimiter(delimiter as u8)
-                    .from_path(&self.filename)?;
+        let Encoding::Csv {
+            include_headers,
+            delimiter,
+        } = self.encoding;
 
-                let data = reader
-                    .records()
-                    .map(|row| Ok(row?.iter().map(|col| col.to_string()).collect::<Vec<_>>()))
-                    .collect::<crate::Result<Vec<_>>>()?;
+        let Source::File { path } = &self.source;
 
-                let headers = if include_headers {
-                    reader
-                        .headers()?
-                        .iter()
-                        .map(|col| col.to_string())
-                        .collect::<Vec<_>>()
-                } else {
-                    // If there are no headers in the datafile we make headers as the numerical index of
-                    // the column.
-                    match data.get(0) {
-                        Some(row) => (0..row.len()).map(|idx| idx.to_string()).collect(),
-                        None => Vec::new(),
-                    }
-                };
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(include_headers)
+            .delimiter(delimiter as u8)
+            .from_path(&path)?;
 
-                trace!(
-                    "Loaded enrichment file {} with headers {:?}",
-                    self.filename,
-                    headers
-                );
+        let data = reader
+            .records()
+            .map(|row| Ok(row?.iter().map(|col| col.to_string()).collect::<Vec<_>>()))
+            .collect::<crate::Result<Vec<_>>>()?;
 
-                Ok(Box::new(File::new(data, headers)))
+        let headers = if include_headers {
+            reader
+                .headers()?
+                .iter()
+                .map(|col| col.to_string())
+                .collect::<Vec<_>>()
+        } else {
+            // If there are no headers in the datafile we make headers as the numerical index of
+            // the column.
+            match data.get(0) {
+                Some(row) => (0..row.len()).map(|idx| idx.to_string()).collect(),
+                None => Vec::new(),
             }
-        }
+        };
+
+        trace!(
+            "Loaded enrichment file {} with headers {:?}",
+            path.to_str().unwrap_or("path with invalid utf"),
+            headers
+        );
+
+        Ok(Box::new(File::new(data, headers)))
     }
 }
 

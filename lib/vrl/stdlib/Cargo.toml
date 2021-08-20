@@ -75,7 +75,6 @@ default = [
     "get_enrichment_table_record",
     "get_env_var",
     "get_hostname",
-    "get_enrichment_table_record",
     "includes",
     "integer",
     "ip_aton",
@@ -190,7 +189,6 @@ format_timestamp = ["chrono"]
 get_enrichment_table_record = []
 get_env_var = []
 get_hostname = ["hostname"]
-get_enrichment_table_record = []
 includes = []
 integer = []
 ip_aton = []

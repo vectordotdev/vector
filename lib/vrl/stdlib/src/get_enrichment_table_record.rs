@@ -68,12 +68,12 @@ impl Expression for GetEnrichmentTableRecordFn {
             .condition
             .iter()
             .map(|(key, value)| {
-                Ok(Condition::Equals {
+                Ok(enrichment::Condition::Equals {
                     field: key,
                     value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned(),
                 })
             })
-            .collect::<Result<Vec<Condition>>>()?;
+            .collect::<Result<Vec<enrichment::Condition>>>()?;
 
         let tables = ctx
             .get_enrichment_tables()
@@ -135,7 +135,7 @@ mod tests {
             assert_eq!("table", table);
             assert_eq!(vec!["field"], fields);
 
-            Ok(IndexHandle(999))
+            Ok(enrichment::IndexHandle(999))
         }
 
         fn as_readonly(&self) -> Box<dyn enrichment::TableSearch + Send + Sync> {
@@ -153,12 +153,12 @@ mod tests {
             assert_eq!(table, "table");
             assert_eq!(
                 condition,
-                vec![Condition::Equals {
+                vec![enrichment::Condition::Equals {
                     field: "field",
                     value: "value".to_string(),
                 }]
             );
-            assert_eq!(index, Some(IndexHandle(999)));
+            assert_eq!(index, Some(enrichment::IndexHandle(999)));
 
             Ok(btreemap! {
                 "field".to_string() => "value".to_string(),
@@ -174,7 +174,7 @@ mod tests {
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
             },
-            index: Some(IndexHandle(999)),
+            index: Some(enrichment::IndexHandle(999)),
         };
 
         let tz = TimeZone::default();
