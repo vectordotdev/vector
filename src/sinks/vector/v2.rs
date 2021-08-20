@@ -265,8 +265,6 @@ impl RetryLogic for VectorGrpcRetryLogic {
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
         use tonic::Code::*;
 
-        dbg!(&err);
-
         match err {
             Error::Request { source } => !matches!(
                 source.code(),
