@@ -4,10 +4,28 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-pub type Pipelines = IndexMap<String, Pipeline>;
+#[derive(Deserialize, Serialize, Debug, Default)]
+pub struct Pipelines(IndexMap<String, Pipeline>);
+
+impl From<IndexMap<String, Pipeline>> for Pipelines {
+    fn from(value: IndexMap<String, Pipeline>) -> Self {
+        Self(value)
+    }
+}
+
+impl Pipelines {
+    pub fn into_scoped(self) -> Vec<(ComponentId, PipelineTransform)> {
+        self.0
+            .into_iter()
+            .map(|(pipeline_id, pipeline)| pipeline.into_scoped(&pipeline_id))
+            .flatten()
+            .collect()
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PipelineTransform {
@@ -15,6 +33,30 @@ pub struct PipelineTransform {
     pub inner: TransformOuter,
     #[serde(default)]
     pub outputs: Vec<ComponentId>,
+}
+
+impl PipelineTransform {
+    pub fn into_scoped(self, pipeline_id: &str, available: &HashSet<String>) -> Self {
+        let inputs = self
+            .inner
+            .inputs
+            .into_iter()
+            .map(|component_id| {
+                if available.contains(component_id.id()) {
+                    component_id.into_pipeline(pipeline_id)
+                } else {
+                    component_id
+                }
+            })
+            .collect();
+        Self {
+            inner: TransformOuter {
+                inputs,
+                inner: self.inner.inner,
+            },
+            outputs: self.outputs,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -25,6 +67,22 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
+    fn into_scoped(self, pipeline_id: &str) -> Vec<(ComponentId, PipelineTransform)> {
+        let transform_keys: HashSet<_> = self
+            .transforms
+            .keys()
+            .map(|item| item.id().to_string())
+            .collect();
+        self.transforms
+            .into_iter()
+            .map(|(transform_id, transform)| {
+                let transform_id = transform_id.into_pipeline(pipeline_id);
+                let transform = transform.into_scoped(pipeline_id, &transform_keys);
+                (transform_id, transform)
+            })
+            .collect()
+    }
+
     pub fn load_from_folder(folder: &Path) -> Result<IndexMap<String, Self>, Vec<String>> {
         let mut index = IndexMap::new();
         let mut errors = Vec::new();

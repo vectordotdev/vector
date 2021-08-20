@@ -8,9 +8,16 @@ use std::{
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum ComponentScope {
+    Global,
+    Pipeline(String),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentId {
     value: String,
     id: String,
+    scope: ComponentScope,
 }
 
 impl ComponentId {
@@ -19,18 +26,46 @@ impl ComponentId {
         Self {
             id: id.clone(),
             value: id,
+            scope: ComponentScope::Global,
         }
+    }
+
+    pub fn pipeline(pipeline: &str, id: &str) -> Self {
+        let value = format!("{}#{}", pipeline, id);
+        Self {
+            id: id.to_string(),
+            value,
+            scope: ComponentScope::Pipeline(pipeline.to_string()),
+        }
+    }
+
+    pub fn id(&self) -> &str {
+        self.id.as_str()
     }
 
     pub fn as_str(&self) -> &str {
         self.value.as_str()
     }
+
+    pub fn into_pipeline(self, id: &str) -> Self {
+        Self::pipeline(id, &self.id)
+    }
 }
 impl From<String> for ComponentId {
     fn from(value: String) -> Self {
-        Self {
-            id: value.clone(),
-            value,
+        let parts = value.split('#').take(2).collect::<Vec<_>>();
+        if parts.len() == 2 {
+            Self {
+                id: parts[1].to_string(),
+                value: value.clone(),
+                scope: ComponentScope::Pipeline(parts[0].to_string()),
+            }
+        } else {
+            Self {
+                id: value.clone(),
+                value: value.clone(),
+                scope: ComponentScope::Global,
+            }
         }
     }
 }
@@ -43,10 +78,7 @@ impl From<&str> for ComponentId {
 
 impl<T: ToString> From<&T> for ComponentId {
     fn from(value: &T) -> Self {
-        Self {
-            id: value.to_string(),
-            value: value.to_string(),
-        }
+        Self::from(value.to_string())
     }
 }
 

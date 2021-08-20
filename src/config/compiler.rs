@@ -1,8 +1,13 @@
 use super::{builder::ConfigBuilder, validation, ComponentId, Config, ExpandType, TransformOuter};
 use indexmap::IndexMap;
 
-pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
+pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
+
+    let (mut builder, merge_errors) = builder.merge_pipelines();
+    if !merge_errors.is_empty() {
+        errors.extend(merge_errors);
+    }
 
     let expansions = expand_macros(&mut builder)?;
 

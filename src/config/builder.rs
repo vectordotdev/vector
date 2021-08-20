@@ -67,6 +67,43 @@ impl From<Config> for ConfigBuilder {
 }
 
 impl ConfigBuilder {
+    // moves the pipeline transforms into regular scoped transforms
+    // and add the output to the sources
+    pub fn merge_pipelines(mut self) -> (Self, Vec<String>) {
+        let mut errors = Vec::new();
+        let pipeline_transforms = self.pipelines.into_scoped();
+        for (component_id, pipeline_transform) in pipeline_transforms {
+            for input in pipeline_transform.outputs.iter() {
+                if let Some(transform) = self.transforms.get_mut(input) {
+                    transform.inputs.push(component_id.clone());
+                } else if let Some(sink) = self.sinks.get_mut(input) {
+                    sink.inputs.push(component_id.clone());
+                } else {
+                    errors.push(format!("Couldn't find transform or sink '{}'", input));
+                }
+            }
+            self.transforms
+                .insert(component_id, pipeline_transform.inner);
+        }
+
+        (
+            Self {
+                global: self.global,
+                #[cfg(feature = "api")]
+                api: self.api,
+                healthchecks: self.healthchecks,
+                sources: self.sources,
+                sinks: self.sinks,
+                transforms: self.transforms,
+                provider: None,
+                tests: self.tests,
+                enrichment_tables: self.enrichment_tables,
+                pipelines: Default::default(),
+            },
+            errors,
+        )
+    }
+
     pub fn build(self) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings()?;
 
