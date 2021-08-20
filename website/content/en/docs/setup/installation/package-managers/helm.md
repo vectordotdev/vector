@@ -4,33 +4,60 @@ short: Helm
 weight: 3
 ---
 
-[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing Vector through the Helm package repository.
-
-## Installation
+[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing the Vector Agent and the Vector Aggregator through the Helm package repository. The Agent and the Aggregator are added by adding the Vector Helm chart but are installed onto each node and configured separately.
 
 {{< warning title="Aggregator role in private beta" >}}
 Helm support for the [aggregator] role is currently in private beta. We're currently seeking beta testers. If interested, please [join our chat][chat] and let us know.
-
-As an alternative, you can still manually deploy Vector in the aggregator role. Instructions throughout this doc will be for the [agent] role only.
 
 [agent]: /docs/setup/deployment/roles/#agent
 [aggregator]: /docs/setup/deployment/roles/#aggregator
 [chat]: https://chat.vector.dev
 {{< /warning >}}
 
-Add the Vector repo:
+## Adding the Helm repo
+
+If you haven't already, start by adding the Vector repo:
 
 ```shell
-helm repo add vector https://helm.vector.dev
+helm repo add timberio https://packages.timber.io/helm/latest
+helm repo update
 ```
 
-Check available Helm chart configuration options:
+## Agent
+
+The Vector [Agent] lets you collect data from your [sources] and then deliver it to a variety of destinations with [sinks].
+
+### Installing
+
+Once you add the Vector Helm repo, install the Vector Agent to each node:
 
 ```shell
-helm show values vector/vector-agent
+helm install vector timberio/vector-agent \
+  --namespace vector \
+  --create-namespace \
+  --values values.yaml
 ```
 
-Configure Vector:
+### Updating
+
+Or to update the Vector Agent:
+
+```shell
+helm repo update && \
+helm upgrade vector timberio/vector-agent \
+  --namespace vector \
+  --reuse-values
+```
+
+### Configuring
+
+To check available Helm chart configuration options:
+
+```shell
+helm show values timberio/vector-agent
+```
+
+This example configuration file lets you use Vector as an Agent to send logs to standard output. For more information about configuration options, see the [configuration] docs page.
 
 ```toml
 cat <<-'VALUES' > values.yaml
@@ -48,33 +75,61 @@ sinks:
     encoding: "json"
 VALUES
 ```
+## Aggregator
 
-Install Vector:
+The Vector [Aggregator] lets you [transform] your data. For example, dedupe, aggregate, or redact the data before sending it to its final destination.
+
+### Installing
+
+Once you add the Vector Helm repo, install the Vector Aggregator to each node:
 
 ```shell
-helm install vector vector/vector-agent \
+helm install vector timberio/vector-aggregator \
   --namespace vector \
   --create-namespace \
-  --values values.yaml
+  --values values.YAML
 ```
 
-## Other actions
+### Updating
 
-{{< tabs default="Upgrade Vector" >}}
-{{< tab title="Upgrade Vector" >}}
+Or to update the Vector Aggregator:
+
 ```shell
-helm repo update && helm upgrade --namespace vector vector vector/vector-agent --reuse-values
+helm repo update && \
+helm upgrade vector timberio/vector-aggregator \
+  --namespace vector \
+  --reuse-values
 ```
-{{< /tab >}}
-{{< tab title="Uninstall Vector" >}}
+
+### Configuring
+
+To check available Helm chart configuration options:
+
 ```shell
-helm uninstall --namespace vector vector
+helm show values timberio/vector-aggregator
 ```
-{{< /tab >}}
-{{< /tabs >}}
+
+This example configuration file lets you use Vector as an Aggregator to parse events to make them human-readable. For more information about configuration options, see the [Configuration] docs page.
+
+```toml
+# Add example
+```
+
+## Uninstalling Vector
+
+To uninstall the Vector helm chart:
+
+```shell
+helm uninstall vector --namespace vector 
+```
 
 ## Management
 
 {{< jump "/docs/administration/management" "helm" >}}
 
 [helm]: https://helm.sh
+[Configuration]: /docs/reference/configuration/
+[Agent]: /docs/setup/deployment/roles/#agent
+[sources]: /docs/reference/configuration/sources/
+[sinks]: /docs/reference/configuration/sinks/
+[Aggregator]: /docs/setup/deployment/roles/#aggregator
