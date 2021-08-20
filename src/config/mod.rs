@@ -82,6 +82,13 @@ impl ConfigPath {
             _ => None,
         }
     }
+
+    pub fn pipeline_dir(&self) -> Option<PathBuf> {
+        match self {
+            Self::Dir(path) => Some(path.join("pipelines")),
+            Self::File(path, _) => path.parent().map(|folder| folder.join("pipelines")),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
