@@ -61,7 +61,7 @@ impl From<Config> for ConfigBuilder {
             transforms: c.transforms,
             provider: None,
             tests: c.tests,
-            pipelines: c.pipelines,
+            pipelines: Default::default(),
         }
     }
 }

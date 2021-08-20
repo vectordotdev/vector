@@ -39,7 +39,6 @@ pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<Stri
                 sinks: builder.sinks,
                 transforms: builder.transforms,
                 tests: builder.tests,
-                pipelines: builder.pipelines,
                 expansions,
             },
             warnings,

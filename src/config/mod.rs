@@ -102,7 +102,6 @@ pub struct Config {
     pub sinks: IndexMap<ComponentId, SinkOuter>,
     pub transforms: IndexMap<ComponentId, TransformOuter>,
     pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
-    pub pipelines: pipeline::Pipelines,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }

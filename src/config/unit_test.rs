@@ -37,7 +37,6 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         sinks: builder.sinks,
         transforms: builder.transforms,
         tests: builder.tests,
-        pipelines: Default::default(),
         expansions,
     };
 
