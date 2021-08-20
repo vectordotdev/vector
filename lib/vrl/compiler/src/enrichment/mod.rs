@@ -10,14 +10,15 @@ pub enum Condition<'a> {
     Equals { field: &'a str, value: String },
 }
 
-pub trait EnrichmentTableSetup: DynClone {
+pub trait TableSetup: DynClone {
     fn table_ids(&self) -> Vec<String>;
     fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<IndexHandle, String>;
+    fn as_readonly(&self) -> Box<dyn TableSearch + Send + Sync>;
 }
 
-dyn_clone::clone_trait_object!(EnrichmentTableSetup);
+dyn_clone::clone_trait_object!(TableSetup);
 
-pub trait EnrichmentTableSearch: DynClone {
+pub trait TableSearch: DynClone + std::fmt::Debug {
     fn find_table_row<'a>(
         &'a self,
         table: &str,
@@ -26,13 +27,13 @@ pub trait EnrichmentTableSearch: DynClone {
     ) -> Result<BTreeMap<String, Value>, String>;
 }
 
-dyn_clone::clone_trait_object!(EnrichmentTableSearch);
+dyn_clone::clone_trait_object!(TableSearch);
 
 /// Create a empty enrichment for situations when we don't have any tables loaded.
 #[derive(Clone, Debug)]
 pub struct EmptyEnrichmentTables;
 
-impl EnrichmentTableSetup for EmptyEnrichmentTables {
+impl TableSetup for EmptyEnrichmentTables {
     fn table_ids(&self) -> Vec<String> {
         Vec::new()
     }
@@ -40,9 +41,13 @@ impl EnrichmentTableSetup for EmptyEnrichmentTables {
     fn add_index(&mut self, _table: &str, _fields: &[&str]) -> Result<IndexHandle, String> {
         Ok(IndexHandle(0))
     }
+
+    fn as_readonly(&self) -> Box<dyn TableSearch + Send + Sync> {
+        Box::new(self.clone())
+    }
 }
 
-impl EnrichmentTableSearch for EmptyEnrichmentTables {
+impl TableSearch for EmptyEnrichmentTables {
     fn find_table_row<'a>(
         &self,
         _table: &str,

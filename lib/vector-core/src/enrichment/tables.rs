@@ -21,7 +21,7 @@
 //! efficient read-only access and can no longer add indexes or otherwise mutate the data.
 //!
 //! This data within the `ArcSwap` is accessed through the `TableSearch` struct. Any transform that
-//! needs access to this can call `TableRegistry::as_search`. This returns a cheaply clonable struct that
+//! needs access to this can call `TableRegistry::as_readonly`. This returns a cheaply clonable struct that
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables can be searched.
 //!
 use super::{IndexHandle, Table};
@@ -91,12 +91,6 @@ impl TableRegistry {
         let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
     }
-
-    /// Returns a cheaply clonable struct through that provides lock free read access to the
-    /// enrichment tables.
-    pub fn as_search(&self) -> TableSearch {
-        TableSearch(self.tables.clone())
-    }
 }
 
 impl std::fmt::Debug for TableRegistry {
@@ -106,7 +100,7 @@ impl std::fmt::Debug for TableRegistry {
 }
 
 #[cfg(feature = "vrl")]
-impl vrl_core::EnrichmentTableSetup for TableRegistry {
+impl vrl_core::enrichment::TableSetup for TableRegistry {
     /// Return a list of the available tables that we can write to.
     /// This only works in the writing stage and will acquire a lock to retrieve the tables.
     ///
@@ -138,20 +132,26 @@ impl vrl_core::EnrichmentTableSetup for TableRegistry {
             },
         }
     }
+
+    /// Returns a cheaply clonable struct through that provides lock free read access to the
+    /// enrichment tables.
+    fn as_readonly(&self) -> Box<dyn vrl_core::enrichment::TableSearch + Send + Sync> {
+        Box::new(TableSearch(self.tables.clone()))
+    }
 }
 
 /// Provides read only access to the enrichment tables via the `vrl::EnrichmentTableSearch` trait.
 /// Cloning this object is designed to be cheap. The underlying data will be shared by all clones.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>);
 
-impl vrl_core::EnrichmentTableSearch for TableSearch {
+impl vrl_core::enrichment::TableSearch for TableSearch {
     /// Search the given table to find the data.
     /// If we are in the writing stage, this function will return an error.
     fn find_table_row<'a>(
         &self,
         table: &str,
-        condition: &'a [vrl_core::Condition<'a>],
+        condition: &'a [vrl_core::enrichment::Condition<'a>],
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
         let tables = self.0.load();
@@ -161,9 +161,7 @@ impl vrl_core::EnrichmentTableSearch for TableSearch {
                 Some(table) => table.find_table_row(condition, index).map(|table| {
                     table
                         .iter()
-                        .map(|(key, value)| {
-                            (key.to_string(), vrl_core::Value::from(value.as_str()))
-                        })
+                        .map(|(key, value)| (key.to_string(), value.as_str().into()))
                         .collect()
                 }),
             }
@@ -208,7 +206,7 @@ mod tests {
     use super::*;
     use shared::btreemap;
     use std::sync::{Arc, Mutex};
-    use vrl_core::{Condition, EnrichmentTableSearch, EnrichmentTableSetup};
+    use vrl_core::enrichment::{Condition, TableSetup};
 
     #[derive(Debug, Clone)]
     struct DummyEnrichmentTable {
@@ -235,12 +233,12 @@ mod tests {
         fn find_table_row(
             &self,
             _condition: &[Condition],
-            _index: Option<vrl_core::IndexHandle>,
+            _index: Option<vrl_core::enrichment::IndexHandle>,
         ) -> Result<BTreeMap<String, String>, String> {
             Ok(self.data.clone())
         }
 
-        fn add_index(&mut self, fields: &[&str]) -> Result<vrl_core::IndexHandle, String> {
+        fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
             let mut indexes = self.indexes.lock().unwrap();
             indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
             Ok(IndexHandle(indexes.len() - 1))
@@ -281,7 +279,7 @@ mod tests {
         tables.insert("dummy1".to_string(), Box::new(dummy));
         let registry = super::TableRegistry::default();
         registry.load(tables);
-        let tables = registry.as_search();
+        let tables = registry.as_readonly();
 
         assert_eq!(
             Err("finish_load not called".to_string()),
@@ -318,7 +316,7 @@ mod tests {
 
         let registry = super::TableRegistry::default();
         registry.load(tables);
-        let tables_search = registry.as_search();
+        let tables_search = registry.as_readonly();
 
         registry.finish_load();
 
@@ -357,10 +355,9 @@ mod tests {
 
         // A load should put both tables back into the list.
         registry.load(tables);
+        let mut table_ids = registry.table_ids();
+        table_ids.sort();
 
-        assert_eq!(
-            vec!["dummy1".to_string(), "dummy2".to_string()],
-            registry.table_ids()
-        );
+        assert_eq!(vec!["dummy1".to_string(), "dummy2".to_string()], table_ids,);
     }
 }

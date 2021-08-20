@@ -61,7 +61,6 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
-    enrichment_tables: enrichment::TableSearch,
 }
 
 impl Remap {
@@ -96,7 +95,6 @@ impl Remap {
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
-            enrichment_tables: enrichment_tables.as_search(),
         })
     }
 }
@@ -124,12 +122,7 @@ impl FunctionTransform for Remap {
 
         let mut runtime = Runtime::default();
 
-        let result = runtime.resolve(
-            &mut target,
-            &self.program,
-            &self.timezone,
-            &Some(Box::new(self.enrichment_tables.clone())),
-        );
+        let result = runtime.resolve(&mut target, &self.program, &self.timezone);
 
         match result {
             Ok(_) => {

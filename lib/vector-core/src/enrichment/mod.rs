@@ -3,14 +3,15 @@ pub mod tables;
 use std::collections::BTreeMap;
 
 use dyn_clone::DynClone;
+
 pub use tables::{TableRegistry, TableSearch};
-pub use vrl_core::{Condition, IndexHandle};
+pub use vrl_core::enrichment::{Condition, IndexHandle};
 
 /// Enrichment tables represent additional data sources that can be used to enrich the event data
 /// passing through Vector.
 pub trait Table: DynClone {
     /// Search the enrichment table data with the given condition.
-    /// All fields within the data must match (AND).
+    /// All conditions must match (AND).
     ///
     /// # Errors
     /// Errors if no rows, or more than 1 row is found.

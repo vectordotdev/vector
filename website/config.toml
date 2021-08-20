@@ -1,5 +1,5 @@
 title = "Vector"
-baseURL = "/"
+baseURL = "https://vector.dev"
 disableKinds = ["taxonomy", "term"]
 copyright = "Datadog, Inc."
 languageCode = "en-us"

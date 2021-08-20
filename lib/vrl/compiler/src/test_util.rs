@@ -54,9 +54,7 @@ macro_rules! bench_function {
                     let mut runtime_state = $crate::state::Runtime::default();
                     let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
                     let tz = shared::TimeZone::Named(chrono_tz::Tz::UTC);
-                    let enrichment_tables =
-                        Some(Box::new($crate::enrichment_tables::EmptyEnrichmentTables) as Box<dyn $crate::enrichment_tables::EnrichmentTableSearch>);
-                    let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz, &enrichment_tables);
+                    let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz, None);
 
                     b.iter(|| {
                         let got = expression.resolve(&mut ctx).map_err(|e| e.to_string());
@@ -96,9 +94,7 @@ macro_rules! test_function {
                         let mut runtime_state = $crate::state::Runtime::default();
                         let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
                         let tz = $tz;
-                        let enrichment_tables =
-                            Some(Box::new($crate::enrichment_tables::EmptyEnrichmentTables) as Box<dyn $crate::enrichment_tables::EnrichmentTableSearch>);
-                        let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz, &enrichment_tables);
+                        let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz, None);
 
                         let got_value = expression.resolve(&mut ctx)
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

@@ -1,5 +1,5 @@
 use crate::{state, Context, Program, Target, Value};
-use compiler::{enrichment_tables::EnrichmentTableSearch, ExpressionError};
+use compiler::ExpressionError;
 use lookup::LookupBuf;
 use shared::TimeZone;
 use std::{error::Error, fmt};
@@ -52,7 +52,6 @@ impl Runtime {
         target: &mut dyn Target,
         program: &Program,
         timezone: &TimeZone,
-        enrichment_tables: &Option<Box<dyn EnrichmentTableSearch>>,
     ) -> RuntimeResult {
         // Validate that the path is an object.
         //
@@ -82,7 +81,12 @@ impl Runtime {
             }
         };
 
-        let mut context = Context::new(target, &mut self.state, timezone, enrichment_tables);
+        let mut context = Context::new(
+            target,
+            &mut self.state,
+            timezone,
+            program.enrichment_tables(),
+        );
 
         let mut values = program
             .iter()

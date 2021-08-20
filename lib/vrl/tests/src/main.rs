@@ -5,7 +5,9 @@ use glob::glob;
 use shared::TimeZone;
 use std::str::FromStr;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, EmptyEnrichmentTables, Runtime, Terminate, Value};
+use vrl::{
+    diagnostic::Formatter, enrichment::EmptyEnrichmentTables, state, Runtime, Terminate, Value,
+};
 
 use vrl_tests::{docs, Test};
 
@@ -136,12 +138,7 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let result = runtime.resolve(
-                    &mut test.object,
-                    &program,
-                    &timezone,
-                    &Some(Box::new(EmptyEnrichmentTables)),
-                );
+                let result = runtime.resolve(&mut test.object, &program, &timezone);
 
                 match result {
                     Ok(got) => {

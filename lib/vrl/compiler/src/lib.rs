@@ -4,7 +4,7 @@ mod program;
 mod target;
 mod test_util;
 
-pub mod enrichment_tables;
+pub mod enrichment;
 pub mod expression;
 pub mod function;
 pub mod state;

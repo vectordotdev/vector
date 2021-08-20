@@ -1,4 +1,5 @@
 use super::{sink, source, transform, Component};
+use crate::config::ComponentId;
 use lazy_static::lazy_static;
 use std::{
     collections::{HashMap, HashSet},
@@ -8,12 +9,12 @@ use std::{
 pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
 
 lazy_static! {
-    pub static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
+    pub static ref COMPONENTS: Arc<RwLock<HashMap<ComponentId, Component>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
 /// Filter components with the provided `map_func`
-pub fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T>) -> Vec<T> {
+pub fn filter_components<T>(map_func: impl Fn((&ComponentId, &Component)) -> Option<T>) -> Vec<T> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
@@ -52,17 +53,17 @@ pub fn get_sinks() -> Vec<sink::Sink> {
 }
 
 /// Returns the current component component_ids as a HashSet
-pub fn get_component_ids() -> HashSet<String> {
+pub fn get_component_ids() -> HashSet<ComponentId> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
         .keys()
         .cloned()
-        .collect::<HashSet<String>>()
+        .collect::<HashSet<ComponentId>>()
 }
 
 /// Gets a component by component_id
-pub fn component_by_component_id(component_id: &str) -> Option<Component> {
+pub fn component_by_component_id(component_id: &ComponentId) -> Option<Component> {
     Some(
         COMPONENTS
             .read()
@@ -73,6 +74,6 @@ pub fn component_by_component_id(component_id: &str) -> Option<Component> {
 }
 
 /// Overwrites component state with new components.
-pub fn update(new_components: HashMap<String, Component>) {
+pub fn update(new_components: HashMap<ComponentId, Component>) {
     *COMPONENTS.write().expect(INVARIANT) = new_components
 }

@@ -2,10 +2,8 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    enrichment_tables::Condition, enrichment_tables::EmptyEnrichmentTables,
-    enrichment_tables::EnrichmentTableSearch, enrichment_tables::EnrichmentTableSetup,
-    enrichment_tables::IndexHandle, function, state, type_def::Index, value, Context, Expression,
-    Function, Program, Target, Value,
+    enrichment, function, state, type_def::Index, value, Context, Expression, Function, Program,
+    Target, Value,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
@@ -13,7 +11,7 @@ pub use runtime::{Runtime, RuntimeResult, Terminate};
 /// Compile a given source into the final [`Program`].
 pub fn compile(
     source: &str,
-    enrichment_tables: Box<dyn EnrichmentTableSetup>,
+    enrichment_tables: Box<dyn enrichment::TableSetup>,
     fns: &[Box<dyn Function>],
 ) -> compiler::Result {
     let mut state = state::Compiler::new_with_enrichment_tables(enrichment_tables);
@@ -26,5 +24,6 @@ pub fn compile_with_state(
     state: &mut state::Compiler,
 ) -> compiler::Result {
     let ast = parser::parse(source).map_err(|err| vec![Box::new(err) as _])?;
+
     compiler::compile_with_state(ast, fns, state)
 }

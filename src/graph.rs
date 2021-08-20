@@ -81,23 +81,23 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let mut dot = String::from("digraph {\n");
 
-    for (name, _source) in &config.sources {
-        dot += &format!("  \"{}\" [shape=trapezium]\n", name);
+    for (id, _source) in &config.sources {
+        dot += &format!("  \"{}\" [shape=trapezium]\n", id);
     }
 
-    for (name, transform) in &config.transforms {
-        dot += &format!("  \"{}\" [shape=diamond]\n", name);
+    for (id, transform) in &config.transforms {
+        dot += &format!("  \"{}\" [shape=diamond]\n", id);
 
         for input in transform.inputs.iter() {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, name);
+            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
         }
     }
 
-    for (name, sink) in &config.sinks {
-        dot += &format!("  \"{}\" [shape=invtrapezium]\n", name);
+    for (id, sink) in &config.sinks {
+        dot += &format!("  \"{}\" [shape=invtrapezium]\n", id);
 
         for input in &sink.inputs {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, name);
+            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
         }
     }
 

@@ -565,7 +565,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
- "strum_macros",
+ "strum_macros 0.18.0",
  "thiserror",
  "typed-builder 0.5.1",
  "uuid",
@@ -1815,6 +1815,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "datadog-grok"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.0.1",
+ "derivative 2.2.0",
+ "grok",
+ "itertools",
+ "lalrpop",
+ "lalrpop-util",
+ "lazy_static",
+ "lookup",
+ "ordered-float",
+ "percent-encoding",
+ "regex",
+ "serde",
+ "serde_json",
+ "shared",
+ "snafu",
+ "strum_macros 0.21.1",
+ "thiserror",
+ "tracing 0.1.26",
+ "vrl-compiler",
+]
+
+[[package]]
 name = "datadog-search-syntax"
 version = "0.1.0"
 dependencies = [
@@ -2253,10 +2278,11 @@ dependencies = [
 
 [[package]]
 name = "fd-lock"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0010f02effd88c702318c5dde0463206be67495d0b4d906ba7c0a8f166cc7f06"
+checksum = "b8806dd91a06a7a403a8e596f9bfbfb34e469efbc363fc9c9713e79e26472e36"
 dependencies = [
+ "cfg-if 1.0.0",
  "libc",
  "winapi 0.3.9",
 ]
@@ -4075,7 +4101,7 @@ dependencies = [
  "metrics-util",
  "once_cell",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -4593,9 +4619,9 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee2c8fd66061a707503d515639b8af10fd3807a5b5ee6959f7ff1bd303634bd5"
+checksum = "3f9bd055fb730c4f8f4f57d45d35cd6b3f0980535b056dc7ff119cee6a66ed6f"
 dependencies = [
  "derivative 2.2.0",
  "num_enum_derive",
@@ -4603,9 +4629,9 @@ dependencies = [
 
 [[package]]
 name = "num_enum_derive"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "474fd1d096da3ad17084694eebed40ba09c4a36c5255cd772bd8b98859cc562e"
+checksum = "486ea01961c4a818096de679a8b740b26d9033146ac5291b1c98557658f8cdd9"
 dependencies = [
  "proc-macro-crate 1.0.0",
  "proc-macro2 1.0.26",
@@ -4705,9 +4731,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.35"
+version = "0.10.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "549430950c79ae24e6d02e0b7404534ecf311d94cc9f861e9e4020187d13d885"
+checksum = "8d9facdb76fec0b73c406f125d44d86fdad818d66fef0531eec9233ca425ff4a"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -4734,9 +4760,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.65"
+version = "0.9.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a7907e3bfa08bb85105209cdfcb6c63d109f8f6c1ed6ca318fff5c1853fbc1d"
+checksum = "1996d2d305e561b70d1ee0c53f1542833f4e1ac6ce9a6708b6ff2738ca67dc82"
 dependencies = [
  "autocfg 1.0.1",
  "cc",
@@ -6025,9 +6051,9 @@ dependencies = [
 
 [[package]]
 name = "rmpv"
-version = "0.4.7"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c760afe11955e16121e36485b6b828326c3f0eaff1c31758d96dbeb5cf09fd5"
+checksum = "de8813b3a2f95c5138fe5925bfb8784175d88d6bff059ba8ce090aa891319754"
 dependencies = [
  "num-traits",
  "rmp",
@@ -6357,9 +6383,9 @@ dependencies = [
 
 [[package]]
 name = "rustyline"
-version = "8.2.0"
+version = "9.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbd4eaf7a7738f76c98e4f0395253ae853be3eb018f7b0bb57fe1b6c17e31874"
+checksum = "790487c3881a63489ae77126f57048b42d62d3b2bafbf37453ea19eedb6340d6"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -6368,7 +6394,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.20.0",
+ "nix 0.22.1",
  "radix_trie",
  "scopeguard",
  "smallvec",
@@ -6690,9 +6716,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.8.17"
+version = "0.8.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15654ed4ab61726bf918a39cb8d98a2e2995b002387807fa6ba58fdf7f59bb23"
+checksum = "039ba818c784248423789eec090aab9fb566c7b94d6ebbfa1814a9fd52c8afb2"
 dependencies = [
  "dtoa",
  "linked-hash-map",
@@ -7190,6 +7216,18 @@ name = "strum_macros"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87c85aa3f8ea653bfd3ddf25f7ee357ee4d204731f6aa9ad04002306f6e2774c"
+dependencies = [
+ "heck",
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "syn 1.0.72",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
 dependencies = [
  "heck",
  "proc-macro2 1.0.26",
@@ -7757,7 +7795,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.15",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
@@ -7791,9 +7829,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9ff14f98b1a4b289c6248a023c1c2fa1491062964e9fed67ab29c4e4da4a052"
+checksum = "2ca517f43f0fb96e0c3072ed5c275fe5eece87e8cb52f4a77b69226d3b1c9df8"
 dependencies = [
  "lazy_static",
 ]
@@ -7828,7 +7866,7 @@ dependencies = [
  "dashmap",
  "mock_instant",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -7840,7 +7878,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
@@ -7851,7 +7889,7 @@ checksum = "c47440f2979c4cd3138922840eec122e3c0ba2148bc290f756bd7fd60fc97fff"
 dependencies = [
  "opentelemetry",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-subscriber",
 ]
 
@@ -7862,14 +7900,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
 ]
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.2.19"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab69019741fca4d98be3c62d2b75254528b5432233fd8a4d2739fec20278de48"
+checksum = "b9cbe87a2fa7e35900ce5de20220a582a9483a7063811defce79d7cbd59d4cfe"
 dependencies = [
  "ansi_term 0.12.1",
  "chrono",
@@ -7882,7 +7920,7 @@ dependencies = [
  "smallvec",
  "thread_local",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-log",
  "tracing-serde",
 ]
@@ -8419,7 +8457,7 @@ dependencies = [
  "tower-layer",
  "tower-test",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -8525,7 +8563,7 @@ dependencies = [
  "tokio-test",
  "toml",
  "tracing 0.1.26",
- "tracing-core 0.1.18",
+ "tracing-core 0.1.19",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
