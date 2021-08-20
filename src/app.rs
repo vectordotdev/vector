@@ -27,6 +27,9 @@ use crate::internal_events::{
     VectorStarted, VectorStopped,
 };
 
+static DATADOG_OBSERVABILITY_MESSAGE: &str =
+    "Datadog API key provided. Internal metrics will be sent to Datadog.";
+
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
@@ -174,7 +177,9 @@ impl Application {
 
                 #[cfg(feature = "datadog")]
                 // Augment config to enable observability within Datadog, if applicable.
-                config::datadog::attach(&mut config);
+                if config::datadog::try_attach(&mut config).is_ok() {
+                    info!(DATADOG_OBSERVABILITY_MESSAGE);
+                }
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -260,7 +265,9 @@ impl Application {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                         #[cfg(feature = "datadog")]
-                                        config::datadog::attach(&mut new_config);
+                                        if config::datadog::try_attach(&mut new_config).is_ok() {
+                                            info!(DATADOG_OBSERVABILITY_MESSAGE);
+                                        }
 
                                         match topology
                                             .reload_config_and_respawn(new_config)
@@ -303,7 +310,9 @@ impl Application {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                     #[cfg(feature = "datadog")]
-                                    config::datadog::attach(&mut new_config);
+                                    if config::datadog::try_attach(&mut new_config).is_ok() {
+                                        info!(DATADOG_OBSERVABILITY_MESSAGE);
+                                    }
 
                                     match topology
                                         .reload_config_and_respawn(new_config)

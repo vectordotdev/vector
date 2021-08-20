@@ -28,6 +28,11 @@ impl InternalMetricsConfig {
             ..Self::default()
         }
     }
+
+    /// Set the interval to collect internal metrics.
+    pub fn scrape_interval_secs(&mut self, value: u64) {
+        self.scrape_interval_secs = value;
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]

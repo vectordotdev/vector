@@ -15,6 +15,9 @@ pub struct Options {
 
     #[serde(default = "default_api_key")]
     pub api_key: Option<String>,
+
+    #[serde(default = "default_reporting_interval_secs")]
+    pub reporting_interval_secs: u64,
 }
 
 impl Default for Options {
@@ -22,6 +25,7 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             api_key: default_api_key(),
+            reporting_interval_secs: default_reporting_interval_secs(),
         }
     }
 }
@@ -36,16 +40,19 @@ fn default_api_key() -> Option<String> {
     None
 }
 
+/// By default, report to Datadog every 5 seconds.
+fn default_reporting_interval_secs() -> u64 {
+    5
+}
+
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
-pub fn attach(config: &mut Config) {
+pub fn try_attach(config: &mut Config) -> Result<(), ()> {
     // Return early if an API key is missing, or the feature isn't enabled.
     let api_key = match (&config.datadog.api_key, config.datadog.enabled) {
         (Some(api_key), true) => api_key.clone(),
-        _ => return,
+        _ => return Err(()),
     };
-
-    info!("Datadog API key detected. Internal metrics will be sent to Datadog.");
 
     let internal_metrics_id = ComponentId::from(INTERNAL_METRICS_KEY);
     let datadog_metrics_id = ComponentId::from(DATADOG_METRICS_KEY);
@@ -53,7 +60,10 @@ pub fn attach(config: &mut Config) {
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, due to the use of a custom namespace to
     // satisfy reporting to Datadog.
-    let internal_metrics = InternalMetricsConfig::namespace("pipelines");
+    let mut internal_metrics = InternalMetricsConfig::namespace("pipelines");
+
+    // Override default scrape interval.
+    internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
 
     config.sources.insert(
         internal_metrics_id.clone(),
@@ -67,6 +77,8 @@ pub fn attach(config: &mut Config) {
         datadog_metrics_id,
         SinkOuter::new(vec![internal_metrics_id], Box::new(datadog_metrics)),
     );
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -89,7 +101,7 @@ mod tests {
         let mut config = Config::default();
 
         // Attaching config without an API enabled should avoid wiring up components.
-        attach(&mut config);
+        assert!(try_attach(&mut config).is_err());
 
         assert!(!config
             .sources
@@ -105,7 +117,8 @@ mod tests {
 
         // Adding an API key should be enough to enable the feature.
         config.datadog.api_key = Some("xxx".to_string());
-        attach(&mut config);
+
+        assert!(try_attach(&mut config).is_ok());
 
         assert!(config
             .sources
@@ -113,5 +126,13 @@ mod tests {
         assert!(config
             .sinks
             .contains_key(&ComponentId::from(DATADOG_METRICS_KEY)));
+    }
+
+    #[test]
+    fn default_reporting_interval_secs() {
+        let config = Config::default();
+
+        // Reporting interval should default to 5 seconds.
+        assert_eq!(config.datadog.reporting_interval_secs, 5);
     }
 }
