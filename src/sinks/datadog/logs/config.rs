@@ -116,27 +116,92 @@ impl DatadogLogsConfig {
             .parse_config(self.batch)
     }
 
-    /// Builds the required BatchedHttpSink.
-    /// Since the DataDog sink can create one of two different sinks, this
-    /// extracts most of the shared functionality required to create either sink.
-    fn build_sink<T, B, O>(
-        &self,
-        cx: SinkContext,
-        service: T,
-        batch: B,
-        timeout: Duration,
-    ) -> crate::Result<(VectorSink, Healthcheck)>
-    where
-        O: 'static,
-        B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
-        B::Output: std::marker::Send + Clone,
-        B::Input: std::marker::Send,
-        T: HttpSink<
-                Input = PartitionInnerBuffer<B::Input, ApiKey>,
-                Output = PartitionInnerBuffer<B::Output, ApiKey>,
-            > + Clone,
-    {
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+    // /// Builds the required BatchedHttpSink.
+    // /// Since the DataDog sink can create one of two different sinks, this
+    // /// extracts most of the shared functionality required to create either sink.
+    // fn build_sink<T, B, O>(
+    //     &self,
+    //     cx: SinkContext,
+    //     service: T,
+    //     _batch: B,
+    //     timeout: Duration,
+    // ) -> crate::Result<(VectorSink, Healthcheck)>
+    // where
+    //     O: 'static,
+    //     B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
+    //     B::Output: std::marker::Send + Clone,
+    //     B::Input: std::marker::Send,
+    //     T: HttpSink<
+    //             Input = PartitionInnerBuffer<B::Input, ApiKey>,
+    //             Output = PartitionInnerBuffer<B::Output, ApiKey>,
+    //         > + Clone,
+    // {
+    //     // let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+
+    //     let tls_settings = MaybeTlsSettings::from_config(
+    //         &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+    //         false,
+    //     )?;
+
+    //     let client = HttpClient::new(tls_settings, cx.proxy())?;
+    //     let healthcheck = healthcheck(
+    //         service.clone(),
+    //         client.clone(),
+    //         self.default_api_key.clone(),
+    //     )
+    //     .boxed();
+    //     // let sink = PartitionHttpSink::new(
+    //     //     service,
+    //     //     PartitionBuffer::new(batch),
+    //     //     request_settings,
+    //     //     timeout,
+    //     //     client,
+    //     //     cx.acker(),
+    //     // )
+    //     // .
+    //     // let sink = VectorSink::Sink(Box::new(sink));
+    //     let log_api = LogApi::new()
+    //         .batch_timeout(Duration::from_secs(15))
+    //         .batch_timeout(timeout)
+    //         .bytes_stored_limit(bytesize::mib(5_u32))
+    //         .compression(self.compression.unwrap_or_default())
+    //         .datadog_uri(self.get_uri())
+    //         .default_api_key(self.default_api_key.clone().into_boxed_str())
+    //         .encoding(self.encoding.clone())
+    //         .http_client(client)
+    //         .log_schema(vector_core::config::log_schema())
+    //         .build()?;
+    //     //.sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
+    //     let sink = VectorSink::Stream(Box::new(log_api));
+
+    //     Ok((sink, healthcheck))
+    // }
+}
+
+// pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
+
+async fn nop_healthcheck() -> crate::Result<()> {
+    Ok(())
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "datadog_logs")]
+impl SinkConfig for DatadogLogsConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // let batch_settings = self.batch_settings()?;
+        // let service = service::Service::builder()
+        //     .encoding(self.encoding.clone())
+        //     .compression(self.compression.unwrap_or_default())
+        //     .uri(self.get_uri())
+        //     .default_api_key(Arc::from(self.default_api_key.clone()))
+        //     .log_schema(vector_core::config::log_schema())
+        //     .build();
+        // self.build_sink(
+        //     cx,
+        //     service,
+        //     JsonArrayBuffer::new(batch_settings.size),
+        //     batch_settings.timeout,
+        // )
 
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
@@ -144,48 +209,28 @@ impl DatadogLogsConfig {
         )?;
 
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck = healthcheck(
-            service.clone(),
-            client.clone(),
-            self.default_api_key.clone(),
-        )
-        .boxed();
-        // let sink = PartitionHttpSink::new(
-        //     service,
-        //     PartitionBuffer::new(batch),
-        //     request_settings,
-        //     timeout,
-        //     client,
-        //     cx.acker(),
+        // let healthcheck = healthcheck(
+        //     service.clone(),
+        //     client.clone(),
+        //     self.default_api_key.clone(),
         // )
-        // .
-        // let sink = VectorSink::Sink(Box::new(sink));
-        let log_api = LogApi::new().build()?;
-        //.sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
+        // .boxed();
+        let healthcheck = nop_healthcheck().boxed();
+
+        let log_api = LogApi::new()
+            // .batch_timeout(batch_settings.timeout)
+            // .bytes_stored_limit(batch_settings.size.bytes as u64)
+            .bytes_stored_limit(bytesize::mib(5_u32))
+            .compression(self.compression.unwrap_or_default())
+            .datadog_uri(self.get_uri())
+            .default_api_key(self.default_api_key.clone().into_boxed_str())
+            .encoding(self.encoding.clone())
+            .http_client(client)
+            .log_schema(vector_core::config::log_schema())
+            .build()?;
         let sink = VectorSink::Stream(Box::new(log_api));
 
         Ok((sink, healthcheck))
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "datadog_logs")]
-impl SinkConfig for DatadogLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = self.batch_settings()?;
-        let service = service::Service::builder()
-            .encoding(self.encoding.clone())
-            .compression(self.compression.unwrap_or_default())
-            .uri(self.get_uri())
-            .default_api_key(Arc::from(self.default_api_key.clone()))
-            .log_schema(vector_core::config::log_schema())
-            .build();
-        self.build_sink(
-            cx,
-            service,
-            JsonArrayBuffer::new(batch_settings.size),
-            batch_settings.timeout,
-        )
     }
 
     fn input_type(&self) -> DataType {
