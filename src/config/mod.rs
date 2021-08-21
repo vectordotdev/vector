@@ -91,6 +91,7 @@ pub struct Config {
     pub sources: IndexMap<ComponentId, SourceOuter>,
     pub sinks: IndexMap<ComponentId, SinkOuter>,
     pub transforms: IndexMap<ComponentId, TransformOuter>,
+    pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }
@@ -386,6 +387,31 @@ pub struct TransformOuter {
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct EnrichmentTableOuter {
+    #[serde(flatten)]
+    pub inner: Box<dyn EnrichmentTableConfig>,
+}
+
+impl EnrichmentTableOuter {
+    pub fn new(inner: Box<dyn EnrichmentTableConfig>) -> Self {
+        EnrichmentTableOuter { inner }
+    }
+}
+
+#[async_trait]
+#[typetag::serde(tag = "type")]
+pub trait EnrichmentTableConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+    async fn build(
+        &self,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Box<dyn enrichment::Table + Send + Sync>>;
+}
+
+pub type EnrichmentTableDescription = ComponentDescription<Box<dyn EnrichmentTableConfig>>;
+
+inventory::collect!(EnrichmentTableDescription);
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]

@@ -111,7 +111,7 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 # Tokio / Futures
 async-trait = "0.1.51"
 futures = { version = "0.3.16", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.9.0", default-features = false, features = ["full"] }
+tokio = { version = "1.10.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.7", default-features = false, features = ["codec", "time"] }
@@ -123,9 +123,9 @@ tracing-futures = { version = "0.2.5", default-features = false, features = ["fu
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.20", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
-tracing-opentelemetry = { version = "0.14.0", default-features = false }
-opentelemetry = { version = "0.15.0", default-features = false, features = ["trace", "rt-tokio"] }
-opentelemetry-datadog = { version = "0.3.1", default-features = false, features = ["reqwest-client"] }
+tracing-opentelemetry = { version = "0.15.0", default-features = false }
+opentelemetry = { version = "0.16.0", default-features = false, features = ["trace", "rt-tokio"] }
+opentelemetry-datadog = { version = "0.4.0", default-features = false, features = ["reqwest-client"] }
 
 # Metrics
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
@@ -196,6 +196,7 @@ lookup = { path = "lib/lookup" }
 
 # External libs
 anyhow = { version = "1.0.43", default-features = false }
+arc-swap = { version = "1.3.0", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
@@ -205,6 +206,7 @@ bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.4", default-features = false }
+csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -217,6 +219,7 @@ flate2 = { version = "1.0.20", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 grok = { version = "1.1.0", default-features = false, optional = true }
+hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.4", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
@@ -314,7 +317,7 @@ matches = "0.1.9"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.4", features = ["json"] }
 tempfile = "3.2.0"
-tokio = { version = "1.9.0", features = ["test-util"] }
+tokio = { version = "1.10.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
@@ -330,14 +333,14 @@ leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "l
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-cmake = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-default-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-default-no-api-client = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-msvc = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+default-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-no-api-client = ["api", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
 disk-buffer = ["vector_core/disk-buffer"]
 
@@ -398,6 +401,10 @@ api-client = [
   "vector_core/api",
   "vector-api-client",
 ]
+
+# Enrichment Tables
+enrichment-tables = ["enrichment-tables-file"]
+enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -777,6 +784,12 @@ name = "remap"
 harness = false
 test = true
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "enrichment_tables_file"
+harness = false
+test = true
+required-features = ["enrichment-tables-file"]
 
 [[bench]]
 name = "languages"

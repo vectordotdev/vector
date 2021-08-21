@@ -208,7 +208,13 @@ impl FileWatcher {
                     // File has been deleted, so return what we have in the buffer, even though it
                     // didn't end with a newline. This is not a perfect signal for when we should
                     // give up waiting for a newline, but it's decent.
-                    Ok(Some(self.buf.split().freeze()))
+                    let buf = self.buf.split().freeze();
+                    if buf.is_empty() {
+                        // EOF
+                        Ok(None)
+                    } else {
+                        Ok(Some(buf))
+                    }
                 } else {
                     Ok(None)
                 }

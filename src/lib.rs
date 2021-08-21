@@ -37,6 +37,7 @@ pub mod app;
 pub mod async_read;
 pub mod buffers;
 pub mod encoding_transcode;
+pub mod enrichment_tables;
 pub mod graph;
 pub mod heartbeat;
 pub mod http;

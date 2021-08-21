@@ -5,7 +5,9 @@ use glob::glob;
 use shared::TimeZone;
 use std::str::FromStr;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
+use vrl::{
+    diagnostic::Formatter, enrichment::EmptyEnrichmentTables, state, Runtime, Terminate, Value,
+};
 
 use vrl_tests::{docs, Test};
 
@@ -125,7 +127,11 @@ fn main() {
 
         let state = state::Runtime::default();
         let mut runtime = Runtime::new(state);
-        let program = vrl::compile(&test.source, &stdlib::all());
+        let program = vrl::compile(
+            &test.source,
+            Box::new(EmptyEnrichmentTables),
+            &stdlib::all(),
+        );
 
         let want = test.result.clone();
         let timezone = cmd.timezone();
