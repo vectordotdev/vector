@@ -54,7 +54,7 @@ impl From<&LokiEvent> for LokiEncodedEvent {
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub tenant_id: Option<String>,
-    pub labels: Labels,
+    pub labels: String,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -79,7 +79,7 @@ pub struct LokiBuffer {
     stream: Vec<LokiEncodedEvent>,
     settings: BatchSize<Self>,
 
-    partition: Option<PartitionKey>,
+    partition: Option<(PartitionKey, Labels)>,
     latest_timestamp: Option<Option<i64>>,
     global_timestamps: GlobalTimestamps,
     out_of_order_action: OutOfOrderAction,
@@ -128,7 +128,7 @@ impl Batch for LokiBuffer {
 
         let partition = &item.partition;
         if self.latest_timestamp.is_none() {
-            self.partition = Some(item.partition.clone());
+            self.partition = Some((item.partition.clone(), item.labels.clone()));
             self.latest_timestamp = Some(self.global_timestamps.take(partition));
         }
         let latest_timestamp = self
@@ -209,7 +209,7 @@ impl Batch for LokiBuffer {
     }
 
     fn finish(self) -> Self::Output {
-        let partition = self.partition.expect("Batch is empty");
+        let (partition, labels) = self.partition.expect("Batch is empty");
 
         let mut events = self.stream;
         // Sort events by timestamp
@@ -218,8 +218,7 @@ impl Batch for LokiBuffer {
         let latest_timestamp = events.last().expect("Batch is empty").timestamp;
         let events = events.into_iter().map(|e| e.encoded).collect::<Vec<_>>();
 
-        let labels = partition
-            .labels
+        let labels = labels
             .iter()
             .map(|&(ref key, ref value)| (key, value))
             .collect::<HashMap<_, _>>();
