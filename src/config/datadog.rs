@@ -3,14 +3,10 @@ use crate::{
     sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
 };
 use serde::{Deserialize, Serialize};
+use std::env;
 
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
-
-/// Error type for failed attempts to attach Datadog observability to a `Config`.
-pub enum AttachError {
-    NotEnabled,
-}
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -18,7 +14,7 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
-    #[serde(default = "default_api_key")]
+    #[serde(default)]
     pub api_key: Option<String>,
 
     #[serde(default = "default_reporting_interval_secs")]
@@ -29,7 +25,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             enabled: default_enabled(),
-            api_key: default_api_key(),
+            api_key: None,
             reporting_interval_secs: default_reporting_interval_secs(),
         }
     }
@@ -37,12 +33,7 @@ impl Default for Options {
 
 /// By default, the Datadog feature is enabled.
 fn default_enabled() -> bool {
-    true
-}
-
-/// By default, no API key is provided.
-fn default_api_key() -> Option<String> {
-    None
+    false
 }
 
 /// By default, report to Datadog every 5 seconds.
@@ -52,12 +43,20 @@ fn default_reporting_interval_secs() -> u64 {
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
-pub fn try_attach(config: &mut Config) -> Result<(), AttachError> {
+pub fn try_attach(config: &mut Config) -> bool {
     // Return early if an API key is missing, or the feature isn't enabled.
     let api_key = match (&config.datadog.api_key, config.datadog.enabled) {
+        // API key provided explicitly.
         (Some(api_key), true) => api_key.clone(),
-        _ => return Err(AttachError::NotEnabled),
+        // No API key; attempt to get it from the environment.
+        (None, true) => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
+            Ok(api_key) => api_key,
+            _ => return false,
+        },
+        _ => return false,
     };
+
+    info!("Datadog API key provided. Internal metrics will be sent to Datadog.");
 
     let internal_metrics_id = ComponentId::from(INTERNAL_METRICS_KEY);
     let datadog_metrics_id = ComponentId::from(DATADOG_METRICS_KEY);
@@ -83,7 +82,7 @@ pub fn try_attach(config: &mut Config) -> Result<(), AttachError> {
         SinkOuter::new(vec![internal_metrics_id], Box::new(datadog_metrics)),
     );
 
-    Ok(())
+    true
 }
 
 #[cfg(test)]
@@ -94,8 +93,8 @@ mod tests {
     fn default() {
         let config = Config::default();
 
-        // The Datadog config should be enabled by default.
-        assert!(config.datadog.enabled);
+        // The Datadog config should be disabled by default.
+        assert!(!config.datadog.enabled);
 
         // There should be no API key.
         assert_eq!(config.datadog.api_key, None);
@@ -106,7 +105,7 @@ mod tests {
         let mut config = Config::default();
 
         // Attaching config without an API enabled should avoid wiring up components.
-        assert!(try_attach(&mut config).is_err());
+        assert!(!try_attach(&mut config));
 
         assert!(!config
             .sources
@@ -120,10 +119,11 @@ mod tests {
     fn enabled() {
         let mut config = Config::default();
 
-        // Adding an API key should be enough to enable the feature.
+        // Explicitly set to enabled and provide an API key to activate.
+        config.datadog.enabled = true;
         config.datadog.api_key = Some("xxx".to_string());
 
-        assert!(try_attach(&mut config).is_ok());
+        assert!(try_attach(&mut config));
 
         assert!(config
             .sources

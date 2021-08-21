@@ -1,6 +1,6 @@
 #[cfg(feature = "api")]
 use super::api;
-#[cfg(feature = "datadog")]
+#[cfg(feature = "datadog-pipelines")]
 use super::datadog;
 use super::{
     compiler, provider, ComponentId, Config, HealthcheckOptions, SinkConfig, SinkOuter,
@@ -18,7 +18,7 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
-    #[cfg(feature = "datadog")]
+    #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
     pub datadog: datadog::Options,
     #[serde(default)]
@@ -52,7 +52,7 @@ impl From<Config> for ConfigBuilder {
             global: c.global,
             #[cfg(feature = "api")]
             api: c.api,
-            #[cfg(feature = "datadog")]
+            #[cfg(feature = "datadog-pipelines")]
             datadog: c.datadog,
             healthchecks: c.healthchecks,
             sources: c.sources,
@@ -123,7 +123,7 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        #[cfg(feature = "datadog")]
+        #[cfg(feature = "datadog-pipelines")]
         {
             self.datadog = with.datadog;
         }

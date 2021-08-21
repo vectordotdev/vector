@@ -27,10 +27,6 @@ use crate::internal_events::{
     VectorStarted, VectorStopped,
 };
 
-#[cfg(feature = "datadog")]
-static DATADOG_OBSERVABILITY_MESSAGE: &str =
-    "Datadog API key provided. Internal metrics will be sent to Datadog.";
-
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
@@ -176,11 +172,9 @@ impl Application {
                 }
                 config.healthchecks.set_require_healthy(require_healthy);
 
-                #[cfg(feature = "datadog")]
+                #[cfg(feature = "datadog-pipelines")]
                 // Augment config to enable observability within Datadog, if applicable.
-                if config::datadog::try_attach(&mut config).is_ok() {
-                    info!(DATADOG_OBSERVABILITY_MESSAGE);
-                }
+                config::datadog::try_attach(&mut config);
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -265,10 +259,8 @@ impl Application {
                                     Ok(mut new_config) => {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
-                                        #[cfg(feature = "datadog")]
-                                        if config::datadog::try_attach(&mut new_config).is_ok() {
-                                            info!(DATADOG_OBSERVABILITY_MESSAGE);
-                                        }
+                                        #[cfg(feature = "datadog-pipelines")]
+                                        config::datadog::try_attach(&mut new_config);
 
                                         match topology
                                             .reload_config_and_respawn(new_config)
@@ -310,10 +302,8 @@ impl Application {
                                 if let Some(mut new_config) = new_config {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
-                                    #[cfg(feature = "datadog")]
-                                    if config::datadog::try_attach(&mut new_config).is_ok() {
-                                        info!(DATADOG_OBSERVABILITY_MESSAGE);
-                                    }
+                                    #[cfg(feature = "datadog-pipelines")]
+                                    config::datadog::try_attach(&mut new_config);
 
                                     match topology
                                         .reload_config_and_respawn(new_config)
