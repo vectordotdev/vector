@@ -246,17 +246,7 @@ impl HttpSink for LokiSink {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
-        // Let's join all of the labels to single string so that
-        // cloning requires only single allocation.
-        // That requires sorting to ensure uniqueness, but
-        // also choosing a separator that isn't likely to be
-        // used in either name or value.
-        labels.sort();
-        let joined_labels = labels.iter().flat_map(|(a, b)| [a, "→", b, "∇"]).collect();
-        let key = PartitionKey {
-            tenant_id,
-            labels: joined_labels,
-        };
+        let key = PartitionKey::new(tenant_id, &mut labels);
 
         let event = LokiEvent { timestamp, event };
         Some(PartitionInnerBuffer::new(

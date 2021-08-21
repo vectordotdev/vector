@@ -54,7 +54,22 @@ impl From<&LokiEvent> for LokiEncodedEvent {
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub tenant_id: Option<String>,
-    pub labels: String,
+    labels: String,
+}
+
+impl PartitionKey {
+    pub fn new(tenant_id: Option<String>, labels: &mut Labels) -> Self {
+        // Let's join all of the labels to single string so that
+        // cloning requires only single allocation.
+        // That requires sorting to ensure uniqueness, but
+        // also choosing a separator that isn't likely to be
+        // used in either name or value.
+        labels.sort();
+        PartitionKey {
+            tenant_id,
+            labels: labels.iter().flat_map(|(a, b)| [a, "→", b, "∇"]).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -266,10 +281,7 @@ mod tests {
         );
         assert!(matches!(
             buffer.push(LokiRecord {
-                partition: PartitionKey {
-                    tenant_id: None,
-                    labels: vec![("label1".into(), "value1".into())]
-                },
+                partition: PartitionKey::new(None, &mut vec![("label1".into(), "value1".into())]),
                 labels: vec![("label1".into(), "value1".into())],
                 event: LokiEvent {
                     timestamp: 123456789,
@@ -297,10 +309,7 @@ mod tests {
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
-                    partition: PartitionKey {
-                        tenant_id: None,
-                        labels: vec![("asdf".into(), "value1".into())]
-                    },
+                    partition: PartitionKey::new(None, &mut vec![("asdf".into(), "value1".into())]),
                     labels: vec![("asdf".into(), "value1".into())],
                     event: LokiEvent {
                         timestamp: 123456780 + n,
