@@ -1,8 +1,9 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, provider, Config, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig,
-    SourceOuter, TestDefinition, TransformOuter,
+    compiler, provider, ComponentId, Config, EnrichmentTableConfig, EnrichmentTableOuter,
+    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -21,11 +22,13 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub sources: IndexMap<String, SourceOuter>,
+    pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<String, SinkOuter>,
+    pub sources: IndexMap<ComponentId, SourceOuter>,
     #[serde(default)]
-    pub transforms: IndexMap<String, TransformOuter>,
+    pub sinks: IndexMap<ComponentId, SinkOuter>,
+    #[serde(default)]
+    pub transforms: IndexMap<ComponentId, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
@@ -50,6 +53,7 @@ impl From<Config> for ConfigBuilder {
             #[cfg(feature = "api")]
             api: c.api,
             healthchecks: c.healthchecks,
+            enrichment_tables: c.enrichment_tables,
             sources: c.sources,
             sinks: c.sinks,
             transforms: c.transforms,
@@ -74,35 +78,51 @@ impl ConfigBuilder {
         compiler::compile(self)
     }
 
-    pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, name: T, source: S) {
-        self.sources.insert(name.into(), SourceOuter::new(source));
+    pub fn add_enrichment_table<E: EnrichmentTableConfig + 'static, T: Into<String>>(
+        &mut self,
+        name: T,
+        enrichment_table: E,
+    ) {
+        self.enrichment_tables.insert(
+            ComponentId::from(name.into()),
+            EnrichmentTableOuter::new(Box::new(enrichment_table)),
+        );
+    }
+
+    pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
+        self.sources
+            .insert(ComponentId::from(id.into()), SourceOuter::new(source));
     }
 
     pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
         &mut self,
-        name: T,
+        id: T,
         inputs: &[&str],
         sink: S,
     ) {
-        let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
+        let inputs = inputs.iter().map(ComponentId::from).collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
 
-        self.sinks.insert(name.into(), sink);
+        self.sinks.insert(ComponentId::from(id.into()), sink);
     }
 
     pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
         &mut self,
-        name: S,
+        id: S,
         inputs: &[&str],
         transform: T,
     ) {
-        let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
+        let inputs = inputs
+            .iter()
+            .map(|value| ComponentId::from(value.to_string()))
+            .collect::<Vec<_>>();
         let transform = TransformOuter {
             inner: Box::new(transform),
             inputs,
         };
 
-        self.transforms.insert(name.into(), transform);
+        self.transforms
+            .insert(ComponentId::from(id.into()), transform);
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
@@ -133,19 +153,24 @@ impl ConfigBuilder {
 
         self.healthchecks.merge(with.healthchecks);
 
+        with.enrichment_tables.keys().for_each(|k| {
+            if self.enrichment_tables.contains_key(k) {
+                errors.push(format!("duplicate enrichment_table name found: {}", k));
+            }
+        });
         with.sources.keys().for_each(|k| {
             if self.sources.contains_key(k) {
-                errors.push(format!("duplicate source name found: {}", k));
+                errors.push(format!("duplicate source id found: {}", k));
             }
         });
         with.sinks.keys().for_each(|k| {
             if self.sinks.contains_key(k) {
-                errors.push(format!("duplicate sink name found: {}", k));
+                errors.push(format!("duplicate sink id found: {}", k));
             }
         });
         with.transforms.keys().for_each(|k| {
             if self.transforms.contains_key(k) {
-                errors.push(format!("duplicate transform name found: {}", k));
+                errors.push(format!("duplicate transform id found: {}", k));
             }
         });
         with.tests.iter().for_each(|wt| {
@@ -157,6 +182,7 @@ impl ConfigBuilder {
             return Err(errors);
         }
 
+        self.enrichment_tables.extend(with.enrichment_tables);
         self.sources.extend(with.sources);
         self.sinks.extend(with.sinks);
         self.transforms.extend(with.transforms);

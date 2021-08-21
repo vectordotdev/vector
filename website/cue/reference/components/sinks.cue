@@ -516,11 +516,11 @@ components: sinks: [Name=string]: {
 						{
 							title: "Adaptive Request Concurrency (ARC)"
 							body:  """
-								Adaptive Requst Concurrency is a feature of Vector that does away
-								with static rate limits and automatically optimizes HTTP
-								concurrency limits based on downstream service responses. The
-								underlying mechanism is a feedback loop inspired by TCP congestion
-								control algorithms. Checkout the [announcement blog post](\(urls.adaptive_request_concurrency_post)),
+								Adaptive Requst Concurrency is a feature of Vector that does away with static
+								concurrency limits and automatically optimizes HTTP concurrency based on downstream
+								service responses. The underlying mechanism is a feedback loop inspired by TCP
+								congestion control algorithms. Checkout the [announcement blog
+								post](\(urls.adaptive_request_concurrency_post)),
 
 								We highly recommend enabling this feature as it improves
 								performance and reliability of Vector and the systems it
@@ -535,18 +535,31 @@ components: sinks: [Name=string]: {
 								"""
 						},
 						{
-							title: "Static rate limits"
+							title: "Static concurrency"
 							body: """
-								If Adaptive Request Concurrency is not for you, you can manually
-								set static rate limits with the `request.rate_limit_duration_secs`,
-								`request.rate_limit_num`, and `request.concurrency` options:
+								If Adaptive Request Concurrency is not for you, you can manually set static concurrency
+								limits by specifying an integer for `request.concurrency`:
+
+								```toml title="vector.toml"
+								[sinks.my-sink]
+								  request.concurrency = 10
+								```
+								"""
+						},
+						{
+							title: "Rate limits"
+							body: """
+								In addition to limiting request concurrency, you can also limit the overall request
+								throughput via the `request.rate_limit_duration_secs` and `request.rate_limit_num`
+								options.
 
 								```toml title="vector.toml"
 								[sinks.my-sink]
 								  request.rate_limit_duration_secs = 1
 								  request.rate_limit_num = 10
-								  request.concurrency = 10
 								```
+
+								These will apply to both `adaptive` and fixed `request.concurrency` values.
 								"""
 						},
 					]

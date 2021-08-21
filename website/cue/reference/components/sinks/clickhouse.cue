@@ -34,8 +34,8 @@ components: sinks: clickhouse: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				headers:                    false
+				enabled: true
+				headers: false
 			}
 			tls: {
 				enabled:                true

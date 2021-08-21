@@ -1,6 +1,6 @@
 subscription ComponentEventsInTotalsSubscription($interval: Int!) {
     componentEventsInTotals(interval: $interval) {
-        name
+        componentId
         metric {
             eventsInTotal
         }

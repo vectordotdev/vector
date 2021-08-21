@@ -174,7 +174,7 @@ Aug 17 15:28:05.954  INFO vector::topology::builder: Healthcheck: Passed.
 This is some input!
 {"host":"autonoma","message":"This is some input!","new_field":"new_value","new_field_2":"new_value_2","source_type":"stdin","timestamp":"2020-08-17T22:28:11.183218406Z"}
 ^CAug 17 15:28:12.690  INFO vector: Shutting down.
-Aug 17 15:28:12.690  INFO source{name=source0 type=stdin}: vector::sources::stdin: finished sending
+Aug 17 15:28:12.690  INFO source{id=source0 type=stdin}: vector::sources::stdin: finished sending
 ```
 
 Now lets dig into the module we tested, see how it works, then write your own!

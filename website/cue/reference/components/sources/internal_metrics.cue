@@ -46,6 +46,15 @@ components: sources: internal_metrics: {
 	}
 
 	configuration: {
+		namespace: {
+			description: "The namespace of the metric."
+			common:      false
+			required:    false
+			type: string: {
+				default: "vector"
+				syntax:  "literal"
+			}
+		}
 		scrape_interval_secs: {
 			description: "The interval between metric gathering, in seconds."
 			common:      true
@@ -905,6 +914,12 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
+		utilization: {
+			description:       "A ratio from 0 to 1 of the load on a component. A value of 0 would indicate a completely idle component that is simply waiting for input. A value of 1 would indicate a that is never idle. This value is updated every 5 seconds."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		value_limit_reached_total: {
 			description: """
 				The total number of times new values for a key have been rejected because the
@@ -969,6 +984,7 @@ components: sources: internal_metrics: {
 		// Helpful tag groupings
 		_component_tags: _internal_metrics_tags & {
 			component_kind: _component_kind
+			component_id:   _component_id
 			component_name: _component_name
 			component_type: _component_type
 		}
@@ -987,10 +1003,15 @@ components: sources: internal_metrics: {
 				"transform": "Vector transform components"
 			}
 		}
-		_component_name: {
-			description: "The Vector component name."
+		_component_id: {
+			description: "The Vector component ID."
 			required:    true
-			examples: ["file_source", "splunk_sink"]
+			examples: ["my_source", "my_sink"]
+		}
+		_component_name: {
+			description: "Deprecated, use `component_id` instead. The value is the same as `component_id`."
+			required:    true
+			examples: ["my_source", "my_sink"]
 		}
 		_component_type: {
 			description: "The Vector component type."

@@ -29,9 +29,9 @@ components: sinks: gcp_stackdriver_logs: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				rate_limit_num:             1000
-				headers:                    false
+				enabled:        true
+				rate_limit_num: 1000
+				headers:        false
 			}
 			tls: {
 				enabled:                true
@@ -132,7 +132,7 @@ components: sinks: gcp_stackdriver_logs: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["vector-logs", "{{ component_name }}"]
+				examples: ["vector-logs", "{{ component_id }}"]
 				syntax: "template"
 			}
 		}
@@ -277,7 +277,7 @@ components: sinks: gcp_stackdriver_logs: {
 			policies: [
 				{
 					_action: "logEntries.create"
-					required_for: ["healthcheck", "write"]
+					required_for: ["healthcheck", "operation"]
 				},
 			]
 		},

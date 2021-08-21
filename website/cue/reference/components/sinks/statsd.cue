@@ -10,10 +10,7 @@ components: sinks: statsd: {
 		healthcheck: sinks.socket.features.healthcheck
 		send: {
 			compression: sinks.socket.features.send.compression
-			encoding: {
-				enabled: true
-				codec: enabled: false
-			}
+			encoding: enabled: false
 			request: sinks.socket.features.send.request
 			send_buffer_bytes: {
 				enabled:       true

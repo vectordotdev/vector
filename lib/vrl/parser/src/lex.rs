@@ -271,14 +271,16 @@ pub enum Token<S> {
     /// any character in the source, instead it represents the start or end of a
     /// sequence of tokens that together form a "query".
     ///
-    /// Some example:
+    /// Some examples:
     ///
-    ///   .          => LQuery, Dot, RQuery
-    ///   .foo       => LQuery, Dot, Ident, RQuery
-    ///   foo.bar[2] => LQuery, Ident, Dot, Ident, LBracket, Integer, RBracket, RQuery
-    ///   foo().bar  => LQuery, FunctionCall, LParen, RParen, Dot, Ident, RQuery
-    ///   [1].foo    => LQuery, LBracket, Integer, RBracket, Dot, Ident, RQuery
-    ///   { .. }[0]  => LQuery, LBrace, ..., RBrace, LBracket, ... RBracket, RQuery
+    /// ```text
+    /// .          => LQuery, Dot, RQuery
+    /// .foo       => LQuery, Dot, Ident, RQuery
+    /// foo.bar[2] => LQuery, Ident, Dot, Ident, LBracket, Integer, RBracket, RQuery
+    /// foo().bar  => LQuery, FunctionCall, LParen, RParen, Dot, Ident, RQuery
+    /// [1].foo    => LQuery, LBracket, Integer, RBracket, Dot, Ident, RQuery
+    /// { .. }[0]  => LQuery, LBrace, ..., RBrace, LBracket, ... RBracket, RQuery
+    /// ```
     ///
     /// The final example shows how the lexer does not care about the semantic
     /// validity of a query (as in, getting the index from an object does not
@@ -286,9 +288,11 @@ pub enum Token<S> {
     ///
     /// Some non-matching examples:
     ///
-    ///   . foo      => Dot, Identifier
-    ///   foo() .a   => FunctionCall, LParen, RParen, LQuery, Dot, Ident, RQuery
-    ///   [1] [2]    => RBracket, Integer, LBracket, RBracket, Integer, RBracket
+    /// ```text
+    /// . foo      => Dot, Identifier
+    /// foo() .a   => FunctionCall, LParen, RParen, LQuery, Dot, Ident, RQuery
+    /// [1] [2]    => RBracket, Integer, LBracket, RBracket, Integer, RBracket
+    /// ```
     ///
     /// The reason these tokens exist is to allow the parser to remain
     /// whitespace-agnostic, while still being able to distinguish between the

@@ -92,7 +92,7 @@ impl Function for ToTimestamp {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ToTimestampFn { value }))
@@ -163,7 +163,7 @@ mod tests {
         let mut object: Value = BTreeMap::new().into();
         let mut runtime_state = vrl::state::Runtime::default();
         let tz = TimeZone::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, None);
         let f = ToTimestampFn {
             value: Box::new(Literal::Integer(9999999999999)),
         };
@@ -176,7 +176,7 @@ mod tests {
         let mut object: Value = BTreeMap::new().into();
         let mut runtime_state = vrl::state::Runtime::default();
         let tz = TimeZone::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, None);
         let f = ToTimestampFn {
             value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),
         };

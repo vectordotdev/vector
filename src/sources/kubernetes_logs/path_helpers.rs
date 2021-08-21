@@ -1,6 +1,6 @@
 //! Simple helpers for building and parsing k8s paths.
 //!
-//! Loosely based on https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go
+//! Loosely based on <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go>.
 
 #![deny(missing_docs)]
 

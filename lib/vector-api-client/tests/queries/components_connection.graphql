@@ -4,7 +4,7 @@ query ComponentsConnectionQuery($after: String, $before: String, $first: Int, $l
             cursor
             node {
                 __typename
-                name
+                componentId
             }
         }
         pageInfo {
