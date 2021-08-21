@@ -5,9 +5,8 @@
 //!
 //! <https://github.com/grafana/loki/blob/master/docs/api.md>
 //!
-//! This sink does not use `PartitionBatching` but elects to do
-//! stream multiplexing by organizing the streams in the `build_request`
-//! phase. There must be at least one valid set of labels.
+//! This sink uses `PartitionBatching` to partition events
+//! by streams. There must be at least one valid set of labels.
 //!
 //! If an event produces no labels, this can happen if the template
 //! does not match, we will add a default label `{agent="vector"}`.
@@ -20,9 +19,8 @@ use crate::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
-        service::ConcurrencyOption,
-        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
-        UriSerde,
+        BatchConfig, BatchSettings, Concurrency, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig, UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -106,11 +104,10 @@ impl SinkConfig for LokiConfig {
             }
         }
 
-        if self.request.concurrency.is_some() {
-            warn!("Option `request.concurrency` is not supported.");
-        }
-        let mut request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        request_settings.concurrency = Some(1);
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(5),
+            ..Default::default()
+        });
 
         let batch_settings = BatchSettings::default()
             .bytes(102_400)
@@ -139,6 +136,7 @@ impl SinkConfig for LokiConfig {
             client.clone(),
             cx.acker(),
         )
+        .ordered()
         .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
         let healthcheck = healthcheck(config, client).boxed();
@@ -199,7 +197,6 @@ impl HttpSink for LokiSink {
                 })
                 .ok()
         });
-        let key = PartitionKey { tenant_id };
 
         let mut labels = Vec::new();
 
@@ -248,6 +245,8 @@ impl HttpSink for LokiSink {
         if labels.is_empty() {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
+
+        let key = PartitionKey::new(tenant_id, &mut labels);
 
         let event = LokiEvent { timestamp, event };
         Some(PartitionInnerBuffer::new(
@@ -873,6 +872,33 @@ mod integration_tests {
         .await;
     }
 
+    #[tokio::test]
+    async fn out_of_order_per_partition() {
+        let batch_size = 2;
+        let big_lines = random_lines(1_000_000).take(2);
+        let small_lines = random_lines(1).take(20);
+        let mut events = big_lines
+            .into_iter()
+            .chain(small_lines)
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        let base = chrono::Utc::now() - Duration::seconds(30);
+        for (i, event) in events.iter_mut().enumerate() {
+            let log = event.as_mut_log();
+            log.insert(
+                log_schema().timestamp_key(),
+                base + Duration::seconds(i as i64),
+            );
+        }
+
+        // So, since all of the events are of the same partition, and if there is concurrency,
+        // then if ordering inside paritions isn't upheld, the big line events will take longer
+        // time to flush than small line events so loki will receive smaller ones before large
+        // ones hence out of order events.
+        test_out_of_order_events(OutOfOrderAction::Drop, batch_size, events.clone(), events).await;
+    }
+
     async fn test_out_of_order_events(
         action: OutOfOrderAction,
         batch_size: usize,
@@ -897,6 +923,7 @@ mod integration_tests {
             Template::try_from(stream.to_string()).unwrap(),
         );
         config.batch.max_events = Some(batch_size);
+        config.batch.max_bytes = Some(4_000_000);
 
         let (sink, _) = config.build(cx).await.unwrap();
         sink.into_sink()
