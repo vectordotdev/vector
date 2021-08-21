@@ -375,7 +375,7 @@ mod tests {
         };
 
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let sink = settings.partition_sink(
+        let mut sink = settings.partition_sink(
             RetryAlways,
             svc,
             PartitionBuffer::new(VecBuffer::new(batch.size)),
@@ -383,6 +383,7 @@ mod tests {
             acker,
             StdServiceLogic::default(),
         );
+        sink.ordered();
 
         let input = (0..20).into_iter().map(|i| PartitionInnerBuffer::new(i, 0));
         sink.sink_map_err(drop)
