@@ -295,11 +295,27 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        buffers::Acker,
+        sinks::util::{
+            retries::{RetryAction, RetryLogic},
+            sink::StdServiceLogic,
+            BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
+        },
+    };
+    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
+    use std::sync::{
+        atomic::{AtomicBool, Ordering::AcqRel},
+        Arc, Mutex,
+    };
+    use tokio::time::Duration;
+
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
+    type TowerRequestConfigTest = TowerRequestConfig<Concurrency>;
 
     #[test]
     fn concurrency_param_works() {
-        type TowerRequestConfigTest = TowerRequestConfig<Concurrency>;
-
         let cfg = TowerRequestConfigTest::default();
         let toml = toml::to_string(&cfg).unwrap();
         toml::from_str::<TowerRequestConfigTest>(&toml).expect("Default config failed");
@@ -327,10 +343,78 @@ mod tests {
 
     #[test]
     fn backward_compatibility_with_in_flight_limit_param_works() {
-        type TowerRequestConfigTest = TowerRequestConfig<Concurrency>;
-
         let cfg = toml::from_str::<TowerRequestConfigTest>("in_flight_limit = 10")
             .expect("Fixed concurrency failed for in_flight_limit param");
         assert_eq!(cfg.concurrency(), &Concurrency::Fixed(10));
+    }
+
+    #[tokio::test]
+    async fn partition_sink_retry_concurrency() {
+        let cfg = TowerRequestConfigTest {
+            concurrency: Concurrency::Fixed(1),
+            ..TowerRequestConfigTest::default()
+        };
+        let settings = cfg.unwrap_with(&TowerRequestConfigTest::default());
+
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let svc = {
+            let sent_requests = Arc::clone(&sent_requests);
+            let delay = Arc::new(AtomicBool::new(true));
+            tower::service_fn(move |req: PartitionInnerBuffer<_, _>| {
+                let (req, _) = req.into_parts();
+                if delay.swap(false, AcqRel) {
+                    // Error on first request
+                    future::err::<(), _>(std::io::Error::new(std::io::ErrorKind::Other, "")).boxed()
+                } else {
+                    sent_requests.lock().unwrap().push(req);
+                    future::ok::<_, std::io::Error>(()).boxed()
+                }
+            })
+        };
+
+        let batch = BatchSettings::default().bytes(9999).events(10);
+        let mut sink = settings.partition_sink(
+            RetryAlways,
+            svc,
+            PartitionBuffer::new(VecBuffer::new(batch.size)),
+            TIMEOUT,
+            acker,
+            StdServiceLogic::default(),
+        );
+        sink.ordered();
+
+        let input = (0..20).into_iter().map(|i| PartitionInnerBuffer::new(i, 0));
+        sink.sink_map_err(drop)
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .await
+            .unwrap();
+
+        let output = sent_requests.lock().unwrap();
+        assert_eq!(
+            &*output,
+            &vec![
+                (0..10).into_iter().collect::<Vec<_>>(),
+                (10..20).into_iter().collect::<Vec<_>>(),
+            ]
+        );
+    }
+
+    #[derive(Clone, Debug, Copy)]
+    struct RetryAlways;
+
+    impl RetryLogic for RetryAlways {
+        type Error = std::io::Error;
+        type Response = ();
+
+        fn is_retriable_error(&self, _: &Self::Error) -> bool {
+            true
+        }
+
+        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
+            // Treat the default as the request is successful
+            RetryAction::Successful
+        }
     }
 }
