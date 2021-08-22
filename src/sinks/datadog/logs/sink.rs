@@ -78,10 +78,11 @@ impl LogApiBuilder {
         self
     }
 
-    pub fn batch_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
-        self
-    }
+    // TODO enable and set from config
+    // pub fn batch_timeout(mut self, timeout: Duration) -> Self {
+    //     self.timeout = Some(timeout);
+    //     self
+    // }
 
     pub fn http_client(mut self, client: HttpClient) -> Self {
         self.http_client = Some(client);
