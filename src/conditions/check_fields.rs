@@ -8,6 +8,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
+use vector_core::enrichment;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
@@ -523,7 +524,10 @@ impl CheckFieldsConfig {
 
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
-    fn build(&self) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        _enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         warn!(message = "The `check_fields` condition is deprecated, use `vrl` instead.",);
         build_predicates(&self.predicates)
             .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })
@@ -610,7 +614,7 @@ mod test {
 
             assert_eq!(
                 CheckFieldsConfig { predicates: preds }
-                    .build()
+                    .build(&Default::default())
                     .err()
                     .unwrap()
                     .to_string(),
@@ -625,7 +629,7 @@ mod test {
             CheckFieldsConfig {
                 predicates: aggregated_preds
             }
-            .build()
+            .build(&Default::default())
             .err()
             .unwrap()
             .to_string(),
@@ -649,7 +653,9 @@ mod test {
             CheckFieldsPredicateArg::VecString(vec!["hello".into(), "world".into()]),
         );
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("neither");
         assert!(!cond.check(&event));
@@ -701,7 +707,9 @@ mod test {
             CheckFieldsPredicateArg::VecString(vec!["hello".into(), "world".into()]),
         );
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("neither");
         assert!(!cond.check(&event));
@@ -758,7 +766,9 @@ mod test {
             CheckFieldsPredicateArg::String("bar".into()),
         );
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("neither");
         assert!(!cond.check(&event));
@@ -805,7 +815,9 @@ mod test {
             CheckFieldsPredicateArg::VecString(vec!["hello".into(), "world".into()]),
         );
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("neither");
         assert!(!cond.check(&event));
@@ -868,7 +880,9 @@ mod test {
             CheckFieldsPredicateArg::VecString(vec!["hello".into(), "world".into()]),
         );
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("neither");
         assert!(!cond.check(&event));
@@ -927,7 +941,9 @@ mod test {
             CheckFieldsPredicateArg::VecString(vec!["hello".into(), "world".into()]),
         );
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("not foo");
         assert!(!cond.check(&event));
@@ -988,7 +1004,9 @@ mod test {
             CheckFieldsPredicateArg::String("end$".into()),
         );
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("starts with a bang");
         assert!(!cond.check(&event));
@@ -1031,7 +1049,9 @@ mod test {
             CheckFieldsPredicateArg::VecString(vec!["2000::/3".into(), "192.168.0.0/16".into()]),
         );
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("ignored message");
         assert!(!cond.check(&event));
@@ -1079,7 +1099,9 @@ mod test {
         preds.insert("foo.exists".into(), CheckFieldsPredicateArg::Boolean(true));
         preds.insert("bar.exists".into(), CheckFieldsPredicateArg::Boolean(false));
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("ignored field");
         assert!(!cond.check(&event));
@@ -1106,7 +1128,9 @@ mod test {
         preds.insert("foo.length_eq".into(), CheckFieldsPredicateArg::Integer(10));
         preds.insert("bar.length_eq".into(), CheckFieldsPredicateArg::Integer(4));
 
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("");
         assert!(!cond.check(&event));
@@ -1134,7 +1158,9 @@ mod test {
             "foo.not_exists".into(),
             CheckFieldsPredicateArg::Boolean(true),
         );
-        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+        let cond = CheckFieldsConfig { predicates: preds }
+            .build(&Default::default())
+            .unwrap();
 
         let mut event = Event::from("ignored field");
         assert!(cond.check(&event));

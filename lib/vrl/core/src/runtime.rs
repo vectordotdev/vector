@@ -81,7 +81,12 @@ impl Runtime {
             }
         };
 
-        let mut context = Context::new(target, &mut self.state, timezone);
+        let mut context = Context::new(
+            target,
+            &mut self.state,
+            timezone,
+            program.enrichment_tables(),
+        );
 
         let mut values = program
             .iter()

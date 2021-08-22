@@ -38,10 +38,10 @@ components: sinks: aws_s3: components._aws & {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				concurrency:                50
-				rate_limit_num:             250
-				headers:                    false
+				enabled:        true
+				concurrency:    50
+				rate_limit_num: 250
+				headers:        false
 			}
 			tls: enabled: false
 			to: {
@@ -402,10 +402,6 @@ components: sinks: aws_s3: components._aws & {
 			policies: [
 				{
 					_action: "HeadBucket"
-					required_for: ["healthcheck"]
-				},
-				{
-					_action: "ListBuckets"
 					required_for: ["healthcheck"]
 				},
 				{

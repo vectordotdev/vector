@@ -5,6 +5,7 @@ use crate::{
 use bytes::Bytes;
 use futures::{channel::mpsc, FutureExt, SinkExt, TryFutureExt};
 use hyper::{
+    body::HttpBody,
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server, StatusCode,
 };
@@ -48,14 +49,19 @@ pub fn build_test_server_status(
     })
 }
 
-pub fn build_test_server_generic(
+pub fn build_test_server_generic<B>(
     addr: SocketAddr,
-    responder: impl Fn() -> Response<Body> + Clone + Send + Sync + 'static,
+    responder: impl Fn() -> Response<B> + Clone + Send + Sync + 'static,
 ) -> (
     mpsc::Receiver<(http::request::Parts, Bytes)>,
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
-) {
+)
+where
+    B: HttpBody + Send + Sync + 'static,
+    <B as HttpBody>::Data: Send + Sync,
+    <B as HttpBody>::Error: snafu::Error + Send + Sync,
+{
     let (tx, rx) = mpsc::channel(100);
     let service = make_service_fn(move |_| {
         let responder = responder.clone();

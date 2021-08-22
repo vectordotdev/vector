@@ -5,7 +5,7 @@ use crate::parser::Node;
 use crate::value::Kind;
 use crate::{Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
@@ -39,7 +39,7 @@ pub trait Function: Sync + fmt::Debug {
     ///
     /// At runtime, the `Expression` returned by this function is executed and
     /// resolved to its final [`Value`].
-    fn compile(&self, arguments: ArgumentList) -> Compiled;
+    fn compile(&self, state: &super::State, arguments: ArgumentList) -> Compiled;
 
     /// An optional list of parameters the function accepts.
     ///
@@ -190,6 +190,31 @@ impl ArgumentList {
 
     pub fn required_regex(&mut self, keyword: &'static str) -> Result<regex::Regex, Error> {
         Ok(required(self.optional_regex(keyword)?))
+    }
+
+    pub fn optional_object(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<Option<BTreeMap<String, Expr>>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| match expr {
+                Expr::Container(Container {
+                    variant: Variant::Object(object),
+                }) => Ok((*object).clone()),
+                expr => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "object",
+                    expr,
+                }),
+            })
+            .transpose()
+    }
+
+    pub fn required_object(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<BTreeMap<String, Expr>, Error> {
+        Ok(required(self.optional_object(keyword)?))
     }
 
     pub fn optional_array(&mut self, keyword: &'static str) -> Result<Option<Vec<Expr>>, Error> {

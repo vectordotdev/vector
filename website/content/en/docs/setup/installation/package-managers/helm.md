@@ -21,13 +21,13 @@ As an alternative, you can still manually deploy Vector in the aggregator role. 
 Add the Vector repo:
 
 ```shell
-helm repo add timberio https://packages.timber.io/helm/latest
+helm repo add vector https://helm.vector.dev
 ```
 
 Check available Helm chart configuration options:
 
 ```shell
-helm show values timberio/vector-agent
+helm show values vector/vector-agent
 ```
 
 Configure Vector:
@@ -52,7 +52,7 @@ VALUES
 Install Vector:
 
 ```shell
-helm install vector timberio/vector-agent \
+helm install vector vector/vector-agent \
   --namespace vector \
   --create-namespace \
   --values values.yaml
@@ -63,7 +63,7 @@ helm install vector timberio/vector-agent \
 {{< tabs default="Upgrade Vector" >}}
 {{< tab title="Upgrade Vector" >}}
 ```shell
-helm repo update && helm upgrade --namespace vector vector timberio/vector-agent --reuse-values
+helm repo update && helm upgrade --namespace vector vector vector/vector-agent --reuse-values
 ```
 {{< /tab >}}
 {{< tab title="Uninstall Vector" >}}

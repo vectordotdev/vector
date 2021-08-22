@@ -22,12 +22,9 @@ components: sinks: vector: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
-			compression: enabled: false
-			encoding: {
-				enabled: true
-				codec: enabled: false
-			}
-			send_buffer_bytes: enabled: false
+			compression: enabled:       false
+			encoding: enabled:          false
+			send_buffer_bytes: enabled: true
 			keepalive: enabled:         true
 			request: enabled:           false
 			tls: {

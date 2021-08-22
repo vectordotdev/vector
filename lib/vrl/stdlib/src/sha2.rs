@@ -39,7 +39,7 @@ impl Function for Sha2 {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let variants = vec![
             value!("SHA-224"),
             value!("SHA-256"),

@@ -27,7 +27,7 @@
       {{ end }}
 
       {{ with $release.description }}
-      <div class="mt-8 prose dark:prose-dark">
+      <div class="mt-8 prose dark:prose-dark max-w-none">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -47,8 +47,10 @@
       {{ end }}
 
       {{ with $release.whats_next }}
-      <div class="mt-8 prose dark:prose-dark">
-        {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
+      <div class="mt-8">
+        <span class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
+        </span>
 
         <div class="mt-6 flex flex-col space-y-6">
           {{ range . }}
@@ -57,7 +59,7 @@
               {{ .title }}
             </span>
 
-            <div class="mt-2.5 prose dark:prose-dark">
+            <div class="mt-2.5 prose dark:prose-dark max-w-none">
               {{ .description | markdownify }}
             </div>
           </div>
@@ -69,7 +71,7 @@
       {{ with $release.commits }}
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark">
+        <div class="prose dark:prose-dark max-w-none">
           {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
         </div>
 
@@ -80,7 +82,7 @@
           {{ $numCommits := len $commits }}
           {{ $heading := printf "%d %s" $numCommits $v }}
           <div>
-            <div class="prose dark:prose-dark">
+            <div class="prose dark:prose-dark max-w-none">
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 

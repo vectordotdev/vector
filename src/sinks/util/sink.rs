@@ -197,6 +197,11 @@ where
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
+///
+/// # Ordering
+/// Per partition ordering can be achived by holding onto future of a request
+/// until it finishes. Until then all further requests in that partition are
+/// delayed.
 #[pin_project]
 pub struct PartitionBatchSink<S, B, K, SL>
 where
@@ -209,6 +214,7 @@ where
     partitions: HashMap<K, StatefulBatch<FinalizersBatch<B>>>,
     timeout: Duration,
     lingers: HashMap<K, Pin<Box<Sleep>>>,
+    in_flight: Option<HashMap<K, BoxFuture<'static, ()>>>,
     closing: bool,
 }
 
@@ -254,8 +260,14 @@ where
             partitions: HashMap::new(),
             timeout,
             lingers: HashMap::new(),
+            in_flight: None,
             closing: false,
         }
+    }
+
+    /// Enforces per partition ordering of request.
+    pub fn ordered(&mut self) {
+        self.in_flight = Some(HashMap::new());
     }
 }
 
@@ -325,7 +337,7 @@ where
             let this = self.as_mut().project();
             let mut partitions_ready = vec![];
             for (partition, batch) in this.partitions.iter() {
-                if (*this.closing && !batch.is_empty())
+                if ((*this.closing && !batch.is_empty())
                     || batch.was_full()
                     || matches!(
                         this.lingers
@@ -333,14 +345,20 @@ where
                             .expect("linger should exists for poll_flush")
                             .poll_unpin(cx),
                         Poll::Ready(())
-                    )
+                    ))
+                    && this
+                        .in_flight
+                        .as_mut()
+                        .and_then(|map| map.get_mut(partition))
+                        .map(|req| matches!(req.poll_unpin(cx), Poll::Ready(())))
+                        .unwrap_or(true)
                 {
                     partitions_ready.push(partition.clone());
                 }
             }
             let mut batch_consumed = false;
             for partition in partitions_ready.iter() {
-                let service_ready = match self.service.poll_ready(cx) {
+                let service_ready = match this.service.poll_ready(cx) {
                     Poll::Ready(Ok(())) => true,
                     Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                     Poll::Pending => false,
@@ -348,12 +366,16 @@ where
                 if service_ready {
                     trace!("Service ready; Sending batch.");
 
-                    let batch = self.partitions.remove(partition).unwrap();
-                    self.lingers.remove(partition);
+                    let batch = this.partitions.remove(partition).unwrap();
+                    this.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
                     let (batch, finalizers) = batch.finish();
-                    tokio::spawn(self.service.call(batch, batch_size, finalizers));
+                    let future = tokio::spawn(this.service.call(batch, batch_size, finalizers));
+
+                    if let Some(map) = this.in_flight.as_mut() {
+                        map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());
+                    }
 
                     batch_consumed = true;
                 } else {
@@ -362,6 +384,18 @@ where
             }
             if batch_consumed {
                 continue;
+            }
+
+            // Cleanup of in flight futures
+            if let Some(in_flight) = this.in_flight.as_mut() {
+                if in_flight.len() > this.partitions.len() {
+                    // There is at least one in flight future without a partition to check it
+                    // so we will do it here.
+                    let partitions = this.partitions;
+                    in_flight.retain(|partition, req| {
+                        partitions.contains_key(partition) || req.poll_unpin(cx).is_pending()
+                    });
+                }
             }
 
             // Try move item from buffer to batch.
@@ -1069,6 +1103,57 @@ mod tests {
         assert_eq!(ack_counter.load(Relaxed), 10);
     }
 
+    #[tokio::test]
+    async fn partition_batch_sink_ordering_per_partition() {
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let mut delay = true;
+        let svc = tower::service_fn(|req| {
+            let sent_requests = Arc::clone(&sent_requests);
+            if delay {
+                // Delay and then error
+                delay = false;
+                sleep(Duration::from_secs(1))
+                    .map(move |_| {
+                        sent_requests.lock().unwrap().push(req);
+                        Result::<_, std::io::Error>::Ok(())
+                    })
+                    .boxed()
+            } else {
+                sent_requests.lock().unwrap().push(req);
+                future::ok::<_, std::io::Error>(()).boxed()
+            }
+        });
+
+        let batch = BatchSettings::default().bytes(9999).events(10);
+        let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        sink.ordered();
+
+        let input = (0..20)
+            .into_iter()
+            .map(|i| (0, i))
+            .chain((0..20).into_iter().map(|i| (1, i)));
+        sink.sink_map_err(drop)
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .await
+            .unwrap();
+
+        let output = sent_requests.lock().unwrap();
+        // We sended '0' partition first and delayed sending only first request, first 10 events,
+        // which should delay sending the second batch of events in the same partition until
+        // the first one succeeds.
+        assert_eq!(
+            &*output,
+            &vec![
+                (0..10).into_iter().map(|i| (1, i)).collect::<Vec<_>>(),
+                (10..20).into_iter().map(|i| (1, i)).collect(),
+                (0..10).into_iter().map(|i| (0, i)).collect(),
+                (10..20).into_iter().map(|i| (0, i)).collect(),
+            ]
+        );
+    }
+
     #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
     enum Partitions {
         A,
@@ -1108,6 +1193,18 @@ mod tests {
     impl Partition<Bytes> for Vec<i32> {
         fn partition(&self) -> Bytes {
             "key".into()
+        }
+    }
+
+    impl Partition<Bytes> for (usize, usize) {
+        fn partition(&self) -> Bytes {
+            format!("{}", self.0).into()
+        }
+    }
+
+    impl EncodedLength for (usize, usize) {
+        fn encoded_length(&self) -> usize {
+            16
         }
     }
 }

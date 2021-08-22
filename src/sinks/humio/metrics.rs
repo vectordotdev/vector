@@ -1,6 +1,9 @@
 use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
+    config::{
+        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
+        TransformContext,
+    },
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
@@ -67,7 +70,11 @@ impl GenerateConfig for HumioMetricsConfig {
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut transform = self.transform.clone().build(&cx.globals).await?;
+        let mut transform = self
+            .transform
+            .clone()
+            .build(&TransformContext::new_with_globals(cx.globals.clone()))
+            .await?;
         let sink = HumioLogsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
