@@ -14,6 +14,7 @@ Library | Purpose
 [`vrl-diagnostic`](diagnostic) | Compiler and runtime error messages as well as runtime error logging
 [`vrl-parser`](parser) | The VRL parser uses an abstract syntax tree (AST) to convert VRL programs inside of Vector configurations into systems of expressions
 [`vrl-proptests`](proptests) | A collection of property-based tests for VRL parser
+[`vrl-shared`](shared) | The code shared between vrl-stdlib and main crate that depends on vrl in some way.
 [`vrl-stdlib`](stdlib) | The current standard library of VRL functions
 [`vrl-tests`](tests) |
 

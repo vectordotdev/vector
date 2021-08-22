@@ -8,6 +8,7 @@ license = "MPL-2.0"
 
 [dependencies]
 vrl = { path = "../core" }
+vrl-shared = { path = "../shared" }
 lookup = { path = "../../lookup" }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
 
