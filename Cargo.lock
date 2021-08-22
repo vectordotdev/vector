@@ -8487,6 +8487,7 @@ dependencies = [
  "vrl-cli",
  "vrl-compiler",
  "vrl-parser",
+ "vrl-shared",
  "vrl-stdlib",
  "walkdir",
  "warp",
@@ -8682,6 +8683,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "vrl-shared"
+version = "0.1.0"
+dependencies = [
+ "nom 6.1.2",
+ "shared",
+ "vrl-compiler",
+]
+
+[[package]]
 name = "vrl-stdlib"
 version = "0.1.0"
 dependencies = [
@@ -8718,6 +8728,7 @@ dependencies = [
  "url",
  "uuid",
  "vrl",
+ "vrl-shared",
  "woothee",
 ]
 
