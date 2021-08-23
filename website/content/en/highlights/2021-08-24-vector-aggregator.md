@@ -1,24 +1,27 @@
 ---
 date: "2021-08-24"
-title: "Moving the aggregator chart to public beta"
-description: "The Vector aggregator Helm chart is now publicly available"
+title: "Moving the Aggregator Helm Chart to public beta"
+description: "The Vector Aggregator Helm Chart is now publicly available"
 authors: ["spencergilbert"]
 pr_numbers: [8801]
 release: "0.16.0"
 hide_on_release_notes: false
 badges:
   type: "announcement"
-  platforms: ["helm"]
+  platforms: ["helm", "kubernetes"]
 ---
 
-We are happy to announce that our [`vector-aggregator`][chart] chart is now publicly available.
-While we continue to iterate on and make improvements to the chart, we feel it is ready to get
-wider feedback from the community at large.
+We're happy to announce that our [`vector-aggregator` Helm Chart][chart] is now
+in public beta! This chart has undergone rigorous testing with our internal
+design partners and is now ready for wider community feedback.
 
-We have also created a dedicated Discord channel, [#aggregator][discord], for support, questions,
-and feedback.
+## Getting Started
 
-## What is an aggregator
+* Follow the [Helm installation instructions][setup].
+* Checkout the [Helm chart][chart] for a full list of options.
+* Hop in our [#aggregator Discord channel][discord] for help.
+
+## What is an aggregator?
 
 When Vector is run in an [aggregator role][aggregator], it is used to transform and ship data
 collected by other agents. The core benefit of having distinct agents and aggregators is that
@@ -26,7 +29,8 @@ you can have a separation of concerns within an observability data processing pi
 can become much “thinner,” in some cases acting as pure pipes that collect from a source and
 ship downstream to aggregators, while aggregators perform the “thicker” work of ensuring that
 the data is scrubbed of sensitive information, properly formatted for downstream consumers,
-sampled to reduce volume, and more.
+sampled to reduce volume, and more. This is especially useful when inserting Vector into
+existing setups.
 
 The `vector-aggregator` chart deploys Vector as a StatefulSet, with the option of installing a
 HAProxy Deployment for load balancing across multiple aggregators.
@@ -46,3 +50,4 @@ on the bundled HAProxy deployment.
 [chart]: https://github.com/timberio/helm-charts/blob/master/charts/vector-aggregator
 [discord]: https://discord.gg/Ywcq9cWEPE
 [setup]: /docs/setup/installation/package-managers/helm/#aggregator
+[statefulset]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
