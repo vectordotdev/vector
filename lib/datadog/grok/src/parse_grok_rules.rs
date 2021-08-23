@@ -48,50 +48,39 @@ pub fn parse_grok_rules(
     helper_rules: &[String],
     parsing_rules: &[String],
 ) -> Result<Vec<GrokRule>, Error> {
-    let mut prev_rule_definitions: HashMap<&str, String> = HashMap::new();
-    let mut prev_rule_filters: HashMap<&str, HashMap<LookupBuf, Vec<GrokFilter>>> = HashMap::new();
+    let mut parsed_rules: HashMap<&str, ParsedGrokRule> = HashMap::new();
     let mut grok = initialize_grok();
 
     // parse helper rules to reference them later in the match rules
-    parse_rules(
-        helper_rules,
-        &mut prev_rule_definitions,
-        &mut prev_rule_filters,
-        &mut grok,
-    )?;
+    parse_rules(helper_rules, &mut parsed_rules, &mut grok)?;
     // parse match rules and return them
-    parse_rules(
-        parsing_rules,
-        &mut prev_rule_definitions,
-        &mut prev_rule_filters,
-        &mut grok,
-    )
+    parse_rules(parsing_rules, &mut parsed_rules, &mut grok)
 }
 
+/// The result of parsing grok rules - pure grok definitions, which can be feed directly to the grok,
+/// and rule filters to post-process extracted fields
+struct ParsedGrokRule {
+    pub definition: String,
+    pub filters: HashMap<LookupBuf, Vec<GrokFilter>>,
+}
+
+/// Parses a set of grok rules and collects parsed rules along the way,
+/// in case they are referenced in the next rules.
 fn parse_rules<'a>(
     parsing_rules: &'a [String],
-    mut prev_rule_definitions: &mut HashMap<&'a str, String>,
-    mut prev_rule_filters: &mut HashMap<&'a str, HashMap<LookupBuf, Vec<GrokFilter>>>,
+    mut parsed_rules: &mut HashMap<&'a str, ParsedGrokRule>,
     mut grok: &mut Grok,
 ) -> Result<Vec<GrokRule>, Error> {
     parsing_rules
         .iter()
         .filter(|&r| !r.is_empty())
-        .map(|r| {
-            parse_grok_rule(
-                r,
-                &mut prev_rule_definitions,
-                &mut prev_rule_filters,
-                &mut grok,
-            )
-        })
+        .map(|r| parse_grok_rule(r, &mut parsed_rules, &mut grok))
         .collect::<Result<Vec<GrokRule>, Error>>()
 }
 
 fn parse_grok_rule<'a>(
     rule: &'a str,
-    mut prev_rule_definitions: &mut HashMap<&'a str, String>,
-    mut prev_rule_filters: &mut HashMap<&'a str, HashMap<LookupBuf, Vec<GrokFilter>>>,
+    mut parsed_rules: &mut HashMap<&'a str, ParsedGrokRule>,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
     let mut split_whitespace = rule.splitn(2, ' ');
@@ -136,14 +125,7 @@ fn parse_grok_rule<'a>(
     let mut filters: HashMap<LookupBuf, Vec<GrokFilter>> = HashMap::new();
     let pure_grok_patterns: Vec<String> = grok_patterns
         .iter()
-        .map(|pattern| {
-            purify_grok_pattern(
-                &pattern,
-                &mut filters,
-                &mut prev_rule_filters,
-                &mut prev_rule_definitions,
-            )
-        })
+        .map(|pattern| purify_grok_pattern(&pattern, &mut filters, &mut parsed_rules))
         .collect::<Result<Vec<String>, Error>>()?;
 
     // replace grok patterns with "purified" ones
@@ -178,8 +160,13 @@ fn parse_grok_rule<'a>(
     pattern.push('$');
 
     // store rule definitions and filters in case this rule is referenced in the next rules
-    prev_rule_definitions.insert(rule_name, rule_def);
-    prev_rule_filters.insert(rule_name, filters.clone());
+    parsed_rules.insert(
+        rule_name,
+        ParsedGrokRule {
+            definition: rule_def,
+            filters: filters.clone(),
+        },
+    );
 
     let pattern = Arc::new(
         grok.compile(&pattern, true)
@@ -223,25 +210,26 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 }
 
 /// Converts each rule to a pure grok rule:
-///  - strips filters and "remembers" them to apply later
+///  - strips filters and collects them to apply later
 ///  - replaces references to previous rules with actual definitions
 ///  - replaces match functions with corresponding regex groups
 fn purify_grok_pattern(
     pattern: &GrokPattern,
     mut filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
-    prev_rule_filters: &mut HashMap<&str, HashMap<LookupBuf, Vec<GrokFilter>>>,
-    prev_rule_definitions: &mut HashMap<&str, String>,
+    parsed_rules: &mut HashMap<&str, ParsedGrokRule>,
 ) -> Result<String, Error> {
     let mut res = String::new();
-    if prev_rule_definitions.contains_key(pattern.match_fn.name.as_str()) {
+    if parsed_rules.contains_key(pattern.match_fn.name.as_str()) {
         // this is a reference to a previous rule - replace it and copy all destinations from the prev rule
         res.push_str(
-            prev_rule_definitions
+            parsed_rules
                 .get(pattern.match_fn.name.as_str())
-                .unwrap(),
+                .unwrap()
+                .definition
+                .as_str(),
         );
-        if let Some(d) = prev_rule_filters.get(pattern.match_fn.name.as_str()) {
-            d.iter().for_each(|(path, function)| {
+        if let Some(prev_rule) = parsed_rules.get(pattern.match_fn.name.as_str()) {
+            prev_rule.filters.iter().for_each(|(path, function)| {
                 filters.insert(path.to_owned(), function.to_owned());
             });
         }
