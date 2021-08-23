@@ -1,13 +1,15 @@
 use super::{filter_result_sync, FilterList, HostMetricsConfig};
 use crate::event::metric::Metric;
 use chrono::{DateTime, Utc};
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use shared::btreemap;
-use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self};
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use tokio::fs::{self, File};
+use tokio::io::AsyncReadExt;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 
@@ -27,85 +29,94 @@ impl HostMetricsConfig {
         let mut buffer = String::new();
         let mut output = Vec::new();
         if let Some(root) = CGroup::root(self.cgroups.base.as_deref()) {
-            self.recurse_cgroup(&mut output, now, root, 1, &mut buffer);
+            self.recurse_cgroup(&mut output, now, root, 1, &mut buffer)
+                .await;
         }
         output
     }
 
-    fn recurse_cgroup(
-        &self,
-        result: &mut Vec<Metric>,
+    fn recurse_cgroup<'a>(
+        &'a self,
+        result: &'a mut Vec<Metric>,
         now: DateTime<Utc>,
         cgroup: CGroup,
         level: usize,
-        buffer: &mut String,
-    ) {
-        let tags = btreemap! {
-            "cgroup" => cgroup.name.to_string_lossy(),
-            "collector" => "cgroups",
-        };
-        if let Some(cpu) = filter_result_sync(
-            cgroup.load_cpu(buffer),
-            "Failed to load/parse cgroups CPU statistics",
-        ) {
-            result.push(self.counter(
-                "cgroup_cpu_usage_seconds_total",
-                now,
-                cpu.usage_usec as f64 * MICROSECONDS,
-                tags.clone(),
-            ));
-            result.push(self.counter(
-                "cgroup_cpu_user_seconds_total",
-                now,
-                cpu.user_usec as f64 * MICROSECONDS,
-                tags.clone(),
-            ));
-            result.push(self.counter(
-                "cgroup_cpu_system_seconds_total",
-                now,
-                cpu.system_usec as f64 * MICROSECONDS,
-                tags.clone(),
-            ));
-        }
-
-        if !cgroup.is_root() {
-            if let Some(current) = filter_result_sync(
-                cgroup.load_memory_current(buffer),
-                "Failed to load/parse cgroups current memory",
+        buffer: &'a mut String,
+    ) -> BoxFuture<'a, ()> {
+        Box::pin(async move {
+            let tags = btreemap! {
+                "cgroup" => cgroup.name.to_string_lossy(),
+                "collector" => "cgroups",
+            };
+            if let Some(cpu) = filter_result_sync(
+                cgroup.load_cpu(buffer).await,
+                "Failed to load/parse cgroups CPU statistics",
             ) {
-                result.push(self.gauge(
-                    "cgroup_memory_current_bytes",
+                result.push(self.counter(
+                    "cgroup_cpu_usage_seconds_total",
                     now,
-                    current as f64,
+                    cpu.usage_usec as f64 * MICROSECONDS,
+                    tags.clone(),
+                ));
+                result.push(self.counter(
+                    "cgroup_cpu_user_seconds_total",
+                    now,
+                    cpu.user_usec as f64 * MICROSECONDS,
+                    tags.clone(),
+                ));
+                result.push(self.counter(
+                    "cgroup_cpu_system_seconds_total",
+                    now,
+                    cpu.system_usec as f64 * MICROSECONDS,
                     tags.clone(),
                 ));
             }
 
-            if let Some(stat) = filter_result_sync(
-                cgroup.load_memory_stat(buffer),
-                "Failed to load/parse cgroups memory statistics",
-            ) {
-                result.push(self.gauge(
-                    "cgroup_memory_anon_bytes",
-                    now,
-                    stat.anon as f64,
-                    tags.clone(),
-                ));
-                result.push(self.gauge("cgroup_memory_file_bytes", now, stat.file as f64, tags));
-            }
-        }
+            if !cgroup.is_root() {
+                if let Some(current) = filter_result_sync(
+                    cgroup.load_memory_current(buffer).await,
+                    "Failed to load/parse cgroups current memory",
+                ) {
+                    result.push(self.gauge(
+                        "cgroup_memory_current_bytes",
+                        now,
+                        current as f64,
+                        tags.clone(),
+                    ));
+                }
 
-        if level < self.cgroups.levels {
-            if let Some(children) =
-                filter_result_sync(cgroup.children(), "Failed to load cgroups children")
-            {
-                for child in children {
-                    if self.cgroups.groups.contains_path(Some(&child.name)) {
-                        self.recurse_cgroup(result, now, child, level + 1, buffer);
+                if let Some(stat) = filter_result_sync(
+                    cgroup.load_memory_stat(buffer).await,
+                    "Failed to load/parse cgroups memory statistics",
+                ) {
+                    result.push(self.gauge(
+                        "cgroup_memory_anon_bytes",
+                        now,
+                        stat.anon as f64,
+                        tags.clone(),
+                    ));
+                    result.push(self.gauge(
+                        "cgroup_memory_file_bytes",
+                        now,
+                        stat.file as f64,
+                        tags,
+                    ));
+                }
+            }
+
+            if level < self.cgroups.levels {
+                if let Some(children) =
+                    filter_result_sync(cgroup.children().await, "Failed to load cgroups children")
+                {
+                    for child in children {
+                        if self.cgroups.groups.contains_path(Some(&child.name)) {
+                            self.recurse_cgroup(result, now, child, level + 1, buffer)
+                                .await;
+                        }
                     }
                 }
             }
-        }
+        })
     }
 }
 
@@ -164,9 +175,12 @@ impl CGroup {
         self.name == Path::new("/")
     }
 
-    fn load_cpu(&self, buffer: &mut String) -> io::Result<CpuStat> {
+    async fn load_cpu(&self, buffer: &mut String) -> io::Result<CpuStat> {
         buffer.clear();
-        File::open(self.make_path("cpu.stat"))?.read_to_string(buffer)?;
+        File::open(self.make_path("cpu.stat"))
+            .await?
+            .read_to_string(buffer)
+            .await?;
         buffer.parse().map_err(map_parse_error)
     }
 
@@ -174,26 +188,35 @@ impl CGroup {
         join_path(&self.root, filename)
     }
 
-    fn load_memory_current(&self, buffer: &mut String) -> io::Result<u64> {
+    async fn load_memory_current(&self, buffer: &mut String) -> io::Result<u64> {
         buffer.clear();
-        File::open(self.make_path("memory.current"))?.read_to_string(buffer)?;
+        File::open(self.make_path("memory.current"))
+            .await?
+            .read_to_string(buffer)
+            .await?;
         buffer.trim().parse().map_err(map_parse_error)
     }
 
-    fn load_memory_stat(&self, buffer: &mut String) -> io::Result<MemoryStat> {
+    async fn load_memory_stat(&self, buffer: &mut String) -> io::Result<MemoryStat> {
         buffer.clear();
-        File::open(self.make_path("memory.stat"))?.read_to_string(buffer)?;
+        File::open(self.make_path("memory.stat"))
+            .await?
+            .read_to_string(buffer)
+            .await?;
         buffer.parse().map_err(map_parse_error)
     }
 
-    fn children(&self) -> io::Result<Vec<CGroup>> {
-        fs::read_dir(&self.root)?
-            .map(|result| {
-                result.map(|entry| (entry.path(), join_name(&self.name, entry.file_name())))
-            })
-            .filter(|result| !matches!(result.as_ref().map(|(path, _)| is_dir(path)), Ok(false)))
-            .map(|result| result.map(|(root, name)| CGroup { root, name }))
-            .collect()
+    async fn children(&self) -> io::Result<Vec<CGroup>> {
+        let mut result = Vec::new();
+        let mut dir = fs::read_dir(&self.root).await?;
+        while let Some(entry) = dir.next_entry().await? {
+            let root = entry.path();
+            if is_dir(&root) {
+                let name = join_name(&self.name, entry.file_name());
+                result.push(CGroup { root, name });
+            }
+        }
+        Ok(result)
     }
 }
 
@@ -243,13 +266,13 @@ fn map_parse_error(error: ParseIntError) -> io::Error {
 }
 
 fn is_dir(path: impl AsRef<Path>) -> bool {
-    fs::metadata(path.as_ref())
+    std::fs::metadata(path.as_ref())
         .map(|metadata| metadata.is_dir())
         .unwrap_or(false)
 }
 
 fn is_file(path: impl AsRef<Path>) -> bool {
-    fs::metadata(path.as_ref())
+    std::fs::metadata(path.as_ref())
         .map(|metadata| metadata.is_file())
         .unwrap_or(false)
 }
