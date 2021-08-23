@@ -25,20 +25,21 @@ impl HostMetricsConfig {
     pub async fn cgroups_metrics(&self) -> Vec<Metric> {
         let now = Utc::now();
         let mut buffer = String::new();
-        CGroup::root(self.cgroups.base.as_deref())
-            .map(|root| self.recurse_cgroup(now, root, 1, &mut buffer))
-            .unwrap_or_else(Vec::new)
+        let mut output = Vec::new();
+        if let Some(root) = CGroup::root(self.cgroups.base.as_deref()) {
+            self.recurse_cgroup(&mut output, now, root, 1, &mut buffer);
+        }
+        output
     }
 
     fn recurse_cgroup(
         &self,
+        result: &mut Vec<Metric>,
         now: DateTime<Utc>,
         cgroup: CGroup,
         level: usize,
         buffer: &mut String,
-    ) -> Vec<Metric> {
-        let mut result = Vec::new();
-
+    ) {
         let tags = btreemap! {
             "cgroup" => cgroup.name.to_string_lossy(),
             "collector" => "cgroups",
@@ -100,13 +101,11 @@ impl HostMetricsConfig {
             {
                 for child in children {
                     if self.cgroups.groups.contains_path(Some(&child.name)) {
-                        result.extend(self.recurse_cgroup(now, child, level + 1));
+                        self.recurse_cgroup(result, now, child, level + 1, buffer);
                     }
                 }
             }
         }
-
-        result
     }
 }
 
