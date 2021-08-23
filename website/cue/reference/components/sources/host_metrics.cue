@@ -119,7 +119,7 @@ components: sources: host_metrics: {
 		}
 		cgroups: {
 			common:      false
-			description: #"Options for the "cgroups" metrics collector. This collector is only available on Linux systems, as the cgroups (control groups) system is only present on Linux."#
+			description: #"Options for the "cgroups" metrics collector. This collector is only available on Linux systems, as the cgroups (control groups) system is only present on Linux, and only supports either version 2 or hybrid cgroups."#
 			required:    false
 			type: object: options: {
 				base: {
@@ -135,7 +135,7 @@ components: sources: host_metrics: {
 				groups: {
 					common:      false
 					required:    false
-					description: "Lists of device name patterns to include or exclude."
+					description: "Lists of group name patterns to include or exclude."
 					type: object: options: {
 						includes: {
 							required: false
