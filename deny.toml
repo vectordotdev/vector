@@ -54,4 +54,8 @@ ignore = [
     # Memory access due to code generation flaw in Cranelift module
     # https://github.com/timberio/vector/issues/7558
     "RUSTSEC-2021-0067",
+
+    # Optional `Deserialize` implementations lacking validation
+    # https://github.com/timberio/vector/issues/8838
+    "RUSTSEC-2021-0089",
 ]
