@@ -137,7 +137,16 @@ fn parse_grok_rule<'a>(
     grok_patterns
         .iter()
         .filter(|&rule| {
-            rule.destination.is_some() && rule.destination.as_ref().unwrap().filter_fn.is_some()
+            matches!(
+                rule,
+                GrokPattern {
+                    destination: Some(Destination {
+                        filter_fn: Some(_),
+                        ..
+                    }),
+                    ..
+                }
+            )
         })
         .map(|rule| {
             let dest = rule.destination.as_ref().unwrap();
