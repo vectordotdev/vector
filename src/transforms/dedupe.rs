@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, Value},
     internal_events::DedupeEventDiscarded,
@@ -79,7 +80,7 @@ impl GenerateConfig for DedupeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::task(Dedupe::new(self.clone())))
     }
 

@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        DataType, ExpandType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     transforms::Transform,
 };
@@ -29,7 +30,7 @@ impl GenerateConfig for CompoundConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "compound")]
 impl TransformConfig for CompoundConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Err("this transform must be expanded".into())
     }
 

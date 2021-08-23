@@ -100,9 +100,9 @@ dependencies = [
 
 [[package]]
 name = "arc-swap"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4d7d63395147b81a9e570bcc6243aaf71c017bd666d4909cfef0085bdda8d73"
+checksum = "e906254e445520903e7fc9da4f709886c84ae4bc4ddaf0e093188d66df4dc820"
 
 [[package]]
 name = "arrayref"
@@ -1821,7 +1821,7 @@ dependencies = [
  "bytes 1.0.1",
  "derivative 2.2.0",
  "grok",
- "itertools 0.10.1",
+ "itertools",
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
@@ -2790,6 +2790,12 @@ name = "half"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62aca2aba2d62b4a7f5b33f3712cb1b0692779a56fb510499d5c0aa594daeaf3"
+
+[[package]]
+name = "hash_hasher"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74721d007512d0cb3338cd20f0654ac913920061a4c4d0d8708edb3f2a698c0c"
 
 [[package]]
 name = "hashbag"
@@ -4768,9 +4774,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff27b33e30432e7b9854936693ca103d8591b0501f7ae9f633de48cda3bf2a67"
+checksum = "e1cf9b1c4e9a6c4de793c632496fa490bdc0e1eea73f0c91394f7b6990935d22"
 dependencies = [
  "async-trait",
  "crossbeam-channel 0.5.1",
@@ -4787,9 +4793,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-datadog"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f8691cf6ef48a74be14d40cf5748830d47df97d3d713c561f3354e8d38c41ab"
+checksum = "f0fc10293a7c94af4a2cb95a3427a7b8486be8ef5e2a630b85a08204c3ef67dd"
 dependencies = [
  "async-trait",
  "http",
@@ -4798,6 +4804,7 @@ dependencies = [
  "lazy_static",
  "opentelemetry",
  "opentelemetry-http",
+ "opentelemetry-semantic-conventions",
  "reqwest",
  "rmp",
  "thiserror",
@@ -4805,9 +4812,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-http"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1eeb0d4b230c69aa425f9c3aadf02ce7aa4b2bc9a4e9fbe59614108232078263"
+checksum = "d50ceb0b0e8b75cb3e388a2571a807c8228dabc5d6670f317b6eb21301095373"
 dependencies = [
  "async-trait",
  "bytes 1.0.1",
@@ -4815,6 +4822,15 @@ dependencies = [
  "http",
  "opentelemetry",
  "reqwest",
+]
+
+[[package]]
+name = "opentelemetry-semantic-conventions"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffeac823339e8b0f27b961f4385057bf9f97f2863bc745bd015fd6091f2270e9"
+dependencies = [
+ "opentelemetry",
 ]
 
 [[package]]
@@ -7509,9 +7525,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b7b349f11a7047e6d1276853e612d152f5e8a352c61917887cc2169e2366b4c"
+checksum = "01cf844b23c6131f624accf65ce0e4e9956a8bb329400ea5bcc26ae3a5c20b0b"
 dependencies = [
  "autocfg 1.0.1",
  "bytes 1.0.1",
@@ -7877,9 +7893,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-opentelemetry"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c47440f2979c4cd3138922840eec122e3c0ba2148bc290f756bd7fd60fc97fff"
+checksum = "599f388ecb26b28d9c1b2e4437ae019a7b336018b45ed911458cd9ebf91129f6"
 dependencies = [
  "opentelemetry",
  "tracing 0.1.26",
@@ -8298,6 +8314,7 @@ version = "0.16.0"
 dependencies = [
  "anyhow",
  "approx",
+ "arc-swap",
  "assert_cmd",
  "async-compression",
  "async-graphql",
@@ -8321,6 +8338,7 @@ dependencies = [
  "colored",
  "criterion",
  "crossterm",
+ "csv",
  "dashmap",
  "data-encoding",
  "datadog-search-syntax",
@@ -8340,6 +8358,7 @@ dependencies = [
  "goauth",
  "gouth",
  "grok",
+ "hash_hasher",
  "headers",
  "heim",
  "hostname",
@@ -8511,6 +8530,7 @@ dependencies = [
 name = "vector_core"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "async-graphql",
  "async-trait",
  "atomig",
@@ -8583,6 +8603,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 name = "vrl"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "bytes 1.0.1",
  "indoc",
  "lookup",
@@ -8618,6 +8639,7 @@ dependencies = [
 name = "vrl-compiler"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "bitflags",
  "bytes 1.0.1",
  "chrono",

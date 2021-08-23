@@ -72,6 +72,7 @@ default = [
     "format_int",
     "format_number",
     "format_timestamp",
+    "get_enrichment_table_record",
     "get_env_var",
     "get_hostname",
     "includes",
@@ -179,12 +180,14 @@ encode_logfmt = ["encode_key_value"]
 encode_percent = ["percent-encoding"]
 ends_with = []
 exists = []
+find_table_row = []
 flatten = []
 float = []
 floor = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
+get_enrichment_table_record = []
 get_env_var = []
 get_hostname = ["hostname"]
 includes = []

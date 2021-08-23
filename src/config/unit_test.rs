@@ -1,5 +1,7 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{self, ComponentId, ConfigPath, GlobalOptions, TransformConfig};
+use crate::config::{
+    self, ComponentId, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
+};
 use crate::{
     conditions::Condition,
     event::{Event, Value},
@@ -30,6 +32,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         #[cfg(feature = "api")]
         api: builder.api,
         healthchecks: builder.healthchecks,
+        enrichment_tables: builder.enrichment_tables,
         sources: builder.sources,
         sinks: builder.sinks,
         transforms: builder.transforms,
@@ -135,7 +138,7 @@ fn walk(
                 // TODO: This is a hack.
                 // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
                 transforms.insert(key, UnitTestTransform {
-                    transform:  futures::executor::block_on(target.config.clone().build(globals))
+                    transform:  futures::executor::block_on(target.config.clone().build(&TransformContext::new_with_globals(globals.clone())))
                         .expect("Failed to build a known valid transform config. Things may have changed during runtime."),
                     config: target.config,
                     next: target.next
@@ -454,11 +457,13 @@ async fn build_unit_test(
         &mut transform_outputs,
     );
 
+    let context = TransformContext::new_with_globals(config.global.clone());
+
     // Build reduced transforms.
     let mut transforms: IndexMap<ComponentId, UnitTestTransform> = IndexMap::new();
     for (id, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(id) {
-            match transform_config.inner.build(&config.global).await {
+            match transform_config.inner.build(&context).await {
                 Ok(transform) => {
                     transforms.insert(
                         id.clone(),
@@ -514,7 +519,7 @@ async fn build_unit_test(
                 .iter()
                 .enumerate()
             {
-                match cond_conf.build() {
+                match cond_conf.build(&Default::default()) {
                     Ok(c) => conditions.push(c),
                     Err(e) => errors.push(format!(
                         "failed to create test condition '{}': {}",
