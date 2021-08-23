@@ -434,12 +434,12 @@ components: sources: host_metrics: {
 		}
 
 		// Host cgroups
-		cgroups_cpu_usage:      _host & _cgroups_cpu & {description:    "The total amount CPU time used by this cgroup and its descendants, in seconds."}
-		cgroups_cpu_user:       _host & _cgroups_cpu & {description:    "The amount of CPU time spent in user space, in seconds."}
-		cgroups_cpu_system:     _host & _cgroups_cpu & {description:    "The amount of CPU time spent in system tasks, in seconds."}
-		cgroups_memory_current: _host & _cgroups_memory & {description: "The total amount of memory currently being used by the cgroup and its descendants, in bytes."}
-		cgroups_memory_anon:    _host & _cgroups_memory & {description: "The amount of memory used in anonymous mappings, in bytes."}
-		cgroups_memory_file:    _host & _cgroups_memory & {description: "The amount of memory used to cache filesystem data, including tmpfs and shared memory, in bytes."}
+		cgroup_cpu_usage_seconds_total:  _host & _cgroup_cpu & {description:    "The total amount CPU time used by this cgroup and its descendants, in seconds."}
+		cgroup_cpu_user_seconds_total:   _host & _cgroup_cpu & {description:    "The amount of CPU time spent in user space, in seconds."}
+		cgroup_cpu_system_seconds_total: _host & _cgroup_cpu & {description:    "The amount of CPU time spent in system tasks, in seconds."}
+		cgroup_memory_current_bytes:     _host & _cgroup_memory & {description: "The total amount of memory currently being used by the cgroup and its descendants, in bytes."}
+		cgroup_memory_anon_bytes:        _host & _cgroup_memory & {description: "The amount of memory used in anonymous mappings, in bytes."}
+		cgroup_memory_file_bytes:        _host & _cgroup_memory & {description: "The amount of memory used to cache filesystem data, including tmpfs and shared memory, in bytes."}
 
 		// Host disk
 		disk_read_bytes_total:       _host & _disk_counter & {description: "The accumulated number of bytes read in."}
@@ -497,14 +497,14 @@ components: sources: host_metrics: {
 			default_namespace: "host"
 		}
 
-		_cgroups_cpu: {
+		_cgroup_cpu: {
 			type: "counter"
 			tags: _host_metrics_tags & {
 				collector: examples: ["cgroups"]
 				cgroup: _cgroup_name
 			}
 		}
-		_cgroups_memory: {
+		_cgroup_memory: {
 			type: "gauge"
 			tags: _host_metrics_tags & {
 				collector: examples: ["cgroups"]

@@ -41,19 +41,19 @@ impl HostMetricsConfig {
             "Failed to load/parse cgroups CPU statistics",
         ) {
             result.push(self.counter(
-                "cgroups_cpu_usage",
+                "cgroup_cpu_usage_seconds_total",
                 now,
                 cpu.usage_usec as f64 * MICROSECONDS,
                 tags.clone(),
             ));
             result.push(self.counter(
-                "cgroups_cpu_user",
+                "cgroup_cpu_user_seconds_total",
                 now,
                 cpu.user_usec as f64 * MICROSECONDS,
                 tags.clone(),
             ));
             result.push(self.counter(
-                "cgroups_cpu_system",
+                "cgroup_cpu_system_seconds_total",
                 now,
                 cpu.system_usec as f64 * MICROSECONDS,
                 tags.clone(),
@@ -65,15 +65,25 @@ impl HostMetricsConfig {
                 cgroup.load_memory_current(),
                 "Failed to load/parse cgroups current memory",
             ) {
-                result.push(self.gauge("cgroup_memory_current", now, current as f64, tags.clone()));
+                result.push(self.gauge(
+                    "cgroup_memory_current_bytes",
+                    now,
+                    current as f64,
+                    tags.clone(),
+                ));
             }
 
             if let Some(stat) = filter_result_sync(
                 cgroup.load_memory_stat(),
                 "Failed to load/parse cgroups memory statistics",
             ) {
-                result.push(self.gauge("cgroup_memory_anon", now, stat.anon as f64, tags.clone()));
-                result.push(self.gauge("cgroup_memory_file", now, stat.file as f64, tags));
+                result.push(self.gauge(
+                    "cgroup_memory_anon_bytes",
+                    now,
+                    stat.anon as f64,
+                    tags.clone(),
+                ));
+                result.push(self.gauge("cgroup_memory_file_bytes", now, stat.file as f64, tags));
             }
         }
 
@@ -266,8 +276,8 @@ mod tests {
 
         assert!(!metrics.is_empty());
         assert_eq!(count_tag(&metrics, "cgroup"), metrics.len());
-        assert!(count_name(&metrics, "cgroups_cpu_usage") > 0);
-        assert!(count_name(&metrics, "cgroups_cpu_user") > 0);
-        assert!(count_name(&metrics, "cgroups_cpu_system") > 0);
+        assert!(count_name(&metrics, "cgroup_cpu_usage_seconds_total") > 0);
+        assert!(count_name(&metrics, "cgroup_cpu_user_seconds_total") > 0);
+        assert!(count_name(&metrics, "cgroup_cpu_system_seconds_total") > 0);
     }
 }
