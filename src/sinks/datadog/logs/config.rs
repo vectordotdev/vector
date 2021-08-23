@@ -10,6 +10,7 @@ use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
+use tower::ServiceBuilder;
 
 // What is important here? I have to have a solution that satisfies the
 // `BatchConfig` passed in. The final sink-type thing must fit into a
@@ -116,6 +117,8 @@ impl SinkConfig for DatadogLogsConfig {
         )?;
 
         let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = ServiceBuilder::new().concurrency_limit(100).service(client);
+
         // let healthcheck = healthcheck(
         //     service.clone(),
         //     client.clone(),

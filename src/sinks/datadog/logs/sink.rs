@@ -1,4 +1,3 @@
-use crate::http::HttpClient;
 use crate::sinks::datadog::logs::config::Encoding;
 use crate::sinks::util::buffer::GZIP_FAST;
 use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfiguration};
@@ -14,8 +13,9 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 use std::io::Write;
-use std::iter::FromIterator;
+use std::iter::Iterator;
 use tokio::time::{self, Duration};
+use tower::Service;
 use twox_hash::XxHash64;
 use vector_core::config::{log_schema, LogSchema};
 use vector_core::event::{Event, LogEvent, Value};
@@ -41,10 +41,16 @@ pub enum LogApiError {
 // LogSchema,
 }
 
-#[derive(Debug, Default)]
-pub struct LogApiBuilder {
+#[derive(Debug)]
+pub struct LogApiBuilder<Client>
+where
+    Client: Service<Request<Body>> + Send + Clone + Unpin,
+    Client::Future: Send,
+    Client::Response: Send,
+    Client::Error: Send,
+{
     encoding: EncodingConfigWithDefault<Encoding>,
-    http_client: Option<HttpClient>,
+    http_client: Option<Client>,
     datadog_uri: Option<Uri>,
     default_api_key: Option<Box<str>>,
     compression: Option<Compression>,
@@ -55,7 +61,36 @@ pub struct LogApiBuilder {
     log_schema_host_key: Option<&'static str>,
 }
 
-impl LogApiBuilder {
+impl<Client> Default for LogApiBuilder<Client>
+where
+    Client: Service<Request<Body>> + Send + Clone + Unpin,
+    Client::Future: Send,
+    Client::Response: Send,
+    Client::Error: Send,
+{
+    fn default() -> Self {
+        Self {
+            encoding: Default::default(),
+            http_client: None,
+            datadog_uri: None,
+            default_api_key: None,
+            compression: None,
+            timeout: None,
+            bytes_stored_limit: u64::max_value(),
+            log_schema_message_key: None,
+            log_schema_timestamp_key: None,
+            log_schema_host_key: None,
+        }
+    }
+}
+
+impl<Client> LogApiBuilder<Client>
+where
+    Client: Service<Request<Body>> + Send + Clone + Unpin,
+    Client::Future: Send,
+    Client::Response: Send,
+    Client::Error: Send,
+{
     pub fn log_schema(mut self, log_schema: &'static LogSchema) -> Self {
         self.log_schema_message_key = Some(log_schema.message_key());
         self.log_schema_timestamp_key = Some(log_schema.timestamp_key());
@@ -84,7 +119,7 @@ impl LogApiBuilder {
     //     self
     // }
 
-    pub fn http_client(mut self, client: HttpClient) -> Self {
+    pub fn http_client(mut self, client: Client) -> Self {
         self.http_client = Some(client);
         self
     }
@@ -99,7 +134,7 @@ impl LogApiBuilder {
         self
     }
 
-    pub fn build(self) -> Result<LogApi, BuildError> {
+    pub fn build(self) -> Result<LogApi<Client>, BuildError> {
         let mut key_slab = HashMap::default();
         let default_api_key = self.default_api_key.unwrap();
         let default_api_key_id = hash(&default_api_key);
@@ -131,7 +166,13 @@ impl LogApiBuilder {
 const MAX_PAYLOAD_ARRAY: usize = 1_000;
 
 #[derive(Debug)]
-pub struct LogApi {
+pub struct LogApi<Client>
+where
+    Client: Service<Request<Body>> + Send + Clone + Unpin,
+    Client::Future: Send,
+    Client::Response: Send,
+    Client::Error: Send,
+{
     /// The default Datadog API key to use
     ///
     /// In some instances an `Event` will come in on the stream with an
@@ -184,7 +225,7 @@ pub struct LogApi {
     /// applied.
     encoding: EncodingConfigWithDefault<Encoding>,
     /// The API http client
-    http_client: HttpClient,
+    http_client: Client,
     /// The URI of the Datadog API
     datadog_uri: Uri,
     /// The compression technique to use when sending requests to the Datadog
@@ -194,12 +235,17 @@ pub struct LogApi {
 
 #[derive(serde::Serialize)]
 struct Payload {
-    //     #[serde(flatten)]
     members: Vec<BTreeMap<String, Value>>,
 }
 
-impl LogApi {
-    pub fn new() -> LogApiBuilder {
+impl<Client> LogApi<Client>
+where
+    Client: Service<Request<Body>> + Send + Clone + Unpin,
+    Client::Future: Send,
+    Client::Response: Send,
+    Client::Error: Send,
+{
+    pub fn new() -> LogApiBuilder<Client> {
         LogApiBuilder::default().bytes_stored_limit(bytesize::mib(5_u32))
     }
 
@@ -249,7 +295,9 @@ impl LogApi {
     }
 
     /// Flush the `Event` batches out to Datadog API
-    async fn flush_to_api(&mut self) -> Result<(), ()> {
+    async fn flush_to_api<'a>(
+        self: &'a mut Self,
+    ) -> Result<impl Iterator<Item = Client::Future> + Send + 'a, ()> {
         // The Datadog API makes no claim on how many requests we can make at
         // one time. We rely on the http client to handle retries and what
         // not. This implementation stacks up futures for each key present in
@@ -260,50 +308,45 @@ impl LogApi {
         // through a vec but mixing ownership confused me greatly, since we need
         // to call back to `self` to flush the batch.
         let batches: Vec<(u64, Vec<Event>)> = self.event_batches.drain().collect();
-        let futures = batches.into_iter().map(|(api_key_id, batch)| {
-            let members: Vec<BTreeMap<String, Value>> = batch
-                .into_iter()
-                .map(|event| event.into_log())
-                .map(|log| log.into_parts().0)
-                .collect();
-            let payload = Payload { members };
-            let body: Vec<u8> = serde_json::to_vec(&payload).expect("failed to encode to json");
+        let futures = // : dyn Iterator<Item = Client::Future> =
+            batches.into_iter().map(move |(api_key_id, batch)| {
+                let members: Vec<BTreeMap<String, Value>> = batch
+                    .into_iter()
+                    .map(|event| event.into_log())
+                    .map(|log| log.into_parts().0)
+                    .collect();
+                let payload = Payload { members };
+                let body: Vec<u8> = serde_json::to_vec(&payload).expect("failed to encode to json");
 
-            let api_key = self
-                .key_slab
-                .get(&api_key_id)
-                .expect("impossible situation");
-            let request = Request::post(self.datadog_uri.clone())
-                .header("Content-Type", "application/json")
-                .header("DD-API-KEY", &api_key[..]);
-            let (request, encoded_body) = match self.compression {
-                Compression::None => (request, body),
-                Compression::Gzip(level) => {
-                    let level = level.unwrap_or(GZIP_FAST);
-                    let mut encoder = GzEncoder::new(
-                        Vec::with_capacity(body.len()),
-                        flate2::Compression::new(level as u32),
-                    );
+                let api_key = self.key_slab.get(&api_key_id).expect("impossible situation");
+                let request = Request::post(self.datadog_uri.clone())
+                    .header("Content-Type", "application/json")
+                    .header("DD-API-KEY", &api_key[..]);
+                let (request, encoded_body) = match self.compression {
+                    Compression::None => (request, body),
+                    Compression::Gzip(level) => {
+                        let level = level.unwrap_or(GZIP_FAST);
+                        let mut encoder = GzEncoder::new(
+                            Vec::with_capacity(body.len()),
+                            flate2::Compression::new(level as u32),
+                        );
 
-                    encoder.write_all(&body).expect("failed to write body");
-                    (
-                        request.header("Content-Encoding", "gzip"),
-                        encoder.finish().expect("failed to encode"),
-                    )
-                }
-            };
-            let request = request
-                .header("Content-Length", encoded_body.len())
-                .body(Body::from(encoded_body))
-                // .map_err(Into::into)
-                .expect("failed to make request");
+                        encoder.write_all(&body).expect("failed to write body");
+                        (
+                            request.header("Content-Encoding", "gzip"),
+                            encoder.finish().expect("failed to encode"),
+                        )
+                    }
+                };
+                let request = request
+                    .header("Content-Length", encoded_body.len())
+                    .body(Body::from(encoded_body))
+                    // .map_err(Into::into)
+                    .expect("failed to make request");
 
-            self.http_client.send(request)
-        });
-        let mut flushes = FuturesUnordered::from_iter(futures);
-        while let Some(_) = flushes.next().await {}
-
-        Ok(())
+                self.http_client.call(request)
+            });
+        Ok(futures)
     }
 }
 
@@ -324,7 +367,13 @@ fn rename_key(from_key: &'static str, to_key: &'static str, log: &mut LogEvent) 
 }
 
 #[async_trait]
-impl StreamSink for LogApi {
+impl<Client> StreamSink for LogApi<Client>
+where
+    Client: Service<Request<Body>> + Send + Clone + Unpin,
+    Client::Future: Send,
+    Client::Response: Send,
+    Client::Error: Send,
+{
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encoding = self.encoding.clone();
         let message_key = self.log_schema_message_key;
@@ -341,12 +390,16 @@ impl StreamSink for LogApi {
         });
 
         let mut interval = time::interval(self.timeout);
+        let mut flushes = FuturesUnordered::new();
         loop {
             // TODO the current ticking method does not take into account
             // flushing. That is, no matter what, we will always flush every
             // interval even if we just finished flushing.
             tokio::select! {
-                _ = interval.tick() => self.flush_to_api().await?,
+                _ = interval.tick() => flushes.extend(self.flush_to_api().await?),
+                Some(_) = flushes.next() => {
+                    // Nothing, intentionally. Maybe we do metrics here?
+                }
                 Some(event) = input.next() => {
                     let key_id = self.register_key_id(&event);
                     let event_size = event.size_of();
@@ -354,13 +407,13 @@ impl StreamSink for LogApi {
                         // We've gone over the bytes limit and must flush our
                         // batches. As a future optimization, since we haven't
                         // passed the timeout yet, we might consider only
-                        // flushing a single large batch. As of this writing the
+                        // flushing a single large batch. As of self writing the
                         // batch structure doesn't allow sorting by size so we
                         // just ship the whole thing.
-                        self.flush_to_api().await?;
+                        flushes.extend(self.flush_to_api().await?);
                     }
                     if !self.has_space(key_id) {
-                        self.flush_to_api().await?;
+                        flushes.extend(self.flush_to_api().await?);
                     }
                     self.store_event(key_id, event);
 
