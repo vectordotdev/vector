@@ -118,9 +118,13 @@ components: sources: host_metrics: {
 			}
 		}
 		cgroups: {
-			common:      false
-			description: #"Options for the "cgroups" metrics collector. This collector is only available on Linux systems, as the cgroups (control groups) system is only present on Linux, and only supports either version 2 or hybrid cgroups."#
-			required:    false
+			common: false
+			description: #"""
+				Options for the "cgroups" (controller groups) metrics collector.
+
+				Note: this collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
+				"""#
+			required: false
 			type: object: options: {
 				base: {
 					common:      false
