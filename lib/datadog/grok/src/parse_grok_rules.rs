@@ -129,9 +129,8 @@ fn parse_grok_rule<'a>(
         .collect::<Result<Vec<String>, Error>>()?;
 
     // replace grok patterns with "purified" ones
-    let mut pure_pattern_it = pure_grok_patterns.iter();
-    for r in raw_grok_patterns {
-        rule_def = rule_def.replacen(r, pure_pattern_it.next().unwrap().as_str(), 1);
+    for (r, pure) in raw_grok_patterns.iter().zip(pure_grok_patterns.iter()) {
+        rule_def = rule_def.replacen(r, pure.as_str(), 1);
     }
 
     // collect all filters to apply later
