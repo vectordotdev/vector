@@ -694,7 +694,7 @@ components: {
 
 			_proxy: {
 				common:      false
-				description: "Configures an HTTP(S) proxy for Vector to use."
+				description: "Configures an HTTP(S) proxy for Vector to use. By default, the globally configured proxy is used."
 				required:    false
 				type: object: options: {
 					enabled: {
@@ -724,9 +724,9 @@ components: {
 						}
 					}
 					no_proxy: {
-						common: false
+						common:      false
 						description: """
-							A list of hosts to avoid proxying globally. Allowed patterns here include:
+							A list of hosts to avoid proxying. Allowed patterns here include:
 
 							Pattern | Example match
 							:-------|:-------------
@@ -736,7 +736,7 @@ components: {
 							[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
 							Splat | `*` matches all hosts
 							"""
-						required: false
+						required:    false
 						type: array: {
 							default: null
 							items: type: string: {
