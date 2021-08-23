@@ -90,10 +90,10 @@ pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
-        let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
+    let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
 
     #[cfg(not(feature = "nightly"))]
-        let pkg_version = built_info::PKG_VERSION;
+    let pkg_version = built_info::PKG_VERSION;
 
     pkg_version
 }

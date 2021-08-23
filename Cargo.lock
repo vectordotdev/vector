@@ -1441,7 +1441,7 @@ dependencies = [
  "criterion-plot",
  "csv",
  "futures 0.3.16",
- "itertools",
+ "itertools 0.10.1",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -1464,7 +1464,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d00996de9f2f7559f7f4dc286073197f83e92256a59ed395f9aac01fe717da57"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.10.1",
 ]
 
 [[package]]
@@ -1821,7 +1821,7 @@ dependencies = [
  "bytes 1.0.1",
  "derivative 2.2.0",
  "grok",
- "itertools",
+ "itertools 0.10.1",
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
@@ -1843,7 +1843,7 @@ dependencies = [
 name = "datadog-search-syntax"
 version = "0.1.0"
 dependencies = [
- "itertools",
+ "itertools 0.10.1",
  "lazy_static",
  "ordered-float",
  "pest",
@@ -3401,6 +3401,15 @@ dependencies = [
 
 [[package]]
 name = "itertools"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69ddb889f9d0d08a67338271fa9b62996bc788c7796a5c18cf057420aaed5eaf"
@@ -3544,7 +3553,7 @@ dependencies = [
  "bit-set",
  "diff",
  "ena",
- "itertools",
+ "itertools 0.10.1",
  "lalrpop-util",
  "petgraph",
  "pico-args",
@@ -4825,7 +4834,7 @@ dependencies = [
  "async-trait",
  "http",
  "indexmap",
- "itertools",
+ "itertools 0.10.1",
  "lazy_static",
  "opentelemetry",
  "opentelemetry-http",
@@ -5234,7 +5243,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6e46ca79eb4e21e2ec14430340c71250ab69332abf85521c95d3a8bc336aa76"
 dependencies = [
  "difflib",
- "itertools",
+ "itertools 0.10.1",
  "predicates-core",
 ]
 
@@ -5371,9 +5380,9 @@ dependencies = [
  "indexmap",
  "nom 6.1.2",
  "num_enum",
- "prost",
- "prost-build",
- "prost-types",
+ "prost 0.8.0",
+ "prost-build 0.8.0",
+ "prost-types 0.8.0",
  "shared",
  "snafu",
 ]
@@ -5412,12 +5421,40 @@ dependencies = [
 
 [[package]]
 name = "prost"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e6984d2f1a23009bd270b8bb56d0926810a3d483f59c987d77969e9d8e840b2"
+dependencies = [
+ "bytes 1.0.1",
+ "prost-derive 0.7.0",
+]
+
+[[package]]
+name = "prost"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de5e2533f59d08fcf364fd374ebda0692a70bd6d7e66ef97f306f45c6c5d8020"
 dependencies = [
  "bytes 1.0.1",
- "prost-derive",
+ "prost-derive 0.8.0",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32d3ebd75ac2679c2af3a92246639f9fcc8a442ee420719cc4fe195b98dd5fa3"
+dependencies = [
+ "bytes 1.0.1",
+ "heck",
+ "itertools 0.9.0",
+ "log",
+ "multimap",
+ "petgraph",
+ "prost 0.7.0",
+ "prost-types 0.7.0",
+ "tempfile",
+ "which 4.1.0",
 ]
 
 [[package]]
@@ -5428,14 +5465,27 @@ checksum = "355f634b43cdd80724ee7848f95770e7e70eefa6dcf14fea676216573b8fd603"
 dependencies = [
  "bytes 1.0.1",
  "heck",
- "itertools",
+ "itertools 0.10.1",
  "log",
  "multimap",
  "petgraph",
- "prost",
- "prost-types",
+ "prost 0.8.0",
+ "prost-types 0.8.0",
  "tempfile",
  "which 4.1.0",
+]
+
+[[package]]
+name = "prost-derive"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "169a15f3008ecb5160cba7d37bcd690a7601b6d30cfb87a117d45e59d52af5d4"
+dependencies = [
+ "anyhow",
+ "itertools 0.9.0",
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "syn 1.0.72",
 ]
 
 [[package]]
@@ -5445,10 +5495,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "600d2f334aa05acb02a755e217ef1ab6dea4d51b58b7846588b747edec04efba"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.1",
  "proc-macro2 1.0.26",
  "quote 1.0.9",
  "syn 1.0.72",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b518d7cdd93dab1d1122cf07fa9a60771836c668dde9d9e2a139f957f0d9f1bb"
+dependencies = [
+ "bytes 1.0.1",
+ "prost 0.7.0",
 ]
 
 [[package]]
@@ -5458,7 +5518,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "603bbd6394701d13f3f25aada59c7de9d35a6a5887cfc156181234a44002771b"
 dependencies = [
  "bytes 1.0.1",
- "prost",
+ "prost 0.8.0",
 ]
 
 [[package]]
@@ -5478,9 +5538,9 @@ dependencies = [
  "native-tls",
  "nom 7.0.0-alpha1",
  "pem",
- "prost",
- "prost-build",
- "prost-derive",
+ "prost 0.8.0",
+ "prost-build 0.8.0",
+ "prost-derive 0.8.0",
  "rand 0.8.4",
  "regex",
  "tokio",
@@ -6819,9 +6879,9 @@ dependencies = [
 
 [[package]]
 name = "shadow-rs"
-version = "0.6.12"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e38b2f0aa94b0fa19fe2098feae5c4002d554a0299f4d99912a0cf1b4bb73043"
+checksum = "3ca10942770d8f21d47e4c4a270bdb9d20a9cb723aa6b672a14cba9f49920fad"
 dependencies = [
  "chrono",
  "git2",
@@ -7749,8 +7809,8 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project 1.0.8",
- "prost",
- "prost-derive",
+ "prost 0.8.0",
+ "prost-derive 0.8.0",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -7764,12 +7824,12 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.5.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d12faebbe071b06f486be82cc9318350814fdd07fcb28f3690840cd770599283"
+checksum = "c695de27302f4697191dda1c7178131a8cb805463dda02864acb80fe1322fdcf"
 dependencies = [
  "proc-macro2 1.0.26",
- "prost-build",
+ "prost-build 0.7.0",
  "quote 1.0.9",
  "syn 1.0.72",
 ]
@@ -8406,7 +8466,7 @@ dependencies = [
  "indoc",
  "infer",
  "inventory",
- "itertools",
+ "itertools 0.10.1",
  "k8s-openapi",
  "lazy_static",
  "libc",
@@ -8446,9 +8506,9 @@ dependencies = [
  "postgres-openssl",
  "pretty_assertions",
  "prometheus-parser",
- "prost",
- "prost-build",
- "prost-types",
+ "prost 0.8.0",
+ "prost-build 0.7.0",
+ "prost-types 0.8.0",
  "pulsar",
  "quickcheck",
  "rand 0.8.4",
@@ -8595,9 +8655,9 @@ dependencies = [
  "pest_derive",
  "pin-project 1.0.8",
  "pretty_assertions",
- "prost",
- "prost-build",
- "prost-types",
+ "prost 0.8.0",
+ "prost-build 0.8.0",
+ "prost-types 0.8.0",
  "quickcheck",
  "regex",
  "serde",
