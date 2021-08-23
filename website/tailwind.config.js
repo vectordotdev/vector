@@ -68,6 +68,10 @@ module.exports = {
             'a code': {
               'color': 'inherit'
             },
+            'ul > li >': {
+              '*:first-child, *:last-child': {
+                margin: 0              }
+            },
             // Spacing between certain shortcode combinations
             '.admonition + .tabs, .svg + .admonition, .highlight + p': {
               'margin-top': '1rem',
