@@ -3,7 +3,7 @@ FROM debian:bullseye-slim AS builder
 COPY vector-*.deb ./
 RUN dpkg -i vector-*-$(dpkg --print-architecture).deb
 
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 
 RUN apt-get update && apt-get install -y ca-certificates tzdata systemd && rm -rf /var/lib/apt/lists/*
 
