@@ -9,6 +9,8 @@ use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
+
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(default)]
@@ -41,19 +43,19 @@ impl HostMetricsConfig {
             result.push(self.counter(
                 "cgroups_cpu_usage",
                 now,
-                cpu.usage_usec as f64 / 1_000_000.0,
+                cpu.usage_usec as f64 * MICROSECONDS,
                 tags.clone(),
             ));
             result.push(self.counter(
                 "cgroups_cpu_user",
                 now,
-                cpu.user_usec as f64 / 1_000_000.0,
+                cpu.user_usec as f64 * MICROSECONDS,
                 tags.clone(),
             ));
             result.push(self.counter(
                 "cgroups_cpu_system",
                 now,
-                cpu.system_usec as f64 / 1_000_000.0,
+                cpu.system_usec as f64 * MICROSECONDS,
                 tags.clone(),
             ));
         }
