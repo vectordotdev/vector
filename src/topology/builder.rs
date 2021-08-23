@@ -272,7 +272,9 @@ pub async fn build_pieces(
 
         let task = Task::new(id.clone(), typetag, sink);
 
-        let component_id = id.to_string();
+        let component_name = id.to_string();
+        let component_id = id.id().to_string();
+        let component_scope = id.scope().to_string();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -289,8 +291,9 @@ pub async fn build_pieces(
                                 component_kind = "sink",
                                 component_type = typetag,
                                 %component_id,
+                                %component_scope,
                                 // maintained for compatibility
-                                component_name = %component_id,
+                                %component_name,
                             );
                             Err(())
                         }
@@ -300,8 +303,9 @@ pub async fn build_pieces(
                                 component_kind = "sink",
                                 component_type = typetag,
                                 %component_id,
+                                %component_scope,
                                 // maintained for compatibility
-                                component_name = %component_id,
+                                %component_name,
                             );
                             Err(())
                         }

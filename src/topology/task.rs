@@ -60,7 +60,8 @@ impl Future for Task {
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
-            .field("id", &self.id.to_string())
+            .field("id", &self.id.id())
+            .field("scope", &self.id.scope())
             .field("typetag", &self.typetag)
             .finish()
     }

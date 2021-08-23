@@ -511,13 +511,17 @@ impl RunningTopology {
 
     fn spawn_sink(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
+        let component_name = id.to_string();
+        let component_id = id.id().to_string();
+        let component_scope = id.scope().to_string();
         let span = error_span!(
             "sink",
-            component_id = %task.id(),
+            %component_id,
+            %component_scope,
             component_kind = "sink",
             component_type = %task.typetag(),
             // maintained for compatibility
-            component_name = %task.id(),
+            %component_name,
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
@@ -528,13 +532,17 @@ impl RunningTopology {
 
     fn spawn_transform(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
+        let component_name = id.to_string();
+        let component_id = id.id().to_string();
+        let component_scope = id.scope().to_string();
         let span = error_span!(
             "transform",
             component_kind = "transform",
-            component_id = %task.id(),
+            %component_id,
+            %component_scope,
             component_type = %task.typetag(),
             // maintained for compatibility
-            component_name = %task.id(),
+            %component_name,
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task);
@@ -545,13 +553,17 @@ impl RunningTopology {
 
     fn spawn_source(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
+        let component_name = id.to_string();
+        let component_id = id.id().to_string();
+        let component_scope = id.scope().to_string();
         let span = error_span!(
             "source",
             component_kind = "source",
-            component_id = %task.id(),
+            %component_id,
+            %component_scope,
             component_type = %task.typetag(),
             // maintained for compatibility
-            component_name = %task.id(),
+            %component_name,
         );
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task);

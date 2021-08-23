@@ -13,6 +13,15 @@ pub enum ComponentScope {
     Pipeline(String),
 }
 
+impl fmt::Display for ComponentScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Global => write!(f, "global"),
+            Self::Pipeline(name) => write!(f, "pipeline:{}", name),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentId {
     id: String,
@@ -43,6 +52,10 @@ impl ComponentId {
             ComponentScope::Pipeline(ref value) => Some(value.as_str()),
             _ => None,
         }
+    }
+
+    pub fn scope(&self) -> &ComponentScope {
+        &self.scope
     }
 
     pub fn into_pipeline(self, id: &str) -> Self {
@@ -194,5 +207,14 @@ mod tests {
         let mut list = vec![&foo_baz, &yolo_bar, &global_baz, &foo_bar];
         list.sort();
         assert_eq!(list, vec![&global_baz, &foo_bar, &foo_baz, &yolo_bar]);
+    }
+
+    #[test]
+    fn display_scope() {
+        assert_eq!(format!("{}", ComponentScope::Global), "global");
+        assert_eq!(
+            format!("{}", ComponentScope::Pipeline("boo".into())),
+            "pipeline:boo"
+        );
     }
 }
