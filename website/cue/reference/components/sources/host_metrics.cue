@@ -439,11 +439,11 @@ components: sources: host_metrics: {
 
 		// Host cgroups
 		cgroup_cpu_usage_seconds_total:  _host & _cgroup_cpu & {description:    "The total amount CPU time used by this cgroup and its descendants, in seconds."}
-		cgroup_cpu_user_seconds_total:   _host & _cgroup_cpu & {description:    "The amount of CPU time spent in user space, in seconds."}
-		cgroup_cpu_system_seconds_total: _host & _cgroup_cpu & {description:    "The amount of CPU time spent in system tasks, in seconds."}
-		cgroup_memory_current_bytes:     _host & _cgroup_memory & {description: "The total amount of memory currently being used by the cgroup and its descendants, in bytes."}
-		cgroup_memory_anon_bytes:        _host & _cgroup_memory & {description: "The amount of memory used in anonymous mappings, in bytes."}
-		cgroup_memory_file_bytes:        _host & _cgroup_memory & {description: "The amount of memory used to cache filesystem data, including tmpfs and shared memory, in bytes."}
+		cgroup_cpu_user_seconds_total:   _host & _cgroup_cpu & {description:    "The total amount of CPU time spent by this cgroup in user space, in seconds."}
+		cgroup_cpu_system_seconds_total: _host & _cgroup_cpu & {description:    "The total amount of CPU time spent by this cgroup in system tasks, in seconds."}
+		cgroup_memory_current_bytes:     _host & _cgroup_memory & {description: "The total amount of memory currently being used by this cgroup and its descendants, in bytes."}
+		cgroup_memory_anon_bytes:        _host & _cgroup_memory & {description: "The total amount of memory used by this cgroup in anonymous mappings (normal program allocation), in bytes."}
+		cgroup_memory_file_bytes:        _host & _cgroup_memory & {description: "The total amount of memory used by this cgroup to cache filesystem data, including tmpfs and shared memory, in bytes."}
 
 		// Host disk
 		disk_read_bytes_total:       _host & _disk_counter & {description: "The accumulated number of bytes read in."}
