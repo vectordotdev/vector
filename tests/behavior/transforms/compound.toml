@@ -7,16 +7,14 @@ inputs = []
 [transforms.simple_compound]
 type = "compound"
 inputs = ["start"]
-    [transforms.simple_compound.nested.step1]
+    [[transforms.simple_compound.steps]]
     type = "add_fields"
-    [transforms.simple_compound.nested.step1.fields]
-        foo = "bar"
-        foobar = "baz"
-    [transforms.simple_compound.nested.step2]
+    fields.foo = "bar"
+    fields.foobar = "baz"
+    [[transforms.simple_compound.steps]]
     type = "add_fields"
-    [transforms.simple_compound.nested.step2.fields]
-        foo = "barbaz"
-        foobarbaz = "qux"
+    fields.foo = "barbaz"
+    fields.foobarbaz = "qux"
 
 [[tests]]
     name = "successful test"
