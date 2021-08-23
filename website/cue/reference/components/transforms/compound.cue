@@ -44,7 +44,7 @@ components: transforms: compound: {
 			required: true
 			warnings: []
 			type: array: {
-				type: object: {
+				items: type: object: {
 					options: {
 						id: {
 							common:      true
