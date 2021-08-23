@@ -111,25 +111,47 @@ struct CGroup {
 
 impl CGroup {
     fn root<P: AsRef<Path>>(base_group: Option<P>) -> Option<CGroup> {
+        // There are three standard possibilities for cgroups setups
+        // (`BASE` below is normally `/sys/fs/cgroup`, but containers
+        // sometimes have `/sys` mounted elsewhere):
+        // 1. Legacy v1 cgroups mounted at `BASE`
+        // 2. Modern v2 cgroups mounted at `BASE`
+        // 3. Hybrid cgroups, with v1 mounted at `BASE` and v2 mounted at `BASE/unified`.
+        //
+        // The `unified` directory only exists if cgroups is operating
+        // in "hybrid" mode. Similarly, v2 cgroups will always have a
+        // file named `cgroup.procs` in the base directory, and that
+        // file is never present in v1 cgroups. By testing for either
+        // the hybrid directory or the base file, we can uniquely
+        // identify the current operating mode and, critically, the
+        // location of the v2 cgroups root directory.
+        //
+        // Within that v2 root directory, each cgroup is a subdirectory
+        // named for the cgroup identifier. Each group, including the
+        // root, contains a set of files representing the controllers
+        // for that group.
+
         let base_dir = join_path(heim::os::linux::sysfs_root(), "fs/cgroup");
-        let root = join_path(&base_dir, "unified");
-        is_dir(&root)
-            .then(|| root)
-            .or_else(|| is_file(join_path(&base_dir, "cgroup.procs")).then(|| base_dir))
-            .and_then(|root| match base_group {
-                Some(group) => {
-                    let group = group.as_ref();
-                    let root = join_path(root, group);
-                    is_dir(&root).then(|| CGroup {
-                        root,
-                        name: group.into(),
-                    })
-                }
-                None => Some(CGroup {
+        let hybrid_root = join_path(&base_dir, "unified");
+
+        let base_dir = is_dir(&hybrid_root)
+            .then(|| hybrid_root)
+            .or_else(|| is_file(join_path(&base_dir, "cgroup.procs")).then(|| base_dir));
+
+        base_dir.and_then(|root| match base_group {
+            Some(group) => {
+                let group = group.as_ref();
+                let root = join_path(root, group);
+                is_dir(&root).then(|| CGroup {
                     root,
-                    name: "/".into(),
-                }),
-            })
+                    name: group.into(),
+                })
+            }
+            None => Some(CGroup {
+                root,
+                name: "/".into(),
+            }),
+        })
     }
 
     fn is_root(&self) -> bool {
