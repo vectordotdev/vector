@@ -134,33 +134,24 @@ fn parse_grok_rule<'a>(
     }
 
     // collect all filters to apply later
-    grok_patterns
-        .iter()
-        .filter(|&rule| {
-            matches!(
-                rule,
-                GrokPattern {
-                    destination: Some(Destination {
-                        filter_fn: Some(_),
-                        ..
-                    }),
+    for pattern in grok_patterns {
+        if let GrokPattern {
+            destination:
+                Some(Destination {
+                    filter_fn: Some(ref filter),
                     ..
-                }
-            )
-        })
-        .map(|rule| {
-            let dest = rule.destination.as_ref().unwrap();
+                }),
+            ..
+        } = pattern
+        {
+            let dest = pattern.destination.as_ref().unwrap();
             let filter = GrokFilter::try_from(dest.filter_fn.as_ref().unwrap())?;
-            Ok((dest, filter))
-        })
-        .collect::<Result<Vec<_>, Error>>()?
-        .iter()
-        .for_each(|(dest, filter)| {
             filters
                 .entry(dest.path.clone())
                 .and_modify(|v| v.push(filter.clone()))
                 .or_insert_with(|| vec![filter.clone()]);
-        });
+        }
+    }
 
     let mut pattern = String::new();
     pattern.push('^');
