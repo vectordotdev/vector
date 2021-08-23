@@ -64,7 +64,7 @@ The `echo` statement sends a single log to Vector via stdin. The `vector...` com
 
 The event we've just sent is received by our `sources.in` component, then sent onto the `sinks.out` component, which in turn echoes it back to the console:
 
-```
+```shell
 ... some logs ...
 Hello World!
 ```
