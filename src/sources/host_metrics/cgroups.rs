@@ -24,12 +24,19 @@ pub(super) struct CgroupsConfig {
 impl HostMetricsConfig {
     pub async fn cgroups_metrics(&self) -> Vec<Metric> {
         let now = Utc::now();
+        let mut buffer = String::new();
         CGroup::root(self.cgroups.base.as_deref())
-            .map(|root| self.recurse_cgroup(now, root, 1))
+            .map(|root| self.recurse_cgroup(now, root, 1, &mut buffer))
             .unwrap_or_else(Vec::new)
     }
 
-    fn recurse_cgroup(&self, now: DateTime<Utc>, cgroup: CGroup, level: usize) -> Vec<Metric> {
+    fn recurse_cgroup(
+        &self,
+        now: DateTime<Utc>,
+        cgroup: CGroup,
+        level: usize,
+        buffer: &mut String,
+    ) -> Vec<Metric> {
         let mut result = Vec::new();
 
         let tags = btreemap! {
@@ -37,7 +44,7 @@ impl HostMetricsConfig {
             "collector" => "cgroups",
         };
         if let Some(cpu) = filter_result_sync(
-            cgroup.load_cpu(),
+            cgroup.load_cpu(buffer),
             "Failed to load/parse cgroups CPU statistics",
         ) {
             result.push(self.counter(
@@ -62,7 +69,7 @@ impl HostMetricsConfig {
 
         if !cgroup.is_root() {
             if let Some(current) = filter_result_sync(
-                cgroup.load_memory_current(),
+                cgroup.load_memory_current(buffer),
                 "Failed to load/parse cgroups current memory",
             ) {
                 result.push(self.gauge(
@@ -74,7 +81,7 @@ impl HostMetricsConfig {
             }
 
             if let Some(stat) = filter_result_sync(
-                cgroup.load_memory_stat(),
+                cgroup.load_memory_stat(buffer),
                 "Failed to load/parse cgroups memory statistics",
             ) {
                 result.push(self.gauge(
@@ -158,27 +165,26 @@ impl CGroup {
         self.name == Path::new("/")
     }
 
-    fn load_cpu(&self) -> io::Result<CpuStat> {
-        let mut data = String::new();
-        File::open(self.make_path("cpu.stat"))?.read_to_string(&mut data)?;
-        data.parse()
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    fn load_cpu(&self, buffer: &mut String) -> io::Result<CpuStat> {
+        buffer.clear();
+        File::open(self.make_path("cpu.stat"))?.read_to_string(buffer)?;
+        buffer.parse().map_err(map_parse_error)
     }
 
     fn make_path(&self, filename: impl AsRef<Path>) -> PathBuf {
         join_path(&self.root, filename)
     }
 
-    fn load_memory_current(&self) -> io::Result<u64> {
-        let mut current = String::new();
-        File::open(self.make_path("memory.current"))?.read_to_string(&mut current)?;
-        current.trim().parse().map_err(map_parse_error)
+    fn load_memory_current(&self, buffer: &mut String) -> io::Result<u64> {
+        buffer.clear();
+        File::open(self.make_path("memory.current"))?.read_to_string(buffer)?;
+        buffer.trim().parse().map_err(map_parse_error)
     }
 
-    fn load_memory_stat(&self) -> io::Result<MemoryStat> {
-        let mut data = String::new();
-        File::open(self.make_path("memory.stat"))?.read_to_string(&mut data)?;
-        data.parse().map_err(map_parse_error)
+    fn load_memory_stat(&self, buffer: &mut String) -> io::Result<MemoryStat> {
+        buffer.clear();
+        File::open(self.make_path("memory.stat"))?.read_to_string(buffer)?;
+        buffer.parse().map_err(map_parse_error)
     }
 
     fn children(&self) -> io::Result<Vec<CGroup>> {
