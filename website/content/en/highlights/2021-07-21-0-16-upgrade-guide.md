@@ -15,6 +15,7 @@ Vector's 0.16.0 release includes three **breaking changes**:
 1. [Component name field renamed to ID](#name-to-id)
 1. [Datadog Log sink encoding option removed](#encoding)
 1. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
+1. `datadog_logs` source renamed to `datadog_agent`
 
 And one **deprecation**:
 
