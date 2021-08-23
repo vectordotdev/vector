@@ -4145,6 +4145,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "minimal-lexical"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6595bb28ed34f43c3fe088e48f6cfb2e033cab45f25a5384d5fdf564fbc8c4b2"
+
+[[package]]
 name = "minisign"
 version = "0.5.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4487,11 +4493,12 @@ dependencies = [
 
 [[package]]
 name = "nom"
-version = "7.0.0-alpha1"
+version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd43cd1e53168596e629accc602ada1297f5125fed588d62cf8be81175b46002"
+checksum = "7ffd9d26838a953b4af82cbeb9f1592c6798916983959be223a7124e992742c1"
 dependencies = [
  "memchr",
+ "minimal-lexical",
  "version_check 0.9.3",
 ]
 
@@ -5344,7 +5351,7 @@ name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
  "indexmap",
- "nom 6.1.2",
+ "nom 7.0.0",
  "num_enum",
  "prost",
  "prost-build",
@@ -5451,7 +5458,7 @@ dependencies = [
  "futures-timer",
  "log",
  "native-tls",
- "nom 7.0.0-alpha1",
+ "nom 7.0.0",
  "pem",
  "prost",
  "prost-build",
@@ -6809,7 +6816,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "derivative 2.2.0",
- "nom 6.1.2",
+ "nom 7.0.0",
  "serde",
  "snafu",
  "tracing 0.1.26",
@@ -8393,7 +8400,7 @@ dependencies = [
  "mongodb",
  "nix 0.22.1",
  "no-proxy",
- "nom 6.1.2",
+ "nom 7.0.0",
  "notify",
  "num-format",
  "num_cpus",
@@ -8701,7 +8708,7 @@ dependencies = [
  "lazy_static",
  "lookup",
  "md-5",
- "nom 6.1.2",
+ "nom 7.0.0",
  "percent-encoding",
  "regex",
  "roxmltree",
