@@ -198,7 +198,7 @@ cli: {
 
 				Example:
 
-				```
+				```shell
 				vector graph --config /etc/vector/vector.toml | dot -Tsvg > graph.svg
 				```
 
