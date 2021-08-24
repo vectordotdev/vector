@@ -148,7 +148,7 @@ helm upgrade vector vector/vector-aggregator \
 To uninstall the Vector helm chart:
 
 ```shell
-helm uninstall vector --namespace vector 
+helm uninstall vector --namespace vector
 ```
 
 ## Management
@@ -160,5 +160,5 @@ helm uninstall vector --namespace vector
 [Agent]: /docs/setup/deployment/roles/#agent
 [sources]: /docs/reference/configuration/sources/
 [sinks]: /docs/reference/configuration/sinks/
-[Aggregator]: /docs/setup/deployment/roles/#aggregator 
+[Aggregator]: /docs/setup/deployment/roles/#aggregator
 [transform]: /docs/reference/configuration/transforms/
