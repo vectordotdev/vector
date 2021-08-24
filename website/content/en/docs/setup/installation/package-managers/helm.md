@@ -18,7 +18,7 @@ Helm support for the [aggregator] role is currently in public beta. We're seekin
 If you haven't already, start by adding the Vector repo:
 
 ```shell
-helm repo add timberio https://packages.timber.io/helm/latest
+helm repo add vector https://helm.vector.dev
 helm repo update
 ```
 
@@ -31,7 +31,7 @@ The Vector [Agent] lets you collect data from your [sources] and then deliver it
 To check available Helm chart configuration options:
 
 ```shell
-helm show values timberio/vector-agent
+helm show values vector/vector-agent
 ```
 
 This example configuration file lets you use Vector as an Agent to send logs to standard output. For more information about configuration options, see the [configuration] docs page.
@@ -58,7 +58,7 @@ VALUES
 Once you add the Vector Helm repo, and added a Vector configuration file, install the Vector Agent:
 
 ```shell
-helm install vector timberio/vector-agent \
+helm install vector vector/vector-agent \
   --namespace vector \
   --create-namespace \
   --values values.yaml
@@ -70,7 +70,7 @@ Or to update the Vector Agent:
 
 ```shell
 helm repo update && \
-helm upgrade vector timberio/vector-agent \
+helm upgrade vector vector/vector-agent \
   --namespace vector \
   --reuse-values
 ```
@@ -84,7 +84,7 @@ The Vector [Aggregator] lets you [transform] your data. For example, dedupe, agg
 To check available Helm chart configuration options:
 
 ```shell
-helm show values timberio/vector-aggregator
+helm show values vector/vector-aggregator
 ```
 
 This example configuration file lets you use Vector as an Aggregator to parse events to make them human-readable. For more information about configuration options, see the [Configuration] docs page.
@@ -126,7 +126,7 @@ VALUES
 Once you add the Vector Helm repo, and add a Vector configuration file, install the Vector Aggregator:
 
 ```shell
-helm install vector timberio/vector-aggregator \
+helm install vector vector/vector-aggregator \
   --namespace vector \
   --create-namespace \
   --values values.yaml
@@ -138,7 +138,7 @@ Or to update the Vector Aggregator:
 
 ```shell
 helm repo update && \
-helm upgrade vector timberio/vector-aggregator \
+helm upgrade vector vector/vector-aggregator \
   --namespace vector \
   --reuse-values
 ```
