@@ -108,7 +108,7 @@ Datadog clients aside from the agent. Let us know if this would be useful to you
 
 ## Upgrade Guide
 
-Rename an `datadog_logs` source components in your configuration to `datadog_agent`:
+Rename a `datadog_logs` source components in your configuration to `datadog_agent`:
 
 ```diff
 [sources.datadog]
