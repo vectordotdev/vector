@@ -70,7 +70,8 @@ module.exports = {
             },
             'ul > li >': {
               '*:first-child, *:last-child': {
-                margin: 0              }
+                margin: 0
+              }
             },
             // Spacing between certain shortcode combinations
             '.admonition + .tabs, .svg + .admonition, .highlight + p': {
