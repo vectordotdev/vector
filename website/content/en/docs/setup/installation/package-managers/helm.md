@@ -9,7 +9,6 @@ weight: 3
 {{< warning title="Aggregator role in public beta" >}}
 Helm support for the [aggregator] role is currently in public beta. We're currently seeking beta testers. If interested, please [join our chat][chat] and let us know.
 
-[agent]: /docs/setup/deployment/roles/#agent
 [aggregator]: /docs/setup/deployment/roles/#aggregator
 [chat]: https://chat.vector.dev
 {{< /warning >}}
@@ -26,28 +25,6 @@ helm repo update
 ## Agent
 
 The Vector [Agent] lets you collect data from your [sources] and then deliver it to a variety of destinations with [sinks].
-
-### Installing
-
-Once you add the Vector Helm repo, install the Vector Agent to each node:
-
-```shell
-helm install vector timberio/vector-agent \
-  --namespace vector \
-  --create-namespace \
-  --values values.yaml
-```
-
-### Updating
-
-Or to update the Vector Agent:
-
-```shell
-helm repo update && \
-helm upgrade vector timberio/vector-agent \
-  --namespace vector \
-  --reuse-values
-```
 
 ### Configuring
 
@@ -75,13 +52,50 @@ sinks:
     encoding: "json"
 VALUES
 ```
+
+### Installing
+
+Once you add the Vector Helm repo, and added a Vector configuration file, install the Vector Agent:
+
+```shell
+helm install vector timberio/vector-agent \
+  --namespace vector \
+  --create-namespace \
+  --values values.yaml
+```
+
+### Updating
+
+Or to update the Vector Agent:
+
+```shell
+helm repo update && \
+helm upgrade vector timberio/vector-agent \
+  --namespace vector \
+  --reuse-values
+```
+
 ## Aggregator
 
 The Vector [Aggregator] lets you [transform] your data. For example, dedupe, aggregate, or redact the data before sending it to its final destination.
 
+### Configuring
+
+To check available Helm chart configuration options:
+
+```shell
+helm show values timberio/vector-aggregator
+```
+
+This example configuration file lets you use Vector as an Aggregator to parse events to make them human-readable. For more information about configuration options, see the [Configuration] docs page.
+
+```toml
+# Add example
+```
+
 ### Installing
 
-Once you add the Vector Helm repo, install the Vector Aggregator:
+Once you add the Vector Helm repo, and add a Vector configuration file, install the Vector Aggregator:
 
 ```shell
 helm install vector timberio/vector-aggregator \
@@ -99,20 +113,6 @@ helm repo update && \
 helm upgrade vector timberio/vector-aggregator \
   --namespace vector \
   --reuse-values
-```
-
-### Configuring
-
-To check available Helm chart configuration options:
-
-```shell
-helm show values timberio/vector-aggregator
-```
-
-This example configuration file lets you use Vector as an Aggregator to parse events to make them human-readable. For more information about configuration options, see the [Configuration] docs page.
-
-```toml
-# Add example
 ```
 
 ## Uninstalling Vector
