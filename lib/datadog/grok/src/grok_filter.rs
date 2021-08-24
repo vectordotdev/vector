@@ -2,11 +2,8 @@ use crate::ast::{Function, FunctionArgument};
 use crate::parse_grok::Error as GrokRuntimeError;
 use crate::parse_grok_rules::Error as GrokStaticError;
 use ordered_float::NotNan;
-use percent_encoding::percent_decode;
-use regex::Regex;
-use std::{convert::TryFrom, ops::Deref, string::ToString};
+use std::{convert::TryFrom, string::ToString};
 use strum_macros::Display;
-use tracing::error;
 use vrl_compiler::Value;
 
 #[derive(Debug, Display, Clone)]
@@ -52,7 +49,7 @@ impl TryFrom<&Function> for GrokFilter {
                 .as_ref()
                 .and_then(|args| {
                     if let FunctionArgument::Arg(ref null_value) = args[0] {
-                        return Some(GrokFilter::NullIf(null_value.to_string()));
+                        Some(GrokFilter::NullIf(null_value.to_string()))
                     } else {
                         None
                     }

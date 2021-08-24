@@ -79,7 +79,7 @@ impl From<serde_json::Value> for Value {
             serde_json::Value::Number(n) => {
                 let float_or_byte = || {
                     n.as_f64()
-                        .map_or_else(|| Value::Bytes(n.to_string().into()), |f| Value::from(f))
+                        .map_or_else(|| Value::Bytes(n.to_string().into()), Value::from)
                 };
                 n.as_i64().map_or_else(float_or_byte, Value::Integer)
             }

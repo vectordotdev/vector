@@ -2,7 +2,6 @@ use std::{collections::HashMap, convert::TryFrom, fmt::Write, sync::Arc};
 
 use grok::Grok;
 use lazy_static::lazy_static;
-use regex::Regex;
 
 use lookup::LookupBuf;
 
@@ -145,7 +144,7 @@ fn parse_grok_rule<'a>(
         } = pattern
         {
             let dest = pattern.destination.as_ref().unwrap();
-            let filter = GrokFilter::try_from(dest.filter_fn.as_ref().unwrap())?;
+            let filter = GrokFilter::try_from(filter)?;
             filters
                 .entry(dest.path.clone())
                 .and_modify(|v| v.push(filter.clone()))
