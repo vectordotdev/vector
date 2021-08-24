@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-#[derive(PartialEq, PartialOrd, Debug, Clone, Deserialize)]
+#[derive(PartialOrd, Debug, Clone, Deserialize)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -24,6 +24,37 @@ pub enum Value {
 }
 
 impl Eq for Value {}
+
+impl PartialEq<Value> for Value {
+    fn eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Array(a), Value::Array(b)) => a.eq(b),
+            (Value::Boolean(a), Value::Boolean(b)) => a.eq(b),
+            (Value::Bytes(a), Value::Bytes(b)) => a.eq(b),
+            (Value::Float(a), Value::Float(b)) => {
+                // This compares floats with the following rules:
+                // * NaNs compare as equal
+                // * Positive and negative infinity are not equal
+                // * -0 and +0 are not equal
+                // * Floats will compare using truncated portion
+                if a.is_sign_negative() == b.is_sign_negative() {
+                    if a.is_finite() && b.is_finite() {
+                        a.trunc().eq(&b.trunc())
+                    } else {
+                        a.is_finite() == b.is_finite()
+                    }
+                } else {
+                    false
+                }
+            }
+            (Value::Integer(a), Value::Integer(b)) => a.eq(b),
+            (Value::Map(a), Value::Map(b)) => a.eq(b),
+            (Value::Null, Value::Null) => true,
+            (Value::Timestamp(a), Value::Timestamp(b)) => a.eq(b),
+            _ => false,
+        }
+    }
+}
 
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -46,7 +77,7 @@ impl Hash for Value {
                 // * otherwise transmute to u64 and hash
                 if v.is_finite() {
                     v.is_sign_negative().hash(state);
-                    let trunc: u64 = unsafe { std::mem::transmute(v.trunc()) };
+                    let trunc: u64 = unsafe { std::mem::transmute(v.trunc().to_bits()) };
                     trunc.hash(state);
                 } else if !v.is_nan() {
                     v.is_sign_negative().hash(state);
@@ -1322,6 +1353,25 @@ mod test {
         test_file.read_to_end(&mut buf)?;
 
         Ok(buf)
+    }
+
+    mod value_compare {
+        use super::*;
+
+        #[test]
+        fn compare_correctly() {
+            assert!(Value::Integer(0).eq(&Value::Integer(0)));
+            assert!(!Value::Integer(0).eq(&Value::Integer(1)));
+            assert!(!Value::Boolean(true).eq(&Value::Integer(2)));
+            assert!(Value::Float(1.2).eq(&Value::Float(1.4)));
+            assert!(!Value::Float(1.2).eq(&Value::Float(-1.2)));
+            assert!(!Value::Float(-0.0).eq(&Value::Float(0.0)));
+            assert!(!Value::Float(f64::NEG_INFINITY).eq(&Value::Float(f64::INFINITY)));
+            assert!(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
+                .eq(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])));
+            assert!(!Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
+                .eq(&Value::Array(vec![Value::Integer(1), Value::Boolean(true)])));
+        }
     }
 
     mod value_hash {
