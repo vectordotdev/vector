@@ -43,11 +43,12 @@ component MUST emit.
 There is leeway in the implementation of these events:
 
 * Events MAY be augmented with additional component-specific context. For
-  example, the `socket` source adds `mode` attribute as additional context.
-* The naming of the event MAY be component specific. For example,
-  `SocketEventReceived` since the `socket` source adds additional context.
+  example, the `socket` source adds a `mode` attribute as additional context.
+* The naming of the events MAY deviate to satisfy implementation. For example,
+  the `socket` source may rename the `EventRecevied` event to
+  `SocketEventReceived` to add additional socket specific context.
 * Components MAY emit events for batches of Vector events for performance
-  reasons, but the resulting metrics state MUST be equivalent to emitting
+  reasons, but the resulting telemetry state MUST be equivalent to emitting
   individual events. For example, emitting the `EventsReceived` event for 10
   events MUST increment the `events_in_total` by 10.
 
@@ -71,7 +72,7 @@ creating a Vector event.
 
 * Metrics
    * MUST increment the `events_in_total` counter by 1.
-   * SHOULD increment the `event_bytes_in_total` counter by the event's byte
+   * MUST increment the `event_bytes_in_total` counter by the event's byte
      size in JSON representation.
 * Logging
    * MUST log a `Event received.` message at the `trace` level with no rate
