@@ -11,7 +11,6 @@ Vector is an end-to-end data pipeline designed to collect, process, and route da
 {{< warning title="Aggregator role in public beta" >}}
 Helm support for the [aggregator] role is currently in public beta. We're currently seeking beta testers. If interested, please [join our chat][chat] and let us know.
 
-[agent]: /docs/setup/deployment/roles/#agent
 [aggregator]: /docs/setup/deployment/roles/#aggregator
 [chat]: https://chat.vector.dev
 {{< /warning >}}
