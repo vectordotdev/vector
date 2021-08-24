@@ -517,6 +517,7 @@ urls: {
 	vector_log:                                               "/docs/about/under-the-hood/architecture/data-model/log"
 	vector_log_data_types:                                    "/docs/about/under-the-hood/architecture/data-model/log/#types"
 	vector_lua_rfc:                                           "\(vector_repo)/blob/master/rfcs/2020-03-06-1999-api-extensions-for-lua-transform.md"
+	vector_lua_transform:                                     "/docs/reference/configuration/transforms/lua/"
 	vector_metric:                                            "/docs/about/under-the-hood/architecture/data-model/metric"
 	vector_monitoring:                                        "/docs/administration/monitoring"
 	vector_msi_source_files:                                  "\(vector_repo)/tree/master/distribution/msi"

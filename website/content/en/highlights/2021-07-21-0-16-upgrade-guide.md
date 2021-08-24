@@ -17,10 +17,6 @@ Vector's 0.16.0 release includes three **breaking changes**:
 1. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
 1. [`datadog_logs` source renamed to `datadog_agent`](#datadog_logs_rename)
 
-And one **deprecation**:
-
-1. [Vector source/sink version 2 released](#vector_source_sink)
-
 We cover them below to help you upgrade quickly:
 
 ## Upgrade guide

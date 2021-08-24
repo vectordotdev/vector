@@ -17,8 +17,8 @@ limiting and concurrency.
 Previously, many sinks were defaulting to a limit of 5 requests / second (for
 example the `http` sink) with a maximum number of concurrent requests of `5`,
 but these limits were rather arbitrary and artifically constrained throughput.
-With this release, we've updated the default for most HTTP-bosed components to
-be no rate limiting and a maximum number of concurrent requests of 1024.
+With this release, we've updated the default for most HTTP-based components to
+have no rate limiting and a maximum number of concurrent requests of 1024.
 
 To configure a request rate limit or maximum concurrency on a HTTP-based sink,
 you can set the `request` parameters like:
