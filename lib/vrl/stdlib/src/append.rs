@@ -31,7 +31,7 @@ impl Function for Append {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let items = arguments.required("items");
 

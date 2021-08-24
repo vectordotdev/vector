@@ -155,10 +155,10 @@ tower = { version = "0.4.8", default-features = false, features = ["buffer", "li
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
-serde = { version = "1.0.127", default-features = false, features = ["derive"] }
+serde = { version = "1.0.129", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.66", default-features = false, features = ["raw_value"] }
-serde_yaml = { version = "0.8.18", default-features = false }
+serde_yaml = { version = "0.8.19", default-features = false }
 rmp-serde = { version = "0.15.5", default-features = false, optional = true }
 
 # Messagepack
@@ -180,7 +180,7 @@ async-graphql-warp = { version = "=2.6.4", default-features = false, optional = 
 itertools = { version = "0.10.1", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.20.0", default-features = false, optional = true }
+crossterm = { version = "0.21.0", default-features = false, optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.16.0", optional = true, default-features = false, features = ["crossterm"] }
@@ -196,7 +196,7 @@ lookup = { path = "lib/lookup" }
 
 # External libs
 anyhow = { version = "1.0.43", default-features = false }
-arc-swap = { version = "1.3.0", default-features = false }
+arc-swap = { version = "1.3.1", default-features = false }
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
@@ -206,6 +206,7 @@ bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.4", default-features = false }
+csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -218,6 +219,7 @@ flate2 = { version = "1.0.20", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 grok = { version = "1.1.0", default-features = false, optional = true }
+hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.4", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
@@ -309,7 +311,7 @@ assert_cmd = "2.0.0"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 httpmock = { version = "0.6.2", default-features = false }
-libc = "0.2.99"
+libc = "0.2.100"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "0.7.2"
@@ -331,29 +333,29 @@ leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "l
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
+default-cmake = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
-default-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
-default-no-api-client = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
-default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all"]
+default-msvc = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+default-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-no-api-client = ["api", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
 disk-buffer = ["vector_core/disk-buffer"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
-all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
+all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datadog-pipelines"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
@@ -399,6 +401,10 @@ api-client = [
   "vector_core/api",
   "vector-api-client",
 ]
+
+# Enrichment Tables
+enrichment-tables = ["enrichment-tables-file"]
+enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -640,6 +646,9 @@ sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
 
+# Datadog integration
+datadog-pipelines = ["sources-internal_metrics", "sinks-datadog"]
+
 # Identifies that the build is a nightly build
 nightly = []
 
@@ -775,6 +784,12 @@ name = "remap"
 harness = false
 test = true
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "enrichment_tables_file"
+harness = false
+test = true
+required-features = ["enrichment-tables-file"]
 
 [[bench]]
 name = "languages"

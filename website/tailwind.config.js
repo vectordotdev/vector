@@ -55,7 +55,6 @@ module.exports = {
                 'background-color': theme('colors.gray.100'),
                 'border-radius': '4px',
                 padding: '0 5px',
-                margin: '0 5px',
                 display: 'inline-flex',
                 'align-items': 'center'
               },

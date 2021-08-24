@@ -29,6 +29,8 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         global: builder.global,
         #[cfg(feature = "api")]
         api: builder.api,
+        #[cfg(feature = "datadog-pipelines")]
+        datadog: builder.datadog,
         healthchecks: builder.healthchecks,
         enrichment_tables: builder.enrichment_tables,
         sources: builder.sources,
@@ -516,7 +518,7 @@ async fn build_unit_test(
                 .iter()
                 .enumerate()
             {
-                match cond_conf.build() {
+                match cond_conf.build(&Default::default()) {
                     Ok(c) => conditions.push(c),
                     Err(e) => errors.push(format!(
                         "failed to create test condition '{}': {}",

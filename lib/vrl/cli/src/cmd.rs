@@ -8,6 +8,7 @@ use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use vrl::enrichment::EmptyEnrichmentTables;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
 #[derive(Debug, StructOpt)]
@@ -102,9 +103,10 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+        let program = vrl::compile(&source, Box::new(EmptyEnrichmentTables), &stdlib::all())
+            .map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         for mut object in objects {
             let result = execute(&mut object, &program, &tz).map(|v| {

@@ -22,8 +22,10 @@ pub struct LaneConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "lane")]
 impl TransformConfig for LaneConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Lane::new(self.condition.build()?)))
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(Lane::new(
+            self.condition.build(&context.enrichment_tables)?,
+        )))
     }
 
     fn input_type(&self) -> DataType {

@@ -152,6 +152,7 @@ scopes:
   - ansi_stripper transform # Anything `ansi_stripper` transform related
   - aws_ec2_metadata transform # Anything `aws_ec2_metadata` transform related
   - coercer transform # Anything `coercer` transform related
+  - compound transform # Anything `compound` transform related
   - concat transform # Anything `concat` transform related
   - dedupe transform # Anything `dedupe` transform related
   - filter transform # Anything `filter` transform related

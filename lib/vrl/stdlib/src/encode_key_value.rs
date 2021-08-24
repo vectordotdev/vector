@@ -42,7 +42,7 @@ impl Function for EncodeKeyValue {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let fields = arguments.optional("fields_ordering");
 
