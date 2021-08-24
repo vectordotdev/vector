@@ -277,7 +277,7 @@ impl RunningTopology {
 
         let deadline = Instant::now() + timeout;
         for id in &diff.sources.to_remove {
-            info!(message = "Removing source.", id = ?id);
+            info!(message = "Removing source.", id = %id);
 
             let previous = self.tasks.remove(id).unwrap();
             drop(previous); // detach and forget
@@ -313,7 +313,7 @@ impl RunningTopology {
 
         // Transforms
         for id in &diff.transforms.to_remove {
-            info!(message = "Removing transform.", id = ?id);
+            info!(message = "Removing transform.", id = %id);
 
             let previous = self.tasks.remove(id).unwrap();
             drop(previous); // detach and forget
@@ -375,7 +375,7 @@ impl RunningTopology {
 
         // Detach removed sinks
         for id in &diff.sinks.to_remove {
-            info!(message = "Removing sink.", id = ?id);
+            info!(message = "Removing sink.", id = %id);
             self.remove_inputs(id).await;
         }
 
@@ -477,34 +477,34 @@ impl RunningTopology {
     pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
         // Sources
         for id in &diff.sources.to_change {
-            info!(message = "Rebuilding source.", id = ?id);
+            info!(message = "Rebuilding source.", id = %id);
             self.spawn_source(id, &mut new_pieces);
         }
 
         for id in &diff.sources.to_add {
-            info!(message = "Starting source.", id = ?id);
+            info!(message = "Starting source.", id = %id);
             self.spawn_source(id, &mut new_pieces);
         }
 
         // Transforms
         for id in &diff.transforms.to_change {
-            info!(message = "Rebuilding transform.", id = ?id);
+            info!(message = "Rebuilding transform.", id = %id);
             self.spawn_transform(id, &mut new_pieces);
         }
 
         for id in &diff.transforms.to_add {
-            info!(message = "Starting transform.", id = ?id);
+            info!(message = "Starting transform.", id = %id);
             self.spawn_transform(id, &mut new_pieces);
         }
 
         // Sinks
         for id in &diff.sinks.to_change {
-            info!(message = "Rebuilding sink.", id = ?id);
+            info!(message = "Rebuilding sink.", id = %id);
             self.spawn_sink(id, &mut new_pieces);
         }
 
         for id in &diff.sinks.to_add {
-            info!(message = "Starting sink.", id = ?id);
+            info!(message = "Starting sink.", id = %id);
             self.spawn_sink(id, &mut new_pieces);
         }
     }
