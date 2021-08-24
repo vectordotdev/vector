@@ -61,12 +61,6 @@ dependencies = [
 
 [[package]]
 name = "ansi_term"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
-
-[[package]]
-name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
@@ -5259,13 +5253,13 @@ dependencies = [
 
 [[package]]
 name = "prettydiff"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93020e52adb6167334b93dc42c6224543df7fbf775555fa6c7491eb46dc20ffb"
+checksum = "fb5671a83709b2755fe5b776d4915701bf36ed2cd9575035502ec12818141d71"
 dependencies = [
- "ansi_term 0.9.0",
+ "ansi_term 0.12.1",
  "prettytable-rs",
- "structopt 0.2.18",
+ "structopt",
 ]
 
 [[package]]
@@ -7187,35 +7181,13 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "structopt"
-version = "0.2.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16c2cdbf9cc375f15d1b4141bc48aeef444806655cd0e904207edc8d68d86ed7"
-dependencies = [
- "clap",
- "structopt-derive 0.2.18",
-]
-
-[[package]]
-name = "structopt"
 version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69b041cdcb67226aca307e6e7be44c8806423d83e018bd662360a93dabce4d71"
 dependencies = [
  "clap",
  "lazy_static",
- "structopt-derive 0.4.15",
-]
-
-[[package]]
-name = "structopt-derive"
-version = "0.2.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53010261a84b37689f9ed7d395165029f9cc7abb9f56bbfe86bee2597ed25107"
-dependencies = [
- "heck",
- "proc-macro2 0.4.30",
- "quote 0.6.13",
- "syn 0.15.44",
+ "structopt-derive",
 ]
 
 [[package]]
@@ -8466,7 +8438,7 @@ dependencies = [
  "socket2 0.4.1",
  "stream-cancel",
  "strip-ansi-escapes",
- "structopt 0.3.22",
+ "structopt",
  "syslog",
  "syslog_loose",
  "tempfile",
@@ -8644,7 +8616,7 @@ dependencies = [
  "rustyline",
  "serde_json",
  "shared",
- "structopt 0.3.22",
+ "structopt",
  "thiserror",
  "vrl",
  "vrl-stdlib",
@@ -8750,7 +8722,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
- "structopt 0.3.22",
+ "structopt",
  "tracing-subscriber",
  "vrl",
  "vrl-parser",
