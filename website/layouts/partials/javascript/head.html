@@ -1,6 +1,10 @@
 {{ $appJs   := "js/app.js"}}
 {{ $appJsOpts := dict "targetPath" $appJs "minify" true }}
 {{ $app  := resources.Get $appJs | resources.ExecuteAsTemplate $appJs . | js.Build $appJsOpts }}
+{{ $dd_browser_logs_rum_path := "js/dd-browser-logs-rum.js" }}
+{{ $dd_browser_logs_rum := resources.Get $dd_browser_logs_rum_path | resources.ExecuteAsTemplate $dd_browser_logs_rum_path . | js.Build }}
+
+<script type="text/javascript" src="{{ $dd_browser_logs_rum.RelPermalink }}"></script>
 <script type="text/javascript" src="{{ $app.RelPermalink }}" integrity="{{ $app.Data.Integrity }}"></script>
 
 {{/* We have a few Ionicons icons scattered throughout */}}
