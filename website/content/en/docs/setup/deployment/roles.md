@@ -17,7 +17,7 @@ Helm support for the [aggregator] role is currently in public beta. We're curren
 
 {{< roles >}}
 
-You can install the Aggregator on Kubernetes using Helm. For more information about getting started with the Aggregator, see the [Helm install docs][helm].
+You can install the Vector as an Aggregator on Kubernetes using Helm. For more information about getting started with the Aggregator role, see the [Helm install docs][helm].
 
 [topologies]: /docs/setup/deployment/topologies
 [helm]: /docs/setup/installation/package-managers/helm/
