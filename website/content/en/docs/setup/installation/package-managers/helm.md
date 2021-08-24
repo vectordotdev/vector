@@ -89,9 +89,36 @@ helm show values timberio/vector-aggregator
 
 This example configuration file lets you use Vector as an Aggregator to parse events to make them human-readable. For more information about configuration options, see the [Configuration] docs page.
 
-```toml
-# Add example
-```
+```yaml
+cat <<-'VALUES' > values.yaml
+# The Vector Aggregator chart defines a
+# vector source that is made available to you.
+# You do not need to define a log source.
+transforms:
+  # Adjust as necessary. This remap transform parses a JSON
+  # formatted log message, emitting a log if the contents are
+  # not valid JSON
+  # /docs/reference/transforms/
+  remap:
+    type: remap
+    inputs: ["vector"]
+    source: |
+      structured, err = parse_json(.message)
+      if err != null {
+        log("Unable to parse JSON: " + err, level: "error")
+      } else {
+        . = merge(., object!(structured))
+      }
+sinks:
+  # Adjust as necessary. By default we use the console sink
+  # to print all data. This allows you to see Vector working.
+  # /docs/reference/sinks/
+  stdout:
+    type: console
+    inputs: ["remap"]
+    target: "stdout"
+    encoding: "json"
+VALUES
 
 ### Installing
 
