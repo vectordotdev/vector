@@ -135,7 +135,7 @@ fn expand_globs_inner(inputs: &mut Vec<ComponentId>, id: &ComponentId, candidate
         let matcher = glob::Pattern::new(&raw_input.to_string())
             .map(InputMatcher::Pattern)
             .unwrap_or_else(|error| {
-                warn!(message = "Invalid glob pattern for input.", component_id = ?id, %error);
+                warn!(message = "Invalid glob pattern for input.", component_id = %id, %error);
                 InputMatcher::String(raw_input.to_string())
             });
         for input in candidates {

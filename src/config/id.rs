@@ -9,29 +9,21 @@ use std::{
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentId {
-    value: String,
     id: String,
 }
 
 impl ComponentId {
     pub fn global<T: Into<String>>(id: T) -> Self {
-        let id = id.into();
-        Self {
-            id: id.clone(),
-            value: id,
-        }
+        Self { id: id.into() }
     }
 
     pub fn as_str(&self) -> &str {
-        self.value.as_str()
+        self.id.as_str()
     }
 }
 impl From<String> for ComponentId {
     fn from(value: String) -> Self {
-        Self {
-            id: value.clone(),
-            value,
-        }
+        Self { id: value }
     }
 }
 
@@ -45,14 +37,13 @@ impl<T: ToString> From<&T> for ComponentId {
     fn from(value: &T) -> Self {
         Self {
             id: value.to_string(),
-            value: value.to_string(),
         }
     }
 }
 
 impl fmt::Display for ComponentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.value.fmt(f)
+        self.id.fmt(f)
     }
 }
 
@@ -67,7 +58,7 @@ impl Serialize for ComponentId {
 
 impl Ord for ComponentId {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.value.cmp(&other.value)
+        self.id.cmp(&other.id)
     }
 }
 
