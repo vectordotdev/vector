@@ -2,8 +2,7 @@
 
 import { ddConfig } from './config-vector';
 import { datadogRum } from '@datadog/browser-rum';
-
-console.log('Hello from DD Browser Logs and Rum init JS file.');
+import { datadogLogs } from '@datadog/browser-logs';
 
 // to-do:  make this better.
 const getEnv = () => {
@@ -28,9 +27,21 @@ if (datadogRum) {
       applicationId: ddConfig.applicationID,
       clientToken: ddConfig.clientToken,
       env,
-      service: 'vector',
+      service: ddConfig.service,
       version: '{{ $latest }}',
       trackInteractions: true
     });
+  }
+}
+
+if (datadogLogs) {
+  if (env === 'preview' || env === 'live') {
+    datadogLogs.init({
+      clientToken: ddConfig.clientToken,
+      forwardErrorsToLogs: true,
+      env,
+      service: ddConfig.service,
+      version: '{{ $latest }}'
+    })
   }
 }
