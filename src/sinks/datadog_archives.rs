@@ -24,6 +24,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use http::StatusCode;
+use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_s3::{HeadBucketRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
@@ -41,7 +42,7 @@ use vector_core::event::Event;
 pub struct DatadogArchivesSinkConfig {
     pub service: String,
     pub bucket: String,
-    pub prefix: Option<String>,
+    pub key_prefix: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
@@ -94,7 +95,7 @@ impl DatadogArchivesSinkConfig {
             .expect("s3 config wasn't provided");
 
         let bucket = self.bucket.clone();
-        let prefix = self.prefix.clone();
+        let prefix = self.key_prefix.clone();
 
         let svc = ServiceBuilder::new()
             .map(move |req| {
@@ -121,35 +122,17 @@ fn build_s3_request(
 ) -> Request {
     let (inner, key) = req.into_parts();
 
-    // For example:
-    //
-    // ``` /my/bucket/prefix/dt=20180515/hour=14/archive_143201.1234.7dq1a9mnSya3bFotoErfxl.json.gz ```
-    //
-    // To further describe each variable:
-    //
-    // <YYYYMMDD> - the day of the log's timestamp (not the current time)
-    //     <HH> - the hour of the log's timestamp (not the current time)
-    //     <HHmmss.SSSS> - the millisecond of the log's timestamp (not the current time)
-    //     <UUID> - a random v4 UUID generated when the archive is written
+    let filename = Uuid::new_v4().to_string();
 
-    // TODO: pull the seconds from the last event
-    // let filename = {
-    //     let seconds = Utc::now().format(&time_format);
-    //
-    //     if uuid {
-    //         let uuid = Uuid::new_v4();
-    //         format!("{}-{}", seconds, uuid.to_hyphenated())
-    //     } else {
-    //         seconds.to_string()
-    //     }
-    // };
-    let filename = "sdfdsf";
-
-    // let extension = extension.unwrap_or_else(|| compression.extension().into());
-    // let key = String::from_utf8_lossy(&key[..]).into_owned();
-    // let key = format!("{}{}.{}", key, filename, extension);
-
-    let key = "sfdfs";
+    let key = String::from_utf8_lossy(&key[..]).into_owned();
+    let key = format!(
+        "{}/{}.{}.{}",
+        path_prefix.unwrap_or_default(),
+        key,
+        filename,
+        "json.gz"
+    )
+    .replace("//", "/");
 
     debug!(
         message = "Sending events.",
@@ -180,9 +163,23 @@ fn build_s3_request(
 }
 
 fn encode_event(mut event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
-    // TODO
+    lazy_static! {
+        static ref KEY_PREFIX: Template =
+            Template::try_from("/dt=%Y%m%d/hour=%H/archive_%H%M%S%.3f")
+                .expect("invalid object key format");
+    }
+    let key = KEY_PREFIX
+        .render_string(&event)
+        .map_err(|error| {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("key_prefix"),
+                drop_event: true,
+            });
+        })
+        .ok()?;
 
-    // encoding.apply_rules(&mut event);
+    // TODO generate id, rename fields
 
     let mut log = event.into_log();
     let bytes = serde_json::to_vec(&log)
@@ -193,7 +190,7 @@ fn encode_event(mut event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Ve
         .expect("Failed to encode event as json, this is a bug!");
 
     Some(EncodedEvent {
-        item: PartitionInnerBuffer::new(bytes, Bytes::new()), //TODO
+        item: PartitionInnerBuffer::new(bytes, key.into()), //TODO
         finalizers: log.metadata_mut().take_finalizers(),
     })
 }
@@ -224,7 +221,67 @@ impl SinkConfig for DatadogArchivesSinkConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::DateTime;
+    use vector_core::event::LogEvent;
 
     #[test]
-    fn generate_config() {}
+    fn generate_config() {
+        crate::test_util::test_generate_config::<S3SinkConfig>();
+    }
+
+    #[test]
+    fn s3_encode_event_text() {
+        let mut log = Event::from("test message");
+        let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
+            .expect("invalid test case")
+            .with_timezone(&Utc);
+        log.as_mut_log().insert("timestamp", timestamp);
+        let encoded = encode_event(log).unwrap();
+
+        let (bytes, key) = encoded.item.into_parts();
+        let encoded_json: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        assert_eq!(
+            encoded_json,
+            serde_json::from_str(
+                r#"{ "message": "test message", "timestamp": "2021-08-23T16:00:27.879Z" } "#
+            )
+            .unwrap()
+        );
+        assert_eq!(key, "/dt=20210823/hour=16/archive_160027.879");
+    }
+
+    #[test]
+    fn s3_build_request() {
+        let mut log = Event::from("test message");
+        let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
+            .expect("invalid test case")
+            .with_timezone(&Utc);
+        log.as_mut_log().insert("timestamp", timestamp);
+        let encoded = encode_event(log).unwrap();
+        // let buf = PartitionInnerBuffer::new(vec![0u8; 10], Bytes::from("key/"));
+
+        let req = build_s3_request(
+            encoded.item,
+            "dd-logs".into(),
+            Some("audit".into()),
+            S3Options::default(),
+        );
+        let prefix = "audit/dt=20210823/hour=16/archive_160027.879.";
+        let file_ext = ".json.gz";
+        assert!(req.key.starts_with(prefix));
+        assert!(req.key.ends_with(file_ext));
+        let uuid1 = &req.key[prefix.len()..req.key.len() - file_ext.len()];
+        assert_eq!(uuid1.len(), 36);
+
+        // check the the second batch has a different UUID
+        let encoded = encode_event(Event::new_empty_log()).unwrap();
+        let req = build_s3_request(
+            encoded.item,
+            "dd-logs".into(),
+            Some("audit".into()),
+            S3Options::default(),
+        );
+        let uuid2 = &req.key[prefix.len()..req.key.len() - file_ext.len()];
+        assert_ne!(uuid1, uuid2);
+    }
 }
