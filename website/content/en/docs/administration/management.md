@@ -126,7 +126,7 @@ docker run \
   -d \
   -v ~/vector.toml:/etc/vector/vector.toml:ro \
   -p 8686:8686 \
-  timberio/vector:0.15.1-alpine
+  timberio/vector:{{< version >}}-alpine
 ```
 {{< /tab >}}
 {{< tab title="Stop" >}}
