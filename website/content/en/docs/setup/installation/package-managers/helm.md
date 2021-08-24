@@ -119,6 +119,7 @@ sinks:
     target: "stdout"
     encoding: "json"
 VALUES
+```
 
 ### Installing
 
