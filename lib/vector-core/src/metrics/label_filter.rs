@@ -7,6 +7,9 @@ pub(crate) struct VectorLabelFilter;
 impl LabelFilter for VectorLabelFilter {
     fn should_include_label(&self, label: &Label) -> bool {
         let key = label.key();
-        key == "component_id" || key == "component_type" || key == "component_kind"
+        key == "component_id"
+            || key == "component_type"
+            || key == "component_kind"
+            || key == "component_name"
     }
 }

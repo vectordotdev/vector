@@ -1,5 +1,7 @@
 #[cfg(feature = "api")]
 use super::api;
+#[cfg(feature = "datadog-pipelines")]
+use super::datadog;
 use super::{
     compiler, provider, ComponentId, Config, EnrichmentTableConfig, EnrichmentTableOuter,
     HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
@@ -7,9 +9,7 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use vector_core::config::GlobalOptions;
-use vector_core::default_data_dir;
-use vector_core::transform::TransformConfig;
+use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -19,6 +19,9 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
+    #[cfg(feature = "datadog-pipelines")]
+    #[serde(default)]
+    pub datadog: datadog::Options,
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
@@ -52,6 +55,8 @@ impl From<Config> for ConfigBuilder {
             global: c.global,
             #[cfg(feature = "api")]
             api: c.api,
+            #[cfg(feature = "datadog-pipelines")]
+            datadog: c.datadog,
             healthchecks: c.healthchecks,
             enrichment_tables: c.enrichment_tables,
             sources: c.sources,
@@ -131,6 +136,11 @@ impl ConfigBuilder {
         #[cfg(feature = "api")]
         if let Err(error) = self.api.merge(with.api) {
             errors.push(error);
+        }
+
+        #[cfg(feature = "datadog-pipelines")]
+        {
+            self.datadog = with.datadog;
         }
 
         self.provider = with.provider;
