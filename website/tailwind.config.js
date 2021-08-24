@@ -73,6 +73,12 @@ module.exports = {
                 margin: 0
               }
             },
+            'ul > li::before': {
+              'background-color': theme('colors.gray.700'),
+            },
+            'ol > li::before': {
+              color: theme('colors.gray.700'),
+            },
             // Spacing between certain shortcode combinations
             '.admonition + .tabs, .svg + .admonition, .highlight + p': {
               'margin-top': '1rem',
@@ -114,8 +120,18 @@ module.exports = {
               }
             },
             color: theme('colors.gray.200'),
-            'p, h1, h2, h3, h4, h5, h6': {
+            'p, h1, h2, h3, h4, h5, h6, li': {
               color: theme('colors.gray.100')
+            },
+            'ul > li': {
+              '&:before': {
+                'background-color': theme('colors.gray.100')
+              }
+            },
+            'ol > li': {
+              '&:before': {
+                color: theme('colors.gray.100')
+              }
             },
             'a, a code, a code:not([class^="language-"])': {
                 color: theme('colors.primary', 'currentColor'),
@@ -136,6 +152,15 @@ module.exports = {
             strong: {
               color: theme('colors.gray.100'),
             },
+          }
+        },
+        sm: {
+          css: {
+            'ul > li >, ol > li >': {
+              '*:first-child, *:last-child': {
+                margin: 0
+              }
+            }
           }
         }
       }),
