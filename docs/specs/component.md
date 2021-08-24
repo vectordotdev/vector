@@ -13,6 +13,7 @@ interpreted as described in [RFC 2119].
 1. [How to read this document](#how-to-read-this-document)
 1. [Instrumentation](#instrumentation)
    1. [Events](#events)
+      1. [BytesReceived](#bytesreceived)
       1. [EventRecevied](#eventrecevied)
 
 <!-- /MarkdownTOC -->
@@ -35,7 +36,7 @@ most sections will be broken along component lines for easy adherence.
 
 ### Events
 
-Vector implements an [event driven pattern ([RFC 2064]) for internal
+Vector implements an event driven pattern ([RFC 2064]) for internal
 instrumentation. This section lists all required and optional events that a
 component MUST emit.
 
@@ -45,19 +46,35 @@ There is leeway in the implementation of these events:
   example, the `socket` source adds `mode` attribute as additional context.
 * The naming of the event MAY be component specific. For example,
   `SocketEventReceived` since the `socket` source adds additional context.
+* Components MAY emit events for batches of Vector events for performance
+  reasons, but the resulting metrics state MUST be equivalent to emitting
+  individual events. For example, emitting the `EventsReceived` event for 10
+  events MUST increment the `events_in_total` by 10.
+
+#### BytesReceived
+
+*Sources* MUST emit a `BytesReceived` event immediately after receiving bytes
+from the upstream source, before the creation of a Vector event. The following
+telemetry MUST be included:
+
+* Metrics
+   * MUST increment the `bytes_in_total` counter by the number of bytes
+     received.
+* Logging
+   * MUST log a `Bytes received.` message at the `trace` level with no rate
+     limiting.
 
 #### EventRecevied
 
-ALL components MUST emit an `EventReceived` event immediately after receiving
-a Vector event with the following telemetry:
+*Components* MUST emit an `EventReceived` event immediately after receiving or
+creating a Vector event.
 
 * Metrics
    * MUST increment the `events_in_total` counter by 1.
-   * SHOULD increment the `bytes_in_total` counter by the total number of bytes.
-      * For sources, the total bytes coming off the wire.
-      * For everything else, the event's JSON byte size representation.
+   * SHOULD increment the `event_bytes_in_total` counter by the event's byte
+     size in JSON representation.
 * Logging
-   * MUST log a `Received one event.` message at the `trace` level with no rate
+   * MUST log a `Event received.` message at the `trace` level with no rate
      limiting.
 
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
