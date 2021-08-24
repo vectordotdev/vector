@@ -1,3 +1,4 @@
+use crate::sinks::aws_s3::Request;
 use crate::sinks::util::ServiceBuilderExt;
 use crate::{
     config::{DataType, SinkConfig, SinkContext},
@@ -20,6 +21,7 @@ use crate::{
     template::Template,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use http::StatusCode;
 use rusoto_core::RusotoError;
@@ -30,6 +32,7 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 use tower::{Service, ServiceBuilder};
+use uuid::Uuid;
 use vector_core::config::proxy::ProxyConfig;
 use vector_core::event::Event;
 
@@ -81,41 +84,21 @@ impl DatadogArchivesSinkConfig {
         // let filename_append_uuid = self.filename_append_uuid.unwrap_or(true);
         let batch = BatchSettings::default().bytes(10_000_000).timeout(300);
 
-        let key_prefix = self.prefix.clone();
-        //
         let s3 = S3Sink { client };
         //
         // let filename_extension = self.filename_extension.clone();
-        let bucket = self.bucket.clone();
         let s3_options = self
             .aws_s3_config
             .as_ref()
             .and_then(|c| Some(c.options.clone()))
             .expect("s3 config wasn't provided");
 
+        let bucket = self.bucket.clone();
+        let prefix = self.prefix.clone();
+
         let svc = ServiceBuilder::new()
             .map(move |req| {
-                aws_s3::build_request(
-                    req,
-                    "sdf".to_string(),
-                    None,
-                    false,
-                    Compression::gzip_default(),
-                    bucket.clone(),
-                    aws_s3::S3Options {
-                        acl: s3_options.acl,
-                        grant_full_control: s3_options.grant_full_control.clone(),
-                        grant_read: s3_options.grant_read.clone(),
-                        grant_read_acp: s3_options.grant_read_acp.clone(),
-                        grant_write_acp: s3_options.grant_write_acp.clone(),
-                        server_side_encryption: s3_options.server_side_encryption.clone(),
-                        ssekms_key_id: s3_options.ssekms_key_id.clone(),
-                        storage_class: s3_options.storage_class.clone(),
-                        tags: s3_options.tags.clone(),
-                        content_encoding: None,
-                        content_type: None,
-                    },
-                )
+                build_s3_request(req, bucket.clone(), prefix.clone(), s3_options.clone())
             })
             .settings(request, S3RetryLogic)
             .service(s3);
@@ -127,6 +110,72 @@ impl DatadogArchivesSinkConfig {
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
         Ok(super::VectorSink::Sink(Box::new(sink)))
+    }
+}
+
+fn build_s3_request(
+    req: PartitionInnerBuffer<Vec<u8>, Bytes>,
+    bucket: String,
+    path_prefix: Option<String>,
+    options: S3Options,
+) -> Request {
+    let (inner, key) = req.into_parts();
+
+    // For example:
+    //
+    // ``` /my/bucket/prefix/dt=20180515/hour=14/archive_143201.1234.7dq1a9mnSya3bFotoErfxl.json.gz ```
+    //
+    // To further describe each variable:
+    //
+    // <YYYYMMDD> - the day of the log's timestamp (not the current time)
+    //     <HH> - the hour of the log's timestamp (not the current time)
+    //     <HHmmss.SSSS> - the millisecond of the log's timestamp (not the current time)
+    //     <UUID> - a random v4 UUID generated when the archive is written
+
+    // TODO: pull the seconds from the last event
+    // let filename = {
+    //     let seconds = Utc::now().format(&time_format);
+    //
+    //     if uuid {
+    //         let uuid = Uuid::new_v4();
+    //         format!("{}-{}", seconds, uuid.to_hyphenated())
+    //     } else {
+    //         seconds.to_string()
+    //     }
+    // };
+    let filename = "sdfdsf";
+
+    // let extension = extension.unwrap_or_else(|| compression.extension().into());
+    // let key = String::from_utf8_lossy(&key[..]).into_owned();
+    // let key = format!("{}{}.{}", key, filename, extension);
+
+    let key = "sfdfs";
+
+    debug!(
+        message = "Sending events.",
+        bytes = ?inner.len(),
+        bucket = ?bucket,
+        key = ?key
+    );
+
+    Request {
+        body: inner,
+        bucket,
+        key: key.to_string(),
+        content_encoding: Compression::gzip_default().content_encoding(),
+        options: aws_s3::S3Options {
+            acl: options.acl,
+            grant_full_control: options.grant_full_control,
+            grant_read: options.grant_read,
+            grant_read_acp: options.grant_read_acp,
+            grant_write_acp: options.grant_write_acp,
+            server_side_encryption: options.server_side_encryption,
+            ssekms_key_id: options.ssekms_key_id,
+            storage_class: options.storage_class,
+            tags: options.tags,
+            content_encoding: Some("gzip".to_string()),
+            content_type: Some("text/json".to_string()),
+        },
     }
 }
 
@@ -156,42 +205,9 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let config = self.aws_s3_config.as_ref().expect("TODO");
-        let s3_options = &config.options;
-        let s3_sink_config = S3SinkConfig {
-            bucket: self.bucket.to_string(),
-            key_prefix: None,
-            filename_time_format: None,
-            filename_append_uuid: None,
-            filename_extension: None,
-            options: aws_s3::S3Options {
-                acl: s3_options.acl,
-                grant_full_control: s3_options.grant_full_control.clone(),
-                grant_read: s3_options.grant_read.clone(),
-                grant_read_acp: s3_options.grant_read_acp.clone(),
-                grant_write_acp: s3_options.grant_write_acp.clone(),
-                server_side_encryption: s3_options.server_side_encryption.clone(),
-                ssekms_key_id: s3_options.ssekms_key_id.clone(),
-                storage_class: s3_options.storage_class.clone(),
-                tags: s3_options.tags.clone(),
-                content_encoding: None,
-                content_type: None,
-            },
-            region: config.region.clone(),
-            encoding: aws_s3::Encoding::Ndjson.into(),
-            compression: Compression::gzip_default(),
-            batch: BatchConfig {
-                //TODO
-                max_bytes: Some(100_000_000),
-                timeout_secs: Some(5),
-                ..Default::default()
-            },
-            request: self.request,
-            assume_role: None,
-            auth: config.auth.clone(),
-        };
-        let client = s3_sink_config.create_client(&cx.proxy)?;
-        let healthcheck = s3_sink_config.clone().healthcheck(client.clone()).boxed();
+        let s3config = self.aws_s3_config.as_ref().expect("TODO");
+        let client = aws_s3::create_client(&s3config.region, &s3config.auth, &cx.proxy)?;
+        let healthcheck = aws_s3::healthcheck(self.bucket.clone(), client.clone()).boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
     }

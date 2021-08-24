@@ -157,8 +157,8 @@ impl SinkConfig for S3SinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+        let client = create_client(&self.region, &self.auth, &cx.proxy)?;
+        let healthcheck = healthcheck(self.bucket.clone(), client.clone()).boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
     }
@@ -235,37 +235,38 @@ impl S3SinkConfig {
 
         Ok(super::VectorSink::Sink(Box::new(sink)))
     }
+}
 
-    pub async fn healthcheck(self, client: S3Client) -> crate::Result<()> {
-        let req = client.head_bucket(HeadBucketRequest {
-            bucket: self.bucket.clone(),
-            expected_bucket_owner: None,
-        });
+pub async fn healthcheck(bucket: String, client: S3Client) -> crate::Result<()> {
+    let req = client.head_bucket(HeadBucketRequest {
+        bucket: bucket.clone(),
+        expected_bucket_owner: None,
+    });
 
-        match req.await {
-            Ok(_) => Ok(()),
-            Err(error) => Err(match error {
-                RusotoError::Unknown(resp) => match resp.status {
-                    StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                    StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket {
-                        bucket: self.bucket,
-                    }
-                    .into(),
-                    status => HealthcheckError::UnknownStatus { status }.into(),
-                },
-                error => error.into(),
-            }),
-        }
+    match req.await {
+        Ok(_) => Ok(()),
+        Err(error) => Err(match error {
+            RusotoError::Unknown(resp) => match resp.status {
+                StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
+                status => HealthcheckError::UnknownStatus { status }.into(),
+            },
+            error => error.into(),
+        }),
     }
+}
 
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<S3Client> {
-        let region = (&self.region).try_into()?;
-        let client = rusoto::client(proxy)?;
+pub fn create_client(
+    region: &RegionOrEndpoint,
+    auth: &AwsAuthentication,
+    proxy: &ProxyConfig,
+) -> crate::Result<S3Client> {
+    let region = region.try_into()?;
+    let client = rusoto::client(proxy)?;
 
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
+    let creds = auth.build(&region, None)?;
 
-        Ok(S3Client::new_with(client, creds, region))
-    }
+    Ok(S3Client::new_with(client, creds, region))
 }
 
 impl Service<Request> for S3Sink {
@@ -331,7 +332,7 @@ impl Service<Request> for S3Sink {
     }
 }
 
-pub(crate) fn build_request(
+fn build_request(
     req: PartitionInnerBuffer<Vec<u8>, Bytes>,
     time_format: String,
     extension: Option<String>,
@@ -376,11 +377,11 @@ pub(crate) fn build_request(
 
 #[derive(Debug, Clone)]
 pub(crate) struct Request {
-    body: Vec<u8>,
-    bucket: String,
-    key: String,
-    content_encoding: Option<&'static str>,
-    options: S3Options,
+    pub(crate) body: Vec<u8>,
+    pub(crate) bucket: String,
+    pub(crate) key: String,
+    pub(crate) content_encoding: Option<&'static str>,
+    pub(crate) options: S3Options,
 }
 
 impl Response for PutObjectOutput {}
@@ -609,7 +610,7 @@ mod integration_tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
-        assert_eq!(keys.len(), 1);
+        assert_eq!(keys.filename_time_formatlen(), 1);
 
         let key = keys[0].clone();
         assert!(key.ends_with(".log"));
