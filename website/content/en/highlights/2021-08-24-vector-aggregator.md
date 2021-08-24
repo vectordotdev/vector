@@ -1,6 +1,6 @@
 ---
 date: "2021-08-24"
-title: "Moving the aggregator chart to public beta"
+title: "Moving the aggregator Helm chart to public beta"
 description: "The Vector aggregator Helm chart is now publicly available"
 authors: ["spencergilbert"]
 pr_numbers: [8801]
