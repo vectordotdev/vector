@@ -4,10 +4,10 @@ short: Helm
 weight: 3
 ---
 
-[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing the Vector Agent and the Vector Aggregator through the Helm package repository. The Agent and the Aggregator are added by adding the Vector Helm chart but are installed onto each node and configured separately.
+[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing the Vector Agent and the Vector Aggregator from the Helm package repository. The Agent and the Aggregator are added by adding the Vector Helm chart but are installed and configured separately.
 
-{{< warning title="Aggregator role in private beta" >}}
-Helm support for the [aggregator] role is currently in private beta. We're currently seeking beta testers. If interested, please [join our chat][chat] and let us know.
+{{< warning title="Aggregator role in public beta" >}}
+Helm support for the [aggregator] role is currently in public beta. We're currently seeking beta testers. If interested, please [join our chat][chat] and let us know.
 
 [agent]: /docs/setup/deployment/roles/#agent
 [aggregator]: /docs/setup/deployment/roles/#aggregator
@@ -59,7 +59,7 @@ helm show values timberio/vector-agent
 
 This example configuration file lets you use Vector as an Agent to send logs to standard output. For more information about configuration options, see the [configuration] docs page.
 
-```toml
+```yaml
 cat <<-'VALUES' > values.yaml
 # The Vector Kubernetes integration automatically defines a
 # kubernetes_logs source that is made available to you.
@@ -81,13 +81,13 @@ The Vector [Aggregator] lets you [transform] your data. For example, dedupe, agg
 
 ### Installing
 
-Once you add the Vector Helm repo, install the Vector Aggregator to each node:
+Once you add the Vector Helm repo, install the Vector Aggregator:
 
 ```shell
 helm install vector timberio/vector-aggregator \
   --namespace vector \
   --create-namespace \
-  --values values.YAML
+  --values values.yaml
 ```
 
 ### Updating
