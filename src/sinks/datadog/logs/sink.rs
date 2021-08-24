@@ -301,6 +301,7 @@ where
     async fn flush_to_api<'a>(
         self: &'a mut Self,
     ) -> Result<impl Iterator<Item = impl Future<Output = ()>> + Send + 'a, ()> {
+        metrics::counter!("flush", 1);
         // The Datadog API makes no claim on how many requests we can make at
         // one time. We rely on the http client to handle retries and what
         // not. This implementation stacks up futures for each key present in
@@ -323,6 +324,7 @@ where
                 finalizers.push(metadata.take_finalizers());
             }
 
+            let total_members = members.len();
             let payload = Payload { members };
             let body: Vec<u8> = serde_json::to_vec(&payload).expect("failed to encode to json");
 
@@ -333,12 +335,15 @@ where
             let request = Request::post(self.datadog_uri.clone())
                 .header("Content-Type", "application/json")
                 .header("DD-API-KEY", &api_key[..]);
+            let serialized_payload_len = body.len();
+            metrics::histogram!("encoded_payload_size_bytes", serialized_payload_len as f64);
+            metrics::histogram!("encoded_payload_size_members", total_members as f64);
             let (request, encoded_body) = match self.compression {
                 Compression::None => (request, body),
                 Compression::Gzip(level) => {
                     let level = level.unwrap_or(GZIP_FAST);
                     let mut encoder = GzEncoder::new(
-                        Vec::with_capacity(body.len()),
+                        Vec::with_capacity(serialized_payload_len),
                         flate2::Compression::new(level as u32),
                     );
 
@@ -356,14 +361,22 @@ where
                 .expect("failed to make request");
 
             let fut: Client::Future = self.http_client.call(request);
-            fut.map(|result| {
+            fut.map(move |result| {
                 let status: EventStatus = match result {
-                    Ok(_) => EventStatus::Delivered,
-                    Err(_) => EventStatus::Errored,
+                    Ok(_) => {
+                        metrics::counter!("flush_success", 1);
+                        EventStatus::Delivered
+                    }
+                    Err(_) => {
+                        metrics::counter!("flush_error", 1);
+                        EventStatus::Errored
+                    }
                 };
                 for finalizer in finalizers {
                     finalizer.update_status(status);
                 }
+                metrics::counter!("processed_bytes_total", serialized_payload_len as u64);
+                metrics::counter!("processed_events_total", total_members as u64);
                 ()
             })
         });
@@ -413,11 +426,15 @@ where
         let mut interval = time::interval(self.timeout);
         let mut flushes = FuturesUnordered::new();
         loop {
+            metrics::gauge!("outstanding_requests", flushes.len() as f64);
             // TODO the current ticking method does not take into account
             // flushing. That is, no matter what, we will always flush every
             // interval even if we just finished flushing.
             tokio::select! {
-                _ = interval.tick() => flushes.extend(self.flush_to_api().await?),
+                _ = interval.tick() => {
+                    metrics::counter!("tick", 1);
+                    flushes.extend(self.flush_to_api().await?)
+                },
                 Some(_) = flushes.next() => {
                     // Nothing, intentionally. Maybe we do metrics here?
                 }
