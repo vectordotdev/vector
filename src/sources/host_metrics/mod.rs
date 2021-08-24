@@ -140,6 +140,7 @@ impl HostMetricsConfig {
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
         let mut metrics = Vec::new();
+        #[cfg(target_os = "linux")]
         if self.has_collector(Collector::Cgroups) {
             metrics.extend(add_collector("cgroups", self.cgroups_metrics().await));
         }
