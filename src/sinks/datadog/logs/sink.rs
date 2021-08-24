@@ -4,6 +4,7 @@ use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigurat
 use crate::sinks::util::Compression;
 use async_trait::async_trait;
 use flate2::write::GzEncoder;
+use futures::future::poll_fn;
 use futures::stream::{BoxStream, FuturesUnordered};
 use futures::StreamExt;
 use http::{Request, Uri};
@@ -308,6 +309,9 @@ where
         // through a vec but mixing ownership confused me greatly, since we need
         // to call back to `self` to flush the batch.
         let batches: Vec<(u64, Vec<Event>)> = self.event_batches.drain().collect();
+        poll_fn(|cx| self.http_client.poll_ready(cx))
+            .await
+            .map_err(|_e| ())?;
         let futures = // : dyn Iterator<Item = Client::Future> =
             batches.into_iter().map(move |(api_key_id, batch)| {
                 let members: Vec<BTreeMap<String, Value>> = batch

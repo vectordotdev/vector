@@ -117,7 +117,7 @@ impl SinkConfig for DatadogLogsConfig {
         )?;
 
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let client = ServiceBuilder::new().concurrency_limit(100).service(client);
+        //        let client = ServiceBuilder::new().concurrency_limit(100).service(client);
 
         // let healthcheck = healthcheck(
         //     service.clone(),
