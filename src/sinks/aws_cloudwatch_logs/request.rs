@@ -5,7 +5,7 @@ use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
     CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,
     DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError,
-    PutLogEventsRequest, PutLogEventsResponse,
+    PutLogEventsRequest, PutLogEventsResponse, PutRetentionPolicyRequest, PutRetentionPolicyError,
 };
 use std::{
     future::Future,
@@ -19,6 +19,7 @@ pub struct CloudwatchFuture {
     state: State,
     create_missing_group: bool,
     create_missing_stream: bool,
+    retention_in_days: Option<u64>,
     events: Vec<Vec<InputLogEvent>>,
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
@@ -46,6 +47,7 @@ impl CloudwatchFuture {
         group_name: String,
         create_missing_group: bool,
         create_missing_stream: bool,
+        retention_in_days: Option<u64>,
         mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
@@ -69,6 +71,7 @@ impl CloudwatchFuture {
             token_tx: Some(token_tx),
             create_missing_group,
             create_missing_stream,
+            retention_in_days,
         }
     }
 }
@@ -88,6 +91,7 @@ impl Future for CloudwatchFuture {
                             info!("Log group provided does not exist; creating a new one.");
 
                             self.state = State::CreateGroup(self.client.create_log_group());
+                            self.state = State::CreateGroup(self.client.set_log_group_retention_policy());
                             continue;
                         }
                         Err(err) => return Poll::Ready(Err(CloudwatchError::Describe(err))),
@@ -214,6 +218,16 @@ impl Client {
 
         let client = self.client.clone();
         Box::pin(async move { client.create_log_group(request).await })
+    }
+
+    pub fn set_log_group_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
+        let request = PutRetentionPolicyRequest {
+            log_group_name: self.group_name.clone(),
+            retention_in_days: self.retention_in_days.clone(),
+        };
+
+        let client = self.client.clone();
+        Box::pin(async move { client.put_retention_policy(request).await })
     }
 
     pub fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {

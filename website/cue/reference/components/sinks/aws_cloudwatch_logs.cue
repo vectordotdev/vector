@@ -90,6 +90,11 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    false
 			type: bool: default: true
 		}
+		retention_in_days: {
+			description: "Specifies the number of days log events remain in the log group"
+			required:    false
+			type: uint: default: 0
+		}
 		group_name: {
 			description: "The [group name](\(urls.aws_cloudwatch_logs_group_name)) of the target CloudWatch Logs stream."
 			required:    true
@@ -126,6 +131,10 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				{
 					_action:       "CreateLogStream"
 					required_when: "[`create_missing_stream`](#create_missing_stream) is set to `true`"
+				},
+				{
+					_action:       "PutRetentionPolicy"
+					required_when: "[`retention_in_days`](#retention_in_days) is set"
 				},
 				{
 					_action: "DescribeLogGroups"

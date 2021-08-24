@@ -69,6 +69,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub encoding: EncodingConfig<Encoding>,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
+    pub retention_in_days: Option<u64>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -99,6 +100,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         encoding: e.into(),
         create_missing_group: Default::default(),
         create_missing_stream: Default::default(),
+        retention_in_days: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -113,6 +115,7 @@ pub struct CloudwatchLogsSvc {
     group_name: String,
     create_missing_group: bool,
     create_missing_stream: bool,
+    retention_in_days: u64,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
@@ -283,6 +286,7 @@ impl CloudwatchLogsSvc {
 
         let create_missing_group = config.create_missing_group.unwrap_or(true);
         let create_missing_stream = config.create_missing_stream.unwrap_or(true);
+        let retention_in_days = config.retention_in_days.unwrap_or(0);
 
         CloudwatchLogsSvc {
             client,
@@ -290,6 +294,7 @@ impl CloudwatchLogsSvc {
             group_name,
             create_missing_group,
             create_missing_stream,
+            retention_in_days,
             token: None,
             token_rx: None,
         }
@@ -386,6 +391,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.group_name.clone(),
                 self.create_missing_group,
                 self.create_missing_stream,
+                self.retention_in_days,
                 event_batches,
                 self.token.take(),
                 tx,
@@ -882,6 +888,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            retention_in_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -929,6 +936,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            retention_in_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -995,6 +1003,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            retention_in_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -1067,6 +1076,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            retention_in_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -1116,6 +1126,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            retention_in_days: None,
             compression: Default::default(),
             batch: BatchConfig {
                 max_events: Some(2),
@@ -1167,6 +1178,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            retention_in_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -1253,6 +1265,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            retention_in_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
