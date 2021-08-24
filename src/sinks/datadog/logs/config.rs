@@ -10,7 +10,6 @@ use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
-use tower::ServiceBuilder;
 
 // What is important here? I have to have a solution that satisfies the
 // `BatchConfig` passed in. The final sink-type thing must fit into a

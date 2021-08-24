@@ -4,8 +4,9 @@ use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigurat
 use crate::sinks::util::Compression;
 use async_trait::async_trait;
 use flate2::write::GzEncoder;
-use futures::future::poll_fn;
+use futures::future::{poll_fn, FutureExt};
 use futures::stream::{BoxStream, FuturesUnordered};
+use futures::Future;
 use futures::StreamExt;
 use http::{Request, Uri};
 use hyper::Body;
@@ -19,7 +20,8 @@ use tokio::time::{self, Duration};
 use tower::Service;
 use twox_hash::XxHash64;
 use vector_core::config::{log_schema, LogSchema};
-use vector_core::event::{Event, LogEvent, Value};
+use vector_core::event::EventStatus;
+use vector_core::event::{Event, EventFinalizers, LogEvent, Value};
 use vector_core::sink::StreamSink;
 use vector_core::ByteSizeOf;
 
@@ -298,7 +300,7 @@ where
     /// Flush the `Event` batches out to Datadog API
     async fn flush_to_api<'a>(
         self: &'a mut Self,
-    ) -> Result<impl Iterator<Item = Client::Future> + Send + 'a, ()> {
+    ) -> Result<impl Iterator<Item = impl Future<Output = ()>> + Send + 'a, ()> {
         // The Datadog API makes no claim on how many requests we can make at
         // one time. We rely on the http client to handle retries and what
         // not. This implementation stacks up futures for each key present in
@@ -312,44 +314,59 @@ where
         poll_fn(|cx| self.http_client.poll_ready(cx))
             .await
             .map_err(|_e| ())?;
-        let futures = // : dyn Iterator<Item = Client::Future> =
-            batches.into_iter().map(move |(api_key_id, batch)| {
-                let members: Vec<BTreeMap<String, Value>> = batch
-                    .into_iter()
-                    .map(|event| event.into_log())
-                    .map(|log| log.into_parts().0)
-                    .collect();
-                let payload = Payload { members };
-                let body: Vec<u8> = serde_json::to_vec(&payload).expect("failed to encode to json");
+        let futures = batches.into_iter().map(move |(api_key_id, batch)| {
+            let mut members: Vec<BTreeMap<String, Value>> = Vec::with_capacity(batch.len());
+            let mut finalizers: Vec<EventFinalizers> = Vec::with_capacity(batch.len());
+            for event in batch.into_iter() {
+                let (fields, mut metadata) = event.into_log().into_parts();
+                members.push(fields);
+                finalizers.push(metadata.take_finalizers());
+            }
 
-                let api_key = self.key_slab.get(&api_key_id).expect("impossible situation");
-                let request = Request::post(self.datadog_uri.clone())
-                    .header("Content-Type", "application/json")
-                    .header("DD-API-KEY", &api_key[..]);
-                let (request, encoded_body) = match self.compression {
-                    Compression::None => (request, body),
-                    Compression::Gzip(level) => {
-                        let level = level.unwrap_or(GZIP_FAST);
-                        let mut encoder = GzEncoder::new(
-                            Vec::with_capacity(body.len()),
-                            flate2::Compression::new(level as u32),
-                        );
+            let payload = Payload { members };
+            let body: Vec<u8> = serde_json::to_vec(&payload).expect("failed to encode to json");
 
-                        encoder.write_all(&body).expect("failed to write body");
-                        (
-                            request.header("Content-Encoding", "gzip"),
-                            encoder.finish().expect("failed to encode"),
-                        )
-                    }
+            let api_key = self
+                .key_slab
+                .get(&api_key_id)
+                .expect("impossible situation");
+            let request = Request::post(self.datadog_uri.clone())
+                .header("Content-Type", "application/json")
+                .header("DD-API-KEY", &api_key[..]);
+            let (request, encoded_body) = match self.compression {
+                Compression::None => (request, body),
+                Compression::Gzip(level) => {
+                    let level = level.unwrap_or(GZIP_FAST);
+                    let mut encoder = GzEncoder::new(
+                        Vec::with_capacity(body.len()),
+                        flate2::Compression::new(level as u32),
+                    );
+
+                    encoder.write_all(&body).expect("failed to write body");
+                    (
+                        request.header("Content-Encoding", "gzip"),
+                        encoder.finish().expect("failed to encode"),
+                    )
+                }
+            };
+            let request = request
+                .header("Content-Length", encoded_body.len())
+                .body(Body::from(encoded_body))
+                // .map_err(Into::into)
+                .expect("failed to make request");
+
+            let fut: Client::Future = self.http_client.call(request);
+            fut.map(|result| {
+                let status: EventStatus = match result {
+                    Ok(_) => EventStatus::Delivered,
+                    Err(_) => EventStatus::Errored,
                 };
-                let request = request
-                    .header("Content-Length", encoded_body.len())
-                    .body(Body::from(encoded_body))
-                    // .map_err(Into::into)
-                    .expect("failed to make request");
-
-                self.http_client.call(request)
-            });
+                for finalizer in finalizers {
+                    finalizer.update_status(status);
+                }
+                ()
+            })
+        });
         Ok(futures)
     }
 }
