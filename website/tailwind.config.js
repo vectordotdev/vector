@@ -68,7 +68,7 @@ module.exports = {
             'a code': {
               'color': 'inherit'
             },
-            'ul > li >': {
+            'ul > li >, ol > li >': {
               '*:first-child, *:last-child': {
                 margin: 0
               }
