@@ -23,6 +23,8 @@ pub mod api;
 mod builder;
 mod compiler;
 pub mod component;
+#[cfg(feature = "datadog-pipelines")]
+pub mod datadog;
 mod diff;
 pub mod format;
 mod id;
@@ -80,6 +82,8 @@ pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
+    #[cfg(feature = "datadog-pipelines")]
+    pub datadog: datadog::Options,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<ComponentId, SourceOuter>,
     pub sinks: IndexMap<ComponentId, SinkOuter>,

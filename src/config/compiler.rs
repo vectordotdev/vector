@@ -28,6 +28,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
                 global: builder.global,
                 #[cfg(feature = "api")]
                 api: builder.api,
+                #[cfg(feature = "datadog-pipelines")]
+                datadog: builder.datadog,
                 healthchecks: builder.healthchecks,
                 enrichment_tables: builder.enrichment_tables,
                 sources: builder.sources,
