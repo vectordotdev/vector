@@ -77,7 +77,7 @@ helm upgrade vector vector/vector-agent \
 
 ## Aggregator
 
-The Vector [Aggregator] lets you [transform] your data. For example, dedupe, aggregate, or redact the data before sending it to its final destination.
+The Vector [Aggregator] lets you [transform] and ship data collected by other agents. For example, it can insure that the data you are collecting is scrubbed of sensitive information, properly formatted for downstream consumers, sampled to reduce volume, and more.
 
 ### Configuring
 
