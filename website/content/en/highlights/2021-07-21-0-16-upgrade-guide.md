@@ -15,10 +15,7 @@ Vector's 0.16.0 release includes three **breaking changes**:
 1. [Component name field renamed to ID](#name-to-id)
 1. [Datadog Log sink encoding option removed](#encoding)
 1. [Renaming of `memory_use_bytes` internal metric](#memory_use_bytes)
-
-And one **deprecation**:
-
-1. [Vector source/sink version 2 released](#vector_source_sink)
+1. [`datadog_logs` source renamed to `datadog_agent`](#datadog_logs_rename)
 
 We cover them below to help you upgrade quickly:
 
@@ -90,99 +87,36 @@ a measure of the `lua` runtime memory usage, you should update to refer to
 
 The documentation for this metric has also been updated.
 
-### Vector source/sink version 2 released {#vector_source_sink}
+### `datadog_logs` source renamed to `datadog_agent` {#datadog_logs_rename}
 
-We've released a new major version (`v2`) of our `vector` [source][]/[sink][]
-components. This release resolves several issues and limitations we experienced
-with our previous (`v1`) TCP-based implementation of these two components:
+With the release of Vector 0.16.0, we've renamed the `datadog_logs` source to `datadog_agent`.
 
-- `vector` sink does not work in k8s with dynamic IP addresses ([#2070][])
-- Allow for HTTP in the vector source and sinks ([#5124][])
-- Allow Vector Source and Sink to Communicate over GRPC ([#6646][])
-- RFC 5843 - Encoding/Decoding for Vector to Vector Communication ([#6032][])
+The naming of the `datadog_logs` source was somewhat ambiguous as it could be construed to indicate it is compatible
+with the `datadog_logs` sink and that it mimics the [Datadog Logs API][datadog_logs_api]. However, the intention of this
+source is to collect data specifically from running [Datadog Agents][datadog_agent] and this release contains some more
+baked in assumptions that the data is specifically coming from agent.
 
-The new version transitions to using gRPC over HTTP as its communication
-protocol, which resolves those limitations.
+For now, this source only collects logs forwarded by the agent, but in the future it will be expanded to collect metrics
+and traces.
 
-To allow operators to transition at their leisure, this new release of Vector
-still defaults to `v1`. In the next release (`0.17.0`) we'll require operators
-to explicitly state which version they want to use, but continue to support
-`v1`. The release after that (`0.18.0`) we'll drop `v1` completely, and default
-to `v2`, we also no longer require you to explicitly set the version since there
-will only be one supported going forward.
+We decided to make this a breaking change, instead of aliasing `datadog_logs`, as the released changes are not backwords
+compatible and the name change reflects this.
 
-If you want to opt in to the new (stable!) `v2` version, you can do so as
-follows:
+It is possible that we will re-add a `datadog_logs` source in the future that mimics the Datadog API for use with other
+Datadog clients aside from the agent. Let us know if this would be useful to you!
 
-```diff
-[sinks.vector]
-  type = "vector"
-+ version = "v2"
 
-[sources.vector]
-  type = "vector"
-+ version = "v2"
-```
+## Upgrade Guide
 
-There are a couple of things to be aware of:
-
-#### Upgrade both the source _and_ sink
-
-You **have** to upgrade **both** the source and sink to `v2`, or none at all,
-you cannot update one without updating the other. Doing so will result in a loss
-of events.
-
-#### Zero-downtime deployment
-
-If you want to do a zero-downtime upgrade to `v2`, you'll have to introduce the
-new source/sink versions next to the existing versions, before removing the
-existing one.
-
-First, deploy the configuration that defines the source:
+Rename a `datadog_logs` source components in your configuration to `datadog_agent`:
 
 ```diff
-  [sources.vector]
-    address = "0.0.0.0:9000"
-    type = "vector"
-+   version = "v1"
-
-+ [sources.vector]
-+   address = "0.0.0.0:5000"
-+   type = "vector"
-+   version = "v2"
+[sources.datadog]
+-type = "datadog_logs"
++type = "datadog_agent"
+address = "0.0.0.0:8080"
+store_api_key = true
 ```
 
-Then, deploy the sink configuration, switching it over to the new version:
-
-```diff
-  [sinks.vector]
--   address = "127.0.1.2:9000"
-+   address = "127.0.1.2:5000"
-    type = "vector"
-+   version = "v2"
-```
-
-Once the sink is deployed, you can do another deploy of the source, removing the
-old version:
-
-```diff
-- [sources.vector]
--   address = "0.0.0.0:9000"
--   type = "vector"
--   version = "v1"
--
-  [sources.vector]
-    address = "0.0.0.0:5000"
-    type = "vector"
-    version = "v2"
-```
-
-That's it! You are now using the new transport protocol for Vector-to-Vector
-communication.
-
-[source]: https://vector.dev/docs/reference/configuration/sources/vector/
-[sink]: https://vector.dev/docs/reference/configuration/sinks/vector/
-[#2070]: https://github.com/timberio/vector/issues/2070
-[#5124]: https://github.com/timberio/vector/issues/5124
-[#6646]: https://github.com/timberio/vector/issues/6646
-[#6032]: https://github.com/timberio/vector/pull/6032
+[datadog_agent]: https://docs.datadoghq.com/agent/
+[datadog_logs_api]: https://docs.datadoghq.com/api/latest/logs/#send-logs
