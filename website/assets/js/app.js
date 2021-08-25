@@ -6,6 +6,9 @@ import 'alpinejs';
 
 const sayHello = () => {
   console.log('Welcome to the Vector website and documentation!');
+
+  // creating an error.
+  test2.test
 }
 
 const clearLocalStorageOnNewGeneration = () => {
