@@ -7,10 +7,8 @@ import { datadogLogs } from '@datadog/browser-logs';
 
 const env = '{{ $env }}';
 
-console.log(`Hugo env: ${env}`);
-
 if (datadogRum) {
-  if (env === 'preview' || env === 'live') {
+  if (env === 'preview' || env === 'production') {
     datadogRum.init({
       applicationId: '{{ $ddConfig.application_id }}',
       clientToken: '{{ $ddConfig.client_token }}',
@@ -23,7 +21,7 @@ if (datadogRum) {
 }
 
 if (datadogLogs) {
-  if (env === 'preview' || env === 'live') {
+  if (env === 'preview' || env === 'production') {
     datadogLogs.init({
       clientToken: '{{ $ddConfig.client_token }}',
       forwardErrorsToLogs: true,
