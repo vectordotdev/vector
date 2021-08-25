@@ -10,13 +10,11 @@ use futures::Future;
 use futures::StreamExt;
 use http::{Request, Uri};
 use hyper::Body;
-use itertools::Itertools;
 use snafu::Snafu;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 use std::io::Write;
-use std::iter::Iterator;
 use tokio::time::{self, Duration};
 use tower::Service;
 use twox_hash::XxHash64;
@@ -362,66 +360,63 @@ where
     }
 
     /// Flush the `Event` batches out to Datadog API
-    // TODO make caller pass in a buffer
-    async fn flush_to_api<'a>(
+    ///
+    /// When this function is called we are guaranteed to have less than
+    /// MAX_PAYLOAD_ARRAY total elements in a batch, whether this is triggered
+    /// by timeout or noting that `has_space` failes.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the batch size exceeds
+    /// MAX_PAYLOAD_ARRAY. Doing so implies a serious bug in the logic of this
+    /// implementaiton.
+    fn flush_to_api<'a>(
         self: &'a mut Self,
         api_key_id: u64,
-    ) -> Result<impl Iterator<Item = impl Future<Output = ()>> + Send + 'a, ()> {
-        metrics::counter!("flush", 1);
-        // The Datadog API makes no claim on how many requests we can make at
-        // one time. We rely on the http client to handle retries and what
-        // not. This implementation stacks up futures for each key present in
-        // the batches and runs them unordered, returning when the last
-        // completes.
-        let mut future_buffer = Vec::with_capacity(128);
+    ) -> Result<impl Future<Output = ()> + Send, ()> {
+        let batch = self
+            .event_batches
+            .remove(&api_key_id)
+            .expect("impossible situation");
+        assert!(batch.len() <= MAX_PAYLOAD_ARRAY);
 
+        metrics::counter!("flush", 1);
         let api_key = self
             .key_slab
             .get(&api_key_id)
             .expect("impossible situation");
-        // Because we track how large a batch is by _bytes_ but the API
-        // tracks by _members_ we have to make a conversion here.
-        for (members, finalizers) in self
-            .event_batches
-            .remove(&api_key_id)
-            .expect("impossible situation")
-            .into_iter()
-            .chunks(MAX_PAYLOAD_ARRAY)
-            .into_iter()
-            .map(|batch| dissect_batch(batch.collect()))
-        {
-            let mut flush_metrics = FlushMetrics::default();
-            let request = build_request(
-                members,
-                &api_key[..],
-                self.datadog_uri.clone(),
-                &self.compression,
-                &mut flush_metrics,
-            );
-            let fut = self.http_client.call(request).map(move |result| {
-                let status: EventStatus = match result {
-                    Ok(_) => {
-                        metrics::counter!("flush_success", 1);
-                        EventStatus::Delivered
-                    }
-                    Err(_) => {
-                        metrics::counter!("flush_error", 1);
-                        EventStatus::Errored
-                    }
-                };
-                for finalizer in finalizers {
-                    finalizer.update_status(status);
+
+        let (members, finalizers) = dissect_batch(batch);
+        let mut flush_metrics = FlushMetrics::default();
+        let request = build_request(
+            members,
+            &api_key[..],
+            self.datadog_uri.clone(),
+            &self.compression,
+            &mut flush_metrics,
+        );
+        let fut = self.http_client.call(request).map(move |result| {
+            let status: EventStatus = match result {
+                Ok(_) => {
+                    metrics::counter!("flush_success", 1);
+                    EventStatus::Delivered
                 }
-                metrics::counter!("processed_bytes_total", flush_metrics.processed_bytes_total);
-                metrics::counter!(
-                    "processed_events_total",
-                    flush_metrics.processed_events_total
-                );
-                ()
-            });
-            future_buffer.push(fut);
-        }
-        Ok(future_buffer.into_iter())
+                Err(_) => {
+                    metrics::counter!("flush_error", 1);
+                    EventStatus::Errored
+                }
+            };
+            for finalizer in finalizers {
+                finalizer.update_status(status);
+            }
+            metrics::counter!("processed_bytes_total", flush_metrics.processed_bytes_total);
+            metrics::counter!(
+                "processed_events_total",
+                flush_metrics.processed_events_total
+            );
+            ()
+        });
+        Ok(fut)
     }
 }
 
@@ -499,7 +494,13 @@ where
                         // flushing a single large batch. As of self writing the
                         // batch structure doesn't allow sorting by size so we
                         // just ship the whole thing.
-                        flushes.extend(self.flush_to_api(key_id).await?);
+                        //
+                        // TODO currently we do serialization inline to this
+                        // call, which is time consuming relative to processing
+                        // incoming events. If we could serialize in parallel to
+                        // doing IO we'd end up ahead most likely.
+                        let flush = self.flush_to_api(key_id)?;
+                        flushes.push(flush);
                         self.bytes_stored = 0;
                     }
                     self.store_event(key_id, event);
