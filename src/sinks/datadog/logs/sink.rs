@@ -326,27 +326,46 @@ where
         }
     }
 
+    /// Determines if there is space in the batch for an additional `Event`
+    ///
+    /// This function determines whether adding a new `Event` to the batch
+    /// associated with `id` will take that batch over the maximum payload
+    /// size. If this function returns true the user may call [`store_event`]
+    /// else they must clear out space in the batch or drop whatever `Event`
+    /// they're holding.
+    #[inline]
+    fn has_space(&self, id: u64) -> bool {
+        if let Some(arr) = self.event_batches.get(&id) {
+            arr.len() < MAX_PAYLOAD_ARRAY
+        } else {
+            true
+        }
+    }
+
     /// Stores the `Event` in its batch
     ///
-    /// This function stores the `Event` in its `id` appropriate batch. This
-    /// will accumulate until a flush is done, triggered by the total byte size
-    /// in storage here.
+    /// This function stores the `Event` in its `id` appropriate batch. Caller
+    /// MUST confirm that there is space in the batch for the `Event` by calling
+    /// `has_space`, which must return true.
     ///
     /// # Panics
     ///
     /// This function will panic if there is no space in the underlying batch.
     #[inline]
     fn store_event(&mut self, id: u64, event: Event) {
-        self.event_batches
+        let arr = self
+            .event_batches
             .entry(id)
-            .or_insert_with(|| Vec::with_capacity(MAX_PAYLOAD_ARRAY))
-            .push(event)
+            .or_insert_with(|| Vec::with_capacity(MAX_PAYLOAD_ARRAY));
+        assert!(arr.len() + 1 <= MAX_PAYLOAD_ARRAY);
+        arr.push(event);
     }
 
     /// Flush the `Event` batches out to Datadog API
     // TODO make caller pass in a buffer
     async fn flush_to_api<'a>(
         self: &'a mut Self,
+        api_key_id: u64,
     ) -> Result<impl Iterator<Item = impl Future<Output = ()>> + Send + 'a, ()> {
         metrics::counter!("flush", 1);
         // The Datadog API makes no claim on how many requests we can make at
@@ -354,60 +373,53 @@ where
         // not. This implementation stacks up futures for each key present in
         // the batches and runs them unordered, returning when the last
         // completes.
-
-        // NOTE I would prefer to map directly over the Drain without going
-        // through a vec but mixing ownership confused me greatly, since we need
-        // to call back to `self` to flush the batch.
-        let batches: Vec<(u64, Vec<Event>)> = self.event_batches.drain().collect();
-        poll_fn(|cx| self.http_client.poll_ready(cx))
-            .await
-            .map_err(|_e| ())?;
         let mut future_buffer = Vec::with_capacity(128);
 
-        for (api_key_id, batch_by_bytes) in batches.into_iter() {
-            let api_key = self
-                .key_slab
-                .get(&api_key_id)
-                .expect("impossible situation");
-            // Because we track how large a batch is by _bytes_ but the API
-            // tracks by _members_ we have to make a conversion here.
-            for (members, finalizers) in batch_by_bytes
-                .into_iter()
-                .chunks(MAX_PAYLOAD_ARRAY)
-                .into_iter()
-                .map(|batch| dissect_batch(batch.collect()))
-            {
-                let mut flush_metrics = FlushMetrics::default();
-                let request = build_request(
-                    members,
-                    &api_key[..],
-                    self.datadog_uri.clone(),
-                    &self.compression,
-                    &mut flush_metrics,
-                );
-                let fut = self.http_client.call(request).map(move |result| {
-                    let status: EventStatus = match result {
-                        Ok(_) => {
-                            metrics::counter!("flush_success", 1);
-                            EventStatus::Delivered
-                        }
-                        Err(_) => {
-                            metrics::counter!("flush_error", 1);
-                            EventStatus::Errored
-                        }
-                    };
-                    for finalizer in finalizers {
-                        finalizer.update_status(status);
+        let api_key = self
+            .key_slab
+            .get(&api_key_id)
+            .expect("impossible situation");
+        // Because we track how large a batch is by _bytes_ but the API
+        // tracks by _members_ we have to make a conversion here.
+        for (members, finalizers) in self
+            .event_batches
+            .remove(&api_key_id)
+            .expect("impossible situation")
+            .into_iter()
+            .chunks(MAX_PAYLOAD_ARRAY)
+            .into_iter()
+            .map(|batch| dissect_batch(batch.collect()))
+        {
+            let mut flush_metrics = FlushMetrics::default();
+            let request = build_request(
+                members,
+                &api_key[..],
+                self.datadog_uri.clone(),
+                &self.compression,
+                &mut flush_metrics,
+            );
+            let fut = self.http_client.call(request).map(move |result| {
+                let status: EventStatus = match result {
+                    Ok(_) => {
+                        metrics::counter!("flush_success", 1);
+                        EventStatus::Delivered
                     }
-                    metrics::counter!("processed_bytes_total", flush_metrics.processed_bytes_total);
-                    metrics::counter!(
-                        "processed_events_total",
-                        flush_metrics.processed_events_total
-                    );
-                    ()
-                });
-                future_buffer.push(fut);
-            }
+                    Err(_) => {
+                        metrics::counter!("flush_error", 1);
+                        EventStatus::Errored
+                    }
+                };
+                for finalizer in finalizers {
+                    finalizer.update_status(status);
+                }
+                metrics::counter!("processed_bytes_total", flush_metrics.processed_bytes_total);
+                metrics::counter!(
+                    "processed_events_total",
+                    flush_metrics.processed_events_total
+                );
+                ()
+            });
+            future_buffer.push(fut);
         }
         Ok(future_buffer.into_iter())
     }
@@ -443,6 +455,11 @@ where
         let timestamp_key = self.log_schema_timestamp_key;
         let host_key = self.log_schema_host_key;
 
+        // Before we start we need to prime the pump on our http client.
+        poll_fn(|cx| self.http_client.poll_ready(cx))
+            .await
+            .map_err(|_e| ())?;
+
         let mut input = input.map(|mut event| {
             let log = event.as_mut_log();
             rename_key(message_key, "message", log);
@@ -469,27 +486,28 @@ where
                 // track by how large a flush ID is. Change flush_to_api to JUST
                 // flush by ID.
 
+                Some(()) = flushes.next() => {
+                    // nothing, intentionally
+                }
                 Some(event) = input.next() => {
                     let key_id = self.register_key_id(&event);
                     let event_size = event.size_of();
-                    if self.bytes_stored_limit < self.bytes_stored + event_size {
+                    if !self.has_space(key_id) || self.bytes_stored_limit < self.bytes_stored + event_size {
                         // We've gone over the bytes limit and must flush our
                         // batches. As a future optimization, since we haven't
                         // passed the timeout yet, we might consider only
                         // flushing a single large batch. As of self writing the
                         // batch structure doesn't allow sorting by size so we
                         // just ship the whole thing.
-                        flushes.extend(self.flush_to_api().await?);
+                        flushes.extend(self.flush_to_api(key_id).await?);
                         self.bytes_stored = 0;
                     }
                     self.store_event(key_id, event);
                     self.bytes_stored += event_size;
                 }
-                Some(()) = flushes.next() => {
-                    // nothing, intentionally
-                }
                 _ = interval.tick() => {
-                    flushes.extend(self.flush_to_api().await?)
+                    // TODO
+                    // flushes.extend(self.flush_to_api().await?)
                 },
             }
         }
