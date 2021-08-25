@@ -236,14 +236,19 @@ url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
 weight = 1
 
 [[languages.en.menus.meta]]
-name = "Release"
-url = "https://github.com/timberio/vector/blob/master/docs/RELEASING.md"
+name = "Security"
+url = "https://github.com/timberio/vector/security/policy"
 weight = 2
 
 [[languages.en.menus.meta]]
-name = "Security"
-url = "https://github.com/timberio/vector/security/policy"
+name = "Releases"
+url = "https://github.com/timberio/vector/blob/master/RELEASES.md"
 weight = 3
+
+[[languages.en.menus.meta]]
+name = "Versioning"
+url = "https://github.com/timberio/vector/blob/master/VERSIONING.md"
+weight = 4
 
 # Buttons in "community" section on main page
 [[languages.en.menus.community]]
