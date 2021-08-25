@@ -1377,7 +1377,7 @@ mod test {
     mod value_hash {
         use super::*;
 
-        fn hash(a: Value) -> u64 {
+        fn hash(a: &Value) -> u64 {
             let mut h = std::collections::hash_map::DefaultHasher::new();
 
             a.hash(&mut h);
@@ -1386,23 +1386,23 @@ mod test {
 
         #[test]
         fn hash_correctly() {
-            assert_eq!(hash(Value::Integer(0)), hash(Value::Integer(0)));
-            assert_ne!(hash(Value::Integer(0)), hash(Value::Integer(1)));
-            assert_ne!(hash(Value::Boolean(true)), hash(Value::Integer(2)));
-            assert_eq!(hash(Value::Float(1.2)), hash(Value::Float(1.4)));
-            assert_ne!(hash(Value::Float(1.2)), hash(Value::Float(-1.2)));
-            assert_ne!(hash(Value::Float(-0.0)), hash(Value::Float(0.0)));
+            assert_eq!(hash(&Value::Integer(0)), hash(&Value::Integer(0)));
+            assert_ne!(hash(&Value::Integer(0)), hash(&Value::Integer(1)));
+            assert_ne!(hash(&Value::Boolean(true)), hash(&Value::Integer(2)));
+            assert_eq!(hash(&Value::Float(1.2)), hash(&Value::Float(1.4)));
+            assert_ne!(hash(&Value::Float(1.2)), hash(&Value::Float(-1.2)));
+            assert_ne!(hash(&Value::Float(-0.0)), hash(&Value::Float(0.0)));
             assert_ne!(
-                hash(Value::Float(f64::NEG_INFINITY)),
-                hash(Value::Float(f64::INFINITY))
+                hash(&Value::Float(f64::NEG_INFINITY)),
+                hash(&Value::Float(f64::INFINITY))
             );
             assert_eq!(
-                hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
-                hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)]))
+                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
+                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)]))
             );
             assert_ne!(
-                hash(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
-                hash(Value::Array(vec![Value::Integer(1), Value::Boolean(true)]))
+                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
+                hash(&Value::Array(vec![Value::Integer(1), Value::Boolean(true)]))
             );
         }
     }
