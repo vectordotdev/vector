@@ -131,7 +131,7 @@ from the upstream source and before the creation of a Vector event.
 or receiving one or more Vector events.
 
 * Properties
-  * `quantity` - The quantity of Vector events.
+  * `count` - The count of Vector events.
   * `byte_size` - The cumulative byte size of all events in JSON representation.
 * Metrics
   * MUST increment the `received_events_total` counter by the defined `quantity`
