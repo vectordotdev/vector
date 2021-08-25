@@ -37,10 +37,10 @@ outline these rules to guide new component development and ongoing maintenance.
 
 ## Scope
 
-This specification addresses direct component concerns
-
-TODO: limit this document to direct component-level code and not supporting
-infrastructure.
+This specification addresses _direct_ component development and does not cover
+aspects that components inherit "for free". For example, this specification does
+not cover gloal context, such as `component_id`, that all components receive in
+their telemetry by nature of being a Vector compoent.
 
 ## How to read this document
 
