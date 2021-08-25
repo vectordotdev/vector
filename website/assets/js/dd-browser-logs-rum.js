@@ -1,24 +1,13 @@
 {{ $latest := index site.Data.docs.versions 0 }}
 {{ $ddConfig := site.Params.datadog_config }}
+{{ $env := hugo.Environment }}
 
 import { datadogRum } from '@datadog/browser-rum';
 import { datadogLogs } from '@datadog/browser-logs';
 
-const getEnv = () => {
-  let env;
+const env = '{{ $env }}';
 
-  if (window.location.hostname.includes('localhost')) {
-    env = 'development'
-  } else if (window.location.hostname.includes('deploy-preview')) {
-    env = 'preview'
-  } else {
-    env = 'live'
-  }
-
-  return env;
-}
-
-const env = getEnv();
+console.log(`Hugo env: ${env}`);
 
 if (datadogRum) {
   if (env === 'preview' || env === 'live') {
