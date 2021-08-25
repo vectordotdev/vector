@@ -532,7 +532,7 @@ urls: {
 	vector_regex_parser:                                      "/docs/reference/configuration/transforms/regex_parser"
 	vector_releases:                                          "/releases/latest/"
 	vector_reduce_transform:                                  "/docs/reference/configuration/transforms/reduce"
-	vector_release_policy:                                    "https://github.com/timberio/vector/blob/master/RELEASING.md"
+	vector_release_policy:                                    "https://github.com/timberio/vector/blob/master/docs/RELEASING.md"
 	vector_remap_transform:                                   "/docs/reference/configuration/transforms/remap/"
 	vector_remap_transform_multiple:                          "/docs/reference/configuration/transforms/remap/#emitting-multiple-log-events"
 	vector_repo:                                              "\(github)/timberio/vector"
