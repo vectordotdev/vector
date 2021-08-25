@@ -235,6 +235,10 @@ impl Look<'static> for LookupBuf {
         self.is_empty()
     }
 
+    #[allow(clippy::should_implement_trait)]
+    // This is also defined as `FromStr` on `LookupBuf` but we need `from_str` to be defined on the
+    // `Lookup` trait itself since we cannot define `FromStr` for `LookupView` due to the lifetime
+    // constraint
     pub fn from_str(value: &'static str) -> Result<LookupBuf, LookupError> {
         Lookup::from_str(value).map(|l| l.into_buf())
     }
