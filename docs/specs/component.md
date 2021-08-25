@@ -12,13 +12,17 @@ interpreted as described in [RFC 2119].
 1. [Introduction](#introduction)
 1. [Scope](#scope)
 1. [How to read this document](#how-to-read-this-document)
+1. [Configuration](#configuration)
+   1. [Options](#options)
+      1. [`address`](#address)
+      1. [`endpoint(s)`](#endpoints)
 1. [Instrumentation](#instrumentation)
    1. [Batching](#batching)
    1. [Events](#events)
       1. [BytesReceived](#bytesreceived)
       1. [EventsRecevied](#eventsrecevied)
-      1. [EventsProcessed](#eventsprocessed)
       1. [EventsSent](#eventssent)
+      1. [BytesSent](#bytessent)
       1. [Error](#error)
 
 <!-- /MarkdownTOC -->
@@ -43,6 +47,20 @@ infrastructure.
 This document is written from the broad perspective of a Vector component.
 Unless otherwise stated, a section applies to all component types (sources,
 transforms, and sinks).
+
+## Configuration
+
+### Options
+
+#### `address`
+
+When a component binds to an address, it should expose an `address` option that
+takes a `string` representing a single address.
+
+#### `endpoint(s)`
+
+When a component sends data to a downstream target, it should expose an
+`endpoint(s)` option that takes a `string` representing one or more endpoints
 
 ## Instrumentation
 
@@ -78,53 +96,112 @@ There is leeway in the implementation of these events:
 #### BytesReceived
 
 *Sources* MUST emit a `BytesReceived` event immediately after receiving bytes
-from the upstream source, before the creation of a Vector event. The following
-telemetry MUST be included:
+from the upstream source and before the creation of a Vector event.
 
+* Properties
+  * `byte_size`
+    * For UDP, TCP, and Unix protocols, the total number of bytes received from
+      the socket excluding the delimiter.
+    * For HTTP-based protocols, the total number of bytes in the HTTP body, as
+      represented by the `Content-Length` header.
+    * For files, the total number of bytes read from the file excluding the
+      delimiter.
+  * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+    `unix`, `http`, `https`, `file`, etc.)
+  * `address` - If relevant, the bound address that the bytes were received
+    from. For HTTP, this MUST be the host and path only, excluding the query
+    string.
+  * `path` - If relevant, the HTTP path, excluding query strings.
+  * `socket` - If relevant, the socket number that bytes were received from.
+  * `remote_address` - If relevant, the remote IP address of the upstream
+    client.
+  * `file` - If relevant, the absolute path of the file.
 * Metrics
-   * MUST increment the `bytes_in_total` counter by the number of bytes
-     received.
-     * If received over the HTTP then the `http_path` tag must be set.
+  * MUST increment the `received_bytes_total` counter by the defined value with
+    the defined properties as metric tags.
 * Logging
-   * MUST log a `Bytes received.` message at the `trace` level with no rate
-     limiting.
+  * MUST log a `{byte_size} bytes received.` message at the `trace` level with
+    the defined properties as structured data. It MUST NOT be rate limited.
 
 #### EventsRecevied
 
 *All components* MUST emit an `EventsReceived` event immediately after creating
 or receiving one or more Vector events.
 
+* Properties
+  * `quantity` - The quantity of Vector events.
+  * `byte_size` - The cumulative byte size of all events in JSON representation.
 * Metrics
-   * MUST increment the `events_in_total` counter by the number of events
-     received.
-   * MUST increment the `event_bytes_in_total` counter by the cumulative byte
-     size of the events in JSON representation.
+  * MUST increment the `received_events_total` counter by the defined `quantity`
+    property with the other properties as metric tags.
+  * MUST increment the `received_event_bytes_total` counter by the defined
+    `byte_size` property with the other properties as metric tags.
 * Logging
-   * MUST log a `{count} events received.` message at the `trace` level with no
-     rate limiting.
-
-#### EventsProcessed
-
-*All components* MUST emit an `EventsProcessed` event processing an event,
-before the event is encoded and sent downstream.
-
-* Metrics
-   * MUST increment the `events_in_total` counter by 1.
-   * MUST increment the `event_bytes_in_total` counter by the event's byte
-     size in JSON representation.
-* Logging
-   * MUST log a `Event received.` message at the `trace` level with no rate
-     limiting.
+  * MUST log a `{quantity} events received.` message at the `trace` level with
+    the defined properties as structured data. It MUST NOT be rate limited.
 
 #### EventsSent
 
-*All components* MUST emit an `EventsSent` event processing an event,
-before the event is encoded and sent downstream.
+*All components* MUST emit an `EventsSent` event immediately before sending the
+event down stream. This should happen before any transmission preparation, such
+as encoding.
 
+* Properties
+  * `quantity` - The quantity of Vector events.
+  * `byte_size` - The cumulative byte size of all events in JSON representation.
+* Metrics
+  * MUST increment the `sent_events_total` counter by the defined value with the
+    defined properties as metric tags.
+  * MUST increment the `sent_event_bytes_total` counter by the event's byte size
+    in JSON representation.
+* Logging
+  * MUST log a `{quantity} events sent.` message at the `trace` level with the
+    defined properties as structured data. It MUST NOT be rate limited.
+
+#### BytesSent
+
+*Sinks* MUST emit a `BytesSent` event immediately after sending bytes to the
+downstream target regardless if the transmission was successful or not.
+
+* Properties
+  * `byte_size`
+    * For UDP, TCP, and Unix protocols, the total number of bytes placed on the
+      socket excluding the delimiter.
+    * For HTTP-based protocols, the total number of bytes in the HTTP body, as
+      represented by the `Content-Length` header.
+    * For files, the total number of bytes written to the file excluding the
+      delimiter.
+  * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+    `unix`, `http`, `http`, `file`, etc.)
+  * `endpoint` - If relevant, the endpoint that the bytes were sent to. For
+    HTTP, this MUST be the host and path only, excluding the query string.
+  * `file` - If relevant, the absolute path of the file.
+* Metrics
+  * MUST increment the `bytes_in_total` counter by the defined value with the
+    defined properties as metric tags.
+* Logging
+  * MUST log a `{byte_size} bytes received.` message at the `trace` level with
+    the defined properties as structured data. It MUST NOT be rate limited.
 
 #### Error
 
+*All components* MUST emit error events when an error occurs, and errors MUST be
+named with an `Error` suffix. For example, the `socket` source emits a
+`SocketReceiveError` representing any error that occurs while receiving data off
+of the socket.
 
+This specification does list a standard set of errors that components must
+implement since errors are specific to the component.
+
+* Properties
+  * `error` - The string representation of the error.
+  * `stage` - The stage at which the error occured. MUST be one of `receiving`,
+    `processing`, `sending`.
+* Metrics
+  * MUST increment the `errors_total` counter by 1 with the defined properties
+    as metric tags.
+  * MUST increment the `events_discarded_total` counter by the number of Vector
+    events discarded if the error resulted in discarding (dropping) events.
 
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/
