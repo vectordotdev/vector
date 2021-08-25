@@ -10,11 +10,16 @@ interpreted as described in [RFC 2119].
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Introduction](#introduction)
+1. [Scope](#scope)
 1. [How to read this document](#how-to-read-this-document)
 1. [Instrumentation](#instrumentation)
+   1. [Batching](#batching)
    1. [Events](#events)
       1. [BytesReceived](#bytesreceived)
-      1. [EventRecevied](#eventrecevied)
+      1. [EventsRecevied](#eventsrecevied)
+      1. [EventsProcessed](#eventsprocessed)
+      1. [EventsSent](#eventssent)
+      1. [Error](#error)
 
 <!-- /MarkdownTOC -->
 
@@ -26,19 +31,37 @@ and in order to meet our [high user experience expectations] each Component must
 adhere to a common set of behaviorial rules. This document aims to clearly
 outline these rules to guide new component development and ongoing maintenance.
 
+## Scope
+
+This specification addresses direct component concerns
+
+TODO: limit this document to direct component-level code and not supporting
+infrastructure.
+
 ## How to read this document
 
 This document is written from the broad perspective of a Vector component.
-Unless otherwise stated, a section applies to all component types, although,
-most sections will be broken along component lines for easy adherence.
+Unless otherwise stated, a section applies to all component types (sources,
+transforms, and sinks).
 
 ## Instrumentation
+
+Vector components MUST be instrumented for optimal observability and monitoring.
+This is required to drive various interfaces that Vector users depend on to
+manage Vector installations in mission critical production environments.
+
+### Batching
+
+For performance reasons, components SHOULD instrument batches of Vector events
+as opposed to individual Vector events. [Pull request #8383] demonstrated
+meaningful performance improvements as a result of this strategy.
 
 ### Events
 
 Vector implements an event driven pattern ([RFC 2064]) for internal
 instrumentation. This section lists all required and optional events that a
-component MUST emit.
+component MUST emit. It is expected that components will emit custom events
+beyond those listed here that reflect component specific behavior.
 
 There is leeway in the implementation of these events:
 
@@ -61,14 +84,29 @@ telemetry MUST be included:
 * Metrics
    * MUST increment the `bytes_in_total` counter by the number of bytes
      received.
+     * If received over the HTTP then the `http_path` tag must be set.
 * Logging
    * MUST log a `Bytes received.` message at the `trace` level with no rate
      limiting.
 
-#### EventRecevied
+#### EventsRecevied
 
-*Components* MUST emit an `EventReceived` event immediately after receiving or
-creating a Vector event.
+*All components* MUST emit an `EventsReceived` event immediately after creating
+or receiving one or more Vector events.
+
+* Metrics
+   * MUST increment the `events_in_total` counter by the number of events
+     received.
+   * MUST increment the `event_bytes_in_total` counter by the cumulative byte
+     size of the events in JSON representation.
+* Logging
+   * MUST log a `{count} events received.` message at the `trace` level with no
+     rate limiting.
+
+#### EventsProcessed
+
+*All components* MUST emit an `EventsProcessed` event processing an event,
+before the event is encoded and sent downstream.
 
 * Metrics
    * MUST increment the `events_in_total` counter by 1.
@@ -78,6 +116,17 @@ creating a Vector event.
    * MUST log a `Event received.` message at the `trace` level with no rate
      limiting.
 
+#### EventsSent
+
+*All components* MUST emit an `EventsSent` event processing an event,
+before the event is encoded and sent downstream.
+
+
+#### Error
+
+
+
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[Pull request #8383]: https://github.com/timberio/vector/pull/8383/
 [RFC 2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
