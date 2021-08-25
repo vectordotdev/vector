@@ -1,10 +1,9 @@
 {{ $latest := index site.Data.docs.versions 0 }}
+{{ $ddConfig := site.Params.datadog_config }}
 
-import { ddConfig } from './config-vector';
 import { datadogRum } from '@datadog/browser-rum';
 import { datadogLogs } from '@datadog/browser-logs';
 
-// to-do:  make this better.
 const getEnv = () => {
   let env;
 
@@ -24,10 +23,10 @@ const env = getEnv();
 if (datadogRum) {
   if (env === 'preview' || env === 'live') {
     datadogRum.init({
-      applicationId: ddConfig.applicationID,
-      clientToken: ddConfig.clientToken,
+      applicationId: '{{ $ddConfig.application_id }}',
+      clientToken: '{{ $ddConfig.client_token }}',
       env,
-      service: ddConfig.service,
+      service: '{{ $ddConfig.service_name }}',
       version: '{{ $latest }}',
       trackInteractions: true
     });
@@ -37,10 +36,10 @@ if (datadogRum) {
 if (datadogLogs) {
   if (env === 'preview' || env === 'live') {
     datadogLogs.init({
-      clientToken: ddConfig.clientToken,
+      clientToken: '{{ $ddConfig.client_token }}',
       forwardErrorsToLogs: true,
       env,
-      service: ddConfig.service,
+      service: '{{ $ddConfig.service_name }}',
       version: '{{ $latest }}'
     })
   }
