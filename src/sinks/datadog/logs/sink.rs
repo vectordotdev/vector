@@ -234,11 +234,6 @@ where
     compression: Compression,
 }
 
-#[derive(serde::Serialize)]
-struct Payload {
-    members: Vec<BTreeMap<String, Value>>,
-}
-
 #[inline]
 fn dissect_batch(batch: Vec<Event>) -> (Vec<BTreeMap<String, Value>>, Vec<EventFinalizers>) {
     let mut members: Vec<BTreeMap<String, Value>> = Vec::with_capacity(batch.len());
@@ -260,8 +255,7 @@ fn build_request(
 ) -> Request<Body> {
     let total_members = members.len();
     assert!(total_members <= 1_000);
-    let payload = Payload { members };
-    let body: Vec<u8> = serde_json::to_vec(&payload).expect("failed to encode to json");
+    let body: Vec<u8> = serde_json::to_vec(&members).expect("failed to encode to json");
 
     let request = Request::post(datadog_uri)
         .header("Content-Type", "application/json")
@@ -475,12 +469,6 @@ where
             // interval even if we just finished flushing.
             tokio::select! {
                 biased;
-
-                // TODO better results when we immediately make a request once
-                // 1k members are available. Drop the bytes size thing and only
-                // track by how large a flush ID is. Change flush_to_api to JUST
-                // flush by ID.
-
                 Some(()) = flushes.next() => {
                     // nothing, intentionally
                 }
@@ -501,12 +489,18 @@ where
                         // doing IO we'd end up ahead most likely.
                         let flush = self.flush_to_api(key_id)?;
                         flushes.push(flush);
-                        self.bytes_stored = 0;
+                        self.bytes_stored = 0; // TODO logic is now wrong since we flush single-batch
                     }
                     self.store_event(key_id, event);
                     self.bytes_stored += event_size;
                 }
                 _ = interval.tick() => {
+                    let keys: Vec<u64> = self.event_batches.keys().into_iter().map(|x| *x).collect();
+                    for key_id in keys.into_iter() {
+                        let flush = self.flush_to_api(key_id)?;
+                        flushes.push(flush);
+                    }
+                    self.bytes_stored = 0;
                     // TODO
                     // flushes.extend(self.flush_to_api().await?)
                 },
