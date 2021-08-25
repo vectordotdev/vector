@@ -668,6 +668,9 @@ mod test {
                     indoc! {r#"
                         data_dir = "/foobar"
 
+                        [proxy]
+                          http = "http://proxy.inc:3128"
+
                         [transforms.foo]
                           type = "json_parser"
                           inputs = [ "in" ]
@@ -691,6 +694,8 @@ mod test {
             Ok(())
         );
 
+        assert!(config.global.proxy.http.is_some());
+        assert!(config.global.proxy.https.is_none());
         assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
         assert!(config.sources.contains_key(&ComponentId::from("in")));
         assert!(config.sinks.contains_key(&ComponentId::from("out")));
@@ -770,6 +775,38 @@ mod test {
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
         assert!(config.global.proxy.no_proxy.matches("localhost"));
+        let source = config.sources.get(&ComponentId::from("in")).unwrap();
+        assert_eq!(source.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(source.proxy.https, Some("http://other:3128".into()));
+        assert!(source.proxy.no_proxy.matches("localhost"));
+    }
+
+    #[test]
+    fn with_partial_proxy() {
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [proxy]
+                  http = "http://server:3128"
+
+                [sources.in]
+                  type = "nginx_metrics"
+                  endpoints = ["http://localhost:8000/basic_status"]
+
+                [sources.in.proxy]
+                  http = "http://server:3128"
+                  https = "http://other:3128"
+                  no_proxy = ["localhost", "127.0.0.1"]
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["in"]
+                  encoding = "json"
+            "#},
+            Some(Format::Toml),
+        )
+        .unwrap();
+        assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(config.global.proxy.https, None);
         let source = config.sources.get(&ComponentId::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3128".into()));
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
