@@ -24,6 +24,7 @@
 #[cfg(feature = "api")]
 pub mod api;
 pub mod config;
+pub mod enrichment;
 pub mod event;
 pub mod mapping;
 pub mod metrics;

@@ -726,14 +726,15 @@ components: {
 					no_proxy: {
 						common: false
 						description: """
-							List of hosts to avoid proxying globally.
+							A list of hosts to avoid proxying globally. Allowed patterns here include:
 
-							Allowed patterns here include:
-								- Domain names. For example, `example.com` will match requests to to `example.com`
-								- Wildcard domains. For example, `.example.com` will match requests to `example.com` and its subdomains
-								- IP addresses. For example, `127.0.0.1` will match requests to 127.0.0.1
-								- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
-								- `*` will match all hosts
+							Pattern | Example match
+							:-------|:-------------
+							Domain names | `example.com` matches requests to `example.com`
+							Wildcard domains | `.example.com` matches requests to `example.com` and its subdomains
+							IP addresses | `127.0.0.1` matches requests to 127.0.0.1
+							[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
+							Splat | `*` matches all hosts
 							"""
 						required: false
 						type: array: {

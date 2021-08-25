@@ -30,8 +30,8 @@ use tracing::{error, info};
 use vector::{
     buffers::Acker,
     config::{
-        DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
-        TransformConfig,
+        DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
+        TransformContext,
     },
     event::{
         metric::{self, MetricData, MetricValue},
@@ -257,7 +257,7 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform, vector::Error> {
+    async fn build(&self, _globals: &TransformContext) -> Result<Transform, vector::Error> {
         Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,

@@ -682,6 +682,36 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
+    // https://github.com/timberio/vector/issues/8363
+    #[tokio::test]
+    async fn file_read_empty_lines() {
+        let n = 5;
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
+
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+
+            writeln!(&mut file, "line for checkpointing").unwrap();
+            for _i in 0..n {
+                writeln!(&mut file).unwrap();
+            }
+
+            sleep_500_millis().await;
+        })
+        .await;
+
+        assert_eq!(received.len(), n + 1);
+    }
+
     #[tokio::test]
     async fn file_truncate() {
         let n = 5;

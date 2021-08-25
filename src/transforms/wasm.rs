@@ -1,6 +1,6 @@
 use super::{TaskTransform, Transform};
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     wasm::WasmModule,
 };
@@ -64,7 +64,7 @@ impl GenerateConfig for WasmConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::task(Wasm::new(self.clone())?))
     }
 

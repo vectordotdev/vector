@@ -31,7 +31,7 @@ impl Function for ParseNginxLog {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let variants = vec![value!("combined"), value!("error")];
 
         let value = arguments.required("value");
