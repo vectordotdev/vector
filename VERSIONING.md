@@ -19,7 +19,6 @@ Please see the [FAQ](#faq) section for more info.**
    1. [How does Vector treat patch and minor versions?](#how-does-vector-treat-patch-and-minor-versions)
    1. [How does Vector treat major versions \(breaking changes\)?](#how-does-vector-treat-major-versions-breaking-changes)
    1. [How does Vector treat pre-1.0 versions?](#how-does-vector-treat-pre-10-versions)
-   1. [Release cadence](#release-cadence)
 
 <!-- /MarkdownTOC -->
 
@@ -47,7 +46,7 @@ The following Vector areas are covered in Vector's definition of public API.
 
 #### Intended for *public* consumption
 
-The follow Vector areas are inteded for *public* consumption (consumption by
+The follow Vector areas are intended for *public* consumption (consumption by
 anything other than Vector itself). Backward incompatble changes will trigger
 a major version increment.
 
@@ -64,7 +63,7 @@ a major version increment.
 
 #### Intended for *private* consumption
 
-The following Vector areas are inteded for *private* consumption (consumption by
+The following Vector areas are intended for *private* consumption (consumption by
 Vector only). Backward incompatble changes will trigger a major version
 increment only if Vector itself is not compatbile with previous versions.
 
@@ -114,11 +113,9 @@ As defined by [Semantic Versioning]:
 
 And while this is true to the spec, Vector takes breaking changes *very*
 seriously during this phase. What's outlined in the
-[major versions](##major-versions-breaking-changes) section still holds true
+[major versions](#major-versions-breaking-changes) section still holds true
 here. Each minor release bump will include an upgrade guide in the
 [release notes] if necessary.
-
-### Release cadence
 
 [@vectordotdev]: https://twitter.com/vectordotdev
 [chat]: https://chat.vector.dev
