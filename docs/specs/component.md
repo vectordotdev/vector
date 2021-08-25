@@ -54,7 +54,7 @@ transforms, and sinks).
 
 #### `address`
 
-When a component binds to an address, it should expose an `address` option that
+When a component binds to an address, it SHOULD expose an `address` option that
 takes a `string` representing a single address.
 
 #### `endpoint(s)`
@@ -80,7 +80,7 @@ meaningful performance improvements as a result of this strategy.
 
 Vector implements an event driven pattern ([RFC 2064]) for internal
 instrumentation. This section lists all required and optional events that a
-component MUST emit. It is expected that components will emit custom events
+component must emit. It is expected that components will emit custom events
 beyond those listed here that reflect component specific behavior.
 
 There is leeway in the implementation of these events:
@@ -93,7 +93,7 @@ There is leeway in the implementation of these events:
 * Components MAY emit events for batches of Vector events for performance
   reasons, but the resulting telemetry state MUST be equivalent to emitting
   individual events. For example, emitting the `EventsReceived` event for 10
-  events MUST increment the `events_in_total` by 10.
+  events MUST increment the `events_in_total` counter by 10.
 
 #### BytesReceived
 
@@ -110,8 +110,8 @@ from the upstream source and before the creation of a Vector event.
       delimiter.
   * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.)
-  * `address` - If relevant, the bound address that the bytes were received
-    from. For HTTP, this MUST be the host and path only, excluding the query
+  * `address` - If relevant, the local address that the bytes were received
+    on. For HTTP, this MUST be the host and path only, excluding the query
     string.
   * `path` - If relevant, the HTTP path, excluding query strings.
   * `socket` - If relevant, the socket number that bytes were received from.
