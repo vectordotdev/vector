@@ -119,7 +119,7 @@ from the upstream source and before the creation of a Vector event.
 * Metrics
   * MUST increment the `received_bytes_total` counter by the defined value with
     the defined properties as metric tags.
-* Logging
+* Logs
   * MUST log a `{byte_size} bytes received.` message at the `trace` level with
     the defined properties as structured data. It MUST NOT be rate limited.
 
@@ -136,7 +136,7 @@ or receiving one or more Vector events.
     property with the other properties as metric tags.
   * MUST increment the `received_event_bytes_total` counter by the defined
     `byte_size` property with the other properties as metric tags.
-* Logging
+* Logs
   * MUST log a `{quantity} events received.` message at the `trace` level with
     the defined properties as structured data. It MUST NOT be rate limited.
 
@@ -154,7 +154,7 @@ as encoding.
     defined properties as metric tags.
   * MUST increment the `sent_event_bytes_total` counter by the event's byte size
     in JSON representation.
-* Logging
+* Logs
   * MUST log a `{quantity} events sent.` message at the `trace` level with the
     defined properties as structured data. It MUST NOT be rate limited.
 
@@ -179,7 +179,7 @@ downstream target regardless if the transmission was successful or not.
 * Metrics
   * MUST increment the `bytes_in_total` counter by the defined value with the
     defined properties as metric tags.
-* Logging
+* Logs
   * MUST log a `{byte_size} bytes received.` message at the `trace` level with
     the defined properties as structured data. It MUST NOT be rate limited.
 
@@ -202,6 +202,10 @@ implement since errors are specific to the component.
     as metric tags.
   * MUST increment the `events_discarded_total` counter by the number of Vector
     events discarded if the error resulted in discarding (dropping) events.
+* Logs
+  * MUST log a `{stage} error: {error}` message at the `error` level with the
+    defined properties as structured data. It SHOULD be rate limited to 10
+    seconds.
 
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/
