@@ -201,7 +201,7 @@ implement since errors are specific to the component.
 * Metrics
   * MUST increment the `errors_total` counter by 1 with the defined properties
     as metric tags.
-  * MUST increment the `events_discarded_total` counter by the number of Vector
+  * MUST increment the `discarded_events_total` counter by the number of Vector
     events discarded if the error resulted in discarding (dropping) events.
 * Logs
   * MUST log a `{stage} error: {error}` message at the `error` level with the
