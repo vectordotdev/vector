@@ -116,8 +116,8 @@ from the upstream source and before the creation of a Vector event.
   * MUST increment the `bytes_in_total` counter by the defined value with
     the defined properties as metric tags.
 * Logs
-  * MUST log a `{byte_size} bytes received.` message at the `trace` level with
-    the defined properties as structured data. It MUST NOT be rate limited.
+  * MUST log a `Bytes received.` message at the `trace` level with the
+    defined properties as key-value pairs. It MUST NOT be rate limited.
 
 #### EventsRecevied
 
@@ -133,8 +133,8 @@ or receiving one or more Vector events.
   * MUST increment the `received_event_bytes_total` counter by the defined
     `byte_size` property with the other properties as metric tags.
 * Logs
-  * MUST log a `{quantity} events received.` message at the `trace` level with
-    the defined properties as structured data. It MUST NOT be rate limited.
+  * MUST log a `Events received.` message at the `trace` level with the
+    defined properties as key-value pairs. It MUST NOT be rate limited.
 
 #### EventsSent
 
@@ -143,16 +143,16 @@ event down stream. This should happen before any transmission preparation, such
 as encoding.
 
 * Properties
-  * `quantity` - The quantity of Vector events.
-  * `byte_size` - The cumulative byte size of all events in JSON representation.
+  * `count` - The count of Vector events.
+  * `byte_size` - The cumulative in-memory byte size of all events sent.
 * Metrics
   * MUST increment the `sent_events_total` counter by the defined value with the
     defined properties as metric tags.
   * MUST increment the `sent_event_bytes_total` counter by the event's byte size
     in JSON representation.
 * Logs
-  * MUST log a `{quantity} events sent.` message at the `trace` level with the
-    defined properties as structured data. It MUST NOT be rate limited.
+  * MUST log a `Events sent.` message at the `trace` level with the
+    defined properties as key-value pairs. It MUST NOT be rate limited.
 
 #### BytesSent
 
@@ -173,11 +173,11 @@ downstream target regardless if the transmission was successful or not.
     HTTP, this MUST be the host and path only, excluding the query string.
   * `file` - If relevant, the absolute path of the file.
 * Metrics
-  * MUST increment the `bytes_in_total` counter by the defined value with the
+  * MUST increment the `bytes_out_total` counter by the defined value with the
     defined properties as metric tags.
 * Logs
-  * MUST log a `{byte_size} bytes received.` message at the `trace` level with
-    the defined properties as structured data. It MUST NOT be rate limited.
+  * MUST log a `Bytes received.` message at the `trace` level with the
+    defined properties as key-value pairs. It MUST NOT be rate limited.
 
 #### Error
 
@@ -190,18 +190,20 @@ This specification does list a standard set of errors that components must
 implement since errors are specific to the component.
 
 * Properties
-  * `error` - The string representation of the error.
-  * `stage` - The stage at which the error occured. MUST be one of `receiving`,
-    `processing`, `sending`.
+  * `error` - The specifics of the error condition, such as system error code, etc.
+  * `stage` - The stage at which the error occurred. MUST be one of
+    `receiving`, `processing`, or `sending`. This MAY be omitted from
+    being represented explicitly in the event data when the error may
+    only happen at one stage, but MUST be included in the emitted logs
+    and metrics as if it were present.
 * Metrics
   * MUST increment the `errors_total` counter by 1 with the defined properties
     as metric tags.
   * MUST increment the `discarded_events_total` counter by the number of Vector
     events discarded if the error resulted in discarding (dropping) events.
 * Logs
-  * MUST log a `{stage} error: {error}` message at the `error` level with the
-    defined properties as structured data. It SHOULD be rate limited to 10
-    seconds.
+  * MUST log a message at the `error` level with the defined properties
+    as key-value pairs. It SHOULD be rate limited to 10 seconds.
 
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/
