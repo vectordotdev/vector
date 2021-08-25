@@ -145,6 +145,20 @@ impl ConfigBuilder {
 
         self.provider = with.provider;
 
+        if self.global.proxy.http.is_some() && with.global.proxy.http.is_some() {
+            errors.push("conflicting values for 'proxy.http' found".to_owned());
+        }
+
+        if self.global.proxy.https.is_some() && with.global.proxy.https.is_some() {
+            errors.push("conflicting values for 'proxy.https' found".to_owned());
+        }
+
+        if !self.global.proxy.no_proxy.is_empty() && !with.global.proxy.no_proxy.is_empty() {
+            errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
+        }
+
+        self.global.proxy = self.global.proxy.merge(&with.global.proxy);
+
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
         } else if with.global.data_dir != default_data_dir()
