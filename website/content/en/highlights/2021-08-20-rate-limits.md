@@ -29,7 +29,7 @@ request.rate_limit_num = 10 # limit to 10 requests / second
 ```
 
 If you haven't already, we recommend trying out our [adaptive concurrency
-controller](\(urls.adaptive_request_concurrency_post)) to have Vector
+controller](/blog/adaptive-request-concurrency/) to have Vector
 automatically determine the optimal number of in-flight requests to maximize
 throughput. You can do this by setting `request.concurrency = "adaptive"`. We
 are planning for this to be the default behavior in `v0.17.0`.
