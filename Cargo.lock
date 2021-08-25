@@ -2628,6 +2628,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 
 [[package]]
+name = "global_counter"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a77c0a6d353621e0ba32c0eb64a5ed3832d900135712779e38bd2ea31d6509f"
+dependencies = [
+ "once_cell",
+]
+
+[[package]]
 name = "gloo-timers"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3931,6 +3940,16 @@ dependencies = [
  "wabt",
  "wasmparser 0.58.0",
  "witx",
+]
+
+[[package]]
+name = "mac_address"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89544d9544366f6cda81244514a80809b137b5a179947b73bfa9f2797480de69"
+dependencies = [
+ "nix 0.22.1",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -8300,6 +8319,7 @@ dependencies = [
  "futures 0.3.16",
  "getset",
  "glob 0.3.0",
+ "global_counter",
  "goauth",
  "gouth",
  "grok",
@@ -8327,6 +8347,7 @@ dependencies = [
  "lucet-runtime",
  "lucet-wasi",
  "lucetc",
+ "mac_address",
  "matches",
  "maxminddb",
  "md-5",

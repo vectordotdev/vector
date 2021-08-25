@@ -278,6 +278,8 @@ cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.5", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
+mac_address = { version = "1.1.2", default-features = false, optional = true }
+global_counter = { version = "0.2.2", default-features = false, optional = true }
 
 # For WASM
 async-stream = "0.3.2"
@@ -616,7 +618,7 @@ sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = ["bytesize"]
-sinks-datadog_archives = ["sinks-aws_s3"]
+sinks-datadog_archives = ["sinks-aws_s3", "mac_address", "global_counter"]
 sinks-elasticsearch = ["bytesize", "rusoto", "transforms-metric_to_log"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "gouth", "smpl_jwt", "uuid"]

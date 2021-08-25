@@ -21,8 +21,11 @@ use crate::{
     template::Template,
 };
 use bytes::Bytes;
+use bytes::{BufMut, BytesMut};
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use global_counter::generic::Counter;
+use global_counter::primitive::exact::CounterU32;
 use http::StatusCode;
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
@@ -81,13 +84,10 @@ impl DatadogArchivesSinkConfig {
             ..Default::default()
         });
 
-        // let filename_time_format = "";
-        // let filename_append_uuid = self.filename_append_uuid.unwrap_or(true);
         let batch = BatchSettings::default().bytes(10_000_000).timeout(300);
 
         let s3 = S3Sink { client };
         //
-        // let filename_extension = self.filename_extension.clone();
         let s3_options = self
             .aws_s3_config
             .as_ref()
@@ -162,7 +162,7 @@ fn build_s3_request(
     }
 }
 
-fn encode_event(mut event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
+fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     lazy_static! {
         static ref KEY_PREFIX: Template =
             Template::try_from("/dt=%Y%m%d/hour=%H/archive_%H%M%S%.3f")
@@ -179,9 +179,10 @@ fn encode_event(mut event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Ve
         })
         .ok()?;
 
-    // TODO generate id, rename fields
-
     let mut log = event.into_log();
+
+    log.insert("_id", generate_log_id());
+
     let bytes = serde_json::to_vec(&log)
         .map(|mut b| {
             b.push(b'\n');
@@ -193,6 +194,48 @@ fn encode_event(mut event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Ve
         item: PartitionInnerBuffer::new(bytes, key.into()), //TODO
         finalizers: log.metadata_mut().take_finalizers(),
     })
+}
+
+fn generate_log_id() -> String {
+    let mut id = BytesMut::with_capacity(18);
+    // timestamp in millis - 6 bytes
+    let now = Utc::now();
+    id.put_int(now.timestamp_millis(), 6);
+    // namespace + version, both 0 - 2 bytes
+    id.put_i16(0);
+
+    // host-based number - 5 bytes
+    lazy_static! {
+        static ref HOST_NUMBER: Vec<u8> = host_number();
+    }
+    id.put_slice(&HOST_NUMBER[..]);
+
+    // counter - 5 bytes
+    id.put_u8(0); // one padding byte
+                  // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
+    lazy_static! {
+        static ref COUNTER: CounterU32 = CounterU32::new(0);
+    }
+    id.put_u32(COUNTER.inc()); // 4 bytes
+
+    base64::encode(id.freeze())
+}
+
+/// returns 5 first bytes of the MAC address XOR-ed with random bytes
+fn host_number() -> Vec<u8> {
+    extern crate mac_address;
+    use mac_address::get_mac_address;
+    use rand::Rng;
+
+    let mac = get_mac_address().unwrap().unwrap().bytes();
+    let mut rng = rand::thread_rng();
+    let mut rand_bytes = rng.gen::<[u8; 5]>();
+
+    rand_bytes
+        .iter_mut()
+        .zip(mac[..5].iter()) // take first 5 bytes
+        .map(|(x, y)| *x ^ *y) // apply XOR
+        .collect::<Vec<_>>()
 }
 
 #[async_trait::async_trait]
@@ -222,7 +265,6 @@ impl SinkConfig for DatadogArchivesSinkConfig {
 mod tests {
     use super::*;
     use chrono::DateTime;
-    use vector_core::event::LogEvent;
 
     #[test]
     fn generate_config() {
@@ -237,17 +279,43 @@ mod tests {
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
         let encoded = encode_event(log).unwrap();
-
         let (bytes, key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        let id1 = validate_event_id(&encoded_json);
+
         assert_eq!(
-            encoded_json,
-            serde_json::from_str(
-                r#"{ "message": "test message", "timestamp": "2021-08-23T16:00:27.879Z" } "#
-            )
-            .unwrap()
+            encoded_json.get("message").expect("message not found"),
+            "test message"
+        );
+        assert_eq!(
+            encoded_json.get("timestamp").expect("timestamp not found"),
+            "2021-08-23T16:00:27.879Z"
         );
         assert_eq!(key, "/dt=20210823/hour=16/archive_160027.879");
+
+        // check that id is different
+        let encoded = encode_event(Event::new_empty_log()).unwrap();
+        let (bytes, _) = encoded.item.into_parts();
+        let encoded_json: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        let id2 = validate_event_id(&encoded_json);
+        assert_ne!(id1, id2)
+    }
+
+    /// check that _id is 18 bytes, base64-encoded, first 6 bytes - a "now" timestamp in millis
+    fn validate_event_id(encoded_json: &BTreeMap<String, String>) -> String {
+        let id = encoded_json.get("_id").expect("_id not found");
+        let bytes = base64::decode(id).expect("_id is not base64-encoded");
+        assert_eq!(bytes.len(), 18);
+        let mut timestamp: [u8; 8] = [0; 8];
+        for (i, b) in bytes[..6].iter().enumerate() {
+            timestamp[i + 2] = *b;
+        }
+        let timestamp = i64::from_be_bytes(timestamp);
+        // check that it is a recent timestamp in millis
+        assert!(Utc::now().timestamp_millis() - timestamp < 1000);
+        id.to_owned()
     }
 
     #[test]
