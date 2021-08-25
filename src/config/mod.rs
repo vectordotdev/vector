@@ -668,6 +668,9 @@ mod test {
                     indoc! {r#"
                         data_dir = "/foobar"
 
+                        [proxy]
+                          http = "http://proxy.inc:3128"
+
                         [transforms.foo]
                           type = "json_parser"
                           inputs = [ "in" ]
@@ -691,6 +694,8 @@ mod test {
             Ok(())
         );
 
+        assert!(config.global.proxy.http.is_some());
+        assert!(config.global.proxy.https.is_none());
         assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
         assert!(config.sources.contains_key(&ComponentId::from("in")));
         assert!(config.sinks.contains_key(&ComponentId::from("out")));
