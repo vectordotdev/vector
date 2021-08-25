@@ -128,8 +128,12 @@ impl SinkConfig for DatadogLogsConfig {
 
         let log_api = LogApi::new()
             // .batch_timeout(batch_settings.timeout)
-            // .bytes_stored_limit(batch_settings.size.bytes as u64)
-            .bytes_stored_limit(bytesize::mib(5_u32))
+            .bytes_stored_limit(
+                self.batch
+                    .max_bytes
+                    .map(|bytes| bytes as u64)
+                    .unwrap_or_else(|| bytesize::mib(5_u32) as u64),
+            )
             .compression(self.compression.unwrap_or_default())
             .datadog_uri(self.get_uri())
             .default_api_key(self.default_api_key.clone().into_boxed_str())

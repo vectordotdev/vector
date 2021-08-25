@@ -10,6 +10,7 @@ use futures::Future;
 use futures::StreamExt;
 use http::{Request, Uri};
 use hyper::Body;
+use itertools::Itertools;
 use snafu::Snafu;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -34,15 +35,7 @@ pub enum BuildError {
 }
 
 #[derive(Debug, Snafu)]
-pub enum LogApiError {
-    // Encoding,
-// HttpClient,
-// DatadogUri,
-// Compression,
-// TimeoutSeconds,
-// BytesStoreLimit,
-// LogSchema,
-}
+pub enum LogApiError {}
 
 #[derive(Debug)]
 pub struct LogApiBuilder<Client>
@@ -168,6 +161,13 @@ where
 
 const MAX_PAYLOAD_ARRAY: usize = 1_000;
 
+#[derive(Debug, Default)]
+struct FlushMetrics {
+    processed_bytes_total: u64,
+    processed_events_total: u64,
+    success: bool,
+}
+
 #[derive(Debug)]
 pub struct LogApi<Client>
 where
@@ -241,6 +241,61 @@ struct Payload {
     members: Vec<BTreeMap<String, Value>>,
 }
 
+#[inline]
+fn dissect_batch(batch: Vec<Event>) -> (Vec<BTreeMap<String, Value>>, Vec<EventFinalizers>) {
+    let mut members: Vec<BTreeMap<String, Value>> = Vec::with_capacity(batch.len());
+    let mut finalizers: Vec<EventFinalizers> = Vec::with_capacity(batch.len());
+    for event in batch.into_iter() {
+        let (fields, mut metadata) = event.into_log().into_parts();
+        members.push(fields);
+        finalizers.push(metadata.take_finalizers());
+    }
+    (members, finalizers)
+}
+
+fn build_request(
+    members: Vec<BTreeMap<String, Value>>,
+    api_key: &str,
+    datadog_uri: Uri,
+    compression: &Compression,
+    flush_metrics: &mut FlushMetrics,
+) -> Request<Body> {
+    let total_members = members.len();
+    assert!(total_members <= 1_000);
+    let payload = Payload { members };
+    let body: Vec<u8> = serde_json::to_vec(&payload).expect("failed to encode to json");
+
+    let request = Request::post(datadog_uri)
+        .header("Content-Type", "application/json")
+        .header("DD-API-KEY", api_key);
+    let serialized_payload_len = body.len();
+    metrics::histogram!("encoded_payload_size_bytes", serialized_payload_len as f64);
+    metrics::gauge!("encoded_payload_size_members", total_members as f64);
+    let (request, encoded_body) = match compression {
+        Compression::None => (request, body),
+        Compression::Gzip(level) => {
+            let level = level.unwrap_or(GZIP_FAST);
+            let mut encoder = GzEncoder::new(
+                Vec::with_capacity(serialized_payload_len),
+                flate2::Compression::new(level as u32),
+            );
+
+            encoder.write_all(&body).expect("failed to write body");
+            (
+                request.header("Content-Encoding", "gzip"),
+                encoder.finish().expect("failed to encode"),
+            )
+        }
+    };
+    flush_metrics.processed_bytes_total = serialized_payload_len as u64;
+    flush_metrics.processed_events_total = total_members as u64;
+    request
+        .header("Content-Length", encoded_body.len())
+        .body(Body::from(encoded_body))
+        // .map_err(Into::into)
+        .expect("failed to make request")
+}
+
 impl<Client> LogApi<Client>
 where
     Client: Service<Request<Body>> + Send + Clone + Unpin,
@@ -271,33 +326,25 @@ where
         }
     }
 
-    fn has_space(&self, id: u64) -> bool {
-        if let Some(arr) = self.event_batches.get(&id) {
-            arr.len() < MAX_PAYLOAD_ARRAY
-        } else {
-            true
-        }
-    }
-
     /// Stores the `Event` in its batch
     ///
-    /// This function stores the `Event` in its `id` appropriate batch. Caller
-    /// MUST confirm that there is space in the batch for the `Event` by calling
-    /// `has_space`, which must return true.
+    /// This function stores the `Event` in its `id` appropriate batch. This
+    /// will accumulate until a flush is done, triggered by the total byte size
+    /// in storage here.
     ///
     /// # Panics
     ///
     /// This function will panic if there is no space in the underlying batch.
+    #[inline]
     fn store_event(&mut self, id: u64, event: Event) {
-        let arr = self
-            .event_batches
+        self.event_batches
             .entry(id)
-            .or_insert_with(|| Vec::with_capacity(MAX_PAYLOAD_ARRAY));
-        assert!(arr.len() + 1 <= MAX_PAYLOAD_ARRAY);
-        arr.push(event);
+            .or_insert_with(|| Vec::with_capacity(MAX_PAYLOAD_ARRAY))
+            .push(event)
     }
 
     /// Flush the `Event` batches out to Datadog API
+    // TODO make caller pass in a buffer
     async fn flush_to_api<'a>(
         self: &'a mut Self,
     ) -> Result<impl Iterator<Item = impl Future<Output = ()>> + Send + 'a, ()> {
@@ -315,72 +362,54 @@ where
         poll_fn(|cx| self.http_client.poll_ready(cx))
             .await
             .map_err(|_e| ())?;
-        let futures = batches.into_iter().map(move |(api_key_id, batch)| {
-            let mut members: Vec<BTreeMap<String, Value>> = Vec::with_capacity(batch.len());
-            let mut finalizers: Vec<EventFinalizers> = Vec::with_capacity(batch.len());
-            for event in batch.into_iter() {
-                let (fields, mut metadata) = event.into_log().into_parts();
-                members.push(fields);
-                finalizers.push(metadata.take_finalizers());
-            }
+        let mut future_buffer = Vec::with_capacity(128);
 
-            let total_members = members.len();
-            let payload = Payload { members };
-            let body: Vec<u8> = serde_json::to_vec(&payload).expect("failed to encode to json");
-
+        for (api_key_id, batch_by_bytes) in batches.into_iter() {
             let api_key = self
                 .key_slab
                 .get(&api_key_id)
                 .expect("impossible situation");
-            let request = Request::post(self.datadog_uri.clone())
-                .header("Content-Type", "application/json")
-                .header("DD-API-KEY", &api_key[..]);
-            let serialized_payload_len = body.len();
-            metrics::histogram!("encoded_payload_size_bytes", serialized_payload_len as f64);
-            metrics::histogram!("encoded_payload_size_members", total_members as f64);
-            let (request, encoded_body) = match self.compression {
-                Compression::None => (request, body),
-                Compression::Gzip(level) => {
-                    let level = level.unwrap_or(GZIP_FAST);
-                    let mut encoder = GzEncoder::new(
-                        Vec::with_capacity(serialized_payload_len),
-                        flate2::Compression::new(level as u32),
+            // Because we track how large a batch is by _bytes_ but the API
+            // tracks by _members_ we have to make a conversion here.
+            for (members, finalizers) in batch_by_bytes
+                .into_iter()
+                .chunks(MAX_PAYLOAD_ARRAY)
+                .into_iter()
+                .map(|batch| dissect_batch(batch.collect()))
+            {
+                let mut flush_metrics = FlushMetrics::default();
+                let request = build_request(
+                    members,
+                    &api_key[..],
+                    self.datadog_uri.clone(),
+                    &self.compression,
+                    &mut flush_metrics,
+                );
+                let fut = self.http_client.call(request).map(move |result| {
+                    let status: EventStatus = match result {
+                        Ok(_) => {
+                            metrics::counter!("flush_success", 1);
+                            EventStatus::Delivered
+                        }
+                        Err(_) => {
+                            metrics::counter!("flush_error", 1);
+                            EventStatus::Errored
+                        }
+                    };
+                    for finalizer in finalizers {
+                        finalizer.update_status(status);
+                    }
+                    metrics::counter!("processed_bytes_total", flush_metrics.processed_bytes_total);
+                    metrics::counter!(
+                        "processed_events_total",
+                        flush_metrics.processed_events_total
                     );
-
-                    encoder.write_all(&body).expect("failed to write body");
-                    (
-                        request.header("Content-Encoding", "gzip"),
-                        encoder.finish().expect("failed to encode"),
-                    )
-                }
-            };
-            let request = request
-                .header("Content-Length", encoded_body.len())
-                .body(Body::from(encoded_body))
-                // .map_err(Into::into)
-                .expect("failed to make request");
-
-            let fut: Client::Future = self.http_client.call(request);
-            fut.map(move |result| {
-                let status: EventStatus = match result {
-                    Ok(_) => {
-                        metrics::counter!("flush_success", 1);
-                        EventStatus::Delivered
-                    }
-                    Err(_) => {
-                        metrics::counter!("flush_error", 1);
-                        EventStatus::Errored
-                    }
-                };
-                for finalizer in finalizers {
-                    finalizer.update_status(status);
-                }
-                metrics::counter!("processed_bytes_total", serialized_payload_len as u64);
-                metrics::counter!("processed_events_total", total_members as u64);
-                ()
-            })
-        });
-        Ok(futures)
+                    ()
+                });
+                future_buffer.push(fut);
+            }
+        }
+        Ok(future_buffer.into_iter())
     }
 }
 
@@ -425,19 +454,21 @@ where
 
         let mut interval = time::interval(self.timeout);
         let mut flushes = FuturesUnordered::new();
+        metrics::gauge!("bytes_stored_limit", self.bytes_stored_limit as f64);
         loop {
             metrics::gauge!("outstanding_requests", flushes.len() as f64);
+            metrics::gauge!("bytes_stored", self.bytes_stored as f64);
             // TODO the current ticking method does not take into account
             // flushing. That is, no matter what, we will always flush every
             // interval even if we just finished flushing.
             tokio::select! {
-                _ = interval.tick() => {
-                    metrics::counter!("tick", 1);
-                    flushes.extend(self.flush_to_api().await?)
-                },
-                Some(_) = flushes.next() => {
-                    // Nothing, intentionally. Maybe we do metrics here?
-                }
+                biased;
+
+                // TODO better results when we immediately make a request once
+                // 1k members are available. Drop the bytes size thing and only
+                // track by how large a flush ID is. Change flush_to_api to JUST
+                // flush by ID.
+
                 Some(event) = input.next() => {
                     let key_id = self.register_key_id(&event);
                     let event_size = event.size_of();
@@ -449,14 +480,17 @@ where
                         // batch structure doesn't allow sorting by size so we
                         // just ship the whole thing.
                         flushes.extend(self.flush_to_api().await?);
-                    }
-                    if !self.has_space(key_id) {
-                        flushes.extend(self.flush_to_api().await?);
+                        self.bytes_stored = 0;
                     }
                     self.store_event(key_id, event);
-
-                    // TODO how do we ack?
+                    self.bytes_stored += event_size;
                 }
+                Some(()) = flushes.next() => {
+                    // nothing, intentionally
+                }
+                _ = interval.tick() => {
+                    flushes.extend(self.flush_to_api().await?)
+                },
             }
         }
     }
