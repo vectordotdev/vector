@@ -126,7 +126,7 @@ or receiving one or more Vector events.
 
 * Properties
   * `count` - The count of Vector events.
-  * `byte_size` - The cumulative byte size of all events in JSON representation.
+  * `byte_size` - The cumulative in-memory byte size of all events received.
 * Metrics
   * MUST increment the `received_events_total` counter by the defined `quantity`
     property with the other properties as metric tags.
