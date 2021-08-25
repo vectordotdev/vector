@@ -10,7 +10,7 @@ components: transforms: wasm: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "stream"
 		stateful:      true
 	}
@@ -43,7 +43,16 @@ components: transforms: wasm: {
 			[Building Vector](\(urls.contributing)) docs for more info.*
 			""",
 		]
-		warnings: []
+		warnings: [
+			"""
+			The `wasm` transform has been deprecated and will be removed in v0.17.0.
+
+			In its place, the [`lua` transform](\(urls.vector_lua_transform)) can be used for custom logic that cannot
+			be covered by the [`remap` transform](\(urls.vector_remap_transform)).
+
+			See [the v0.16.0 release highlight](/highlights/2021-08-23-removing-wasm) for more details on this deprecation.
+			""",
+		]
 		notices: [
 			"""
 			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using this tranform. The
