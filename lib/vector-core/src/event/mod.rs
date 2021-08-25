@@ -4,6 +4,7 @@ use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
+    Finalizable,
 };
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;

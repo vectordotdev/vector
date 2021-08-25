@@ -107,6 +107,25 @@ where
 }
 
 impl<T: ConcurrencyOption> TowerRequestConfig<T> {
+    pub const fn const_new(concurrency: T, in_flight_limit: T) -> Self {
+        Self {
+            concurrency,
+            in_flight_limit,
+            timeout_secs: Some(TIMEOUT_SECONDS_DEFAULT),
+            rate_limit_duration_secs: Some(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
+            rate_limit_num: Some(RATE_LIMIT_NUM_DEFAULT),
+            retry_attempts: Some(RETRY_ATTEMPTS_DEFAULT),
+            retry_max_duration_secs: Some(RETRY_MAX_DURATION_SECONDS_DEFAULT),
+            retry_initial_backoff_secs: Some(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
+            adaptive_concurrency: AdaptiveConcurrencySettings::const_default(),
+        }
+    }
+
+    pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
+        self.rate_limit_num = Some(rate_limit_num);
+        self
+    }
+
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
             concurrency: self.concurrency().parse_concurrency(defaults.concurrency()),
