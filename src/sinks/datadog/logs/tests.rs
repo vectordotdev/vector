@@ -5,7 +5,6 @@ use crate::{
     test_util::{next_addr, random_lines_with_stream},
 };
 use bytes::Bytes;
-use futures::SinkExt;
 use futures::{
     channel::mpsc::{Receiver, TryRecvError},
     stream, StreamExt,
@@ -132,8 +131,7 @@ async fn api_key_in_metadata() {
     .unwrap();
 
     let addr = next_addr();
-    // Swap out the endpoint so we can force send it
-    // to our local server
+    // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
@@ -145,14 +143,14 @@ async fn api_key_in_metadata() {
     let (expected, events) = random_lines_with_stream(100, 10, None);
 
     let api_key = "0xDECAFBAD";
-    let mut events = events.map(|mut e| {
+    let events = events.map(|mut e| {
         e.as_mut_log()
             .metadata_mut()
             .set_datadog_api_key(Some(Arc::from(api_key)));
-        Ok(e)
+        e
     });
 
-    let _ = sink.into_sink().send_all(&mut events).await.unwrap();
+    let _ = sink.run(events).await.unwrap();
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
     for (i, val) in output.iter().enumerate() {
