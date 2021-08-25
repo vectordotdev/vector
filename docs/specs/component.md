@@ -110,16 +110,10 @@ from the upstream source and before the creation of a Vector event.
       delimiter.
   * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.)
-  * `address` - If relevant, the local address that the bytes were received
-    on. For HTTP, this MUST be the host and path only, excluding the query
-    string.
   * `path` - If relevant, the HTTP path, excluding query strings.
   * `socket` - If relevant, the socket number that bytes were received from.
-  * `remote_address` - If relevant, the remote IP address of the upstream
-    client.
-  * `file` - If relevant, the absolute path of the file.
 * Metrics
-  * MUST increment the `received_bytes_total` counter by the defined value with
+  * MUST increment the `bytes_in_total` counter by the defined value with
     the defined properties as metric tags.
 * Logs
   * MUST log a `{byte_size} bytes received.` message at the `trace` level with
