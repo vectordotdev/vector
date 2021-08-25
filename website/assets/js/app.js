@@ -6,6 +6,12 @@ import 'alpinejs';
 
 const sayHello = () => {
   console.log('Welcome to the Vector website and documentation!');
+
+  if (window.DD_LOGS) {
+		window.DD_LOGS.logger.info("Test", { log: "Testing Logs on Vector", requested_url: window.location.href });
+	} else {
+    console.error('Logger not working.')
+  }
 }
 
 const clearLocalStorageOnNewGeneration = () => {
