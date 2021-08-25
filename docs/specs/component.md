@@ -59,9 +59,10 @@ takes a `string` representing a single address.
 
 #### `endpoint(s)`
 
-When a component sends data to a downstream target, it should expose an
-`endpoint(s)` option that takes a `string` representing one or more comma
-separated endpoints.
+When a component sends data to a downstream target, it MUST expose
+either an `endpoint` option that takes a `string` representing a single
+endpoint, or an `endpoints` option that takes an array of strings
+representing multiple endpoints.
 
 ## Instrumentation
 
