@@ -159,6 +159,8 @@ impl<'a> Look<'a> for Lookup<'a> {
     }
 
     /// Parse the lookup from a str.
+    #[allow(clippy::should_implement_trait)]
+    // Cannot be defined as `FromStr` due to lifetime constraint on return type
     pub fn from_str(input: &'a str) -> Result<Self, LookupError> {
         crate::parser::parse_lookup(input).map_err(|err| LookupError::Invalid { message: err })
     }
