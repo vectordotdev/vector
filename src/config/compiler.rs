@@ -36,6 +36,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
                 sinks: builder.sinks,
                 transforms: builder.transforms,
                 tests: builder.tests,
+                pipelines: builder.pipelines,
                 expansions,
             },
             warnings,

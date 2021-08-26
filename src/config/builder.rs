@@ -3,9 +3,9 @@ use super::api;
 #[cfg(feature = "datadog-pipelines")]
 use super::datadog;
 use super::{
-    compiler, provider, ComponentId, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
-    TransformOuter,
+    compiler, pipeline::Pipelines, provider, ComponentId, Config, EnrichmentTableConfig,
+    EnrichmentTableOuter, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,8 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    #[serde(default)]
+    pub pipelines: Pipelines,
 }
 
 impl Clone for ConfigBuilder {
@@ -64,6 +66,7 @@ impl From<Config> for ConfigBuilder {
             transforms: c.transforms,
             provider: None,
             tests: c.tests,
+            pipelines: c.pipelines,
         }
     }
 }
@@ -128,6 +131,10 @@ impl ConfigBuilder {
 
         self.transforms
             .insert(ComponentId::from(id.into()), transform);
+    }
+
+    pub fn set_pipelines(&mut self, pipelines: Pipelines) {
+        self.pipelines = pipelines;
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {

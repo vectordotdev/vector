@@ -29,6 +29,7 @@ mod diff;
 pub mod format;
 mod id;
 mod loading;
+mod pipeline;
 pub mod provider;
 mod unit_test;
 mod validation;
@@ -41,7 +42,7 @@ pub use format::{Format, FormatHint};
 pub use id::ComponentId;
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    merge_path_lists, process_paths, CONFIG_PATHS,
+    load_pipelines_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
@@ -77,6 +78,19 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
     }
 }
 
+impl ConfigPath {
+    pub fn as_dir(&self) -> Option<&PathBuf> {
+        match self {
+            Self::Dir(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    pub fn pipeline_dir(&self) -> Option<PathBuf> {
+        self.as_dir().map(|path| path.join("pipelines"))
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
@@ -89,6 +103,7 @@ pub struct Config {
     pub sinks: IndexMap<ComponentId, SinkOuter>,
     pub transforms: IndexMap<ComponentId, TransformOuter>,
     pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
+    pub pipelines: IndexMap<String, pipeline::Pipeline>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }
@@ -581,6 +596,7 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
+            Default::default(),
         )
         .unwrap();
 
@@ -604,6 +620,7 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
+            Default::default(),
         )
         .unwrap();
 
@@ -637,6 +654,7 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
+            Default::default(),
         )
         .unwrap();
 
@@ -947,6 +965,7 @@ mod resource_tests {
                   encoding = "json"
             "#},
             Some(Format::Toml),
+            Default::default(),
         )
         .is_err());
     }
