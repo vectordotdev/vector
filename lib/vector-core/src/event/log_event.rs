@@ -121,8 +121,18 @@ impl LogEvent {
         util::log::insert_path(self.as_map_mut(), key, value.into())
     }
 
+    /// Rename a key in place without reference to pathing
+    ///
+    /// The function will rename a key in place without reference to any path
+    /// information in the key, much as if you were to call [`remove_key`] and
+    /// then [`insert_flat`].
+    ///
+    /// This function is a no-op if `from_key` and `to_key` are identical. If
+    /// `to_key` already exists in the structure its value will be overwritten
+    /// silently.
     #[instrument(level = "trace", skip(self, from_key, to_key), fields(key = %from_key))]
-    pub fn rename_key<K>(&mut self, from_key: K, to_key: K)
+    #[inline]
+    pub fn rename_key_flat<K>(&mut self, from_key: K, to_key: K)
     where
         K: AsRef<str> + Into<String> + PartialEq + Display,
     {
@@ -456,27 +466,27 @@ mod test {
     // The following two tests assert that renaming a key has no effect if the
     // keys are equivalent, whether the key exists in the log or not.
     #[test]
-    fn rename_key_equiv_exists() {
+    fn rename_key_flat_equiv_exists() {
         let mut fields = BTreeMap::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
         let expected_fields = fields.clone();
 
         let mut base = LogEvent::from_parts(fields, EventMetadata::default());
-        base.rename_key("one", "one");
+        base.rename_key_flat("one", "one");
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_fields, actual_fields);
     }
     #[test]
-    fn rename_key_equiv_not_exists() {
+    fn rename_key_flat_equiv_not_exists() {
         let mut fields = BTreeMap::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
         let expected_fields = fields.clone();
 
         let mut base = LogEvent::from_parts(fields, EventMetadata::default());
-        base.rename_key("three", "three");
+        base.rename_key_flat("three", "three");
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_fields, actual_fields);
@@ -484,14 +494,14 @@ mod test {
     // Assert that renaming a key has no effect if the key does not originally
     // exist in the log, when the to -> from keys are not identical.
     #[test]
-    fn rename_key_not_exists() {
+    fn rename_key_flat_not_exists() {
         let mut fields = BTreeMap::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
         let expected_fields = fields.clone();
 
         let mut base = LogEvent::from_parts(fields, EventMetadata::default());
-        base.rename_key("three", "four");
+        base.rename_key_flat("three", "four");
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_fields, actual_fields);
@@ -499,7 +509,7 @@ mod test {
     // Assert that renaming a key has the effect of moving the value from one
     // key name to another if the key exists.
     #[test]
-    fn rename_key_no_overlap() {
+    fn rename_key_flat_no_overlap() {
         let mut fields = BTreeMap::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
@@ -509,7 +519,7 @@ mod test {
         expected_fields.insert("three".to_string(), val);
 
         let mut base = LogEvent::from_parts(fields, EventMetadata::default());
-        base.rename_key("one", "three");
+        base.rename_key_flat("one", "three");
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_fields, actual_fields);
@@ -518,7 +528,7 @@ mod test {
     // key name to another if the key exists and will overwrite another key if
     // it exists.
     #[test]
-    fn rename_key_overlap() {
+    fn rename_key_flat_overlap() {
         let mut fields = BTreeMap::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
@@ -528,33 +538,11 @@ mod test {
         expected_fields.insert("two".to_string(), val);
 
         let mut base = LogEvent::from_parts(fields, EventMetadata::default());
-        base.rename_key("one", "two");
+        base.rename_key_flat("one", "two");
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_fields, actual_fields);
     }
-
-    // Assert that renaming a key is equivalent to removing (if it exists) and
-    // inserting under a new name.
-    //
-    // This test ensures that `rename_key` is equivalent to the following:
-    //
-    //   * GIVEN that KEY exists in the LogEvent rename_key has the same effect
-    //     as a composed insert_flat(NEW_KEY, remove(KEY))
-    //   * GIVEN that KEY does not exist in the LogEvent rename_key has the same
-    //     effect as insert_flat(NEW_KEY, ...)
-    // #[test]
-    // fn rename_key_equiv_not_exists() {
-    //     let mut fields = BTreeMap::new();
-    //     fields.insert("one", Value::Integer(1_i64));
-    //     fields.insert("two", Value::Integer(2_i64));
-
-    //     let base = LogEvent::from_parts(fields, EventMetadata::default());
-    //     let expr = orig.clone();
-
-    //     base.insert_flat("three", Value::Integer(3_i64));
-    //     base.rename_key(
-    // }
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
     //
