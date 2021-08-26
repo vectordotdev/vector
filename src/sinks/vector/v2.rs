@@ -392,8 +392,14 @@ mod tests {
 
     #[test]
     fn test_with_default_scheme() {
-        assert_eq!(with_default_scheme("0.0.0.0", false).unwrap().to_string(), "http://0.0.0.0/");
-        assert_eq!(with_default_scheme("0.0.0.0", true).unwrap().to_string(), "https://0.0.0.0/");
+        assert_eq!(
+            with_default_scheme("0.0.0.0", false).unwrap().to_string(),
+            "http://0.0.0.0/"
+        );
+        assert_eq!(
+            with_default_scheme("0.0.0.0", true).unwrap().to_string(),
+            "https://0.0.0.0/"
+        );
     }
 
     async fn get_received(
