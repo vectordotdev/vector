@@ -1,5 +1,6 @@
-use crate::sinks::aws_s3::Request;
-use crate::sinks::util::ServiceBuilderExt;
+use crate::sinks::aws_s3::{healthcheck, Request};
+use crate::sinks::util::service::Map;
+use crate::sinks::util::{ServiceBuilderExt, TowerRequestSettings};
 use crate::{
     config::{DataType, SinkConfig, SinkContext},
     internal_events::{aws_s3::sink::S3EventsSent, TemplateRenderingFailed},
@@ -19,6 +20,7 @@ use crate::{
         },
     },
     template::Template,
+    Error,
 };
 use bytes::Bytes;
 use bytes::{BufMut, BytesMut};
@@ -29,13 +31,15 @@ use global_counter::primitive::exact::CounterU32;
 use http::StatusCode;
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
-use rusoto_s3::{HeadBucketRequest, S3Client, S3};
+use rusoto_s3::{HeadBucketRequest, PutObjectOutput, S3Client, S3};
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::collections::HashSet;
 use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},
 };
+use tower::util::BoxService;
 use tower::{Service, ServiceBuilder};
 use uuid::Uuid;
 use vector_core::config::proxy::ProxyConfig;
@@ -50,7 +54,7 @@ pub struct DatadogArchivesSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
-    pub aws_s3_config: Option<S3Config>,
+    pub aws_s3: Option<S3Config>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -77,41 +81,71 @@ pub struct S3Options {
     tags: Option<BTreeMap<String, String>>,
 }
 
+#[derive(Debug, Snafu)]
+enum ConfigError {
+    #[snafu(display("Unsupported service: {:?}", service))]
+    UnsupportedService { service: String },
+}
+
 impl DatadogArchivesSinkConfig {
-    pub fn new(&self, client: S3Client, cx: SinkContext) -> crate::Result<super::VectorSink> {
+    pub fn new(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
             concurrency: Concurrency::Fixed(50),
             rate_limit_num: Some(250),
             ..Default::default()
         });
 
-        let batch = BatchSettings::default().bytes(10_000_000).timeout(300);
-
-        let s3 = S3Sink { client };
-        //
-        let s3_options = self
-            .aws_s3_config
-            .as_ref()
-            .and_then(|c| Some(c.options.clone()))
-            .expect("s3 config wasn't provided");
+        let batch = BatchSettings::default().bytes(100_000_000).timeout(60); //TODO change timeout to 900(15min)
 
         let bucket = self.bucket.clone();
         let prefix = self.key_prefix.clone();
 
-        let svc = ServiceBuilder::new()
-            .map(move |req| {
-                build_s3_request(req, bucket.clone(), prefix.clone(), s3_options.clone())
-            })
-            .settings(request, S3RetryLogic)
-            .service(s3);
+        let (svc, healthcheck) = match &self.service[..] {
+            "aws_s3" => {
+                let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
+                let client = aws_s3::create_client(&s3_config.region, &s3_config.auth, &cx.proxy)?;
+                Ok((
+                    self.build_s3_service(request, bucket.clone(), prefix, client.clone()),
+                    aws_s3::healthcheck(bucket.clone(), client).boxed(),
+                ))
+            }
 
+            service => Err(ConfigError::UnsupportedService {
+                service: service.to_owned(),
+            }),
+        }?;
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, Compression::gzip_default()));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .with_flat_map(move |e| stream::iter(encode_event(e)).map(Ok))
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+    }
+
+    fn build_s3_service(
+        &self,
+        request: TowerRequestSettings,
+        bucket: String,
+        prefix: Option<String>,
+        client: S3Client,
+    ) -> Map<
+        BoxService<Request, PutObjectOutput, Box<dyn std::error::Error + Send + Sync>>,
+        PartitionInnerBuffer<Vec<u8>, Bytes>,
+        Request,
+    > {
+        let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
+
+        let s3_options = s3_config.options.clone();
+
+        let s3 = S3Sink { client };
+        let svc = ServiceBuilder::new()
+            .map(move |req| {
+                build_s3_request(req, bucket.clone(), prefix.clone(), s3_options.clone())
+            })
+            .settings(request, S3RetryLogic)
+            .service(s3);
+        svc
     }
 }
 
@@ -233,7 +267,7 @@ fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8
         .expect("Failed to encode event as json, this is a bug!");
 
     Some(EncodedEvent {
-        item: PartitionInnerBuffer::new(bytes, key.into()), //TODO
+        item: PartitionInnerBuffer::new(bytes, key.into()),
         finalizers: log.metadata_mut().take_finalizers(),
     })
 }
@@ -287,11 +321,8 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let s3config = self.aws_s3_config.as_ref().expect("TODO");
-        let client = aws_s3::create_client(&s3config.region, &s3config.auth, &cx.proxy)?;
-        let healthcheck = aws_s3::healthcheck(self.bucket.clone(), client.clone()).boxed();
-        let sink = self.new(client, cx)?;
-        Ok((sink, healthcheck))
+        let sink_and_healthcheck = self.new(cx)?;
+        Ok(sink_and_healthcheck)
     }
 
     fn input_type(&self) -> DataType {
@@ -324,7 +355,6 @@ mod tests {
         log.as_mut_log().insert("timestamp", timestamp);
         let encoded = encode_event(log).unwrap();
         let (bytes, key) = encoded.item.into_parts();
-        //TODO
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
 
