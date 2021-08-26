@@ -23,6 +23,7 @@ pretty_assertions = "0.7.2"
 quickcheck = "1.0"
 tempdir = "0.3"
 tokio-test = "0.4.2"
+metrics-exporter-prometheus = "0.6"
 
 [features]
 disk-buffer = ["db-key", "snafu", "leveldb"]
