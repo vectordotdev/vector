@@ -1,5 +1,5 @@
 ---
-date: "2021-07-28"
+date: "2021-08-25"
 title: "0.16 Upgrade Guide"
 description: "An upgrade guide that addresses breaking changes in 0.16.0"
 authors: ["jszwedko", "JeanMertz"]
