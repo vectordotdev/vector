@@ -55,28 +55,29 @@ impl ComponentId {
         matches!(self.scope, ComponentScope::Global)
     }
 }
+
 impl From<String> for ComponentId {
     fn from(value: String) -> Self {
-        let parts = value.split('#').take(2).collect::<Vec<_>>();
-        if parts.len() == 2 {
-            Self {
-                id: parts[1].to_string(),
-                value: value.clone(),
-                scope: ComponentScope::Pipeline(parts[0].to_string()),
-            }
-        } else {
-            Self {
-                id: value.clone(),
-                value: value.clone(),
-                scope: ComponentScope::Global,
-            }
-        }
+        Self::from(value.as_str())
     }
 }
 
 impl From<&str> for ComponentId {
     fn from(value: &str) -> Self {
-        Self::from(value.to_string())
+        let parts = value.split('#').take(2).collect::<Vec<_>>();
+        if parts.len() == 2 {
+            Self {
+                id: parts[1].to_string(),
+                value: value.to_string(),
+                scope: ComponentScope::Pipeline(parts[0].to_string()),
+            }
+        } else {
+            Self {
+                id: value.to_string(),
+                value: value.to_string(),
+                scope: ComponentScope::Global,
+            }
+        }
     }
 }
 
