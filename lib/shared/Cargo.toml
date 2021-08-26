@@ -7,7 +7,7 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-bytes = { version = "1.0.0", optional = true }
+bytes = { version = "1.1.0", optional = true }
 chrono = { version = "0.4", optional = true }
 chrono-tz = "0.5.3"
 derivative = "2.1.3"
