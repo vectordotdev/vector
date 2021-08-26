@@ -20,7 +20,7 @@ use tokio::time::{self, Duration};
 use tower::Service;
 use twox_hash::XxHash64;
 use vector_core::event::EventStatus;
-use vector_core::event::{Event, EventFinalizers, LogEvent, Value};
+use vector_core::event::{Event, EventFinalizers, Value};
 use vector_core::sink::StreamSink;
 use vector_core::ByteSizeOf;
 
@@ -87,15 +87,6 @@ fn build_request(
         .header("Content-Length", encoded_body.len())
         .body(Body::from(encoded_body))
         .map_err(Into::into)
-}
-
-// NOTE likely implementation for #8491
-fn rename_key(from_key: &'static str, to_key: &'static str, log: &mut LogEvent) {
-    if from_key != to_key {
-        if let Some(val) = log.remove(from_key) {
-            log.insert_flat(to_key, val);
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -309,9 +300,9 @@ where
 
         let mut input = input.map(|mut event| {
             let log = event.as_mut_log();
-            rename_key(message_key, "message", log);
-            rename_key(timestamp_key, "date", log);
-            rename_key(host_key, "host", log);
+            log.rename_key_flat(message_key, "message");
+            log.rename_key_flat(timestamp_key, "date");
+            log.rename_key_flat(host_key, "host");
             encoding.apply_rules(&mut event);
             event
         });
