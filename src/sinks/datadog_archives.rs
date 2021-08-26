@@ -1,4 +1,5 @@
 use crate::sinks::aws_s3::{healthcheck, Request};
+use crate::sinks::util::buffer::compression::GZIP_DEFAULT;
 use crate::sinks::util::service::Map;
 use crate::sinks::util::{ServiceBuilderExt, TowerRequestSettings};
 use crate::{
@@ -24,7 +25,7 @@ use crate::{
 };
 use bytes::Bytes;
 use bytes::{BufMut, BytesMut};
-use chrono::Utc;
+use chrono::{SecondsFormat, Utc};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use global_counter::generic::Counter;
 use global_counter::primitive::exact::CounterU32;
@@ -161,7 +162,7 @@ fn build_s3_request(
 
     let key = String::from_utf8_lossy(&key[..]).into_owned();
     let key = format!(
-        "{}/{}.{}.{}",
+        "{}/{}{}.{}",
         path_prefix.unwrap_or_default(),
         key,
         filename,
@@ -191,8 +192,8 @@ fn build_s3_request(
             ssekms_key_id: options.ssekms_key_id,
             storage_class: options.storage_class,
             tags: options.tags,
-            content_encoding: Some("gzip".to_string()),
-            content_type: Some("text/json".to_string()),
+            content_encoding: None,
+            content_type: None,
         },
     }
 }
@@ -200,8 +201,7 @@ fn build_s3_request(
 fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     lazy_static! {
         static ref KEY_PREFIX: Template =
-            Template::try_from("/dt=%Y%m%d/hour=%H/archive_%H%M%S%.3f")
-                .expect("invalid object key format");
+            Template::try_from("/dt=%Y%m%d/hour=%H/").expect("invalid object key format");
     }
     let key = KEY_PREFIX
         .render_string(&event)
@@ -230,9 +230,9 @@ fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8
         "date",
         timestamp
             .as_timestamp()
-            .map_or(chrono::Utc::now().timestamp_millis(), |t| {
-                t.timestamp_millis()
-            }),
+            .cloned()
+            .unwrap_or_else(|| chrono::Utc::now())
+            .to_rfc3339_opts(SecondsFormat::Millis, true),
     );
     if let Some(message) = log.remove(crate::config::log_schema().message_key()) {
         log.insert("message", message);
@@ -372,9 +372,9 @@ mod tests {
             encoded_json
                 .get("date")
                 .expect("date not found")
-                .as_i64()
+                .as_str()
                 .expect("date is not an integer"),
-            1629734427879
+            "2021-08-23T16:00:27.879Z"
         );
         assert_eq!(
             encoded_json
@@ -388,7 +388,7 @@ mod tests {
                 .expect("not_a_reserved_attribute is not a string"),
             "value"
         );
-        assert_eq!(key, "/dt=20210823/hour=16/archive_160027.879");
+        assert_eq!(key, "/dt=20210823/hour=16/");
 
         // check that id is different
         let encoded = encode_event(Event::new_empty_log()).unwrap();
@@ -438,7 +438,7 @@ mod tests {
             Some("audit".into()),
             S3Options::default(),
         );
-        let prefix = "audit/dt=20210823/hour=16/archive_160027.879.";
+        let prefix = "audit/dt=20210823/hour=16/";
         let file_ext = ".json.gz";
         assert!(req.key.starts_with(prefix));
         assert!(req.key.ends_with(file_ext));
