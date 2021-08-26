@@ -52,6 +52,10 @@ impl Compiler {
         }
     }
 
+    pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
+        self.variables.keys()
+    }
+
     pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
         self.variables.get(ident)
     }
