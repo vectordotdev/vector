@@ -96,7 +96,7 @@ impl DatadogArchivesSinkConfig {
             ..Default::default()
         });
 
-        let batch = BatchSettings::default().bytes(100_000_000).timeout(60); //TODO change timeout to 900(15min)
+        let batch = BatchSettings::default().bytes(100_000_000).timeout(900);
 
         let bucket = self.bucket.clone();
         let prefix = self.key_prefix.clone();
