@@ -93,7 +93,7 @@ There is leeway in the implementation of these events:
 * Components MAY emit events for batches of Vector events for performance
   reasons, but the resulting telemetry state MUST be equivalent to emitting
   individual events. For example, emitting the `EventsReceived` event for 10
-  events MUST increment the `events_in_total` counter by 10.
+  events MUST increment the `received_events_total` counter by 10.
 
 #### BytesReceived
 
@@ -113,7 +113,7 @@ from the upstream source and before the creation of a Vector event.
   * `path` - If relevant, the HTTP path, excluding query strings.
   * `socket` - If relevant, the socket number that bytes were received from.
 * Metrics
-  * MUST increment the `bytes_in_total` counter by the defined value with
+  * MUST increment the `received_bytes_total` counter by the defined value with
     the defined properties as metric tags.
 * Logs
   * MUST log a `Bytes received.` message at the `trace` level with the
@@ -173,7 +173,7 @@ downstream target regardless if the transmission was successful or not.
     HTTP, this MUST be the host and path only, excluding the query string.
   * `file` - If relevant, the absolute path of the file.
 * Metrics
-  * MUST increment the `bytes_out_total` counter by the defined value with the
+  * MUST increment the `sent_bytes_total` counter by the defined value with the
     defined properties as metric tags.
 * Logs
   * MUST log a `Bytes received.` message at the `trace` level with the
