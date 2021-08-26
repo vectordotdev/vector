@@ -168,11 +168,11 @@
   inputs = []
   type = "remap"
   source = """
-    .result_a, err = .a * .b + .c - .d
-    .result_b, err = .a * (.b + .c) - .d
-    .result_c, err = .a + .b * .c / .d
-    .result_d, err = (.a + .b) * (.c / .d)
-    .result_e, err = .e / .c
+    .result_a, _err = .a * .b + .c - .d
+    .result_b, _err = .a * (.b + .c) - .d
+    .result_c, _err = .a + .b * .c / .d
+    .result_d, _err = (.a + .b) * (.c / .d)
+    .result_e, _err = .e / .c
   """
 [[tests]]
   name = "remap_arithmetic"
@@ -204,7 +204,7 @@
   source = """
     a = 10
     b = 0
-    .a, err = a / b
+    .a, _err = a / b
   """
 [[tests]]
   name = "remap_arithmetic_error"
@@ -222,10 +222,10 @@
   inputs = []
   type = "remap"
   source = """
-    .result_a, err = .a + .b > 9
-    .result_b, err = .a * .b < 20
-    .result_c, err = 1 >= .a / .b
-    .result_d, err = .a + .b > .c + .d
+    .result_a, _err = .a + .b > 9
+    .result_b, _err = .a * .b < 20
+    .result_c, _err = 1 >= .a / .b
+    .result_d, _err = .a + .b > .c + .d
   """
 [[tests]]
   name = "remap_boolean_arithmetic"

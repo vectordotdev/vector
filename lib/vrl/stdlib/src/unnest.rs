@@ -33,7 +33,7 @@ impl Function for Unnest {
                 title: "variable target",
                 source: indoc! {r#"
                     foo = {"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}
-                    foo = unnest(foo.events)
+                    unnest(foo.events)
                 "#},
                 result: Ok(
                     r#"[{"hostname": "localhost", "events": {"message": "hello"}}, {"hostname": "localhost", "events": {"message": "world"}}]"#,

@@ -34,6 +34,8 @@ impl<'a> Compiler<'a> {
             .map(|expr| Box::new(expr) as _)
             .collect();
 
+        self.handle_unused_variables();
+
         if !self.errors.is_empty() {
             return Err(self.errors);
         }
@@ -401,5 +403,22 @@ impl<'a> Compiler<'a> {
 
     fn handle_parser_error(&mut self, error: parser::Error) {
         self.errors.push(Box::new(error))
+    }
+
+    /// Check for any unused variables, and mark them as compiler errors.
+    fn handle_unused_variables(&mut self) {
+        let unused_variables: Vec<_> = self
+            .state
+            .variable_idents()
+            .filter(|ident| !self.state.variable_references().contains(ident))
+            .filter(|ident| !ident.starts_with('_')) // allow unused `_foo` variable names
+            .collect();
+
+        for ident in unused_variables {
+            let span = self.state.variable(ident).expect("variable exists").span();
+            let error = Box::new(assignment::Error::unused_variable_assignment(span));
+
+            self.errors.push(error);
+        }
     }
 }

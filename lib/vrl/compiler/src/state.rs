@@ -1,7 +1,10 @@
 use crate::enrichment;
 use crate::expression::assignment;
-use crate::{parser::ast::Ident, TypeDef, Value};
-use std::collections::HashMap;
+use crate::{
+    parser::ast::{Ident, Node},
+    TypeDef, Value,
+};
+use std::collections::{HashMap, HashSet};
 
 /// The state held by the compiler.
 ///
@@ -9,11 +12,19 @@ use std::collections::HashMap;
 /// compilation, which in turn drives our progressive type checking system.
 #[derive(Clone, Default)]
 pub struct Compiler {
-    // stored external target type definition
+    /// Stored external target type definition.
     target: Option<assignment::Details>,
 
-    // stored internal variable type definitions
-    variables: HashMap<Ident, assignment::Details>,
+    /// Stored internal variable type definitions.
+    ///
+    /// We keep the span (`Node`) details around, so that the compiler can point
+    /// to unused variables after compiling the entire program.
+    variables: HashMap<Ident, Node<assignment::Details>>,
+
+    /// A list of variables referenced in a program.
+    ///
+    /// This list is used to track whether a variable assignment is unused or not.
+    variable_references: HashSet<Ident>,
 
     enrichment_tables: Option<Box<dyn enrichment::TableSetup>>,
 
@@ -39,6 +50,7 @@ impl Compiler {
                 value: None,
             }),
             variables: HashMap::new(),
+            variable_references: HashSet::new(),
             enrichment_tables: None,
             snapshot: None,
         }
@@ -52,15 +64,26 @@ impl Compiler {
         }
     }
 
+    pub(crate) fn variable(&self, ident: &Ident) -> Option<&Node<assignment::Details>> {
+        self.variables.get(ident)
+    }
+
     pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
         self.variables.keys()
     }
 
-    pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
-        self.variables.get(ident)
+    pub(crate) fn variable_references(&self) -> &HashSet<Ident> {
+        &self.variable_references
     }
 
-    pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
+    pub(crate) fn variable_references_mut(&mut self) -> &mut HashSet<Ident> {
+        &mut self.variable_references
+    }
+
+    pub(crate) fn insert_variable(&mut self, ident: Ident, details: Node<assignment::Details>) {
+        // When a variable is inserted, any references to that variable are nullified.
+        self.variable_references.remove(&ident);
+
         self.variables.insert(ident, details);
     }
 
@@ -78,11 +101,13 @@ impl Compiler {
     pub(crate) fn snapshot(&mut self) {
         let target = self.target.clone();
         let variables = self.variables.clone();
+        let variable_references = self.variable_references.clone();
         let enrichment_tables = self.enrichment_tables.clone();
 
         let snapshot = Self {
             target,
             variables,
+            variable_references,
             enrichment_tables,
             snapshot: None,
         };

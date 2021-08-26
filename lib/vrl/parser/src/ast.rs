@@ -284,6 +284,14 @@ impl AsRef<str> for Ident {
     }
 }
 
+impl Deref for Ident {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl fmt::Display for Ident {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)

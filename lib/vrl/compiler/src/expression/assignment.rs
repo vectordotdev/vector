@@ -52,7 +52,7 @@ impl Assignment {
                 }
 
                 let expr = expr.into_inner();
-                let target = Target::try_from(target.into_inner())?;
+                let target = Target::try_from(target)?;
                 let value = match &expr {
                     Expr::Literal(v) => Some(v.to_value()),
                     _ => None,
@@ -106,7 +106,7 @@ impl Assignment {
                 // "ok" target takes on the type definition of the value, but is
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
-                let ok = Target::try_from(ok.into_inner())?;
+                let ok = Target::try_from(ok)?;
                 let type_def = type_def.infallible();
                 let default = type_def.kind().default_value();
                 let value = match &expr {
@@ -118,7 +118,7 @@ impl Assignment {
 
                 // "err" target is assigned `null` or a string containing the
                 // error message.
-                let err = Target::try_from(err.into_inner())?;
+                let err = Target::try_from(err)?;
                 let type_def = TypeDef::new().bytes().add_null().infallible();
 
                 err.insert_type_def(state, type_def, None);
@@ -183,7 +183,7 @@ impl fmt::Debug for Assignment {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Target {
     Noop,
-    Internal(Ident, Option<LookupBuf>),
+    Internal(Node<Ident>, Option<LookupBuf>),
     External(Option<LookupBuf>),
 }
 
@@ -215,12 +215,14 @@ impl Target {
 
                 let type_def = match state.variable(ident) {
                     None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
+                    Some(node) => set_type_def(&node.type_def, td, path),
                 };
 
                 let details = Details { type_def, value };
+                let (span, ident) = ident.clone().take();
+                let node = Node::new(span, details);
 
-                state.insert_variable(ident.clone(), details);
+                state.insert_variable(ident, node);
             }
 
             External(path) => {
@@ -251,7 +253,11 @@ impl Target {
                 // without any path appended and return early.
                 let path = match path {
                     Some(path) => path,
-                    None => return ctx.state_mut().insert_variable(ident.clone(), value),
+                    None => {
+                        return ctx
+                            .state_mut()
+                            .insert_variable(ident.clone().into_inner(), value)
+                    }
                 };
 
                 // Update existing variable using the provided path, or create a
@@ -260,7 +266,7 @@ impl Target {
                     Some(stored) => stored.insert_by_path(path, value),
                     None => ctx
                         .state_mut()
-                        .insert_variable(ident.clone(), value.at_path(path)),
+                        .insert_variable(ident.clone().into_inner(), value.at_path(path)),
                 }
             }
 
@@ -301,11 +307,13 @@ impl fmt::Debug for Target {
     }
 }
 
-impl TryFrom<ast::AssignmentTarget> for Target {
+impl TryFrom<Node<ast::AssignmentTarget>> for Target {
     type Error = Error;
 
-    fn try_from(target: ast::AssignmentTarget) -> Result<Self, Error> {
+    fn try_from(node: Node<ast::AssignmentTarget>) -> Result<Self, Error> {
         use Target::*;
+
+        let (span, target) = node.take();
 
         let target = match target {
             ast::AssignmentTarget::Noop => Noop,
@@ -318,7 +326,9 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 let span = Span::new(target_span.start(), path_span.end());
 
                 match target {
-                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path)),
+                    ast::QueryTarget::Internal(ident) => {
+                        Internal(Node::new(span, ident), Some(path))
+                    }
                     ast::QueryTarget::External => External(Some(path)),
                     _ => {
                         return Err(Error {
@@ -330,7 +340,9 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                     }
                 }
             }
-            ast::AssignmentTarget::Internal(ident, path) => Internal(ident, path.map(Into::into)),
+            ast::AssignmentTarget::Internal(ident, path) => {
+                Internal(Node::new(span, ident), path.map(Into::into))
+            }
             ast::AssignmentTarget::External(path) => External(path.map(Into::into)),
         };
 
@@ -435,6 +447,17 @@ pub struct Error {
     assignment_span: Span,
 }
 
+impl Error {
+    pub(crate) fn unused_variable_assignment(span: Span) -> Self {
+        Self {
+            variant: ErrorVariant::UnusedVariableAssignment(span),
+            span: Span::default(),
+            expr_span: Span::default(),
+            assignment_span: Span::default(),
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorVariant {
     #[error("unnecessary no-op assignment")]
@@ -448,6 +471,9 @@ pub enum ErrorVariant {
 
     #[error("invalid assignment target")]
     InvalidTarget(Span),
+
+    #[error("unused variable assignment")]
+    UnusedVariableAssignment(Span),
 }
 
 impl fmt::Display for Error {
@@ -471,6 +497,7 @@ impl DiagnosticError for Error {
             FallibleAssignment(..) => 103,
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
+            UnusedVariableAssignment(..) => 642,
         }
     }
 
@@ -500,6 +527,10 @@ impl DiagnosticError for Error {
             InvalidTarget(span) => vec![
                 Label::primary("invalid assignment target", span),
                 Label::context("use one of variable or path", span),
+            ],
+            UnusedVariableAssignment(span) => vec![
+                Label::primary("this variable is unused", span),
+                Label::context("remove the assignment or use its value", span),
             ],
         }
     }

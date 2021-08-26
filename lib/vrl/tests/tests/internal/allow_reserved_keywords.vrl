@@ -4,9 +4,9 @@
 string(.foo) ?? ""
 
 # partially reserved keywords in variables are allowed
-if_foo = true
-foo_else = true
-abort_foo_for = true
+_if_foo = true
+_foo_else = true
+_abort_foo_for = true
 
 # reserved keywords in paths are allowed
 .true = true

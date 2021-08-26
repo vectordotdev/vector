@@ -12,7 +12,7 @@ pub struct Variable {
 }
 
 impl Variable {
-    pub(crate) fn new(span: Span, ident: Ident, state: &State) -> Result<Self, Error> {
+    pub(crate) fn new(span: Span, ident: Ident, state: &mut State) -> Result<Self, Error> {
         let value = match state.variable(&ident) {
             Some(variable) => variable.value.as_ref().cloned(),
             None => {
@@ -24,6 +24,8 @@ impl Variable {
                 return Err(Error::undefined(ident, span, idents));
             }
         };
+
+        state.variable_references_mut().insert(ident.clone());
 
         Ok(Self { ident, value })
     }
@@ -54,7 +56,7 @@ impl Expression for Variable {
         state
             .variable(&self.ident)
             .cloned()
-            .map(|d| d.type_def)
+            .map(|d| d.into_inner().type_def)
             .unwrap_or_else(|| TypeDef::new().null().infallible())
     }
 }

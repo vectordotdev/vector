@@ -2,5 +2,5 @@
 # result: "BAR"
 
 .foo # any
-.foo, err = to_string(.foo) # string (empty or "bar")
+.foo, _ = to_string(.foo) # string (empty or "bar")
 .foo = upcase(.foo) # string

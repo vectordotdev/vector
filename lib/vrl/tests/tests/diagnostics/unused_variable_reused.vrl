@@ -1,0 +1,16 @@
+# result:
+#
+# error[E642]: unused variable assignment
+#   ┌─ :4:1
+#   │
+# 4 │ unused_variable = false
+#   │ ^^^^^^^^^^^^^^^
+#   │ │
+#   │ this variable is unused
+#   │ remove the assignment or use its value
+#   │
+#   = see language documentation at https://vrl.dev
+
+unused_variable = true
+unused_variable
+unused_variable = false

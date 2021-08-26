@@ -112,6 +112,7 @@ remap: expressions: assignment: {
 			title: "Variable assignment"
 			source: #"""
 				my_variable = "Hello, World!"
+				my_variable
 				"""#
 			return: "Hello, World!"
 		},
@@ -120,6 +121,7 @@ remap: expressions: assignment: {
 			source: #"""
 				my_variable = {"message": "Hello, World!"}
 				my_variable |= {"level": "info"}
+				my_variable
 				"""#
 			return: {"level": "info", "message": "Hello, World!"}
 		},
