@@ -25,7 +25,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn load_from_folder(folder: &Path) -> Result<IndexMap<String, Self>, Vec<String>> {
+    pub fn load_from_folder(folder: &Path) -> Result<Pipelines, Vec<String>> {
         let mut index = IndexMap::new();
         let mut errors = Vec::new();
         fs::read_dir(folder)
