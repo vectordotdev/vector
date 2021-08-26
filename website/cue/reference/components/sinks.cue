@@ -244,6 +244,9 @@ components: sinks: [Name=string]: {
 					common:      false
 					description: "Configures the sink request behavior."
 					required:    false
+					if features.send.request.relevant_when != _|_ {
+						relevant_when: features.send.request.relevant_when
+					}
 					type: object: {
 						examples: []
 						options: {
