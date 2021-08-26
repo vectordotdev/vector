@@ -6,7 +6,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
-bytes = { version = "1.0.1", default-features = false }
+bytes = { version = "1.1.0", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 futures = { version = "0.3.16", default-features = false, features = ["std"] }
 leveldb = { version = "0.8.6", default-features = false, optional = true }
