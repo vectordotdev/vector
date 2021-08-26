@@ -1,6 +1,6 @@
 subscription ComponentEventsOutThroughputsSubscription($interval: Int!) {
     componentEventsOutThroughputs(interval: $interval) {
-        name
+        componentId
         throughput
     }
 }

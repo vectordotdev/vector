@@ -70,6 +70,14 @@ struct DatadogRequest<T> {
 }
 
 impl DatadogConfig {
+    /// Returns a new Datadog config from API key.
+    pub fn from_api_key<T: Into<String>>(api_key: T) -> Self {
+        Self {
+            api_key: api_key.into(),
+            ..Self::default()
+        }
+    }
+
     fn get_endpoint(&self) -> String {
         self.endpoint.clone().unwrap_or_else(|| {
             // Follow the official Datadog agent convention:
@@ -229,17 +237,12 @@ impl SinkConfig for DatadogConfig {
 }
 
 fn encode_metric(
-    metric: Metric,
+    mut metric: Metric,
 ) -> Result<EncodedEvent<PartitionInnerBuffer<Metric, DatadogEndpoint>>, ()> {
     let endpoint = DatadogEndpoint::from_metric(&metric);
-    // TODO: Avoiding this clone requires rewriting MetricsBuffer to
-    // accept separated MetricSeries and MetricData values, which in
-    // turn requires rewriting all metrics sinks. See Issue #6045
-    let metadata = metric.metadata().clone();
-    Ok(EncodedEvent {
-        item: PartitionInnerBuffer::new(metric, endpoint),
-        metadata: Some(metadata),
-    })
+    let finalizers = metric.metadata_mut().take_finalizers();
+    let item = PartitionInnerBuffer::new(metric, endpoint);
+    Ok(EncodedEvent { item, finalizers })
 }
 
 impl DatadogSink {

@@ -7,8 +7,7 @@ use crate::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
-        UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -144,11 +143,10 @@ impl SinkConfig for HttpSinkConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.tower.unwrap_with(&TowerRequestConfig {
-            timeout_secs: Some(30),
-            ..Default::default()
-        });
-
+        let request = config
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
         let sink = BatchedHttpSink::new(
             config,
             Buffer::new(batch.size, Compression::None),
@@ -178,7 +176,7 @@ impl HttpSink for HttpSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
@@ -215,7 +213,7 @@ impl HttpSink for HttpSinkConfig {
             byte_size: body.len(),
         });
 
-        Some(EncodedEvent::new(body).with_metadata(event))
+        Some(body)
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -341,7 +339,7 @@ mod tests {
 
         let mut config = default_config(Encoding::Text);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
 
         assert_eq!(bytes, Vec::from("hello world\n"));
     }
@@ -353,7 +351,7 @@ mod tests {
 
         let mut config = default_config(Encoding::Json);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap().item;
+        let bytes = config.encode_event(event).unwrap();
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]

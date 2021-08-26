@@ -10,8 +10,6 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use tracing::{debug, info};
 
-const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
-
 const HELM_VALUES_LOWER_GLOB: &str = indoc! {r#"
     kubernetesLogsSource:
       rawConfig: |
@@ -56,16 +54,6 @@ const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
         encoding: "json"
 "#};
 
-const HELM_VALUES_STDOUT_SINK_RAW_CONFIG: &str = indoc! {r#"
-    sinks:
-      stdout:
-        type: "console"
-        inputs: ["kubernetes_logs"]
-        rawConfig: |
-          target = "stdout"
-          encoding = "json"
-"#};
-
 const HELM_VALUES_ADDITIONAL_CONFIGMAP: &str = indoc! {r#"
     extraConfigDirSources:
     - configMap:
@@ -88,109 +76,6 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
 
 /// This test validates that vector-agent picks up logs at the simplest case
 /// possible - a new pod is deployed and prints to stdout, and we assert that
-/// vector picks that up.
-#[tokio::test]
-async fn simple() -> Result<(), Box<dyn std::error::Error>> {
-    let _guard = lock();
-    init();
-
-    let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
-    let framework = make_framework();
-    let override_name = get_override_name(&namespace, "vector-agent");
-
-    let vector = framework
-        .vector(
-            &namespace,
-            HELM_CHART_VECTOR_AGENT,
-            VectorConfig {
-                custom_helm_values: vec![
-                    &config_override_name(&override_name, true),
-                    HELM_VALUES_STDOUT_SINK,
-                    HELM_VALUES_LOWER_GLOB,
-                ],
-                ..Default::default()
-            },
-        )
-        .await?;
-
-    framework
-        .wait_for_rollout(
-            &namespace,
-            &format!("daemonset/{}", override_name),
-            vec!["--timeout=60s"],
-        )
-        .await?;
-
-    let test_namespace = framework
-        .namespace(namespace::Config::from_namespace(
-            &namespace::make_namespace(pod_namespace.clone(), None),
-        )?)
-        .await?;
-
-    let test_pod = framework
-        .test_pod(test_pod::Config::from_pod(&make_test_pod(
-            &pod_namespace,
-            "test-pod",
-            "echo MARKER",
-            vec![],
-            vec![],
-        ))?)
-        .await?;
-
-    framework
-        .wait(
-            &pod_namespace,
-            vec!["pods/test-pod"],
-            WaitFor::Condition("initialized"),
-            vec!["--timeout=60s"],
-        )
-        .await?;
-
-    // Make sure we read the correct nodes logs.
-    let vector_pod = framework
-        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
-        .await?;
-
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
-    smoke_check_first_line(&mut log_reader).await;
-
-    // Read the rest of the log lines.
-    let mut got_marker = false;
-    look_for_log_line(&mut log_reader, |val| {
-        if val["kubernetes"]["pod_namespace"] != pod_namespace.as_str() {
-            // A log from something other than our test pod, pretend we don't
-            // see it.
-            return FlowControlCommand::GoOn;
-        }
-
-        // Ensure we got the marker.
-        assert_eq!(val["message"], "MARKER");
-
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
-
-        // If we did, remember it.
-        got_marker = true;
-
-        // Request to stop the flow.
-        FlowControlCommand::Terminate
-    })
-    .await?;
-
-    assert!(got_marker);
-
-    drop(test_pod);
-    drop(test_namespace);
-    drop(vector);
-    Ok(())
-}
-
-/// This test validates that vector-agent picks up logs at the simplest case
-/// possible - a new pod is deployed and prints to stdout, and we assert that
 /// vector picks that up - but with the new `customConfig` way of passing the
 /// sink configuration.
 #[tokio::test]
@@ -204,115 +89,14 @@ async fn simple_custom_config() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
                     HELM_VALUES_CUSTOM_CONFIG,
-                ],
-                ..Default::default()
-            },
-        )
-        .await?;
-    framework
-        .wait_for_rollout(
-            &namespace,
-            &format!("daemonset/{}", override_name),
-            vec!["--timeout=60s"],
-        )
-        .await?;
-
-    let test_namespace = framework
-        .namespace(namespace::Config::from_namespace(
-            &namespace::make_namespace(pod_namespace.clone(), None),
-        )?)
-        .await?;
-
-    let test_pod = framework
-        .test_pod(test_pod::Config::from_pod(&make_test_pod(
-            &pod_namespace,
-            "test-pod",
-            "echo MARKER",
-            vec![],
-            vec![],
-        ))?)
-        .await?;
-    framework
-        .wait(
-            &pod_namespace,
-            vec!["pods/test-pod"],
-            WaitFor::Condition("initialized"),
-            vec!["--timeout=60s"],
-        )
-        .await?;
-
-    // Make sure we read the correct nodes logs.
-    let vector_pod = framework
-        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
-        .await?;
-
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
-    smoke_check_first_line(&mut log_reader).await;
-
-    // Read the rest of the log lines.
-    let mut got_marker = false;
-    look_for_log_line(&mut log_reader, |val| {
-        if val["kubernetes"]["pod_namespace"] != pod_namespace.as_str() {
-            // A log from something other than our test pod, pretend we don't
-            // see it.
-            return FlowControlCommand::GoOn;
-        }
-
-        // Ensure we got the marker.
-        assert_eq!(val["message"], "MARKER");
-
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
-
-        // If we did, remember it.
-        got_marker = true;
-
-        // Request to stop the flow.
-        FlowControlCommand::Terminate
-    })
-    .await?;
-
-    assert!(got_marker);
-
-    drop(test_pod);
-    drop(test_namespace);
-    drop(vector);
-    Ok(())
-}
-
-/// This test validates that vector-agent picks up logs at the simplest case
-/// possible - a new pod is deployed and prints to stdout, and we assert that
-/// vector picks that up - but with the legacy `rawConfig` way of passing the
-/// sink configuration.
-#[tokio::test]
-async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
-    let _guard = lock();
-    init();
-
-    let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
-    let framework = make_framework();
-    let override_name = get_override_name(&namespace, "vector-agent");
-
-    let vector = framework
-        .vector(
-            &namespace,
-            HELM_CHART_VECTOR_AGENT,
-            VectorConfig {
-                custom_helm_values: vec![
-                    &config_override_name(&override_name, true),
-                    HELM_VALUES_STDOUT_SINK_RAW_CONFIG,
-                    HELM_VALUES_LOWER_GLOB,
                 ],
                 ..Default::default()
             },
@@ -405,9 +189,10 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -533,9 +318,10 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -610,9 +396,10 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -712,9 +499,10 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -861,9 +649,10 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1064,9 +853,10 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     "#};
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1261,9 +1051,10 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1434,9 +1225,10 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1596,9 +1388,10 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1733,9 +1526,10 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1833,9 +1627,10 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1984,9 +1779,10 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -2045,9 +1841,10 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
 
     let vector = framework
-        .vector(
+        .helm_chart(
             "test-vector",
-            HELM_CHART_VECTOR_AGENT,
+            "vector-agent",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![HELM_VALUES_STDOUT_SINK, HELM_VALUES_LOWER_GLOB],
                 ..Default::default()

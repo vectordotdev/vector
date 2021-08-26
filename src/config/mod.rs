@@ -16,15 +16,20 @@ use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 pub use vector_core::config::GlobalOptions;
-pub use vector_core::transform::{DataType, ExpandType, TransformConfig};
+use vector_core::enrichment;
+pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
 
 pub mod api;
 mod builder;
 mod compiler;
 pub mod component;
+#[cfg(feature = "datadog-pipelines")]
+pub mod datadog;
 mod diff;
 pub mod format;
+mod id;
 mod loading;
+mod pipeline;
 pub mod provider;
 mod unit_test;
 mod validation;
@@ -34,9 +39,10 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
+pub use id::ComponentId;
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    merge_path_lists, process_paths, CONFIG_PATHS,
+    load_pipelines_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
@@ -72,17 +78,34 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
     }
 }
 
+impl ConfigPath {
+    pub fn as_dir(&self) -> Option<&PathBuf> {
+        match self {
+            Self::Dir(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    pub fn pipeline_dir(&self) -> Option<PathBuf> {
+        self.as_dir().map(|path| path.join("pipelines"))
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
+    #[cfg(feature = "datadog-pipelines")]
+    pub datadog: datadog::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, SourceOuter>,
-    pub sinks: IndexMap<String, SinkOuter>,
-    pub transforms: IndexMap<String, TransformOuter>,
+    pub sources: IndexMap<ComponentId, SourceOuter>,
+    pub sinks: IndexMap<ComponentId, SinkOuter>,
+    pub transforms: IndexMap<ComponentId, TransformOuter>,
+    pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
+    pub pipelines: IndexMap<String, pipeline::Pipeline>,
     tests: Vec<TestDefinition>,
-    expansions: IndexMap<String, Vec<String>>,
+    expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -172,7 +195,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub name: String,
+    pub id: ComponentId,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -183,14 +206,14 @@ pub struct SourceContext {
 impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
-        name: &str,
+        id: &ComponentId,
         out: Pipeline,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(name);
+        let (shutdown_signal, _) = shutdown.register_source(id);
         (
             Self {
-                name: name.into(),
+                id: id.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -204,7 +227,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            name: "default".into(),
+            id: ComponentId::from("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
@@ -220,8 +243,7 @@ inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
-    pub inputs: Vec<String>,
-
+    pub inputs: Vec<ComponentId>,
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
 
@@ -244,20 +266,20 @@ pub struct SinkOuter {
 }
 
 impl SinkOuter {
-    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> Self {
+    pub fn new(inputs: Vec<ComponentId>, inner: Box<dyn SinkConfig>) -> SinkOuter {
         SinkOuter {
+            inputs,
             buffer: Default::default(),
             healthcheck: SinkHealthcheckOptions::default(),
             healthcheck_uri: None,
             inner,
-            inputs,
             proxy: Default::default(),
         }
     }
 
-    pub fn resources(&self, name: &str) -> Vec<Resource> {
+    pub fn resources(&self, id: &ComponentId) -> Vec<Resource> {
         let mut resources = self.inner.resources();
-        resources.append(&mut self.buffer.resources(name));
+        resources.append(&mut self.buffer.resources(&id.to_string()));
         resources
     }
 
@@ -369,7 +391,7 @@ inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
-    pub inputs: Vec<String>,
+    pub inputs: Vec<ComponentId>,
     #[serde(flatten)]
     pub inner: Box<dyn TransformConfig>,
 }
@@ -377,6 +399,31 @@ pub struct TransformOuter {
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct EnrichmentTableOuter {
+    #[serde(flatten)]
+    pub inner: Box<dyn EnrichmentTableConfig>,
+}
+
+impl EnrichmentTableOuter {
+    pub fn new(inner: Box<dyn EnrichmentTableConfig>) -> Self {
+        EnrichmentTableOuter { inner }
+    }
+}
+
+#[async_trait]
+#[typetag::serde(tag = "type")]
+pub trait EnrichmentTableConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+    async fn build(
+        &self,
+        globals: &GlobalOptions,
+    ) -> crate::Result<Box<dyn enrichment::Table + Send + Sync>>;
+}
+
+pub type EnrichmentTableDescription = ComponentDescription<Box<dyn EnrichmentTableConfig>>;
+
+inventory::collect!(EnrichmentTableDescription);
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -474,7 +521,7 @@ pub struct TestDefinition {
     #[serde(default)]
     pub outputs: Vec<TestOutput>,
     #[serde(default)]
-    pub no_outputs_from: Vec<String>,
+    pub no_outputs_from: Vec<ComponentId>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -489,7 +536,7 @@ pub enum TestInputValue {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestInput {
-    pub insert_at: String,
+    pub insert_at: ComponentId,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
     pub value: Option<String>,
@@ -504,7 +551,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
-    pub extract_from: String,
+    pub extract_from: ComponentId,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -513,14 +560,14 @@ impl Config {
         Default::default()
     }
 
-    /// Expand a logical component name (i.e. from the config file) into the names of the
+    /// Expand a logical component id (i.e. from the config file) into the ids of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &str) -> Vec<String> {
+    pub fn get_inputs(&self, identifier: &ComponentId) -> Vec<ComponentId> {
         self.expansions
             .get(identifier)
             .cloned()
-            .unwrap_or_else(|| vec![String::from(identifier)])
+            .unwrap_or_else(|| vec![identifier.clone()])
     }
 }
 
@@ -531,7 +578,7 @@ impl Config {
     feature = "transforms-json_parser"
 ))]
 mod test {
-    use super::{builder::ConfigBuilder, format, load_from_str, Format};
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentId, Format};
     use indoc::indoc;
     use std::path::PathBuf;
 
@@ -549,6 +596,7 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
+            Default::default(),
         )
         .unwrap();
 
@@ -572,6 +620,7 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
+            Default::default(),
         )
         .unwrap();
 
@@ -605,6 +654,7 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
+            Default::default(),
         )
         .unwrap();
 
@@ -636,6 +686,9 @@ mod test {
                     indoc! {r#"
                         data_dir = "/foobar"
 
+                        [proxy]
+                          http = "http://proxy.inc:3128"
+
                         [transforms.foo]
                           type = "json_parser"
                           inputs = [ "in" ]
@@ -659,10 +712,12 @@ mod test {
             Ok(())
         );
 
+        assert!(config.global.proxy.http.is_some());
+        assert!(config.global.proxy.https.is_none());
         assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
-        assert!(config.sources.contains_key("in"));
-        assert!(config.sinks.contains_key("out"));
-        assert!(config.transforms.contains_key("foo"));
+        assert!(config.sources.contains_key(&ComponentId::from("in")));
+        assert!(config.sinks.contains_key(&ComponentId::from("out")));
+        assert!(config.transforms.contains_key(&ComponentId::from("foo")));
         assert_eq!(config.tests.len(), 1);
     }
 
@@ -705,8 +760,8 @@ mod test {
                 .unwrap()
             ),
             Err(vec![
-                "duplicate source name found: in".into(),
-                "duplicate sink name found: out".into(),
+                "duplicate source id found: in".into(),
+                "duplicate sink id found: out".into(),
             ])
         );
     }
@@ -738,7 +793,39 @@ mod test {
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
         assert!(config.global.proxy.no_proxy.matches("localhost"));
-        let source = config.sources.get("in").unwrap();
+        let source = config.sources.get(&ComponentId::from("in")).unwrap();
+        assert_eq!(source.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(source.proxy.https, Some("http://other:3128".into()));
+        assert!(source.proxy.no_proxy.matches("localhost"));
+    }
+
+    #[test]
+    fn with_partial_proxy() {
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [proxy]
+                  http = "http://server:3128"
+
+                [sources.in]
+                  type = "nginx_metrics"
+                  endpoints = ["http://localhost:8000/basic_status"]
+
+                [sources.in.proxy]
+                  http = "http://server:3128"
+                  https = "http://other:3128"
+                  no_proxy = ["localhost", "127.0.0.1"]
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["in"]
+                  encoding = "json"
+            "#},
+            Some(Format::Toml),
+        )
+        .unwrap();
+        assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(config.global.proxy.https, None);
+        let source = config.sources.get(&ComponentId::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3128".into()));
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));
@@ -878,6 +965,7 @@ mod resource_tests {
                   encoding = "json"
             "#},
             Some(Format::Toml),
+            Default::default(),
         )
         .is_err());
     }

@@ -120,7 +120,7 @@ where
 
         if let Some((key, value)) = this.buffer.pop_front() {
             this.unacked_sizes.push_back(value.len());
-            this.read_offset = key.0;
+            this.read_offset = key.0 + 1;
 
             let buffer: Bytes = Bytes::from(value);
             match T::decode(buffer) {

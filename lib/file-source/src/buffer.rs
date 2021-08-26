@@ -20,7 +20,7 @@ use tracing::warn;
 /// interior `usize` is the number of bytes written into `buf`.
 ///
 /// Tweak of
-/// https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471
+/// <https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471>.
 ///
 /// # Performance
 ///

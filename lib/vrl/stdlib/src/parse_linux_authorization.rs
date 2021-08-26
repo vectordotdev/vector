@@ -32,7 +32,7 @@ impl Function for ParseLinuxAuthorization {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
         // The parse_linux_authorization function is just an alias for parse_syslog

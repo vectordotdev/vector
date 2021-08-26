@@ -3,7 +3,7 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
-        encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
+        encode_log, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -62,7 +62,7 @@ impl SinkConfig for SocketSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
-        let encode_event = move |event| encode_event(event, &encoding);
+        let encode_event = move |event| encode_log(event, &encoding);
         match &self.mode {
             Mode::Tcp(config) => config.build(cx, encode_event),
             Mode::Udp(config) => config.build(cx, encode_event),

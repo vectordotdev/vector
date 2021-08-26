@@ -21,7 +21,7 @@ pub mod glob;
 /// ```
 ///
 /// However, that's currently unavailable at Rust.
-/// See: https://github.com/rust-lang/rust/issues/44265
+/// See: <https://github.com/rust-lang/rust/issues/44265>
 ///
 /// We use an `IntoIter` here as a workaround.
 pub trait PathsProvider {

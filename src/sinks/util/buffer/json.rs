@@ -41,7 +41,7 @@ impl Batch for JsonArrayBuffer {
         let raw_item = to_raw_value(&item).expect("Value should be valid json");
         let new_len = self.total_bytes + raw_item.get().len() + 1;
         if self.is_empty() && new_len >= self.settings.bytes {
-            err_event_too_large(raw_item.get().len())
+            err_event_too_large(raw_item.get().len(), self.settings.bytes)
         } else if self.buffer.len() >= self.settings.events || new_len > self.settings.bytes {
             PushResult::Overflow(item)
         } else {

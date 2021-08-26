@@ -151,8 +151,8 @@ pub struct RootOpts {
     #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
 
-    /// [experimental] Send internal tracing spans to a local APM-enabled Datadog agent with
-    /// a granularity matching the current log level.
+    /// Send internal tracing spans to a local APM-enabled Datadog agent with
+    /// a granularity matching the current log level. This is experimental.
     #[structopt(long, env = "VECTOR_ENABLE_DATADOG_TRACING", takes_value(false))]
     pub enable_datadog_tracing: bool,
 }
@@ -189,7 +189,7 @@ pub enum SubCommand {
     List(list::Opts),
 
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
-    /// For guidance on how to write unit tests check out: https://vector.dev/guides/level-up/unit-testing/
+    /// For guidance on how to write unit tests check out <https://vector.dev/guides/level-up/unit-testing/>.
     Test(unit_test::Opts),
 
     /// Output the topology as visual representation using the DOT language which can be rendered by GraphViz
