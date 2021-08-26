@@ -31,3 +31,4 @@ if (datadogLogs) {
     })
   }
 }
+
