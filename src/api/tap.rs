@@ -283,7 +283,7 @@ async fn tap_handler(
                 // Remove components that have gone away.
                 sinks.retain(|id, _| {
                     outputs.contains_key(id) || {
-                        debug!(message = "Removing component.", component_id = ?id);
+                        debug!(message = "Removing component.", component_id = %id);
                         false
                     }
                 });

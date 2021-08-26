@@ -35,6 +35,12 @@ status = 301
 force = true
 
 [[redirects]]
+from = "https://calendar.vector.dev/*"
+to = "https://calendar.google.com/calendar/embed?src=c_qsq1nrsgetsspkn7pjrqh6cclc%40group.calendar.google.com&ctz=America%2FNew_York"
+status = 302
+force = true
+
+[[redirects]]
 from = "https://chat.vector.dev/*"
 to = "https://discord.gg/dX3bdkF"
 status = 302

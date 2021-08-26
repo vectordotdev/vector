@@ -368,15 +368,19 @@ components: sinks: [Name=string]: {
 		}
 
 		if features.send != _|_ {
-			if features.send.send_buffer_size != _|_ {
+			if features.send.send_buffer_bytes != _|_ {
 				send_buffer_bytes: {
 					common:      false
 					description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
 					required:    false
 					type: uint: {
+						default: null
 						examples: [65536]
+						unit: "bytes"
 					}
-					relevant_when: features.send.send_buffer_bytes.relevant_when
+					if features.send.send_buffer_bytes.relevant_when != _|_ {
+						relevant_when: features.send.send_buffer_bytes.relevant_when
+					}
 				}
 			}
 
