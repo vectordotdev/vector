@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 pub struct Pipelines(IndexMap<String, Pipeline>);
@@ -18,6 +18,66 @@ impl From<IndexMap<String, Pipeline>> for Pipelines {
 }
 
 impl Pipelines {
+    pub fn load_from_paths(paths: impl Iterator<Item = PathBuf>) -> Result<Pipelines, Vec<String>> {
+        let mut index: IndexMap<String, Pipeline> = IndexMap::new();
+        let mut errors: Vec<String> = Vec::new();
+        for folder in paths {
+            match Self::load_from_folder(&folder) {
+                Ok(result) => {
+                    for (key, value) in result.into_iter() {
+                        index.insert(key, value);
+                    }
+                }
+                Err(result) => {
+                    for err in result.into_iter() {
+                        errors.push(err);
+                    }
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(Self::from(index))
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn load_from_folder(folder: &Path) -> Result<IndexMap<String, Pipeline>, Vec<String>> {
+        let mut index = IndexMap::new();
+        let mut errors = Vec::new();
+        fs::read_dir(folder)
+            .map_err(|err| {
+                vec![format!(
+                    "Could not list folder content: {:?}, {}",
+                    folder, err
+                )]
+            })?
+            .filter_map(|entry| match entry {
+                Ok(item) => {
+                    let path = item.path();
+                    if path.is_file() {
+                        Some(Pipeline::load_from_file(&path))
+                    } else {
+                        None
+                    }
+                }
+                Err(err) => Some(Err(err.to_string())),
+            })
+            .for_each(|res| match res {
+                Ok((id, pipeline)) => {
+                    index.insert(id, pipeline);
+                }
+                Err(err) => {
+                    errors.push(err);
+                }
+            });
+        if errors.is_empty() {
+            Ok(index)
+        } else {
+            Err(errors)
+        }
+    }
+
     pub fn into_scoped(self) -> Vec<(ComponentId, PipelineTransform)> {
         self.0
             .into_iter()
@@ -81,42 +141,6 @@ impl Pipeline {
                 (transform_id, transform)
             })
             .collect()
-    }
-
-    pub fn load_from_folder(folder: &Path) -> Result<IndexMap<String, Self>, Vec<String>> {
-        let mut index = IndexMap::new();
-        let mut errors = Vec::new();
-        fs::read_dir(folder)
-            .map_err(|err| {
-                vec![format!(
-                    "Could not list folder content: {:?}, {}",
-                    folder, err
-                )]
-            })?
-            .filter_map(|entry| match entry {
-                Ok(item) => {
-                    let path = item.path();
-                    if path.is_file() {
-                        Some(Self::load_from_file(&path))
-                    } else {
-                        None
-                    }
-                }
-                Err(err) => Some(Err(err.to_string())),
-            })
-            .for_each(|res| match res {
-                Ok((id, pipeline)) => {
-                    index.insert(id, pipeline);
-                }
-                Err(err) => {
-                    errors.push(err);
-                }
-            });
-        if errors.is_empty() {
-            Ok(index)
-        } else {
-            Err(errors)
-        }
     }
 
     pub fn load_from_file(file: &Path) -> Result<(String, Self), String> {

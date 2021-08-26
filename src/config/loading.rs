@@ -1,12 +1,9 @@
 use super::{
-    builder::ConfigBuilder,
-    format,
-    pipeline::{Pipeline, Pipelines},
-    validation, vars, Config, ConfigPath, Format, FormatHint,
+    builder::ConfigBuilder, format, pipeline::Pipelines, validation, vars, Config, ConfigPath,
+    Format, FormatHint,
 };
 use crate::signal;
 use glob::glob;
-use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
@@ -145,27 +142,7 @@ pub fn load_pipelines_from_paths(config_paths: &[ConfigPath]) -> Result<Pipeline
         .iter()
         .filter_map(|path| path.pipeline_dir())
         .filter(|path| path.exists());
-    let mut index: IndexMap<String, Pipeline> = IndexMap::new();
-    let mut errors: Vec<String> = Vec::new();
-    for folder in folders {
-        match Pipeline::load_from_folder(&folder) {
-            Ok(result) => {
-                for (key, value) in result.into_iter() {
-                    index.insert(key, value);
-                }
-            }
-            Err(result) => {
-                for err in result.into_iter() {
-                    errors.push(err);
-                }
-            }
-        }
-    }
-    if errors.is_empty() {
-        Ok(Pipelines::from(index))
-    } else {
-        Err(errors)
-    }
+    Pipelines::load_from_paths(folders)
 }
 
 pub fn load_builder_from_paths(
