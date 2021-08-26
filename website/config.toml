@@ -85,6 +85,12 @@ twitter_handle = "vectordotdev"
 github_repo = "timberio/vector"
 discord = "https://chat.vector.dev"
 
+# Datadog configuration
+[params.datadog_config]
+application_id = "0b95923b-b06d-445b-893f-a861e93d6ea3"
+client_token = "puba5f23a97d613091ae2ca8c0f4a135af4"
+service_name = "vector"
+
 ## Menus
 
 # Main page doc links
