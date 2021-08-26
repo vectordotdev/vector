@@ -124,8 +124,8 @@ impl LogEvent {
     /// Rename a key in place without reference to pathing
     ///
     /// The function will rename a key in place without reference to any path
-    /// information in the key, much as if you were to call [`remove_key`] and
-    /// then [`insert_flat`].
+    /// information in the key, much as if you were to call [`remove`] and then
+    /// [`insert_flat`].
     ///
     /// This function is a no-op if `from_key` and `to_key` are identical. If
     /// `to_key` already exists in the structure its value will be overwritten
