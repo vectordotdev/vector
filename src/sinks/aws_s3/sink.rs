@@ -23,13 +23,10 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use flate2::write::GzEncoder;
 use futures::stream::BoxStream;
+use tokio::{pin, select, sync::mpsc::channel};
 use tower::Service;
 use uuid::Uuid;
-use vector_core::{
-    buffers::Acker,
-    event::{EventFinalizers, Value},
-    sink::StreamSink,
-};
+use vector_core::{buffers::Acker, event::EventFinalizers, sink::StreamSink};
 
 use super::{
     config::{S3Options, S3RequestOptions},
@@ -75,8 +72,60 @@ where
     P::Item: Send,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        pin!(input);
+
+        // All sinks do the same fundamental job: take in events, and ship them out.  Empirical
+        // testing shows that our number one priority for high throughput needs to be servicing I/O
+        // as soon as we possibly can.  In order to do that, we'll spin up a separate task that
+        // deals exclusively with I/O, while we deal with everything else here: batching, ordering,
+        // and so on.
+        let (io_tx, io_rx) = channel(32);
+        let _ = tokio::spawn(async move {
+            run_io(io_rx, self.service);
+        });
+
+        let mut closed = false;
+        loop {
+            select! {
+                // This explicitly enables biasing, which ensures the branches in this select block
+                // are polled in top-down order.  We do tghis to ensure that we send ready batches
+                // as soon as possible to keep I/O saturated to the best of our ability.
+                biased;
+
+                // Batches ready to send.
+                Some(batches) = self.batcher.get_ready_batches() => {
+
+                }
+
+                // Take in new events.
+                maybe_event = input.next() => {
+                    if let Some(event) = maybe_event {
+
+                    } else {
+                        // We're not going to get any more events from our input stream, but we
+                        // might have outstanding batches.  Thus, we mark ourselves and the batch as
+                        // closed, and the next time we're here, if we're already closed, then we
+                        // forcefully break out of the loop.  This ensures that we make at least one
+                        // more iteration of the loop, where our next call to `get_ready_batches`
+                        // will return all the remaining batches regardless of size or expiration.
+                         if !closed {
+                             closed = true;
+                         } else {
+                             break;
+                         }
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
+}
+
+async fn run_io<S>(rx: Receiver<S3Request>, service: S)
+where
+    S: Service<S3Request>,
+{
 }
 
 fn build_request<P>(
@@ -259,7 +308,7 @@ fn encode_event(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, convert::TryFrom, io::Cursor};
+    use std::{collections::BTreeMap, io::Cursor};
 
     use crate::sinks::util::{
         buffer::partition::{BatchPushResult, PartitionInFlightBatch, Partitioner},

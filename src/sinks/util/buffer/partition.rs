@@ -1,5 +1,10 @@
 use std::{
-    collections::HashMap, hash::Hash, io::Write, marker::PhantomData, task::Poll, time::Duration,
+    collections::{HashMap, HashSet},
+    hash::Hash,
+    io::Write,
+    marker::PhantomData,
+    task::Poll,
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -123,11 +128,36 @@ pub enum BatchPushResult<I> {
     /// The boolean value indicates whether or not the batch is now full after pushing the item in.
     Success(bool),
 
-    /// The batch was either already full or there was
+    /// The batch was already full.
     Overflow(I),
+
+    /// The batcher indicated that it is closed and is no longer taking items.
+    Closed(I),
 
     /// The item failed to be pushed into the batch due to an error during partitioning.
     Failure(I),
+}
+
+impl<I> BatchPushResult<I> {
+    /// Whether or not the given batch should be flushed.
+    pub fn should_flush(&self) -> bool {
+        match self {
+            BatchPushResult::Success(full) => *full,
+            BatchPushResult::Overflow(_) => true,
+            BatchPushResult::Closed(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Takes the inner object if one exists.
+    pub fn into_inner(self) -> Option<I> {
+        match self {
+            BatchPushResult::Overflow(item) => Some(item),
+            BatchPushResult::Closed(item) => Some(item),
+            BatchPushResult::Failure(item) => Some(item),
+            _ => None,
+        }
+    }
 }
 
 /// An in-progress batch for `PartitionBatch`.
@@ -243,22 +273,41 @@ where
     settings: BatchSettings<()>,
     timeout_queue: DelayQueue<P::Key>,
     batches: HashMap<P::Key, PartitionInFlightBatch<P>>,
+    closed: bool,
 }
 
 impl<P> PartitionBatcher<P>
 where
     P: Partitioner,
 {
+    /// Creates a new `PartitionBatcher`.
     pub fn new(partitioner: P, settings: BatchSettings<()>) -> Self {
         PartitionBatcher {
             partitioner,
             settings,
             timeout_queue: DelayQueue::new(),
             batches: HashMap::new(),
+            closed: false,
         }
     }
 
+    /// Marks this batcher as closed.
+    ///
+    /// All future calls to `get_ready_batches` will return all in-flight batches regardless of
+    /// whether or not they're full and whether or not they've timed out.  This allows callers to
+    /// retrieve all in-flight batches in the case of Vector shutting down.
+    pub fn close(&mut self) {
+        self.closed = true;
+    }
+
+    /// Pushes an item into its corresponding batch.
+    ///
+    /// If there was an item
     pub fn push(&mut self, item: P::Item) -> BatchPushResult<P::Item> {
+        if self.closed {
+            return BatchPushResult::Closed(item);
+        }
+
         match self.partitioner.partition(&item) {
             Some(pk) => {
                 let mut batch = self
@@ -278,7 +327,13 @@ where
         let mut ready_partitions = self
             .batches
             .iter()
-            .filter_map(|(pk, b)| if b.is_full() { Some(pk.clone()) } else { None })
+            .filter_map(|(pk, b)| {
+                if b.is_full() || self.closed {
+                    Some(pk.clone())
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         // Check to see if any batches have expired, indicating a need for them to be flushed.  We
@@ -287,9 +342,14 @@ where
         // which might block the task from accepting more items.  However, this differs from
         // `FutureExt::now_and_never` in that `poll!` ensures this task context is properly attached
         // so that the next batch expiration wakes us up.
-        while let Poll::Ready(Some(Ok(pk))) = poll!(self.timeout_queue.next()) {
-            let pk = pk.into_inner();
-            ready_partitions.push(pk);
+        //
+        // We gate the polling of timed out batches to ensure we don't end up with duplicates when
+        // the batcher flips to closed mode.
+        if !self.closed {
+            while let Poll::Ready(Some(Ok(pk))) = poll!(self.timeout_queue.next()) {
+                let pk = pk.into_inner();
+                ready_partitions.push(pk);
+            }
         }
 
         for pk in ready_partitions {
