@@ -64,8 +64,6 @@ pub mod split;
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
-#[cfg(feature = "wasm")]
-pub mod wasm;
 
 pub use vector_core::transform::{FunctionTransform, TaskTransform, Transform};
 
