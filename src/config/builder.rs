@@ -80,8 +80,8 @@ impl ConfigBuilder {
             .map(|id| id.id().to_string())
             .collect::<HashSet<_>>();
 
-        let pipelines = std::mem::replace(&mut self.pipelines, Default::default());
-        let pipeline_transforms = pipelines.into_scoped();
+        let pipelines = std::mem::take(&mut self.pipelines);
+        let pipeline_transforms = pipelines.into_scoped_transforms();
 
         for (component_id, pipeline_transform) in pipeline_transforms {
             // to avoid ambiguity, we forbid to use a component name in the pipeline scope
