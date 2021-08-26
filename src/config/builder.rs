@@ -70,18 +70,23 @@ impl From<Config> for ConfigBuilder {
 impl ConfigBuilder {
     // moves the pipeline transforms into regular scoped transforms
     // and add the output to the sources
-    pub fn merge_pipelines(mut self) -> (Self, Vec<String>) {
+    pub fn merge_pipelines(&mut self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
-        let global_transforms = self
+        let global_inputs = self
             .transforms
             .keys()
             .chain(self.sources.keys())
             .filter(|id| id.is_global())
             .map(|id| id.id().to_string())
             .collect::<HashSet<_>>();
-        let pipeline_transforms = self.pipelines.into_scoped();
+
+        let pipelines = std::mem::replace(&mut self.pipelines, Default::default());
+        let pipeline_transforms = pipelines.into_scoped();
+
         for (component_id, pipeline_transform) in pipeline_transforms {
-            if global_transforms.contains(component_id.id()) {
+            // to avoid ambiguity, we forbid to use a component name in the pipeline scope
+            // that is already used as the global scope.
+            if global_inputs.contains(component_id.id()) {
                 errors.push(format!(
                     "Component ID '{}' is already used.",
                     component_id.id()
@@ -101,22 +106,11 @@ impl ConfigBuilder {
                 .insert(component_id, pipeline_transform.inner);
         }
 
-        (
-            Self {
-                global: self.global,
-                #[cfg(feature = "api")]
-                api: self.api,
-                healthchecks: self.healthchecks,
-                sources: self.sources,
-                sinks: self.sinks,
-                transforms: self.transforms,
-                provider: None,
-                tests: self.tests,
-                enrichment_tables: self.enrichment_tables,
-                pipelines: Default::default(),
-            },
-            errors,
-        )
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 
     pub fn build(self) -> Result<Config, Vec<String>> {
