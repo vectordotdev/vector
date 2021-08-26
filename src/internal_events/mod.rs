@@ -132,8 +132,6 @@ mod topology;
 mod udp;
 mod unix;
 mod vector;
-#[cfg(feature = "wasm")]
-mod wasm;
 
 pub mod kubernetes;
 
@@ -269,8 +267,6 @@ pub use self::topology::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
-#[cfg(feature = "wasm")]
-pub use self::wasm::*;
 #[cfg(windows)]
 pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]

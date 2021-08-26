@@ -27,8 +27,6 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
-#[cfg(feature = "wasm")]
-pub mod wasm;
 #[macro_use]
 pub mod internal_events;
 #[cfg(feature = "api")]
