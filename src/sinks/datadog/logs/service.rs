@@ -101,11 +101,7 @@ impl HttpSink for Service {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let log = event.as_mut_log();
 
-        if self.log_schema_message_key != "message" {
-            if let Some(message) = log.remove(self.log_schema_message_key) {
-                log.insert_flat("message", message);
-            }
-        }
+        log.rename_key(self.log_schema_message_key, "message");
 
         if self.log_schema_timestamp_key != "date" {
             if let Some(timestamp) = log.remove(self.log_schema_timestamp_key) {

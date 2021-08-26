@@ -121,6 +121,18 @@ impl LogEvent {
         util::log::insert_path(self.as_map_mut(), key, value.into())
     }
 
+    #[instrument(level = "trace", skip(self, from_key, to_key), fields(key = %from_key))]
+    pub fn rename_key<K>(&mut self, from_key: K, to_key: K)
+    where
+        K: AsRef<str> + Into<String> + PartialEq + Display,
+    {
+        if from_key != to_key {
+            if let Some(val) = self.remove(from_key) {
+                self.insert_flat(to_key, val);
+            }
+        }
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = %key))]
     pub fn insert_flat<K, V>(&mut self, key: K, value: V)
     where
@@ -441,11 +453,117 @@ mod test {
     use serde_json::json;
     use std::str::FromStr;
 
-    // This test iterates over the `tests/data/fixtures/log_event` folder and:
-    //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
-    //     item being just plain parsed as json.
+    // The following two tests assert that renaming a key has no effect if the
+    // keys are equivalent, whether the key exists in the log or not.
+    #[test]
+    fn rename_key_equiv_exists() {
+        let mut fields = BTreeMap::new();
+        fields.insert("one".to_string(), Value::Integer(1_i64));
+        fields.insert("two".to_string(), Value::Integer(2_i64));
+        let expected_fields = fields.clone();
+
+        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        base.rename_key("one", "one");
+        let (actual_fields, _) = base.into_parts();
+
+        assert_eq!(expected_fields, actual_fields);
+    }
+    #[test]
+    fn rename_key_equiv_not_exists() {
+        let mut fields = BTreeMap::new();
+        fields.insert("one".to_string(), Value::Integer(1_i64));
+        fields.insert("two".to_string(), Value::Integer(2_i64));
+        let expected_fields = fields.clone();
+
+        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        base.rename_key("three", "three");
+        let (actual_fields, _) = base.into_parts();
+
+        assert_eq!(expected_fields, actual_fields);
+    }
+    // Assert that renaming a key has no effect if the key does not originally
+    // exist in the log, when the to -> from keys are not identical.
+    #[test]
+    fn rename_key_not_exists() {
+        let mut fields = BTreeMap::new();
+        fields.insert("one".to_string(), Value::Integer(1_i64));
+        fields.insert("two".to_string(), Value::Integer(2_i64));
+        let expected_fields = fields.clone();
+
+        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        base.rename_key("three", "four");
+        let (actual_fields, _) = base.into_parts();
+
+        assert_eq!(expected_fields, actual_fields);
+    }
+    // Assert that renaming a key has the effect of moving the value from one
+    // key name to another if the key exists.
+    #[test]
+    fn rename_key_no_overlap() {
+        let mut fields = BTreeMap::new();
+        fields.insert("one".to_string(), Value::Integer(1_i64));
+        fields.insert("two".to_string(), Value::Integer(2_i64));
+
+        let mut expected_fields = fields.clone();
+        let val = expected_fields.remove("one").unwrap();
+        expected_fields.insert("three".to_string(), val);
+
+        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        base.rename_key("one", "three");
+        let (actual_fields, _) = base.into_parts();
+
+        assert_eq!(expected_fields, actual_fields);
+    }
+    // Assert that renaming a key has the effect of moving the value from one
+    // key name to another if the key exists and will overwrite another key if
+    // it exists.
+    #[test]
+    fn rename_key_overlap() {
+        let mut fields = BTreeMap::new();
+        fields.insert("one".to_string(), Value::Integer(1_i64));
+        fields.insert("two".to_string(), Value::Integer(2_i64));
+
+        let mut expected_fields = fields.clone();
+        let val = expected_fields.remove("one").unwrap();
+        expected_fields.insert("two".to_string(), val);
+
+        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        base.rename_key("one", "two");
+        let (actual_fields, _) = base.into_parts();
+
+        assert_eq!(expected_fields, actual_fields);
+    }
+
+    // Assert that renaming a key is equivalent to removing (if it exists) and
+    // inserting under a new name.
     //
-    // Basically: This test makes sure we aren't mutilating any content users might be sending.
+    // This test ensures that `rename_key` is equivalent to the following:
+    //
+    //   * GIVEN that KEY exists in the LogEvent rename_key has the same effect
+    //     as a composed insert_flat(NEW_KEY, remove(KEY))
+    //   * GIVEN that KEY does not exist in the LogEvent rename_key has the same
+    //     effect as insert_flat(NEW_KEY, ...)
+    // #[test]
+    // fn rename_key_equiv_not_exists() {
+    //     let mut fields = BTreeMap::new();
+    //     fields.insert("one", Value::Integer(1_i64));
+    //     fields.insert("two", Value::Integer(2_i64));
+
+    //     let base = LogEvent::from_parts(fields, EventMetadata::default());
+    //     let expr = orig.clone();
+
+    //     base.insert_flat("three", Value::Integer(3_i64));
+    //     base.rename_key(
+    // }
+
+    // This test iterates over the `tests/data/fixtures/log_event` folder and:
+    //
+    //   * Ensures the EventLog parsed from bytes and turned into a
+    //   serde_json::Value are equal to the item being just plain parsed as
+    //   json.
+    //
+    // Basically: This test makes sure we aren't mutilating any content users
+    // might be sending.
     #[test]
     fn json_value_to_vector_log_event_to_json_value() {
         const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
