@@ -80,7 +80,7 @@ and "implementation" sections _per proposed solution_.
 When a VRL program is compiled, it accumulates compilation errors before showing
 a list of diagnostic messages to the operator. We do this, so that operators can
 resolve multiple errors at once without having to recompile after each
-individual error. 
+individual error.
 
 The existing implementation to support this is very simplistic, and can result
 in the compiler injecting _new_ errors that aren't caused by the operator.
