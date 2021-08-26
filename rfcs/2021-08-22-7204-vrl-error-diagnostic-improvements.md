@@ -562,7 +562,7 @@ expression, it does something like the following:
 ```rust
 for expr in root_expressions {
     let expr = self.compile_expr(expr);
-  
+
     if expr.is_fallible() {
         self.errors.push(ExpressionError);
     }
