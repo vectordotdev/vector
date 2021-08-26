@@ -186,7 +186,7 @@ named with an `Error` suffix. For example, the `socket` source emits a
 `SocketReceiveError` representing any error that occurs while receiving data off
 of the socket.
 
-This specification does list a standard set of errors that components must
+This specification does not list a standard set of errors that components must
 implement since errors are specific to the component.
 
 * Properties
