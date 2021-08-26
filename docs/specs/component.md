@@ -59,9 +59,9 @@ takes a `string` representing a single address.
 
 #### `endpoint(s)`
 
-When a component sends data to a downstream target, it MUST expose
-either an `endpoint` option that takes a `string` representing a single
-endpoint, or an `endpoints` option that takes an array of strings
+When a component makes a connection to a downstream target, it MUST
+expose either an `endpoint` option that takes a `string` representing a
+single endpoint, or an `endpoints` option that takes an array of strings
 representing multiple endpoints.
 
 ## Instrumentation
@@ -110,7 +110,7 @@ from the upstream source and before the creation of a Vector event.
       delimiter.
   * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.)
-  * `path` - If relevant, the HTTP path, excluding query strings.
+  * `http_path` - If relevant, the HTTP path, excluding query strings.
   * `socket` - If relevant, the socket number that bytes were received from.
 * Metrics
   * MUST increment the `received_bytes_total` counter by the defined value with
