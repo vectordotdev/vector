@@ -377,6 +377,7 @@ components: {
 				retry_max_duration_secs:    uint64 | *3600
 				timeout_secs:               uint64 | *60
 				headers:                    bool
+				relevant_when?:             string
 			}
 		}
 
