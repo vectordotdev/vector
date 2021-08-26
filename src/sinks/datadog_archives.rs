@@ -31,6 +31,7 @@ use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_s3::{HeadBucketRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},
@@ -183,6 +184,47 @@ fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8
 
     log.insert("_id", generate_log_id());
 
+    // - `_id` is generated in the sink(format described below);
+    // - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current UNIX timestamp in millis if missing;
+    // - `message`,`host` are set from the corresponding Global Log Schema mappings;
+    // - `source`, `service`, `status`, `tags` are left as is;
+    // - the rest of the fields is moved to `attributes`.
+    let timestamp = log
+        .remove(crate::config::log_schema().timestamp_key())
+        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
+    log.insert(
+        "date",
+        timestamp
+            .as_timestamp()
+            .map_or(chrono::Utc::now().timestamp_millis(), |t| {
+                t.timestamp_millis()
+            }),
+    );
+    if let Some(message) = log.remove(crate::config::log_schema().message_key()) {
+        log.insert("message", message);
+    }
+    if let Some(message) = log.remove(crate::config::log_schema().host_key()) {
+        log.insert("host", message);
+    }
+
+    lazy_static! {
+        static ref RESERVED_ATTRIBUTES: HashSet<&'static str> =
+            vec!["_id", "date", "message", "host", "source", "service", "status", "tags"]
+                .into_iter()
+                .collect();
+    }
+    let mut attributes = BTreeMap::new();
+    let custom_attributes: Vec<String> = log
+        .keys()
+        .filter(|path| !RESERVED_ATTRIBUTES.contains(path.as_str()))
+        .collect();
+    for path in custom_attributes {
+        if let Some(value) = log.remove(&path) {
+            attributes.insert(path, value);
+        }
+    }
+    log.insert("attributes", attributes);
+
     let bytes = serde_json::to_vec(&log)
         .map(|mut b| {
             b.push(b'\n');
@@ -265,6 +307,7 @@ impl SinkConfig for DatadogArchivesSinkConfig {
 mod tests {
     use super::*;
     use chrono::DateTime;
+    use vector_core::event::Value;
 
     #[test]
     fn generate_config() {
@@ -272,41 +315,72 @@ mod tests {
     }
 
     #[test]
-    fn s3_encode_event_text() {
+    fn s3_encode_event() {
         let mut log = Event::from("test message");
+        log.as_mut_log().insert("not_a_reserved_attribute", "value");
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
             .expect("invalid test case")
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
         let encoded = encode_event(log).unwrap();
         let (bytes, key) = encoded.item.into_parts();
-        let encoded_json: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        //TODO
+        let encoded_json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(&bytes[..]).unwrap();
 
         let id1 = validate_event_id(&encoded_json);
 
         assert_eq!(
-            encoded_json.get("message").expect("message not found"),
+            encoded_json
+                .get("message")
+                .expect("message not found")
+                .as_str()
+                .expect("message is not a string"),
             "test message"
         );
         assert_eq!(
-            encoded_json.get("timestamp").expect("timestamp not found"),
-            "2021-08-23T16:00:27.879Z"
+            encoded_json
+                .get("date")
+                .expect("date not found")
+                .as_i64()
+                .expect("date is not an integer"),
+            1629734427879
+        );
+        assert_eq!(
+            encoded_json
+                .get("attributes")
+                .expect("attributes not found")
+                .as_object()
+                .expect("attributes is not an object")
+                .get("not_a_reserved_attribute")
+                .expect("not_a_reserved_attribute wasn't moved to attributes")
+                .as_str()
+                .expect("not_a_reserved_attribute is not a string"),
+            "value"
         );
         assert_eq!(key, "/dt=20210823/hour=16/archive_160027.879");
 
         // check that id is different
         let encoded = encode_event(Event::new_empty_log()).unwrap();
         let (bytes, _) = encoded.item.into_parts();
-        let encoded_json: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let encoded_json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(&bytes[..]).unwrap();
 
         let id2 = validate_event_id(&encoded_json);
         assert_ne!(id1, id2)
     }
 
-    /// check that _id is 18 bytes, base64-encoded, first 6 bytes - a "now" timestamp in millis
-    fn validate_event_id(encoded_json: &BTreeMap<String, String>) -> String {
-        let id = encoded_json.get("_id").expect("_id not found");
-        let bytes = base64::decode(id).expect("_id is not base64-encoded");
+    /// check that _id is:
+    /// - 18 bytes,
+    /// - base64-encoded,
+    /// - first 6 bytes - a "now" timestamp in millis
+    fn validate_event_id(encoded_json: &BTreeMap<String, serde_json::Value>) -> String {
+        let id = encoded_json
+            .get("_id")
+            .expect("_id not found")
+            .as_str()
+            .expect("_id is not a string");
+        let bytes = base64::decode(id.clone()).expect("_id is not base64-encoded");
         assert_eq!(bytes.len(), 18);
         let mut timestamp: [u8; 8] = [0; 8];
         for (i, b) in bytes[..6].iter().enumerate() {
