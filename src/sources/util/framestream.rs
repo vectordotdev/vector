@@ -593,7 +593,7 @@ mod test {
         FrameHandler,
     };
     use crate::{
-        config::log_schema,
+        config::{log_schema, ComponentId},
         test_util::{collect_n, collect_n_stream},
     };
     use crate::{event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
@@ -707,7 +707,7 @@ mod test {
     }
 
     fn init_framstream_unix(
-        source_name: &str,
+        source_id: &str,
         frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
         pipeline: Pipeline,
     ) -> (
@@ -715,9 +715,10 @@ mod test {
         JoinHandle<Result<(), ()>>,
         SourceShutdownCoordinator,
     ) {
+        let source_id = ComponentId::from(source_id);
         let socket_path = frame_handler.socket_path();
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(source_name);
+        let (shutdown_signal, _) = shutdown.register_source(&source_id);
         let server = build_framestream_unix_source(frame_handler, shutdown_signal, pipeline)
             .expect("Failed to build framestream unix source.");
 
@@ -799,7 +800,8 @@ mod test {
     async fn signal_shutdown(source_name: &str, shutdown: &mut SourceShutdownCoordinator) {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let id = ComponentId::from(source_name);
+        let shutdown_complete = shutdown.shutdown_source(&id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
     }

@@ -1,8 +1,10 @@
 use super::{
-    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
+    builder::ConfigBuilder, format, pipeline::Pipeline, validation, vars, Config, ConfigPath,
+    Format, FormatHint,
 };
 use crate::signal;
 use glob::glob;
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
@@ -97,7 +99,9 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
 }
 
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
-    let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    let pipelines = load_pipelines_from_paths(config_paths)?;
+    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    builder.set_pipelines(pipelines);
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
@@ -113,7 +117,9 @@ pub async fn load_from_paths_with_provider(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
+    let pipelines = load_pipelines_from_paths(config_paths)?;
     let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    builder.set_pipelines(pipelines);
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
@@ -130,6 +136,36 @@ pub async fn load_from_paths_with_provider(
     }
 
     Ok(new_config)
+}
+
+pub fn load_pipelines_from_paths(
+    config_paths: &[ConfigPath],
+) -> Result<IndexMap<String, Pipeline>, Vec<String>> {
+    let folders = config_paths
+        .iter()
+        .filter_map(|path| path.pipeline_dir())
+        .filter(|path| path.exists());
+    let mut index: IndexMap<String, Pipeline> = IndexMap::new();
+    let mut errors: Vec<String> = Vec::new();
+    for folder in folders {
+        match Pipeline::load_from_folder(&folder) {
+            Ok(result) => {
+                for (key, value) in result.into_iter() {
+                    index.insert(key, value);
+                }
+            }
+            Err(result) => {
+                for err in result.into_iter() {
+                    errors.push(err);
+                }
+            }
+        }
+    }
+    if errors.is_empty() {
+        Ok(index)
+    } else {
+        Err(errors)
+    }
 }
 
 pub fn load_builder_from_paths(
@@ -182,8 +218,14 @@ pub fn load_builder_from_paths(
     }
 }
 
-pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<String>> {
-    let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
+pub fn load_from_str(
+    input: &str,
+    format: FormatHint,
+    pipelines: IndexMap<String, Pipeline>,
+) -> Result<Config, Vec<String>> {
+    let (mut builder, load_warnings) =
+        load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
+    builder.set_pipelines(pipelines);
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
@@ -250,4 +292,27 @@ pub fn load(
     let (with_vars, warnings) = vars::interpolate(&source_string, &vars);
 
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::load_pipelines_from_paths;
+    use crate::config::{ConfigPath, Format};
+    use std::path::PathBuf;
+
+    #[test]
+    fn load_pipelines_from_tests() {
+        let path = PathBuf::from("tests/pipelines");
+        let path = ConfigPath::Dir(path);
+        let paths = vec![path];
+        load_pipelines_from_paths(&paths).unwrap();
+    }
+
+    #[test]
+    fn load_pipelines_from_tests_config() {
+        let path = PathBuf::from("tests/pipelines/vector.toml");
+        let path = ConfigPath::File(path, Some(Format::Toml));
+        let paths = vec![path];
+        load_pipelines_from_paths(&paths).unwrap();
+    }
 }

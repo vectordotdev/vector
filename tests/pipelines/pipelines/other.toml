@@ -1,0 +1,7 @@
+[transforms.first]
+type = "remap"
+inputs = ["in"]
+outputs = ["stdout"]
+source = """
+.hello = "world"
+"""

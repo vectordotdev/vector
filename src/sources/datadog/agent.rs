@@ -10,19 +10,12 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use vector_core::event::LogEvent;
-use warp::http::StatusCode;
-
 use warp::http::HeaderMap;
-
-lazy_static! {
-    static ref API_KEY_MATCHER: Regex =
-        Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??").unwrap();
-}
+use warp::http::StatusCode;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DatadogAgentConfig {
@@ -53,9 +46,7 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogAgentSource {
-            store_api_key: self.store_api_key,
-        };
+        let source = DatadogAgentSource::new(self.store_api_key);
         // We accept /v1/input & /v1/input/<API_KEY>
         source.run(self.address, "/v1/input", false, &self.tls, &self.auth, cx)
     }
@@ -73,9 +64,72 @@ impl SourceConfig for DatadogAgentConfig {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct DatadogAgentSource {
     store_api_key: bool,
+    api_key_matcher: Regex,
+    log_schema_timestamp_key: &'static str,
+    log_schema_source_type_key: &'static str,
+}
+
+impl DatadogAgentSource {
+    fn new(store_api_key: bool) -> Self {
+        Self {
+            store_api_key,
+            api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
+                .expect("static regex always compiles"),
+            log_schema_source_type_key: log_schema().source_type_key(),
+            log_schema_timestamp_key: log_schema().timestamp_key(),
+        }
+    }
+
+    fn extract_api_key<'a>(&self, headers: &'a HeaderMap, path: &'a str) -> Option<&'a str> {
+        // Grab from URL first
+        self.api_key_matcher
+            .captures(path)
+            .and_then(|cap| cap.name("api_key").map(|key| key.as_str()))
+            // Try from header next
+            .or_else(|| headers.get("dd-api-key").and_then(|key| key.to_str().ok()))
+    }
+
+    fn decode_body(
+        &self,
+        body: Bytes,
+        api_key: Option<Arc<str>>,
+        events: &mut Vec<Event>,
+    ) -> Result<(), ErrorMessage> {
+        let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Error parsing JSON: {:?}", error),
+            )
+        })?;
+        let now = Utc::now();
+        let iter = messages
+            .into_iter()
+            .map(|msg| {
+                let mut log = LogEvent::default();
+                log.insert_flat(self.log_schema_timestamp_key, now);
+                log.insert_flat(
+                    self.log_schema_source_type_key,
+                    Bytes::from("datadog_agent"),
+                );
+                log.insert_flat("message".to_string(), msg.message);
+                log.insert_flat("status".to_string(), msg.status);
+                log.insert_flat("timestamp".to_string(), msg.timestamp);
+                log.insert_flat("hostname".to_string(), msg.hostname);
+                log.insert_flat("service".to_string(), msg.service);
+                log.insert_flat("ddsource".to_string(), msg.ddsource);
+                log.insert_flat("ddtags".to_string(), msg.ddtags);
+                if let Some(k) = &api_key {
+                    log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
+                }
+                log
+            })
+            .map(|log| log.into());
+        events.extend(iter);
+        Ok(())
+    }
 }
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
@@ -89,43 +143,6 @@ struct LogMsg {
     pub service: Bytes,
     pub ddsource: Bytes,
     pub ddtags: Bytes,
-}
-
-fn decode_body(
-    body: Bytes,
-    api_key: Option<Arc<str>>,
-    events: &mut Vec<Event>,
-) -> Result<(), ErrorMessage> {
-    let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
-        ErrorMessage::new(
-            StatusCode::BAD_REQUEST,
-            format!("Error parsing JSON: {:?}", error),
-        )
-    })?;
-    let timestamp_key = log_schema().timestamp_key();
-    let source_type_key = log_schema().source_type_key();
-    let now = Utc::now();
-    let iter = messages
-        .into_iter()
-        .map(|msg| {
-            let mut log = LogEvent::default();
-            log.insert_flat(timestamp_key, now);
-            log.insert_flat(source_type_key, Bytes::from("datadog_agent"));
-            log.insert_flat("message".to_string(), msg.message);
-            log.insert_flat("status".to_string(), msg.status);
-            log.insert_flat("timestamp".to_string(), msg.timestamp);
-            log.insert_flat("hostname".to_string(), msg.hostname);
-            log.insert_flat("service".to_string(), msg.service);
-            log.insert_flat("ddsource".to_string(), msg.ddsource);
-            log.insert_flat("ddtags".to_string(), msg.ddtags);
-            if let Some(k) = &api_key {
-                log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
-            }
-            log
-        })
-        .map(|log| log.into());
-    events.extend(iter);
-    Ok(())
 }
 
 impl HttpSource for DatadogAgentSource {
@@ -146,33 +163,24 @@ impl HttpSource for DatadogAgentSource {
         }
 
         let api_key = match self.store_api_key {
-            true => extract_api_key(&header_map, request_path),
+            true => self.extract_api_key(&header_map, request_path),
             false => None,
         }
         .map(Arc::from);
 
         let mut events: Vec<Event> = Vec::with_capacity(1024);
-        decode_body(body, api_key, &mut events)?;
+        self.decode_body(body, api_key, &mut events)?;
         Ok(events)
     }
 }
 
-fn extract_api_key<'a>(headers: &'a HeaderMap, path: &'a str) -> Option<String> {
-    // Grab from URL first
-    API_KEY_MATCHER
-        .captures(path)
-        .and_then(|cap| cap.name("api_key").map(|key| key.as_str()))
-        // Try from header next
-        .or_else(|| headers.get("dd-api-key").and_then(|key| key.to_str().ok()))
-        .map(str::to_owned)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{decode_body, DatadogAgentConfig, LogMsg};
+    use super::{DatadogAgentConfig, LogMsg};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus},
+        sources::datadog::agent::DatadogAgentSource,
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -208,7 +216,8 @@ mod tests {
             let api_key = None;
 
             let mut events = Vec::with_capacity(msgs.len());
-            decode_body(body, api_key, &mut events).unwrap();
+            let source = DatadogAgentSource::new(true);
+            source.decode_body(body, api_key, &mut events).unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
                 let log = event.as_log();

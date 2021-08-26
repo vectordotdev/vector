@@ -41,27 +41,30 @@ impl From<Metric> for ProcessedEventsTotal {
 }
 
 pub struct ComponentProcessedEventsTotal {
-    name: String,
+    component_id: String,
     metric: Metric,
 }
 
 impl ComponentProcessedEventsTotal {
     /// Returns a new `ComponentProcessedEventsTotal` struct, which is a GraphQL type. The
-    /// component name is hoisted for clear field resolution in the resulting payload
+    /// component id is hoisted for clear field resolution in the resulting payload
     pub fn new(metric: Metric) -> Self {
-        let name = metric.tag_value("component_name").expect(
-            "Returned a metric without a `component_name`, which shouldn't happen. Please report.",
+        let component_id = metric.tag_value("component_id").expect(
+            "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
 
-        Self { name, metric }
+        Self {
+            component_id,
+            metric,
+        }
     }
 }
 
 #[Object]
 impl ComponentProcessedEventsTotal {
-    /// Component name
-    async fn name(&self) -> &str {
-        &self.name
+    /// Component id
+    async fn component_id(&self) -> &str {
+        &self.component_id
     }
 
     /// Events processed total metric
@@ -71,22 +74,25 @@ impl ComponentProcessedEventsTotal {
 }
 
 pub struct ComponentProcessedEventsThroughput {
-    name: String,
+    component_id: String,
     throughput: i64,
 }
 
 impl ComponentProcessedEventsThroughput {
-    /// Returns a new `ComponentProcessedEventsThroughput`, set to the provided name/throughput values
-    pub fn new(name: String, throughput: i64) -> Self {
-        Self { name, throughput }
+    /// Returns a new `ComponentProcessedEventsThroughput`, set to the provided id/throughput values
+    pub fn new(component_id: String, throughput: i64) -> Self {
+        Self {
+            component_id,
+            throughput,
+        }
     }
 }
 
 #[Object]
 impl ComponentProcessedEventsThroughput {
-    /// Component name
-    async fn name(&self) -> &str {
-        &self.name
+    /// Component id
+    async fn component_id(&self) -> &str {
+        &self.component_id
     }
 
     /// Events processed throughput

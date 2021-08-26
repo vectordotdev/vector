@@ -87,7 +87,7 @@ pub struct TcpSocketError {
 
 impl InternalEvent for TcpSocketError {
     fn emit_logs(&self) {
-        debug!(message = "TCP socket error.", error = %self.error);
+        warn!(message = "TCP socket error.", error = %self.error);
     }
 
     fn emit_metrics(&self) {

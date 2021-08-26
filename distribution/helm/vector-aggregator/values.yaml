@@ -9,6 +9,14 @@ global:
 # commonLabels:
 #   app.kubernetes.io/component: aggregator
 
+secrets:
+  generic: {}
+    # Each Key/Value will be added to a Secret resource
+    # Values should be entered base64 encoded (examples below are "REPLACE_ME" encoded)
+    # NOTE: Don't commit unencrypted secrets to git!
+    # awsAccessKeyId: "UkVQTEFDRV9NRQo="
+    # awsSecretAccessKey: "UkVQTEFDRV9NRQo="
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -81,11 +89,11 @@ securityContext: {}
 
 # Extra env vars to pass to the `vector` container.
 env: []
-  # - name: VAR
-  #    valueFrom:
-  #      secretKeyRef:
-  #        name: secret
-  #        key: password
+  # - name: AWS_ACCESS_KEY_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: vector-aggregator
+  #       key: awsAcessKeyId
 
 # Extra arguments to pass to the `vector` container.
 args: []
@@ -167,6 +175,35 @@ rbac:
 psp:
   # Whether to create `PodSecurityPolicy` or not.
   enabled: false
+
+# Use Liveness Probe (The Probe is using API endpoint which is disabled by default.
+# You have to enable the API in the Config to expose the endpoint.)
+livenessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Use Readyness Probe (The Probe is using API endpoint which is disabled by default.
+# You have to enable the API in the Config to expose the endpoint.)
+readinessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Change DNS Policy
+dnsPolicy:
+
+# Custom DNS configuration to be added to vector-agent pods
+dnsConfig: {}
+  # nameservers:
+  #   - 1.2.3.4
+  # searches:
+  #   - ns1.svc.cluster-domain.example
+  #   - my.dns.search.suffix
+  # options:
+  #   - name: ndots
+  #     value: "2"
+  #   - name: edns0
 
 # Configuration for both regular and headless `Service`.
 service:

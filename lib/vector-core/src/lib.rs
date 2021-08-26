@@ -24,6 +24,8 @@
 #[cfg(feature = "api")]
 pub mod api;
 pub mod config;
+#[cfg(feature = "vrl")]
+pub mod enrichment;
 pub mod event;
 pub mod mapping;
 pub mod metrics;

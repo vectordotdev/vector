@@ -71,7 +71,7 @@ pub fn make_namespace(name: String, labels: Option<BTreeMap<String, String>>) ->
     Namespace {
         metadata: ObjectMeta {
             name: Some(name),
-            labels: labels.unwrap_or_default(),
+            labels,
             ..Default::default()
         },
         spec: None,
