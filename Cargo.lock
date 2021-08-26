@@ -925,6 +925,7 @@ dependencies = [
  "futures 0.3.16",
  "leveldb",
  "metrics",
+ "metrics-exporter-prometheus",
  "pin-project 1.0.8",
  "pretty_assertions",
  "quickcheck",
@@ -4083,6 +4084,22 @@ dependencies = [
  "ahash",
  "metrics-macros",
  "proc-macro-hack",
+]
+
+[[package]]
+name = "metrics-exporter-prometheus"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9db7052a7cb0b0c0922a1ce499c9e78576763b1d47499ba980a4fe731b96909d"
+dependencies = [
+ "hyper",
+ "ipnet",
+ "metrics",
+ "metrics-util",
+ "parking_lot",
+ "quanta",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
