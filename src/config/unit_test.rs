@@ -13,7 +13,9 @@ use std::collections::HashMap;
 pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
 
-    let (config, _) = super::loading::load_builder_from_paths(paths)?;
+    let pipelines = super::loading::load_pipelines_from_paths(paths)?;
+    let (mut config, _) = super::loading::load_builder_from_paths(paths)?;
+    config.set_pipelines(pipelines);
 
     build_unit_tests(config).await
 }
@@ -29,12 +31,15 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         global: builder.global,
         #[cfg(feature = "api")]
         api: builder.api,
+        #[cfg(feature = "datadog-pipelines")]
+        datadog: builder.datadog,
         healthchecks: builder.healthchecks,
         enrichment_tables: builder.enrichment_tables,
         sources: builder.sources,
         sinks: builder.sinks,
         transforms: builder.transforms,
         tests: builder.tests,
+        pipelines: Default::default(),
         expansions,
     };
 

@@ -5,10 +5,10 @@ use vector::{
 };
 
 async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, Vec<String>> {
-    match config::load_from_str(config, format) {
+    match config::load_from_str(config, format, Default::default()) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
-            let c2 = config::load_from_str(config, format).unwrap();
+            let c2 = config::load_from_str(config, format, Default::default()).unwrap();
             match (
                 config::warnings(&c2.into()),
                 topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
