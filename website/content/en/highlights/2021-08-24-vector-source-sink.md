@@ -35,11 +35,11 @@ follows:
 ```diff
 [sinks.vector]
   type = "vector"
-+ version = "v2"
++ version = "2"
 
 [sources.vector]
   type = "vector"
-+ version = "v2"
++ version = "2"
 ```
 
 There are a couple of things to be aware of:
@@ -62,12 +62,12 @@ First, deploy the configuration that defines the source:
   [sources.vector]
     address = "0.0.0.0:9000"
     type = "vector"
-+   version = "v1"
++   version = "1"
 
 + [sources.vector]
 +   address = "0.0.0.0:5000"
 +   type = "vector"
-+   version = "v2"
++   version = "2"
 ```
 
 Then, deploy the sink configuration, switching it over to the new version:
@@ -77,7 +77,7 @@ Then, deploy the sink configuration, switching it over to the new version:
 -   address = "127.0.1.2:9000"
 +   address = "127.0.1.2:5000"
     type = "vector"
-+   version = "v2"
++   version = "2"
 ```
 
 Once the sink is deployed, you can do another deploy of the source, removing the
@@ -87,12 +87,12 @@ old version:
 - [sources.vector]
 -   address = "0.0.0.0:9000"
 -   type = "vector"
--   version = "v1"
+-   version = "1"
 -
   [sources.vector]
     address = "0.0.0.0:5000"
     type = "vector"
-    version = "v2"
+    version = "2"
 ```
 
 That's it! You are now using the new transport protocol for Vector-to-Vector
