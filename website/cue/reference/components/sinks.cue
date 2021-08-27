@@ -533,14 +533,8 @@ components: sinks: [Name=string]: {
 
 								We highly recommend enabling this feature as it improves
 								performance and reliability of Vector and the systems it
-								communicates with.
-
-								To enable, set the `request.concurrency` option to `adaptive`:
-
-								```toml title="vector.toml"
-								[sinks.my-sink]
-								  request.concurrency = "adaptive"
-								```
+								communicates with. As such, we have made it the default,
+								and no further configuration is required.
 								"""
 						},
 						{
