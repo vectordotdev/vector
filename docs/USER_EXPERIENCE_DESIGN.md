@@ -100,8 +100,8 @@ an opt-in choice by the user.
 
 Examples:
 
-- Choose back pressure over load shedding
-- In retry failed requests in sinks until the service recovers
+- Choose back pressure over shedding load
+- Retry failed requests in sinks until the service recovers
 
 ### Logical boundaries
 
