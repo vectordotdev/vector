@@ -52,11 +52,6 @@ transforms, and sinks).
 
 ### Options
 
-#### `address`
-
-When a component binds to an address, it SHOULD expose an `address` option that
-takes a `string` representing a single address.
-
 #### `endpoint(s)`
 
 When a component makes a connection to a downstream target, it MUST
