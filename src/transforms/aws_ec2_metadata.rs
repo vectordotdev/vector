@@ -20,8 +20,27 @@ use std::{
 use tokio::time::{sleep, Duration, Instant};
 use tracing_futures::Instrument;
 
-type WriteHandle = evmap::WriteHandle<String, Bytes, (), RandomState>;
-type ReadHandle = evmap::ReadHandle<String, Bytes, (), RandomState>;
+type WriteHandle = evmap::WriteHandle<String, CopiableBytes, (), RandomState>;
+type ReadHandle = evmap::ReadHandle<String, CopiableBytes, (), RandomState>;
+
+#[derive(Eq, Hash, Debug, PartialEq)]
+pub struct CopiableBytes(Bytes);
+
+// copied from evmap implementation before it was dropped
+// https://github.com/jonhoo/evmap/commit/416ccef
+impl evmap::ShallowCopy for CopiableBytes {
+    unsafe fn shallow_copy(&self) -> std::mem::ManuallyDrop<Self> {
+        let len = self.0.len();
+        let buf: &'static [u8] = std::slice::from_raw_parts(self.0.as_ptr(), len);
+        std::mem::ManuallyDrop::new(CopiableBytes(bytes::Bytes::from_static(buf)))
+    }
+}
+
+impl From<CopiableBytes> for Bytes {
+    fn from(bytes: CopiableBytes) -> Bytes {
+        bytes.0
+    }
+}
 
 const AMI_ID_KEY: &str = "ami-id";
 const AVAILABILITY_ZONE_KEY: &str = "availability-zone";
@@ -197,15 +216,17 @@ impl Ec2MetadataTransform {
                 Event::Log(ref mut log) => {
                     read_ref.into_iter().for_each(|(k, v)| {
                         if let Some(value) = v.get_one() {
-                            log.insert(k.clone(), value.clone());
+                            log.insert(k.clone(), value.0.clone());
                         }
                     });
                 }
                 Event::Metric(ref mut metric) => {
                     read_ref.into_iter().for_each(|(k, v)| {
                         if let Some(value) = v.get_one() {
-                            metric
-                                .insert_tag(k.clone(), String::from_utf8_lossy(value).to_string());
+                            metric.insert_tag(
+                                k.clone(),
+                                String::from_utf8_lossy(&value.0).to_string(),
+                            );
                         }
                     });
                 }
@@ -418,7 +439,11 @@ impl MetadataClient {
             }
         }
 
-        self.state.extend(state);
+        self.state.extend(
+            state
+                .into_iter()
+                .map(|(key, value)| (key, CopiableBytes(value))),
+        );
 
         // Make changes viewable to the transform. This may block if
         // readers are still reading.
