@@ -2,7 +2,7 @@
 date: "2021-08-25"
 title: "0.16 Upgrade Guide"
 description: "An upgrade guide that addresses breaking changes in 0.16.0"
-authors: ["jszwedko", "JeanMertz"]
+authors: ["jszwedko", "JeanMertz", "spencergilbert"]
 pr_numbers: []
 release: "0.16.0"
 hide_on_release_notes: false
@@ -106,7 +106,7 @@ compatible and the name change reflects this.
 It is possible that we will re-add a `datadog_logs` source in the future that mimics the Datadog API for use with other
 Datadog clients aside from the agent. Let us know if this would be useful to you!
 
-### `kubernetes_logs` source's new RBAC (#kubernetes_logs_rbac)
+### `kubernetes_logs` source's new RBAC {#kubernetes_logs_rbac}
 
 The `kubernetes_logs` source will now enrich events with labels from the Namespace they originate from. This enhancement
 requires access to an additional resource in Kubernetes. Our Kubernetes manifests and Helm chart have been updated to
