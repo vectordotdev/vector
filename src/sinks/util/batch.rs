@@ -129,7 +129,7 @@ impl<B> BatchSettings<B> {
     pub const fn const_default() -> Self {
         BatchSettings {
             size: BatchSize::const_default(),
-            timeout: Duration::new(0, 0),
+            timeout: Duration::from_nanos(0),
         }
     }
 
@@ -353,7 +353,7 @@ impl Batch for () {
         Ok(config.get_settings_or_default(defaults))
     }
 
-    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+    fn push(&mut self, _item: Self::Input) -> PushResult<Self::Input> {
         PushResult::Ok(false)
     }
 

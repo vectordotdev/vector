@@ -7,6 +7,7 @@ use rusoto_core::{ByteStream, RusotoError};
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use tower::Service;
 use tracing_futures::Instrument;
+use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{serde::to_string, sinks::util::sink::Response};
 
@@ -14,16 +15,18 @@ use super::config::S3Options;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
-    body: Bytes,
-    bucket: String,
-    key: String,
-    content_encoding: Option<&'static str>,
-    options: S3Options,
+    pub body: Bytes,
+    pub bucket: String,
+    pub key: String,
+    pub content_encoding: Option<&'static str>,
+    pub options: S3Options,
+    pub batch_size: usize,
+    pub finalizers: EventFinalizers,
 }
 
-impl S3Request {
-    pub fn key(&self) -> &str {
-        &self.key
+impl Finalizable for S3Request {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
     }
 }
 

@@ -1,32 +1,14 @@
-use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-    io::Write,
-    marker::PhantomData,
-    task::Poll,
-    time::Duration,
-};
+use std::{collections::HashMap, hash::Hash, marker::PhantomData, task::Poll};
 
-use bytes::Bytes;
-use flate2::write::GzEncoder;
 use futures::{poll, StreamExt};
-use serde::Serialize;
 use tokio_util::time::DelayQueue;
 use vector_core::{
-    event::{Event, EventFinalizers, Finalizable},
+    event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
 
-use crate::sinks::util::{
-    batch::{FinalizersBatch, StatefulBatch},
-    encoding::EncodingConfig,
-    BatchSize, EncodedEvent,
-};
-
-use super::{
-    super::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult},
-    Compression, GZIP_FAST,
-};
+use crate::sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
+use crate::sinks::util::BatchSize;
 
 pub trait Partition<K> {
     fn partition(&self) -> K;
@@ -193,7 +175,7 @@ where
         self.items.len() == self.size.events || self.total_size >= self.size.bytes
     }
 
-    pub fn push(&mut self, item: P::Item) -> BatchPushResult<P::Item> {
+    pub fn push(&mut self, mut item: P::Item) -> BatchPushResult<P::Item> {
         // Don't overrun our batch size in bytes.
         let item_size = item.allocated_bytes();
         if self.total_size + item_size > self.size.bytes {
@@ -310,17 +292,20 @@ where
 
         match self.partitioner.partition(&item) {
             Some(pk) => {
-                let mut batch = self
+                // TODO: any good way to push this clone into the closure for or_insert_with without
+                // stacked borrows? or another general approach that defers the clone?
+                let size = self.settings.size.clone();
+                let batch = self
                     .batches
                     .entry(pk)
-                    .or_insert_with(|| PartitionInFlightBatch::new(self.settings.size.clone()));
+                    .or_insert_with(|| PartitionInFlightBatch::new(size));
                 batch.push(item)
             }
             None => BatchPushResult::Failure(item),
         }
     }
 
-    pub async fn get_ready_batches(&mut self) -> Vec<PartitionFinishedBatch<P>> {
+    pub async fn get_ready_batches(&mut self) -> Option<Vec<PartitionFinishedBatch<P>>> {
         let mut batches = Vec::new();
 
         // Check to see if any batches are full and need to be flushed out.
@@ -357,6 +342,10 @@ where
             batches.push(batch.finish(pk));
         }
 
-        batches
+        if !batches.is_empty() {
+            Some(batches)
+        } else {
+            None
+        }
     }
 }
