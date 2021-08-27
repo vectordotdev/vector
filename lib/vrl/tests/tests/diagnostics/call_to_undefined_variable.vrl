@@ -1,9 +1,9 @@
 # result:
 #
 # error[E701]: call to undefined variable
-#   ┌─ :3:1
+#   ┌─ :4:1
 #   │
-# 3 │ unknown_variable
+# 4 │ unknown_variable
 #   │ ^^^^^^^^^^^^^^^^
 #   │ │
 #   │ undefined variable
@@ -12,4 +12,5 @@
 #   = see language documentation at https://vrl.dev
 
 known_variable = true
+known_variable
 unknown_variable
