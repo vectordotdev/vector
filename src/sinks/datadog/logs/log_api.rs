@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::io::Write;
+use tokio::sync::mpsc::Receiver;
 use tokio::time::{self, Duration};
 use tower::Service;
 use twox_hash::XxHash64;
@@ -24,6 +25,7 @@ use vector_core::event::{Event, EventFinalizers, Value};
 use vector_core::sink::StreamSink;
 use vector_core::ByteSizeOf;
 
+mod batcher;
 mod builder;
 mod common;
 mod errors;
@@ -279,6 +281,51 @@ where
     }
 }
 
+// /// Run the IO loop of this sink
+// ///
+// /// This sink is busy doing two things: encoding `Event` instances into Datadog
+// /// logs payloads and then shunting these off to Datadog. Mixing the two causes
+// /// a good deal of lifetime hassle in this sink, not to mention we don't light
+// /// up CPUs like we might otherwise.
+// fn run_io<Client>(requests: Receiver<(Vec<EventFinalizers>, Request<Body>)>, http_client: Client)
+// where
+//     Client: Service<Request<Body>> + Send + Unpin,
+//     Client::Future: Send,
+//     Client::Response: Send,
+//     Client::Error: Send,
+// {
+//     let mut flushes = FuturesUnordered::new();
+//     tokio::select! {
+//         Some(()) = flushes.next() => {
+//             // nothing, intentionally
+//         }
+//         (finalizers, request) = requests.recv() => {
+//             let fut = http_client.call(request).map(move |result| {
+//                 let status: EventStatus = match result {
+//                     Ok(_) => {
+//                         metrics::counter!("flush_success", 1);
+//                         EventStatus::Delivered
+//                     }
+//                     Err(_) => {
+//                         metrics::counter!("flush_error", 1);
+//                         EventStatus::Errored
+//                     }
+//                 };
+//                 for finalizer in finalizers {
+//                     finalizer.update_status(status);
+//                 }
+//                 metrics::counter!("processed_bytes_total", flush_metrics.processed_bytes_total);
+//                 metrics::counter!(
+//                     "processed_events_total",
+//                     flush_metrics.processed_events_total
+//                 );
+//                 ()
+//             });
+//             flushes.push(fut);
+//         }
+//     }
+// }
+
 #[async_trait]
 impl<Client> StreamSink for LogApi<Client>
 where
@@ -298,14 +345,16 @@ where
             .await
             .map_err(|_e| ())?;
 
-        let mut input = input.map(|mut event| {
-            let log = event.as_mut_log();
-            log.rename_key_flat(message_key, "message");
-            log.rename_key_flat(timestamp_key, "date");
-            log.rename_key_flat(host_key, "host");
-            encoding.apply_rules(&mut event);
-            event
-        });
+        let mut input = input
+            .map(|mut event| {
+                let log = event.as_mut_log();
+                log.rename_key_flat(message_key, "message");
+                log.rename_key_flat(timestamp_key, "date");
+                log.rename_key_flat(host_key, "host");
+                encoding.apply_rules(&mut event);
+                event
+            })
+            .fuse();
 
         let mut interval = time::interval(self.timeout);
         let mut flushes = FuturesUnordered::new();
