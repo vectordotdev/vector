@@ -32,7 +32,6 @@ use std::{
     convert::{TryFrom, TryInto},
     task::{Context, Poll},
 };
-use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, EnumIter};
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;

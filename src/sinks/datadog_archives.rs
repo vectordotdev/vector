@@ -1,50 +1,37 @@
-use crate::sinks::aws_s3::{healthcheck, Request};
-use crate::sinks::util::buffer::compression::GZIP_DEFAULT;
-use crate::sinks::util::service::Map;
-use crate::sinks::util::{ServiceBuilderExt, TowerRequestSettings};
+use std::collections::HashSet;
+use std::{collections::BTreeMap, convert::TryFrom};
+
+use bytes::{BufMut, Bytes, BytesMut};
+use chrono::{SecondsFormat, Utc};
+use futures::{stream, FutureExt, SinkExt, StreamExt};
+use global_counter::primitive::exact::CounterU32;
+use lazy_static::lazy_static;
+use rusoto_s3::{PutObjectOutput, S3Client};
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+use tower::{util::BoxService, ServiceBuilder};
+use uuid::Uuid;
+
+use vector_core::event::Event;
+
+use crate::config::GenerateConfig;
 use crate::{
     config::{DataType, SinkConfig, SinkContext},
-    internal_events::{aws_s3::sink::S3EventsSent, TemplateRenderingFailed},
-    rusoto,
+    internal_events::TemplateRenderingFailed,
     rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
-        aws_s3,
-        aws_s3::S3RetryLogic,
         aws_s3::{
-            Encoding, S3CannedAcl, S3ServerSideEncryption, S3Sink, S3SinkConfig, S3StorageClass,
+            self, Request, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3Sink,
+            S3StorageClass,
         },
-        util::encoding::EncodingConfig,
-        util::BatchSettings,
         util::{
-            BatchConfig, Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+            service::Map, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
+            PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
+            TowerRequestConfig, TowerRequestSettings,
         },
     },
     template::Template,
-    Error,
 };
-use bytes::Bytes;
-use bytes::{BufMut, BytesMut};
-use chrono::{SecondsFormat, Utc};
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
-use global_counter::generic::Counter;
-use global_counter::primitive::exact::CounterU32;
-use http::StatusCode;
-use lazy_static::lazy_static;
-use rusoto_core::RusotoError;
-use rusoto_s3::{HeadBucketRequest, PutObjectOutput, S3Client, S3};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::collections::HashSet;
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-};
-use tower::util::BoxService;
-use tower::{Service, ServiceBuilder};
-use uuid::Uuid;
-use vector_core::config::proxy::ProxyConfig;
-use vector_core::event::Event;
 
 lazy_static! {
     static ref RESERVED_ATTRIBUTES: HashSet<&'static str> = vec![
@@ -67,7 +54,7 @@ pub struct DatadogArchivesSinkConfig {
     pub aws_s3: Option<S3Config>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct S3Config {
     #[serde(flatten)]
@@ -89,6 +76,19 @@ pub struct S3Options {
     ssekms_key_id: Option<String>,
     storage_class: Option<S3StorageClass>,
     tags: Option<BTreeMap<String, String>>,
+}
+
+impl GenerateConfig for DatadogArchivesSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            service: "".to_owned(),
+            bucket: "".to_owned(),
+            key_prefix: None,
+            request: TowerRequestConfig::default(),
+            aws_s3: Some(S3Config::default()),
+        })
+        .unwrap()
+    }
 }
 
 #[derive(Debug, Snafu, PartialEq)]
@@ -117,7 +117,7 @@ impl DatadogArchivesSinkConfig {
                 let svc = self
                     .build_s3_service(request, bucket.clone(), prefix, client.clone())
                     .map_err(|error| format!("{:?}", error))?;
-                Ok((svc, aws_s3::healthcheck(bucket.clone(), client).boxed()))
+                Ok((svc, aws_s3::healthcheck(bucket, client).boxed()))
             }
 
             service => Err(ConfigError::UnsupportedService {
@@ -125,9 +125,9 @@ impl DatadogArchivesSinkConfig {
             }),
         }?;
 
-        /// We should avoid producing many small batches, therefore we use settings recommended by DD:
-        /// batch size - 100mb
-        /// batch timeout - 15min
+        // We should avoid producing many small batches, therefore we use settings recommended by DD:
+        // batch size - 100mb
+        // batch timeout - 15min
         let batch = BatchSettings::default().bytes(100_000_000).timeout(900);
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, Compression::gzip_default()));
 
@@ -206,7 +206,7 @@ fn build_s3_request(
     Request {
         body: inner,
         bucket,
-        key: key.to_string(),
+        key,
         content_encoding: Compression::gzip_default().content_encoding(),
         options: aws_s3::S3Options {
             acl: options.acl,
@@ -258,7 +258,7 @@ fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8
         timestamp
             .as_timestamp()
             .cloned()
-            .unwrap_or_else(|| chrono::Utc::now())
+            .unwrap_or_else(chrono::Utc::now)
             .to_rfc3339_opts(SecondsFormat::Millis, true),
     );
     if let Some(message) = log.remove(crate::config::log_schema().message_key()) {
@@ -361,12 +361,10 @@ impl SinkConfig for DatadogArchivesSinkConfig {
 mod tests {
     use super::*;
     use chrono::DateTime;
-    use strum::{AsStaticRef, IntoEnumIterator};
-    use vector_core::event::Value;
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<S3SinkConfig>();
+        crate::test_util::test_generate_config::<DatadogArchivesSinkConfig>();
     }
 
     #[test]
@@ -439,9 +437,9 @@ mod tests {
 
     #[test]
     fn generates_valid_id() {
-        let mut log = Event::from("test message");
+        let log = Event::from("test message");
         let encoded = encode_event(log).unwrap();
-        let (bytes, key) = encoded.item.into_parts();
+        let (bytes, _key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
         let id1 = validate_event_id(&encoded_json);
@@ -458,9 +456,9 @@ mod tests {
 
     #[test]
     fn generates_date_if_missing() {
-        let mut log = Event::from("test message");
+        let log = Event::from("test message");
         let encoded = encode_event(log).unwrap();
-        let (bytes, key) = encoded.item.into_parts();
+        let (bytes, _key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
 
@@ -487,7 +485,7 @@ mod tests {
             .expect("_id not found")
             .as_str()
             .expect("_id is not a string");
-        let bytes = base64::decode(id.clone()).expect("_id is not base64-encoded");
+        let bytes = base64::decode(id).expect("_id is not base64-encoded");
         assert_eq!(bytes.len(), 18);
         let mut timestamp: [u8; 8] = [0; 8];
         for (i, b) in bytes[..6].iter().enumerate() {
@@ -536,6 +534,8 @@ mod tests {
 
     #[tokio::test]
     async fn error_if_unsupported_s3_storage_class() {
+        use strum::IntoEnumIterator;
+
         for class in S3StorageClass::iter() {
             let config = DatadogArchivesSinkConfig {
                 service: "aws_s3".to_owned(),
