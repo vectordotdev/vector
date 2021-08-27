@@ -7,24 +7,24 @@ concurrency_limit_params.scale = 1.0
 # limiter will keep the concurrency low (timing skews occasionally
 # has it reaching 3, but usually just 2),
 [stats.in_flight]
-max = [2, 3]
+max = [2, 7]
 # and it will spend most of its time between 1 and 2.
-mode = [2, 2]
-mean = [1.5, 2.0]
+mode = [2, 5]
+mean = [1.5, 5.0]
 
 [controller.in_flight]
-max = [2, 3]
-mode = [2, 2]
-mean = [1.5, 2.0]
+max = [2, 7]
+mode = [2, 5]
+mean = [1.5, 5.0]
 
 [controller.concurrency_limit]
-mode = [2, 3]
-mean = [1.7, 2.0]
+mode = [2, 5]
+mean = [1.7, 5.0]
 
 [controller.observed_rtt]
 min = [0.100, 0.102]
-mean = [0.100, 0.310]
+mean = [0.100, 0.450]
 
 [controller.averaged_rtt]
 min = [0.100, 0.102]
-mean = [0.100, 0.310]
+mean = [0.100, 0.450]
