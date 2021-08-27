@@ -8,6 +8,14 @@ weight: 1
 tags: ["webassembly", "wasm", "multiline", "multi-line", "advanced", "guides", "guide"]
 ---
 
+{{< warning >}}
+[Vector `wasm` support was removed in
+v0.17.0](https://github.com/timberio/vector/issues/8036). This guide remains for
+posterity.
+
+It can be used with Vector versions prior to its removal.
+{{< /warning >}}
+
 {{< requirement title="Pre-requisites" >}}
 * You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][docs.setup.quickstart].
 * You must be using a Linux system (or WSL2 for Windows users) for WASM related work right now.

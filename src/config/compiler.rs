@@ -32,6 +32,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
                 global: builder.global,
                 #[cfg(feature = "api")]
                 api: builder.api,
+                #[cfg(feature = "datadog-pipelines")]
+                datadog: builder.datadog,
                 healthchecks: builder.healthchecks,
                 enrichment_tables: builder.enrichment_tables,
                 sources: builder.sources,
@@ -137,7 +139,7 @@ fn expand_globs_inner(inputs: &mut Vec<ComponentId>, id: &ComponentId, candidate
         let matcher = glob::Pattern::new(&raw_input.to_string())
             .map(InputMatcher::Pattern)
             .unwrap_or_else(|error| {
-                warn!(message = "Invalid glob pattern for input.", component_id = ?id, %error);
+                warn!(message = "Invalid glob pattern for input.", component_id = %id, %error);
                 InputMatcher::String(raw_input.to_string())
             });
         for input in candidates {

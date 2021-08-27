@@ -44,7 +44,7 @@ impl ComponentId {
     }
 
     pub fn as_str(&self) -> &str {
-        self.value.as_str()
+        self.id.as_str()
     }
 
     pub fn into_pipeline(self, id: &str) -> Self {
@@ -104,7 +104,7 @@ impl Serialize for ComponentId {
 
 impl Ord for ComponentId {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.value.cmp(&other.value)
+        self.id.cmp(&other.id)
     }
 }
 

@@ -109,10 +109,12 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   done
 
   echo "Add latest symlinks"
-  find "$td" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file  ; do
+  find "$td" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file ; do
     file=$(basename "$file")
     # vector-$version-amd64.deb -> vector-latest-amd64.deb
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/$i/latest}" --website-redirect "/vector/$i/$file" --acl public-read
+    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/$VERSION_EXACT/latest}" --website-redirect "/vector/latest/$file" --acl public-read
+    # vector-$version-amd64.deb -> vector-amd64.deb
+    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/$VERSION_EXACT-/}" --website-redirect "/vector/latest/$file" --acl public-read
   done
   echo "Added latest symlinks"
 
@@ -127,9 +129,6 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   verify_artifact \
     "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz" \
     "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
-  verify_artifact \
-    "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu-debug.tar.gz" \
-    "$td/vector-$VERSION-x86_64-unknown-linux-gnu-debug.tar.gz"
 fi
 
 #

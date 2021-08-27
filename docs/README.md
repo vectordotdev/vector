@@ -19,8 +19,6 @@ development of Vector and ensuring your change gets approved in a timely manner.
 Vector team members have additional responsibilities beyond outside
 contributors:
 
-* **[RELEASING.md](USER_EXPERIENCE_DESIGN.md)** - How to release a new Vector
-   version.
 * **[REVIEWING.md](REVIEWING.md)** - Code review expectations and guidelines.
 * **[USER_EXPERIENCE_DESIGN.md](USER_EXPERIENCE_DESIGN.md)** - User experience
    principles and guidelines.
@@ -31,5 +29,7 @@ Vector's policies are located in the root directory:
 
 * **[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)**
 * **[PRIVACY.md](../PRIVACY.md)**
+* **[RELEASES.md](../RELEASES.md)**
 * **[SECURITY.md](../SECURITY.md)**
+* **[VERSIONING.md](../VERSIONING.md)**
 

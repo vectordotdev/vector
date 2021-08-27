@@ -1,4 +1,5 @@
 use crate::config::GlobalOptions;
+#[cfg(feature = "vrl")]
 use crate::enrichment;
 use async_trait::async_trait;
 use indexmap::IndexMap;
@@ -16,10 +17,17 @@ pub enum ExpandType {
     Serial,
 }
 
+#[cfg(feature = "vrl")]
 #[derive(Debug, Default)]
 pub struct TransformContext {
     pub globals: GlobalOptions,
     pub enrichment_tables: enrichment::TableRegistry,
+}
+
+#[cfg(not(feature = "vrl"))]
+#[derive(Debug, Default)]
+pub struct TransformContext {
+    pub globals: GlobalOptions,
 }
 
 impl TransformContext {

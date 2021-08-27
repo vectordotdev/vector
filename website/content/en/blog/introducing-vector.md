@@ -31,7 +31,7 @@ So what exactly is Vector and how is it a better solution to this problem? At fi
 On top of this basic functionality, Vector adds a few important enhancements:
 
 1. A **richer data model**, supporting not only logs but aggregated metrics, fully structured events, etc
-2. **Programmable transforms** written in lua (or eventually wasm) that let you parse, filter, aggregate, and otherwise manipulate your data in arbitrary ways
+2. **Programmable transforms** written in lua that let you parse, filter, aggregate, and otherwise manipulate your data in arbitrary ways
 3. **Uncompromising performance and efficiency** that enables a huge variety of deployment strategies
 
 The end result is a tool that can **be** your pipeline, rather than just another component in it. We hope to enable the full flexibility and power of a custom built solution with a tiny fraction of the required investment. There have been a few other projects aimed in this direction (heka and cernan are two big inspirations), but with Vector we think we can take the ease of use and breadth of capabilities to another level.
