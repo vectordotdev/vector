@@ -74,7 +74,8 @@ pub trait TestQueryExt {
     ) -> crate::QueryResult<FileSourceMetricsQuery>;
     async fn component_by_component_id_query(
         &self,
-        id: &str,
+        pipeline_id: Option<String>,
+        component_id: &str,
     ) -> crate::QueryResult<ComponentByComponentIdQuery>;
     async fn components_connection_query(
         &self,
@@ -122,12 +123,15 @@ impl TestQueryExt for crate::Client {
 
     async fn component_by_component_id_query(
         &self,
+        pipeline_id: Option<String>,
         component_id: &str,
     ) -> QueryResult<ComponentByComponentIdQuery> {
-        let request_body =
-            ComponentByComponentIdQuery::build_query(component_by_component_id_query::Variables {
+        let request_body = ComponentByComponentIdQuery::build_query(
+            global_component_by_component_id_query::Variables {
+                pipeline_id,
                 component_id: component_id.to_string(),
-            });
+            },
+        );
         self.query::<ComponentByComponentIdQuery>(&request_body)
             .await
     }
