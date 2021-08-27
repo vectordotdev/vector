@@ -1,5 +1,9 @@
 #![deny(missing_docs)]
 
+mod character_delimited;
+
+pub use character_delimited::{CharacterDelimitedCodec, CharacterDelimitedDecoderConfig};
+
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
 use std::fmt::Debug;

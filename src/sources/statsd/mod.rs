@@ -1,5 +1,6 @@
 use crate::udp;
 use crate::{
+    codec::CharacterDelimitedCodec,
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -10,7 +11,6 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
 use futures::{stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -199,10 +199,10 @@ struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
     type Error = std::io::Error;
-    type Decoder = BytesDelimitedCodec;
+    type Decoder = CharacterDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
-        BytesDelimitedCodec::new(b'\n')
+        CharacterDelimitedCodec::new('\n')
     }
 
     fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
