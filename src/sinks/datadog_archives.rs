@@ -47,10 +47,12 @@ use vector_core::config::proxy::ProxyConfig;
 use vector_core::event::Event;
 
 lazy_static! {
-    static ref RESERVED_ATTRIBUTES: HashSet<&'static str> =
-        vec!["_id", "date", "message", "host", "source", "service", "status", "tags"]
-            .into_iter()
-            .collect();
+    static ref RESERVED_ATTRIBUTES: HashSet<&'static str> = vec![
+        "_id", "date", "message", "host", "source", "service", "status", "tags", "trace_id",
+        "span_id"
+    ]
+    .into_iter()
+    .collect();
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -222,6 +224,12 @@ fn build_s3_request(
     }
 }
 
+/// Applies the following transformations to align event's schema with DD:
+/// - `_id` is generated in the sink(format described below);
+/// - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current time if missing;
+/// - `message`,`host` are set from the corresponding Global Log Schema mappings;
+/// - `source`, `service`, `status`, `tags` and other reserved attributes are left as is;
+/// - the rest of the fields is moved to `attributes`.
 fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     lazy_static! {
         static ref KEY_PREFIX: Template =
@@ -242,11 +250,6 @@ fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8
 
     log.insert("_id", generate_log_id());
 
-    // - `_id` is generated in the sink(format described below);
-    // - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current UNIX timestamp in millis if missing;
-    // - `message`,`host` are set from the corresponding Global Log Schema mappings;
-    // - `source`, `service`, `status`, `tags` are left as is;
-    // - the rest of the fields is moved to `attributes`.
     let timestamp = log
         .remove(crate::config::log_schema().timestamp_key())
         .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
@@ -290,6 +293,7 @@ fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8
     })
 }
 
+/// Generates a unique ID compatible with DD
 fn generate_log_id() -> String {
     let mut id = BytesMut::with_capacity(18);
     // timestamp in millis - 6 bytes
@@ -316,7 +320,7 @@ fn generate_log_id() -> String {
     base64::encode(id.freeze())
 }
 
-/// returns 5 first bytes of the MAC address XOR-ed with random bytes
+/// Returns 5 first bytes of the MAC address XOR-ed with random bytes
 fn host_number() -> Vec<u8> {
     extern crate mac_address;
     use mac_address::get_mac_address;
@@ -366,8 +370,9 @@ mod tests {
     }
 
     #[test]
-    fn should_encode_event() {
+    fn encodes_event() {
         let mut log = Event::from("test message");
+        log.as_mut_log().insert("service", "test-service");
         log.as_mut_log().insert("not_a_reserved_attribute", "value");
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
             .expect("invalid test case")
@@ -380,6 +385,7 @@ mod tests {
 
         let id1 = validate_event_id(&encoded_json);
 
+        assert_eq!(encoded_json.len(), 5); // _id, message, date, service, attributes
         assert_eq!(
             encoded_json
                 .get("message")
@@ -398,10 +404,21 @@ mod tests {
         );
         assert_eq!(
             encoded_json
-                .get("attributes")
-                .expect("attributes not found")
-                .as_object()
-                .expect("attributes is not an object")
+                .get("service")
+                .expect("service not found")
+                .as_str()
+                .expect("service is not an string"),
+            "test-service"
+        );
+
+        let attributes = encoded_json
+            .get("attributes")
+            .expect("attributes not found")
+            .as_object()
+            .expect("attributes is not an object");
+        assert_eq!(attributes.len(), 1);
+        assert_eq!(
+            attributes
                 .get("not_a_reserved_attribute")
                 .expect("not_a_reserved_attribute wasn't moved to attributes")
                 .as_str()
@@ -418,6 +435,46 @@ mod tests {
 
         let id2 = validate_event_id(&encoded_json);
         assert_ne!(id1, id2)
+    }
+
+    #[test]
+    fn generates_valid_id() {
+        let mut log = Event::from("test message");
+        let encoded = encode_event(log).unwrap();
+        let (bytes, key) = encoded.item.into_parts();
+        let encoded_json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(&bytes[..]).unwrap();
+        let id1 = validate_event_id(&encoded_json);
+
+        // check that id is different for the next event
+        let encoded = encode_event(Event::new_empty_log()).unwrap();
+        let (bytes, _) = encoded.item.into_parts();
+        let encoded_json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(&bytes[..]).unwrap();
+
+        let id2 = validate_event_id(&encoded_json);
+        assert_ne!(id1, id2)
+    }
+
+    #[test]
+    fn generates_date_if_missing() {
+        let mut log = Event::from("test message");
+        let encoded = encode_event(log).unwrap();
+        let (bytes, key) = encoded.item.into_parts();
+        let encoded_json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(&bytes[..]).unwrap();
+
+        let date = DateTime::parse_from_rfc3339(
+            encoded_json
+                .get("date")
+                .expect("date not found")
+                .as_str()
+                .expect("date is not an integer"),
+        )
+        .expect("date is not in an rfc3339 format");
+
+        // check that it is a recent timestamp
+        assert!(Utc::now().timestamp() - date.timestamp() < 1000);
     }
 
     /// check that _id is:
