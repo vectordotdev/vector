@@ -9,7 +9,7 @@ use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::event::{EventFinalizers, Finalizable};
 
-use crate::{serde::to_string, sinks::util::sink::Response};
+use crate::{internal_events::aws_s3::sink::S3EventsSent, serde::to_string, sinks::util::sink::Response};
 
 use super::config::S3Options;
 
@@ -78,13 +78,7 @@ impl Service<S3Request> for S3Service {
         }
         let tagging = tagging.finish();
 
-        /*
-        we need to shuffle this somewhere else, but i'm not sure where yet
-
-        emit!(S3EventsSent {
-            byte_size: request.body.len(),
-        });
-        */
+        let body_len = request.body.len();
         let client = self.client.clone();
         let request = PutObjectRequest {
             body: Some(bytes_to_bytestream(request.body)),
@@ -105,10 +99,22 @@ impl Service<S3Request> for S3Service {
             ..Default::default()
         };
 
-        Box::pin(async move { client.put_object(request).in_current_span().await })
+        Box::pin(async move { 
+            let result = client.put_object(request).in_current_span().await;
+            
+            // TODO: This is fine for testing, but we should have a better pattern for this.
+            emit!(S3EventsSent {
+                byte_size: body_len,
+            });
+
+            result
+        })
     }
 }
 
 fn bytes_to_bytestream(buf: Bytes) -> ByteStream {
-    ByteStream::new(Box::pin(stream::once(async move { Ok(Bytes::from(buf)) })))
+    // We _have_ to provide the size hint, because without it, Rusoto can't generate the
+    // Content-Length header which is required for the S3 PutObject API call.
+    let len = buf.len();
+    ByteStream::new_with_size(Box::pin(stream::once(async move { Ok(Bytes::from(buf)) })), len)
 }

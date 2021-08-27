@@ -1,7 +1,7 @@
-use std::{collections::HashMap, hash::Hash, marker::PhantomData, task::Poll};
+use std::{collections::{HashMap, HashSet}, hash::Hash, marker::PhantomData, task::Poll};
 
 use futures::{poll, StreamExt};
-use tokio_util::time::DelayQueue;
+use tokio_util::time::{DelayQueue, delay_queue::Key};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
@@ -150,10 +150,12 @@ pub struct PartitionInFlightBatch<P>
 where
     P: Partitioner,
 {
+    closed: bool,
     items: Vec<P::Item>,
     finalizers: EventFinalizers,
     total_size: usize,
     size: BatchSize<()>,
+    delay_id: Option<Key>,
     _partitioner: PhantomData<P>,
 }
 
@@ -162,23 +164,59 @@ where
     P: Partitioner,
 {
     pub fn new(size: BatchSize<()>) -> Self {
+        trace!("new batch sizing: {} bytes or {} items", size.bytes, size.events);
         Self {
+            closed: false,
             items: Vec::new(),
             finalizers: EventFinalizers::default(),
             total_size: 0,
             size,
+            delay_id: None,
             _partitioner: PhantomData,
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
     pub fn is_full(&self) -> bool {
-        self.items.len() == self.size.events || self.total_size >= self.size.bytes
+        self.closed || self.items.len() == self.size.events || self.total_size >= self.size.bytes
+    }
+
+    pub fn set_delay_id(&mut self, id: Key) {
+        self.delay_id = Some(id);
+    }
+
+    pub fn delay_id(&self) -> Option<&Key> {
+        self.delay_id.as_ref()
     }
 
     pub fn push(&mut self, mut item: P::Item) -> BatchPushResult<P::Item> {
         // Don't overrun our batch size in bytes.
         let item_size = item.allocated_bytes();
         if self.total_size + item_size > self.size.bytes {
+            // This is a corner case, but one that isn't actually particularly rare:
+            //
+            // If we have a batch that, for example, is using 99999 bytes out of 100000 bytes, the next
+            // push attempt with an item that's 2 bytes or bigger will fail.  Obviously, going over our limit
+            // in small increments isn't truly an issue: our memory limits are best-effort, not in
+            // the same vein as a hard real-time system.  
+            //
+            // If we reject the item but leave the batch as-is, technically, the batch is not yet
+            // full: we haven't exceeded the size limit, or item count limit.  This poses a problem
+            // for downstream usage, where callers will likely temporarily hold the item and try to
+            // flush the batch so that they can attempt to push it again. However, therein lies the
+            // problem: our batch doesn't actually believe it's full yet, so we're in a conundrum.
+            //
+            // Instead, we mark the batch closed here so that the next caller to inspect it is
+            // notified that it is full and should be flushed.  This is splitting the difference:
+            // it's not yet full, we haven't overflowed it, but it clearly needs to be cleared to
+            // allow progress by the caller.
+            //
+            // We don't need to do this in the item count path, because that one only happens in
+            // discrete increments of 1; we can either add another item or we cannot.
+            self.closed = true;
             return BatchPushResult::Overflow(item);
         }
 
@@ -199,6 +237,7 @@ where
     }
 
     pub fn finish(self, key: P::Key) -> PartitionFinishedBatch<P> {
+        trace!("batch finished with {} bytes, {} items", self.total_size, self.items.len());
         PartitionFinishedBatch {
             key,
             items: self.items,
@@ -295,10 +334,28 @@ where
                 // TODO: any good way to push this clone into the closure for or_insert_with without
                 // stacked borrows? or another general approach that defers the clone?
                 let size = self.settings.size.clone();
+                let mut new_batch_pk = None;
                 let batch = self
                     .batches
-                    .entry(pk)
-                    .or_insert_with(|| PartitionInFlightBatch::new(size));
+                    .entry(pk.clone())
+                    .or_insert_with_key(|k| {
+                        new_batch_pk = Some(k.clone());
+                        PartitionInFlightBatch::new(size)
+                    });
+                
+                // If we've created a new batch, we need to shove it into our timeout queue.
+                if let Some(pk) = new_batch_pk {
+                    // Don't register this batch for expiration unless the timeout is actually
+                    // greater than zero, as a zero timeout is our "don't ever timeout" sentinel
+                    // value.
+                    //
+                    // TODO: Should probably be an Option<Duration>... hmmm...
+                    if self.settings.timeout.as_nanos() != 0 {
+                        let id = self.timeout_queue.insert(pk, self.settings.timeout);
+                        batch.set_delay_id(id);
+                    }
+                }
+
                 batch.push(item)
             }
             None => BatchPushResult::Failure(item),
@@ -319,7 +376,7 @@ where
                     None
                 }
             })
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
 
         // Check to see if any batches have expired, indicating a need for them to be flushed.  We
         // explicitly use the `poll!` macro to poll the delay queue, which holds all batch
@@ -333,12 +390,15 @@ where
         if !self.closed {
             while let Poll::Ready(Some(Ok(pk))) = poll!(self.timeout_queue.next()) {
                 let pk = pk.into_inner();
-                ready_partitions.push(pk);
+                let _ = ready_partitions.insert(pk);
             }
         }
 
         for pk in ready_partitions {
             let batch = self.batches.remove(&pk).expect("batch must always exist");
+            if let Some(id) = batch.delay_id() {
+                self.timeout_queue.remove(id);
+            }
             batches.push(batch.finish(pk));
         }
 

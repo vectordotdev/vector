@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fmt::Display,
+    fmt::{Debug, Display},
     io::{self, Write},
 };
 
@@ -37,14 +37,10 @@ use tokio::{
         oneshot,
     },
 };
-use tower::Service;
+use tower::{Service, ServiceExt};
 use tracing_futures::Instrument;
 use uuid::Uuid;
-use vector_core::{
-    buffers::Acker,
-    event::{EventFinalizers, Finalizable},
-    sink::StreamSink,
-};
+use vector_core::{buffers::Acker, event::{EventFinalizers, Finalizable}, sink::StreamSink};
 
 use super::{config::S3RequestOptions, partitioner::KeyPartitioner, service::S3Request};
 use crate::sinks::util::sink::Response;
@@ -78,7 +74,7 @@ where
     S: Service<S3Request> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: Response + Send + 'static,
-    S::Error: Into<crate::Error> + Send,
+    S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         // All sinks do the same fundamental job: take in events, and ship them out.  Empirical
@@ -86,7 +82,7 @@ where
         // as soon as we possibly can.  In order to do that, we'll spin up a separate task that
         // deals exclusively with I/O, while we deal with everything else here: batching, ordering,
         // and so on.
-        let (io_tx, io_rx) = channel(32);
+        let (io_tx, io_rx) = channel(64);
         let service = self
             .service
             .take()
@@ -95,13 +91,18 @@ where
             .acker
             .take()
             .expect("same sink should not be run twice");
+
+        let io = run_io(io_rx, service, acker).in_current_span();
         let _ = tokio::spawn(async move {
-            run_io(io_rx, service, acker).await;
+            io.await;
         });
 
         let mut closed = false;
         let mut queued_event = None;
+        let mut iter = 0;
         loop {
+            iter += 1;
+
             select! {
                 // This explicitly enables biasing, which ensures the branches in this select block
                 // are polled in top-down order.  We do tghis to ensure that we send ready batches
@@ -116,12 +117,16 @@ where
                 // flush interval could be more than enough batching when subject to high ingest
                 // rate e.g. tens or hundreds of thousands of events per second.
                 Some(batches) = self.batcher.get_ready_batches() => {
+                    info!("{} -> got {} batches to flush", iter, batches.len());
                     for batch in batches {
+                        let batch_key = batch.key().to_string();
                         let request = build_request(batch, &self.options);
                         if let Err(_) = io_tx.send(request).await {
                             // TODO: change this to "error! + return Err" after initial testing/debugging
                             panic!("sink I/O channel should not be closed before sink itself is closed");
                         }
+
+                        info!("{} -> sent batch '{}' to I/O task", iter, batch_key);
                     }
                 }
 
@@ -136,8 +141,11 @@ where
                     // should be cleared by the time this branch executes.
                     if let Some(_) = self.batcher.push(event).into_inner() {
                         // TODO: change this to "error! + return Err" after initial testing/debugging
-                        panic!("wasn't able to push queued event into batch after flushing ready batches; this should be impossible");
+                        info!("{} -> wasn't able to push queued event into batch after flushing ready batches; this should be impossible", iter);
+                        panic!("boom");
                     }
+
+                    trace!("{} -> pushed queued event into batch", iter);
                 }
 
                 // Take in new events.
@@ -153,6 +161,7 @@ where
                         // happens, we'll push that queued event into a batch.
                         let result = self.batcher.push(event);
                         if result.should_flush() {
+                            info!("{} -> batch full, continuing to force flush", iter);
                             queued_event = result.into_inner();
                             continue;
                         }
@@ -164,9 +173,11 @@ where
                         // more iteration of the loop, where our next call to `get_ready_batches`
                         // will return all the remaining batches regardless of size or expiration.
                          if !closed {
+                             trace!("stream closed, marking batcher closed and flushing");
                              closed = true;
                              self.batcher.close();
                          } else {
+                             trace!("stream completed, post-close flush complete, ending");
                              break;
                          }
                     }
@@ -183,7 +194,7 @@ where
     S: Service<S3Request>,
     S::Future: Send + 'static,
     S::Response: Response + Send + 'static,
-    S::Error: Into<crate::Error> + Send,
+    S::Error: Debug + Into<crate::Error> + Send,
 {
     let in_flight = FuturesUnordered::new();
     let mut pending_acks = HashMap::new();
@@ -194,8 +205,9 @@ where
 
     loop {
         select! {
-            // TODO: why the hell is this coming out as &S3Request?!?!
             Some(req) = rx.recv() => {
+                // Rebind the variable to avoid a bug with the pattern matching in `select!`:
+                // https://github.com/tokio-rs/tokio/issues/4076
                 let mut req = req;
                 let seqno = seq_head;
                 seq_head += 1;
@@ -211,15 +223,16 @@ where
                 // TODO: This likely need be parameterized, which builds a stronger case for
                 // following through with the comment mentioned below.
                 let logic = StdServiceLogic::default();
-                // TODO: I'm not entirely happy with how we have to smuggle batch_size/finalizers
+                // TODO: I'm not entirely happy with how we're smuggling batch_size/finalizers
                 // this far through, from the finished batch all the way through to the concrete
                 // request type...we lifted this code from `ServiceSink` directly, but we should
                 // probably treat it like `PartitionBatcher` and shove it into a single,
                 // encapsulated type instead.
                 let batch_size = req.batch_size;
                 let finalizers = req.take_finalizers();
-                let fut = service
-                    .call(req)
+
+                let svc = service.ready().await.expect("should not get error when waiting for svc readiness");
+                let fut = svc.call(req)
                     .err_into()
                     .map(move |result| {
                         logic.update_finalizers(result, finalizers);
@@ -234,6 +247,7 @@ where
             },
 
             Some(Ok((seqno, batch_size))) = in_flight.next() => {
+                info!("pending batch {} finished (n={})", seqno, batch_size);
                 pending_acks.insert(seqno, batch_size);
 
                 let mut num_to_ack = 0;
