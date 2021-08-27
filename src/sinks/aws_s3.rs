@@ -51,7 +51,7 @@ pub struct S3SinkConfig {
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
     #[serde(flatten)]
-    pub(crate) options: S3Options,
+    options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
@@ -62,7 +62,7 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
-    pub(crate) assume_role: Option<String>,
+    assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
@@ -611,7 +611,7 @@ mod integration_tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
-        assert_eq!(keys.filename_time_formatlen(), 1);
+        assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
         assert!(key.ends_with(".log"));
