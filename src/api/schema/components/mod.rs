@@ -56,7 +56,7 @@ impl Component {
             Component::Transform(c) => &c.0.component_id,
             Component::Sink(c) => &c.0.component_id,
         }
-        .pipeline()
+        .pipeline_str()
     }
 
     fn get_component_kind(&self) -> ComponentKind {
