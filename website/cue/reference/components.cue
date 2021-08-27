@@ -369,7 +369,7 @@ components: {
 			enabled: bool
 
 			if enabled {
-				adaptive_concurrency:       bool | *false
+				adaptive_concurrency:       bool | *true
 				concurrency:                uint64 | *null
 				rate_limit_duration_secs:   uint64 | *1
 				rate_limit_num:             uint64 | *9223372036854775807
