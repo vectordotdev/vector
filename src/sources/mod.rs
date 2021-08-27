@@ -65,7 +65,7 @@ pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
 
-mod util;
+pub(crate) mod util;
 
 pub use vector_core::source::Source;
 

@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpIsErrorFatal, TcpSource};
+use super::util::{SocketListenAddr, TcpError, TcpSource};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
@@ -124,8 +124,8 @@ impl std::fmt::Display for DecodeError {
     }
 }
 
-impl TcpIsErrorFatal for DecodeError {
-    fn is_error_fatal(&self) -> bool {
+impl TcpError for DecodeError {
+    fn is_fatal(&self) -> bool {
         match self {
             DecodeError::IO(_) => true,
             DecodeError::Decode(_) => false,

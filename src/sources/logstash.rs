@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpIsErrorFatal, TcpSource};
+use super::util::{SocketListenAddr, TcpError, TcpSource};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
@@ -161,8 +161,8 @@ pub enum DecodeError {
     DecompressionFailed { source: io::Error },
 }
 
-impl TcpIsErrorFatal for DecodeError {
-    fn is_error_fatal(&self) -> bool {
+impl TcpError for DecodeError {
+    fn is_fatal(&self) -> bool {
         use DecodeError::*;
 
         match self {

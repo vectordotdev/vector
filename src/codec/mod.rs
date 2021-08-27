@@ -9,6 +9,7 @@ mod parsers;
 use crate::{
     event::Event,
     internal_events::{DecoderFramingFailed, DecoderParseFailed},
+    sources::util::TcpError,
 };
 use bytes::{Bytes, BytesMut};
 pub use framers::*;
@@ -41,6 +42,15 @@ impl std::error::Error for Error {}
 impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
         Self::FramingError(Box::new(error))
+    }
+}
+
+impl TcpError for Error {
+    fn is_fatal(&self) -> bool {
+        match self {
+            Self::FramingError(error) => error.is_fatal(),
+            Self::ParsingError(_) => false,
+        }
     }
 }
 
