@@ -158,7 +158,7 @@ impl SinkConfig for S3SinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = create_client(&self.region, &self.auth, &cx.proxy)?;
+        let client = create_client(&self.region, &self.auth, None, &cx.proxy)?;
         let healthcheck = healthcheck(self.bucket.clone(), client.clone()).boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
@@ -260,12 +260,13 @@ pub async fn healthcheck(bucket: String, client: S3Client) -> crate::Result<()> 
 pub fn create_client(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,
+    assume_role: Option<String>,
     proxy: &ProxyConfig,
 ) -> crate::Result<S3Client> {
     let region = region.try_into()?;
     let client = rusoto::client(proxy)?;
 
-    let creds = auth.build(&region, None)?;
+    let creds = auth.build(&region, assume_role)?;
 
     Ok(S3Client::new_with(client, creds, region))
 }

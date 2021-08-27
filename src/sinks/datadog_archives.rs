@@ -113,7 +113,8 @@ impl DatadogArchivesSinkConfig {
         let (svc, healthcheck) = match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
-                let client = aws_s3::create_client(&s3_config.region, &s3_config.auth, &cx.proxy)?;
+                let client =
+                    aws_s3::create_client(&s3_config.region, &s3_config.auth, None, &cx.proxy)?;
                 let svc = self
                     .build_s3_service(request, bucket.clone(), prefix, client.clone())
                     .map_err(|error| format!("{:?}", error))?;
