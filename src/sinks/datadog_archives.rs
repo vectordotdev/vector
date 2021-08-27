@@ -82,10 +82,12 @@ pub struct S3Options {
     tags: Option<BTreeMap<String, String>>,
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, PartialEq)]
 enum ConfigError {
     #[snafu(display("Unsupported service: {:?}", service))]
     UnsupportedService { service: String },
+    #[snafu(display("Unsupported storage class: {:?}", storage_class))]
+    UnsupportedStorageClass { storage_class: String },
 }
 
 impl DatadogArchivesSinkConfig {
@@ -105,10 +107,10 @@ impl DatadogArchivesSinkConfig {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
                 let client = aws_s3::create_client(&s3_config.region, &s3_config.auth, &cx.proxy)?;
-                Ok((
-                    self.build_s3_service(request, bucket.clone(), prefix, client.clone()),
-                    aws_s3::healthcheck(bucket.clone(), client).boxed(),
-                ))
+                let svc = self
+                    .build_s3_service(request, bucket.clone(), prefix, client.clone())
+                    .map_err(|error| format!("{:?}", error))?;
+                Ok((svc, aws_s3::healthcheck(bucket.clone(), client).boxed()))
             }
 
             service => Err(ConfigError::UnsupportedService {
@@ -130,14 +132,26 @@ impl DatadogArchivesSinkConfig {
         bucket: String,
         prefix: Option<String>,
         client: S3Client,
-    ) -> Map<
-        BoxService<Request, PutObjectOutput, Box<dyn std::error::Error + Send + Sync>>,
-        PartitionInnerBuffer<Vec<u8>, Bytes>,
-        Request,
+    ) -> Result<
+        Map<
+            BoxService<Request, PutObjectOutput, Box<dyn std::error::Error + Send + Sync>>,
+            PartitionInnerBuffer<Vec<u8>, Bytes>,
+            Request,
+        >,
+        ConfigError,
     > {
         let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
 
         let s3_options = s3_config.options.clone();
+
+        match s3_options.storage_class {
+            Some(class @ S3StorageClass::DeepArchive) | Some(class @ S3StorageClass::Glacier) => {
+                return Err(ConfigError::UnsupportedStorageClass {
+                    storage_class: format!("{:?}", class),
+                });
+            }
+            _ => (),
+        }
 
         let s3 = S3Sink { client };
         let svc = ServiceBuilder::new()
@@ -146,7 +160,7 @@ impl DatadogArchivesSinkConfig {
             })
             .settings(request, S3RetryLogic)
             .service(s3);
-        svc
+        Ok(svc)
     }
 }
 
@@ -287,8 +301,9 @@ fn generate_log_id() -> String {
     id.put_slice(&HOST_NUMBER[..]);
 
     // counter - 5 bytes
-    id.put_u8(0); // one padding byte
-                  // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
+    id.put_u8(0);
+    // one padding byte
+    // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
     lazy_static! {
         static ref COUNTER: CounterU32 = CounterU32::new(0);
     }
@@ -338,6 +353,7 @@ impl SinkConfig for DatadogArchivesSinkConfig {
 mod tests {
     use super::*;
     use chrono::DateTime;
+    use strum::{AsStaticRef, IntoEnumIterator};
     use vector_core::event::Value;
 
     #[test]
@@ -455,5 +471,39 @@ mod tests {
         );
         let uuid2 = &req.key[prefix.len()..req.key.len() - file_ext.len()];
         assert_ne!(uuid1, uuid2);
+    }
+
+    #[tokio::test]
+    async fn error_if_unsupported_s3_storage_class() {
+        for class in S3StorageClass::iter() {
+            let config = DatadogArchivesSinkConfig {
+                service: "aws_s3".to_owned(),
+                bucket: "vector-datadog-archives".to_owned(),
+                key_prefix: Some("logs/".to_owned()),
+                request: TowerRequestConfig::default(),
+                aws_s3: Some(S3Config {
+                    options: S3Options {
+                        storage_class: Some(class),
+                        ..Default::default()
+                    },
+                    region: RegionOrEndpoint::with_region("us-east-1".to_owned()),
+                    auth: Default::default(),
+                }),
+            };
+
+            let res = config.new(SinkContext::new_test());
+
+            if class == S3StorageClass::Glacier || class == S3StorageClass::DeepArchive {
+                assert_eq!(
+                    res.err().unwrap().to_string(),
+                    format!(
+                        r#"UnsupportedStorageClass {{ storage_class: "{}" }}"#,
+                        class.as_ref()
+                    )
+                );
+            } else {
+                assert!(res.is_ok());
+            }
+        }
     }
 }

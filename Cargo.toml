@@ -280,6 +280,8 @@ data-encoding = { version = "2.2", default-features = false, features = ["std"],
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
 mac_address = { version = "1.1.2", default-features = false, optional = true }
 global_counter = { version = "0.2.2", default-features = false, optional = true }
+strum = { version = "0.21.0", default-features = false, optional = true }
+strum_macros = { version = "0.21.0", default-features = false, optional = true }
 
 # For WASM
 async-stream = "0.3.2"
@@ -610,7 +612,7 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["base64", "bytesize", "md-5", "rusoto", "rusoto_s3", "uuid"]
+sinks-aws_s3 = ["base64", "bytesize", "md-5", "rusoto", "rusoto_s3", "uuid", "strum", "strum_macros"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
 sinks-azure_blob = ["bytesize", "azure_core", "azure_storage", "reqwest", "uuid"]
 sinks-azure_monitor_logs = ["bytesize"]
