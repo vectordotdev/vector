@@ -33,7 +33,6 @@ pub enum GeneratorConfigError {
 #[derivative(Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
 pub enum OutputFormat {
-    #[derivative(Default)]
     Shuffle {
         #[serde(default)]
         sequence: bool,
@@ -45,6 +44,7 @@ pub enum OutputFormat {
     Syslog,
     #[serde(alias = "rfc3164")]
     BsdSyslog,
+    #[derivative(Default)]
     Json,
 }
 
