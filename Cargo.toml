@@ -343,12 +343,12 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datado
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
