@@ -79,12 +79,12 @@ impl sort::SortableByField<SourcesSortFieldName> for Source {
 impl Source {
     /// Source component_id
     pub async fn component_id(&self) -> &str {
-        self.get_component_id().id()
+        self.0.component_id.id()
     }
 
     /// Source pipeline_id
     pub async fn pipeline_id(&self) -> Option<&str> {
-        self.get_component_id().pipeline_str()
+        self.0.component_id.pipeline_str()
     }
 
     /// Source type
@@ -115,7 +115,7 @@ impl Source {
 
     /// Source metrics
     pub async fn metrics(&self) -> metrics::SourceMetrics {
-        metrics::by_component_id(self.get_component_id())
+        metrics::by_component_id(&self.0.component_id)
             .into_source_metrics(self.get_component_type())
     }
 }

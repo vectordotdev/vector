@@ -45,7 +45,7 @@ impl ComponentId {
 
     pub fn pipeline_str(&self) -> Option<&str> {
         match self.scope {
-            ComponentScope::Pipeline(value) => Some(value.as_str()),
+            ComponentScope::Pipeline(ref value) => Some(value.as_str()),
             _ => None,
         }
     }
@@ -56,6 +56,10 @@ impl ComponentId {
 
     pub fn is_global(&self) -> bool {
         matches!(self.scope, ComponentScope::Global)
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.value.as_str()
     }
 }
 

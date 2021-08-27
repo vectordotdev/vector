@@ -53,12 +53,12 @@ impl sort::SortableByField<TransformsSortFieldName> for Transform {
 impl Transform {
     /// Transform component_id
     pub async fn component_id(&self) -> &str {
-        self.get_component_id().id()
+        self.0.component_id.id()
     }
 
     /// Transform component_id
     pub async fn pipeline_id(&self) -> Option<&str> {
-        self.get_component_id().pipeline_str()
+        self.0.component_id.pipeline_str()
     }
 
     /// Transform type

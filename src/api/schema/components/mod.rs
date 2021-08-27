@@ -24,7 +24,7 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "component_id", type = "String"),
-    field(name = "pipeline_id", type = "Option<String>"),
+    field(name = "pipeline_id", type = "Option<&str>"),
     field(name = "component_type", type = "String")
 )]
 pub enum Component {
@@ -41,22 +41,12 @@ pub enum ComponentKind {
 }
 
 impl Component {
-    fn get_component_id(&self) -> &str {
+    fn get_component_id(&self) -> &ComponentId {
         match self {
             Component::Source(c) => &c.0.component_id,
             Component::Transform(c) => &c.0.component_id,
             Component::Sink(c) => &c.0.component_id,
         }
-        .id()
-    }
-
-    fn get_pipeline_id(&self) -> Option<&str> {
-        match self {
-            Component::Source(c) => &c.0.component_id,
-            Component::Transform(c) => &c.0.component_id,
-            Component::Sink(c) => &c.0.component_id,
-        }
-        .pipeline_str()
     }
 
     fn get_component_kind(&self) -> ComponentKind {
