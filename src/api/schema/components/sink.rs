@@ -79,7 +79,12 @@ impl sort::SortableByField<SinksSortFieldName> for Sink {
 impl Sink {
     /// Sink component_id
     pub async fn component_id(&self) -> &str {
-        self.get_component_id().as_str()
+        self.get_component_id().id()
+    }
+
+    /// Sink component_id
+    pub async fn pipeline_id(&self) -> Option<&str> {
+        self.get_component_id().pipeline()
     }
 
     /// Sink type

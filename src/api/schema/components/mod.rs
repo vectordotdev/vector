@@ -24,6 +24,7 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "component_id", type = "String"),
+    field(name = "pipeline_id", type = "Option<String>"),
     field(name = "component_type", type = "String")
 )]
 pub enum Component {
@@ -40,12 +41,22 @@ pub enum ComponentKind {
 }
 
 impl Component {
-    fn get_component_id(&self) -> &ComponentId {
+    fn get_component_id(&self) -> &str {
         match self {
             Component::Source(c) => &c.0.component_id,
             Component::Transform(c) => &c.0.component_id,
             Component::Sink(c) => &c.0.component_id,
         }
+        .id()
+    }
+
+    fn get_pipeline_id(&self) -> Option<&str> {
+        match self {
+            Component::Source(c) => &c.0.component_id,
+            Component::Transform(c) => &c.0.component_id,
+            Component::Sink(c) => &c.0.component_id,
+        }
+        .pipeline()
     }
 
     fn get_component_kind(&self) -> ComponentKind {
@@ -207,18 +218,16 @@ impl ComponentsQuery {
     }
 
     /// Gets a configured component by component_id
-    async fn global_component_by_component_id(&self, component_id: String) -> Option<Component> {
-        let id = ComponentId::global(component_id);
-        component_by_component_id(&id)
-    }
-
-    /// Gets a configured component by component_id
-    async fn pipeline_component_by_component_id(
+    async fn component_by_component_id(
         &self,
-        pipeline_id: String,
+        pipeline_id: Option<String>,
         component_id: String,
     ) -> Option<Component> {
-        let id = ComponentId::pipeline(&pipeline_id, &component_id);
+        let id = if let Some(pipeline_id) = pipeline_id {
+            ComponentId::pipeline(&pipeline_id, &component_id)
+        } else {
+            ComponentId::global(&component_id)
+        };
         component_by_component_id(&id)
     }
 }

@@ -3112,42 +3112,11 @@
                 {
                   "defaultValue": null,
                   "description": null,
-                  "name": "componentId",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "String",
-                      "ofType": null
-                    }
-                  }
-                }
-              ],
-              "deprecationReason": null,
-              "description": "Gets a configured component by component_id",
-              "isDeprecated": false,
-              "name": "globalComponentByComponentId",
-              "type": {
-                "kind": "INTERFACE",
-                "name": "Component",
-                "ofType": null
-              }
-            },
-            {
-              "args": [
-                {
-                  "defaultValue": null,
-                  "description": null,
                   "name": "pipelineId",
                   "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "String",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
                   }
                 },
                 {
@@ -3168,7 +3137,7 @@
               "deprecationReason": null,
               "description": "Gets a configured component by component_id",
               "isDeprecated": false,
-              "name": "pipelineComponentByComponentId",
+              "name": "componentByComponentId",
               "type": {
                 "kind": "INTERFACE",
                 "name": "Component",

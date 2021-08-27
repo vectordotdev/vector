@@ -1,11 +1,7 @@
 query ComponentByComponentIdQuery($pipelineId: String, $componentId: String!) {
-    globalComponentByComponentId(componentId: $componentId) {
+    componentByComponentId(pipelineId: $pipelineId, componentId: $componentId) {
         __typename
-        componentId
-    }
-    pipelineComponentByComponentId(pipelineId: $pipelineId, componentId: $componentId) {
-        __typename
-        componentId
         pipelineId
+        componentId
     }
 }

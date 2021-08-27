@@ -43,8 +43,11 @@ impl ComponentId {
         self.id.as_str()
     }
 
-    pub fn as_str(&self) -> &str {
-        self.id.as_str()
+    pub fn pipeline(&self) -> Option<&str> {
+        match self.scope {
+            ComponentScope::Pipeline(value) => Some(value.as_str()),
+            _ => None,
+        }
     }
 
     pub fn into_pipeline(self, id: &str) -> Self {

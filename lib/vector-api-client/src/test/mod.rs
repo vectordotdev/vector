@@ -126,12 +126,11 @@ impl TestQueryExt for crate::Client {
         pipeline_id: Option<String>,
         component_id: &str,
     ) -> QueryResult<ComponentByComponentIdQuery> {
-        let request_body = ComponentByComponentIdQuery::build_query(
-            global_component_by_component_id_query::Variables {
+        let request_body =
+            ComponentByComponentIdQuery::build_query(component_by_component_id_query::Variables {
                 pipeline_id,
                 component_id: component_id.to_string(),
-            },
-        );
+            });
         self.query::<ComponentByComponentIdQuery>(&request_body)
             .await
     }
