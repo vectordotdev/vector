@@ -181,7 +181,7 @@ components: sources: host_metrics: {
 					description: "The number of levels of the cgroups hierarchy for which to report metrics. A value of `1` means just the root or named cgroup."
 					type: uint: {
 						unit:    null
-						default: 18446744073709551615
+						default: 100
 						examples: [1, 3]
 					}
 				}

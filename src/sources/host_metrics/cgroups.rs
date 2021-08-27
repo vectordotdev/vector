@@ -17,7 +17,7 @@ const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 #[derivative(Default)]
 #[serde(default)]
 pub(super) struct CgroupsConfig {
-    #[derivative(Default(value = "usize::MAX"))]
+    #[derivative(Default(value = "100"))]
     levels: usize,
     base: Option<PathBuf>,
     groups: FilterList,
