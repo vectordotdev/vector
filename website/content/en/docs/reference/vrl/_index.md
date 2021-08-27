@@ -3,7 +3,7 @@ title: Vector Remap Language (VRL)
 description: A domain-specific language for modifying your observability data
 short: Vector Remap Language
 weight: 4
-aliases: ["/docs/reference/remap"]
+aliases: ["/docs/reference/remap", "/docs/reference/configuration/transforms/wasm"]
 ---
 
 Vector Remap Language (VRL) is an expression-oriented language designed for transforming observability data (logs and metrics) in a [safe](#safety) and [performant](#performance) manner. It features a simple [syntax](expressions) and a rich set of built-in functions tailored specifically to observability use cases.
