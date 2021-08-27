@@ -129,14 +129,14 @@ error[E110]: invalid argument type
   │        this expression resolves to the exact type "null"
   │        but the parameter "value" expects the exact type "string"
   │
-  = try: ensuring an appropriate type at runtime
-  =
-  =     foo = string!(foo)
-  =     upcase(foo)
-  =
   = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
   =
   =     foo = to_string(foo) ?? "default"
+  =     upcase(foo)
+  =
+  = try: ensuring an appropriate type at runtime
+  =
+  =     foo = string!(foo)
   =     upcase(foo)
 ```
 
@@ -648,6 +648,9 @@ function call fails.
 When an infallible function becomes fallible because of an invalid argument
 type, the compiler will explain this situation in the diagnostic, to avoid any
 user confusion.
+
+Additionally, the website documentation will be updated to ensure users are
+aware of this specific behavior of the VRL compiler.
 
 #### Implementation
 
