@@ -57,15 +57,16 @@ prost-build = "0.8"
 criterion = { version = "0.3.5", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1.0.3"
+proptest = "1.0"
 pretty_assertions = "0.7.2"
 tokio-test = "0.4.2"
 
 [features]
-default = []
 api = ["async-graphql"]
+default = []
+disk-buffer = ["buffers/disk-buffer"]
 lua = ["mlua", "tokio-stream"]
 vrl = ["vrl-core"]
-disk-buffer = ["buffers/disk-buffer"]
 
 [[bench]]
 name = "lookup"

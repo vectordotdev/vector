@@ -31,6 +31,7 @@ pub struct TransformContext {
 }
 
 impl TransformContext {
+    #[allow(clippy::needless_update)]
     pub fn new_with_globals(globals: GlobalOptions) -> Self {
         Self {
             globals,
