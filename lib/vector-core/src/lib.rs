@@ -36,6 +36,7 @@ mod test_util;
 pub mod transform;
 pub use buffers;
 mod byte_size_of;
+pub mod partition;
 pub mod serde;
 
 pub use byte_size_of::ByteSizeOf;
