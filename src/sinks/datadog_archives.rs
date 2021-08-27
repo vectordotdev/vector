@@ -46,6 +46,13 @@ use uuid::Uuid;
 use vector_core::config::proxy::ProxyConfig;
 use vector_core::event::Event;
 
+lazy_static! {
+    static ref RESERVED_ATTRIBUTES: HashSet<&'static str> =
+        vec!["_id", "date", "message", "host", "source", "service", "status", "tags"]
+            .into_iter()
+            .collect();
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogArchivesSinkConfig {
@@ -98,8 +105,6 @@ impl DatadogArchivesSinkConfig {
             ..Default::default()
         });
 
-        let batch = BatchSettings::default().bytes(100_000_000).timeout(900);
-
         let bucket = self.bucket.clone();
         let prefix = self.key_prefix.clone();
 
@@ -117,6 +122,11 @@ impl DatadogArchivesSinkConfig {
                 service: service.to_owned(),
             }),
         }?;
+
+        /// We should avoid producing many small batches, therefore we use settings recommended by DD:
+        /// batch size - 100mb
+        /// batch timeout - 15min
+        let batch = BatchSettings::default().bytes(100_000_000).timeout(900);
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, Compression::gzip_default()));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
@@ -255,12 +265,6 @@ fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8
         log.insert("host", message);
     }
 
-    lazy_static! {
-        static ref RESERVED_ATTRIBUTES: HashSet<&'static str> =
-            vec!["_id", "date", "message", "host", "source", "service", "status", "tags"]
-                .into_iter()
-                .collect();
-    }
     let mut attributes = BTreeMap::new();
     let custom_attributes: Vec<String> = log
         .keys()
@@ -362,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn s3_encode_event() {
+    fn should_encode_event() {
         let mut log = Event::from("test message");
         log.as_mut_log().insert("not_a_reserved_attribute", "value");
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
@@ -454,11 +458,11 @@ mod tests {
             Some("audit".into()),
             S3Options::default(),
         );
-        let prefix = "audit/dt=20210823/hour=16/";
-        let file_ext = ".json.gz";
-        assert!(req.key.starts_with(prefix));
-        assert!(req.key.ends_with(file_ext));
-        let uuid1 = &req.key[prefix.len()..req.key.len() - file_ext.len()];
+        let expected_key_prefix = "audit/dt=20210823/hour=16/";
+        let expected_key_ext = ".json.gz";
+        assert!(req.key.starts_with(expected_key_prefix));
+        assert!(req.key.ends_with(expected_key_ext));
+        let uuid1 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
         // check the the second batch has a different UUID
@@ -469,7 +473,7 @@ mod tests {
             Some("audit".into()),
             S3Options::default(),
         );
-        let uuid2 = &req.key[prefix.len()..req.key.len() - file_ext.len()];
+        let uuid2 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
         assert_ne!(uuid1, uuid2);
     }
 
