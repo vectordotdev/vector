@@ -210,7 +210,7 @@ components: sinks: loki: {
 		processing_errors_total:   components.sources.internal_metrics.output.metrics.processing_errors_total
 		out_of_order_events_total: components.sources.internal_metrics.output.metrics.out_of_order_events_total
 		streams_total:			   components.sources.internal_metrics.output.metrics.streams_total
-		unlabeld_events_total: 	   components.sources.internal_metrics.output.metrics.unlabeld_events_total
+		unlabeled_events_total:    components.sources.internal_metrics.output.metrics.unlabeled_events_total
 		large_events_total:        components.sources.internal_metrics.output.metrics.large_events_total
 	}
 }

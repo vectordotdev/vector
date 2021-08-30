@@ -2,11 +2,11 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct LokiEventUnlabeld;
+pub struct LokiEventUnlabeled;
 
-impl InternalEvent for LokiEventUnlabeld {
+impl InternalEvent for LokiEventUnlabeled {
     fn emit_metrics(&self) {
-        counter!("unlabeld_events_total", 1);
+        counter!("unlabeled_events_total", 1);
     }
 }
 

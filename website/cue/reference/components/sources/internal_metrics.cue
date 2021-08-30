@@ -912,7 +912,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		unlabeld_events_total: {
+		unlabeled_events_total: {
 			description:       "The total number of events without any label."
 			type:              "counter"
 			default_namespace: "vector"

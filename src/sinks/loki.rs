@@ -15,7 +15,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{LokiEventUnlabeld, LokiEventsProcessed, TemplateRenderingFailed},
+    internal_events::{LokiEventUnlabeled, LokiEventsProcessed, TemplateRenderingFailed},
     sinks::util::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -244,7 +244,7 @@ impl HttpSink for LokiSink {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(LokiEventUnlabeld);
+            emit!(LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
