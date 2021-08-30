@@ -46,7 +46,7 @@ pub fn build_sink<T>(
 where
     T: HttpSink<Input = Vec<u8>, Output = Vec<u8>>,
 {
-    validate_host(&endpoint)?;
+    validate_host(endpoint)?;
 
     let batch_settings = BatchSettings::default()
         .bytes(bytesize::mib(1u64))

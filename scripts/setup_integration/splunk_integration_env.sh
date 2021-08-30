@@ -45,7 +45,7 @@ stop_docker () {
 }
 
 wait_for_splunk () {
-  for i in {1..20}
+  for _ in {1..20}
   do
     if curl -sf http://localhost:8088/services/collector/health > /dev/null
     then

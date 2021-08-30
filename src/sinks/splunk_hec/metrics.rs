@@ -180,7 +180,7 @@ impl HecSinkMetricsConfig {
     fn extract_timestamp(metric: &Metric) -> f64 {
         metric
             .timestamp()
-            .unwrap_or(chrono::Utc::now())
+            .unwrap_or_else(chrono::Utc::now)
             .timestamp_millis() as f64
             / 1000f64
     }
@@ -222,7 +222,9 @@ impl HecSinkMetricsConfig {
 
     fn extract_metric_name(&self, metric: &Metric) -> String {
         encode_namespace(
-            metric.namespace().or(self.default_namespace.as_deref()),
+            metric
+                .namespace()
+                .or_else(|| self.default_namespace.as_deref()),
             '.',
             metric.name(),
         )
@@ -243,9 +245,9 @@ impl HecSinkMetricsConfig {
     }
 
     fn extract_metric_value(metric: &Metric) -> Option<f64> {
-        match metric.value() {
-            &MetricValue::Counter { value } => Some(value),
-            &MetricValue::Gauge { value } => Some(value),
+        match *metric.value() {
+            MetricValue::Counter { value } => Some(value),
+            MetricValue::Gauge { value } => Some(value),
             _ => {
                 emit!(SplunkInvalidMetricReceived {
                     value: metric.value(),
@@ -607,7 +609,7 @@ mod integration_tests {
         assert!(
             metric_dimensions_exist(
                 "example-counter",
-                &vec!["host", "source", "sourcetype", "tag_one"],
+                &["host", "source", "sourcetype", "tag_one"],
             )
             .await
         );
@@ -639,7 +641,7 @@ mod integration_tests {
         assert!(
             metric_dimensions_exist(
                 "example-gauge",
-                &vec!["host", "source", "sourcetype", "tag_two"],
+                &["host", "source", "sourcetype", "tag_two"],
             )
             .await
         );
@@ -647,7 +649,7 @@ mod integration_tests {
 
     // It usually takes ~1 second for the metric to show up in search with all dimensions, so poll
     // multiple times.
-    async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &Vec<&str>) -> bool {
+    async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &[&str]) -> bool {
         for _ in 0..20usize {
             let resp = metric_dimensions(metric_name).await;
             let actual_dimensions = resp
