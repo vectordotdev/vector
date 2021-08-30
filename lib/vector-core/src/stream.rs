@@ -1,3 +1,1 @@
-mod batcher;
-
-pub use batcher::Batcher;
+pub mod batcher;

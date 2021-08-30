@@ -9,7 +9,8 @@ use std::mem;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use tokio::time::{interval, Interval, MissedTickBehavior};
 use twox_hash::XxHash64;
 
 /// A [`Timer`] for [`Batch`]
@@ -19,27 +20,24 @@ use twox_hash::XxHash64;
 /// purposes. It stores an internal notion of when it was started and how "wide"
 /// away from that start time can drift before the timer has elapsed.
 pub struct BatcherTimer {
-    width: Duration,
-    start: Instant,
+    interval: Interval,
 }
 
 impl BatcherTimer {
     #[allow(dead_code)]
-    pub fn new(width: Duration) -> Self {
-        Self {
-            width,
-            start: Instant::now(),
-        }
+    pub fn new(period: Duration) -> Self {
+        let mut interval = interval(period);
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        Self { interval }
     }
 }
 
 impl Timer for BatcherTimer {
-    fn has_elapsed(&self) -> bool {
-        self.start.elapsed() > self.width
-    }
-
-    fn reset(&mut self) {
-        self.start = Instant::now();
+    fn poll_elapsed(&mut self, cx: &mut Context) -> Poll<bool> {
+        match self.interval.poll_tick(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(_) => Poll::Ready(true),
+        }
     }
 }
 
@@ -213,18 +211,17 @@ where
                 return Poll::Ready(this.closed_batches.pop());
             }
             match this.stream.as_mut().poll_next(cx) {
-                Poll::Pending => {
-                    if this.timer.has_elapsed() {
+                Poll::Pending => match this.timer.poll_elapsed(cx) {
+                    Poll::Pending | Poll::Ready(false) => return Poll::Pending,
+                    Poll::Ready(true) => {
                         this.closed_batches.extend(
                             this.batches
                                 .drain()
                                 .map(|(key, batch)| (key, batch.destruct().1)),
                         );
-                        this.timer.reset();
                         continue;
                     }
-                    return Poll::Pending;
-                }
+                },
                 Poll::Ready(None) => {
                     // Now that the underlying stream is closed we need to clear
                     // out our batches.
@@ -248,30 +245,34 @@ where
                             // When there's space in the partition batch just
                             // push the item in and loop back around.
                             batch.push(item);
-                        } else if this.timer.has_elapsed() {
-                            // If there is not space in the partition batch
-                            // check to see if the global timer has elapsed. If
-                            // it has then close all batches, including the one
-                            // we have a mutable ref to, and then insert a brand
-                            // new batch with `item` in it.
-                            this.closed_batches.extend(
-                                this.batches
-                                    .drain()
-                                    .map(|(key, batch)| (key, batch.destruct().1)),
-                            );
-                            this.timer.reset();
-                            // With all batches closed put the item into a new
-                            // batch.
-                            let batch = Batch::new(item_limit, alloc_limit).with(item);
-                            this.batches.insert(item_key, batch);
                         } else {
-                            // There's no space in the partition batch but the
-                            // timer hasn't fired yet. Swap out the existing,
-                            // full partition batch for a new one, push the old
-                            // one into closed_batches.
-                            let nb = Batch::new(item_limit, alloc_limit).with(item);
-                            let batch = mem::replace(batch, nb);
-                            this.closed_batches.push((item_key, batch.destruct().1));
+                            match this.timer.poll_elapsed(cx) {
+                                Poll::Pending | Poll::Ready(false) => {
+                                    // There's no space in the partition batch
+                                    // but the timer hasn't fired yet. Swap out
+                                    // the existing, full partition batch for a
+                                    // new one, push the old one into
+                                    // closed_batches.
+                                    let nb = Batch::new(item_limit, alloc_limit).with(item);
+                                    let batch = mem::replace(batch, nb);
+                                    this.closed_batches.push((item_key, batch.destruct().1));
+                                }
+                                Poll::Ready(true) => {
+                                    // The global timer has elapsed. Close all
+                                    // batches, including the one we have a
+                                    // mutable ref to, and then insert a brand
+                                    // new batch with `item` in it.
+                                    this.closed_batches.extend(
+                                        this.batches
+                                            .drain()
+                                            .map(|(key, batch)| (key, batch.destruct().1)),
+                                    );
+                                    // With all batches closed put the item into
+                                    // a new batch.
+                                    let batch = Batch::new(item_limit, alloc_limit).with(item);
+                                    this.batches.insert(item_key, batch);
+                                }
+                            }
                         }
                     } else {
                         let batch = Batch::new(item_limit, alloc_limit).with(item);
@@ -286,20 +287,16 @@ where
 #[cfg(test)]
 mod test {
     use crate::partition::Partitioner;
-    use crate::stream::Batcher;
+    use crate::stream::batcher::Batcher;
     use crate::time::Timer;
     use futures::task::noop_waker;
     use futures::{stream, Stream};
     use pin_project::pin_project;
     use proptest::prelude::*;
-    use std::cell::RefCell;
     use std::collections::HashMap;
     use std::num::{NonZeroU8, NonZeroUsize};
     use std::pin::Pin;
     use std::task::{Context, Poll};
-    use std::time::Duration;
-
-    use super::BatcherTimer;
 
     #[derive(Debug)]
     /// A test timer
@@ -309,25 +306,34 @@ mod test {
     /// for whether deadlines have elapsed or not. This allows us to include the
     /// notion of time in our property tests below.
     struct TestTimer {
-        canned_responses: RefCell<Vec<bool>>,
+        responses: Vec<Poll<bool>>,
     }
 
     impl TestTimer {
-        fn new(responses: Vec<bool>) -> Self {
-            Self {
-                canned_responses: RefCell::new(responses),
-            }
+        fn new(responses: Vec<Poll<bool>>) -> Self {
+            Self { responses }
         }
     }
 
     impl Timer for TestTimer {
-        fn has_elapsed(&self) -> bool {
-            self.canned_responses.borrow_mut().pop().unwrap_or(false)
+        fn poll_elapsed(&mut self, _cx: &mut Context) -> Poll<bool> {
+            self.responses.pop().unwrap_or(Poll::Pending)
         }
+    }
 
-        fn reset(&mut self) {
-            // intentionally nothing
-        }
+    fn arb_timer() -> impl Strategy<Value = TestTimer> {
+        Vec::<u8>::arbitrary()
+            .prop_map(|v| {
+                v.into_iter()
+                    .map(|i| match i % 3 {
+                        0 => Poll::Pending,
+                        1 => Poll::Ready(true),
+                        2 => Poll::Ready(false),
+                        _ => unreachable!(),
+                    })
+                    .collect()
+            })
+            .prop_map(|resps| TestTimer::new(resps))
     }
 
     #[pin_project]
@@ -354,10 +360,6 @@ mod test {
         (1..u8::max_value(),).prop_map(|(ks,)| TestPartitioner {
             key_space: NonZeroU8::new(ks).unwrap(),
         })
-    }
-
-    fn arb_timer() -> impl Strategy<Value = TestTimer> {
-        Vec::<bool>::arbitrary().prop_map(|resps| TestTimer::new(resps))
     }
 
     proptest! {
@@ -533,17 +535,5 @@ mod test {
                 }
             }
         }
-    }
-
-    #[test]
-    fn batch_timer_fires() {
-        let millis = 100;
-        let mut batch_timer = BatcherTimer::new(Duration::from_millis(millis));
-        assert!(!batch_timer.has_elapsed());
-        std::thread::sleep(Duration::from_millis(millis * 2));
-        assert!(batch_timer.has_elapsed());
-
-        batch_timer.reset();
-        assert!(!batch_timer.has_elapsed());
     }
 }

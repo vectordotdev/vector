@@ -1,5 +1,7 @@
 //! Time utilities for vector-core
 
+use std::task::{Context, Poll};
+
 /// A trait for representing timers
 ///
 /// Embedding time as a type into other types eases property testing and
@@ -8,10 +10,6 @@
 pub trait Timer {
     // For an example of how property testing can use this type see the
     // `stream::Batcher` property tests.
-
     /// Whether the timer has elapsed or not, true if yes.
-    fn has_elapsed(&self) -> bool;
-
-    /// Signal that the timer ought to be reset.
-    fn reset(&mut self);
+    fn poll_elapsed(&mut self, cx: &mut Context) -> Poll<bool>;
 }
