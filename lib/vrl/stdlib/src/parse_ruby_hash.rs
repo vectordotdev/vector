@@ -283,6 +283,14 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_key_number() {
+        let result = parse(r#"{ 42 => "hello world" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get("42").unwrap().is_bytes());
+    }
+
+    #[test]
     fn test_parse_underscore() {
         let result = parse(r#"{ with_underscore => "hello world" }"#).unwrap();
         assert!(result.is_object());
