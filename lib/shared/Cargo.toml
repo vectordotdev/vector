@@ -15,6 +15,7 @@ nom = { version = "6", optional = true }
 serde = { version = "1.0.129", optional = true }
 snafu = { version = "0.6", optional = true }
 tracing = { version = "0.1", optional = true }
+serde_json = { version = "1.0.66", optional = true }
 
 [features]
 default = [
@@ -22,6 +23,7 @@ default = [
   "btreemap",
   "conversion",
   "tokenize",
+  "encoding"
 ]
 
 aws_cloudwatch_logs_subscription = [
@@ -36,6 +38,12 @@ conversion = [
   "chrono",
   "snafu",
   "tracing",
+]
+
+encoding = [
+  "nom",
+  "serde_json",
+  "snafu"
 ]
 
 tokenize = [
