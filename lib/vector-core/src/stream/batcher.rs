@@ -195,9 +195,9 @@ where
 
 impl<St, Prt, T> Stream for Batcher<St, Prt, T>
 where
-    St: Stream + Unpin,
+    St: Stream<Item = Prt::Item> + Unpin,
     Prt: Partitioner + Unpin,
-    Prt::Item: ByteSizeOf + From<St::Item>,
+    Prt::Item: ByteSizeOf,
     T: Timer,
 {
     type Item = (Option<Prt::Key>, Vec<Prt::Item>);
@@ -238,7 +238,6 @@ where
                     return Poll::Ready(None);
                 }
                 Poll::Ready(Some(item)) => {
-                    let item: Prt::Item = item.into();
                     let item_key = this.partitioner.partition(&item);
 
                     if let Some(batch) = this.batches.get_mut(&item_key) {
