@@ -240,30 +240,41 @@ where
                 }
                 Poll::Ready(Some(item)) => {
                     let item_key = this.partitioner.partition(&item);
+                    let item_limit: usize = *this.batch_item_limit;
+                    let alloc_limit: usize = *this.batch_allocation_limit;
 
                     if let Some(batch) = this.batches.get_mut(&item_key) {
                         if batch.has_space(&item) {
+                            // When there's space in the partition batch just
+                            // push the item in and loop back around.
                             batch.push(item);
+                        } else if this.timer.has_elapsed() {
+                            // If there is not space in the partition batch
+                            // check to see if the global timer has elapsed. If
+                            // it has then close all batches, including the one
+                            // we have a mutable ref to, and then insert a brand
+                            // new batch with `item` in it.
+                            this.closed_batches.extend(
+                                this.batches
+                                    .drain()
+                                    .map(|(key, batch)| (key, batch.destruct().1)),
+                            );
+                            this.timer.reset();
+                            // With all batches closed put the item into a new
+                            // batch.
+                            let batch = Batch::new(item_limit, alloc_limit).with(item);
+                            this.batches.insert(item_key, batch);
                         } else {
-                            let new_batch =
-                                Batch::new(*this.batch_item_limit, *this.batch_allocation_limit)
-                                    .with(item);
-                            let batch = mem::replace(batch, new_batch);
-                            let (_, arr) = batch.destruct();
-                            if this.timer.has_elapsed() {
-                                this.closed_batches.extend(
-                                    this.batches
-                                        .drain()
-                                        .map(|(key, batch)| (key, batch.destruct().1)),
-                                );
-                                this.timer.reset();
-                            }
-                            return Poll::Ready(Some((item_key, arr)));
+                            // There's no space in the partition batch but the
+                            // timer hasn't fired yet. Swap out the existing,
+                            // full partition batch for a new one, push the old
+                            // one into closed_batches.
+                            let nb = Batch::new(item_limit, alloc_limit).with(item);
+                            let batch = mem::replace(batch, nb);
+                            this.closed_batches.push((item_key, batch.destruct().1));
                         }
                     } else {
-                        let batch =
-                            Batch::new(*this.batch_item_limit, *this.batch_allocation_limit)
-                                .with(item);
+                        let batch = Batch::new(item_limit, alloc_limit).with(item);
                         this.batches.insert(item_key, batch);
                     }
                 }
