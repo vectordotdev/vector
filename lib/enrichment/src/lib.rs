@@ -1,11 +1,22 @@
+pub mod get_enrichment_table_record;
 pub mod tables;
+
+#[cfg(test)]
+mod test_util;
 
 use std::collections::BTreeMap;
 
 use dyn_clone::DynClone;
 
 pub use tables::{TableRegistry, TableSearch};
-pub use vrl_core::enrichment::{Condition, IndexHandle};
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct IndexHandle(pub usize);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Condition<'a> {
+    Equals { field: &'a str, value: String },
+}
 
 /// Enrichment tables represent additional data sources that can be used to enrich the event data
 /// passing through Vector.
@@ -30,3 +41,10 @@ pub trait Table: DynClone {
 }
 
 dyn_clone::clone_trait_object!(Table);
+
+pub fn vrl_functions() -> Vec<Box<dyn vrl_core::Function>> {
+    vec![
+        Box::new(get_enrichment_table_record::GetEnrichmentTableRecord)
+            as Box<dyn vrl_core::Function>,
+    ]
+}

@@ -67,6 +67,7 @@ depends = ""
 members = [
   ".",
   "lib/codec",
+  "lib/enrichment",
   "lib/vector-core",
   "lib/vector-core/buffers",
   "lib/dnsmsg-parser",
@@ -96,6 +97,7 @@ members = [
 # Internal libs
 codec = { path = "lib/codec" }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
+enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }

@@ -11,7 +11,6 @@ pub mod vrl;
 
 pub use self::vrl::VrlConfig;
 pub use check_fields::CheckFieldsConfig;
-use vector_core::enrichment;
 
 pub trait Condition: Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
