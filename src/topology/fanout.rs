@@ -476,7 +476,10 @@ mod tests {
             async {
                 sleep(Duration::from_millis(100)).await;
                 fanout_control
-                    .send(ControlMessage::Replace(ComponentKey::from("a"), Some(tx_a2)))
+                    .send(ControlMessage::Replace(
+                        ComponentKey::from("a"),
+                        Some(tx_a2),
+                    ))
                     .await
                     .unwrap();
             },
