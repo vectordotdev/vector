@@ -683,6 +683,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		large_events_total: {
+			description:       "The total number of events discarded for their large size."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		logging_driver_errors_total: {
 			description: """
 				The total number of logging driver errors encountered caused by not using either
@@ -715,6 +721,12 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
+		}
+		out_of_order_events_total: {
+			description:       "The number of events that were out of order."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
 		}
 		parse_errors_total: {
 			description:       "The total number of errors parsing metrics for this component."
@@ -810,6 +822,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		streams_total: {
+			description:       "The total number of streams."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		sqs_message_delete_failed_total: {
 			description:       "The total number of failures to delete SQS messages."
 			type:              "counter"
@@ -890,6 +908,12 @@ components: sources: internal_metrics: {
 		}
 		timestamp_parse_errors_total: {
 			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		unlabeld_events_total: {
+			description:       "The total number of events without any label."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
