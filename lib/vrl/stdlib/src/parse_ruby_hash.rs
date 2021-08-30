@@ -1,13 +1,13 @@
 use nom::{
     branch::alt,
-    bytes::complete::{escaped, tag, take_while},
-    character::complete::{alphanumeric1 as alphanumeric, char, one_of},
-    combinator::{cut, map, value},
-    error::{context, ContextError, FromExternalError, ParseError},
-    multi::separated_list0,
+    bytes::complete::{escaped, tag, take_while, take_while1},
+    character::complete::{char, satisfy},
+    combinator::{cut, map, opt, recognize, value},
+    error::{context, ContextError, ErrorKind, FromExternalError, ParseError},
+    multi::{many1, separated_list0},
     number::complete::double,
-    sequence::{preceded, separated_pair, terminated},
-    IResult,
+    sequence::{preceded, separated_pair, terminated, tuple},
+    AsChar, IResult, InputTakeAtPosition,
 };
 use std::num::ParseIntError;
 use vrl::prelude::*;
@@ -91,8 +91,40 @@ fn sp<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E
     take_while(move |c| chars.contains(c))(input)
 }
 
-fn parse_str<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
-    escaped(alphanumeric, '\\', one_of("\"n\\"))(input)
+fn parse_inner_str<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+    delimiter: char,
+) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
+    move |input| {
+        println!("parse_inner_str: {:?}", input);
+        map(
+            opt(escaped(
+                recognize(many1(tuple((
+                    take_while1(|c: char| c != '\\' && c != delimiter),
+                    // Consume \something
+                    opt(tuple((
+                        satisfy(|c| c == '\\'),
+                        satisfy(|c| c != '\\' && c != delimiter),
+                    ))),
+                )))),
+                '\\',
+                satisfy(|c| c == '\\' || c == delimiter),
+            )),
+            |inner| inner.unwrap_or(""),
+        )(input)
+    }
+}
+
+/// Parses text with a given delimiter.
+fn parse_str<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+    delimiter: char,
+) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
+    context(
+        "string",
+        preceded(
+            char(delimiter),
+            cut(terminated(parse_inner_str(delimiter), char(delimiter))),
+        ),
+    )
 }
 
 fn parse_boolean<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, bool, E> {
@@ -109,36 +141,49 @@ fn parse_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Val
 fn parse_bytes<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Bytes, E> {
     context(
         "bytes",
-        map(
-            preceded(char('\"'), cut(terminated(parse_str::<'a, E>, char('\"')))),
-            |value| Bytes::copy_from_slice(value.as_bytes()),
-        ),
+        map(alt((parse_str('"'), parse_str('\''))), |value| {
+            Bytes::copy_from_slice(value.as_bytes())
+        }),
     )(input)
 }
 
+fn parse_simple_key<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar,
+{
+    input.split_at_position1_complete(
+        |item| {
+            let c = item.as_char();
+            !c.is_alphanum() && c.as_char() != '_'
+        },
+        ErrorKind::Complete,
+    )
+}
+
 fn parse_key<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+    println!("parse_key: {:?}", input);
     context(
         "string",
         map(
-            alt((
-                preceded(char('\"'), cut(terminated(parse_str, char('\"')))),
-                preceded(char('\''), cut(terminated(parse_str, char('\'')))),
-                alphanumeric,
-            )),
+            alt((parse_str('"'), parse_str('\''), parse_simple_key)),
             String::from,
         ),
     )(input)
 }
 
-fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Vec<Value>, E> {
+fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
     context(
         "array",
-        preceded(
-            char('['),
-            cut(terminated(
-                separated_list0(preceded(sp, char(',')), parse_value),
-                preceded(sp, char(']')),
-            )),
+        map(
+            preceded(
+                char('['),
+                cut(terminated(
+                    separated_list0(preceded(sp, char(',')), parse_value),
+                    preceded(sp, char(']')),
+                )),
+            ),
+            Value::Array,
         ),
     )(input)
 }
@@ -178,7 +223,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
         alt((
             parse_nil,
             parse_hash,
-            map(parse_array, Value::Array),
+            parse_array,
             map(parse_bytes, Value::Bytes),
             map(double, |value| Value::Float(NotNan::new(value).unwrap())),
             map(parse_boolean, Value::Boolean),
@@ -216,6 +261,11 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_empty_array() {
+        parse("{ array => [] }").unwrap();
+    }
+
+    #[test]
     fn test_parse_simple_object() {
         let result = parse(
             r#"{ "hello" => "world", "number" => 42, "float" => 4.2, "array" => [1, 2.3], "object" => { "nope" => nil } }"#,
@@ -233,8 +283,32 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_underscore() {
+        let result = parse(r#"{ with_underscore => "hello world" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get("with_underscore").unwrap().is_bytes());
+    }
+
+    #[test]
+    fn test_parse_dash() {
+        let result = parse(r#"{ "with-dash" => "foo" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get("with-dash").unwrap().is_bytes());
+    }
+
+    #[test]
+    fn test_parse_quote() {
+        let result = parse(r#"{ "with'quote" => "and\"double\"quote" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get("with'quote").unwrap().is_bytes());
+    }
+
+    #[test]
     fn test_parse_weird_format() {
-        let result = parse(r#"{hello=>"world",'number'=>42}"#).unwrap();
+        let result = parse(r#"{hello=>"world",'number'=>42,"weird"=>'format\'here'}"#).unwrap();
         assert!(result.is_object());
         let result = result.as_object().unwrap();
         assert!(result.get("hello").unwrap().is_bytes());
