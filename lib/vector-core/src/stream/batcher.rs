@@ -333,7 +333,7 @@ mod test {
                     })
                     .collect()
             })
-            .prop_map(|resps| TestTimer::new(resps))
+            .prop_map(TestTimer::new)
     }
 
     #[pin_project]
@@ -350,8 +350,9 @@ mod test {
         type Item = u64;
         type Key = u8;
 
+        #[allow(clippy::cast_possible_truncation)]
         fn partition(&self, item: &Self::Item) -> Option<Self::Key> {
-            let key = *item % self.key_space.get() as Self::Item;
+            let key = *item % u64::from(self.key_space.get());
             Some(key as Self::Key)
         }
     }
@@ -443,12 +444,12 @@ mod test {
             .fold(
                 HashMap::default(),
                 |mut acc: HashMap<Option<u8>, Vec<u64>>, (key, item)| {
-                    let arr: &mut Vec<u64> = acc.entry(key).or_insert_with(|| Vec::default());
+                    let arr: &mut Vec<u64> = acc.entry(key).or_insert_with(Vec::default);
                     arr.push(item);
                     acc
                 },
             );
-        for (_, part) in map.iter_mut() {
+        for part in map.values_mut() {
             part.reverse();
         }
         map
@@ -487,13 +488,13 @@ mod test {
                             .get_mut(&key)
                             .expect("impossible situation");
                         for item in actual_batch {
-                            assert_eq!(item, expected_partition.pop().unwrap())
+                            assert_eq!(item, expected_partition.pop().unwrap());
                         }
                     }
                 }
             }
             for v in partitions.values() {
-                assert!(v.is_empty())
+                assert!(v.is_empty());
             }
         }
     }
