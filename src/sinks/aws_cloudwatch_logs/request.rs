@@ -5,7 +5,7 @@ use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
     CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,
     DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError,
-    PutLogEventsRequest, PutLogEventsResponse, PutRetentionPolicyRequest, PutRetentionPolicyError,
+    PutLogEventsRequest, PutLogEventsResponse, PutRetentionPolicyError, PutRetentionPolicyRequest,
 };
 use std::{
     future::Future,
@@ -19,7 +19,7 @@ pub struct CloudwatchFuture {
     state: State,
     create_missing_group: bool,
     create_missing_stream: bool,
-    retention_in_days: Option<u64>,
+    retention_days: Option<u64>,
     events: Vec<Vec<InputLogEvent>>,
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
@@ -34,6 +34,8 @@ type ClientResult<T, E> = BoxFuture<'static, RusotoResult<T, E>>;
 
 enum State {
     CreateGroup(ClientResult<(), CreateLogGroupError>),
+    PutRetention(ClientResult<(), PutRetentionPolicyError>),
+    CreatedGroup,
     CreateStream(ClientResult<(), CreateLogStreamError>),
     DescribeStream(ClientResult<DescribeLogStreamsResponse, DescribeLogStreamsError>),
     Put(ClientResult<PutLogEventsResponse, PutLogEventsError>),
@@ -47,7 +49,7 @@ impl CloudwatchFuture {
         group_name: String,
         create_missing_group: bool,
         create_missing_stream: bool,
-        retention_in_days: Option<u64>,
+        retention_days: Option<u64>,
         mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
@@ -71,7 +73,7 @@ impl CloudwatchFuture {
             token_tx: Some(token_tx),
             create_missing_group,
             create_missing_stream,
-            retention_in_days,
+            retention_days,
         }
     }
 }
@@ -91,7 +93,6 @@ impl Future for CloudwatchFuture {
                             info!("Log group provided does not exist; creating a new one.");
 
                             self.state = State::CreateGroup(self.client.create_log_group());
-                            self.state = State::CreateGroup(self.client.set_log_group_retention_policy());
                             continue;
                         }
                         Err(err) => return Poll::Ready(Err(CloudwatchError::Describe(err))),
@@ -133,6 +134,25 @@ impl Future for CloudwatchFuture {
 
                     info!(message = "Group created.", name = %self.client.group_name);
 
+                    if let Some(retention_days) = self.retention_days {
+                        self.state =
+                            State::PutRetention(self.client.put_retention_policy(retention_days));
+                    } else {
+                        self.state = State::CreatedGroup;
+                    }
+                }
+
+                State::PutRetention(fut) => {
+                    if let Err(error) = ready!(fut.poll_unpin(cx)) {
+                        return Poll::Ready(Err(CloudwatchError::PutRetention(error)));
+                    };
+
+                    info!(message = "Set retention.", retention_days = %self.retention_days.unwrap());
+
+                    self.state = State::CreatedGroup;
+                }
+
+                State::CreatedGroup => {
                     // self does not abide by `create_missing_stream` since a group
                     // never has any streams and thus we need to create one if a group
                     // is created no matter what.
@@ -220,10 +240,13 @@ impl Client {
         Box::pin(async move { client.create_log_group(request).await })
     }
 
-    pub fn set_log_group_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
+    pub fn put_retention_policy(
+        &self,
+        retention_days: u64,
+    ) -> ClientResult<(), PutRetentionPolicyError> {
         let request = PutRetentionPolicyRequest {
             log_group_name: self.group_name.clone(),
-            retention_in_days: self.retention_in_days.clone(),
+            retention_in_days: retention_days as i64,
         };
 
         let client = self.client.clone();

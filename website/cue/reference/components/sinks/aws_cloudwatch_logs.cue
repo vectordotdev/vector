@@ -90,10 +90,13 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    false
 			type: bool: default: true
 		}
-		retention_in_days: {
+		retention_days: {
 			description: "Specifies the number of days log events remain in the log group"
 			required:    false
-			type: uint: default: 0
+			type: uint: {
+				examples: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
+				unit: "days"
+			}
 		}
 		group_name: {
 			description: "The [group name](\(urls.aws_cloudwatch_logs_group_name)) of the target CloudWatch Logs stream."
@@ -134,7 +137,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				},
 				{
 					_action:       "PutRetentionPolicy"
-					required_when: "[`retention_in_days`](#retention_in_days) is set"
+					required_when: "[`retention_days`](#retention_days) is set"
 				},
 				{
 					_action: "DescribeLogGroups"

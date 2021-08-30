@@ -22,6 +22,7 @@ use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
+    PutRetentionPolicyError,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -69,7 +70,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub encoding: EncodingConfig<Encoding>,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
-    pub retention_in_days: Option<u64>,
+    pub retention_days: Option<u64>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -100,7 +101,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         encoding: e.into(),
         create_missing_group: Default::default(),
         create_missing_stream: Default::default(),
-        retention_in_days: Default::default(),
+        retention_days: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -115,7 +116,7 @@ pub struct CloudwatchLogsSvc {
     group_name: String,
     create_missing_group: bool,
     create_missing_stream: bool,
-    retention_in_days: u64,
+    retention_days: Option<u64>,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
@@ -152,6 +153,7 @@ pub enum CloudwatchError {
     Describe(RusotoError<DescribeLogStreamsError>),
     CreateStream(RusotoError<CreateLogStreamError>),
     CreateGroup(RusotoError<CreateLogGroupError>),
+    PutRetention(RusotoError<PutRetentionPolicyError>),
     NoStreamsFound,
     ServiceDropped,
     MakeService,
@@ -286,7 +288,7 @@ impl CloudwatchLogsSvc {
 
         let create_missing_group = config.create_missing_group.unwrap_or(true);
         let create_missing_stream = config.create_missing_stream.unwrap_or(true);
-        let retention_in_days = config.retention_in_days.unwrap_or(0);
+        let retention_days = config.retention_days;
 
         CloudwatchLogsSvc {
             client,
@@ -294,7 +296,7 @@ impl CloudwatchLogsSvc {
             group_name,
             create_missing_group,
             create_missing_stream,
-            retention_in_days,
+            retention_days,
             token: None,
             token_rx: None,
         }
@@ -391,7 +393,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.group_name.clone(),
                 self.create_missing_group,
                 self.create_missing_stream,
-                self.retention_in_days,
+                self.retention_days,
                 event_batches,
                 self.token.take(),
                 tx,
@@ -651,6 +653,9 @@ impl fmt::Display for CloudwatchError {
             CloudwatchError::CreateGroup(error) => {
                 write!(f, "CloudwatchError::CreateGroup: {}", error)
             }
+            CloudwatchError::PutRetention(error) => {
+                write!(f, "CloudwatchError::PutRetention: {}", error)
+            }
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
             CloudwatchError::ServiceDropped => write!(
                 f,
@@ -888,7 +893,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
-            retention_in_days: None,
+            retention_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -936,7 +941,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
-            retention_in_days: None,
+            retention_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -1003,7 +1008,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
-            retention_in_days: None,
+            retention_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -1076,7 +1081,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
-            retention_in_days: None,
+            retention_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -1126,7 +1131,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
-            retention_in_days: None,
+            retention_days: None,
             compression: Default::default(),
             batch: BatchConfig {
                 max_events: Some(2),
@@ -1178,7 +1183,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
-            retention_in_days: None,
+            retention_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -1265,7 +1270,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
-            retention_in_days: None,
+            retention_days: None,
             compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
