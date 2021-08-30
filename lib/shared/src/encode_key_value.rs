@@ -22,8 +22,8 @@ impl Error for EncodingError {
     }
 }
 
-pub fn encode<'a>(
-    input: BTreeMap<String, impl Serialize>,
+pub fn encode<'a, V: Serialize>(
+    input: BTreeMap<String, V>,
     fields: &[String],
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
@@ -509,5 +509,222 @@ impl<'a> SerializeMap for KeyedKeyValueSerializer<'a> {
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::btreemap;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn single_element() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "lvl" => "info"
+                },
+                &[],
+                "=",
+                " ",
+                true
+            )
+            .unwrap(),
+            "lvl=info"
+        )
+    }
+
+    #[test]
+    fn multiple_elements() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "lvl" => "info",
+                    "log_id" => 12345
+                },
+                &[],
+                "=",
+                " ",
+                true
+            )
+            .unwrap(),
+            "log_id=12345 lvl=info"
+        )
+    }
+
+    #[test]
+    fn string_with_spaces() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "lvl" => "info",
+                    "msg" => "This is a log message"
+                },
+                &[],
+                "=",
+                " ",
+                true
+            )
+            .unwrap(),
+            r#"lvl=info msg="This is a log message""#
+        )
+    }
+
+    #[test]
+    fn flatten_boolean() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "beta" => true,
+                    "prod" => false,
+                    "lvl" => "info",
+                    "msg" => "This is a log message",
+                },
+                &[],
+                "=",
+                " ",
+                true
+            )
+            .unwrap(),
+            r#"beta lvl=info msg="This is a log message""#
+        )
+    }
+
+    #[test]
+    fn dont_flatten_boolean() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "beta" => true,
+                    "prod" => false,
+                    "lvl" => "info",
+                    "msg" => "This is a log message",
+                },
+                &[],
+                "=",
+                " ",
+                false
+            )
+            .unwrap(),
+            r#"beta=true lvl=info msg="This is a log message" prod=false"#
+        )
+    }
+
+    #[test]
+    fn other_delimiters() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "tag_a" => "val_a",
+                    "tag_b" => "val_b",
+                    "tag_c" => true,
+                },
+                &[],
+                ":",
+                ",",
+                true
+            )
+            .unwrap(),
+            r#"tag_a:val_a,tag_b:val_b,tag_c"#
+        )
+    }
+
+    #[test]
+    fn string_with_characters_to_escape() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "lvl" => "info",
+                    "msg" => r#"payload: {"code": 200}\n"#,
+                    "another_field" => "some\nfield\\and things",
+                    "space key" => "foo"
+                },
+                &[],
+                "=",
+                " ",
+                true
+            )
+            .unwrap(),
+            r#"another_field="some\\nfield\\and things" lvl=info msg="payload: {\"code\": 200}\\n" "space key"=foo"#
+        )
+    }
+
+    #[test]
+    fn nested_fields() {
+        assert_eq!(
+                &encode::<Value>(
+                    btreemap! {
+                        "log" => json!({
+                            "file": {
+                                "path": "encode_key_value.rs"
+                            },
+                        }),
+                        "agent" => json!({
+                            "name": "vector",
+                            "id": 1234
+                        }),
+                        "network" => json!({
+                            "ip": [127, 0, 0, 1],
+                            "proto": "tcp"
+                        }),
+                        "event" => "log"
+                    },
+                    &[],
+                    "=",
+                    " ",
+                    true
+                ).unwrap()
+                ,
+                "agent.id=1234 agent.name=vector event=log log.file.path=encode_key_value.rs network.ip.0=127 network.ip.1=0 network.ip.2=0 network.ip.3=1 network.proto=tcp"
+            )
+    }
+
+    #[test]
+    fn fields_ordering() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "lvl" => "info",
+                    "msg" => "This is a log message",
+                    "log_id" => 12345,
+                },
+                &["lvl".to_string(), "msg".to_string()],
+                "=",
+                " ",
+                true
+            )
+            .unwrap(),
+            r#"lvl=info msg="This is a log message" log_id=12345"#
+        )
+    }
+
+    #[test]
+    fn nested_fields_ordering() {
+        assert_eq!(
+            &encode::<Value>(
+                btreemap! {
+                    "log" => json!({
+                        "file": {
+                            "path": "encode_key_value.rs"
+                        },
+                    }),
+                    "agent" => json!({
+                        "name": "vector",
+                    }),
+                    "event" => "log"
+                },
+                &[
+                    "event".to_owned(),
+                    "log.file.path".to_owned(),
+                    "agent.name".to_owned()
+                ],
+                "=",
+                " ",
+                true
+            )
+            .unwrap(),
+            "event=log log.file.path=encode_key_value.rs agent.name=vector"
+        )
     }
 }

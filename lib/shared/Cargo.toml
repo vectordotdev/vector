@@ -43,7 +43,8 @@ conversion = [
 encoding = [
   "nom",
   "serde_json",
-  "snafu"
+  "snafu",
+  "btreemap"
 ]
 
 tokenize = [
