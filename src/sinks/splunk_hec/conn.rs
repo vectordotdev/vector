@@ -377,10 +377,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            &healthcheck.await.unwrap_err().to_string(),
-            "Failed to make HTTP(S) request: error trying to connect: tcp connect error: Connection refused (os error 61)"
-        );
+        assert!(&healthcheck.await.unwrap_err().to_string().starts_with(
+            "Failed to make HTTP(S) request: error trying to connect: tcp connect error:"
+        ));
     }
 
     #[tokio::test]
@@ -513,10 +512,9 @@ mod tests {
         .err()
         .unwrap();
 
-        assert_eq!(
-            err.to_string(),
-            "Could not open certificate file \"invalid_path\": No such file or directory (os error 2)"
-        )
+        assert!(err
+            .to_string()
+            .starts_with("Could not open certificate file \"invalid_path\":"));
     }
 
     #[tokio::test]
