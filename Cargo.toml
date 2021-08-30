@@ -565,6 +565,7 @@ sinks-logs = [
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-clickhouse",
+  "sinks-gcp-bigquery",
   "sinks-console",
   "sinks-datadog",
   "sinks-elasticsearch",
@@ -624,6 +625,7 @@ sinks-kafka = ["rdkafka"]
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize", "uuid"]
 sinks-nats = ["async-nats"]
+sinks-gcp-bigquery = []
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]
 sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]
@@ -646,6 +648,7 @@ nightly = []
 all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
+  "gcp-bigquery-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
@@ -701,6 +704,7 @@ fluent-integration-tests = ["docker", "sources-fluent", "uuid"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
+gcp-bigquery-integration-tests = ["sinks-gcp-bigquery"]
 humio-integration-tests = ["sinks-humio"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
