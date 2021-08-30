@@ -221,6 +221,7 @@ where
                                 .map(|(key, batch)| (key, batch.destruct().1)),
                         );
                         this.timer.reset();
+                        continue;
                     }
                     return Poll::Pending;
                 }
