@@ -1,9 +1,9 @@
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_while, take_while1},
-    character::complete::{char, satisfy},
+    character::complete::{char, digit1, satisfy},
     combinator::{consumed, cut, map, opt, recognize, value},
-    error::{context, ContextError, ErrorKind, FromExternalError, ParseError},
+    error::{context, ContextError, FromExternalError, ParseError},
     multi::{many1, separated_list0},
     number::complete::double,
     sequence::{preceded, separated_pair, terminated, tuple},
@@ -146,36 +146,37 @@ fn parse_bytes<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
     )(input)
 }
 
-fn parse_simple_key<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
+fn parse_symbol_key<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
 where
+    T: std::fmt::Display,
     T: InputTakeAtPosition,
     <T as InputTakeAtPosition>::Item: AsChar,
 {
-    input.split_at_position1_complete(
-        |item| {
-            let c = item.as_char();
-            !c.is_alphanum() && c != '_'
-        },
-        ErrorKind::Complete,
-    )
+    take_while1(move |item: <T as InputTakeAtPosition>::Item| {
+        let c = item.as_char();
+        c.is_alphanum() || c == '_'
+    })(input)
 }
 
 fn parse_colon_key<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
-    map(consumed(preceded(char(':'), parse_simple_key)), |res| res.0)(input)
+    map(consumed(preceded(char(':'), parse_symbol_key)), |res| res.0)(input)
 }
 
-fn parse_key<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
-    context(
-        "string",
-        map(
-            alt((
-                parse_str('"'),
-                parse_str('\''),
-                parse_colon_key,
-                parse_simple_key,
-            )),
-            String::from,
-        ),
+fn parse_key_arrow_hash<'a, E: HashParseError<&'a str>>(
+    input: &'a str,
+) -> IResult<&'a str, String, E> {
+    map(
+        alt((parse_str('"'), parse_str('\''), parse_colon_key, digit1)),
+        String::from,
+    )(input)
+}
+
+fn parse_key_colon_hash<'a, E: HashParseError<&'a str>>(
+    input: &'a str,
+) -> IResult<&'a str, String, E> {
+    map(
+        alt((parse_str('"'), parse_str('\''), parse_symbol_key, digit1)),
+        String::from,
     )(input)
 }
 
@@ -195,14 +196,30 @@ fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
     )(input)
 }
 
-fn parse_key_value<'a, E: HashParseError<&'a str>>(
+fn parse_key_value_arrow<'a, E: HashParseError<&'a str>>(
     input: &'a str,
 ) -> IResult<&'a str, (String, Value), E> {
     separated_pair(
-        preceded(sp, parse_key),
+        preceded(sp, parse_key_arrow_hash),
         cut(preceded(sp, tag("=>"))),
         parse_value,
     )(input)
+}
+
+fn parse_key_value_colon<'a, E: HashParseError<&'a str>>(
+    input: &'a str,
+) -> IResult<&'a str, (String, Value), E> {
+    separated_pair(
+        preceded(sp, parse_key_colon_hash),
+        cut(preceded(sp, tag(":"))),
+        parse_value,
+    )(input)
+}
+
+fn parse_key_value<'a, E: HashParseError<&'a str>>(
+    input: &'a str,
+) -> IResult<&'a str, (String, Value), E> {
+    alt((parse_key_value_arrow, parse_key_value_colon))(input)
 }
 
 fn parse_hash<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
@@ -268,12 +285,12 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_empty_array() {
-        parse("{ array => [] }").unwrap();
+    fn test_parse_arrow_empty_array() {
+        parse("{ :array => [] }").unwrap();
     }
 
     #[test]
-    fn test_parse_simple_object() {
+    fn test_parse_arrow_object() {
         let result = parse(
             r#"{ "hello" => "world", "number" => 42, "float" => 4.2, "array" => [1, 2.3], "object" => { "nope" => nil } }"#,
         )
@@ -290,7 +307,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_key_number() {
+    fn test_parse_arrow_object_key_number() {
         let result = parse(r#"{ 42 => "hello world" }"#).unwrap();
         assert!(result.is_object());
         let result = result.as_object().unwrap();
@@ -298,7 +315,13 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_key_colon() {
+    #[should_panic]
+    fn test_parse_arrow_object_key_variable() {
+        parse(r#"{ nope => "hello world" }"#).unwrap();
+    }
+
+    #[test]
+    fn test_parse_arrow_object_key_colon() {
         let result = parse(r#"{ :colon => "hello world" }"#).unwrap();
         assert!(result.is_object());
         let result = result.as_object().unwrap();
@@ -306,11 +329,38 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_underscore() {
-        let result = parse(r#"{ with_underscore => "hello world" }"#).unwrap();
+    fn test_parse_arrow_object_key_underscore() {
+        let result = parse(r#"{ :with_underscore => "hello world" }"#).unwrap();
         assert!(result.is_object());
         let result = result.as_object().unwrap();
-        assert!(result.get("with_underscore").unwrap().is_bytes());
+        assert!(result.get(":with_underscore").unwrap().is_bytes());
+    }
+
+    #[test]
+    fn test_parse_colon_object_double_quote() {
+        let result = parse(r#"{ "hello": "world" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("hello").unwrap();
+        assert_eq!(value, &Value::Bytes("world".into()));
+    }
+
+    #[test]
+    fn test_parse_colon_object_single_quote() {
+        let result = parse(r#"{ 'hello': 'world' }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("hello").unwrap();
+        assert_eq!(value, &Value::Bytes("world".into()));
+    }
+
+    #[test]
+    fn test_parse_colon_object_no_quote() {
+        let result = parse(r#"{ hello: "world" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("hello").unwrap();
+        assert_eq!(value, &Value::Bytes("world".into()));
     }
 
     #[test]
@@ -326,15 +376,16 @@ mod tests {
         let result = parse(r#"{ "with'quote" => "and\"double\"quote" }"#).unwrap();
         assert!(result.is_object());
         let result = result.as_object().unwrap();
-        assert!(result.get("with'quote").unwrap().is_bytes());
+        let value = result.get("with'quote").unwrap();
+        assert_eq!(value, &Value::Bytes("and\\\"double\\\"quote".into()));
     }
 
     #[test]
     fn test_parse_weird_format() {
-        let result = parse(r#"{hello=>"world",'number'=>42,"weird"=>'format\'here'}"#).unwrap();
+        let result = parse(r#"{:hello=>"world",'number'=>42,"weird"=>'format\'here'}"#).unwrap();
         assert!(result.is_object());
         let result = result.as_object().unwrap();
-        assert!(result.get("hello").unwrap().is_bytes());
+        assert!(result.get(":hello").unwrap().is_bytes());
         assert!(result.get("number").unwrap().is_float());
     }
 
