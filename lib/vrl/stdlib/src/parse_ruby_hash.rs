@@ -154,7 +154,7 @@ where
     input.split_at_position1_complete(
         |item| {
             let c = item.as_char();
-            !c.is_alphanum() && c.as_char() != '_'
+            !c.is_alphanum() && c != '_'
         },
         ErrorKind::Complete,
     )
