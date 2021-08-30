@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_while, take_while1},
     character::complete::{char, satisfy},
-    combinator::{cut, map, opt, recognize, value},
+    combinator::{consumed, cut, map, opt, recognize, value},
     error::{context, ContextError, ErrorKind, FromExternalError, ParseError},
     multi::{many1, separated_list0},
     number::complete::double,
@@ -95,7 +95,6 @@ fn parse_inner_str<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     delimiter: char,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
     move |input| {
-        println!("parse_inner_str: {:?}", input);
         map(
             opt(escaped(
                 recognize(many1(tuple((
@@ -161,12 +160,20 @@ where
     )
 }
 
+fn parse_colon_key<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
+    map(consumed(preceded(char(':'), parse_simple_key)), |res| res.0)(input)
+}
+
 fn parse_key<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
-    println!("parse_key: {:?}", input);
     context(
         "string",
         map(
-            alt((parse_str('"'), parse_str('\''), parse_simple_key)),
+            alt((
+                parse_str('"'),
+                parse_str('\''),
+                parse_colon_key,
+                parse_simple_key,
+            )),
             String::from,
         ),
     )(input)
@@ -288,6 +295,14 @@ mod tests {
         assert!(result.is_object());
         let result = result.as_object().unwrap();
         assert!(result.get("42").unwrap().is_bytes());
+    }
+
+    #[test]
+    fn test_parse_key_colon() {
+        let result = parse(r#"{ :colon => "hello world" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get(":colon").unwrap().is_bytes());
     }
 
     #[test]
