@@ -10,7 +10,7 @@ pub struct LargeEventDropped {
 impl InternalEvent for LargeEventDropped {
     fn emit_logs(&self) {
         error!(
-            message = "Event larger than batch max_bytes, dropping; dropping event.",
+            message = "Event larger than batch max_bytes; dropping event.",
             batch_max_bytes = %self.max_length,
             length = %self.length,
             internal_log_rate_secs = 1
