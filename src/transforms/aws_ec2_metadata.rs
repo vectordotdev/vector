@@ -12,35 +12,14 @@ use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt as _;
 use std::{
-    collections::{hash_map::RandomState, HashSet},
+    collections::{HashMap, HashSet},
     error, fmt,
     future::ready,
     pin::Pin,
+    sync::{Arc, RwLock},
 };
 use tokio::time::{sleep, Duration, Instant};
 use tracing_futures::Instrument;
-
-type WriteHandle = evmap::WriteHandle<String, CopiableBytes, (), RandomState>;
-type ReadHandle = evmap::ReadHandle<String, CopiableBytes, (), RandomState>;
-
-#[derive(Eq, Hash, Debug, PartialEq)]
-pub struct CopiableBytes(Bytes);
-
-// copied from evmap implementation before it was dropped
-// https://github.com/jonhoo/evmap/commit/416ccef
-impl evmap::ShallowCopy for CopiableBytes {
-    unsafe fn shallow_copy(&self) -> std::mem::ManuallyDrop<Self> {
-        let len = self.0.len();
-        let buf: &'static [u8] = std::slice::from_raw_parts(self.0.as_ptr(), len);
-        std::mem::ManuallyDrop::new(CopiableBytes(bytes::Bytes::from_static(buf)))
-    }
-}
-
-impl From<CopiableBytes> for Bytes {
-    fn from(bytes: CopiableBytes) -> Bytes {
-        bytes.0
-    }
-}
 
 const AMI_ID_KEY: &str = "ami-id";
 const AVAILABILITY_ZONE_KEY: &str = "availability-zone";
@@ -106,7 +85,7 @@ pub struct Ec2Metadata {
 
 #[derive(Clone, Debug)]
 pub struct Ec2MetadataTransform {
-    state: ReadHandle,
+    state: Arc<RwLock<HashMap<String, Bytes>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -135,7 +114,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        let (read, write) = evmap::new();
+        let state: Arc<RwLock<HashMap<String, Bytes>>> = Arc::new(RwLock::new(HashMap::new()));
 
         // Check if the namespace is set to `""` which should mean that we do
         // not want a prefixed namespace.
@@ -167,8 +146,14 @@ impl TransformConfig for Ec2Metadata {
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
 
-        let mut client =
-            MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
+        let mut client = MetadataClient::new(
+            http_client,
+            host,
+            keys,
+            Arc::clone(&state),
+            refresh_interval,
+            fields,
+        );
 
         client.refresh_metadata().await?;
 
@@ -180,7 +165,7 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Transform::task(Ec2MetadataTransform { state: read }))
+        Ok(Transform::task(Ec2MetadataTransform { state }))
     }
 
     fn input_type(&self) -> DataType {
@@ -211,23 +196,16 @@ impl TaskTransform for Ec2MetadataTransform {
 
 impl Ec2MetadataTransform {
     fn transform_one(&mut self, mut event: Event) -> Event {
-        if let Some(read_ref) = self.state.read() {
+        if let Ok(state) = self.state.read() {
             match event {
                 Event::Log(ref mut log) => {
-                    read_ref.into_iter().for_each(|(k, v)| {
-                        if let Some(value) = v.get_one() {
-                            log.insert(k.clone(), value.0.clone());
-                        }
+                    state.iter().for_each(|(k, v)| {
+                        log.insert(k.clone(), v.clone());
                     });
                 }
                 Event::Metric(ref mut metric) => {
-                    read_ref.into_iter().for_each(|(k, v)| {
-                        if let Some(value) = v.get_one() {
-                            metric.insert_tag(
-                                k.clone(),
-                                String::from_utf8_lossy(&value.0).to_string(),
-                            );
-                        }
+                    state.iter().for_each(|(k, v)| {
+                        metric.insert_tag(k.clone(), String::from_utf8_lossy(v).to_string());
                     });
                 }
             }
@@ -242,7 +220,7 @@ struct MetadataClient {
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
-    state: WriteHandle,
+    state: Arc<RwLock<HashMap<String, Bytes>>>,
     refresh_interval: Duration,
     fields: HashSet<String>,
 }
@@ -265,7 +243,7 @@ impl MetadataClient {
         client: HttpClient<Body>,
         host: Uri,
         keys: Keys,
-        state: WriteHandle,
+        state: Arc<RwLock<HashMap<String, Bytes>>>,
         refresh_interval: Duration,
         fields: Vec<String>,
     ) -> Self {
@@ -343,8 +321,6 @@ impl MetadataClient {
     }
 
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
-        use std::collections::HashMap;
-
         let mut state: HashMap<String, Bytes> = HashMap::new();
 
         // Fetch all resources, _then_ add them to the state map.
@@ -439,15 +415,11 @@ impl MetadataClient {
             }
         }
 
-        self.state.extend(
-            state
-                .into_iter()
-                .map(|(key, value)| (key, CopiableBytes(value))),
-        );
-
-        // Make changes viewable to the transform. This may block if
-        // readers are still reading.
-        self.state.refresh();
+        {
+            if let Ok(mut old_state) = self.state.write() {
+                old_state.extend(state);
+            }
+        }
 
         Ok(())
     }
