@@ -3,7 +3,7 @@ use super::api;
 #[cfg(feature = "datadog-pipelines")]
 use super::datadog;
 use super::{
-    compiler, pipeline::Pipelines, provider, ComponentId, Config, EnrichmentTableConfig,
+    compiler, pipeline::Pipelines, provider, ComponentKey, Config, EnrichmentTableConfig,
     EnrichmentTableOuter, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
     TestDefinition, TransformOuter,
 };
@@ -26,13 +26,13 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
+    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     #[serde(default)]
-    pub sources: IndexMap<ComponentId, SourceOuter>,
+    pub sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<ComponentId, SinkOuter>,
+    pub sinks: IndexMap<ComponentKey, SinkOuter>,
     #[serde(default)]
-    pub transforms: IndexMap<ComponentId, TransformOuter>,
+    pub transforms: IndexMap<ComponentKey, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
@@ -138,14 +138,14 @@ impl ConfigBuilder {
         enrichment_table: E,
     ) {
         self.enrichment_tables.insert(
-            ComponentId::from(name.into()),
+            ComponentKey::from(name.into()),
             EnrichmentTableOuter::new(Box::new(enrichment_table)),
         );
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
         self.sources
-            .insert(ComponentId::from(id.into()), SourceOuter::new(source));
+            .insert(ComponentKey::from(id.into()), SourceOuter::new(source));
     }
 
     pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
@@ -154,10 +154,10 @@ impl ConfigBuilder {
         inputs: &[&str],
         sink: S,
     ) {
-        let inputs = inputs.iter().map(ComponentId::from).collect::<Vec<_>>();
+        let inputs = inputs.iter().map(ComponentKey::from).collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
 
-        self.sinks.insert(ComponentId::from(id.into()), sink);
+        self.sinks.insert(ComponentKey::from(id.into()), sink);
     }
 
     pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
@@ -168,7 +168,7 @@ impl ConfigBuilder {
     ) {
         let inputs = inputs
             .iter()
-            .map(|value| ComponentId::from(value.to_string()))
+            .map(|value| ComponentKey::from(value.to_string()))
             .collect::<Vec<_>>();
         let transform = TransformOuter {
             inner: Box::new(transform),
@@ -176,7 +176,7 @@ impl ConfigBuilder {
         };
 
         self.transforms
-            .insert(ComponentId::from(id.into()), transform);
+            .insert(ComponentKey::from(id.into()), transform);
     }
 
     pub fn set_pipelines(&mut self, pipelines: Pipelines) {

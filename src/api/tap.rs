@@ -1,7 +1,7 @@
 use super::{ShutdownRx, ShutdownTx};
 use crate::topology::fanout::ControlChannel;
 use crate::{
-    config::ComponentId,
+    config::ComponentKey,
     event::{Event, LogEvent},
     topology::{fanout, WatchRx},
 };
@@ -44,18 +44,18 @@ pub enum TapNotification {
 /// to be communicated back to the client to alert them about the status of the tap request.
 #[derive(Debug)]
 pub enum TapPayload {
-    Log(ComponentId, LogEvent),
-    Metric(ComponentId, LogEvent),
-    Notification(ComponentId, TapNotification),
+    Log(ComponentKey, LogEvent),
+    Metric(ComponentKey, LogEvent),
+    Notification(ComponentKey, TapNotification),
 }
 
 impl TapPayload {
     pub fn matched(input_id: &str) -> Self {
-        Self::Notification(ComponentId::from(input_id), TapNotification::Matched)
+        Self::Notification(ComponentKey::from(input_id), TapNotification::Matched)
     }
 
     pub fn not_matched(input_id: &str) -> Self {
-        Self::Notification(ComponentId::from(input_id), TapNotification::NotMatched)
+        Self::Notification(ComponentKey::from(input_id), TapNotification::NotMatched)
     }
 }
 
@@ -63,12 +63,12 @@ impl TapPayload {
 /// `Event`s. If these are of type `Event::LogEvent`, they are relayed to the tap client.
 pub struct TapSink {
     tap_tx: TapSender,
-    component_id: ComponentId,
+    component_id: ComponentKey,
     buffer: VecDeque<LogEvent>,
 }
 
 impl TapSink {
-    pub fn new(tap_tx: TapSender, component_id: ComponentId) -> Self {
+    pub fn new(tap_tx: TapSender, component_id: ComponentKey) -> Self {
         Self {
             tap_tx,
             component_id,
@@ -162,7 +162,7 @@ impl TapController {
 }
 
 /// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
-fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: ComponentId) -> ShutdownTx {
+fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
@@ -205,7 +205,7 @@ async fn tap_handler(
 
     // Sinks register for the current tap. Contains the id of the matched component, and
     // a shutdown trigger for sending a remove control message when matching sinks change.
-    let mut sinks: HashMap<ComponentId, _> = HashMap::new();
+    let mut sinks: HashMap<ComponentKey, _> = HashMap::new();
 
     loop {
         tokio::select! {
@@ -247,7 +247,7 @@ async fn tap_handler(
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(ComponentId::from(&sink_id), Box::new(sink)))
+                                .send(fanout::ControlMessage::Add(ComponentKey::from(&sink_id), Box::new(sink)))
                                 .await
                             {
                                 Ok(_) => {
@@ -258,7 +258,7 @@ async fn tap_handler(
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
                                     sinks
-                                        .insert(component_id.clone(), shutdown_trigger(control_tx.clone(), ComponentId::global(&sink_id)));
+                                        .insert(component_id.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::global(&sink_id)));
                                 }
                                 Err(error) => {
                                     error!(
@@ -345,7 +345,7 @@ mod tests {
     async fn sink_log_events() {
         let pattern_matched = "tes*";
         let pattern_not_matched = "xyz";
-        let id = ComponentId::global("test");
+        let id = ComponentKey::global("test");
 
         let (mut fanout, control_tx) = fanout::Fanout::new();
         let mut outputs = HashMap::new();
