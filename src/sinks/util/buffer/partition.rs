@@ -317,8 +317,13 @@ where
     /// All future calls to `get_ready_batches` will return all in-flight batches regardless of
     /// whether or not they're full and whether or not they've timed out.  This allows callers to
     /// retrieve all in-flight batches in the case of Vector shutting down.
+    ///
+    /// This will also remove all pending batch expirations, so the caller must call
+    /// `get_ready_batches` at least once after calling `close` to ensure all remaining batches are
+    /// retrieved.
     pub fn close(&mut self) {
         self.closed = true;
+        self.timeout_queue.clear();
     }
 
     /// Pushes an item into its corresponding batch.
@@ -387,18 +392,26 @@ where
         //
         // We gate the polling of timed out batches to ensure we don't end up with duplicates when
         // the batcher flips to closed mode.
+        let mut requires_removal = ready_partitions.clone();
         if !self.closed {
             while let Poll::Ready(Some(Ok(pk))) = poll!(self.timeout_queue.next()) {
                 let pk = pk.into_inner();
+                let _ = requires_removal.remove(&pk);
                 let _ = ready_partitions.insert(pk);
             }
         }
 
         for pk in ready_partitions {
             let batch = self.batches.remove(&pk).expect("batch must always exist");
-            if let Some(id) = batch.delay_id() {
-                self.timeout_queue.remove(id);
+
+            // Make sure we only try to remove the timeout entry when we didn't see it during this
+            // iteration, since removal from DelayQueue will panic if the item doesn't exist.
+            if let Some(delay_id) = batch.delay_id() {
+                if !self.closed && requires_removal.contains(&pk) {
+                    let _ = self.timeout_queue.remove(delay_id);
+                }
             }
+
             batches.push(batch.finish(pk));
         }
 

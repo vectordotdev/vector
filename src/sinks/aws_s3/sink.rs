@@ -105,7 +105,7 @@ where
 
             select! {
                 // This explicitly enables biasing, which ensures the branches in this select block
-                // are polled in top-down order.  We do tghis to ensure that we send ready batches
+                // are polled in top-down order.  We do this to ensure that we send ready batches
                 // as soon as possible to keep I/O saturated to the best of our ability.
                 biased;
 
@@ -117,16 +117,17 @@ where
                 // flush interval could be more than enough batching when subject to high ingest
                 // rate e.g. tens or hundreds of thousands of events per second.
                 Some(batches) = self.batcher.get_ready_batches() => {
-                    info!("{} -> got {} batches to flush", iter, batches.len());
+                    trace!("{} -> got {} batches to flush", iter, batches.len());
                     for batch in batches {
                         let batch_key = batch.key().to_string();
                         let request = build_request(batch, &self.options);
                         if let Err(_) = io_tx.send(request).await {
                             // TODO: change this to "error! + return Err" after initial testing/debugging
-                            panic!("sink I/O channel should not be closed before sink itself is closed");
+                            trace!("{} -> sink I/O channel should not be closed before sink itself is closed", iter);
+                            panic!("boom 1")
                         }
 
-                        info!("{} -> sent batch '{}' to I/O task", iter, batch_key);
+                        trace!("{} -> sent batch '{}' to I/O task", iter, batch_key);
                     }
                 }
 
@@ -141,8 +142,8 @@ where
                     // should be cleared by the time this branch executes.
                     if let Some(_) = self.batcher.push(event).into_inner() {
                         // TODO: change this to "error! + return Err" after initial testing/debugging
-                        info!("{} -> wasn't able to push queued event into batch after flushing ready batches; this should be impossible", iter);
-                        panic!("boom");
+                        trace!("{} -> wasn't able to push queued event into batch after flushing ready batches; this should be impossible", iter);
+                        panic!("boom 2");
                     }
 
                     trace!("{} -> pushed queued event into batch", iter);
@@ -161,7 +162,7 @@ where
                         // happens, we'll push that queued event into a batch.
                         let result = self.batcher.push(event);
                         if result.should_flush() {
-                            info!("{} -> batch full, continuing to force flush", iter);
+                            trace!("{} -> batch full, continuing to force flush", iter);
                             queued_event = result.into_inner();
                             continue;
                         }
@@ -173,11 +174,11 @@ where
                         // more iteration of the loop, where our next call to `get_ready_batches`
                         // will return all the remaining batches regardless of size or expiration.
                          if !closed {
-                             trace!("stream closed, marking batcher closed and flushing");
+                             trace!("{} -> stream closed, marking batcher closed and flushing", iter);
                              closed = true;
                              self.batcher.close();
                          } else {
-                             trace!("stream completed, post-close flush complete, ending");
+                             trace!("{} -> stream completed, post-close flush complete, ending", iter);
                              break;
                          }
                     }
@@ -247,7 +248,7 @@ where
             },
 
             Some(Ok((seqno, batch_size))) = in_flight.next() => {
-                info!("pending batch {} finished (n={})", seqno, batch_size);
+                trace!("pending batch {} finished (n={})", seqno, batch_size);
                 pending_acks.insert(seqno, batch_size);
 
                 let mut num_to_ack = 0;
