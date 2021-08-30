@@ -1,7 +1,6 @@
 use serde::ser::*;
 use std::collections::BTreeMap;
 use std::fmt::{self, Write};
-use std::result::Result;
 
 #[derive(Debug, snafu::Snafu)]
 pub enum EncodingError {
@@ -24,7 +23,7 @@ impl Error for EncodingError {
 
 pub fn encode<'a, V: Serialize>(
     input: BTreeMap<String, V>,
-    fields: &[String],
+    fields_order: &[String],
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
     flatten_boolean: bool,
@@ -33,7 +32,7 @@ pub fn encode<'a, V: Serialize>(
 
     let mut input = flatten(input, '.')?;
 
-    for field in fields.iter() {
+    for field in fields_order.iter() {
         match (input.remove(field), flatten_boolean) {
             (Some(Data::Boolean(false)), true) => (),
             (Some(Data::Boolean(true)), true) => {

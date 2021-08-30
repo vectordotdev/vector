@@ -20,3 +20,5 @@ pub mod tokenize;
 
 #[cfg(feature = "encoding")]
 pub mod encode_key_value;
+#[cfg(feature = "encoding")]
+pub mod encode_logfmt;
