@@ -12,7 +12,7 @@ use crate::{
         aws_s3::config::Encoding,
         util::{
             buffer::{
-                partition::{PartitionBatcher, PartitionFinishedBatch, Partitioner},
+                partition::{PartitionBatcher, PartitionFinishedBatch},
                 GZIP_FAST,
             },
             encoding::{EncodingConfig, EncodingConfiguration},
@@ -40,7 +40,12 @@ use tokio::{
 use tower::{Service, ServiceExt};
 use tracing_futures::Instrument;
 use uuid::Uuid;
-use vector_core::{buffers::Acker, event::{EventFinalizers, Finalizable}, sink::StreamSink};
+use vector_core::{
+    buffers::Acker,
+    event::{EventFinalizers, Finalizable},
+    partition::Partitioner,
+    sink::StreamSink,
+};
 
 use super::{config::S3RequestOptions, partitioner::KeyPartitioner, service::S3Request};
 use crate::sinks::util::sink::Response;
@@ -450,10 +455,11 @@ mod tests {
     use crate::sinks::{
         aws_s3::config::S3Options,
         util::{
-            buffer::partition::{BatchPushResult, PartitionInFlightBatch, Partitioner},
+            buffer::partition::{BatchPushResult, PartitionInFlightBatch},
             BatchSize,
         },
     };
+    use vector_core::partition::Partitioner;
 
     use super::*;
 

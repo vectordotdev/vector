@@ -1,11 +1,12 @@
-use std::{collections::{HashMap, HashSet}, hash::Hash, marker::PhantomData, task::Poll};
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+    task::Poll,
+};
 
 use futures::{poll, StreamExt};
-use tokio_util::time::{DelayQueue, delay_queue::Key};
-use vector_core::{
-    event::{EventFinalizers, Finalizable},
-    ByteSizeOf,
-};
+use tokio_util::time::{delay_queue::Key, DelayQueue};
+use vector_core::{ByteSizeOf, event::{EventFinalizers, Finalizable}, partition::Partitioner};
 
 use crate::sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
 use crate::sinks::util::BatchSize;
@@ -95,14 +96,6 @@ where
     }
 }
 
-/// Strategy for partitioning events.
-pub trait Partitioner {
-    type Item: ByteSizeOf + Finalizable;
-    type Key: Clone + Eq + Hash;
-
-    fn partition(&self, item: &Self::Item) -> Option<Self::Key>;
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum BatchPushResult<I> {
     /// The item was partitioned and batched successfully.
@@ -162,9 +155,14 @@ where
 impl<P> PartitionInFlightBatch<P>
 where
     P: Partitioner,
+    P::Item: ByteSizeOf + Finalizable,
 {
     pub fn new(size: BatchSize<()>) -> Self {
-        trace!("new batch sizing: {} bytes or {} items", size.bytes, size.events);
+        trace!(
+            "new batch sizing: {} bytes or {} items",
+            size.bytes,
+            size.events
+        );
         Self {
             closed: false,
             items: Vec::new(),
@@ -201,7 +199,7 @@ where
             // If we have a batch that, for example, is using 99999 bytes out of 100000 bytes, the next
             // push attempt with an item that's 2 bytes or bigger will fail.  Obviously, going over our limit
             // in small increments isn't truly an issue: our memory limits are best-effort, not in
-            // the same vein as a hard real-time system.  
+            // the same vein as a hard real-time system.
             //
             // If we reject the item but leave the batch as-is, technically, the batch is not yet
             // full: we haven't exceeded the size limit, or item count limit.  This poses a problem
@@ -237,7 +235,11 @@ where
     }
 
     pub fn finish(self, key: P::Key) -> PartitionFinishedBatch<P> {
-        trace!("batch finished with {} bytes, {} items", self.total_size, self.items.len());
+        trace!(
+            "batch finished with {} bytes, {} items",
+            self.total_size,
+            self.items.len()
+        );
         PartitionFinishedBatch {
             key,
             items: self.items,
@@ -289,6 +291,7 @@ where
 pub struct PartitionBatcher<P>
 where
     P: Partitioner,
+    P::Item: ByteSizeOf + Finalizable,
 {
     partitioner: P,
     settings: BatchSettings<()>,
@@ -300,6 +303,7 @@ where
 impl<P> PartitionBatcher<P>
 where
     P: Partitioner,
+    P::Item: ByteSizeOf + Finalizable,
 {
     /// Creates a new `PartitionBatcher`.
     pub fn new(partitioner: P, settings: BatchSettings<()>) -> Self {
@@ -340,14 +344,11 @@ where
                 // stacked borrows? or another general approach that defers the clone?
                 let size = self.settings.size.clone();
                 let mut new_batch_pk = None;
-                let batch = self
-                    .batches
-                    .entry(pk.clone())
-                    .or_insert_with_key(|k| {
-                        new_batch_pk = Some(k.clone());
-                        PartitionInFlightBatch::new(size)
-                    });
-                
+                let batch = self.batches.entry(pk.clone()).or_insert_with_key(|k| {
+                    new_batch_pk = Some(k.clone());
+                    PartitionInFlightBatch::new(size)
+                });
+
                 // If we've created a new batch, we need to shove it into our timeout queue.
                 if let Some(pk) = new_batch_pk {
                     // Don't register this batch for expiration unless the timeout is actually

@@ -8,8 +8,18 @@ use crate::{
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{sync::{Arc, atomic::{AtomicUsize, Ordering}}, time::{Duration, Instant}};
-use tokio::{select, sync::watch, time::{interval, sleep_until}};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
+use tokio::{
+    select,
+    sync::watch,
+    time::{interval, sleep_until},
+};
 use vector_core::event::Event;
 use vector_core::ByteSizeOf;
 
@@ -90,7 +100,6 @@ impl StreamSink for BlackholeSink {
         let interval_dur = Duration::from_secs(self.config.print_interval_secs);
         let (tx, mut rx) = watch::channel(());
 
-
         tokio::spawn(async move {
             let mut print_interval = interval(interval_dur);
             loop {
@@ -99,7 +108,7 @@ impl StreamSink for BlackholeSink {
                         info!({
                             events = total_events.load(Ordering::Relaxed),
                             raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
-                        }, "Total events collected"); 
+                        }, "Total events collected");
                     },
                     _ = rx.changed() => break,
                 }
@@ -108,7 +117,7 @@ impl StreamSink for BlackholeSink {
             info!({
                 events = total_events.load(Ordering::Relaxed),
                 raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
-            }, "Total events collected"); 
+            }, "Total events collected");
         });
 
         let mut chunks = input.ready_chunks(1024);
@@ -124,7 +133,9 @@ impl StreamSink for BlackholeSink {
             let message_len = events.size_of();
 
             let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
-            let _ = self.total_raw_bytes.fetch_add(message_len, Ordering::AcqRel);
+            let _ = self
+                .total_raw_bytes
+                .fetch_add(message_len, Ordering::AcqRel);
 
             emit!(BlackholeEventReceived {
                 byte_size: message_len

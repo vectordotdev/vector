@@ -11,8 +11,6 @@ use std::task::Poll;
 use std::{cmp, mem, sync::Arc};
 use tokio::sync::oneshot;
 
-use super::Event;
-
 type ImmutVec<T> = Box<[T]>;
 
 /// Wrapper type for an array of event finalizers. This is the primary
@@ -329,18 +327,10 @@ impl EventStatus {
 pub trait Finalizable {
     /// Consumes the finalizers of this object.
     ///
-    /// Typically used for coalescing the finalizers of multiple items, such as when batching
-    /// finalizable objects where all finalizations will be processed when the batch itself is processed.
+    /// Typically used for coalescing the finalizers of multiple items, such as
+    /// when batching finalizable objects where all finalizations will be
+    /// processed when the batch itself is processed.
     fn take_finalizers(&mut self) -> EventFinalizers;
-}
-
-impl Finalizable for Event {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        match self {
-            Event::Log(log) => log.metadata_mut().take_finalizers(),
-            Event::Metric(metric) => metric.metadata_mut().take_finalizers(),
-        }
-    }
 }
 
 #[cfg(test)]

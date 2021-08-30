@@ -5,6 +5,8 @@ releases: "0.16.0": {
 	codename: ""
 
 	description: """
+	**Note: this release contains a regression for disk buffers. If you are using disk buffers, please install 0.16.1 instead.**
+
 	The Vector team is pleased to announce version 0.16.0!
 
 	Be sure to check out the [upgrade guide](/highlights/2021-07-21-0-16-upgrade-guide) for breaking changes in this release.

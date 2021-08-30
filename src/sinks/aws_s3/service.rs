@@ -9,7 +9,9 @@ use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::event::{EventFinalizers, Finalizable};
 
-use crate::{internal_events::aws_s3::sink::S3EventsSent, serde::to_string, sinks::util::sink::Response};
+use crate::{
+    internal_events::aws_s3::sink::S3EventsSent, serde::to_string, sinks::util::sink::Response,
+};
 
 use super::config::S3Options;
 
@@ -26,7 +28,7 @@ pub struct S3Request {
 
 impl Finalizable for S3Request {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.finalizers)
+        std::mem::replace(&mut self.finalizers, EventFinalizers::default())
     }
 }
 
@@ -99,9 +101,9 @@ impl Service<S3Request> for S3Service {
             ..Default::default()
         };
 
-        Box::pin(async move { 
+        Box::pin(async move {
             let result = client.put_object(request).in_current_span().await;
-            
+
             // TODO: This is fine for testing, but we should have a better pattern for this.
             emit!(S3EventsSent {
                 byte_size: body_len,
@@ -116,5 +118,8 @@ fn bytes_to_bytestream(buf: Bytes) -> ByteStream {
     // We _have_ to provide the size hint, because without it, Rusoto can't generate the
     // Content-Length header which is required for the S3 PutObject API call.
     let len = buf.len();
-    ByteStream::new_with_size(Box::pin(stream::once(async move { Ok(Bytes::from(buf)) })), len)
+    ByteStream::new_with_size(
+        Box::pin(stream::once(async move { Ok(Bytes::from(buf)) })),
+        len,
+    )
 }

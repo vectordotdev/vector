@@ -1,9 +1,6 @@
-use vector_core::event::Event;
+use vector_core::{event::Event, partition::Partitioner};
 
-use crate::{
-    internal_events::TemplateRenderingFailed, sinks::util::buffer::partition::Partitioner,
-    template::Template,
-};
+use crate::{internal_events::TemplateRenderingFailed, template::Template};
 
 /// Partitions items based on the generated S3 object key for the given event.
 ///

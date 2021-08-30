@@ -17,7 +17,6 @@ components: sinks: vector: {
 		service_providers: []
 		stateful: false
 	}
-
 	features: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
@@ -26,7 +25,12 @@ components: sinks: vector: {
 			encoding: enabled:          false
 			send_buffer_bytes: enabled: true
 			keepalive: enabled:         true
-			request: enabled:           false
+			request: {
+				enabled:       true
+				headers:       false
+				relevant_when: "version = \"v2\""
+			}
+
 			tls: {
 				enabled:                true
 				can_enable:             true

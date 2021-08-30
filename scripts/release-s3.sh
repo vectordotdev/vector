@@ -129,9 +129,6 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   verify_artifact \
     "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz" \
     "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
-  verify_artifact \
-    "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu-debug.tar.gz" \
-    "$td/vector-$VERSION-x86_64-unknown-linux-gnu-debug.tar.gz"
 fi
 
 #

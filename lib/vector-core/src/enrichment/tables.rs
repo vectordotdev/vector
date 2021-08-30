@@ -1,29 +1,34 @@
-//! The Enrichment `TableRegistry` manages the collection of `Table`s loaded into Vector.
-//! Enrichment Tables go through two stages.
+//! The Enrichment `TableRegistry` manages the collection of `Table`s loaded
+//! into Vector. Enrichment Tables go through two stages.
 //!
 //! ## 1. Writing
 //!
-//! The  tables are loaded. There are two elements that need loading. The first is the actual data.
-//! This is loaded at config load time, the actual loading is performed by the implementation of
-//! the `EnrichmentTable` trait. Next, the tables are passed through Vectors `Transform` components,
-//! particularly the `Remap` transform. These Transforms are able to determine which fields we will
-//! want to lookup whilst Vector is running. They can notify the tables of these fields so that the
-//! data can be indexed.
+//! The tables are loaded. There are two elements that need loading. The first
+//! is the actual data. This is loaded at config load time, the actual loading
+//! is performed by the implementation of the `EnrichmentTable` trait. Next, the
+//! tables are passed through Vectors `Transform` components, particularly the
+//! `Remap` transform. These Transforms are able to determine which fields we
+//! will want to lookup whilst Vector is running. They can notify the tables of
+//! these fields so that the data can be indexed.
 //!
-//! During this phase, the data is loaded within a single thread, so can be loaded directly into a
-//! `HashMap`.
+//! During this phase, the data is loaded within a single thread, so can be
+//! loaded directly into a `HashMap`.
 //!
 //! ## 2. Reading
 //!
-//! Once all the data has been loaded we can move to the next stage. This is signified by calling
-//! the `finish_load` method. At this point all the data is swapped into the `ArcSwap` of the `tables`
-//! field. `ArcSwap` provides lock-free read-only access to the data. From this point on we have fast,
-//! efficient read-only access and can no longer add indexes or otherwise mutate the data.
+//! Once all the data has been loaded we can move to the next stage. This is
+//! signified by calling the `finish_load` method. At this point all the data is
+//! swapped into the `ArcSwap` of the `tables` field. `ArcSwap` provides
+//! lock-free read-only access to the data. From this point on we have fast,
+//! efficient read-only access and can no longer add indexes or otherwise mutate
+//! the data.
 //!
-//! This data within the `ArcSwap` is accessed through the `TableSearch` struct. Any transform that
-//! needs access to this can call `TableRegistry::as_readonly`. This returns a cheaply clonable struct that
-//! implements `vrl:EnrichmentTableSearch` through with the enrichment tables can be searched.
-//!
+//! This data within the `ArcSwap` is accessed through the `TableSearch`
+//! struct. Any transform that needs access to this can call
+//! `TableRegistry::as_readonly`. This returns a cheaply clonable struct that
+//! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
+//! can be searched.
+
 use super::{IndexHandle, Table};
 use arc_swap::ArcSwap;
 use std::collections::{BTreeMap, HashMap};
@@ -38,26 +43,29 @@ pub struct TableRegistry {
 impl TableRegistry {
     /// Load the given Enrichment Tables into the registry.
     ///
-    /// If there are no tables currently loaded into the registry, this is a simple operation, we
-    /// simply load the tables into the `loading` field.
+    /// If there are no tables currently loaded into the registry, this is a
+    /// simple operation, we simply load the tables into the `loading` field.
     ///
-    /// If there are tables that have already been loaded things get a bit more complicated. This
-    /// can occur when the config is reloaded. Vector will be currently running and transforming
-    /// events, thus the tables loaded into the `tables` field could be in active use. Since there
-    /// is no lock against these tables, we cannot mutate this list. We do need to have a full list
-    /// of tables in the `loading` field since there may be some transforms that will need to add
-    /// indexes to these tables during the reload.
+    /// If there are tables that have already been loaded things get a bit more
+    /// complicated. This can occur when the config is reloaded. Vector will be
+    /// currently running and transforming events, thus the tables loaded into
+    /// the `tables` field could be in active use. Since there is no lock
+    /// against these tables, we cannot mutate this list. We do need to have a
+    /// full list of tables in the `loading` field since there may be some
+    /// transforms that will need to add indexes to these tables during the
+    /// reload.
     ///
-    /// Our only option is to clone the data that is in `tables` and move it into the `loading`
-    /// field so it can be mutated. This could be a potentially expensive operation. For the period
-    /// whilst the config is reloading we could potentially have double the enrichment data loaded
+    /// Our only option is to clone the data that is in `tables` and move it
+    /// into the `loading` field so it can be mutated. This could be a
+    /// potentially expensive operation. For the period whilst the config is
+    /// reloading we could potentially have double the enrichment data loaded
     /// into memory.
     ///
-    /// Once loading is complete, the data is swapped out of `loading` and we return to a single
-    /// copy of the tables.
+    /// Once loading is complete, the data is swapped out of `loading` and we
+    /// return to a single copy of the tables.
     ///
-    /// TODO This function currently does nothing to reload the the underlying data should it have
-    /// changed in the enrichment source.
+    /// TODO This function currently does nothing to reload the the underlying
+    /// data should it have changed in the enrichment source.
     ///
     /// # Panics
     ///
@@ -80,8 +88,9 @@ impl TableRegistry {
     }
 
     /// Swap the data out of the `HashTable` into the `ArcSwap`.
-    /// From this point we can no longer add indexes to the tables, but are now allowed to read the
-    /// data.
+    ///
+    /// From this point we can no longer add indexes to the tables, but are now
+    /// allowed to read the data.
     ///
     /// # Panics
     ///
@@ -102,7 +111,9 @@ impl std::fmt::Debug for TableRegistry {
 #[cfg(feature = "vrl")]
 impl vrl_core::enrichment::TableSetup for TableRegistry {
     /// Return a list of the available tables that we can write to.
-    /// This only works in the writing stage and will acquire a lock to retrieve the tables.
+    ///
+    /// This only works in the writing stage and will acquire a lock to retrieve
+    /// the tables.
     ///
     /// # Panics
     ///
@@ -116,6 +127,7 @@ impl vrl_core::enrichment::TableSetup for TableRegistry {
     }
 
     /// Adds an index to the given Enrichment Table.
+    ///
     /// If we are in the reading stage, this function will error.
     ///
     /// # Panics
@@ -133,20 +145,22 @@ impl vrl_core::enrichment::TableSetup for TableRegistry {
         }
     }
 
-    /// Returns a cheaply clonable struct through that provides lock free read access to the
-    /// enrichment tables.
+    /// Returns a cheaply clonable struct through that provides lock free read
+    /// access to the enrichment tables.
     fn as_readonly(&self) -> Box<dyn vrl_core::enrichment::TableSearch + Send + Sync> {
         Box::new(TableSearch(self.tables.clone()))
     }
 }
 
-/// Provides read only access to the enrichment tables via the `vrl::EnrichmentTableSearch` trait.
-/// Cloning this object is designed to be cheap. The underlying data will be shared by all clones.
+/// Provides read only access to the enrichment tables via the
+/// `vrl::EnrichmentTableSearch` trait. Cloning this object is designed to be
+/// cheap. The underlying data will be shared by all clones.
 #[derive(Clone, Default)]
 pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>);
 
 impl vrl_core::enrichment::TableSearch for TableSearch {
     /// Search the given table to find the data.
+    ///
     /// If we are in the writing stage, this function will return an error.
     fn find_table_row<'a>(
         &self,
