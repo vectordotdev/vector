@@ -21,6 +21,7 @@ module.exports = {
       },
       // Custom colors
       colors: {
+        'inherit': 'inherit',
         'dark': '#191927',  // Vector dark
         'primary': '#28d9f2', // Vector greenish blue
         'primary-dark': '#00a9bc', // Vector darker greenish blue
@@ -42,16 +43,41 @@ module.exports = {
               'text-decoration': 'none',
               code: {
                 color: theme('colors.primary-dark'),
+                '&:not([class^="language-"])': {
+                  color: theme('colors.inherit')
+                },
               },
             },
             code: {
               color: theme('colors.primary-dark', 'currentColor'),
+              '&:not([class^="language-"])': {
+                color: theme('colors.dark', 'currentColor'),
+                'background-color': theme('colors.gray.100'),
+                'border-radius': '4px',
+                padding: '0 5px',
+                display: 'inline-flex',
+                'align-items': 'center'
+              },
               '&::before': {
                 display: 'none',
               },
               '&::after': {
                 display: 'none',
               },
+            },
+            'a code': {
+              'color': 'inherit'
+            },
+            'ul > li >, ol > li >': {
+              '*:first-child, *:last-child': {
+                margin: 0
+              }
+            },
+            'ul > li::before': {
+              'background-color': theme('colors.gray.700'),
+            },
+            'ol > li::before': {
+              color: theme('colors.gray.700'),
             },
             // Spacing between certain shortcode combinations
             '.admonition + .tabs, .svg + .admonition, .highlight + p': {
@@ -88,21 +114,53 @@ module.exports = {
             },
             code: {
               color: theme('colors.primary', 'currentColor'),
+              '&:not([class^="language-"])': {
+                color: theme('colors.gray.100'),
+                'background-color': theme('colors.gray.700'),
+              }
             },
             color: theme('colors.gray.200'),
-            'p, h1, h2, h3, h4, h5, h6': {
+            'p, h1, h2, h3, h4, h5, h6, li': {
               color: theme('colors.gray.100')
             },
-            'a, a code': {
-              color: theme('colors.primary', 'currentColor'),
-              'text-decoration': 'none',
-              '&:hover, &:active': {
-                color: theme('colors.secondary'),
+            'ul > li': {
+              '&:before': {
+                'background-color': theme('colors.gray.100')
+              }
+            },
+            'ol > li': {
+              '&:before': {
+                color: theme('colors.gray.100')
+              }
+            },
+            'a, a code, a code:not([class^="language-"])': {
+                color: theme('colors.primary', 'currentColor'),
+                'text-decoration': 'none',
+                '&:hover, &:active': {
+                  color: theme('colors.secondary'),
               },
+            },
+            'a': {
+              '&:hover': {
+                'code': {
+                  '&:not([class^="language-"])': {
+                    color: theme('colors.inherit')
+                  }
+                }
+              }
             },
             strong: {
               color: theme('colors.gray.100'),
             },
+          }
+        },
+        sm: {
+          css: {
+            'ul > li >, ol > li >': {
+              '*:first-child, *:last-child': {
+                margin: 0
+              }
+            }
           }
         }
       }),

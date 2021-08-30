@@ -161,7 +161,9 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{log_schema, GlobalOptions, SinkContext, SourceConfig, SourceContext},
+        config::{
+            log_schema, ComponentId, GlobalOptions, SinkContext, SourceConfig, SourceContext,
+        },
         event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
@@ -370,10 +372,10 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
-        let source_id = "tcp_shutdown_simple";
+        let source_id = ComponentId::from("tcp_shutdown_simple");
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(source_id, tx);
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
 
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
@@ -393,7 +395,7 @@ mod test {
 
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_id, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -407,10 +409,10 @@ mod test {
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
         let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
-        let source_id = "tcp_shutdown_infinite_stream";
+        let source_id = ComponentId::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(source_id, tx);
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
 
         // Start TCP Source
         let server = SocketConfig::from({
@@ -452,7 +454,7 @@ mod test {
         }
 
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_id, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -490,7 +492,7 @@ mod test {
 
     async fn init_udp_with_shutdown(
         sender: Pipeline,
-        source_id: &str,
+        source_id: &ComponentId,
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (shutdown_signal, _) = shutdown.register_source(source_id);
@@ -498,20 +500,25 @@ mod test {
     }
 
     async fn init_udp(sender: Pipeline) -> SocketAddr {
-        let (addr, _handle) = init_udp_inner(sender, "default", ShutdownSignal::noop()).await;
+        let (addr, _handle) = init_udp_inner(
+            sender,
+            &ComponentId::from("default"),
+            ShutdownSignal::noop(),
+        )
+        .await;
         addr
     }
 
     async fn init_udp_inner(
         sender: Pipeline,
-        source_id: &str,
+        source_id: &ComponentId,
         shutdown_signal: ShutdownSignal,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let address = next_addr();
 
         let server = SocketConfig::from(UdpConfig::from_address(address))
             .build(SourceContext {
-                id: source_id.into(),
+                id: source_id.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,
@@ -609,10 +616,10 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_simple() {
         let (tx, rx) = Pipeline::new_test();
-        let source_id = "udp_shutdown_simple";
+        let source_id = ComponentId::from("udp_shutdown_simple");
 
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (address, source_handle) = init_udp_with_shutdown(tx, source_id, &mut shutdown).await;
+        let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
 
         send_lines_udp(address, vec!["test".to_string()]);
         let events = collect_n(rx, 1).await;
@@ -624,7 +631,7 @@ mod test {
 
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_id, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -635,10 +642,10 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_infinite_stream() {
         let (tx, rx) = Pipeline::new_test();
-        let source_id = "udp_shutdown_infinite_stream";
+        let source_id = ComponentId::from("udp_shutdown_infinite_stream");
 
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (address, source_handle) = init_udp_with_shutdown(tx, source_id, &mut shutdown).await;
+        let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
 
         // Stream that keeps sending lines to the UDP source forever.
         let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
@@ -659,7 +666,7 @@ mod test {
         }
 
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_id, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 

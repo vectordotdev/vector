@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, ProxyConfig, SinkContext, SourceContext},
+    config::{ComponentId, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
     event::Event,
     internal_events::{EventIn, EventOut},
     shutdown::SourceShutdownCoordinator,
@@ -13,6 +13,7 @@ use crate::{
     Pipeline,
 };
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
     collections::HashMap,
@@ -21,22 +22,28 @@ use std::{
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
+use vector_core::enrichment;
+
+lazy_static! {
+    static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
+}
 
 pub struct Pieces {
-    pub inputs: HashMap<String, (buffers::BufferInputCloner<Event>, Vec<String>)>,
-    pub outputs: HashMap<String, fanout::ControlChannel>,
-    pub tasks: HashMap<String, Task>,
-    pub source_tasks: HashMap<String, Task>,
-    pub healthchecks: HashMap<String, Task>,
+    pub inputs: HashMap<ComponentId, (buffers::BufferInputCloner<Event>, Vec<ComponentId>)>,
+    pub outputs: HashMap<ComponentId, fanout::ControlChannel>,
+    pub tasks: HashMap<ComponentId, Task>,
+    pub source_tasks: HashMap<ComponentId, Task>,
+    pub healthchecks: HashMap<ComponentId, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
-    pub detach_triggers: HashMap<String, Trigger>,
+    pub detach_triggers: HashMap<ComponentId, Trigger>,
+    pub enrichment_tables: enrichment::TableRegistry,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
-    mut buffers: HashMap<String, BuiltBuffer>,
+    mut buffers: HashMap<ComponentId, BuiltBuffer>,
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
@@ -47,6 +54,24 @@ pub async fn build_pieces(
     let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
+
+    let mut enrichment_tables = HashMap::new();
+
+    // Build enrichment tables
+    for (name, table) in config
+        .enrichment_tables
+        .iter()
+        .filter(|(name, _)| diff.enrichment_tables.contains_new(name))
+    {
+        let table = match table.inner.build(&config.global).await {
+            Ok(table) => table,
+            Err(error) => {
+                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
+                continue;
+            }
+        };
+        enrichment_tables.insert(name.as_str().to_string(), table);
+    }
 
     // Build sources
     for (id, source) in config
@@ -62,7 +87,7 @@ pub async fn build_pieces(
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(id);
 
         let context = SourceContext {
-            id: id.into(),
+            id: id.clone(),
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,
@@ -79,7 +104,7 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
         let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
-        let pump = Task::new(id, typetag, pump);
+        let pump = Task::new(id.clone(), typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
@@ -95,12 +120,19 @@ pub async fn build_pieces(
                 Err(_) => Err(()),
             }
         };
-        let server = Task::new(id, typetag, server);
+        let server = Task::new(id.clone(), typetag, server);
 
         outputs.insert(id.clone(), control);
         tasks.insert(id.clone(), pump);
         source_tasks.insert(id.clone(), server);
     }
+
+    ENRICHMENT_TABLES.load(enrichment_tables);
+
+    let context = TransformContext {
+        globals: config.global.clone(),
+        enrichment_tables: ENRICHMENT_TABLES.clone(),
+    };
 
     // Build transforms
     for (id, transform) in config
@@ -113,7 +145,7 @@ pub async fn build_pieces(
         let typetag = transform.inner.transform_type();
 
         let input_type = transform.inner.input_type();
-        let transform = match transform.inner.build(&config.global).await {
+        let transform = match transform.inner.build(&context).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", id, error));
                 continue;
@@ -160,7 +192,7 @@ pub async fn build_pieces(
             debug!("Finished.");
             TaskOutput::Transform
         });
-        let task = Task::new(id, typetag, transform);
+        let task = Task::new(id.clone(), typetag, transform);
 
         inputs.insert(id.clone(), (input_tx, trans_inputs.clone()));
         outputs.insert(id.clone(), control);
@@ -237,9 +269,10 @@ pub async fn build_pieces(
                 TaskOutput::Sink(rx, acker)
             })
         };
-        let task = Task::new(id, typetag, sink);
 
-        let component_id = id.clone();
+        let task = Task::new(id.clone(), typetag, sink);
+
+        let component_id = id.to_string();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -279,13 +312,18 @@ pub async fn build_pieces(
                 Ok(TaskOutput::Healthcheck)
             }
         };
-        let healthcheck_task = Task::new(id, typetag, healthcheck_task);
+
+        let healthcheck_task = Task::new(id.clone(), typetag, healthcheck_task);
 
         inputs.insert(id.clone(), (tx, sink_inputs.clone()));
         healthchecks.insert(id.clone(), healthcheck_task);
         tasks.insert(id.clone(), task);
         detach_triggers.insert(id.clone(), trigger);
     }
+
+    // We should have all the data for the enrichment tables loaded now, so switch them over to
+    // readonly.
+    ENRICHMENT_TABLES.finish_load();
 
     if errors.is_empty() {
         let pieces = Pieces {
@@ -296,6 +334,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
+            enrichment_tables: ENRICHMENT_TABLES.clone(),
         };
 
         Ok(pieces)

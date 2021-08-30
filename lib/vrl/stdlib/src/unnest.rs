@@ -42,7 +42,7 @@ impl Function for Unnest {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let path = arguments.required_query("path")?;
 
         Ok(Box::new(UnnestFn { path }))
@@ -426,7 +426,7 @@ mod tests {
         for (object, expected, func, expected_typedef) in cases {
             let mut object = object.clone();
             let mut runtime_state = vrl::state::Runtime::default();
-            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+            let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, None);
 
             let typedef = func.type_def(&compiler);
 

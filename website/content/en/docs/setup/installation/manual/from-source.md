@@ -255,7 +255,6 @@ Name | Description
 | `transforms-sample`                                  | Enables building the [`sample` transform](/docs/reference/configuration/transforms/sample)
 | `transforms-route`                                   | Enables building the [`route` transform](/docs/reference/configuration/transforms/route)
 | `transforms-tag_cardinality_limit`                   | Enables building the [`tag_cardinality_limit` transform](/docs/reference/configuration/transforms/tag_cardinality_limit)
-| `transforms-wasm`                                    | Enables building the [`wasm` transform](/docs/reference/configuration/transforms/wasm)
 | `sinks-aws_cloudwatch_logs`                          | Enables building the [`aws_cloudwatch_logs` sink](/docs/reference/configuration/sinks/aws_cloudwatch_logs)
 | `sinks-aws_cloudwatch_metrics`                       | Enables building the [`aws_cloudwatch_metrics` sink](/docs/reference/configuration/sinks/aws_cloudwatch_metrics)
 | `sinks-aws_kinesis_firehose`                         | Enables building the [`aws_kinesis_firehose` sink](/docs/reference/configuration/sinks/aws_kinesis_firehose)

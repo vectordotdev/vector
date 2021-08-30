@@ -377,6 +377,7 @@ components: {
 				retry_max_duration_secs:    uint64 | *3600
 				timeout_secs:               uint64 | *60
 				headers:                    bool
+				relevant_when?:             string
 			}
 		}
 
@@ -694,7 +695,7 @@ components: {
 
 			_proxy: {
 				common:      false
-				description: "Configures an HTTP(S) proxy for Vector to use."
+				description: "Configures an HTTP(S) proxy for Vector to use. By default, the globally configured proxy is used."
 				required:    false
 				type: object: options: {
 					enabled: {
@@ -724,18 +725,19 @@ components: {
 						}
 					}
 					no_proxy: {
-						common: false
+						common:      false
 						description: """
-							List of hosts to avoid proxying globally.
+							A list of hosts to avoid proxying. Allowed patterns here include:
 
-							Allowed patterns here include:
-								- Domain names. For example, `example.com` will match requests to to `example.com`
-								- Wildcard domains. For example, `.example.com` will match requests to `example.com` and its subdomains
-								- IP addresses. For example, `127.0.0.1` will match requests to 127.0.0.1
-								- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
-								- `*` will match all hosts
+							Pattern | Example match
+							:-------|:-------------
+							Domain names | `example.com` matches requests to `example.com`
+							Wildcard domains | `.example.com` matches requests to `example.com` and its subdomains
+							IP addresses | `127.0.0.1` matches requests to 127.0.0.1
+							[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
+							Splat | `*` matches all hosts
 							"""
-						required: false
+						required:    false
 						type: array: {
 							default: null
 							items: type: string: {

@@ -28,9 +28,12 @@ remap: literals: regular_expression: {
 				in-browser [Rustexp expression editor and tester](\#(urls.regex_tester)).
 				"""#
 			enum: {
-				"x": "Ignore whitespace"
 				"i": "Case insensitive"
 				"m": "Multi-line mode"
+				"x": "Ignore whitespace"
+				"s": "Allow . to match \n"
+				"U": "Swap the meaning of x* and x*?"
+				"u": "Unicode support (enabled by default)"
 			}
 		}
 		named_captures: {

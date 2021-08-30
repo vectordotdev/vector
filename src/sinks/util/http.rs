@@ -291,6 +291,12 @@ where
             slot: None,
         }
     }
+
+    /// Enforces per partition ordering of request.
+    pub fn ordered(mut self) -> Self {
+        self.inner.ordered();
+        self
+    }
 }
 
 impl<T, B, K, RL> Sink<Event> for PartitionHttpSink<T, B, K, RL>

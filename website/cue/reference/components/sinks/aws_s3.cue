@@ -405,10 +405,6 @@ components: sinks: aws_s3: components._aws & {
 					required_for: ["healthcheck"]
 				},
 				{
-					_action: "ListBuckets"
-					required_for: ["healthcheck"]
-				},
-				{
 					_action: "PutObject"
 				},
 			]

@@ -4,35 +4,39 @@ short: Helm
 weight: 3
 ---
 
-[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing Vector through the Helm package repository.
+[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing the Vector agent chart and the Vector aggregator chart from the Helm package repository. The agent chart and the aggregator chart are made available by adding the Vector Helm repository but are installed and configured separately.
 
-## Installation
+{{< warning title="Aggregator role in public beta" >}}
+Helm support for the [aggregator] role is currently in public beta. We're seeking beta testers! If deploying the aggregator chart, please [join our chat][chat] and let us know how it went.
 
-{{< warning title="Aggregator role in private beta" >}}
-Helm support for the [aggregator] role is currently in private beta. We're currently seeking beta testers. If interested, please [join our chat][chat] and let us know.
-
-As an alternative, you can still manually deploy Vector in the aggregator role. Instructions throughout this doc will be for the [agent] role only.
-
-[agent]: /docs/setup/deployment/roles/#agent
 [aggregator]: /docs/setup/deployment/roles/#aggregator
 [chat]: https://chat.vector.dev
 {{< /warning >}}
 
-Add the Vector repo:
+## Adding the Helm repo
+
+If you haven't already, start by adding the Vector repo:
 
 ```shell
-helm repo add timberio https://packages.timber.io/helm/latest
+helm repo add vector https://helm.vector.dev
+helm repo update
 ```
 
-Check available Helm chart configuration options:
+## Agent
+
+The Vector [Agent] lets you collect data from your [sources] and then deliver it to a variety of destinations with [sinks].
+
+### Configuring
+
+To check available Helm chart configuration options:
 
 ```shell
-helm show values timberio/vector-agent
+helm show values vector/vector-agent
 ```
 
-Configure Vector:
+This example configuration file lets you use Vector as an Agent to send logs to standard output. For more information about configuration options, see the [configuration] docs page.
 
-```toml
+```yaml
 cat <<-'VALUES' > values.yaml
 # The Vector Kubernetes integration automatically defines a
 # kubernetes_logs source that is made available to you.
@@ -49,32 +53,112 @@ sinks:
 VALUES
 ```
 
-Install Vector:
+### Installing
+
+Once you add the Vector Helm repo, and added a Vector configuration file, install the Vector Agent:
 
 ```shell
-helm install vector timberio/vector-agent \
+helm install vector vector/vector-agent \
   --namespace vector \
   --create-namespace \
   --values values.yaml
 ```
 
-## Other actions
+### Updating
 
-{{< tabs default="Upgrade Vector" >}}
-{{< tab title="Upgrade Vector" >}}
+Or to update the Vector Agent:
+
 ```shell
-helm repo update && helm upgrade --namespace vector vector timberio/vector-agent --reuse-values
+helm repo update && \
+helm upgrade vector vector/vector-agent \
+  --namespace vector \
+  --reuse-values
 ```
-{{< /tab >}}
-{{< tab title="Uninstall Vector" >}}
+
+## Aggregator
+
+The Vector [Aggregator] lets you [transform] and ship data collected by other agents. For example, it can insure that the data you are collecting is scrubbed of sensitive information, properly formatted for downstream consumers, sampled to reduce volume, and more.
+
+### Configuring
+
+To check available Helm chart configuration options:
+
 ```shell
-helm uninstall --namespace vector vector
+helm show values vector/vector-aggregator
 ```
-{{< /tab >}}
-{{< /tabs >}}
+
+This example configuration file lets you use Vector as an Aggregator to parse events to make them human-readable. For more information about configuration options, see the [Configuration] docs page.
+
+```yaml
+cat <<-'VALUES' > values.yaml
+# The Vector Aggregator chart defines a
+# vector source that is made available to you.
+# You do not need to define a log source.
+transforms:
+  # Adjust as necessary. This remap transform parses a JSON
+  # formatted log message, emitting a log if the contents are
+  # not valid JSON
+  # /docs/reference/transforms/
+  remap:
+    type: remap
+    inputs: ["vector"]
+    source: |
+      structured, err = parse_json(.message)
+      if err != null {
+        log("Unable to parse JSON: " + err, level: "error")
+      } else {
+        . = merge(., object!(structured))
+      }
+sinks:
+  # Adjust as necessary. By default we use the console sink
+  # to print all data. This allows you to see Vector working.
+  # /docs/reference/sinks/
+  stdout:
+    type: console
+    inputs: ["remap"]
+    target: "stdout"
+    encoding: "json"
+VALUES
+```
+
+### Installing
+
+Once you add the Vector Helm repo, and add a Vector configuration file, install the Vector Aggregator:
+
+```shell
+helm install vector vector/vector-aggregator \
+  --namespace vector \
+  --create-namespace \
+  --values values.yaml
+```
+
+### Updating
+
+Or to update the Vector Aggregator:
+
+```shell
+helm repo update && \
+helm upgrade vector vector/vector-aggregator \
+  --namespace vector \
+  --reuse-values
+```
+
+## Uninstalling Vector
+
+To uninstall the Vector helm chart:
+
+```shell
+helm uninstall vector --namespace vector
+```
 
 ## Management
 
 {{< jump "/docs/administration/management" "helm" >}}
 
 [helm]: https://helm.sh
+[Configuration]: /docs/reference/configuration/
+[Agent]: /docs/setup/deployment/roles/#agent
+[sources]: /docs/reference/configuration/sources/
+[sinks]: /docs/reference/configuration/sinks/
+[Aggregator]: /docs/setup/deployment/roles/#aggregator
+[transform]: /docs/reference/configuration/transforms/

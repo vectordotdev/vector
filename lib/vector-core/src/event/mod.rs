@@ -1,3 +1,4 @@
+use crate::event::finalization::Finalizable;
 use crate::ByteSizeOf;
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
@@ -52,6 +53,15 @@ impl ByteSizeOf for Event {
         match self {
             Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
+        }
+    }
+}
+
+impl Finalizable for Event {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        match self {
+            Event::Log(log) => log.metadata_mut().take_finalizers(),
+            Event::Metric(metric) => metric.metadata_mut().take_finalizers(),
         }
     }
 }

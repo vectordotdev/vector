@@ -5,7 +5,7 @@ use indoc::indoc;
 use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{GlobalOptions, TransformConfig},
+    config::{TransformConfig, TransformContext},
     event::Event,
     test_util::{collect_ready, runtime},
     transforms::{self, Transform},
@@ -106,7 +106,7 @@ fn bench_field_filter(c: &mut Criterion) {
                     field: "the_field".to_string(),
                     value: "0".to_string(),
                 }
-                .build(&GlobalOptions::default())
+                .build(&TransformContext::default())
                 .await
                 .unwrap()
             })

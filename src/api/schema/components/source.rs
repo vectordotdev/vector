@@ -5,6 +5,7 @@ use crate::{
         metrics::{self, IntoSourceMetrics},
         sort,
     },
+    config::ComponentId,
     config::DataType,
     filter_check,
 };
@@ -30,7 +31,7 @@ impl From<DataType> for SourceOutputType {
 
 #[derive(Debug, Clone)]
 pub struct Data {
-    pub component_id: String,
+    pub component_id: ComponentId,
     pub component_type: String,
     pub output_type: DataType,
 }
@@ -46,8 +47,8 @@ pub enum SourcesSortFieldName {
 pub struct Source(pub Data);
 
 impl Source {
-    pub fn get_component_id(&self) -> &str {
-        self.0.component_id.as_str()
+    pub fn get_component_id(&self) -> &ComponentId {
+        &self.0.component_id
     }
     pub fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
@@ -78,7 +79,7 @@ impl sort::SortableByField<SourcesSortFieldName> for Source {
 impl Source {
     /// Source component_id
     pub async fn component_id(&self) -> &str {
-        self.get_component_id()
+        self.get_component_id().as_str()
     }
 
     /// Source type
@@ -125,9 +126,9 @@ pub struct SourcesFilter {
 impl filter::CustomFilter<Source> for SourcesFilter {
     fn matches(&self, source: &Source) -> bool {
         filter_check!(
-            self.component_id
-                .as_ref()
-                .map(|f| f.iter().all(|f| f.filter_value(source.get_component_id()))),
+            self.component_id.as_ref().map(|f| f
+                .iter()
+                .all(|f| f.filter_value(source.get_component_id().as_str()))),
             self.component_type.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(source.get_component_type()))),
@@ -152,17 +153,17 @@ mod tests {
     fn source_fixtures() -> Vec<Source> {
         vec![
             Source(Data {
-                component_id: "gen1".to_string(),
+                component_id: ComponentId::from("gen1"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                component_id: "gen2".to_string(),
+                component_id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                component_id: "gen3".to_string(),
+                component_id: ComponentId::from("gen3"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -219,7 +220,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen3", "gen2", "gen1"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id(), *component_id);
+            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -227,17 +228,17 @@ mod tests {
     fn sort_component_type_asc() {
         let mut sources = vec![
             Source(Data {
-                component_id: "gen1".to_string(),
+                component_id: ComponentId::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                component_id: "gen2".to_string(),
+                component_id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                component_id: "gen3".to_string(),
+                component_id: ComponentId::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -250,7 +251,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen3", "gen1", "gen2"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id(), *component_id);
+            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -258,17 +259,17 @@ mod tests {
     fn sort_component_type_desc() {
         let mut sources = vec![
             Source(Data {
-                component_id: "gen1".to_string(),
+                component_id: ComponentId::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                component_id: "gen2".to_string(),
+                component_id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                component_id: "gen3".to_string(),
+                component_id: ComponentId::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -281,7 +282,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen2", "gen1", "gen3"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id(), *component_id);
+            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -289,17 +290,17 @@ mod tests {
     fn sort_output_type_asc() {
         let mut sources = vec![
             Source(Data {
-                component_id: "gen1".to_string(),
+                component_id: ComponentId::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                component_id: "gen2".to_string(),
+                component_id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                component_id: "gen3".to_string(),
+                component_id: ComponentId::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -312,7 +313,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen1", "gen2", "gen3"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id(), *component_id);
+            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
         }
     }
 
@@ -320,17 +321,17 @@ mod tests {
     fn sort_output_type_desc() {
         let mut sources = vec![
             Source(Data {
-                component_id: "gen1".to_string(),
+                component_id: ComponentId::from("gen1"),
                 component_type: "file".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
-                component_id: "gen2".to_string(),
+                component_id: ComponentId::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
-                component_id: "gen3".to_string(),
+                component_id: ComponentId::from("gen3"),
                 component_type: "docker_logs".to_string(),
                 output_type: DataType::Metric,
             }),
@@ -343,7 +344,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen3", "gen2", "gen1"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id(), *component_id);
+            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
         }
     }
 }

@@ -27,8 +27,6 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
-#[cfg(feature = "wasm")]
-pub mod wasm;
 #[macro_use]
 pub mod internal_events;
 #[cfg(feature = "api")]
@@ -37,6 +35,7 @@ pub mod app;
 pub mod async_read;
 pub mod buffers;
 pub mod encoding_transcode;
+pub mod enrichment_tables;
 pub mod graph;
 pub mod heartbeat;
 pub mod http;
