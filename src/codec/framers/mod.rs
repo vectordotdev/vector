@@ -1,9 +1,5 @@
 #![deny(missing_docs)]
 
-mod newline_delimited;
-
-pub use self::newline_delimited::{NewlineDelimitedCodec, NewlineDelimitedDecoderConfig};
-
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
 use std::fmt::Debug;

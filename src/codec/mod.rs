@@ -143,68 +143,17 @@ impl DecodingConfig {
             .framing
             .as_ref()
             .map(|config| config.build())
-            .unwrap_or_else(|| NewlineDelimitedDecoderConfig::new().build());
+            .unwrap_or_else(|| {
+                todo!("Fallback to newline delimited framer is not implemented yet.")
+            });
 
-        // Build the parser or use a plain byte parser if not provided.
+        // Build the parser or use a plain bytes parser if not provided.
         let parser: BoxedParser = self
             .decoding
             .as_ref()
             .map(|config| config.build())
-            .unwrap_or_else(|| BytesParserConfig::new().build());
+            .unwrap_or_else(|| todo!("Fallback to bytes parser is not implemented yet."));
 
         Decoder::new(framer, parser)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::log_schema;
-    use tokio_util::codec::Decoder;
-
-    #[tokio::test]
-    async fn basic_decoder() {
-        let mut decoder = super::Decoder::new(
-            Box::new(NewlineDelimitedCodec::new()),
-            Box::new(BytesParser),
-        );
-        let mut input = BytesMut::from("foo\nbar\nbaz");
-
-        let mut events = Vec::new();
-        while let Some(next) = decoder.decode_eof(&mut input).unwrap() {
-            events.push(next);
-        }
-
-        assert_eq!(events.len(), 3);
-        assert_eq!(events[0].0.len(), 1);
-        assert_eq!(
-            events[0].0[0].as_log()[log_schema().message_key()],
-            "foo".into()
-        );
-        assert!(events[0].0[0]
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
-        assert_eq!(events[0].1, 3);
-        assert_eq!(events[1].0.len(), 1);
-        assert_eq!(
-            events[1].0[0].as_log()[log_schema().message_key()],
-            "bar".into()
-        );
-        assert!(events[1].0[0]
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
-        assert_eq!(events[1].1, 3);
-        assert_eq!(events[2].0.len(), 1);
-        assert_eq!(
-            events[2].0[0].as_log()[log_schema().message_key()],
-            "baz".into()
-        );
-        assert!(events[2].0[0]
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
-        assert_eq!(events[2].1, 3);
     }
 }

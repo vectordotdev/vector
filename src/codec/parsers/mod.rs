@@ -3,10 +3,6 @@
 
 #![deny(missing_docs)]
 
-mod bytes;
-
-pub use self::bytes::{BytesParser, BytesParserConfig};
-
 use crate::event::Event;
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
