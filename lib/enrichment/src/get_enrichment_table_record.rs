@@ -1,6 +1,41 @@
 use crate::{Condition, IndexHandle, TableRegistry, TableSearch};
 use std::collections::BTreeMap;
-use vrl_core::prelude::*;
+use vrl_core::{
+    diagnostic::{Label, Span},
+    prelude::*,
+};
+
+#[derive(Debug)]
+pub enum Error {
+    TablesNotLoaded,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::TablesNotLoaded => write!(f, "enrichment tables not loaded"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        111
+    }
+
+    fn labels(&self) -> Vec<Label> {
+        match self {
+            Error::TablesNotLoaded => {
+                vec![Label::primary(
+                    "enrichment table error: tables not loaded".to_string(),
+                    Span::default(),
+                )]
+            }
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetEnrichmentTableRecord;
@@ -31,7 +66,7 @@ impl Function for GetEnrichmentTableRecord {
     fn compile(&self, state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let registry = state
             .get_external_context::<TableRegistry>()
-            .expect("enrichment tables not loaded");
+            .ok_or(Box::new(Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
 
         let tables = registry
             .table_ids()
