@@ -8,13 +8,13 @@ use crate::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BoxedRawValue, Buffer, Compression, EncodedEvent, JsonArrayBuffer, TowerRequestConfig,
+            BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt};
 use http::Uri;
 use hyper::{Body, Request};
 use indoc::indoc;
@@ -128,9 +128,6 @@ enum HealthcheckError {
 }
 
 struct BigquerySink {
-    project: String,
-    dataset: String,
-    table: String,
     api_key: Option<String>,
     creds: Option<GcpCredentials>,
     uri_base: String,
@@ -146,9 +143,6 @@ impl BigquerySink {
         );
 
         Ok(BigquerySink {
-            project: config.project.clone(),
-            dataset: config.dataset.clone(),
-            table: config.table.clone(),
             api_key: config.auth.api_key.clone(),
             creds,
             uri_base,
@@ -172,13 +166,11 @@ impl HttpSink for BigquerySink {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
-        // Each event needs to be base64 encoded, and put into a JSON object
-        // as the `data` item.
         let log = event.into_log();
         let json = serde_json::json!(&log);
-        Some(EncodedEvent::new(json))
+        Some(json)
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
