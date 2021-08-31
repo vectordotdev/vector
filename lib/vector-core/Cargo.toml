@@ -15,7 +15,7 @@ chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
-enrichment = { path = "../enrichment" }
+enrichment = { path = "../enrichment", optional = true }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
@@ -64,7 +64,7 @@ tokio-test = "0.4.2"
 default = []
 api = ["async-graphql"]
 lua = ["mlua", "tokio-stream"]
-vrl = ["vrl-core"]
+vrl = ["vrl-core", "enrichment"]
 disk-buffer = ["buffers/disk-buffer"]
 
 [[bench]]
