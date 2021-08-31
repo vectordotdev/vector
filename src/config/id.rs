@@ -15,26 +15,21 @@ pub enum ComponentScope {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentId {
-    value: String,
     id: String,
     scope: ComponentScope,
 }
 
 impl ComponentId {
     pub fn global<T: Into<String>>(id: T) -> Self {
-        let id = id.into();
         Self {
-            id: id.clone(),
-            value: id,
+            id: id.into(),
             scope: ComponentScope::Global,
         }
     }
 
     pub fn pipeline(pipeline: &str, id: &str) -> Self {
-        let value = format!("{}#{}", pipeline, id);
         Self {
             id: id.to_string(),
-            value,
             scope: ComponentScope::Pipeline(pipeline.to_string()),
         }
     }
@@ -57,10 +52,6 @@ impl ComponentId {
     pub fn is_global(&self) -> bool {
         matches!(self.scope, ComponentScope::Global)
     }
-
-    pub fn as_str(&self) -> &str {
-        self.value.as_str()
-    }
 }
 
 impl From<String> for ComponentId {
@@ -75,13 +66,11 @@ impl From<&str> for ComponentId {
         if parts.len() == 2 {
             Self {
                 id: parts[1].to_string(),
-                value: value.to_string(),
                 scope: ComponentScope::Pipeline(parts[0].to_string()),
             }
         } else {
             Self {
                 id: value.to_string(),
-                value: value.to_string(),
                 scope: ComponentScope::Global,
             }
         }
@@ -96,7 +85,11 @@ impl<T: ToString> From<&T> for ComponentId {
 
 impl fmt::Display for ComponentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.value.fmt(f)
+        if let Some(pipeline) = self.pipeline_str() {
+            write!(f, "{}.{}", pipeline, self.id)
+        } else {
+            self.id.fmt(f)
+        }
     }
 }
 

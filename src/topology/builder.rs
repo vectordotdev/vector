@@ -70,7 +70,7 @@ pub async fn build_pieces(
                 continue;
             }
         };
-        enrichment_tables.insert(name.as_str().to_string(), table);
+        enrichment_tables.insert(name.to_string(), table);
     }
 
     // Build sources
