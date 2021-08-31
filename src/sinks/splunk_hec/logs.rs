@@ -18,7 +18,7 @@ use serde_json::json;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct HecSinkConfig {
+pub struct HecSinkLogsConfig {
     pub token: String,
     // Deprecated name
     #[serde(alias = "host")]
@@ -52,10 +52,14 @@ fn host_key() -> String {
 }
 
 inventory::submit! {
-    SinkDescription::new::<HecSinkConfig>("splunk_hec")
+    SinkDescription::new::<HecSinkLogsConfig>("splunk_hec")
 }
 
-impl GenerateConfig for HecSinkConfig {
+inventory::submit! {
+    SinkDescription::new::<HecSinkLogsConfig>("splunk_hec_logs")
+}
+
+impl GenerateConfig for HecSinkLogsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
@@ -76,8 +80,8 @@ impl GenerateConfig for HecSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec")]
-impl SinkConfig for HecSinkConfig {
+#[typetag::serde(name = "splunk_hec_logs")]
+impl SinkConfig for HecSinkLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         conn::build_sink(
             self.clone(),
@@ -97,12 +101,36 @@ impl SinkConfig for HecSinkConfig {
     }
 
     fn sink_type(&self) -> &'static str {
+        "splunk_hec_logs"
+    }
+}
+
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct HecSinkCompatConfig {
+    #[serde(flatten)]
+    config: HecSinkLogsConfig,
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec")]
+impl SinkConfig for HecSinkCompatConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.config.build(cx).await
+    }
+
+    fn input_type(&self) -> DataType {
+        self.config.input_type()
+    }
+
+    fn sink_type(&self) -> &'static str {
         "splunk_hec"
     }
 }
 
 #[async_trait::async_trait]
-impl HttpSink for HecSinkConfig {
+impl HttpSink for HecSinkLogsConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
@@ -203,7 +231,7 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<HecSinkConfig>();
+        crate::test_util::test_generate_config::<HecSinkLogsConfig>();
     }
 
     #[derive(Deserialize, Debug)]
@@ -222,12 +250,12 @@ mod tests {
     }
 
     #[test]
-    fn splunk_encode_event_json() {
+    fn splunk_encode_log_event_json() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
         event.as_mut_log().insert("magic", "vector");
 
-        let (config, _cx) = load_sink::<HecSinkConfig>(
+        let (config, _cx) = load_sink::<HecSinkLogsConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -277,11 +305,11 @@ mod tests {
     }
 
     #[test]
-    fn splunk_encode_event_text() {
+    fn splunk_encode_log_event_text() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _cx) = load_sink::<HecSinkConfig>(
+        let (config, _cx) = load_sink::<HecSinkLogsConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -548,7 +576,7 @@ mod integration_tests {
     async fn splunk_configure_hostname() {
         let cx = SinkContext::new_test();
 
-        let config = HecSinkConfig {
+        let config = HecSinkLogsConfig {
             host_key: "roast".into(),
             ..config(Encoding::Json, vec!["asdf".to_string()]).await
         };
@@ -601,8 +629,8 @@ mod integration_tests {
     async fn config(
         encoding: impl Into<EncodingConfig<Encoding>>,
         indexed_fields: Vec<String>,
-    ) -> HecSinkConfig {
-        HecSinkConfig {
+    ) -> HecSinkLogsConfig {
+        HecSinkLogsConfig {
             token: get_token().await,
             endpoint: "http://localhost:8088/".into(),
             host_key: "host".into(),

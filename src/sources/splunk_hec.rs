@@ -777,7 +777,7 @@ mod tests {
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
         sinks::{
-            splunk_hec::logs::{Encoding, HecSinkConfig},
+            splunk_hec::logs::{Encoding, HecSinkLogsConfig},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
@@ -831,7 +831,7 @@ mod tests {
         encoding: impl Into<EncodingConfig<Encoding>>,
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
-        HecSinkConfig {
+        HecSinkLogsConfig {
             token: TOKEN.to_owned(),
             endpoint: format!("http://{}", address),
             host_key: "host".to_owned(),

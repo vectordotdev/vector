@@ -1,7 +1,8 @@
 package metadata
 
-components: sinks: splunk_hec: {
-	title: "Splunk HEC"
+components: sinks: splunk_hec_logs: {
+	title: "Splunk HEC logs"
+	alias: "splunk_hec"
 
 	classes: {
 		commonly_used: true
