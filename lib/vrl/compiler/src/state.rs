@@ -8,13 +8,13 @@ use std::{any::Any, collections::HashMap};
 /// compilation, which in turn drives our progressive type checking system.
 #[derive(Default)]
 pub struct Compiler {
-    // stored external target type definition
+    /// stored external target type definition
     target: Option<assignment::Details>,
 
-    // stored internal variable type definitions
+    /// stored internal variable type definitions
     variables: HashMap<Ident, assignment::Details>,
 
-    // enrichment_tables: Option<Box<dyn enrichment::TableSetup>>,
+    /// context passed between the client program and a VRL function.
     external_context: Vec<Box<dyn Any>>,
 
     /// On request, the compiler can store its state in this field, which can
@@ -96,16 +96,20 @@ impl Compiler {
         self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
+    /// Adds external context data for VRL functions to use.
     pub fn add_external_context(&mut self, data: Vec<Box<dyn Any>>) {
         self.external_context = data;
     }
 
+    /// Retrieves the first data of the required type from the external context.
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
         self.external_context
             .iter()
             .find_map(|data| data.downcast_ref::<T>())
     }
 
+    /// Retrieves a mutable reference to the first data of the required type from
+    /// the external context.
     pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.external_context
             .iter_mut()
