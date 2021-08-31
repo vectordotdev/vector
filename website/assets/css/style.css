@@ -290,5 +290,5 @@
 }
 
 footer ion-icon[name="logo-github"]:hover {
-  @apply text-gray-500
+  @apply dark:text-gray-500
 }
