@@ -91,9 +91,11 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			type: bool: default: true
 		}
 		retention_days: {
-			description: "Specifies the number of days log events remain in the log group"
+			common:      false
+			description: "Specifies the number of days log events remain in the log group."
 			required:    false
 			type: uint: {
+				default: null
 				examples: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
 				unit: "days"
 			}
