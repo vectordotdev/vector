@@ -16,7 +16,7 @@ db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
 enrichment = { path = "../enrichment" }
-futures = { version = "0.3.16", default-features = false, features = ["std"] }
+futures = { version = "0.3.17", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
@@ -35,8 +35,8 @@ pin-project = { version = "1.0.8", default-features = false }
 prost = { version = "0.8", default-features = false }
 prost-types = { version = "0.8", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.129", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.66", default-features = false }
+serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.67", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
 tokio = { version = "1.10.1", default-features = false }
