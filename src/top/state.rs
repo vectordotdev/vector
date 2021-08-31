@@ -26,6 +26,7 @@ pub type StateRx = mpsc::Receiver<State>;
 #[derive(Debug, Clone)]
 pub struct ComponentRow {
     pub id: String,
+    pub pipeline: Option<String>,
     pub kind: String,
     pub component_type: String,
     pub processed_bytes_total: i64,

@@ -1,5 +1,4 @@
 use super::state;
-use crate::config::ComponentId;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 use vector_api_client::{
@@ -21,6 +20,7 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
             let _ = tx
                 .send(state::EventType::ComponentAdded(state::ComponentRow {
                     id: c.component_id,
+                    pipeline: c.pipeline_id,
                     kind: c.on.to_string(),
                     component_type: c.component_type,
                     events_in_total: 0,
@@ -244,15 +244,11 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
         .flat_map(|d| {
             d.into_iter().filter_map(|edge| {
                 let d = edge?.node;
-                let id = match d.pipeline_id {
-                    Some(pipeline_id) => ComponentId::pipeline(&pipeline_id, &d.component_id),
-                    None => ComponentId::global(d.component_id),
-                }
-                .to_string();
                 Some((
-                    id.clone(),
+                    d.component_id.clone(),
                     state::ComponentRow {
-                        id,
+                        id: d.component_id.clone(),
+                        pipeline: d.pipeline_id.clone(),
                         kind: d.on.to_string(),
                         component_type: d.component_type,
                         events_in_total: d.on.events_in_total(),
