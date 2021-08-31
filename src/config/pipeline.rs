@@ -18,6 +18,10 @@ impl From<IndexMap<String, Pipeline>> for Pipelines {
 }
 
 impl Pipelines {
+    pub fn names(&self) -> impl Iterator<Item = &String> {
+        self.0.keys()
+    }
+
     pub fn load_from_paths(paths: impl Iterator<Item = PathBuf>) -> Result<Pipelines, Vec<String>> {
         let mut index: IndexMap<String, Pipeline> = IndexMap::new();
         let mut errors: Vec<String> = Vec::new();

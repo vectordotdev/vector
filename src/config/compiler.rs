@@ -4,6 +4,10 @@ use indexmap::IndexMap;
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
+    if let Err(pipeline_errors) = validation::check_pipelines(&builder.pipelines) {
+        errors.extend(pipeline_errors);
+    }
+
     if let Err(merge_errors) = builder.merge_pipelines() {
         errors.extend(merge_errors);
     }
