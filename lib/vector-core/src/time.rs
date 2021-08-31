@@ -10,6 +10,9 @@ use std::task::{Context, Poll};
 pub trait Timer {
     // For an example of how property testing can use this type see the
     // `stream::Batcher` property tests.
-    /// Whether the timer has elapsed or not, true if yes.
-    fn poll_elapsed(&mut self, cx: &mut Context) -> Poll<bool>;
+    /// Whether the timer has elapsed or not.
+    ///
+    /// This function will return `Poll::Pending` if the timer has not yet
+    /// fired, `Poll::Ready(())` if it has.
+    fn poll_elapsed(&mut self, cx: &mut Context) -> Poll<()>;
 }

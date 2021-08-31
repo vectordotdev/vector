@@ -33,10 +33,10 @@ impl BatcherTimer {
 }
 
 impl Timer for BatcherTimer {
-    fn poll_elapsed(&mut self, cx: &mut Context) -> Poll<bool> {
+    fn poll_elapsed(&mut self, cx: &mut Context) -> Poll<()> {
         match self.interval.poll_tick(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(_) => Poll::Ready(true),
+            Poll::Ready(_) => Poll::Ready(()),
         }
     }
 }
@@ -212,8 +212,8 @@ where
             }
             match this.stream.as_mut().poll_next(cx) {
                 Poll::Pending => match this.timer.poll_elapsed(cx) {
-                    Poll::Pending | Poll::Ready(false) => return Poll::Pending,
-                    Poll::Ready(true) => {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(()) => {
                         this.closed_batches.extend(
                             this.batches
                                 .drain()
@@ -247,7 +247,7 @@ where
                             batch.push(item);
                         } else {
                             match this.timer.poll_elapsed(cx) {
-                                Poll::Pending | Poll::Ready(false) => {
+                                Poll::Pending => {
                                     // There's no space in the partition batch
                                     // but the timer hasn't fired yet. Swap out
                                     // the existing, full partition batch for a
@@ -257,7 +257,7 @@ where
                                     let batch = mem::replace(batch, nb);
                                     this.closed_batches.push((item_key, batch.into_inner()));
                                 }
-                                Poll::Ready(true) => {
+                                Poll::Ready(()) => {
                                     // The global timer has elapsed. Close all
                                     // batches, including the one we have a
                                     // mutable ref to, and then insert a brand
@@ -306,31 +306,26 @@ mod test {
     /// for whether deadlines have elapsed or not. This allows us to include the
     /// notion of time in our property tests below.
     struct TestTimer {
-        responses: Vec<Poll<bool>>,
+        responses: Vec<Poll<()>>,
     }
 
     impl TestTimer {
-        fn new(responses: Vec<Poll<bool>>) -> Self {
+        fn new(responses: Vec<Poll<()>>) -> Self {
             Self { responses }
         }
     }
 
     impl Timer for TestTimer {
-        fn poll_elapsed(&mut self, _cx: &mut Context) -> Poll<bool> {
+        fn poll_elapsed(&mut self, _cx: &mut Context) -> Poll<()> {
             self.responses.pop().unwrap_or(Poll::Pending)
         }
     }
 
     fn arb_timer() -> impl Strategy<Value = TestTimer> {
-        Vec::<u8>::arbitrary()
+        Vec::<bool>::arbitrary()
             .prop_map(|v| {
                 v.into_iter()
-                    .map(|i| match i % 3 {
-                        0 => Poll::Pending,
-                        1 => Poll::Ready(true),
-                        2 => Poll::Ready(false),
-                        _ => unreachable!(),
-                    })
+                    .map(|i| if i { Poll::Pending } else { Poll::Ready(()) })
                     .collect()
             })
             .prop_map(TestTimer::new)
