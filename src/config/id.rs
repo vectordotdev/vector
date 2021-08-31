@@ -71,7 +71,7 @@ impl From<String> for ComponentId {
 
 impl From<&str> for ComponentId {
     fn from(value: &str) -> Self {
-        let parts = value.split('#').take(2).collect::<Vec<_>>();
+        let parts = value.split('.').take(2).collect::<Vec<_>>();
         if parts.len() == 2 {
             Self {
                 id: parts[1].to_string(),
@@ -166,9 +166,9 @@ mod tests {
 
     #[test]
     fn from_pipeline() {
-        let item = ComponentId::from("foo#bar");
+        let item = ComponentId::from("foo.bar");
         assert_eq!(item.id(), "bar");
         assert_eq!(item.scope, ComponentScope::Pipeline("foo".into()));
-        assert_eq!(item.to_string(), "foo#bar");
+        assert_eq!(item.to_string(), "foo.bar");
     }
 }
