@@ -15,7 +15,15 @@ pub struct IndexHandle(pub usize);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Condition<'a> {
-    Equals { field: &'a str, value: String },
+    Equals {
+        field: &'a str,
+        value: String,
+    },
+    BetweenDates {
+        field: &'a str,
+        from: chrono::,
+        to: usize,
+    },
 }
 
 /// Enrichment tables represent additional data sources that can be used to enrich the event data

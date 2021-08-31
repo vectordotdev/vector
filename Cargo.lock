@@ -1893,6 +1893,7 @@ name = "enrichment"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
+ "chrono",
  "dyn-clone",
  "shared",
  "vrl",

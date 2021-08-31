@@ -171,6 +171,39 @@ impl File {
 
         index
     }
+
+    /// Sequentially searches through the iterator for the given condition
+    fn sequential<'a, I>(
+        &'a self,
+        data: I,
+        condition: &'a [Condition<'a>],
+    ) -> impl Iterator<Item = BTreeMap<String, String>> + 'a
+    where
+        I: Iterator<Item = &'a Vec<String>> + 'a,
+    {
+        data.filter_map(move |row| {
+            if self.row_equals(condition, &*row) {
+                Some(self.add_columns(&*row))
+            } else {
+                None
+            }
+        })
+    }
+}
+
+/// Returns an error if the iterator doesn't yield exactly one result.
+fn single_or_err<I, T>(mut iter: T) -> Result<I, String>
+where
+    T: Iterator<Item = I>,
+{
+    let result = iter.next();
+
+    if iter.next().is_some() {
+        // More than one row has been found.
+        Err("more than one row found".to_string())
+    } else {
+        result.ok_or_else(|| "no rows found".to_string())
+    }
 }
 
 impl Table for File {
@@ -182,22 +215,7 @@ impl Table for File {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
-                let mut found = self.data.iter().filter_map(|row| {
-                    if self.row_equals(condition, &*row) {
-                        Some(self.add_columns(row))
-                    } else {
-                        None
-                    }
-                });
-
-                let result = found.next();
-
-                if found.next().is_some() {
-                    // More than one row has been found.
-                    Err("more than one row found".to_string())
-                } else {
-                    result.ok_or_else(|| "no rows found".to_string())
-                }
+                single_or_err(self.sequential(self.data.iter(), condition))
             }
             Some(IndexHandle(handle)) => {
                 // The index to use has been passed, we can use this to search the data.
@@ -218,19 +236,14 @@ impl Table for File {
 
                 let key = hash.finish();
 
-                self.indexes[handle]
+                let result = self.indexes[handle]
                     .get(&key)
-                    .ok_or_else(|| "no rows found".to_string())
-                    .and_then(|rows| {
-                        // Ensure we have exactly one result.
-                        if rows.len() == 1 {
-                            Ok(self.add_columns(&self.data[rows[0]]))
-                        } else if rows.is_empty() {
-                            Err("no rows found".to_string())
-                        } else {
-                            Err(format!("{} rows found", rows.len()))
-                        }
-                    })
+                    .ok_or_else(|| "no rows found".to_string())?
+                    .iter()
+                    .map(|idx| &self.data[*idx]);
+
+                // Perform a sequential scan over the indexed result.
+                single_or_err(self.sequential(result, condition))
             }
         }
     }
