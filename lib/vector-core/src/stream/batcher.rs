@@ -27,7 +27,7 @@ impl BatcherTimer {
     #[allow(dead_code)]
     pub fn new(period: Duration) -> Self {
         let mut interval = interval(period);
-        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         Self { interval }
     }
 }
