@@ -122,6 +122,7 @@ where
                     // stall.
                     //
                     // To avoid this we notify the reader to notify this writer.
+                    //trace!("waking up reader (caught up case)");
                     self.write_notifier.wake();
                 }
 
@@ -190,6 +191,7 @@ where
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
         self.write_notifier.wake();
+        //trace!("waking up reader");
     }
 }
 

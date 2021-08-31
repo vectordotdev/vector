@@ -1,7 +1,7 @@
 use super::Key;
 use crate::bytes::DecodeBytes;
 use bytes::Bytes;
-use futures::{task::AtomicWaker, Stream};
+use futures::{Stream, task::AtomicWaker};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     compaction::Compaction,
@@ -9,8 +9,10 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
+use tokio::task::JoinHandle;
 use std::collections::VecDeque;
 use std::fmt::Display;
+use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::{
@@ -76,6 +78,10 @@ where
     pub(crate) max_uncompacted_size: usize,
     /// Last time that compaction was triggered.
     pub(crate) last_compaction: Instant,
+    // Pending read from the LevelDB datasbase
+    pub(crate) pending_read: Option<JoinHandle<Vec<(Key, Vec<u8>)>>>,
+    //pub(crate) in_flight_reads: usize,
+    //pub(crate) total_reads: usize,
     pub(crate) phantom: PhantomData<T>,
 }
 
@@ -108,14 +114,51 @@ where
             // This will usually complete instantly, but in the case of a large
             // queue (or a fresh launch of the app), this will have to go to
             // disk.
-            tokio::task::block_in_place(|| {
-                this.buffer.extend(
-                    this.db
-                        .iter(ReadOptions::new())
-                        .from(&Key(this.read_offset))
-                        .take(100),
-                );
-            });
+            loop {
+                match this.pending_read.take() {
+                    None => {
+                        // We have no pending read in-flight, so queue one up.
+                        let db = Arc::clone(&this.db);
+                        let read_offset = this.read_offset;
+                        let handle = tokio::task::spawn_blocking(move || {
+                            db.iter(ReadOptions::new())
+                                .from(&Key(read_offset))
+                                .take(1000)
+                                .collect::<Vec<_>>()
+                        });
+
+                        //trace!("queued up blocking read at offset={} (in-flight={}, total-reads={})",
+                        //    this.read_offset, this.in_flight_reads, this.total_reads);
+
+                        // Store the handle, and let the loop come back around.
+                        this.pending_read = Some(handle);
+                        //this.in_flight_reads += 1;
+                        //this.total_reads += 1;
+                    },
+                    Some(mut handle) => {
+                        match Pin::new(&mut handle).poll(cx) {
+                            Poll::Ready(r) => {
+                                match r {
+                                    Ok(items) => this.buffer.extend(items),
+                                    Err(e) => error!("error during read: {}", e),
+                                }
+
+                                this.pending_read = None;
+                                //this.in_flight_reads -= 1;
+
+                                break
+                            },
+                            Poll::Pending => {
+                                this.pending_read = Some(handle);
+                                return Poll::Pending
+                            },
+                        }
+                    }
+                }
+            }
+
+            // If we've broke out of the loop, our read has completed.
+            this.pending_read = None;
         }
 
         if let Some((key, value)) = this.buffer.pop_front() {
@@ -135,6 +178,7 @@ where
             // There are no writers left
             Poll::Ready(None)
         } else {
+            //trace!("going to sleep");
             Poll::Pending
         }
     }
