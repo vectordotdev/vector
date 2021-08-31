@@ -31,6 +31,9 @@ pub struct TransformContext {
 }
 
 impl TransformContext {
+    // clippy allow avoids an issue where vrl is flagged off and `globals` is
+    // the sole field in the struct
+    #[allow(clippy::needless_update)]
     pub fn new_with_globals(globals: GlobalOptions) -> Self {
         Self {
             globals,
