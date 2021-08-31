@@ -13,21 +13,18 @@ use futures::StreamExt;
 use http::{Request, Uri};
 use hyper::Body;
 use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
 use std::io::Write;
-use tokio::sync::mpsc::Receiver;
-use tokio::time::{self, Duration};
+use std::num::NonZeroUsize;
+use std::sync::Arc;
+use tokio::time::Duration;
 use tower::Service;
-use twox_hash::XxHash64;
 use vector_core::event::EventStatus;
 use vector_core::event::{Event, EventFinalizers, Value};
+use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
-use vector_core::ByteSizeOf;
+use vector_core::stream::batcher::{Batcher, BatcherTimer};
 
-mod batcher;
 mod builder;
-mod common;
 mod errors;
 
 const MAX_PAYLOAD_ARRAY: usize = 1_000;
@@ -52,21 +49,20 @@ fn dissect_batch(batch: Vec<Event>) -> (Vec<BTreeMap<String, Value>>, Vec<EventF
 }
 
 fn build_request(
-    members: Vec<BTreeMap<String, Value>>,
+    members: &Vec<BTreeMap<String, Value>>,
     api_key: &str,
     datadog_uri: Uri,
     compression: &Compression,
-    flush_metrics: &mut FlushMetrics,
 ) -> Result<Request<Body>, FlushError> {
     let total_members = members.len();
-    assert!(total_members <= 1_000);
-    let body: Vec<u8> = serde_json::to_vec(&members).expect("failed to encode to json");
+    assert!(total_members <= MAX_PAYLOAD_ARRAY);
+    let body: Vec<u8> = serde_json::to_vec(members).expect("failed to encode to json");
 
     let request = Request::post(datadog_uri)
         .header("Content-Type", "application/json")
         .header("DD-API-KEY", api_key);
     let serialized_payload_len = body.len();
-    metrics::histogram!("encoded_payload_size_bytes", serialized_payload_len as f64);
+    // metrics::histogram!("encoded_payload_size_bytes", serialized_payload_len as f64);
     let (request, encoded_body) = match compression {
         Compression::None => (request, body),
         Compression::Gzip(level) => {
@@ -83,12 +79,24 @@ fn build_request(
             )
         }
     };
-    flush_metrics.processed_bytes_total = serialized_payload_len as u64;
-    flush_metrics.processed_events_total = total_members as u64;
+    // flush_metrics.processed_bytes_total = serialized_payload_len as u64;
+    // flush_metrics.processed_events_total = total_members as u64;
     request
         .header("Content-Length", encoded_body.len())
         .body(Body::from(encoded_body))
         .map_err(Into::into)
+}
+
+#[derive(Default)]
+struct EventPartitioner {}
+
+impl Partitioner for EventPartitioner {
+    type Item = Event;
+    type Key = Arc<str>;
+
+    fn partition(&self, item: &Self::Item) -> Option<Self::Key> {
+        item.metadata().datadog_api_key().clone()
+    }
 }
 
 #[derive(Debug)]
@@ -105,20 +113,7 @@ where
     /// associated API key. That API key is the one it'll get batched up by but
     /// otherwise we will see `Event` instances with no associated key. In that
     /// case we batch them by this default.
-    ///
-    /// Note that this is a `usize` and not a `Box<str>` or similar. This sink
-    /// stores all API keys in a slab and only materializes the actual API key
-    /// when needed.
-    default_api_key: u64,
-    /// The slab of API keys
-    ///
-    /// This slab holds the actual materialized API key in the form of a
-    /// `Box<str>`. This avoids having lots of little strings running around
-    /// with the downside of being an unbounded structure, in the present
-    /// implementation.
-    key_slab: HashMap<u64, Box<str>, BuildHasherDefault<XxHash64>>,
-    /// The batches of `Event` instances, sorted by API key
-    event_batches: HashMap<u64, Vec<Event>, BuildHasherDefault<XxHash64>>,
+    default_api_key: Arc<str>,
     /// The total duration before a flush is forced
     ///
     /// This value sets the duration that is allowed to ellapse prior to a flush
@@ -131,12 +126,6 @@ where
     /// event comes in and would cause `bytes_stored` to eclipse this value
     /// we'll need to temporarily store that event while a flush happens.
     bytes_stored_limit: usize,
-    /// Tracks the total in-memory bytes being held by this struct
-    ///
-    /// This value tells us how many bytes our buffered `Event` instances are
-    /// consuming. Once this value is >= `bytes_stored_limit` a flush will be
-    /// triggered.
-    bytes_stored: usize,
     /// The "message" key for the global log schema
     log_schema_message_key: &'static str,
     /// The "timestamp" key for the global log schema
@@ -159,6 +148,35 @@ where
     compression: Compression,
 }
 
+fn flush_to_api<'a, Client>(
+    http_client: &'a mut Client,
+    request: Request<Body>,
+    finalizers: Vec<EventFinalizers>,
+) -> Result<impl Future<Output = ()> + Send, FlushError>
+where
+    Client: Service<Request<Body>> + Send + Unpin,
+    Client::Future: Send,
+    Client::Response: Send,
+    Client::Error: Send,
+{
+    let fut = http_client.call(request).map(move |result| {
+        let status: EventStatus = match result {
+            Ok(_) => {
+                metrics::counter!("flush_success", 1);
+                EventStatus::Delivered
+            }
+            Err(_) => {
+                metrics::counter!("flush_error", 1);
+                EventStatus::Errored
+            }
+        };
+        for finalizer in finalizers {
+            finalizer.update_status(status);
+        }
+    });
+    Ok(fut)
+}
+
 impl<Client> LogApi<Client>
 where
     Client: Service<Request<Body>> + Send + Unpin,
@@ -169,194 +187,69 @@ where
     pub fn new() -> LogApiBuilder<Client> {
         LogApiBuilder::default().bytes_stored_limit(bytesize::mib(5_u32))
     }
-
-    /// Calculates the API key ID of an `Event`
-    ///
-    /// This function calculates the API key ID of a given `Event`. As a
-    /// side-effect it mutates internal state of the struct allowing callers to
-    /// use the ID to retrieve a `Box<str>` of the key at a later time.
-    fn register_key_id(&mut self, event: &Event) -> u64 {
-        if let Some(api_key) = event.metadata().datadog_api_key() {
-            let key = api_key.as_ref();
-            let key_hash = common::hash(key);
-            // TODO it'd be nice to avoid passing through String
-            self.key_slab
-                .entry(key_hash)
-                .or_insert_with(|| String::from(key).into_boxed_str());
-            key_hash
-        } else {
-            self.default_api_key
-        }
-    }
-
-    /// Determines if there is space in the batch for an additional `Event`
-    ///
-    /// This function determines whether adding a new `Event` to the batch
-    /// associated with `id` will take that batch over the maximum payload
-    /// size. If this function returns true the user may call [`store_event`]
-    /// else they must clear out space in the batch or drop whatever `Event`
-    /// they're holding.
-    #[inline]
-    fn has_space(&self, id: u64) -> bool {
-        if let Some(arr) = self.event_batches.get(&id) {
-            arr.len() < MAX_PAYLOAD_ARRAY
-        } else {
-            true
-        }
-    }
-
-    /// Stores the `Event` in its batch
-    ///
-    /// This function stores the `Event` in its `id` appropriate batch. Caller
-    /// MUST confirm that there is space in the batch for the `Event` by calling
-    /// `has_space`, which must return true.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if there is no space in the underlying batch.
-    #[inline]
-    fn store_event(&mut self, id: u64, event: Event) {
-        let arr = self
-            .event_batches
-            .entry(id)
-            .or_insert_with(|| Vec::with_capacity(MAX_PAYLOAD_ARRAY));
-        assert!(arr.len() + 1 <= MAX_PAYLOAD_ARRAY);
-        arr.push(event);
-    }
-
-    /// Flush the `Event` batches out to Datadog API
-    ///
-    /// When this function is called we are guaranteed to have less than
-    /// MAX_PAYLOAD_ARRAY total elements in a batch, whether this is triggered
-    /// by timeout or noting that `has_space` failes.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the batch size exceeds
-    /// MAX_PAYLOAD_ARRAY. Doing so implies a serious bug in the logic of this
-    /// implementaiton.
-    fn flush_to_api<'a>(
-        self: &'a mut Self,
-        api_key_id: u64,
-        batch: Vec<Event>,
-    ) -> Result<impl Future<Output = ()> + Send, FlushError> {
-        assert!(batch.len() <= MAX_PAYLOAD_ARRAY);
-
-        let api_key = self
-            .key_slab
-            .get(&api_key_id)
-            .expect("impossible situation");
-
-        let (members, finalizers) = dissect_batch(batch);
-        let mut flush_metrics = FlushMetrics::default();
-        let request = build_request(
-            members,
-            &api_key[..],
-            self.datadog_uri.clone(),
-            &self.compression,
-            &mut flush_metrics,
-        );
-        let fut = self.http_client.call(request?).map(move |result| {
-            let status: EventStatus = match result {
-                Ok(_) => {
-                    metrics::counter!("flush_success", 1);
-                    EventStatus::Delivered
-                }
-                Err(_) => {
-                    metrics::counter!("flush_error", 1);
-                    EventStatus::Errored
-                }
-            };
-            for finalizer in finalizers {
-                finalizer.update_status(status);
-            }
-            metrics::counter!("processed_bytes_total", flush_metrics.processed_bytes_total);
-            metrics::counter!(
-                "processed_events_total",
-                flush_metrics.processed_events_total
-            );
-            ()
-        });
-        Ok(fut)
-    }
 }
-
-// /// Run the IO loop of this sink
-// ///
-// /// This sink is busy doing two things: encoding `Event` instances into Datadog
-// /// logs payloads and then shunting these off to Datadog. Mixing the two causes
-// /// a good deal of lifetime hassle in this sink, not to mention we don't light
-// /// up CPUs like we might otherwise.
-// fn run_io<Client>(requests: Receiver<(Vec<EventFinalizers>, Request<Body>)>, http_client: Client)
-// where
-//     Client: Service<Request<Body>> + Send + Unpin,
-//     Client::Future: Send,
-//     Client::Response: Send,
-//     Client::Error: Send,
-// {
-//     let mut flushes = FuturesUnordered::new();
-//     tokio::select! {
-//         Some(()) = flushes.next() => {
-//             // nothing, intentionally
-//         }
-//         (finalizers, request) = requests.recv() => {
-//             let fut = http_client.call(request).map(move |result| {
-//                 let status: EventStatus = match result {
-//                     Ok(_) => {
-//                         metrics::counter!("flush_success", 1);
-//                         EventStatus::Delivered
-//                     }
-//                     Err(_) => {
-//                         metrics::counter!("flush_error", 1);
-//                         EventStatus::Errored
-//                     }
-//                 };
-//                 for finalizer in finalizers {
-//                     finalizer.update_status(status);
-//                 }
-//                 metrics::counter!("processed_bytes_total", flush_metrics.processed_bytes_total);
-//                 metrics::counter!(
-//                     "processed_events_total",
-//                     flush_metrics.processed_events_total
-//                 );
-//                 ()
-//             });
-//             flushes.push(fut);
-//         }
-//     }
-// }
 
 #[async_trait]
 impl<Client> StreamSink for LogApi<Client>
 where
-    Client: Service<Request<Body>> + Send + Unpin,
+    Client: Service<Request<Body>> + Send + Sync + Unpin,
     Client::Future: Send,
     Client::Response: Send,
     Client::Error: Send,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        // copy items out of `self`, needed as we don't have ownership
+        let compression = self.compression.clone();
+        let datadog_uri = self.datadog_uri.clone();
+        let default_api_key = self.default_api_key.clone();
         let encoding = self.encoding.clone();
+        let host_key = self.log_schema_host_key;
         let message_key = self.log_schema_message_key;
         let timestamp_key = self.log_schema_timestamp_key;
-        let host_key = self.log_schema_host_key;
 
         // Before we start we need to prime the pump on our http client.
         poll_fn(|cx| self.http_client.poll_ready(cx))
             .await
             .map_err(|_e| ())?;
 
-        let mut input = input
-            .map(|mut event| {
-                let log = event.as_mut_log();
-                log.rename_key_flat(message_key, "message");
-                log.rename_key_flat(timestamp_key, "date");
-                log.rename_key_flat(host_key, "host");
-                encoding.apply_rules(&mut event);
-                event
+        let input = input.map(|mut event| {
+            let log = event.as_mut_log();
+            log.rename_key_flat(message_key, "message");
+            log.rename_key_flat(timestamp_key, "date");
+            log.rename_key_flat(host_key, "host");
+            encoding.apply_rules(&mut event);
+            event
+        });
+        let input =
+            Batcher::new(
+                input,
+                EventPartitioner::default(),
+                BatcherTimer::new(self.timeout),
+                NonZeroUsize::new(MAX_PAYLOAD_ARRAY).unwrap(),
+                None,
+            )
+            .map(|(api_key, events): (Option<Arc<str>>, Vec<Event>)| {
+                let api_key = api_key.unwrap_or_else(|| default_api_key.clone());
+                let (fields, finalizers) = dissect_batch(events);
+                let uri = datadog_uri.clone();
+                let request = build_request(&fields, &api_key, uri, &compression);
+                (request, finalizers)
             })
+            .filter_map(
+                |(request, finalizers): (
+                    Result<Request<Body>, FlushError>,
+                    Vec<EventFinalizers>,
+                )| async move {
+                    // TODO must address this error somehow
+                    if request.is_err() {
+                        return None;
+                    }
+                    Some((request.unwrap(), finalizers))
+                },
+            )
             .fuse();
+        let mut input = Box::pin(input);
 
-        let mut interval = time::interval(self.timeout);
         let mut flushes = FuturesUnordered::new();
         loop {
             tokio::select! {
@@ -364,45 +257,14 @@ where
                 Some(()) = flushes.next() => {
                     // nothing, intentionally
                 }
-                Some(event) = input.next() => {
-                    let key_id = self.register_key_id(&event);
-                    let event_size = event.size_of();
-                    if !self.has_space(key_id) || self.bytes_stored_limit < self.bytes_stored + event_size {
-                        let batch = self
-                            .event_batches
-                            .remove(&key_id)
-                            .expect("impossible situation");
-                        // TODO currently we do serialization inline to this
-                        // call, which is time consuming relative to processing
-                        // incoming events. If we could serialize in parallel to
-                        // doing IO we'd end up ahead most likely.
-                        let flush = self.flush_to_api(key_id, batch).expect("unsure how to handle error");
-                        flushes.push(flush);
-                        self.bytes_stored = 0; // TODO logic is now wrong since we flush single-batch
-                    }
-                    self.store_event(key_id, event);
-                    self.bytes_stored += event_size;
-                }
-                _ = interval.tick() => {
-                    // The current ticking method does not take into account
-                    // flushing. That is, no matter what, we will always flush
-                    // every interval even if we just finished flushing. We
-                    // could avoid this if we were able to keep track of when a
-                    // batch was last flushed _or_ if we pull batching
-                    // responsibility (+ timeouts) into a stream manipulator
-                    // prior to this sink.
-                    let keys: Vec<u64> = self.event_batches.keys().into_iter().map(|x| *x).collect();
-                    for key_id in keys.into_iter() {
-                        let batch = self
-                            .event_batches
-                            .remove(&key_id)
-                            .expect("impossible situation");
-                        let flush = self.flush_to_api(key_id, batch).expect("unsure how to handle error");
-                        flushes.push(flush);
-                    }
-                    self.bytes_stored = 0;
+                Some((request, finalizers)) = input.next() => {
+                    let flush = flush_to_api(&mut self.http_client, request, finalizers)
+                        .expect("some unrecoverable failure");
+                    flushes.push(flush);
                 },
+                else => break,
             }
         }
+        Ok(())
     }
 }

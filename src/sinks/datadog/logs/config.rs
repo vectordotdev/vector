@@ -10,6 +10,7 @@ use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
+use std::sync::Arc;
 use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -116,6 +117,7 @@ impl SinkConfig for DatadogLogsConfig {
         // .boxed();
         let healthcheck = nop_healthcheck().boxed();
 
+        let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
         let log_api = LogApi::new()
             // .batch_timeout(batch_settings.timeout)
             .bytes_stored_limit(
@@ -126,7 +128,7 @@ impl SinkConfig for DatadogLogsConfig {
             )
             .compression(self.compression.unwrap_or_default())
             .datadog_uri(self.get_uri())
-            .default_api_key(self.default_api_key.clone().into_boxed_str())
+            .default_api_key(default_api_key)
             .encoding(self.encoding.clone())
             .http_client(client)
             .log_schema(vector_core::config::log_schema())

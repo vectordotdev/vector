@@ -1,12 +1,11 @@
 use crate::sinks::datadog::logs::config::Encoding;
-use crate::sinks::datadog::logs::log_api::common;
 use crate::sinks::datadog::logs::log_api::LogApi;
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::Compression;
 use http::{Request, Uri};
 use hyper::Body;
 use snafu::Snafu;
-use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::time::Duration;
 use tower::Service;
 use vector_core::config::{log_schema, LogSchema};
@@ -30,7 +29,7 @@ where
     encoding: EncodingConfigWithDefault<Encoding>,
     http_client: Option<Client>,
     datadog_uri: Option<Uri>,
-    default_api_key: Option<Box<str>>,
+    default_api_key: Option<Arc<str>>,
     compression: Option<Compression>,
     timeout: Option<Duration>,
     bytes_stored_limit: u64,
@@ -81,7 +80,7 @@ where
         self
     }
 
-    pub fn default_api_key(mut self, api_key: Box<str>) -> Self {
+    pub fn default_api_key(mut self, api_key: Arc<str>) -> Self {
         self.default_api_key = Some(api_key);
         self
     }
@@ -113,17 +112,9 @@ where
     }
 
     pub fn build(self) -> Result<LogApi<Client>, BuildError> {
-        let mut key_slab = HashMap::default();
-        let default_api_key = self.default_api_key.unwrap();
-        let default_api_key_id = common::hash(&default_api_key);
-        key_slab.insert(default_api_key_id, default_api_key);
-
         let log_api = LogApi {
-            default_api_key: default_api_key_id,
-            key_slab,
-            event_batches: HashMap::default(),
+            default_api_key: self.default_api_key.unwrap(),
             bytes_stored_limit: self.bytes_stored_limit as usize,
-            bytes_stored: 0,
             compression: self.compression.unwrap_or_default(),
             datadog_uri: self.datadog_uri.ok_or(BuildError::MissingUri)?,
             encoding: self.encoding,
