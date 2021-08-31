@@ -150,7 +150,7 @@ where
     /// The maximum number of items that are allowed per-batch
     batch_item_limit: usize,
     /// The total number of bytes a single batch in this struct is allowed to
-    /// hold. If None effectively unlimited.
+    /// hold.
     batch_allocation_limit: usize,
     /// The store of live batches. Note that the key here is an option type,
     /// on account of the interface of `Prt`.
