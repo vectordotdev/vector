@@ -109,8 +109,8 @@ where
     /// Called by the user when they want to get at the internal store of
     /// items. Returns a tuple, the first element being the allocated size of
     /// stored items and the second the store of items.
-    fn destruct(self) -> (usize, Vec<I>) {
-        (self.allocated_bytes, self.elements)
+    fn into_inner(self) -> Vec<I> {
+        self.elements
     }
 
     /// Whether the batch has space for a new item
@@ -217,7 +217,7 @@ where
                         this.closed_batches.extend(
                             this.batches
                                 .drain()
-                                .map(|(key, batch)| (key, batch.destruct().1)),
+                                .map(|(key, batch)| (key, batch.into_inner())),
                         );
                         continue;
                     }
@@ -229,7 +229,7 @@ where
                         this.closed_batches.extend(
                             this.batches
                                 .drain()
-                                .map(|(key, batch)| (key, batch.destruct().1)),
+                                .map(|(key, batch)| (key, batch.into_inner())),
                         );
                         continue;
                     }
@@ -255,7 +255,7 @@ where
                                     // closed_batches.
                                     let nb = Batch::new(item_limit, alloc_limit).with(item);
                                     let batch = mem::replace(batch, nb);
-                                    this.closed_batches.push((item_key, batch.destruct().1));
+                                    this.closed_batches.push((item_key, batch.into_inner()));
                                 }
                                 Poll::Ready(true) => {
                                     // The global timer has elapsed. Close all
@@ -265,7 +265,7 @@ where
                                     this.closed_batches.extend(
                                         this.batches
                                             .drain()
-                                            .map(|(key, batch)| (key, batch.destruct().1)),
+                                            .map(|(key, batch)| (key, batch.into_inner())),
                                     );
                                     // With all batches closed put the item into
                                     // a new batch.
