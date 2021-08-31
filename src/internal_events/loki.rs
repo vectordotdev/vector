@@ -6,7 +6,8 @@ pub struct LokiEventUnlabeled;
 
 impl InternalEvent for LokiEventUnlabeled {
     fn emit_metrics(&self) {
-        counter!("unlabeled_events_total", 1);
+        counter!("processing_errors_total", 1,
+                "error_type" => "unlabeled_event");
     }
 }
 

@@ -209,6 +209,5 @@ components: sinks: loki: {
 		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processing_errors_total:   components.sources.internal_metrics.output.metrics.processing_errors_total
 		streams_total:			   components.sources.internal_metrics.output.metrics.streams_total
-		unlabeled_events_total:    components.sources.internal_metrics.output.metrics.unlabeled_events_total
 	}
 }

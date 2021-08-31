@@ -902,12 +902,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		unlabeled_events_total: {
-			description:       "The total number of events without any label."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		uptime_seconds: {
 			description:       "The total number of seconds the Vector instance has been up."
 			type:              "gauge"
@@ -1051,6 +1045,7 @@ components: sources: internal_metrics: {
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."
+				"unlabeled_event":			   "The event was not labeled."
 				"value_invalid":               "The value was invalid."
 			}
 		}
