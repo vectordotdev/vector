@@ -59,8 +59,15 @@ impl Pipelines {
             .filter_map(|entry| match entry {
                 Ok(item) => {
                     let path = item.path();
+                    let format = match Format::from_path(&path) {
+                        Ok(value) => value,
+                        Err(path) => {
+                            debug!("Couldnt get format for {:?}", path);
+                            return None;
+                        }
+                    };
                     if path.is_file() {
-                        Some(Pipeline::load_from_file(&path))
+                        Some(Pipeline::load_from_file(&path, format))
                     } else {
                         None
                     }
@@ -147,9 +154,7 @@ impl Pipeline {
             .collect()
     }
 
-    pub fn load_from_file(file: &Path) -> Result<(String, Self), String> {
-        let format =
-            Format::from_path(file).map_err(|err| format!("Could not read format: {:?}", err))?;
+    pub fn load_from_file(file: &Path, format: Format) -> Result<(String, Self), String> {
         let filename = file
             .file_stem()
             .and_then(|name| name.to_str().map(ToString::to_string))
