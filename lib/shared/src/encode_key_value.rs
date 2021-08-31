@@ -21,11 +21,11 @@ impl Error for EncodingError {
     }
 }
 
-pub fn to_string<'a, V: Serialize>(
+pub fn to_string<V: Serialize>(
     input: BTreeMap<String, V>,
     fields_order: &[String],
-    key_value_delimiter: &'a str,
-    field_delimiter: &'a str,
+    key_value_delimiter: &str,
+    field_delimiter: &str,
     flatten_boolean: bool,
 ) -> Result<String, EncodingError> {
     let mut output = String::new();
@@ -171,7 +171,7 @@ impl<'a> KeyValueSerializer<'a> {
         self
     }
 
-    fn child<'b>(&'b mut self, child: impl fmt::Display) -> KeyValueSerializer<'b> {
+    fn child(&mut self, child: impl fmt::Display) -> KeyValueSerializer<'_> {
         KeyValueSerializer {
             key: format!("{}{}{}", self.key, self.separator, child),
             separator: self.separator,
