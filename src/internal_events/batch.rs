@@ -18,7 +18,7 @@ impl InternalEvent for LargeEventDropped {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_discarded_total", 1);
-        counter!("large_events_total", 1);
+        counter!("events_discarded_total", 1
+              "reason" => "oversized");
     }
 }

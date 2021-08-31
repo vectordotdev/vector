@@ -441,7 +441,9 @@ components: sources: internal_metrics: {
 			description:       "The total number of events discarded by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _internal_metrics_tags & {
+				reason: _reason
+			}
 		}
 		events_failed_total: {
 			description:       "The total number of failures to read a Kafka message."
@@ -683,12 +685,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		large_events_total: {
-			description:       "The total number of events discarded for their large size."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		logging_driver_errors_total: {
 			description: """
 				The total number of logging driver errors encountered caused by not using either
@@ -721,12 +717,6 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		out_of_order_events_total: {
-			description:       "The number of events that were out of order."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
 		}
 		parse_errors_total: {
 			description:       "The total number of errors parsing metrics for this component."
@@ -1055,6 +1045,7 @@ components: sources: internal_metrics: {
 				"invalid_metric":              "The metric was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
+				"out_of_order":				   "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
 				"render_error":                "The rendering operation failed."
 				"type_conversion_failed":      "The type conversion operating failed."
@@ -1088,6 +1079,14 @@ components: sources: internal_metrics: {
 		_path: {
 			description: "The path that produced the error."
 			required:    true
+		}
+		_reason: {
+			description: "The type of the error"
+			required:    true
+			enum: {
+				"out_of_order": "The event was out of order."
+				"oversized":    "The event was too large."				
+			}
 		}
 	}
 }

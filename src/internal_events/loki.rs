@@ -42,8 +42,10 @@ impl InternalEvent for LokiOutOfOrderEventDropped {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_discarded_total", 1);
-        counter!("out_of_order_events_total", 1);
+        counter!("events_discarded_total", 1,
+                "reason" => "out_of_order");
+        counter!("processing_errors_total", 1,
+                "error_type" => "out_of_order");
     }
 }
 
@@ -59,6 +61,7 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
     }
 
     fn emit_metrics(&self) {
-        counter!("out_of_order_events_total", 1);
+        counter!("processing_errors_total", 1,
+                "error_type" => "out_of_order");
     }
 }
