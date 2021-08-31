@@ -19,21 +19,19 @@ pub struct HumioLogsConfig {
     pub(in crate::sinks::humio) endpoint: Option<String>,
     pub(in crate::sinks::humio) source: Option<Template>,
     pub(in crate::sinks::humio) encoding: EncodingConfig<Encoding>,
-
     pub(in crate::sinks::humio) event_type: Option<Template>,
-
     #[serde(default = "host_key")]
     pub(in crate::sinks::humio) host_key: String,
-
+    #[serde(default)]
+    pub(in crate::sinks::humio) indexed_fields: Vec<String>,
+    #[serde(default)]
+    pub(in crate::sinks::humio) index: Option<Template>,
     #[serde(default)]
     pub(in crate::sinks::humio) compression: Compression,
-
     #[serde(default)]
     pub(in crate::sinks::humio) request: TowerRequestConfig,
-
     #[serde(default)]
     pub(in crate::sinks::humio) batch: BatchConfig,
-
     pub(in crate::sinks::humio) tls: Option<TlsOptions>,
 }
 
@@ -49,6 +47,8 @@ impl GenerateConfig for HumioLogsConfig {
             source: None,
             encoding: Encoding::Json.into(),
             event_type: None,
+            indexed_fields: vec![],
+            index: None,
             host_key: host_key(),
             compression: Compression::default(),
             request: TowerRequestConfig::default(),
@@ -83,8 +83,8 @@ impl HumioLogsConfig {
             token: self.token.clone(),
             endpoint,
             host_key: self.host_key.clone(),
-            indexed_fields: vec![],
-            index: None,
+            indexed_fields: self.indexed_fields.clone(),
+            index: self.index.clone(),
             sourcetype: self.event_type.clone(),
             source: self.source.clone(),
             encoding: self.encoding.clone().into_encoding(),
@@ -286,6 +286,8 @@ mod integration_tests {
             encoding: Encoding::Json.into(),
             event_type: None,
             host_key: log_schema().host_key().to_string(),
+            indexed_fields: vec![],
+            index: None,
             compression: Compression::None,
             request: TowerRequestConfig::default(),
             batch: BatchConfig {

@@ -127,6 +127,30 @@ components: sinks: _humio: {
 				syntax: "literal"
 			}
 		}
+		index: {
+			common:      false
+			description: "The name of the index where to send the events to. If not specified, the default index is used."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["{{ host }}", "custom_index"]
+				syntax: "template"
+			}
+		}
+		indexed_fields: {
+			common:      true
+			description: "Fields to be added to the index via [Splunk HEC indexed fields](\(urls.splunk_hec_indexed_fields))."
+			required:    false
+			warnings: []
+			type: array: {
+				default: null
+				items: type: string: {
+					examples: ["field1", "field2"]
+					syntax: "field_path"
+				}
+			}
+		}
 		source: {
 			common: false
 			description: """
