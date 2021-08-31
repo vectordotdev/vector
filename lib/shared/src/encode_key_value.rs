@@ -21,7 +21,7 @@ impl Error for EncodingError {
     }
 }
 
-pub fn encode<'a, V: Serialize>(
+pub fn to_string<'a, V: Serialize>(
     input: BTreeMap<String, V>,
     fields_order: &[String],
     key_value_delimiter: &'a str,
@@ -502,7 +502,7 @@ impl<'a> SerializeMap for KeyedKeyValueSerializer<'a> {
     where
         T: Serialize,
     {
-        let key = self.key.take().expect("Key must present.");
+        let key = self.key.take().expect("Key must be present.");
         value.serialize(self.ser.child(key))
     }
 
@@ -520,7 +520,7 @@ mod tests {
     #[test]
     fn single_element() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "lvl" => "info"
                 },
@@ -537,7 +537,7 @@ mod tests {
     #[test]
     fn multiple_elements() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "lvl" => "info",
                     "log_id" => 12345
@@ -555,7 +555,7 @@ mod tests {
     #[test]
     fn string_with_spaces() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "lvl" => "info",
                     "msg" => "This is a log message"
@@ -573,7 +573,7 @@ mod tests {
     #[test]
     fn flatten_boolean() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "beta" => true,
                     "prod" => false,
@@ -593,7 +593,7 @@ mod tests {
     #[test]
     fn dont_flatten_boolean() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "beta" => true,
                     "prod" => false,
@@ -613,7 +613,7 @@ mod tests {
     #[test]
     fn other_delimiters() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "tag_a" => "val_a",
                     "tag_b" => "val_b",
@@ -632,7 +632,7 @@ mod tests {
     #[test]
     fn string_with_characters_to_escape() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "lvl" => "info",
                     "msg" => r#"payload: {"code": 200}\n"#,
@@ -652,7 +652,7 @@ mod tests {
     #[test]
     fn nested_fields() {
         assert_eq!(
-                &encode::<Value>(
+                &to_string::<Value>(
                     btreemap! {
                         "log" => json!({
                             "file": {
@@ -682,7 +682,7 @@ mod tests {
     #[test]
     fn fields_ordering() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "lvl" => "info",
                     "msg" => "This is a log message",
@@ -701,7 +701,7 @@ mod tests {
     #[test]
     fn nested_fields_ordering() {
         assert_eq!(
-            &encode::<Value>(
+            &to_string::<Value>(
                 btreemap! {
                     "log" => json!({
                         "file": {

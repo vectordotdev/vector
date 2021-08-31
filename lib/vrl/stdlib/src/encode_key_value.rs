@@ -1,9 +1,6 @@
-use shared::encode_key_value::encode;
-use std::collections::BTreeMap;
-use std::fmt::Write;
+use shared::encode_key_value;
 use std::result::Result;
 use vrl::prelude::*;
-use Value::{Array, Boolean, Object};
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeKeyValue;
@@ -130,7 +127,7 @@ impl Expression for EncodeKeyValueFn {
         let field_delimiter = value.try_bytes_utf8_lossy()?;
         let flatten_boolean = self.flatten_boolean.resolve(ctx)?.try_boolean()?;
 
-        Ok(encode(
+        Ok(encode_key_value::to_string(
             object,
             &fields[..],
             &key_value_delimiter,

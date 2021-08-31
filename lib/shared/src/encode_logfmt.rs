@@ -1,9 +1,7 @@
-use crate::encode_key_value::{encode as encode_key_value, EncodingError};
+use crate::encode_key_value::{to_string as encode_key_value, EncodingError};
 use serde::Serialize;
+use std::collections::BTreeMap;
 
-pub fn encode<'a, V: Serialize>(
-    input: BTreeMap<String, V>,
-    fields_order: &[String],
-) -> Result<String, EncodingError> {
-    encode_key_value(input, fields_order, "=", " ", true)
+pub fn to_string<'a, V: Serialize>(input: BTreeMap<String, V>) -> Result<String, EncodingError> {
+    encode_key_value(input, &[], "=", " ", true)
 }
