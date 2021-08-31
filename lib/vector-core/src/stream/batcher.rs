@@ -34,10 +34,7 @@ impl BatcherTimer {
 
 impl Timer for BatcherTimer {
     fn poll_elapsed(&mut self, cx: &mut Context) -> Poll<()> {
-        match self.interval.poll_tick(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(_) => Poll::Ready(()),
-        }
+        self.interval.poll_tick(cx).map(|_| ())
     }
 }
 
