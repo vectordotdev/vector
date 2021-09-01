@@ -281,12 +281,9 @@ fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8
     }
     log.insert("attributes", attributes);
 
-    let bytes = serde_json::to_vec(&log)
-        .map(|mut b| {
-            b.push(b'\n');
-            b
-        })
+    let mut bytes = serde_json::to_vec(&log)
         .expect("Failed to encode event as json, this is a bug!");
+    bytes.push('\n');
 
     Some(EncodedEvent {
         item: PartitionInnerBuffer::new(bytes, key.into()),
@@ -370,9 +367,9 @@ mod tests {
 
     #[test]
     fn encodes_event() {
-        let mut log = Event::from("test message");
-        log.as_mut_log().insert("service", "test-service");
-        log.as_mut_log().insert("not_a_reserved_attribute", "value");
+        let mut log = LogEvent::from("test message");
+        log.insert("service", "test-service");
+        log.insert("not_a_reserved_attribute", "value");
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
             .expect("invalid test case")
             .with_timezone(&Utc);
