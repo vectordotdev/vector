@@ -1116,6 +1116,51 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn cloudwatch_set_log_retention() {
+        trace_init();
+
+        let stream_name = gen_name();
+        let group_name = gen_name();
+
+        let config = CloudwatchLogsSinkConfig {
+            stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+            group_name: Template::try_from(group_name.as_str()).unwrap(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            encoding: Encoding::Text.into(),
+            create_missing_group: None,
+            create_missing_stream: None,
+            retention_days: Some(123),
+            compression: Default::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            assume_role: None,
+            auth: Default::default(),
+        };
+
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+
+        let (_, events) = random_lines_with_stream(100, 1, None);
+        sink.run(events).await.unwrap();
+
+        let request = DescribeLogGroupsRequest {
+            log_group_name_prefix: Some(group_name.clone()),
+            ..Default::default()
+        };
+
+        let response = create_client_test()
+            .describe_log_groups(request)
+            .await
+            .unwrap();
+        let log_groups = response.log_groups.unwrap();
+
+        assert_eq!(log_groups.len(), 1);
+
+        let log_group = &log_groups[0];
+        assert_eq!(log_group.log_group_name, Some(group_name.clone()));
+        assert_eq!(log_group.retention_in_days, Some(123));
+    }
+
+    #[tokio::test]
     async fn cloudwatch_insert_log_event_batched() {
         trace_init();
 
