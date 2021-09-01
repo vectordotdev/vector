@@ -53,7 +53,7 @@ preview-build:
 	--environment "preview" \
 	--minify
 
-ci-preview-build: setup structured-data preview-build algolia
+ci-preview-build: setup structured-data preview-build run-link-checker algolia
 
 run-link-checker:
 	htmltest
