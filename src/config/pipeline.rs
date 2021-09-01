@@ -62,7 +62,7 @@ impl Pipelines {
                     let format = match Format::from_path(&path) {
                         Ok(value) => value,
                         Err(path) => {
-                            debug!("Couldnt get format for {:?}", path);
+                            debug!("Could not get format for {:?}.", path);
                             return None;
                         }
                     };
