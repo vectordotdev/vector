@@ -199,7 +199,7 @@ invent anything particularly new for Vector.
 
 ## Alternatives
 
-### What other approaches have been considered and why did you not choose them?
+### Event-focused spans
 
 The primary alternative implementation that's been discussed is to have spans be
 event-focused rather than component-focused. This would involve stashing a root
@@ -211,6 +211,8 @@ interesting data, it would be significantly more complex and manual to
 implement, and it's not clear that the data would actually be more useful in
 addressing performance issues.
 
+### Non-`tracing` spans
+
 Another alternative would be to avoid the coupling between tracing spans and
 logs, and use a library other than `tracing` for this functionality. This may
 provide some benefit in reducing confusion about log levels, accumulating events
@@ -219,12 +221,35 @@ system for instrumentation. It would also be rather confusing to use the
 `tracing` crate, but not for tracing, especially since it is one of the most
 widely used and well-engineered crates for this purpose.
 
-### How about not doing this at all?
+### More granular metrics
 
-As discussed in the Rationale section, not doing this at all would leave us with
-a meaningful gap in our observability. There would be no immediate dire
-consequences, but we would expect to continue sinking more engineering time into
-debugging customer issues than we would if this data were easily available.
+Perhaps the most compelling alternative is to tracing as a whole. Instead of
+adding an additional type of signal to Vector's observability, we could invest
+further into out internal metrics with a specific focus on addressing the pain
+points laid out in this RFC. Most of the missing signal is around timing of
+operations and their relative share of wall clock time. This is something that
+could be captured reasonably well with timing histograms, with minimal runtime
+cost and no additional moving parts.
+
+The primary disadvantages of metrics in relation to traces for this use case are
+as follows:
+
+1. The lack inherent relations (à la parent and child spans) and their
+   corresponding visualizations means it would take more interpretation and
+   external knowledge to derive the same signal.
+
+1. Their aggregated nature would put a limit on the level of detail (e.g. no
+   file name field on a `read` span from the file source).
+
+1. Collecting timings directly is likely to require more explicit
+   instrumentation code than simply adding spans.
+
+### Do nothing
+
+As discussed in the Rationale section, not addressing this pain at all would
+leave us with a meaningful gap in our observability. There would be no immediate
+dire consequences, but we would expect to continue sinking more engineering time
+into debugging customer issues than we would if this data were easily available.
 
 ## Outstanding Questions
 
