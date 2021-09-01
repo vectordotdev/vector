@@ -106,6 +106,16 @@ components: sinks: gcp_stackdriver_metrics: {
 				syntax:  "literal"
 			}
 		}
+		max_batch_size: {
+			common:      false
+			description: "Maximum time series batch size used when sending metrics to GCP."
+			required:    false
+			warnings: []
+			type: uint: {
+				default: 200
+				unit:    "bytes"
+			}
+		}
 		resource: {
 			description: "Options for describing the logging resource."
 			required:    true

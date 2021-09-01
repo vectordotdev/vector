@@ -241,18 +241,18 @@ pub struct GcpPointValue {
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct GcpSerie<'a> {
+pub struct GcpSerie {
     pub metric: GcpTypedResource,
     pub resource: GcpTypedResource,
     pub metric_kind: GcpMetricKind,
     pub value_type: GcpValueType,
-    pub points: &'a [GcpPoint],
+    pub points: Vec<GcpPoint>,
 }
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct GcpSeries<'a> {
-    time_series: &'a [GcpSerie<'a>],
+pub struct GcpSeries {
+    time_series: Vec<GcpSerie>,
 }
 
 fn serialize_int64_value<S>(value: &Option<i64>, serializer: S) -> Result<S::Ok, S::Error>

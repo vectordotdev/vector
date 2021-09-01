@@ -1,17 +1,16 @@
-use crate::config::{DataType, SinkConfig, SinkContext, SinkDescription};
-use crate::event::{Event, Metric, MetricValue};
-use crate::http::HttpClient;
-use crate::sinks::gcp;
-use crate::sinks::util::buffer::metrics::MetricsBuffer;
-use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{BatchConfig, BatchSettings, TowerRequestConfig};
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::tls::{TlsOptions, TlsSettings};
+use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, MetricValue},
+    sinks::{gcp, util::StreamSink, Healthcheck, VectorSink},
+};
 use chrono::{DateTime, Utc};
-use futures::{sink::SinkExt, FutureExt};
-use http::header::AUTHORIZATION;
-use http::{HeaderValue, Uri};
+use futures::{stream::BoxStream, FutureExt};
+use http::{header::AUTHORIZATION, HeaderValue};
 use serde::{Deserialize, Serialize};
+use std::{
+    hash::{Hash, Hasher},
+    time::Duration,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -21,11 +20,7 @@ pub struct StackdriverConfig {
     pub credentials_path: Option<String>,
     #[serde(default = "default_metric_namespace_value")]
     pub default_namespace: String,
-    #[serde(default)]
-    pub request: TowerRequestConfig,
-    #[serde(default)]
-    pub batch: BatchConfig,
-    pub tls: Option<TlsOptions>,
+    pub max_batch_size: Option<usize>,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -41,7 +36,7 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut token = gouth::Builder::new().scopes(&[
             "https://www.googleapis.com/auth/cloud-platform",
             "https://www.googleapis.com/auth/monitoring",
@@ -54,37 +49,9 @@ impl SinkConfig for StackdriverConfig {
 
         let token = token.build()?;
         let healthcheck = healthcheck().boxed();
-        let started = chrono::Utc::now();
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            rate_limit_duration_secs: Some(1),
-            ..Default::default()
-        });
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let batch = BatchSettings::default()
-            .events(1)
-            .parse_config(self.batch)?;
+        let sink = HttpEventSink::new(self.clone(), token);
 
-        let sink = HttpEventSink {
-            config: self.clone(),
-            started,
-            token,
-        };
-
-        let sink = BatchedHttpSink::new(
-            sink,
-            MetricsBuffer::new(batch.size),
-            request,
-            batch.timeout,
-            client,
-            cx.acker(),
-        )
-        .sink_map_err(
-            |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
-        );
-
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -99,74 +66,106 @@ impl SinkConfig for StackdriverConfig {
 struct HttpEventSink {
     config: StackdriverConfig,
     started: DateTime<Utc>,
+    client: reqwest::Client,
     token: gouth::Token,
 }
 
-#[async_trait::async_trait]
-impl HttpSink for HttpEventSink {
-    type Input = Metric;
-    type Output = Vec<Metric>;
-
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
-        let metric = event.into_metric();
-
-        match metric.value() {
-            &MetricValue::Counter { .. } => Some(metric),
-            &MetricValue::Gauge { .. } => Some(metric),
-            not_supported => {
-                warn!("Unsupported metric type: {:?}.", not_supported);
-                None
-            }
+impl HttpEventSink {
+    fn new(config: StackdriverConfig, token: gouth::Token) -> Self {
+        Self {
+            config,
+            token,
+            started: chrono::Utc::now(),
+            client: reqwest::Client::new(),
         }
     }
+}
 
-    async fn build_request(
-        &self,
-        mut metrics: Self::Output,
-    ) -> crate::Result<hyper::Request<Vec<u8>>> {
-        let metric = metrics.pop().expect("only one metric");
-        let (series, data, _metadata) = metric.into_parts();
-        let namespace = series
-            .name
-            .namespace
-            .unwrap_or_else(|| self.config.default_namespace.clone());
-        let metric_type = format!(
-            "custom.googleapis.com/{}/metrics/{}",
-            namespace, series.name.name
-        );
+struct Wrap {
+    r#type: String,
+    series: gcp::GcpSerie,
+}
 
-        let end_time = data.timestamp.unwrap_or_else(chrono::Utc::now);
+impl PartialEq for Wrap {
+    fn eq(&self, right: &Wrap) -> bool {
+        self.r#type == right.r#type
+    }
+}
 
-        let (point_value, interval, metric_kind) = match &data.value {
-            MetricValue::Counter { value } => {
-                let interval = gcp::GcpInterval {
-                    start_time: Some(self.started),
-                    end_time,
-                };
+impl Eq for Wrap {}
 
-                (*value, interval, gcp::GcpMetricKind::Cumulative)
-            }
-            MetricValue::Gauge { value } => {
-                let interval = gcp::GcpInterval {
-                    start_time: None,
-                    end_time,
-                };
+impl Hash for Wrap {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.r#type.hash(state)
+    }
+}
 
-                (*value, interval, gcp::GcpMetricKind::Gauge)
-            }
-            _ => unreachable!(),
-        };
+const DEFAULT_MAX_GCP_SERIES_BATCH_SIZE: usize = 200;
+const DEFAULT_MIN_GCP_SAMPLING_PERIOD: Duration = Duration::from_secs(10);
 
-        let metric_labels = series
-            .tags
-            .unwrap_or_default()
-            .into_iter()
-            .collect::<std::collections::HashMap<_, _>>();
+#[async_trait::async_trait]
+impl StreamSink for HttpEventSink {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        use futures::StreamExt;
+        use std::time::Instant;
 
-        let series = gcp::GcpSeries {
-            time_series: &[gcp::GcpSerie {
+        let max_batch_size = self
+            .config
+            .max_batch_size
+            .unwrap_or(DEFAULT_MAX_GCP_SERIES_BATCH_SIZE);
+        let mut buffer = std::collections::HashSet::with_capacity(max_batch_size);
+        let mut last_time = Instant::now();
+
+        while let Some(event) = input.next().await {
+            let metric = event.into_metric();
+            let (series, data, _metadata) = metric.into_parts();
+            let namespace = series
+                .name
+                .namespace
+                .unwrap_or_else(|| self.config.default_namespace.clone());
+            let metric_type = format!(
+                "custom.googleapis.com/{}/metrics/{}",
+                namespace, series.name.name
+            );
+
+            let end_time = data.timestamp.unwrap_or_else(chrono::Utc::now);
+
+            let (point_value, interval, metric_kind) = match &data.value {
+                MetricValue::Counter { value } => {
+                    let interval = gcp::GcpInterval {
+                        start_time: Some(self.started),
+                        end_time,
+                    };
+
+                    (value, interval, gcp::GcpMetricKind::Cumulative)
+                }
+                MetricValue::Gauge { value } => {
+                    let interval = gcp::GcpInterval {
+                        start_time: None,
+                        end_time,
+                    };
+
+                    (value, interval, gcp::GcpMetricKind::Gauge)
+                }
+
+                not_supported => {
+                    warn!("Unsupported metric type: {:?}.", not_supported);
+                    continue;
+                }
+            };
+
+            let metric_labels = series
+                .tags
+                .unwrap_or_default()
+                .into_iter()
+                .collect::<std::collections::HashMap<_, _>>();
+
+            let series = gcp::GcpSerie {
                 metric: gcp::GcpTypedResource {
-                    r#type: metric_type,
+                    r#type: metric_type.clone(),
                     labels: metric_labels,
                 },
                 resource: gcp::GcpTypedResource {
@@ -175,31 +174,69 @@ impl HttpSink for HttpEventSink {
                 },
                 metric_kind,
                 value_type: gcp::GcpValueType::Int64,
-                points: &[gcp::GcpPoint {
+                points: vec![gcp::GcpPoint {
                     interval,
                     value: gcp::GcpPointValue {
-                        int64_value: Some(point_value as i64),
+                        int64_value: Some(*point_value as i64),
                     },
                 }],
-            }],
-        };
+            };
 
-        let body = serde_json::to_vec(&series).unwrap();
-        let uri: Uri = format!(
-            "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
-            self.config.project_id
-        )
-        .parse()?;
+            let wrapped = Wrap {
+                r#type: metric_type,
+                series,
+            };
 
-        let request = hyper::Request::post(uri)
-            .header("content-type", "application/json")
-            .header(
-                AUTHORIZATION,
-                self.token.header_value()?.parse::<HeaderValue>()?,
-            )
-            .body(body)?;
+            if buffer.contains(&wrapped) {
+                buffer.replace(wrapped);
+            } else {
+                buffer.insert(wrapped);
+            }
 
-        Ok(request)
+            if buffer.len() == max_batch_size
+                || last_time.elapsed() >= DEFAULT_MIN_GCP_SAMPLING_PERIOD
+            {
+                let time_series = buffer.drain().map(|w| w.series).collect();
+                let time_series = gcp::GcpSeries { time_series };
+
+                let uri = format!(
+                    "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
+                    self.config.project_id
+                );
+
+                let token_header_value = match self.token.header_value() {
+                    Ok(value) => match value.parse::<HeaderValue>() {
+                        Ok(value) => value,
+                        Err(err) => {
+                            error!(message = "Error when parsing token as an header. ", %err);
+                            return Err(());
+                        }
+                    },
+
+                    Err(err) => {
+                        error!(message = "Error when producing a token. ", %err);
+                        return Err(());
+                    }
+                };
+
+                let req = self
+                    .client
+                    .post(uri)
+                    .header("content-type", "application/json")
+                    .header(AUTHORIZATION, token_header_value)
+                    .json(&time_series);
+
+                if let Err(err) = req.send().await {
+                    error!(message = "Error when sending time series to GCP. ", %err);
+                } else {
+                    debug!("Successfully pushed time series!");
+                }
+
+                last_time = Instant::now();
+            }
+        }
+
+        Ok(())
     }
 }
 
