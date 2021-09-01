@@ -26,4 +26,4 @@ of events coming into the sink, including when _no_ events are coming in.
 
 The configuration field `print_amount` has been removed, and replaced with `print_interval_secs`.
 Additionally, `print_interval_secs` defaults to `1 second`, which has the additional benefit of
-providing a "events per second" indicator out-of-the-box.
+providing a very basic "events per second" indicator out-of-the-box.
