@@ -7,7 +7,7 @@ use crate::sinks::util::Compression;
 use async_trait::async_trait;
 use flate2::write::GzEncoder;
 use futures::future::{poll_fn, FutureExt};
-use futures::stream::{BoxStream, FuturesUnordered};
+use futures::stream::BoxStream;
 use futures::Future;
 use futures::StreamExt;
 use http::{Request, Uri};
@@ -246,25 +246,15 @@ where
                     }
                     Some((request.unwrap(), finalizers))
                 },
-            )
-            .fuse();
+            );
         let mut input = Box::pin(input);
 
-        let mut flushes = FuturesUnordered::new();
-        loop {
-            tokio::select! {
-                biased;
-                Some(()) = flushes.next() => {
-                    // nothing, intentionally
-                }
-                Some((request, finalizers)) = input.next() => {
-                    let flush = flush_to_api(&mut self.http_client, request, finalizers)
-                        .expect("some unrecoverable failure");
-                    flushes.push(flush);
-                },
-                else => break,
-            }
+        while let Some((request, finalizers)) = input.next().await {
+            flush_to_api(&mut self.http_client, request, finalizers)
+                .expect("unhandled error")
+                .await
         }
+
         Ok(())
     }
 }
