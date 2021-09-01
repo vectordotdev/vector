@@ -161,7 +161,6 @@ where
     Client::Error: Send + Debug,
 {
     let fut = http_client.call(request).map(move |result| {
-        println!("{:?}", result);
         let status: EventStatus = match result {
             Ok(response) => {
                 let status = response.status();
