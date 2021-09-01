@@ -1,10 +1,10 @@
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use enrichment::{Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hasher;
 use std::path::PathBuf;
 use tracing::trace;
-use vector_core::enrichment::{Condition, IndexHandle, Table};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]

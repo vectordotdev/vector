@@ -288,3 +288,7 @@
   padding-bottom: 1px;
   width: 20px;
 }
+
+footer ion-icon[name="logo-github"]:hover {
+  @apply dark:text-gray-500
+}
