@@ -4,8 +4,6 @@ use std::{collections::BTreeMap, convert::TryFrom};
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use futures::{stream, FutureExt, SinkExt, StreamExt};
-use global_counter::primitive::exact::CounterU32;
-use lazy_static::lazy_static;
 use rusoto_s3::{PutObjectOutput, S3Client};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -32,15 +30,6 @@ use crate::{
     },
     template::Template,
 };
-
-lazy_static! {
-    static ref RESERVED_ATTRIBUTES: HashSet<&'static str> = vec![
-        "_id", "date", "message", "host", "source", "service", "status", "tags", "trace_id",
-        "span_id"
-    ]
-    .into_iter()
-    .collect();
-}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -99,6 +88,8 @@ enum ConfigError {
     UnsupportedStorageClass { storage_class: String },
 }
 
+const KEY_TEMPLATE: &'static str = "/dt=%Y%m%d/hour=%H/";
+
 impl DatadogArchivesSinkConfig {
     pub fn new(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
@@ -132,8 +123,16 @@ impl DatadogArchivesSinkConfig {
         let batch = BatchSettings::default().bytes(100_000_000).timeout(900);
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, Compression::gzip_default()));
 
+        let mut encoding = DatadogArchivesSinkEncoding {
+            key_prefix_template: Template::try_from(KEY_TEMPLATE)
+                .expect("invalid object key format"),
+            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+            host_number: host_number(),
+            counter: 0,
+        };
+
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .with_flat_map(move |e| stream::iter(encode_event(e)).map(Ok))
+            .with_flat_map(move |e| stream::iter(encoding.encode_event(e)).map(Ok))
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
@@ -174,6 +173,107 @@ impl DatadogArchivesSinkConfig {
             .settings(request, S3RetryLogic)
             .service(s3);
         Ok(svc)
+    }
+}
+
+const RESERVED_ATTRIBUTES: [&'static str; 10] = [
+    "_id", "date", "message", "host", "source", "service", "status", "tags", "trace_id", "span_id",
+];
+
+struct DatadogArchivesSinkEncoding {
+    key_prefix_template: Template,
+    reserved_attributes: HashSet<&'static str>,
+    host_number: Vec<u8>,
+    counter: u32,
+}
+
+impl DatadogArchivesSinkEncoding {
+    /// Applies the following transformations to align event's schema with DD:
+    /// - `_id` is generated in the sink(format described below);
+    /// - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current time if missing;
+    /// - `message`,`host` are set from the corresponding Global Log Schema mappings;
+    /// - `source`, `service`, `status`, `tags` and other reserved attributes are left as is;
+    /// - the rest of the fields is moved to `attributes`.
+    fn encode_event(
+        &mut self,
+        event: Event,
+    ) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
+        let key = self
+            .key_prefix_template
+            .render_string(&event)
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("key_prefix"),
+                    drop_event: true,
+                });
+            })
+            .ok()?;
+
+        let mut log = event.into_log();
+
+        log.insert("_id", self.generate_log_id());
+
+        let timestamp = log
+            .remove(crate::config::log_schema().timestamp_key())
+            .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
+        log.insert(
+            "date",
+            timestamp
+                .as_timestamp()
+                .cloned()
+                .unwrap_or_else(chrono::Utc::now)
+                .to_rfc3339_opts(SecondsFormat::Millis, true),
+        );
+        if let Some(message) = log.remove(crate::config::log_schema().message_key()) {
+            log.insert("message", message);
+        }
+        if let Some(message) = log.remove(crate::config::log_schema().host_key()) {
+            log.insert("host", message);
+        }
+
+        let mut attributes = BTreeMap::new();
+        let custom_attributes: Vec<String> = log
+            .keys()
+            .filter(|path| !self.reserved_attributes.contains(path.as_str()))
+            .collect();
+        for path in custom_attributes {
+            if let Some(value) = log.remove(&path) {
+                attributes.insert(path, value);
+            }
+        }
+        log.insert("attributes", attributes);
+
+        let mutbytes =
+            serde_json::to_vec(&log).expect("Failed to encode event as json, this is a bug!");
+        bytes.push('\n');
+
+        Some(EncodedEvent {
+            item: PartitionInnerBuffer::new(bytes, key.into()),
+            finalizers: log.metadata_mut().take_finalizers(),
+        })
+    }
+
+    /// Generates a unique ID compatible with DD
+    fn generate_log_id(&mut self) -> String {
+        let mut id = BytesMut::with_capacity(18);
+        // timestamp in millis - 6 bytes
+        let now = Utc::now();
+        id.put_int(now.timestamp_millis(), 6);
+        // namespace + version, both 0 - 2 bytes
+        id.put_i16(0);
+
+        // host-based number - 5 bytes
+        id.put_slice(&self.host_number);
+
+        // counter - 5 bytes
+        id.put_u8(0);
+        // one padding byte
+        // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
+        self.counter += 1; // TODO thread-safety
+        id.put_u32(self.counter); // 4 bytes
+
+        base64::encode(id.freeze())
     }
 }
 
@@ -223,99 +323,6 @@ fn build_s3_request(
             content_type: None,
         },
     }
-}
-
-/// Applies the following transformations to align event's schema with DD:
-/// - `_id` is generated in the sink(format described below);
-/// - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current time if missing;
-/// - `message`,`host` are set from the corresponding Global Log Schema mappings;
-/// - `source`, `service`, `status`, `tags` and other reserved attributes are left as is;
-/// - the rest of the fields is moved to `attributes`.
-fn encode_event(event: Event) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
-    lazy_static! {
-        static ref KEY_PREFIX: Template =
-            Template::try_from("/dt=%Y%m%d/hour=%H/").expect("invalid object key format");
-    }
-    let key = KEY_PREFIX
-        .render_string(&event)
-        .map_err(|error| {
-            emit!(TemplateRenderingFailed {
-                error,
-                field: Some("key_prefix"),
-                drop_event: true,
-            });
-        })
-        .ok()?;
-
-    let mut log = event.into_log();
-
-    log.insert("_id", generate_log_id());
-
-    let timestamp = log
-        .remove(crate::config::log_schema().timestamp_key())
-        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
-    log.insert(
-        "date",
-        timestamp
-            .as_timestamp()
-            .cloned()
-            .unwrap_or_else(chrono::Utc::now)
-            .to_rfc3339_opts(SecondsFormat::Millis, true),
-    );
-    if let Some(message) = log.remove(crate::config::log_schema().message_key()) {
-        log.insert("message", message);
-    }
-    if let Some(message) = log.remove(crate::config::log_schema().host_key()) {
-        log.insert("host", message);
-    }
-
-    let mut attributes = BTreeMap::new();
-    let custom_attributes: Vec<String> = log
-        .keys()
-        .filter(|path| !RESERVED_ATTRIBUTES.contains(path.as_str()))
-        .collect();
-    for path in custom_attributes {
-        if let Some(value) = log.remove(&path) {
-            attributes.insert(path, value);
-        }
-    }
-    log.insert("attributes", attributes);
-
-    let mut bytes = serde_json::to_vec(&log)
-        .expect("Failed to encode event as json, this is a bug!");
-    bytes.push('\n');
-
-    Some(EncodedEvent {
-        item: PartitionInnerBuffer::new(bytes, key.into()),
-        finalizers: log.metadata_mut().take_finalizers(),
-    })
-}
-
-/// Generates a unique ID compatible with DD
-fn generate_log_id() -> String {
-    let mut id = BytesMut::with_capacity(18);
-    // timestamp in millis - 6 bytes
-    let now = Utc::now();
-    id.put_int(now.timestamp_millis(), 6);
-    // namespace + version, both 0 - 2 bytes
-    id.put_i16(0);
-
-    // host-based number - 5 bytes
-    lazy_static! {
-        static ref HOST_NUMBER: Vec<u8> = host_number();
-    }
-    id.put_slice(&HOST_NUMBER[..]);
-
-    // counter - 5 bytes
-    id.put_u8(0);
-    // one padding byte
-    // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
-    lazy_static! {
-        static ref COUNTER: CounterU32 = CounterU32::new(0);
-    }
-    id.put_u32(COUNTER.inc()); // 4 bytes
-
-    base64::encode(id.freeze())
 }
 
 /// Returns 5 first bytes of the MAC address XOR-ed with random bytes
@@ -374,7 +381,14 @@ mod tests {
             .expect("invalid test case")
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
-        let encoded = encode_event(log).unwrap();
+        let mut encoding = DatadogArchivesSinkEncoding {
+            key_prefix_template: Template::try_from(KEY_TEMPLATE)
+                .expect("invalid object key format"),
+            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+            host_number: host_number(),
+            counter: 0,
+        };
+        let encoded = encoding.encode_event(log).unwrap();
         let (bytes, key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
@@ -424,7 +438,7 @@ mod tests {
         assert_eq!(key, "/dt=20210823/hour=16/");
 
         // check that id is different
-        let encoded = encode_event(Event::new_empty_log()).unwrap();
+        let encoded = encoding.encode_event(Event::new_empty_log()).unwrap();
         let (bytes, _) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
@@ -436,14 +450,21 @@ mod tests {
     #[test]
     fn generates_valid_id() {
         let log = Event::from("test message");
-        let encoded = encode_event(log).unwrap();
+        let mut encoding = DatadogArchivesSinkEncoding {
+            key_prefix_template: Template::try_from(KEY_TEMPLATE)
+                .expect("invalid object key format"),
+            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+            host_number: host_number(),
+            counter: 0,
+        };
+        let encoded = encoding.encode_event(log).unwrap();
         let (bytes, _key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
         let id1 = validate_event_id(&encoded_json);
 
         // check that id is different for the next event
-        let encoded = encode_event(Event::new_empty_log()).unwrap();
+        let encoded = encoding.encode_event(Event::new_empty_log()).unwrap();
         let (bytes, _) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
@@ -455,7 +476,14 @@ mod tests {
     #[test]
     fn generates_date_if_missing() {
         let log = Event::from("test message");
-        let encoded = encode_event(log).unwrap();
+        let mut encoding = DatadogArchivesSinkEncoding {
+            key_prefix_template: Template::try_from(KEY_TEMPLATE)
+                .expect("invalid object key format"),
+            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+            host_number: host_number(),
+            counter: 0,
+        };
+        let encoded = encoding.encode_event(log).unwrap();
         let (bytes, _key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
@@ -502,8 +530,14 @@ mod tests {
             .expect("invalid test case")
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
-        let encoded = encode_event(log).unwrap();
-        // let buf = PartitionInnerBuffer::new(vec![0u8; 10], Bytes::from("key/"));
+        let mut encoding = DatadogArchivesSinkEncoding {
+            key_prefix_template: Template::try_from(KEY_TEMPLATE)
+                .expect("invalid object key format"),
+            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+            host_number: host_number(),
+            counter: 0,
+        };
+        let encoded = encoding.encode_event(log).unwrap();
 
         let req = build_s3_request(
             encoded.item,
@@ -519,7 +553,7 @@ mod tests {
         assert_eq!(uuid1.len(), 36);
 
         // check the the second batch has a different UUID
-        let encoded = encode_event(Event::new_empty_log()).unwrap();
+        let encoded = encoding.encode_event(Event::new_empty_log()).unwrap();
         let req = build_s3_request(
             encoded.item,
             "dd-logs".into(),
