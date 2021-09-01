@@ -5,6 +5,7 @@ authors: ["hoverbear"]
 domain: transforms
 transforms: ["wasm"]
 weight: 1
+noindex: true
 tags: ["webassembly", "wasm", "multiline", "multi-line", "advanced", "guides", "guide"]
 ---
 
