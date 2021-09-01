@@ -491,7 +491,6 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                dbg!(&error);
                 emit!(SplunkHecRequestBodyInvalid {
                     error: error.into()
                 });
