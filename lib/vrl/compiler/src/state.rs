@@ -76,7 +76,7 @@ impl Compiler {
         let snapshot = Self {
             target,
             variables,
-            external_context: Default::default(),
+            external_context: None,
             snapshot: None,
         };
 
