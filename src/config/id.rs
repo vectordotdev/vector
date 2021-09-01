@@ -54,6 +54,22 @@ impl ComponentId {
     }
 }
 
+impl From<(Option<String>, String)> for ComponentId {
+    fn from(value: (Option<String>, String)) -> Self {
+        if let Some(pipeline) = value.0 {
+            Self {
+                id: value.1,
+                scope: ComponentScope::Pipeline(pipeline),
+            }
+        } else {
+            Self {
+                id: value.1,
+                scope: ComponentScope::Global,
+            }
+        }
+    }
+}
+
 impl From<String> for ComponentId {
     fn from(value: String) -> Self {
         Self::from(value.as_str())

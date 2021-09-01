@@ -18,7 +18,7 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_added;
-            let id = ComponentId::from(&c.component_id);
+            let id = ComponentId::from((c.pipeline_id, c.component_id));
             let _ = tx
                 .send(state::EventType::ComponentAdded(state::ComponentRow {
                     id,
@@ -259,7 +259,7 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
         .flat_map(|d| {
             d.into_iter().filter_map(|edge| {
                 let d = edge?.node;
-                let id = ComponentId::from(&d.component_id);
+                let id = ComponentId::from((d.pipeline_id, d.component_id));
                 Some((
                     id.clone(),
                     state::ComponentRow {
