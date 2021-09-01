@@ -8,7 +8,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
-use vector_core::enrichment;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]

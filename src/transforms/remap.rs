@@ -12,7 +12,6 @@ use snafu::{ResultExt, Snafu};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use vector_core::enrichment;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -83,10 +82,13 @@ impl Remap {
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
 
+        let mut functions = vrl_stdlib::all();
+        functions.append(&mut enrichment::vrl_functions());
+
         let program = vrl::compile(
             &source,
-            Box::new(enrichment_tables.clone()),
-            &vrl_stdlib::all(),
+            &functions,
+            Some(Box::new(enrichment_tables.clone())),
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 

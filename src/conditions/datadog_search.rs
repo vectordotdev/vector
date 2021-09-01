@@ -3,7 +3,6 @@ use crate::conditions::{Condition, ConditionConfig, ConditionDescription};
 
 #[cfg(feature = "transforms-filter")]
 use serde::{Deserialize, Serialize};
-use vector_core::enrichment;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct DatadogSearchConfig {

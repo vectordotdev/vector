@@ -1,6 +1,4 @@
 use crate::config::GlobalOptions;
-#[cfg(feature = "vrl")]
-use crate::enrichment;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
