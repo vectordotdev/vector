@@ -5,6 +5,7 @@ use crate::sinks::util::Compression;
 use http::{Request, Uri};
 use hyper::Body;
 use snafu::Snafu;
+use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::time::Duration;
 use tower::Service;
@@ -23,8 +24,8 @@ pub struct LogApiBuilder<Client>
 where
     Client: Service<Request<Body>> + Send + Unpin,
     Client::Future: Send,
-    Client::Response: Send,
-    Client::Error: Send,
+    Client::Response: Send + Debug,
+    Client::Error: Send + Debug,
 {
     encoding: EncodingConfigWithDefault<Encoding>,
     http_client: Option<Client>,
@@ -42,8 +43,8 @@ impl<Client> Default for LogApiBuilder<Client>
 where
     Client: Service<Request<Body>> + Send + Unpin,
     Client::Future: Send,
-    Client::Response: Send,
-    Client::Error: Send,
+    Client::Response: Send + Debug,
+    Client::Error: Send + Debug,
 {
     fn default() -> Self {
         Self {
@@ -65,8 +66,8 @@ impl<Client> LogApiBuilder<Client>
 where
     Client: Service<Request<Body>> + Send + Unpin,
     Client::Future: Send,
-    Client::Response: Send,
-    Client::Error: Send,
+    Client::Response: Send + Debug,
+    Client::Error: Send + Debug,
 {
     pub fn log_schema(mut self, log_schema: &'static LogSchema) -> Self {
         self.log_schema_message_key = Some(log_schema.message_key());

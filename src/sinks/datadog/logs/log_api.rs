@@ -10,9 +10,11 @@ use futures::future::{poll_fn, FutureExt};
 use futures::stream::BoxStream;
 use futures::Future;
 use futures::StreamExt;
+use http::response::Response;
 use http::{Request, Uri};
 use hyper::Body;
 use std::collections::BTreeMap;
+use std::fmt::Debug;
 use std::io::Write;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -104,8 +106,8 @@ pub struct LogApi<Client>
 where
     Client: Service<Request<Body>> + Send + Unpin,
     Client::Future: Send,
-    Client::Response: Send,
-    Client::Error: Send,
+    Client::Response: Send + Debug,
+    Client::Error: Send + Debug,
 {
     /// The default Datadog API key to use
     ///
@@ -154,16 +156,24 @@ fn flush_to_api<'a, Client>(
     finalizers: Vec<EventFinalizers>,
 ) -> Result<impl Future<Output = ()> + Send, FlushError>
 where
-    Client: Service<Request<Body>> + Send + Unpin,
+    Client: Service<Request<Body>, Response = http::response::Response<Body>> + Send + Unpin,
     Client::Future: Send,
-    Client::Response: Send,
-    Client::Error: Send,
+    Client::Error: Send + Debug,
 {
     let fut = http_client.call(request).map(move |result| {
+        println!("{:?}", result);
         let status: EventStatus = match result {
-            Ok(_) => {
-                metrics::counter!("flush_success", 1);
-                EventStatus::Delivered
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() {
+                    metrics::counter!("flush_success", 1);
+                    EventStatus::Delivered
+                } else if status.is_server_error() || status.is_client_error() {
+                    metrics::counter!("flush_failed", 1);
+                    EventStatus::Failed
+                } else {
+                    unimplemented!()
+                }
             }
             Err(_) => {
                 metrics::counter!("flush_error", 1);
@@ -181,8 +191,8 @@ impl<Client> LogApi<Client>
 where
     Client: Service<Request<Body>> + Send + Unpin,
     Client::Future: Send,
-    Client::Response: Send,
-    Client::Error: Send,
+    Client::Response: Send + Debug,
+    Client::Error: Send + Debug,
 {
     pub fn new() -> LogApiBuilder<Client> {
         LogApiBuilder::default().bytes_stored_limit(bytesize::mib(5_u32))
@@ -192,10 +202,9 @@ where
 #[async_trait]
 impl<Client> StreamSink for LogApi<Client>
 where
-    Client: Service<Request<Body>> + Send + Sync + Unpin,
+    Client: Service<Request<Body>, Response = Response<Body>> + Send + Sync + Unpin,
     Client::Future: Send,
-    Client::Response: Send,
-    Client::Error: Send,
+    Client::Error: Send + Debug,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // copy items out of `self`, needed as we don't have ownership
