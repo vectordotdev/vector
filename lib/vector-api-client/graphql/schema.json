@@ -636,6 +636,18 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Events processed throughput",
               "isDeprecated": false,
               "name": "throughput",
@@ -674,6 +686,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
