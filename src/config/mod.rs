@@ -16,7 +16,6 @@ use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 pub use vector_core::config::GlobalOptions;
-use vector_core::enrichment;
 pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
 
 pub mod api;

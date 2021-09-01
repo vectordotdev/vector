@@ -50,8 +50,6 @@ mod format_int;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
-#[cfg(feature = "get_enrichment_table_record")]
-mod get_enrichment_table_record;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
@@ -289,8 +287,6 @@ pub use format_int::FormatInt;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
-#[cfg(feature = "get_enrichment_table_record")]
-pub use get_enrichment_table_record::GetEnrichmentTableRecord;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
@@ -502,8 +498,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
-        #[cfg(feature = "get_enrichment_table_record")]
-        Box::new(GetEnrichmentTableRecord),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "float")]
