@@ -637,6 +637,33 @@ impl RetryLogic for CloudwatchRetryLogic {
 
                 _ => false,
             },
+
+            CloudwatchError::PutRetention(error) => match error {
+                RusotoError::Service(PutRetentionPolicyError::ServiceUnavailable(error)) => {
+                    error!(message = "Put retention service unavailable.", %error);
+                    true
+                }
+
+                RusotoError::Unknown(res)
+                    if res.status.is_server_error()
+                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                {
+                    let BufferedHttpResponse { status, body, .. } = res;
+                    let body = String::from_utf8_lossy(&body[..]);
+                    let body = &body[..body.len().min(50)];
+
+                    error!(message = "Put retention HTTP error.", status = %status, body = %body);
+                    true
+                }
+
+                RusotoError::HttpDispatch(error) => {
+                    error!(message = "Put retention HTTP dispatch.", %error);
+                    true
+                }
+
+                _ => false,
+            },
+
             _ => false,
         }
     }
