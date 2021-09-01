@@ -21,8 +21,8 @@ pub enum Condition<'a> {
     },
     BetweenDates {
         field: &'a str,
-        from: chrono::,
-        to: usize,
+        from: chrono::DateTime<chrono::Utc>,
+        to: chrono::DateTime<chrono::Utc>,
     },
 }
 

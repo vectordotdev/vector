@@ -1,4 +1,5 @@
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use chrono::TimeZone;
 use enrichment::{Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -120,6 +121,18 @@ impl File {
                 None => false,
                 Some(idx) => row[idx].to_lowercase() == value.to_lowercase(),
             },
+            Condition::BetweenDates { field, from, to } => match self.column_index(field) {
+                None => false,
+                Some(idx) => {
+                    // TODO, we really need schemas so that the date parsing can occur during load.
+                    // Schemas should also allow the date format to be specified. Here we assume
+                    // 2021-01-01 12:23
+                    match chrono::Utc.datetime_from_str(&row[idx], "%Y-%m-%d %R") {
+                        Ok(date) => from <= &date && &date <= to,
+                        _ => false,
+                    }
+                }
+            },
         })
     }
 
@@ -134,6 +147,8 @@ impl File {
     /// Creates an index with the given fields.
     /// Uses seahash to create a hash of the data that is used as the key in a hashmap lookup to
     /// the index of the row in the data.
+    ///
+    /// Ensure fields that are searched via a comparison are not included in the index!
     fn index_data(&self, index: &[&str]) -> HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher> {
         // Get the positions of the fields we are indexing
         let fieldidx = self
