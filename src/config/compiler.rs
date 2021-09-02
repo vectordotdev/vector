@@ -139,10 +139,17 @@ fn expand_globs_inner(inputs: &mut Vec<ComponentId>, id: &ComponentId, candidate
                 warn!(message = "Invalid glob pattern for input.", component_id = %id, %error);
                 InputMatcher::String(raw_input.to_string())
             });
+        let mut matched = false;
         for input in candidates {
             if matcher.matches(&input.to_string()) && input != id {
+                matched = true;
                 inputs.push(input.clone())
             }
+        }
+        // If it didn't work as a glob pattern, leave it in the inputs as-is. This lets us give
+        // more accurate error messages about non-existent inputs.
+        if !matched {
+            inputs.push(raw_input)
         }
     }
 }
