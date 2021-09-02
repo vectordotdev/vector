@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_while, take_while1},
     character::complete::{char, digit1, satisfy},
-    combinator::{consumed, cut, map, opt, recognize, value},
+    combinator::{cut, map, opt, recognize, value},
     error::{context, ContextError, FromExternalError, ParseError},
     multi::{many1, separated_list0},
     number::complete::double,
@@ -91,7 +91,7 @@ fn sp<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E
     take_while(move |c| chars.contains(c))(input)
 }
 
-fn parse_inner_str<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn parse_inner_str<'a, E: ParseError<&'a str>>(
     delimiter: char,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
     move |input| {
@@ -148,7 +148,6 @@ fn parse_bytes<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
 
 fn parse_symbol_key<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
 where
-    T: std::fmt::Display,
     T: InputTakeAtPosition,
     <T as InputTakeAtPosition>::Item: AsChar,
 {
@@ -158,26 +157,34 @@ where
     })(input)
 }
 
-fn parse_colon_key<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
-    map(consumed(preceded(char(':'), parse_symbol_key)), |res| res.0)(input)
-}
-
-fn parse_key_arrow_hash<'a, E: HashParseError<&'a str>>(
+fn parse_colon_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
 ) -> IResult<&'a str, String, E> {
     map(
-        alt((parse_str('"'), parse_str('\''), parse_colon_key, digit1)),
-        String::from,
+        preceded(
+            char(':'),
+            alt((parse_str('"'), parse_str('\''), parse_symbol_key)),
+        ),
+        |res| String::from(":") + res,
     )(input)
 }
 
-fn parse_key_colon_hash<'a, E: HashParseError<&'a str>>(
-    input: &'a str,
-) -> IResult<&'a str, String, E> {
-    map(
-        alt((parse_str('"'), parse_str('\''), parse_symbol_key, digit1)),
-        String::from,
-    )(input)
+// This parse_key function allows some cases that shouldn't be produced by ruby.
+// For example, { foo => "bar" } shouldn't be parsed but { foo: "bar" } should.
+// Considering that Vector's goal is to parse log produced by other applications
+// and that Vector is NOT a ruby parser, cases like the following one are ignored
+// because they shouldn't appear in the logs.
+// That being said, handling all the corner cases from Ruby's syntax would imply
+// increasing a lot the code complexity which is probably not necessary considering
+// that Vector is not a Ruby parser.
+fn parse_key<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+    alt((
+        map(
+            alt((parse_str('"'), parse_str('\''), parse_symbol_key, digit1)),
+            String::from,
+        ),
+        parse_colon_key,
+    ))(input)
 }
 
 fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
@@ -196,30 +203,14 @@ fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
     )(input)
 }
 
-fn parse_key_value_arrow<'a, E: HashParseError<&'a str>>(
-    input: &'a str,
-) -> IResult<&'a str, (String, Value), E> {
-    separated_pair(
-        preceded(sp, parse_key_arrow_hash),
-        cut(preceded(sp, tag("=>"))),
-        parse_value,
-    )(input)
-}
-
-fn parse_key_value_colon<'a, E: HashParseError<&'a str>>(
-    input: &'a str,
-) -> IResult<&'a str, (String, Value), E> {
-    separated_pair(
-        preceded(sp, parse_key_colon_hash),
-        cut(preceded(sp, tag(":"))),
-        parse_value,
-    )(input)
-}
-
 fn parse_key_value<'a, E: HashParseError<&'a str>>(
     input: &'a str,
 ) -> IResult<&'a str, (String, Value), E> {
-    alt((parse_key_value_arrow, parse_key_value_colon))(input)
+    separated_pair(
+        preceded(sp, parse_key),
+        cut(preceded(sp, alt((tag(":"), tag("=>"))))),
+        parse_value,
+    )(input)
 }
 
 fn parse_hash<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
@@ -315,17 +306,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_parse_arrow_object_key_variable() {
-        parse(r#"{ nope => "hello world" }"#).unwrap();
-    }
-
-    #[test]
     fn test_parse_arrow_object_key_colon() {
-        let result = parse(r#"{ :colon => "hello world" }"#).unwrap();
+        let result =
+            parse(r#"{ :colon => "hello world", :"double" => "quote", :'simple' => "quote" }"#)
+                .unwrap();
         assert!(result.is_object());
         let result = result.as_object().unwrap();
         assert!(result.get(":colon").unwrap().is_bytes());
+        assert!(result.get(":double").unwrap().is_bytes());
+        assert!(result.get(":simple").unwrap().is_bytes());
     }
 
     #[test]
