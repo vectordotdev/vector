@@ -552,7 +552,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "strum 0.18.0",
+ "strum",
  "strum_macros 0.18.0",
  "thiserror",
  "typed-builder 0.5.1",
@@ -6577,12 +6577,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
 
 [[package]]
-name = "strum"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
-
-[[package]]
 name = "strum_macros"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7774,8 +7768,6 @@ dependencies = [
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt",
- "strum 0.21.0",
- "strum_macros 0.21.1",
  "syslog",
  "syslog_loose",
  "tempfile",

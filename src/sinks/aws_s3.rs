@@ -32,7 +32,6 @@ use std::{
     convert::{TryFrom, TryInto},
     task::{Context, Poll},
 };
-use strum_macros::{AsRefStr, EnumIter};
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;
@@ -105,7 +104,7 @@ pub(crate) enum S3ServerSideEncryption {
     AwsKms,
 }
 
-#[derive(AsRefStr, Clone, Copy, Debug, Derivative, Deserialize, EnumIter, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, PartialEq, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub(crate) enum S3StorageClass {

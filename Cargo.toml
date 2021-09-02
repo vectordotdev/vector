@@ -283,8 +283,6 @@ tonic = { version = "0.5", optional = true, default-features = false, features =
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
 mac_address = { version = "1.1.2", default-features = false, optional = true }
-strum = { version = "0.21.0", default-features = false, optional = true }
-strum_macros = { version = "0.21.0", default-features = false, optional = true }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.19"
@@ -609,7 +607,7 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["base64", "bytesize", "md-5", "rusoto", "rusoto_s3", "uuid", "strum", "strum_macros"]
+sinks-aws_s3 = ["base64", "bytesize", "md-5", "rusoto", "rusoto_s3", "uuid"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
 sinks-azure_blob = ["bytesize", "azure_core", "azure_storage", "reqwest", "uuid"]
 sinks-azure_monitor_logs = ["bytesize"]

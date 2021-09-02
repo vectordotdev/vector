@@ -30,7 +30,6 @@ use crate::{
     },
     template::Template,
 };
-use nom::number::complete::u32;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -547,9 +546,15 @@ mod tests {
 
     #[tokio::test]
     async fn error_if_unsupported_s3_storage_class() {
-        use strum::IntoEnumIterator;
-
-        for class in S3StorageClass::iter() {
+        for (class, supported) in [
+            (S3StorageClass::Standard, true),
+            (S3StorageClass::StandardIa, true),
+            (S3StorageClass::IntelligentTiering, true),
+            (S3StorageClass::OnezoneIa, true),
+            (S3StorageClass::ReducedRedundancy, true),
+            (S3StorageClass::DeepArchive, false),
+            (S3StorageClass::Glacier, false),
+        ] {
             let config = DatadogArchivesSinkConfig {
                 service: "aws_s3".to_owned(),
                 bucket: "vector-datadog-archives".to_owned(),
@@ -567,16 +572,16 @@ mod tests {
 
             let res = config.new(SinkContext::new_test());
 
-            if class == S3StorageClass::Glacier || class == S3StorageClass::DeepArchive {
+            if supported {
+                assert!(res.is_ok());
+            } else {
                 assert_eq!(
                     res.err().unwrap().to_string(),
                     format!(
-                        r#"UnsupportedStorageClass {{ storage_class: "{}" }}"#,
-                        class.as_ref()
+                        r#"UnsupportedStorageClass {{ storage_class: "{:?}" }}"#,
+                        class
                     )
                 );
-            } else {
-                assert!(res.is_ok());
             }
         }
     }
