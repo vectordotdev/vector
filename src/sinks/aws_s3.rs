@@ -67,6 +67,7 @@ pub struct S3SinkConfig {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct S3Options {
     pub(crate) acl: Option<S3CannedAcl>,
     pub(crate) grant_full_control: Option<String>,

@@ -56,6 +56,7 @@ pub struct S3Config {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct S3Options {
     acl: Option<S3CannedAcl>,
     grant_full_control: Option<String>,
