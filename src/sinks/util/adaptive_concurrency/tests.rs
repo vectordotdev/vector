@@ -124,7 +124,7 @@ struct TestParams {
     concurrency: Concurrency,
 }
 
-fn default_concurrency() -> Concurrency {
+const fn default_concurrency() -> Concurrency {
     Concurrency::Adaptive
 }
 

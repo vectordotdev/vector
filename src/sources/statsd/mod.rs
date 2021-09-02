@@ -62,6 +62,7 @@ struct TcpConfig {
 
 impl TcpConfig {
     #[cfg(all(test, feature = "sinks-prometheus"))]
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
