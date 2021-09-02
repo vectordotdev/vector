@@ -155,7 +155,7 @@ components: sinks: datadog_archives: {
 				with the following customizations for compatibility with DataDog Log Rehydration:
 				- custom object key format
 				- event pre-processing
-				- batch parameters, recommended by DataDog
+				- batch parameters, optimized for Log Rehydration
 				- events are always JSON-encoded
 				- batches are always gzip-compressed
 

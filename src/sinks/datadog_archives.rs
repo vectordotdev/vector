@@ -119,7 +119,8 @@ impl DatadogArchivesSinkConfig {
             }),
         }?;
 
-        // We should avoid producing many small batches, therefore we use settings recommended by DD:
+        // We should avoid producing many small batches - this might slow down Log Rehydration,
+        // these values are similar with how DataDog's Log Archives work internally:
         // batch size - 100mb
         // batch timeout - 15min
         let batch = BatchSettings::default().bytes(100_000_000).timeout(900);
