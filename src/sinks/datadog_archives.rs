@@ -4,6 +4,8 @@ use std::{collections::BTreeMap, convert::TryFrom};
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use futures::{stream, FutureExt, SinkExt, StreamExt};
+use mac_address::get_mac_address;
+use rand::Rng;
 use rusoto_s3::{PutObjectOutput, S3Client};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -327,10 +329,6 @@ fn build_s3_request(
 
 /// Returns 5 first bytes of the MAC address XOR-ed with random bytes
 fn host_number() -> Vec<u8> {
-    extern crate mac_address;
-    use mac_address::get_mac_address;
-    use rand::Rng;
-
     let mac = get_mac_address().unwrap().unwrap().bytes();
     let mut rng = rand::thread_rng();
     let mut rand_bytes = rng.gen::<[u8; 5]>();
