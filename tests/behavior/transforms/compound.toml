@@ -24,7 +24,7 @@ inputs = ["start"]
     value = "message"
 
     [[tests.outputs]]
-    extract_from = "simple_compound.step2"
+    extract_from = "simple_compound.step1"
     [[tests.outputs.conditions]]
         type = "check_fields"
         "foo.equals" = "barbaz"
