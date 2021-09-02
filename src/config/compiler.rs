@@ -1,5 +1,6 @@
 use super::{builder::ConfigBuilder, validation, ComponentId, Config, ExpandType, TransformOuter};
 use indexmap::IndexMap;
+use std::collections::HashSet;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -103,7 +104,7 @@ fn expand_globs(config: &mut ConfigBuilder) {
         .keys()
         .chain(config.transforms.keys())
         .cloned()
-        .collect::<Vec<ComponentId>>();
+        .collect::<HashSet<ComponentId>>();
 
     for (id, transform) in config.transforms.iter_mut() {
         expand_globs_inner(&mut transform.inputs, id, &candidates);
@@ -130,7 +131,11 @@ impl InputMatcher {
     }
 }
 
-fn expand_globs_inner(inputs: &mut Vec<ComponentId>, id: &ComponentId, candidates: &[ComponentId]) {
+fn expand_globs_inner(
+    inputs: &mut Vec<ComponentId>,
+    id: &ComponentId,
+    candidates: &HashSet<ComponentId>,
+) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
         let matcher = glob::Pattern::new(&raw_input.to_string())
