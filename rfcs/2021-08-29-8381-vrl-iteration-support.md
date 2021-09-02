@@ -146,7 +146,7 @@ Let's take a look at this function in action:
     # `value` can be a boolean, or any other value. We enforce it to be
     # a boolean.
     value = bool!(value) ?? false
-    
+
     # Manipulate the field string ("tag") if the value returns `true`.
     if value {
         tag = "__" + upcase(tag)
@@ -737,4 +737,3 @@ for_each(.) |index, value| .[value] = index
     "baz": 2
 }
 ```
-
