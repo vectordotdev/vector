@@ -1,19 +1,119 @@
-use bimap::BiHashMap;
-use tokio_util::time::delay_queue::Key;
 use crate::partition::Partitioner;
-use crate::time::Timer;
 use crate::ByteSizeOf;
+use futures::ready;
 use futures::stream::Stream;
 use pin_project::pin_project;
 use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
+use std::hash::{BuildHasherDefault, Hash};
 use std::mem;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tokio_util::time::delay_queue::Key;
 use tokio_util::time::DelayQueue;
 use twox_hash::XxHash64;
+
+/// Behavioral hooks to modify the behavior of `ExpirationQueue<P>`.
+pub trait ExpirationHook {
+    /// Called during `poll_expired`, before any interior logic is executed.
+    fn on_poll(&mut self, cx: &mut Context<'_>) {}
+}
+
+pub struct NoopHook;
+
+impl ExpirationHook for NoopHook {}
+
+pub struct ExpirationQueue<K, H = NoopHook> {
+    timeout: Duration,
+    expirations: DelayQueue<K>,
+    expiration_map: HashMap<K, Key>,
+    hook: H,
+}
+
+impl<K> ExpirationQueue<K, NoopHook>
+where
+    K: Eq + Hash + Clone,
+{
+    /// Creates a new `ExpirationQueue<K, H>` with the given timeout.
+    pub fn new(timeout: Duration) -> Self {
+        Self {
+            timeout,
+            expirations: DelayQueue::new(),
+            expiration_map: HashMap::new(),
+            hook: NoopHook,
+        }
+    }
+}
+
+impl<K, H> ExpirationQueue<K, H>
+where
+    K: Eq + Hash + Clone,
+    H: ExpirationHook,
+{
+    /// Creates a new `ExpirationQueue<K, H>` with the given timeout and hooks.
+    pub fn with_hook(timeout: Duration, hook: H) -> Self {
+        Self {
+            timeout,
+            expirations: DelayQueue::new(),
+            expiration_map: HashMap::new(),
+            hook,
+        }
+    }
+
+    /// Removes all expirations from the queue.
+    pub fn clear(&mut self) {
+        self.expirations.clear();
+        self.expiration_map.clear();
+    }
+
+    /// Adds a new item to the queue.
+    ///
+    /// If an entry exists for the same item key, the expiration for that item is reset.
+    pub fn insert(&mut self, item_key: K) {
+        match self.expiration_map.get(&item_key) {
+            Some(expiration_key) => {
+                // We already have an expiration entry for this item key, so just
+                // reset the expiration.
+                self.expirations.reset(expiration_key, self.timeout);
+            }
+            None => {
+                // This is a yet-unseen item key, so create a new expiration entry.
+                let expiration_key = self.expirations.insert(item_key.clone(), self.timeout);
+                assert!(self
+                    .expiration_map
+                    .insert(item_key, expiration_key)
+                    .is_none());
+            }
+        }
+    }
+
+    pub fn poll_expired(&mut self, cx: &mut Context<'_>) -> Poll<Option<K>> {
+        self.hook.on_poll(cx);
+
+        match ready!(self.expirations.poll_expired(cx)) {
+            // No expirations yet.
+            None => Poll::Ready(None),
+            Some(expiration) => match expiration {
+                // We shouldn't really ever hit this error arm, as `DelayQueue` doesn't
+                // actually return ever return an error, but it's part of the type signature
+                // so we must abide.
+                Err(e) => {
+                    error!(
+                        "caught unexpected error while polling for expired batches: {}",
+                        e
+                    );
+                    Poll::Pending
+                }
+                Ok(expiration) => {
+                    // An item has expired, so remove it from the map and return it.
+                    assert!(self.expiration_map.remove(expiration.get_ref()).is_some());
+                    Poll::Ready(Some(expiration.into_inner()))
+                }
+            },
+        }
+    }
+}
 
 /// A batch for use by `Batcher`
 ///
@@ -115,21 +215,16 @@ where
 }
 
 #[pin_project]
-pub struct Batcher<St, Prt>
+pub struct Batcher<St, Prt, Eh>
 where
     Prt: Partitioner,
+    Eh: ExpirationHook,
 {
-    /// The queue of pending batch expirations
-    expirations: DelayQueue<Prt::Key>,
-    /// The map of batch expiration keys to the partition key for the batch
-    expiration_map: BiHashMap<Key, Prt::Key>,
-    /// The timeout for an individual batch
-    batch_timeout: Duration,
-    /// The maximum number of items that are allowed per-batch
-    batch_item_limit: usize,
     /// The total number of bytes a single batch in this struct is allowed to
     /// hold.
     batch_allocation_limit: usize,
+    /// The maximum number of items that are allowed per-batch
+    batch_item_limit: usize,
     /// The store of live batches. Note that the key here is an option type,
     /// on account of the interface of `Prt`.
     batches: HashMap<Prt::Key, Batch<Prt::Item>, BuildHasherDefault<XxHash64>>,
@@ -137,6 +232,8 @@ where
     /// preferentially flushed prior to consuming any new items from the
     /// underlying stream.
     closed_batches: Vec<(Prt::Key, Vec<Prt::Item>)>,
+    /// The queue of pending batch expirations
+    expiration_queue: ExpirationQueue<Prt::Key, Eh>,
     /// The partitioner for this `Batcher`
     partitioner: Prt,
     #[pin]
@@ -144,7 +241,7 @@ where
     stream: St,
 }
 
-impl<St, Prt> Batcher<St, Prt>
+impl<St, Prt> Batcher<St, Prt, NoopHook>
 where
     St: Stream + Unpin,
     Prt: Partitioner + Unpin,
@@ -157,26 +254,51 @@ where
         batch_allocation_limit: Option<NonZeroUsize>,
     ) -> Self {
         Self {
-            batch_item_limit: batch_item_limit.get(),
             batch_allocation_limit: batch_allocation_limit
                 .map_or(usize::max_value(), NonZeroUsize::get),
+            batch_item_limit: batch_item_limit.get(),
             batches: HashMap::default(),
             closed_batches: Vec::default(),
-            batch_timeout,
-            expirations: DelayQueue::new(),
-            expiration_map: BiHashMap::new(),
+            expiration_queue: ExpirationQueue::new(batch_timeout),
             partitioner,
             stream,
         }
     }
 }
 
-impl<St, Prt> Stream for Batcher<St, Prt>
+impl<St, Prt, Eh> Batcher<St, Prt, Eh>
+where
+    St: Stream + Unpin,
+    Prt: Partitioner + Unpin,
+    Eh: ExpirationHook,
+{
+    pub fn with_expiration_queue(
+        stream: St,
+        partitioner: Prt,
+        expiration_queue: ExpirationQueue<Prt::Key, Eh>,
+        batch_item_limit: NonZeroUsize,
+        batch_allocation_limit: Option<NonZeroUsize>,
+    ) -> Self {
+        Self {
+            batch_allocation_limit: batch_allocation_limit
+                .map_or(usize::max_value(), NonZeroUsize::get),
+            batch_item_limit: batch_item_limit.get(),
+            batches: HashMap::default(),
+            closed_batches: Vec::default(),
+            expiration_queue,
+            partitioner,
+            stream,
+        }
+    }
+}
+
+impl<St, Prt, Eh> Stream for Batcher<St, Prt, Eh>
 where
     St: Stream<Item = Prt::Item> + Unpin,
     Prt: Partitioner + Unpin,
-    Prt::Key: Clone,
+    Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
+    Eh: ExpirationHook,
 {
     type Item = (Prt::Key, Vec<Prt::Item>);
 
@@ -191,24 +313,18 @@ where
                 return Poll::Ready(this.closed_batches.pop());
             }
             match this.stream.as_mut().poll_next(cx) {
-                Poll::Pending => match this.expirations.poll_expired(cx) {
+                Poll::Pending => match this.expiration_queue.poll_expired(cx) {
                     // Unlike normal streams, `DelayQueue` can return `None` here but still be
                     // usable later if more entries are added.
                     Poll::Pending | Poll::Ready(None) => return Poll::Pending,
-                    Poll::Ready(Some(expiration)) => match expiration {
-                        // We shouldn't really ever hit this error arm, as `DelayQueue` doesn't
-                        // actually return ever return an error, but it's part of the type signature
-                        // so we must abide.
-                        Err(e) => error!("caught unexpected error while polling for expired batches: {}", e),
-                        Ok(expiration) => {
-                            let (_, item_key) = this.expiration_map.remove_by_left(&expiration.key())
-                                .expect("batch should not expire if it does not exist");
-                            let batch = this.batches.remove(&item_key)
-                                .expect("batch should exist if it is set to expire");
-                            this.closed_batches.push((item_key, batch.into_inner()));
-                            
-                            continue
-                        },
+                    Poll::Ready(Some(item_key)) => {
+                        let batch = this
+                            .batches
+                            .remove(&item_key)
+                            .expect("batch should exist if it is set to expire");
+                        this.closed_batches.push((item_key, batch.into_inner()));
+
+                        continue;
                     }
                 },
                 Poll::Ready(None) => {
@@ -216,14 +332,13 @@ where
                     // including all expiration entries. If we had any batches to hand over, we have
                     // to continue looping so the caller can drain them all before we finish.
                     if !this.batches.is_empty() {
-                        this.expirations.clear();
-                        this.expiration_map.clear();
+                        this.expiration_queue.clear();
                         this.closed_batches.extend(
                             this.batches
                                 .drain()
                                 .map(|(key, batch)| (key, batch.into_inner())),
                         );
-                        continue
+                        continue;
                     }
                     return Poll::Ready(None);
                 }
@@ -244,9 +359,7 @@ where
                             // The batch for this partition key was set to expire, but now it's
                             // overflowed and must be pushed out, so now we reset the batch
                             // timeout.
-                            let expiration_key = this.expiration_map.get_by_right(&item_key)
-                                .expect("expiration mapping should always exist for batch");
-                            this.expirations.reset(expiration_key, *this.batch_timeout);
+                            this.expiration_queue.insert(item_key.clone());
 
                             this.closed_batches.push((item_key, batch.into_inner()));
                         }
@@ -256,11 +369,7 @@ where
                         // filling up, and vise versa.
                         let batch = Batch::new(item_limit, alloc_limit).with(item);
                         this.batches.insert(item_key.clone(), batch);
-
-                        let expiration_key = this.expirations.insert(item_key.clone(), *this.batch_timeout);
-                        if let Err(_) = this.expiration_map.insert_no_overwrite(expiration_key, item_key) {
-                            panic!("there shoud never be an existing expiration map entry for a brand new batch");
-                        }
+                        this.expiration_queue.insert(item_key);
                     }
                 }
             }
@@ -277,44 +386,54 @@ mod test {
     use futures::{stream, Stream};
     use pin_project::pin_project;
     use proptest::prelude::*;
-    use tokio::runtime::Runtime;
     use std::collections::HashMap;
     use std::num::{NonZeroU8, NonZeroUsize};
     use std::pin::Pin;
     use std::task::{Context, Poll};
     use std::time::Duration;
 
+    use super::{ExpirationHook, ExpirationQueue};
+
     #[derive(Debug)]
-    /// A test timer
+    /// A test hook.
     ///
-    /// This timer implements `Timer` and is rigged up in such a way that it
-    /// doesn't _actually_ tell time but instead uses a set of canned responses
-    /// for whether deadlines have elapsed or not. This allows us to include the
-    /// notion of time in our property tests below.
-    struct TestTimer {
-        responses: Vec<Poll<()>>,
+    /// Designed to arbitrarily advance Tokio's time every time `ExpirationQueue<K, H>` is polled,
+    /// so that we can deterministically move time forward while running under `proptest`.
+    ///
+    /// Takes a series of durations and consumes one of them every time `poll_expired` is called,
+    /// advancing the time by that much.
+    struct TestHook {
+        advancements: Vec<Duration>,
     }
 
-    impl TestTimer {
-        fn new(responses: Vec<Poll<()>>) -> Self {
-            Self { responses }
+    impl TestHook {
+        fn new(advancements: Vec<Duration>) -> Self {
+            Self { advancements }
         }
     }
 
-    impl Timer for TestTimer {
-        fn poll_elapsed(&mut self, _cx: &mut Context) -> Poll<()> {
-            self.responses.pop().unwrap_or(Poll::Pending)
+    impl ExpirationHook for TestHook {
+        fn on_poll(&mut self, cx: &mut Context<'_>) {
+            if let Some(duration) = self.advancements.pop() {
+                // WIP: this is where we would theoretically advance the time so that `DelayQueue`
+                // can actually be driven natively by Tokio, but this requires an `.await` which
+                // we can't easily do here.
+                //
+                // overall, the goal is that `poll_expired` returns the partition key itself i.e.
+                // "the batch tied to this partition key has expired, please flush" which hopefully
+                // comes through in the code, so we can...
+                //
+                // - figure out how to actually advance the time
+                // - make the trait be at the poll_expired level and parameterize the keys being
+                //   returned, rather than trying to advance time
+                // - something else?
+                // tokio::time::advance(duration);
+            }
         }
     }
 
-    fn arb_timer() -> impl Strategy<Value = TestTimer> {
-        Vec::<bool>::arbitrary()
-            .prop_map(|v| {
-                v.into_iter()
-                    .map(|i| if i { Poll::Pending } else { Poll::Ready(()) })
-                    .collect()
-            })
-            .prop_map(TestTimer::new)
+    fn arb_expiration_hook() -> impl Strategy<Value = TestHook> {
+        Vec::<Duration>::arbitrary().prop_map(TestHook::new)
     }
 
     #[pin_project]
@@ -350,7 +469,7 @@ mod test {
                         item_limit in 1..u16::max_value(),
                         allocation_limit in 8..128,
                         partitioner in arb_partitioner(),
-                        timer in arb_timer()) {
+                        expiration_hook in arb_expiration_hook()) {
             // Asserts that the size hint of the batcher stream is the same as
             // that of the internal stream. In the future we may want to produce
             // a tighter bound -- since batching will reduce some streams -- but
@@ -362,7 +481,8 @@ mod test {
             let timeout_limit = Duration::from_nanos(1);
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let batcher = Batcher::new(&mut stream, partitioner, timeout_limit,
+            let expiration_queue = ExpirationQueue::with_hook(timeout_limit, expiration_hook);
+            let batcher = Batcher::with_expiration_queue(&mut stream, partitioner, expiration_queue,
                                     item_limit, Some(allocation_limit));
             let batcher_size_hint = batcher.size_hint();
 
@@ -376,7 +496,7 @@ mod test {
                                      item_limit in 1..u16::max_value(),
                                      allocation_limit in 8..128,
                                      partitioner in arb_partitioner(),
-                                     timer in arb_timer()) {
+                                     expiration_hook in arb_expiration_hook()) {
             // Asserts that for every received batch the size is always less
             // than the expected limit.
             let waker = noop_waker();
@@ -386,8 +506,9 @@ mod test {
             let timeout_limit = Duration::from_nanos(1);
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut batcher = Batcher::new(&mut stream, partitioner, timeout_limit,
-                                           item_limit, Some(allocation_limit));
+            let expiration_queue = ExpirationQueue::with_hook(timeout_limit, expiration_hook);
+            let mut batcher = Batcher::with_expiration_queue(&mut stream, partitioner, expiration_queue,
+                                    item_limit, Some(allocation_limit));
             let mut pin = Pin::new(&mut batcher);
 
             loop {
@@ -444,7 +565,7 @@ mod test {
                                   item_limit in 1..u16::max_value(),
                                   allocation_limit in 8..128,
                                   partitioner in arb_partitioner(),
-                                  timer in arb_timer()) {
+                                  expiration_hook in arb_expiration_hook()) {
             // Asserts that for every received batch received the elements in
             // the batch are not reordered within a batch. No claim is made on
             // when batches themselves will issue, batch sizes etc.
@@ -457,8 +578,9 @@ mod test {
             let timeout_limit = Duration::from_nanos(1);
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut batcher = Batcher::new(&mut stream, partitioner, timeout_limit,
-                                           item_limit, Some(allocation_limit));
+            let expiration_queue = ExpirationQueue::with_hook(timeout_limit, expiration_hook);
+            let mut batcher = Batcher::with_expiration_queue(&mut stream, partitioner, expiration_queue,
+                                    item_limit, Some(allocation_limit));
             let mut pin = Pin::new(&mut batcher);
 
             loop {
@@ -489,7 +611,7 @@ mod test {
                                      item_limit in 1..u16::max_value(),
                                      allocation_limit in 8..128,
                                      partitioner in arb_partitioner(),
-                                     timer in arb_timer()) {
+                                     expiration_hook in arb_expiration_hook()) {
             // Asserts that for every received batch the sum of all batch sizes
             // equals the number of stream elements.
             let waker = noop_waker();
@@ -500,8 +622,9 @@ mod test {
             let timeout_limit = Duration::from_nanos(1);
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut batcher = Batcher::new(&mut stream, partitioner, timeout_limit,
-                                           item_limit, Some(allocation_limit));
+            let expiration_queue = ExpirationQueue::with_hook(timeout_limit, expiration_hook);
+            let mut batcher = Batcher::with_expiration_queue(&mut stream, partitioner, expiration_queue,
+                                    item_limit, Some(allocation_limit));
             let mut pin = Pin::new(&mut batcher);
 
             let mut observed_items = 0;
