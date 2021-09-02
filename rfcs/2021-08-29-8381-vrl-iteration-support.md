@@ -23,6 +23,7 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
     * [Lexical Scoping](#lexical-scoping)
     * [Returning Two-Element Array](#returning-two-element-array)
       * [Tuple Type](#tuple-type)
+    * [Parser Ambiguity](#parser-ambiguity)
 * [Rationale](#rationale)
 * [Drawbacks](#drawbacks)
 * [Prior Art](#prior-art)
@@ -517,6 +518,22 @@ VRL itself.
 Since there isn't a clear benefit at this moment to using a tuple over
 a two-element array, the choice is made to forgo adding the tuple type at this
 moment.
+
+#### Parser Ambiguity
+
+TODO, figure out how to handle parser ambiguity.
+
+That is, these are identical:
+
+```coffee
+# merge the result of `fn(a)` with `b` and `c`
+fn(a) | b | c
+```
+
+```coffee
+# call `fn(a)` with closure `|b| c`
+fn(a) |b| c
+```
 
 ## Rationale
 
