@@ -30,6 +30,7 @@ use crate::{
     },
     template::Template,
 };
+use std::sync::atomic::{AtomicU32, Ordering};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -123,14 +124,7 @@ impl DatadogArchivesSinkConfig {
         let batch = BatchSettings::default().bytes(100_000_000).timeout(900);
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, Compression::gzip_default()));
 
-        let mut encoding = DatadogArchivesSinkEncoding {
-            key_prefix_template: Template::try_from(KEY_TEMPLATE)
-                .expect("invalid object key format"),
-            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
-            host_number: host_number(),
-            counter: 0,
-        };
-
+        let mut encoding = default_encoding();
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .with_flat_map(move |e| stream::iter(encoding.encode_event(e)).map(Ok))
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
@@ -184,7 +178,7 @@ struct DatadogArchivesSinkEncoding {
     key_prefix_template: Template,
     reserved_attributes: HashSet<&'static str>,
     host_number: Vec<u8>,
-    counter: u32,
+    counter: AtomicU32,
 }
 
 impl DatadogArchivesSinkEncoding {
@@ -244,9 +238,9 @@ impl DatadogArchivesSinkEncoding {
         }
         log.insert("attributes", attributes);
 
-        let mutbytes =
+        let mut bytes =
             serde_json::to_vec(&log).expect("Failed to encode event as json, this is a bug!");
-        bytes.push('\n');
+        bytes.push(b'\n');
 
         Some(EncodedEvent {
             item: PartitionInnerBuffer::new(bytes, key.into()),
@@ -270,10 +264,18 @@ impl DatadogArchivesSinkEncoding {
         id.put_u8(0);
         // one padding byte
         // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
-        self.counter += 1; // TODO thread-safety
-        id.put_u32(self.counter); // 4 bytes
+        id.put_u32(self.counter.fetch_add(1, Ordering::Relaxed)); // 4 bytes
 
         base64::encode(id.freeze())
+    }
+}
+
+fn default_encoding() -> DatadogArchivesSinkEncoding {
+    DatadogArchivesSinkEncoding {
+        key_prefix_template: Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
+        reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+        host_number: host_number(),
+        counter: AtomicU32::default(),
     }
 }
 
@@ -365,6 +367,7 @@ impl SinkConfig for DatadogArchivesSinkConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LogEvent;
     use chrono::DateTime;
 
     #[test]
@@ -380,15 +383,9 @@ mod tests {
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
             .expect("invalid test case")
             .with_timezone(&Utc);
-        log.as_mut_log().insert("timestamp", timestamp);
-        let mut encoding = DatadogArchivesSinkEncoding {
-            key_prefix_template: Template::try_from(KEY_TEMPLATE)
-                .expect("invalid object key format"),
-            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
-            host_number: host_number(),
-            counter: 0,
-        };
-        let encoded = encoding.encode_event(log).unwrap();
+        log.insert("timestamp", timestamp);
+        let mut encoding = default_encoding();
+        let encoded = encoding.encode_event(log.into()).unwrap();
         let (bytes, key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&bytes[..]).unwrap();
@@ -450,13 +447,7 @@ mod tests {
     #[test]
     fn generates_valid_id() {
         let log = Event::from("test message");
-        let mut encoding = DatadogArchivesSinkEncoding {
-            key_prefix_template: Template::try_from(KEY_TEMPLATE)
-                .expect("invalid object key format"),
-            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
-            host_number: host_number(),
-            counter: 0,
-        };
+        let mut encoding = default_encoding();
         let encoded = encoding.encode_event(log).unwrap();
         let (bytes, _key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
@@ -476,13 +467,7 @@ mod tests {
     #[test]
     fn generates_date_if_missing() {
         let log = Event::from("test message");
-        let mut encoding = DatadogArchivesSinkEncoding {
-            key_prefix_template: Template::try_from(KEY_TEMPLATE)
-                .expect("invalid object key format"),
-            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
-            host_number: host_number(),
-            counter: 0,
-        };
+        let mut encoding = default_encoding();
         let encoded = encoding.encode_event(log).unwrap();
         let (bytes, _key) = encoded.item.into_parts();
         let encoded_json: BTreeMap<String, serde_json::Value> =
@@ -530,13 +515,7 @@ mod tests {
             .expect("invalid test case")
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
-        let mut encoding = DatadogArchivesSinkEncoding {
-            key_prefix_template: Template::try_from(KEY_TEMPLATE)
-                .expect("invalid object key format"),
-            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
-            host_number: host_number(),
-            counter: 0,
-        };
+        let mut encoding = default_encoding();
         let encoded = encoding.encode_event(log).unwrap();
 
         let req = build_s3_request(
