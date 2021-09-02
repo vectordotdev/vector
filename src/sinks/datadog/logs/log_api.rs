@@ -10,6 +10,7 @@ use futures::future::{poll_fn, FutureExt};
 use futures::stream::BoxStream;
 use futures::Future;
 use futures::StreamExt;
+use futures_util::future;
 use http::response::Response;
 use http::{Request, Uri};
 use hyper::Body;
@@ -19,6 +20,7 @@ use std::io::Write;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::time::Duration;
+use tower::retry::Policy;
 use tower::Service;
 use vector_core::event::EventStatus;
 use vector_core::event::{Event, EventFinalizers, Value};
@@ -30,13 +32,6 @@ mod builder;
 mod errors;
 
 const MAX_PAYLOAD_ARRAY: usize = 1_000;
-
-#[derive(Debug, Default)]
-struct FlushMetrics {
-    processed_bytes_total: u64,
-    processed_events_total: u64,
-    success: bool,
-}
 
 #[inline]
 fn dissect_batch(batch: Vec<Event>) -> (Vec<BTreeMap<String, Value>>, Vec<EventFinalizers>) {
@@ -50,12 +45,18 @@ fn dissect_batch(batch: Vec<Event>) -> (Vec<BTreeMap<String, Value>>, Vec<EventF
     (members, finalizers)
 }
 
+struct ApiRequest {
+    serialized_payload_bytes_len: usize,
+    payload_members_len: usize,
+    inner: Request<Body>,
+}
+
 fn build_request(
     members: &Vec<BTreeMap<String, Value>>,
     api_key: &str,
     datadog_uri: Uri,
     compression: &Compression,
-) -> Result<Request<Body>, FlushError> {
+) -> Result<ApiRequest, FlushError> {
     let total_members = members.len();
     assert!(total_members <= MAX_PAYLOAD_ARRAY);
     let body: Vec<u8> = serde_json::to_vec(members).expect("failed to encode to json");
@@ -63,14 +64,17 @@ fn build_request(
     let request = Request::post(datadog_uri)
         .header("Content-Type", "application/json")
         .header("DD-API-KEY", api_key);
-    let serialized_payload_len = body.len();
-    // metrics::histogram!("encoded_payload_size_bytes", serialized_payload_len as f64);
+    let serialized_payload_bytes_len = body.len();
+    metrics::histogram!(
+        "encoded_payload_size_bytes",
+        serialized_payload_bytes_len as f64
+    );
     let (request, encoded_body) = match compression {
         Compression::None => (request, body),
         Compression::Gzip(level) => {
             let level = level.unwrap_or(GZIP_FAST);
             let mut encoder = GzEncoder::new(
-                Vec::with_capacity(serialized_payload_len),
+                Vec::with_capacity(serialized_payload_bytes_len),
                 flate2::Compression::new(level as u32),
             );
 
@@ -81,12 +85,15 @@ fn build_request(
             )
         }
     };
-    // flush_metrics.processed_bytes_total = serialized_payload_len as u64;
-    // flush_metrics.processed_events_total = total_members as u64;
     request
         .header("Content-Length", encoded_body.len())
         .body(Body::from(encoded_body))
         .map_err(Into::into)
+        .map(|rq| ApiRequest {
+            inner: rq,
+            serialized_payload_bytes_len,
+            payload_members_len: total_members,
+        })
 }
 
 #[derive(Default)]
@@ -148,6 +155,33 @@ where
     /// The compression technique to use when sending requests to the Datadog
     /// API
     compression: Compression,
+}
+
+pub struct LogApiRetry;
+
+impl<E> Policy<Request<Body>, http::response::Response<Body>, E> for LogApiRetry {
+    type Future = future::Ready<Self>;
+
+    fn retry(
+        &self,
+        _req: &Request<Body>,
+        result: Result<&http::response::Response<Body>, &E>,
+    ) -> Option<Self::Future> {
+        match result {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() || status.is_client_error() {
+                    return None;
+                }
+                Some(future::ready(Self))
+            }
+            Err(_) => None,
+        }
+    }
+
+    fn clone_request(&self, _req: &Request<Body>) -> Option<Request<Body>> {
+        None
+    }
 }
 
 fn flush_to_api<'a, Client>(
@@ -245,11 +279,14 @@ where
             })
             .filter_map(
                 |(request, finalizers): (
-                    Result<Request<Body>, FlushError>,
+                    Result<ApiRequest, FlushError>,
                     Vec<EventFinalizers>,
                 )| async move {
-                    // TODO must address this error somehow
                     if request.is_err() {
+                        // TODO must log this error
+                        for finalizer in finalizers {
+                            finalizer.update_status(EventStatus::Failed);
+                        }
                         return None;
                     }
                     Some((request.unwrap(), finalizers))
@@ -257,10 +294,18 @@ where
             );
         let mut input = Box::pin(input);
 
-        while let Some((request, finalizers)) = input.next().await {
-            flush_to_api(&mut self.http_client, request, finalizers)
+        while let Some((api_request, finalizers)) = input.next().await {
+            flush_to_api(&mut self.http_client, api_request.inner, finalizers)
                 .expect("unhandled error")
-                .await
+                .await;
+            metrics::counter!(
+                "processed_bytes_total",
+                api_request.serialized_payload_bytes_len as u64
+            );
+            metrics::counter!(
+                "processed_events_total",
+                api_request.payload_members_len as u64
+            );
         }
 
         Ok(())

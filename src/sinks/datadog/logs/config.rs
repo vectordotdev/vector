@@ -11,6 +11,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::sync::Arc;
+use std::time::Duration;
 use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -77,8 +78,7 @@ impl DatadogLogsConfig {
     }
 }
 
-// pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
-
+// TODO re-introduce a proper healthcheck
 async fn nop_healthcheck() -> crate::Result<()> {
     Ok(())
 }
@@ -99,12 +99,12 @@ impl SinkConfig for DatadogLogsConfig {
                 request_settings.rate_limit_num,
                 request_settings.rate_limit_duration,
             )
-            // TODO need whatever `retry_logic` was previously
-            // .retry(request_settings.retry_policy
+            // TODO types are bungled here somehow
+            // .retry(LogApiRetry)
             // .layer(AdaptiveConcurrencyLimitLayer::new(
-            //     self.concurrency,
-            //     self.adaptive_concurrency,
-            //     retry_logic,
+            //     request_settings.concurrency,
+            //     request_settings.adaptive_concurrency,
+            //     LogApiRetry,
             // ))
             .timeout(request_settings.timeout)
             .service(client);
@@ -118,8 +118,13 @@ impl SinkConfig for DatadogLogsConfig {
         let healthcheck = nop_healthcheck().boxed();
 
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
-        let log_api = LogApi::new()
-            // .batch_timeout(batch_settings.timeout)
+        let log_api = LogApi::new();
+        let log_api = if let Some(batch_timeout) = self.batch.timeout_secs {
+            log_api.batch_timeout(Duration::from_secs(batch_timeout))
+        } else {
+            log_api
+        };
+        let log_api = log_api
             .bytes_stored_limit(
                 self.batch
                     .max_bytes

@@ -91,11 +91,10 @@ where
         self
     }
 
-    // TODO enable and set from config
-    // pub fn batch_timeout(mut self, timeout: Duration) -> Self {
-    //     self.timeout = Some(timeout);
-    //     self
-    // }
+    pub fn batch_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
 
     pub fn http_client(mut self, client: Client) -> Self {
         self.http_client = Some(client);
