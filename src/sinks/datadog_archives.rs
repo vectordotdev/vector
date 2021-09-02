@@ -220,12 +220,8 @@ impl DatadogArchivesSinkEncoding {
                 .unwrap_or_else(chrono::Utc::now)
                 .to_rfc3339_opts(SecondsFormat::Millis, true),
         );
-        if let Some(message) = log.remove(crate::config::log_schema().message_key()) {
-            log.insert("message", message);
-        }
-        if let Some(message) = log.remove(crate::config::log_schema().host_key()) {
-            log.insert("host", message);
-        }
+        log.rename_key_flat(crate::config::log_schema().message_key(), "message");
+        log.rename_key_flat(crate::config::log_schema().host_key(), "host");
 
         let mut attributes = BTreeMap::new();
         let custom_attributes: Vec<String> = log
