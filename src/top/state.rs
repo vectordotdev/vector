@@ -1,5 +1,5 @@
 use crate::config::ComponentId;
-use std::collections::HashMap;
+use std::collections::btree_map::BTreeMap;
 use tokio::sync::mpsc;
 
 type IdentifiedMetric = (ComponentId, i64);
@@ -19,7 +19,7 @@ pub enum EventType {
     ComponentRemoved(ComponentId),
 }
 
-pub type State = HashMap<ComponentId, ComponentRow>;
+pub type State = BTreeMap<ComponentId, ComponentRow>;
 pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
 pub type StateRx = mpsc::Receiver<State>;
