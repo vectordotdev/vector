@@ -103,10 +103,10 @@ impl JournaldConfig {
 
     fn merge_units(matches: &Matches, units: &[String]) -> Matches {
         let mut matches = matches.clone();
-        units.iter().map(|s| fixup_unit(s)).for_each(|unit| {
+        for unit in units {
             let entry = matches.entry(String::from(SYSTEMD_UNIT));
-            entry.or_default().insert(unit);
-        });
+            entry.or_default().insert(fixup_unit(unit));
+        }
         matches
     }
 }
