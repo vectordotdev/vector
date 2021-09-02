@@ -82,8 +82,7 @@ impl LimitParams {
     }
 
     fn scale(&self, level: usize) -> f64 {
-        (level - 1) as f64 * self.scale
-            + self
+        ((level - 1) as f64).mul_add(self.scale, self
                 .knee_start
                 .map(|knee| {
                     self.knee_exp
@@ -91,7 +90,7 @@ impl LimitParams {
                         .powf(level.saturating_sub(knee) as f64)
                         - 1.0
                 })
-                .unwrap_or(0.0)
+                .unwrap_or(0.0))
     }
 }
 
@@ -206,10 +205,9 @@ impl TestSink {
 
     fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
         self.params.delay
-            * (1.0
+            * thread_rng().sample::<f64, _>(Exp1).mul_add(self.params.jitter, 1.0
                 + self.params.concurrency_limit_params.scale(in_flight)
-                + self.params.rate.scale(rate)
-                + thread_rng().sample::<f64, _>(Exp1) * self.params.jitter)
+                + self.params.rate.scale(rate))
     }
 }
 

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 /// The healthcheck is performed by sending an empty request to Datadog and
 /// checking the return.
-pub(crate) async fn healthcheck<T, O>(
+pub async fn healthcheck<T, O>(
     sink: T,
     client: HttpClient,
     api_key: String,

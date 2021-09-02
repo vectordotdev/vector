@@ -27,8 +27,9 @@ pub struct BatchConfig {
 }
 
 impl BatchConfig {
-    // This is used internally by new_relic_logs sink, else it could be pub(super) too
-    pub fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
+    // This is used internally by new_relic_logs sink, else it could be
+    // pub(super) too
+    pub const fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
         let max_bytes = match (self.max_bytes, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
             (Some(bytes), None) => Some(bytes),
@@ -42,7 +43,7 @@ impl BatchConfig {
         })
     }
 
-    pub(super) fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
+    pub(super) const fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
         match self.max_bytes {
@@ -51,7 +52,7 @@ impl BatchConfig {
         }
     }
 
-    pub(super) fn use_size_as_events(&self) -> Result<Self, BatchError> {
+    pub(super) const fn use_size_as_events(&self) -> Result<Self, BatchError> {
         let max_events = match (self.max_events, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
             (Some(events), None) => Some(events),
@@ -266,10 +267,11 @@ impl<B: Batch> From<B> for StatefulBatch<B> {
 }
 
 impl<B> StatefulBatch<B> {
-    pub fn was_full(&self) -> bool {
+    pub const fn was_full(&self) -> bool {
         self.was_full
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_inner(self) -> B {
         self.inner
     }

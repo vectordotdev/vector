@@ -41,7 +41,7 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
-    pub fn from_address(address: SocketAddr) -> Self {
+    pub const fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
             receive_buffer_bytes: None,
@@ -73,7 +73,7 @@ impl TcpConfig {
     }
 }
 
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 

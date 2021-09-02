@@ -2,4 +2,4 @@
 use crate::event::proto as event;
 
 #[cfg(any(feature = "sources-vector", feature = "sinks-vector"))]
-pub(crate) mod vector;
+pub mod vector;

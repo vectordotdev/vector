@@ -22,7 +22,7 @@ pub struct Data {
 pub struct Sink(pub Data);
 
 impl Sink {
-    pub fn get_component_id(&self) -> &ComponentId {
+    pub const fn get_component_id(&self) -> &ComponentId {
         &self.0.component_id
     }
 

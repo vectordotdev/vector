@@ -64,11 +64,11 @@ pub struct KafkaSinkConfig {
     librdkafka_options: HashMap<String, String>,
 }
 
-fn default_socket_timeout_ms() -> u64 {
+const fn default_socket_timeout_ms() -> u64 {
     60000 // default in librdkafka
 }
 
-fn default_message_timeout_ms() -> u64 {
+const fn default_message_timeout_ms() -> u64 {
     300000 // default in librdkafka
 }
 

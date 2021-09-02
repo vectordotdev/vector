@@ -15,11 +15,11 @@ pub struct VecBuffer<T> {
 }
 
 impl<T> VecBuffer<T> {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_settings(settings)
     }
 
-    fn new_with_settings(settings: BatchSize<Self>) -> Self {
+    const fn new_with_settings(settings: BatchSize<Self>) -> Self {
         Self {
             batch: None,
             bytes: 0,

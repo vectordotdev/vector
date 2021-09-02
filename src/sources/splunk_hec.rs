@@ -551,7 +551,7 @@ struct DefaultExtractor {
 }
 
 impl DefaultExtractor {
-    fn new(field: &'static str, to_field: &'static str) -> Self {
+    const fn new(field: &'static str, to_field: &'static str) -> Self {
         DefaultExtractor {
             field,
             to_field,

@@ -15,22 +15,22 @@ pub enum MaybeTls<R, T> {
 }
 
 impl<R, T> MaybeTls<R, T> {
-    pub fn is_raw(&self) -> bool {
+    pub const fn is_raw(&self) -> bool {
         matches!(self, Self::Raw(_))
     }
 
-    pub fn is_tls(&self) -> bool {
+    pub const fn is_tls(&self) -> bool {
         matches!(self, Self::Tls(_))
     }
 
-    pub fn raw(&self) -> Option<&R> {
+    pub const fn raw(&self) -> Option<&R> {
         match self {
             Self::Raw(raw) => Some(raw),
             Self::Tls(_) => None,
         }
     }
 
-    pub fn tls(&self) -> Option<&T> {
+    pub const fn tls(&self) -> Option<&T> {
         match self {
             Self::Raw(_) => None,
             Self::Tls(tls) => Some(tls),

@@ -140,7 +140,7 @@ struct LogstashDecoder {
 }
 
 impl LogstashDecoder {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             state: LogstashDecoderReadState::ReadProtocol,
         }

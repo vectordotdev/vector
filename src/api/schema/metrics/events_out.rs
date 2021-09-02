@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 pub struct EventsOutTotal(Metric);
 
 impl EventsOutTotal {
-    pub fn new(m: Metric) -> Self {
+    pub const fn new(m: Metric) -> Self {
         Self(m)
     }
 
@@ -80,7 +80,7 @@ pub struct ComponentEventsOutThroughput {
 
 impl ComponentEventsOutThroughput {
     /// Returns a new `ComponentEventsOutThroughput`, set to the provided id/throughput values
-    pub fn new(component_id: String, throughput: i64) -> Self {
+    pub const fn new(component_id: String, throughput: i64) -> Self {
         Self {
             component_id,
             throughput,

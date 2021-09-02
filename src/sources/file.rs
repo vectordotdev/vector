@@ -152,7 +152,7 @@ fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-fn default_lines() -> usize {
+const fn default_lines() -> usize {
     1
 }
 

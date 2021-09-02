@@ -285,7 +285,7 @@ pub fn emit(event: impl InternalEvent) {
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        $crate::internal_events::emit($event);
+        $crate::internal_events::emit($event)
     };
 }
 

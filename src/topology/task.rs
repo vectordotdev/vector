@@ -39,7 +39,7 @@ impl Task {
         }
     }
 
-    pub fn id(&self) -> &ComponentId {
+    pub const fn id(&self) -> &ComponentId {
         &self.id
     }
 
