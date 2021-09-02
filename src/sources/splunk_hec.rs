@@ -1267,7 +1267,9 @@ mod tests {
     async fn whitespace() {
         trace_init();
 
-        let message = r#" {"event":"first"} "#;
+        let message = r#"
+        {"event":"first"}
+        "#;
         let (source, address) = source().await;
 
         assert_eq!(
