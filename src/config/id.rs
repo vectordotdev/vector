@@ -120,7 +120,9 @@ impl Serialize for ComponentId {
 
 impl Ord for ComponentId {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
+        self.scope
+            .cmp(&other.scope)
+            .then_with(|| self.id.cmp(&other.id))
     }
 }
 
