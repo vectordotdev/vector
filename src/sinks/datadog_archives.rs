@@ -4,8 +4,7 @@ use std::{collections::BTreeMap, convert::TryFrom};
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use futures::{stream, FutureExt, SinkExt, StreamExt};
-use mac_address::get_mac_address;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use rusoto_s3::{PutObjectOutput, S3Client};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -179,8 +178,8 @@ const RESERVED_ATTRIBUTES: [&'static str; 10] = [
 struct DatadogArchivesSinkEncoding {
     key_prefix_template: Template,
     reserved_attributes: HashSet<&'static str>,
-    host_number: Vec<u8>,
-    seq_number: u32,
+    id_rnd_bytes: [u8; 8],
+    id_seq_number: u32,
 }
 
 impl DatadogArchivesSinkEncoding {
@@ -246,24 +245,25 @@ impl DatadogArchivesSinkEncoding {
         })
     }
 
-    /// Generates a unique ID compatible with DD
+    /// Generates a unique event ID compatible with DD:
+    /// - 18 bytes;
+    /// - first 6 bytes represent a "now" timestamp in millis;
+    /// - the rest 12 bytes can be just any sequence unique for a given timestamp.
+    ///
+    /// To generate unique-ish trailing 12 bytes we use random 8 bytes, generated at startup,
+    /// and a rolling-over 4-bytes sequence number.
     fn generate_log_id(&mut self) -> String {
         let mut id = BytesMut::with_capacity(18);
         // timestamp in millis - 6 bytes
         let now = Utc::now();
         id.put_int(now.timestamp_millis(), 6);
-        // namespace + version, both 0 - 2 bytes
-        id.put_i16(0);
 
-        // host-based number - 5 bytes
-        id.put_slice(&self.host_number);
+        // 8 random bytes
+        id.put_slice(&self.id_rnd_bytes);
 
-        // counter - 5 bytes
-        id.put_u8(0);
-        // one padding byte
         // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
-        self.seq_number = self.seq_number.wrapping_add(1);
-        id.put_u32(self.seq_number); // 4 bytes
+        self.id_seq_number = self.id_seq_number.wrapping_add(1);
+        id.put_u32(self.id_seq_number);
 
         base64::encode(id.freeze())
     }
@@ -273,8 +273,8 @@ fn default_encoding() -> DatadogArchivesSinkEncoding {
     DatadogArchivesSinkEncoding {
         key_prefix_template: Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
         reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
-        host_number: host_number(),
-        seq_number: u32::default(),
+        id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
+        id_seq_number: u32::default(),
     }
 }
 
@@ -324,25 +324,6 @@ fn build_s3_request(
             content_type: None,
         },
     }
-}
-
-/// Returns 5 first bytes of the MAC address XOR-ed with random bytes
-fn host_number() -> Vec<u8> {
-    let mut rng = rand::thread_rng();
-    let mac = get_mac_address()
-        .unwrap_or_default()
-        .and_then(|mac| mac.bytes().into())
-        .unwrap_or_else(|| {
-            warn!(message = "Failed to retrieve a MAC address - using random bytes instead");
-            rng.gen::<[u8; 6]>()
-        });
-    let mut rand_bytes = rng.gen::<[u8; 5]>();
-
-    rand_bytes
-        .iter_mut()
-        .zip(mac[..5].iter()) // take first 5 bytes
-        .map(|(x, y)| *x ^ *y) // apply XOR
-        .collect::<Vec<_>>()
 }
 
 #[async_trait::async_trait]
