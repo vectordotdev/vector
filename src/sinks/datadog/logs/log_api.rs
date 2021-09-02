@@ -157,6 +157,7 @@ where
     compression: Compression,
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct LogApiRetry;
 
 impl<E> Policy<Request<Body>, http::response::Response<Body>, E> for LogApiRetry {

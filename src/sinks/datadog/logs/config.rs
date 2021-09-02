@@ -1,5 +1,6 @@
+use super::log_api::LogApiRetry;
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::http::HttpClient;
+use crate::http::{HttpClient, HttpError};
 use crate::sinks::datadog::logs::log_api::LogApi;
 use crate::sinks::datadog::Region;
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
@@ -7,6 +8,8 @@ use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 use futures::FutureExt;
+use http::{Request, Response};
+use hyper::Body;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -95,18 +98,25 @@ impl SinkConfig for DatadogLogsConfig {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let client = ServiceBuilder::new()
+            .check_service::<HttpClient, Request<Body>, Response<Body>, HttpError>()
             .rate_limit(
                 request_settings.rate_limit_num,
                 request_settings.rate_limit_duration,
             )
-            // TODO types are bungled here somehow
-            // .retry(LogApiRetry)
+            .check_service::<HttpClient, Request<Body>, Response<Body>, HttpError>()
+            .retry(LogApiRetry)
+            .check_service::<HttpClient, Request<Body>, Response<Body>, HttpError>()
+            // TODO introduction causes a compilation failure for want of a Sync
+            // implementation on the `State` enum of adapative concurrency.
+            //
             // .layer(AdaptiveConcurrencyLimitLayer::new(
             //     request_settings.concurrency,
             //     request_settings.adaptive_concurrency,
             //     LogApiRetry,
             // ))
+            // .check_service::<HttpClient, Request<Body>, Response<Body>, _>()
             .timeout(request_settings.timeout)
+            .check_service::<HttpClient, Request<Body>, Response<Body>, _>()
             .service(client);
 
         // let healthcheck = healthcheck(
