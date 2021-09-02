@@ -6,7 +6,11 @@ use std::{
 
 use futures::{poll, StreamExt};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use vector_core::{ByteSizeOf, event::{EventFinalizers, Finalizable}, partition::Partitioner};
+use vector_core::{
+    event::{EventFinalizers, Finalizable},
+    partition::Partitioner,
+    ByteSizeOf,
+};
 
 use crate::sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
 use crate::sinks::util::BatchSize;

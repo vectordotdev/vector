@@ -1,7 +1,9 @@
 use std::{
     collections::HashMap,
-    fmt::{Debug, Display},
+    fmt::Debug,
     io::{self, Write},
+    num::NonZeroUsize,
+    time::Duration,
 };
 
 use crate::sinks::util::sink::ServiceLogic;
@@ -11,10 +13,7 @@ use crate::{
     sinks::{
         aws_s3::config::Encoding,
         util::{
-            buffer::{
-                partition::{PartitionBatcher, PartitionFinishedBatch},
-                GZIP_FAST,
-            },
+            buffer::GZIP_FAST,
             encoding::{EncodingConfig, EncodingConfiguration},
             sink::StdServiceLogic,
             Compression,
@@ -26,7 +25,6 @@ use bytes::Bytes;
 use chrono::Utc;
 use flate2::write::GzEncoder;
 use futures::{
-    future::ready,
     stream::{BoxStream, FuturesUnordered, StreamExt},
     FutureExt, TryFutureExt,
 };
@@ -43,8 +41,8 @@ use uuid::Uuid;
 use vector_core::{
     buffers::Acker,
     event::{EventFinalizers, Finalizable},
-    partition::Partitioner,
     sink::StreamSink,
+    stream::batcher::{Batcher, BatcherTimer},
 };
 
 use super::{config::S3RequestOptions, partitioner::KeyPartitioner, service::S3Request};
@@ -53,7 +51,10 @@ use crate::sinks::util::sink::Response;
 pub struct S3Sink<S> {
     acker: Option<Acker>,
     service: Option<S>,
-    batcher: PartitionBatcher<KeyPartitioner>,
+    partitioner: Option<KeyPartitioner>,
+    batch_size_bytes: NonZeroUsize,
+    batch_size_events: Option<NonZeroUsize>,
+    batch_timeout: Duration,
     options: S3RequestOptions,
 }
 
@@ -61,13 +62,19 @@ impl<S> S3Sink<S> {
     pub fn new(
         cx: SinkContext,
         service: S,
-        batcher: PartitionBatcher<KeyPartitioner>,
+        partitioner: KeyPartitioner,
+        batch_size_bytes: NonZeroUsize,
+        batch_size_events: Option<NonZeroUsize>,
+        batch_timeout: Duration,
         options: S3RequestOptions,
     ) -> Self {
         Self {
             acker: Some(cx.acker()),
             service: Some(service),
-            batcher,
+            partitioner: Some(partitioner),
+            batch_size_bytes,
+            batch_size_events,
+            batch_timeout,
             options,
         }
     }
@@ -81,7 +88,7 @@ where
     S::Response: Response + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // All sinks do the same fundamental job: take in events, and ship them out.  Empirical
         // testing shows that our number one priority for high throughput needs to be servicing I/O
         // as soon as we possibly can.  In order to do that, we'll spin up a separate task that
@@ -96,98 +103,45 @@ where
             .acker
             .take()
             .expect("same sink should not be run twice");
+        let partitioner = self
+            .partitioner
+            .take()
+            .expect("same sink should not be run twice");
 
         let io = run_io(io_rx, service, acker).in_current_span();
         let _ = tokio::spawn(async move {
             io.await;
         });
 
-        let mut closed = false;
-        let mut queued_event = None;
-        let mut iter = 0;
-        loop {
-            iter += 1;
+        let batcher_timer = BatcherTimer::new(self.batch_timeout);
+        let batcher = Batcher::new(
+            input,
+            partitioner,
+            batcher_timer,
+            self.batch_size_bytes,
+            self.batch_size_events,
+        );
+        pin!(batcher);
 
-            select! {
-                // This explicitly enables biasing, which ensures the branches in this select block
-                // are polled in top-down order.  We do this to ensure that we send ready batches
-                // as soon as possible to keep I/O saturated to the best of our ability.
-                biased;
-
-                // Batches ready to send.
-                //
-                // TODO: We may want to reconsider running this on an interval in the future because
-                // right now we'll be checking it after every single event we receive on our input
-                // stream, and it's not exactly the _fastest_ function.  Something like a 10-25ms
-                // flush interval could be more than enough batching when subject to high ingest
-                // rate e.g. tens or hundreds of thousands of events per second.
-                Some(batches) = self.batcher.get_ready_batches() => {
-                    trace!("{} -> got {} batches to flush", iter, batches.len());
-                    for batch in batches {
-                        let batch_key = batch.key().to_string();
-                        let request = build_request(batch, &self.options);
-                        if let Err(_) = io_tx.send(request).await {
-                            // TODO: change this to "error! + return Err" after initial testing/debugging
-                            trace!("{} -> sink I/O channel should not be closed before sink itself is closed", iter);
-                            panic!("boom 1")
-                        }
-
-                        trace!("{} -> sent batch '{}' to I/O task", iter, batch_key);
-                    }
-                }
-
-                // Queued event that was previously diverted because we were unable to insert it to
-                // a batch.  Try again now after flushing batches.
-                Some(event) = ready(queued_event.take()) => {
-                    // If we're able to get back the event after trying to push it into a batch, it
-                    // means we didn't successfully insert the event.  This should not be possible,
-                    // as we only queue an event for reinsertion if the batch push failed for a
-                    // non-error reason.  If it fails for a non-error reason, that implies that the
-                    // batch is full, and that based on our biased select block, any ready batches
-                    // should be cleared by the time this branch executes.
-                    if let Some(_) = self.batcher.push(event).into_inner() {
+        while let Some((key, batch)) = batcher.next().await {
+            match key {
+                Some(key) => {
+                    // We could push this down to the I/O task if we wanted to.
+                    let request = build_request(key, batch, &self.options);
+                    if let Err(_) = io_tx.send(request).await {
                         // TODO: change this to "error! + return Err" after initial testing/debugging
-                        trace!("{} -> wasn't able to push queued event into batch after flushing ready batches; this should be impossible", iter);
-                        panic!("boom 2");
-                    }
-
-                    trace!("{} -> pushed queued event into batch", iter);
-                }
-
-                // Take in new events.
-                maybe_event = input.next() => {
-                    if let Some(event) = maybe_event {
-                        // When we receive an event, we aren't yet sure which batch it's going to
-                        // land in, based on the configured partitioning, so we might run into a
-                        // situation where a batch is actually full and we need to flush it first.
-                        //
-                        // We'll temporarily hold that event in a side buffer -- `queued_event` --
-                        // so that we can forcefully continue the loop, to let our prioritized
-                        // "flush buffers" branch run, clearing out the full batch.  After that
-                        // happens, we'll push that queued event into a batch.
-                        let result = self.batcher.push(event);
-                        if result.should_flush() {
-                            trace!("{} -> batch full, continuing to force flush", iter);
-                            queued_event = result.into_inner();
-                            continue;
-                        }
-                    } else {
-                        // We're not going to get any more events from our input stream, but we
-                        // might have outstanding batches.  Thus, we mark ourselves and the batch as
-                        // closed, and the next time we're here, if we're already closed, then we
-                        // forcefully break out of the loop.  This ensures that we make at least one
-                        // more iteration of the loop, where our next call to `get_ready_batches`
-                        // will return all the remaining batches regardless of size or expiration.
-                         if !closed {
-                             trace!("{} -> stream closed, marking batcher closed and flushing", iter);
-                             closed = true;
-                             self.batcher.close();
-                         } else {
-                             trace!("{} -> stream completed, post-close flush complete, ending", iter);
-                             break;
-                         }
+                        trace!(
+                            "sink I/O channel should not be closed before sink itself is closed"
+                        );
+                        panic!("boom 1")
                     }
                 }
+                // Partitioning failed for one or more events.
+                //
+                // TODO: this might b e where we would insert something like the proposed error
+                // handling/dead letter queue stuff; events that _we_ can't handle, but some other
+                // component may be able to salvage
+                None => continue,
             }
         }
 
@@ -270,12 +224,7 @@ where
     }
 }
 
-fn build_request<P>(batch: PartitionFinishedBatch<P>, options: &S3RequestOptions) -> S3Request
-where
-    P: Partitioner,
-    P::Key: Display,
-    P::Item: Into<Event>,
-{
+fn build_request(key: String, batch: Vec<Event>, options: &S3RequestOptions) -> S3Request {
     // Generate the filename for this batch, which involves a surprising amount of code.
     let filename = {
         /*
@@ -327,14 +276,14 @@ where
         .as_ref()
         .cloned()
         .unwrap_or_else(|| options.compression.extension().into());
-    let key = format!("{}{}.{}", batch.key(), filename, extension);
+    let key = format!("{}{}.{}", key, filename, extension);
 
     // Process our events. This does all of the necessary encoding rule application, as well as
     // encoding and compressing the events.  We're handed back a tidy `Bytes` instance we can send
     // directly to S3.
     //
     // TODO: we need to do something with these
-    let batch_size = batch.items().len();
+    let batch_size = batch.len();
     let (body, finalizers) = process_event_batch(batch, &options.encoding, options.compression);
 
     debug!(
@@ -355,15 +304,11 @@ where
     }
 }
 
-pub fn process_event_batch<P>(
-    batch: PartitionFinishedBatch<P>,
+pub fn process_event_batch(
+    batch: Vec<Event>,
     encoding: &EncodingConfig<Encoding>,
     compression: Compression,
-) -> (Bytes, EventFinalizers)
-where
-    P: Partitioner,
-    P::Item: Into<Event>,
-{
+) -> (Bytes, EventFinalizers) {
     enum Writer {
         Plain(Vec<u8>),
         GzipCompressed(GzEncoder<Vec<u8>>),
@@ -385,15 +330,12 @@ where
         }
     }
 
-    let total_size = batch.total_size();
-    let (_key, events, finalizers) = batch.into_parts();
-
     // Build our compressor first, so that we can encode directly into it.
     let mut writer = {
         // This is a best guess, because encoding could add a good chunk of overhead to the raw,
         // in-memory representation of an event, but if we're compressing, then we should end up
         // net below the capacity.
-        let buffer = Vec::with_capacity(total_size);
+        let buffer = Vec::new();
         match compression {
             Compression::None => Writer::Plain(buffer),
             Compression::Gzip(level) => {
@@ -406,9 +348,13 @@ where
         }
     };
 
+    let mut finalizers = EventFinalizers::default();
+
     // Now encode each item into the writer.
-    for event in events {
-        let _ = encode_event(event.into(), encoding, &mut writer)
+    for mut event in batch {
+        finalizers.merge(event.take_finalizers());
+
+        let _ = encode_event(event, encoding, &mut writer)
             .expect("failed to encode event into writer; this is a bug!");
     }
 
@@ -452,18 +398,12 @@ fn encode_event(
 mod tests {
     use std::{collections::BTreeMap, io::Cursor};
 
-    use crate::sinks::{
-        aws_s3::config::S3Options,
-        util::{
-            buffer::partition::{BatchPushResult, PartitionInFlightBatch},
-            BatchSize,
-        },
-    };
+    use crate::sinks::aws_s3::config::S3Options;
     use vector_core::partition::Partitioner;
 
     use super::*;
 
-    #[derive(Clone)]
+    #[derive(Clone, Default)]
     struct TestPartitioner;
 
     impl Partitioner for TestPartitioner {
@@ -529,13 +469,14 @@ mod tests {
 
     #[test]
     fn s3_build_request() {
-        let batch_size = BatchSize::const_default();
-        let mut batch = PartitionInFlightBatch::<TestPartitioner>::new(batch_size);
+        let partitioner = TestPartitioner::default();
 
         let event = "hello world".into();
-        assert_eq!(batch.push(event), BatchPushResult::Success(false));
-
-        let finished_batch = batch.finish("key");
+        let partition_key = partitioner
+            .partition(&event)
+            .expect("event should not fail to partition")
+            .to_string();
+        let finished_batch = vec![event];
 
         let settings = S3RequestOptions {
             bucket: "bucket".into(),
@@ -546,28 +487,28 @@ mod tests {
             encoding: Encoding::Text.into(),
             compression: Compression::None,
         };
-        let req = build_request(finished_batch.clone(), &settings);
+        let req = build_request(partition_key.clone(), finished_batch.clone(), &settings);
         assert_eq!(req.key, "key/date.ext");
 
         let settings = S3RequestOptions {
             filename_extension: None,
             ..settings.clone()
         };
-        let req = build_request(finished_batch.clone(), &settings);
+        let req = build_request(partition_key.clone(), finished_batch.clone(), &settings);
         assert_eq!(req.key, "key/date.log");
 
         let settings = S3RequestOptions {
             compression: Compression::gzip_default(),
             ..settings.clone()
         };
-        let req = build_request(finished_batch.clone(), &settings);
+        let req = build_request(partition_key.clone(), finished_batch.clone(), &settings);
         assert_eq!(req.key, "key/date.log.gz");
 
         let settings = S3RequestOptions {
             filename_append_uuid: true,
             ..settings.clone()
         };
-        let req = build_request(finished_batch.clone(), &settings);
+        let req = build_request(partition_key, finished_batch, &settings);
         assert_ne!(req.key, "key/date.log.gz");
     }
 }

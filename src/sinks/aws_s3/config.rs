@@ -1,6 +1,5 @@
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::util::buffer::partition::PartitionBatcher;
 use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::util::retries::RetryLogic;
 use crate::sinks::util::{BatchConfig, BatchSettings};
@@ -15,6 +14,7 @@ use rusoto_core::RusotoError;
 use rusoto_s3::{HeadBucketRequest, PutObjectError, PutObjectOutput, S3Client, S3};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::num::NonZeroUsize;
 use std::{collections::BTreeMap, convert::TryInto};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
@@ -201,8 +201,11 @@ impl S3SinkConfig {
             .cloned()
             .unwrap_or_else(|| DEFAULT_KEY_PREFIX.into())
             .try_into()?;
-        let key_partitioner = KeyPartitioner::new(key_prefix);
-        let batcher = PartitionBatcher::new(key_partitioner, batch_settings);
+        let partitioner = KeyPartitioner::new(key_prefix);
+        let batch_size_bytes = NonZeroUsize::new(batch_settings.size.bytes)
+            .ok_or("batch, in bytes, max be greater than 0")?;
+        let batch_size_events = NonZeroUsize::new(batch_settings.size.events);
+        let batch_timeout = batch_settings.timeout;
 
         // And now collect all of the S3-specific options and configuration knobs.
         let filename_time_format = self
@@ -224,7 +227,15 @@ impl S3SinkConfig {
             compression: self.compression,
         };
 
-        let sink = S3Sink::new(cx, service, batcher, request_options);
+        let sink = S3Sink::new(
+            cx,
+            service,
+            partitioner,
+            batch_size_bytes,
+            batch_size_events,
+            batch_timeout,
+            request_options,
+        );
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }

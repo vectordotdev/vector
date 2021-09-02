@@ -62,7 +62,7 @@ pub fn init(color: bool, json: bool, levels: &str, enable_datadog_tracing: bool)
     //tokio::spawn(tasks_server.serve());
 
     let subscriber = tracing_subscriber::registry::Registry::default()
-//        .with(tasks_layer)
+        //        .with(tasks_layer)
         .with(tracing_subscriber::filter::EnvFilter::from(levels));
 
     // dev note: we attempted to refactor to reduce duplication but it was starting to seem like

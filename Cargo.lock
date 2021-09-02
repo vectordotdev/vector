@@ -1195,7 +1195,7 @@ version = "0.1.0"
 source = "git+https://github.com/tokio-rs/console#3c04f65b4e92ce69db5eafc309d39a98f861beef"
 dependencies = [
  "console-api",
- "futures 0.3.16",
+ "futures 0.3.17",
  "hdrhistogram",
  "serde",
  "serde_json",

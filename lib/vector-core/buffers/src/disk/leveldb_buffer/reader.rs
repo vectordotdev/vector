@@ -1,7 +1,7 @@
 use super::Key;
 use crate::bytes::DecodeBytes;
 use bytes::Bytes;
-use futures::{Stream, task::AtomicWaker};
+use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     compaction::Compaction,
@@ -9,7 +9,6 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
-use tokio::task::JoinHandle;
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::future::Future;
@@ -21,6 +20,7 @@ use std::sync::{
 };
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
+use tokio::task::JoinHandle;
 
 /// How much time needs to pass between compaction to trigger new one.
 const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
@@ -134,7 +134,7 @@ where
                         this.pending_read = Some(handle);
                         //this.in_flight_reads += 1;
                         //this.total_reads += 1;
-                    },
+                    }
                     Some(mut handle) => {
                         match Pin::new(&mut handle).poll(cx) {
                             Poll::Ready(r) => {
@@ -146,12 +146,12 @@ where
                                 this.pending_read = None;
                                 //this.in_flight_reads -= 1;
 
-                                break
-                            },
+                                break;
+                            }
                             Poll::Pending => {
                                 this.pending_read = Some(handle);
-                                return Poll::Pending
-                            },
+                                return Poll::Pending;
+                            }
                         }
                     }
                 }
