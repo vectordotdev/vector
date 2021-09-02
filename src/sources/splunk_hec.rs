@@ -1264,12 +1264,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn whitespace() {
+    async fn handles_newlines() {
         trace_init();
 
         let message = r#"
-        {"event":"first"}
+{"event":"first"}
         "#;
+        let (source, address) = source().await;
+
+        assert_eq!(
+            200,
+            post(address, "services/collector/event", message).await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn handles_spaces() {
+        trace_init();
+
+        let message = r#" {"event":"first"} "#;
         let (source, address) = source().await;
 
         assert_eq!(
