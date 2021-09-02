@@ -329,8 +329,14 @@ fn build_s3_request(
 
 /// Returns 5 first bytes of the MAC address XOR-ed with random bytes
 fn host_number() -> Vec<u8> {
-    let mac = get_mac_address().unwrap().unwrap().bytes();
     let mut rng = rand::thread_rng();
+    let mac = get_mac_address()
+        .unwrap_or_default()
+        .and_then(|mac| mac.bytes().into())
+        .unwrap_or_else(|| {
+            warn!(message = "Failed to retrieve a MAC address - using random bytes instead");
+            rng.gen::<[u8; 6]>()
+        });
     let mut rand_bytes = rng.gen::<[u8; 5]>();
 
     rand_bytes
