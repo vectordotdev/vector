@@ -129,6 +129,7 @@ type Svc = Buffer<
     Vec<InputLogEvent>,
 >;
 
+#[derive(Clone)]
 pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
@@ -184,12 +185,10 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let log_stream = self.stream_name.clone();
 
         let client = self.create_client(cx.proxy())?;
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(request.concurrency.unwrap())
-            .service(CloudwatchLogsPartitionSvc::new(
-                self.clone(),
-                client.clone(),
-            ));
+        let svc = request.service(
+            CloudwatchRetryLogic,
+            CloudwatchLogsPartitionSvc::new(self.clone(), client.clone()),
+        );
 
         let encoding = self.encoding.clone();
         let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
@@ -246,10 +245,9 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
-            // Buffer size is `concurrency` because current service always ready.
             // Concurrency limit is 1 because we need token from previous request.
             let svc = ServiceBuilder::new()
-                .buffer(self.request_settings.concurrency.unwrap())
+                .buffer(1)
                 .concurrency_limit(1)
                 .rate_limit(
                     self.request_settings.rate_limit_num,
