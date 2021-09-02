@@ -9,11 +9,20 @@ use crate::{
 };
 use indexmap::IndexMap;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
-pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
+pub async fn build_unit_tests_main(
+    paths: &[ConfigPath],
+    pipeline_paths: &[PathBuf],
+) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
 
-    let pipelines = super::loading::load_pipelines_from_paths(paths)?;
+    let pipelines = if pipeline_paths.is_empty() {
+        let pipeline_paths = super::loading::pipeline_paths_from_config_paths(paths);
+        super::loading::load_pipelines_from_paths(&pipeline_paths)?
+    } else {
+        super::loading::load_pipelines_from_paths(pipeline_paths)?
+    };
     let (mut config, _) = super::loading::load_builder_from_paths(paths)?;
     config.set_pipelines(pipelines);
 

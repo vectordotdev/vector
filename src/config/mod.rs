@@ -41,7 +41,8 @@ pub use format::{Format, FormatHint};
 pub use id::ComponentId;
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    load_pipelines_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load_pipelines_from_paths, merge_path_lists, pipeline_paths_from_config_paths, process_paths,
+    CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
