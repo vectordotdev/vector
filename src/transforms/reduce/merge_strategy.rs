@@ -236,6 +236,7 @@ struct FlatUniqueMerger {
     v: HashSet<Value>,
 }
 
+#[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
 fn insert_value(h: &mut HashSet<Value>, v: Value) {
     match v {
         Value::Map(m) => {
@@ -255,6 +256,7 @@ fn insert_value(h: &mut HashSet<Value>, v: Value) {
 }
 
 impl FlatUniqueMerger {
+    #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
     fn new(v: Value) -> Self {
         let mut h = HashSet::default();
         insert_value(&mut h, v);
