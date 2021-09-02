@@ -32,7 +32,6 @@ use crate::{
     },
     template::Template,
 };
-use std::sync::atomic::{AtomicU32, Ordering};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -181,7 +180,7 @@ struct DatadogArchivesSinkEncoding {
     key_prefix_template: Template,
     reserved_attributes: HashSet<&'static str>,
     host_number: Vec<u8>,
-    seq_number: AtomicU32,
+    seq_number: u32,
 }
 
 impl DatadogArchivesSinkEncoding {
@@ -263,8 +262,8 @@ impl DatadogArchivesSinkEncoding {
         id.put_u8(0);
         // one padding byte
         // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
-        let seq_number = self.seq_number.fetch_add(1, Ordering::Relaxed);
-        id.put_u32(seq_number); // 4 bytes
+        self.seq_number = self.seq_number.wrapping_add(1);
+        id.put_u32(self.seq_number); // 4 bytes
 
         base64::encode(id.freeze())
     }
@@ -275,7 +274,7 @@ fn default_encoding() -> DatadogArchivesSinkEncoding {
         key_prefix_template: Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
         reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
         host_number: host_number(),
-        seq_number: AtomicU32::default(),
+        seq_number: u32::default(),
     }
 }
 
