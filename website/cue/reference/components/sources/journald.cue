@@ -81,7 +81,7 @@ components: sources: journald: {
 		}
 		exclude_matches: {
 			common:      true
-			description: "The list of Journal field/value pairs to exclude from monitoring. When used with `exclude_units`, it will be merged into include_matches."
+			description: "This list contains sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source. If `exclude_units` is specified, it will be merged into this list."
 			required:    false
 			warnings: []
 			type: object: {
@@ -94,7 +94,7 @@ components: sources: journald: {
 				options: {
 					"*": {
 						common:		   false
-						description: "The Journal values of filter expressions used to match Journal field."
+						description: "The set of field values to match in journal entries that are to be excluded."
 						required:	   false
 						type: array: {
 							default: []
@@ -122,7 +122,7 @@ components: sources: journald: {
 		}
 		include_matches: {
 			common:      true
-			description: "The list of Journal field/value pairs to monitor. If empty or not present, all Journal fields are accepted. When used with `include_units`, it will be merged into include_matches."
+			description: "This list contains sets of field/value pairs to monitor. If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list."
 			required:    false
 			warnings: []
 			type: object: {
@@ -135,7 +135,7 @@ components: sources: journald: {
 				options: {
 					"*": {
 						common:		 false
-						description: "The Journal values of filter expressions used to match Journal field."
+						description: "The set of field values to match in journal entries that are to monitor."
 						required:	 false
 						type: array: {
 							default: []
