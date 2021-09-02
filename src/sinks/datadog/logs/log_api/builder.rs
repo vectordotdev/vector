@@ -119,14 +119,16 @@ where
             datadog_uri: self.datadog_uri.ok_or(BuildError::MissingUri)?,
             encoding: self.encoding,
             http_client: self.http_client.ok_or(BuildError::MissingHttpClient)?,
-            log_schema_host_key: self.log_schema_host_key.unwrap_or(log_schema().host_key()),
+            log_schema_host_key: self
+                .log_schema_host_key
+                .unwrap_or_else(|| log_schema().host_key()),
             log_schema_message_key: self
                 .log_schema_message_key
-                .unwrap_or(log_schema().message_key()),
+                .unwrap_or_else(|| log_schema().message_key()),
             log_schema_timestamp_key: self
                 .log_schema_timestamp_key
-                .unwrap_or(log_schema().timestamp_key()),
-            timeout: self.timeout.unwrap_or(Duration::from_secs(60)),
+                .unwrap_or_else(|| log_schema().timestamp_key()),
+            timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(60)),
         };
         Ok(log_api)
     }

@@ -52,7 +52,7 @@ struct ApiRequest {
 }
 
 fn build_request(
-    members: &Vec<BTreeMap<String, Value>>,
+    members: &[BTreeMap<String, Value>],
     api_key: &str,
     datadog_uri: Uri,
     compression: &Compression,
@@ -184,8 +184,8 @@ impl<E> Policy<Request<Body>, http::response::Response<Body>, E> for LogApiRetry
     }
 }
 
-fn flush_to_api<'a, Client>(
-    http_client: &'a mut Client,
+fn flush_to_api<Client>(
+    http_client: &'_ mut Client,
     request: Request<Body>,
     finalizers: Vec<EventFinalizers>,
 ) -> Result<impl Future<Output = ()> + Send, FlushError>
@@ -241,9 +241,9 @@ where
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // copy items out of `self`, needed as we don't have ownership
-        let compression = self.compression.clone();
+        let compression = self.compression;
         let datadog_uri = self.datadog_uri.clone();
-        let default_api_key = self.default_api_key.clone();
+        let default_api_key = Arc::<str>::clone(&self.default_api_key);
         let encoding = self.encoding.clone();
         let host_key = self.log_schema_host_key;
         let message_key = self.log_schema_message_key;
@@ -271,7 +271,7 @@ where
                 None,
             )
             .map(|(api_key, events): (Option<Arc<str>>, Vec<Event>)| {
-                let api_key = api_key.unwrap_or_else(|| default_api_key.clone());
+                let api_key = api_key.unwrap_or_else(|| Arc::<str>::clone(&default_api_key));
                 let (fields, finalizers) = dissect_batch(events);
                 let uri = datadog_uri.clone();
                 let request = build_request(&fields, &api_key, uri, &compression);
