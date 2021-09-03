@@ -120,10 +120,13 @@ impl Function for GetEnrichmentTableRecord {
             .into_owned();
 
         /*
+         An example of a search condition:
         {
             "field1": .value,
             "field2": { "from": .date1, "to": .date2 }
         }
+
+        field1 is an exact search, field2 is searched against a date range.
         */
 
         let condition = arguments.required_object("condition")?;

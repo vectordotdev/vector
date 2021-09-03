@@ -172,12 +172,7 @@ impl TableSearch {
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_row(condition, index).map(|table| {
-                    table
-                        .iter()
-                        .map(|(key, value)| (key.to_string(), value.as_str().into()))
-                        .collect()
-                }),
+                Some(table) => table.find_table_row(condition, index),
             }
         } else {
             Err("finish_load not called".to_string())

@@ -38,7 +38,7 @@ pub trait Table: DynClone {
         &self,
         condition: &'a [Condition<'a>],
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, String>, String>;
+    ) -> Result<BTreeMap<String, vrl_core::Value>, String>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.
