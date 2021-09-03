@@ -39,7 +39,7 @@ impl Task {
         }
     }
 
-    pub fn key(&self) -> &ComponentKey {
+    const pub fn key(&self) -> &ComponentKey {
         &self.key
     }
 
