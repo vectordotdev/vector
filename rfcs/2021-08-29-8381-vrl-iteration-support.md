@@ -364,9 +364,8 @@ There are several reasons for rejecting this functionality:
   the feature for the intended target audience" design principle.
 
 - We cannot allow assigning closures to event fields, requiring us to make
-  a distinction between assigning to a _variable_ and an _event field_,
-  a distinction we haven't had to made before, and one we would like to avoid
-  adding.
+  a distinction between assigning to a _variable_ and an _event field_, one we
+  haven't had to make before, and would like to avoid making.
 
 - In practice, we haven't seen any use-case from operators that couldn't be
   solved by the current RFC proposal, but would be solved by the above syntax.
