@@ -199,10 +199,10 @@ pub async fn build_pieces(
     }
 
     // Build sinks
-    for (id, sink) in config
+    for (key, sink) in config
         .sinks
         .iter()
-        .filter(|(id, _)| diff.sinks.contains_new(id))
+        .filter(|(key, _)| diff.sinks.contains_new(key))
     {
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
@@ -211,13 +211,13 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input_type();
 
-        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(id) {
+        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, id);
+            let buffer = sink.buffer.build(&config.global.data_dir, key);
             match buffer {
                 Err(error) => {
-                    errors.push(format!("Sink \"{}\": {}", id, error));
+                    errors.push(format!("Sink \"{}\": {}", key, error));
                     continue;
                 }
                 Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into()))), acker),
@@ -233,7 +233,7 @@ pub async fn build_pieces(
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
-                errors.push(format!("Sink \"{}\": {}", id, error));
+                errors.push(format!("Sink \"{}\": {}", key, error));
                 continue;
             }
             Ok(built) => built,
@@ -269,10 +269,10 @@ pub async fn build_pieces(
             })
         };
 
-        let task = Task::new(id.clone(), typetag, sink);
+        let task = Task::new(key.clone(), typetag, sink);
 
         // to avoid lifecycle issues
-        let component_id = id.clone();
+        let component_key = key.clone();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -288,10 +288,10 @@ pub async fn build_pieces(
                                 %error,
                                 component_kind = "sink",
                                 component_type = typetag,
-                                component_id = ?component_id.id(),
-                                component_scope = ?component_id.scope(),
+                                component_id = ?component_key.id(),
+                                component_scope = ?component_key.scope(),
                                 // maintained for compatibility
-                                component_name = ?component_id.id(),
+                                component_name = ?component_key.id(),
                             );
                             Err(())
                         }
@@ -300,10 +300,10 @@ pub async fn build_pieces(
                                 msg = "Healthcheck: timeout.",
                                 component_kind = "sink",
                                 component_type = typetag,
-                                component_id = ?component_id.id(),
-                                component_scope = ?component_id.scope(),
+                                component_id = ?component_key.id(),
+                                component_scope = ?component_key.scope(),
                                 // maintained for compatibility
-                                component_name = ?component_id.id(),
+                                component_name = ?component_key.id(),
                             );
                             Err(())
                         }
@@ -315,12 +315,12 @@ pub async fn build_pieces(
             }
         };
 
-        let healthcheck_task = Task::new(id.clone(), typetag, healthcheck_task);
+        let healthcheck_task = Task::new(key.clone(), typetag, healthcheck_task);
 
-        inputs.insert(id.clone(), (tx, sink_inputs.clone()));
-        healthchecks.insert(id.clone(), healthcheck_task);
-        tasks.insert(id.clone(), task);
-        detach_triggers.insert(id.clone(), trigger);
+        inputs.insert(key.clone(), (tx, sink_inputs.clone()));
+        healthchecks.insert(key.clone(), healthcheck_task);
+        tasks.insert(key.clone(), task);
+        detach_triggers.insert(key.clone(), trigger);
     }
 
     // We should have all the data for the enrichment tables loaded now, so switch them over to
