@@ -354,14 +354,22 @@ my_closure = |k, v| [k, v]
 map(., my_closure)
 ```
 
-As that would require us to (1) allow for a closure to be represented as a `Value`,
-since everything assigned to a variable has to be representable as a value, and
-(2) it would require us to add compiler-support to reject assigning closures to
-an event field (e.g. `.foo = |k, v| [k, v]`), as that would lead to its own set
-of problems.
+There are several reasons for rejecting this functionality:
 
-While closures-as-values might seem useful at first, there hasn't been any
-use-case that has come up in the past that makes this a requirement.
+- It allows for slow or infinite recursion, violating the "Safety and
+  performance over ease of use" VRL design principle.
+
+- It can make reading (and writing) VRL programs more complex, and code can no
+  longer be reasoned about by reading from top-to-bottom, violating the "design
+  the feature for the intended target audience" design principle.
+
+- We cannot allow assigning closures to event fields, requiring us to make
+  a distinction between assigning to a _variable_ and an _event field_,
+  a distinction we haven't had to made before, and one we would like to avoid
+  adding.
+
+- In practice, we haven't seen any use-case from operators that couldn't be
+  solved by the current RFC proposal, but would be solved by the above syntax.
 
 Instead, the closure-syntax is tied to a function call, and can only be added to
 functions that explicitly expose their ability to take a closure with `x`
