@@ -648,12 +648,6 @@ mod test {
         }
     }
 
-    // WIP: this currently won't run because we're pointed to a git checkout of tokio-util, which
-    // uses a path-based dependency on tokio; since we use versioned tokio, this creates a mismatch
-    // between the thread-local variables/globals that the timer code uses to find the current
-    // runtime, and as such, `DelayQueue` will never find the right runtime
-    //
-    // we need to get tokio-util 0.6.8 released
     #[tokio::test(start_paused = true)]
     async fn expiration_queue_impl_keyed_timer() {
         // Asserts that ExpirationQueue properly implements KeyedTimer. We are

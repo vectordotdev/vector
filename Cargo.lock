@@ -662,12 +662,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bimap"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50ae17cabbc8a38a1e3e4c1a6a664e9a09672dc14d0896fa8d865d3a5a446b07"
-
-[[package]]
 name = "bindgen"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7865,7 +7859,6 @@ dependencies = [
  "async-graphql",
  "async-trait",
  "atomig",
- "bimap",
  "buffers",
  "bytes 1.1.0",
  "chrono",
