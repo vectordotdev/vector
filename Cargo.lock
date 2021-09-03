@@ -3537,16 +3537,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mac_address"
-version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89544d9544366f6cda81244514a80809b137b5a179947b73bfa9f2797480de69"
-dependencies = [
- "nix 0.22.1",
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "macaddr"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7699,7 +7689,6 @@ dependencies = [
  "logfmt",
  "lookup",
  "lru",
- "mac_address",
  "matches",
  "maxminddb",
  "md-5",
