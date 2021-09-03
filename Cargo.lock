@@ -7782,6 +7782,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shared",
+ "smallvec",
  "smpl_jwt",
  "snafu",
  "snap",

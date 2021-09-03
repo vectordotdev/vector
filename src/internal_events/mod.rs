@@ -38,6 +38,8 @@ mod console;
 mod datadog_events;
 #[cfg(feature = "sinks-datadog")]
 mod datadog_logs;
+#[cfg(any(feature = "codecs"))]
+mod decoder;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-dnstap")]
@@ -172,6 +174,8 @@ pub use self::console::*;
 pub use self::datadog_events::*;
 #[cfg(feature = "sinks-datadog")]
 pub use self::datadog_logs::*;
+#[cfg(any(feature = "codecs"))]
+pub use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-dnstap")]
