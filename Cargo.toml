@@ -254,7 +254,7 @@ pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.8", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "4.0", default-features = false, features = ["tokio-runtime"], optional = true }
+pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.1", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
@@ -269,7 +269,7 @@ stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.0", default-features = false }
 structopt = { version = "0.3.22", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
-syslog_loose = { version = "0.14.0", default-features = false, optional = true }
+syslog_loose = { version = "0.15.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.2", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }

@@ -7312,6 +7312,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "syslog_loose"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fc28ec47233cf71236a9e0a43a2079da9bc57ac128dd76e37558f6015492747"
+dependencies = [
+ "chrono",
+ "nom 7.0.0",
+]
+
+[[package]]
 name = "take_mut"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8447,7 +8457,7 @@ dependencies = [
  "strip-ansi-escapes",
  "structopt",
  "syslog",
- "syslog_loose",
+ "syslog_loose 0.15.0",
  "tempfile",
  "tokio",
  "tokio-openssl",
@@ -8707,7 +8717,7 @@ dependencies = [
  "sha3",
  "shared",
  "strip-ansi-escapes",
- "syslog_loose",
+ "syslog_loose 0.14.0",
  "tracing 0.1.26",
  "uaparser",
  "url",
