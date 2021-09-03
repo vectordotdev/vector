@@ -17,7 +17,7 @@ use vector_core::config::LogSchema;
 use vector_core::event::Event;
 
 #[derive(Debug, Default)]
-pub(crate) struct ServiceBuilder {
+pub struct ServiceBuilder {
     uri: Option<Uri>,
     default_api_key: Option<ApiKey>,
     compression: Compression,
@@ -28,6 +28,7 @@ pub(crate) struct ServiceBuilder {
 }
 
 impl ServiceBuilder {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub(crate) fn uri(mut self, uri: Uri) -> Self {
         self.uri = Some(uri);
         self
@@ -38,11 +39,13 @@ impl ServiceBuilder {
         self
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub(crate) fn compression(mut self, compression: Compression) -> Self {
         self.compression = compression;
         self
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub(crate) fn encoding(mut self, encoding: EncodingConfigWithDefault<Encoding>) -> Self {
         self.encoding = Some(encoding);
         self
@@ -77,7 +80,7 @@ impl ServiceBuilder {
 }
 
 #[derive(Clone)]
-pub(crate) struct Service {
+pub struct Service {
     uri: Uri,
     default_api_key: ApiKey,
     compression: Compression,

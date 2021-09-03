@@ -104,7 +104,7 @@ pub struct LokiBuffer {
 }
 
 impl LokiBuffer {
-    pub fn new(
+    pub const fn new(
         settings: BatchSize<Self>,
         global_timestamps: GlobalTimestamps,
         out_of_order_action: OutOfOrderAction,
@@ -121,7 +121,7 @@ impl LokiBuffer {
         }
     }
 
-    fn is_full(&self) -> bool {
+    const fn is_full(&self) -> bool {
         self.num_bytes >= self.settings.bytes || self.num_items >= self.settings.events
     }
 }

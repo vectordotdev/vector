@@ -28,7 +28,7 @@ struct DiscardMerger {
 }
 
 impl DiscardMerger {
-    fn new(v: Value) -> Self {
+    const fn new(v: Value) -> Self {
         Self { v }
     }
 }
@@ -52,6 +52,7 @@ struct RetainMerger {
 }
 
 impl RetainMerger {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     fn new(v: Value) -> Self {
         Self { v }
     }
@@ -285,7 +286,7 @@ struct TimestampWindowMerger {
 }
 
 impl TimestampWindowMerger {
-    fn new(v: DateTime<Utc>) -> Self {
+    const fn new(v: DateTime<Utc>) -> Self {
         Self {
             started: v,
             latest: v,
@@ -341,7 +342,7 @@ struct AddNumbersMerger {
 }
 
 impl AddNumbersMerger {
-    fn new(v: NumberMergerValue) -> Self {
+    const fn new(v: NumberMergerValue) -> Self {
         Self { v }
     }
 }
@@ -386,7 +387,7 @@ struct MaxNumberMerger {
 }
 
 impl MaxNumberMerger {
-    fn new(v: NumberMergerValue) -> Self {
+    const fn new(v: NumberMergerValue) -> Self {
         Self { v }
     }
 }
@@ -447,7 +448,7 @@ struct MinNumberMerger {
 }
 
 impl MinNumberMerger {
-    fn new(v: NumberMergerValue) -> Self {
+    const fn new(v: NumberMergerValue) -> Self {
         Self { v }
     }
 }

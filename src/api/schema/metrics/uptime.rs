@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 pub struct Uptime(Metric);
 
 impl Uptime {
-    pub fn new(m: Metric) -> Self {
+    pub const fn new(m: Metric) -> Self {
         Self(m)
     }
 }

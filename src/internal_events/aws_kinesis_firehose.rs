@@ -3,7 +3,7 @@ use crate::sources::aws_kinesis_firehose::Compression;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct AwsKinesisFirehoseEventReceived {
+pub struct AwsKinesisFirehoseEventReceived {
     pub byte_size: usize,
 }
 

@@ -2,7 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct JournaldEventReceived {
+pub struct JournaldEventReceived {
     pub byte_size: usize,
 }
 
@@ -18,7 +18,7 @@ impl InternalEvent for JournaldEventReceived {
 }
 
 #[derive(Debug)]
-pub(crate) struct JournaldInvalidRecord {
+pub struct JournaldInvalidRecord {
     pub error: serde_json::Error,
     pub text: String,
 }

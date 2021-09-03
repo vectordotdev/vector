@@ -2,7 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct AwsCloudwatchLogsSubscriptionParserFailedParse {
+pub struct AwsCloudwatchLogsSubscriptionParserFailedParse {
     pub error: serde_json::Error,
 }
 
