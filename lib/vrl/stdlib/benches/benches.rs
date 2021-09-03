@@ -109,6 +109,7 @@ criterion_group!(
               to_timestamp,
               to_unix_timestamp,
               truncate,
+              unique,
               // TODO: Cannot pass a Path to bench_function
               //unnest
               // TODO: value is dynamic so we cannot assert equality
@@ -2063,6 +2064,24 @@ bench_function! {
             ellipsis: false,
         ],
         want: Ok("Super"),
+    }
+}
+
+bench_function! {
+    unique => vrl_stdlib::Unique;
+
+    default {
+        args: func_args![
+            value: value!(["bar", "foo", "baz", "foo"]),
+        ],
+        want: Ok(value!(["bar", "foo", "baz"])),
+    }
+
+    mixed_values {
+        args: func_args![
+            value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
+        ],
+        want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
     }
 }
 
