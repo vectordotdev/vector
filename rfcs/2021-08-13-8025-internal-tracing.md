@@ -4,6 +4,19 @@ This RFC discusses an integration with the Datadog APM product for Vector's
 internal tracing data, with the goal of enabling faster and more accurate
 diagnosis of performance issues in deployed environments.
 
+## Status
+
+The team decided not to move forward with this change. Implementing tracing
+within Vector is not a worthy goal in itself, and there is a clearer, cheaper
+path to addressing the pain points laid out in this RFC via more granular timing
+metrics.
+
+That being said, the team recognizes that tracing has the potential to provide
+unique observability into Vector internals, just not necessarily in the form
+laid out in this RFC. We will continue to collect implementation ideas and use
+cases, as well as keep an eye on the tracing ecosystem. When a strong case can
+be made, we will revisit this topic.
+
 ## Context
 
 - Existing experimental implementation ([#7929](https://github.com/timberio/vector/pull/7929))
