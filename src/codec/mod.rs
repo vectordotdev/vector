@@ -10,7 +10,7 @@ use crate::{
     event::Event,
     internal_events::{DecoderFramingFailed, DecoderParseFailed},
 };
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 pub use framers::*;
 pub use parsers::*;
 use serde::{Deserialize, Serialize};
@@ -61,13 +61,16 @@ impl Decoder {
     }
 }
 
-impl tokio_util::codec::Decoder for Decoder {
-    type Item = (SmallVec<[Event; 1]>, usize);
-    type Error = Error;
-
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // Frame bytes from the incoming byte stream / byte messages.
-        let frame = self.framer.decode(buf).map_err(|error| {
+impl Decoder {
+    /// Handles the framing result and parses it into a structured event, if
+    /// possible.
+    ///
+    /// Emits logs if either framing or parsing failed.
+    fn handle_framing_result(
+        &mut self,
+        frame: Result<Option<Bytes>, BoxedFramingError>,
+    ) -> Result<Option<(SmallVec<[Event; 1]>, usize)>, Error> {
+        let frame = frame.map_err(|error| {
             emit!(DecoderFramingFailed { error: &error });
             Error::FramingError(error)
         })?;
@@ -88,29 +91,20 @@ impl tokio_util::codec::Decoder for Decoder {
                 Error::ParsingError(error)
             })
     }
+}
+
+impl tokio_util::codec::Decoder for Decoder {
+    type Item = (SmallVec<[Event; 1]>, usize);
+    type Error = Error;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let frame = self.framer.decode(buf);
+        self.handle_framing_result(frame)
+    }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // Frame bytes from the incoming byte stream / byte messages.
-        let frame = self.framer.decode_eof(buf).map_err(|error| {
-            emit!(DecoderFramingFailed { error: &error });
-            Error::FramingError(error)
-        })?;
-
-        let frame = match frame {
-            Some(frame) => frame,
-            _ => return Ok(None),
-        };
-
-        let byte_size = frame.len();
-
-        // Parse structured events from the byte frame.
-        self.parser
-            .parse(frame)
-            .map(|event| Some((event, byte_size)))
-            .map_err(|error| {
-                emit!(DecoderParseFailed { error: &error });
-                Error::ParsingError(error)
-            })
+        let frame = self.framer.decode_eof(buf);
+        self.handle_framing_result(frame)
     }
 }
 
