@@ -231,6 +231,7 @@ urls: {
 	http_server:                                              "\(wikipedia)/wiki/Web_server"
 	humio:                                                    "https://humio.com"
 	humio_hec:                                                "https://docs.humio.com/integrations/data-shippers/hec/"
+	humio_hec_format_of_data:                                 "https://docs.humio.com/integrations/data-shippers/hec/#format-of-data"
 	iam_instance_profile:                                     "\(aws_docs)/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html"
 	iana_time_zone_format:                                    "\(wikipedia)/wiki/Tz_database#Names_of_time_zones"
 	iana_time_zones:                                          "\(wikipedia)/wiki/List_of_tz_database_time_zones"

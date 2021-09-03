@@ -129,7 +129,7 @@ components: sinks: _humio: {
 		}
 		index: {
 			common:      false
-			description: "The name of the index where to send the events to. If not specified, the default index is used."
+			description: "Optional name of the repository to ingest into. In public-facing APIs this must - if present - be equal to the repository used to create the ingest token used for authentication. In private cluster setups, humio can be configured to allow these to be different. For more information, see [Humio's Format of Data](\(urls.humio_hec_format_of_data))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -140,14 +140,14 @@ components: sinks: _humio: {
 		}
 		indexed_fields: {
 			common:      true
-			description: "Fields to be added to the index via [Splunk HEC indexed fields](\(urls.splunk_hec_indexed_fields))."
+			description: "Event fields to be added to Humio's extra fields. Can be used to tag events by specifying fields starting with `#`. For more information, see [Humio's Format of Data](\(urls.humio_hec_format_of_data))."
 			required:    false
 			warnings: []
 			type: array: {
 				default: null
 				items: type: string: {
-					examples: ["field1", "field2"]
-					syntax: "field_path"
+					examples: ["#env", "#datacenter"]
+					syntax: "literal"
 				}
 			}
 		}
