@@ -28,6 +28,7 @@ use crate::{
 };
 use futures::{FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
+use shared::encode_logfmt;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -71,6 +72,7 @@ pub enum OutOfOrderAction {
 enum Encoding {
     Json,
     Text,
+    Logfmt,
 }
 
 inventory::submit! {
@@ -232,12 +234,17 @@ impl HttpSink for LokiSink {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
         let event = match &self.encoding.codec() {
-            Encoding::Json => serde_json::to_string(&log).expect("json encoding should never fail"),
+            Encoding::Json => {
+                serde_json::to_string(&log).expect("json encoding should never fail.")
+            }
 
             Encoding::Text => log
                 .get(log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
+
+            Encoding::Logfmt => encode_logfmt::to_string(log.into_parts().0)
+                .expect("Logfmt encoding should never fail."),
         };
 
         // If no labels are provided we set our own default
@@ -638,6 +645,33 @@ mod integration_tests {
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log()).unwrap();
             assert_eq!(output, &expected_json);
+        }
+    }
+
+    #[tokio::test]
+    async fn logfmt() {
+        let (stream, sink) = build_sink("logfmt").await;
+
+        let events = random_lines(100)
+            .take(10)
+            .map(Event::from)
+            .collect::<Vec<_>>();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events.clone().into_iter().map(
+                move |event| Ok(event.into_log().with_batch_notifier(&batch).into()),
+            )))
+            .await
+            .unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(events.len(), outputs.len());
+        for (i, output) in outputs.iter().enumerate() {
+            let expected_logfmt =
+                encode_logfmt::to_string(events[i].clone().into_log().into_parts().0).unwrap();
+            assert_eq!(output, &expected_logfmt);
         }
     }
 
