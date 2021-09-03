@@ -42,9 +42,7 @@ shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
 tokio = { version = "1.11.0", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
-# Need a release of tokio-util (0.6.8 or above) to pull in these
-# changes: https://github.com/tokio-rs/tokio/pull/4081
-tokio-util = { git = "https://github.com/tokio-rs/tokio", default-features = false, features = ["time"] }
+tokio-util = { version = "0.6.8", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
 tracing = { version = "0.1.26", default-features = false }
 tracing-core = { version = "0.1.19", default-features = false }

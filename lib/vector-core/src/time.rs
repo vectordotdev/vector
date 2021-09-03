@@ -2,32 +2,33 @@
 
 use std::task::{Context, Poll};
 
-/// A trait for representing many timer by key
+/// A trait for representing a timer which holds multiple subtimers, mapped by an arbitrary key, `K`.
 ///
-/// Embedding time as a type into other types eases property testing and
-/// verification. As such, this simple time type encodes the notion of elapsed
-/// timing with reset. Multiple timers are tracked by key -- `K` -- and emitted
-/// as they elapse.
+/// Embedding time as a type into other types eases property testing and verification. As such,
+/// this trait represents the minimum functionality required to describe management of keyed timers
+/// for the types implemented in this crate that require such behavior.
+///
+/// Users can look at `vector_core::stream::batcher::ExpirationQueue` for a concrete implementation.
 pub trait KeyedTimer<K> {
-    /// Clear the KeyedTimer
+    /// Clear the timer.
     ///
-    /// This function clears all keys from the timer. This function will be
-    /// empty afterward and if immediately called `poll_elapsed` will return
-    /// `Poll::Ready(None)`.
+    /// Clears all keys from the timer. Future calls to `poll_expired` will return `None` until
+    /// another key is added.
     fn clear(&mut self);
 
-    /// Insert a `K` into the KeyedTimer
+    /// Insert a new subtimer, keyed by `K`.
     ///
-    /// This function adds a new key into the timer. If the key previously
-    /// existed for the same key the underlying key-timer is reset.
+    /// If the given key already exists in the timer, the underlying subtimer is reset.
     fn insert(&mut self, item_key: K);
 
-    // For an example of how property testing can use this type see the
-    // `stream::Batcher` property tests.
-    /// Whether a key-timer has elapsed or not.
+    /// Attempts to pull out the next expired subtimer in the queue.
     ///
-    /// This function will return `Poll::Ready(None)` if a key-timer has not yet
-    /// fired (or if the timer is empty), `Poll::Ready(Some(K))` if a key-timer
-    /// has.
+    /// The key of the subtimer is returned if it has expired, otherwise, returns `None` if the
+    /// the queue is exhausted.
+    ///
+    /// Unlike a typical stream, returning `None` only indicates that the queue
+    /// is empty, not that the queue will never return anything else in the future.
+    ///
+    /// Used primarily for property testing vis-á-vis `vector_core::stream::batcher::Batcher`.
     fn poll_expired(&mut self, cx: &mut Context) -> Poll<Option<K>>;
 }

@@ -15,6 +15,7 @@ use tokio_util::time::delay_queue::Key;
 use tokio_util::time::DelayQueue;
 use twox_hash::XxHash64;
 
+/// A `KeyedTimer` based on `DelayQueue`.
 pub struct ExpirationQueue<K> {
     /// The timeout to give each new key entry
     timeout: Duration,
@@ -25,6 +26,9 @@ pub struct ExpirationQueue<K> {
 }
 
 impl<K> ExpirationQueue<K> {
+    /// Creates a new `ExpirationQueue`.
+    ///
+    /// `timeout is used for all insertions and resets.
     pub fn new(timeout: Duration) -> Self {
         Self {
             timeout,
@@ -33,8 +37,17 @@ impl<K> ExpirationQueue<K> {
         }
     }
 
+    /// The number of current subtimers in the queue.
+    ///
+    /// Includes subtimers which have expired but have not yet been removed via
+    /// calls to `poll_expired`.
     pub fn len(&self) -> usize {
         self.expirations.len()
+    }
+
+    /// Returns `true` if the queue has a length of 0.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -48,21 +61,18 @@ where
     }
 
     fn insert(&mut self, item_key: K) {
-        match self.expiration_map.get(&item_key) {
-            Some(expiration_key) => {
-                // We already have an expiration entry for this item key, so
-                // just reset the expiration.
-                self.expirations.reset(expiration_key, self.timeout);
-            }
-            None => {
-                // This is a yet-unseen item key, so create a new expiration
-                // entry.
-                let expiration_key = self.expirations.insert(item_key.clone(), self.timeout);
-                assert!(self
-                    .expiration_map
-                    .insert(item_key, expiration_key)
-                    .is_none());
-            }
+        if let Some(expiration_key) = self.expiration_map.get(&item_key) {
+            // We already have an expiration entry for this item key, so
+            // just reset the expiration.
+            self.expirations.reset(expiration_key, self.timeout);
+        } else {
+            // This is a yet-unseen item key, so create a new expiration
+            // entry.
+            let expiration_key = self.expirations.insert(item_key.clone(), self.timeout);
+            assert!(self
+                .expiration_map
+                .insert(item_key, expiration_key)
+                .is_none());
         }
     }
 
@@ -360,9 +370,7 @@ mod test {
     use crate::partition::Partitioner;
     use crate::stream::batcher::{Batcher, ExpirationQueue};
     use crate::time::KeyedTimer;
-    use futures::future::poll_fn;
-    use futures::task::noop_waker;
-    use futures::{stream, FutureExt, Stream};
+    use futures::{stream, Stream};
     use pin_project::pin_project;
     use proptest::prelude::*;
     use std::collections::{HashMap, HashSet};
@@ -370,6 +378,7 @@ mod test {
     use std::pin::Pin;
     use std::task::{Context, Poll};
     use std::time::Duration;
+    use tokio::pin;
     use tokio::time::advance;
 
     #[derive(Debug)]
@@ -495,8 +504,8 @@ mod test {
                                      timer in arb_timer()) {
             // Asserts that for every received batch the size is always less
             // than the expected limit.
-            let waker = noop_waker();
-            let mut cx = Context::from_waker(&waker);
+            let noop_waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&noop_waker);
 
             let mut stream = stream::iter(stream.into_iter());
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
@@ -504,10 +513,10 @@ mod test {
             let mut batcher = Batcher::with_timer(&mut stream, partitioner,
                                                   timer, item_limit,
                                                   Some(allocation_limit));
-            let mut pin = Pin::new(&mut batcher);
+            let mut batcher = Pin::new(&mut batcher);
 
             loop {
-                match pin.as_mut().poll_next(&mut cx) {
+                match batcher.as_mut().poll_next(&mut cx) {
                     Poll::Pending => {}
                     Poll::Ready(None) => {
                         break;
@@ -564,10 +573,10 @@ mod test {
             // Asserts that for every received batch received the elements in
             // the batch are not reordered within a batch. No claim is made on
             // when batches themselves will issue, batch sizes etc.
-            let mut partitions = separate_partitions(stream.clone(), &partitioner);
+            let noop_waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&noop_waker);
 
-            let waker = noop_waker();
-            let mut cx = Context::from_waker(&waker);
+            let mut partitions = separate_partitions(stream.clone(), &partitioner);
 
             let mut stream = stream::iter(stream.into_iter());
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
@@ -575,10 +584,10 @@ mod test {
             let mut batcher = Batcher::with_timer(&mut stream, partitioner,
                                                   timer, item_limit,
                                                   Some(allocation_limit));
-            let mut pin = Pin::new(&mut batcher);
+            let mut batcher = Pin::new(&mut batcher);
 
             loop {
-                match pin.as_mut().poll_next(&mut cx) {
+                match batcher.as_mut().poll_next(&mut cx) {
                     Poll::Pending => {}
                     Poll::Ready(None) => {
                         break;
@@ -608,8 +617,8 @@ mod test {
                                      timer in arb_timer()) {
             // Asserts that for every received batch the sum of all batch sizes
             // equals the number of stream elements.
-            let waker = noop_waker();
-            let mut cx = Context::from_waker(&waker);
+            let noop_waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&noop_waker);
 
             let total_items = stream.len();
             let mut stream = stream::iter(stream.into_iter());
@@ -618,11 +627,11 @@ mod test {
             let mut batcher = Batcher::with_timer(&mut stream, partitioner,
                                                   timer, item_limit,
                                                   Some(allocation_limit));
-            let mut pin = Pin::new(&mut batcher);
+            let mut batcher = Pin::new(&mut batcher);
 
             let mut observed_items = 0;
             loop {
-                match pin.as_mut().poll_next(&mut cx) {
+                match batcher.as_mut().poll_next(&mut cx) {
                     Poll::Pending => {}
                     Poll::Ready(None) => {
                         // inner stream has shut down, ensure we passed every
@@ -657,8 +666,8 @@ mod test {
         // If the queue is empty assert that when we poll for expired entries
         // nothing comes back.
         assert_eq!(0, expiration_queue.len());
-        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
-        assert!(matches!(result, Some(None)));
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(None));
 
         // Insert an item key into the queue. Assert that the size of the queue
         // has grown, assert that the queue still does not believe the item has expired, and _then_
@@ -666,17 +675,19 @@ mod test {
         expiration_queue.insert(128);
         assert_eq!(1, expiration_queue.len());
 
-        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
-        assert!(matches!(result, Some(None)));
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Pending);
 
         advance(timeout + Duration::from_nanos(1)).await;
-        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
-        assert!(matches!(result, Some(Some(128))));
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(Some(128)));
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(None));
 
         // Now we poll assured that the queue has emptied out again.
         assert_eq!(0, expiration_queue.len());
-        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
-        assert!(matches!(result, Some(None)));
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(None));
 
         // Finally, blitz a handful of items into the queue, assert its size,
         // clear the queue and assert it as being empty.
@@ -686,7 +697,17 @@ mod test {
         assert_eq!(3, expiration_queue.len());
         expiration_queue.clear();
         assert_eq!(0, expiration_queue.len());
-        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
-        assert!(matches!(result, Some(None)));
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(None));
+    }
+
+    fn single_poll<T, F>(mut f: F) -> Poll<T>
+    where
+        F: FnMut(&mut Context<'_>) -> Poll<T>,
+    {
+        let noop_waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&noop_waker);
+
+        f(&mut cx)
     }
 }
