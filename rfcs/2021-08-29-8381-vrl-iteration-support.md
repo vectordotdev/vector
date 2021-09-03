@@ -651,7 +651,11 @@ object if you can't use `.`, and goes against the rules as laid out in the
 
 ## Plan Of Attack
 
-TODO
+- [ ] Add lexical scoping to VRL
+- [ ] Add support for parsing function-closure syntax
+- [ ] Add support for compiling function-closure syntax
+- [ ] Add new `map` function
+- [ ] Document new functionality
 
 ## Future Improvements
 
