@@ -1,10 +1,9 @@
 use super::{
-    builder::ConfigBuilder, format, pipeline::Pipeline, validation, vars, Config, ConfigPath,
+    builder::ConfigBuilder, format, pipeline::Pipelines, validation, vars, Config, ConfigPath,
     Format, FormatHint,
 };
 use crate::signal;
 use glob::glob;
-use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
@@ -160,30 +159,8 @@ pub fn pipeline_paths_from_config_paths(config_paths: &[ConfigPath]) -> Vec<Path
         .collect()
 }
 
-pub fn load_pipelines_from_paths(
-    pipeline_paths: &[PathBuf],
-) -> Result<IndexMap<String, Pipeline>, Vec<String>> {
-    let mut index: IndexMap<String, Pipeline> = IndexMap::new();
-    let mut errors: Vec<String> = Vec::new();
-    for folder in pipeline_paths {
-        match Pipeline::load_from_folder(folder) {
-            Ok(result) => {
-                for (key, value) in result.into_iter() {
-                    index.insert(key, value);
-                }
-            }
-            Err(result) => {
-                for err in result.into_iter() {
-                    errors.push(err);
-                }
-            }
-        }
-    }
-    if errors.is_empty() {
-        Ok(index)
-    } else {
-        Err(errors)
-    }
+pub fn load_pipelines_from_paths(pipeline_paths: &[PathBuf]) -> Result<Pipelines, Vec<String>> {
+    Pipelines::load_from_paths(pipeline_paths)
 }
 
 pub fn load_builder_from_paths(
@@ -239,7 +216,7 @@ pub fn load_builder_from_paths(
 pub fn load_from_str(
     input: &str,
     format: FormatHint,
-    pipelines: IndexMap<String, Pipeline>,
+    pipelines: Pipelines,
 ) -> Result<Config, Vec<String>> {
     let (mut builder, load_warnings) =
         load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
