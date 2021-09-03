@@ -3763,6 +3763,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "minimal-lexical"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6595bb28ed34f43c3fe088e48f6cfb2e033cab45f25a5384d5fdf564fbc8c4b2"
+
+[[package]]
 name = "miniz_oxide"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4081,11 +4087,12 @@ dependencies = [
 
 [[package]]
 name = "nom"
-version = "7.0.0-alpha1"
+version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd43cd1e53168596e629accc602ada1297f5125fed588d62cf8be81175b46002"
+checksum = "7ffd9d26838a953b4af82cbeb9f1592c6798916983959be223a7124e992742c1"
 dependencies = [
  "memchr",
+ "minimal-lexical",
  "version_check 0.9.3",
 ]
 
@@ -5000,9 +5007,9 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "4.0.0"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "647e253f7d1b1eedd9542951388f38099b92d2814ac37013976dea7d71d01959"
+checksum = "e08718390090723f5d6ea4aeec22b229794e21c069220b1171a2c1009b0704df"
 dependencies = [
  "bit-vec 0.6.3",
  "bytes 1.1.0",
@@ -5013,7 +5020,7 @@ dependencies = [
  "futures-timer",
  "log",
  "native-tls",
- "nom 7.0.0-alpha1",
+ "nom 7.0.0",
  "pem",
  "prost",
  "prost-build",
