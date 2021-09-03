@@ -154,7 +154,8 @@ components: sinks: [Name=string]: {
 			if features.send.encoding.enabled {
 				encoding: {
 					description: "Configures the encoding specific sink behavior."
-					required:    true
+					required:    false
+					common:      true
 					type: object: options: {
 						if features.send.encoding.codec.enabled {
 							codec: {
