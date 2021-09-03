@@ -79,7 +79,12 @@ impl sort::SortableByField<SourcesSortFieldName> for Source {
 impl Source {
     /// Source component_id
     pub async fn component_id(&self) -> &str {
-        self.get_component_id().as_str()
+        self.0.component_id.id()
+    }
+
+    /// Source pipeline_id
+    pub async fn pipeline_id(&self) -> Option<&str> {
+        self.0.component_id.pipeline_str()
     }
 
     /// Source type
@@ -110,7 +115,7 @@ impl Source {
 
     /// Source metrics
     pub async fn metrics(&self) -> metrics::SourceMetrics {
-        metrics::by_component_id(self.get_component_id())
+        metrics::by_component_id(&self.0.component_id)
             .into_source_metrics(self.get_component_type())
     }
 }
@@ -128,7 +133,7 @@ impl filter::CustomFilter<Source> for SourcesFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(source.get_component_id().as_str()))),
+                .all(|f| f.filter_value(&source.get_component_id().to_string()))),
             self.component_type.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(source.get_component_type()))),
@@ -220,7 +225,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen3", "gen2", "gen1"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sources[i].get_component_id().to_string(), *component_id);
         }
     }
 
@@ -251,7 +256,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen3", "gen1", "gen2"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sources[i].get_component_id().to_string(), *component_id);
         }
     }
 
@@ -282,7 +287,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen2", "gen1", "gen3"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sources[i].get_component_id().to_string(), *component_id);
         }
     }
 
@@ -313,7 +318,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen1", "gen2", "gen3"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sources[i].get_component_id().to_string(), *component_id);
         }
     }
 
@@ -344,7 +349,7 @@ mod tests {
         sort::by_fields(&mut sources, &fields);
 
         for (i, component_id) in ["gen3", "gen2", "gen1"].iter().enumerate() {
-            assert_eq!(sources[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sources[i].get_component_id().to_string(), *component_id);
         }
     }
 }

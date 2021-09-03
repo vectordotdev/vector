@@ -102,7 +102,6 @@ pub struct Config {
     pub sinks: IndexMap<ComponentId, SinkOuter>,
     pub transforms: IndexMap<ComponentId, TransformOuter>,
     pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
-    pub pipelines: IndexMap<String, pipeline::Pipeline>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentId, Vec<ComponentId>>,
 }
@@ -242,6 +241,7 @@ inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
+    #[serde(default)]
     pub inputs: Vec<ComponentId>,
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
@@ -390,6 +390,7 @@ inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
+    #[serde(default)]
     pub inputs: Vec<ComponentId>,
     #[serde(flatten)]
     pub inner: Box<dyn TransformConfig>,

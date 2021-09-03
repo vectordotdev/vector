@@ -9,6 +9,7 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -66,12 +67,57 @@ impl From<Config> for ConfigBuilder {
             transforms: c.transforms,
             provider: None,
             tests: c.tests,
-            pipelines: c.pipelines,
+            pipelines: Default::default(),
         }
     }
 }
 
 impl ConfigBuilder {
+    // moves the pipeline transforms into regular scoped transforms
+    // and add the output to the sources
+    pub fn merge_pipelines(&mut self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        let global_inputs = self
+            .transforms
+            .keys()
+            .chain(self.sources.keys())
+            .filter(|id| id.is_global())
+            .map(|id| id.id().to_string())
+            .collect::<HashSet<_>>();
+
+        let pipelines = std::mem::take(&mut self.pipelines);
+        let pipeline_transforms = pipelines.into_scoped_transforms();
+
+        for (component_id, pipeline_transform) in pipeline_transforms {
+            // to avoid ambiguity, we forbid to use a component name in the pipeline scope
+            // that is already used as the global scope.
+            if global_inputs.contains(component_id.id()) {
+                errors.push(format!(
+                    "Component ID '{}' is already used.",
+                    component_id.id()
+                ));
+                continue;
+            }
+            for input in pipeline_transform.outputs.iter() {
+                if let Some(transform) = self.transforms.get_mut(input) {
+                    transform.inputs.push(component_id.clone());
+                } else if let Some(sink) = self.sinks.get_mut(input) {
+                    sink.inputs.push(component_id.clone());
+                } else {
+                    errors.push(format!("Couldn't find transform or sink '{}'", input));
+                }
+            }
+            self.transforms
+                .insert(component_id, pipeline_transform.inner);
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
     pub fn build(self) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings()?;
 
@@ -220,5 +266,132 @@ impl ConfigBuilder {
         self.tests.extend(with.tests);
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn from_toml(input: &str) -> Self {
+        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
+            .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::pipeline::{Pipeline, Pipelines};
+    use crate::config::ConfigBuilder;
+    use indexmap::IndexMap;
+
+    #[test]
+    fn success() {
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "foo".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.bar]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        let mut builder = ConfigBuilder::from_toml(
+            r#"
+        [sources.logs]
+        type = "generator"
+        format = "syslog"
+
+        [sinks.print]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        builder.set_pipelines(pipelines);
+        let result = builder.build();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn overlaping_transform_id() {
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "foo".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.bar]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        let mut builder = ConfigBuilder::from_toml(
+            r#"
+        [sources.logs]
+        type = "generator"
+        format = "syslog"
+
+        [transforms.bar]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+
+        [sinks.print]
+        inputs = ["bar"]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        builder.set_pipelines(pipelines);
+        let errors = builder.build().unwrap_err();
+        assert_eq!(errors[0], "Component ID 'bar' is already used.");
+    }
+
+    #[test]
+    fn overlaping_pipeline_transform_id() {
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "foo".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.remap]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        pipelines.insert(
+            "bar".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.remap]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        let mut builder = ConfigBuilder::from_toml(
+            r#"
+        [sources.logs]
+        type = "generator"
+        format = "syslog"
+
+        [sinks.print]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        builder.set_pipelines(pipelines);
+        let config = builder.build().unwrap();
+        assert_eq!(config.transforms.len(), 2);
     }
 }

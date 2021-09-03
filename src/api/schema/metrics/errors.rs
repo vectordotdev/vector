@@ -1,3 +1,4 @@
+use crate::config::ComponentId;
 use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
@@ -33,7 +34,7 @@ impl From<Metric> for ErrorsTotal {
 }
 
 pub struct ComponentErrorsTotal {
-    component_id: String,
+    component_id: ComponentId,
     metric: Metric,
 }
 
@@ -44,6 +45,7 @@ impl ComponentErrorsTotal {
         let component_id = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
+        let component_id = ComponentId::from((metric.tag_value("pipeline_id"), component_id));
 
         Self {
             component_id,
@@ -56,7 +58,12 @@ impl ComponentErrorsTotal {
 impl ComponentErrorsTotal {
     /// Component id
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.component_id.id()
+    }
+
+    /// Pipeline id
+    async fn pipeline_id(&self) -> Option<&str> {
+        self.component_id.pipeline_str()
     }
 
     /// Errors processed metric
