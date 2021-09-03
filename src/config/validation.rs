@@ -113,7 +113,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             errors.push(format!(
                 "{} \"{}\" has input \"{}\" duplicated {} times",
                 capitalize(output_type),
-                id,
+                key,
                 dup,
                 count,
             ));
