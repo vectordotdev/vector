@@ -376,6 +376,7 @@ impl std::fmt::Debug for File {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
     use shared::btreemap;
 
     #[test]
@@ -445,6 +446,45 @@ mod tests {
     }
 
     #[test]
+    fn finds_row_with_dates() {
+        let mut file = File::new(
+            vec![
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(chrono::Utc.ymd(2015, 12, 7).and_hms(0, 0, 0)),
+                ],
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
+                ],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(&["field1"]).unwrap();
+
+        let conditions = [
+            Condition::Equals {
+                field: "field1",
+                value: "zip".into(),
+            },
+            Condition::BetweenDates {
+                field: "field2",
+                from: chrono::Utc.ymd(2016, 1, 1).and_hms(0, 0, 0),
+                to: chrono::Utc.ymd(2017, 1, 1).and_hms(0, 0, 0),
+            },
+        ];
+
+        assert_eq!(
+            Ok(btreemap! {
+                "field1" => "zip",
+                "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
+            }),
+            file.find_table_row(&conditions, Some(handle))
+        );
+    }
+
+    #[test]
     fn doesnt_find_row() {
         let file = File::new(
             vec![
@@ -483,7 +523,7 @@ mod tests {
         };
 
         assert_eq!(
-            Err("no rows found".to_string()),
+            Err("no rows found in index".to_string()),
             file.find_table_row(&[condition], Some(handle))
         );
     }
