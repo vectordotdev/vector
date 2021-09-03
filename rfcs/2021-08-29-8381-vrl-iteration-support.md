@@ -555,7 +555,10 @@ the future by introducing more iteration-based functions.
 
 ## Prior Art
 
-TODO
+- [Rust `Iterator` trait](https://doc.rust-lang.org/std/iter/trait.Iterator.html#)
+- [Nested data structure traversal examples](https://github.com/josevalim/nested-data-structure-traversal)
+- [Ruby blocks](https://www.tutorialspoint.com/ruby/ruby_blocks.htm)
+- [Rust closures](https://doc.rust-lang.org/book/ch13-01-closures.html)
 
 ## Alternatives
 
