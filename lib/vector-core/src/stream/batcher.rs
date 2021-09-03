@@ -11,6 +11,7 @@ use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tokio_util::time::delay_queue::Key;
 use tokio_util::time::DelayQueue;
 use twox_hash::XxHash64;
 
@@ -19,6 +20,8 @@ pub struct ExpirationQueue<K> {
     timeout: Duration,
     /// The queue of expirations
     expirations: DelayQueue<K>,
+    /// The Key -> K mapping, allows for resets
+    expiration_map: HashMap<K, Key>,
 }
 
 impl<K> ExpirationQueue<K> {
@@ -26,6 +29,7 @@ impl<K> ExpirationQueue<K> {
         Self {
             timeout,
             expirations: DelayQueue::new(),
+            expiration_map: HashMap::default(),
         }
     }
 
@@ -34,16 +38,32 @@ impl<K> ExpirationQueue<K> {
     }
 }
 
-impl<K> KeyedTimer<K> for ExpirationQueue<K> {
+impl<K> KeyedTimer<K> for ExpirationQueue<K>
+where
+    K: Eq + Hash + Clone,
+{
     fn clear(&mut self) {
         self.expirations.clear();
+        self.expiration_map.clear();
     }
 
     fn insert(&mut self, item_key: K) {
-        // TODO the previous implementation held a map to make sure we would
-        // reset in the event of a re-insertion. Just re-inserting over the top
-        // like we do here might be wasteful in some way I'm not aware of.
-        let _ = self.expirations.insert(item_key, self.timeout);
+        match self.expiration_map.get(&item_key) {
+            Some(expiration_key) => {
+                // We already have an expiration entry for this item key, so
+                // just reset the expiration.
+                self.expirations.reset(expiration_key, self.timeout);
+            }
+            None => {
+                // This is a yet-unseen item key, so create a new expiration
+                // entry.
+                let expiration_key = self.expirations.insert(item_key.clone(), self.timeout);
+                assert!(self
+                    .expiration_map
+                    .insert(item_key, expiration_key)
+                    .is_none());
+            }
+        }
     }
 
     fn poll_expired(&mut self, cx: &mut Context) -> Poll<Option<K>> {
@@ -61,7 +81,12 @@ impl<K> KeyedTimer<K> for ExpirationQueue<K> {
                     );
                     Poll::Pending
                 }
-                Ok(expiration) => Poll::Ready(Some(expiration.into_inner())),
+                Ok(expiration) => {
+                    // An item has expired, so remove it from the map and return
+                    // it.
+                    assert!(self.expiration_map.remove(expiration.get_ref()).is_some());
+                    Poll::Ready(Some(expiration.into_inner()))
+                }
             },
         }
     }
