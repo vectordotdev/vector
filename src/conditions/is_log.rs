@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use vector_core::enrichment;
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},

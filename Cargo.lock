@@ -1889,6 +1889,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
 
 [[package]]
+name = "enrichment"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "dyn-clone",
+ "shared",
+ "vrl",
+]
+
+[[package]]
 name = "enum-as-inner"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6198,6 +6208,7 @@ dependencies = [
  "derivative",
  "nom 6.1.2",
  "serde",
+ "serde_json",
  "snafu",
  "tracing 0.1.26",
 ]
@@ -6558,9 +6569,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "structopt"
-version = "0.3.22"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69b041cdcb67226aca307e6e7be44c8806423d83e018bd662360a93dabce4d71"
+checksum = "bf9d950ef167e25e0bdb073cf1d68e9ad2795ac826f2f3f59647817cf23c0bfa"
 dependencies = [
  "clap",
  "lazy_static",
@@ -6569,9 +6580,9 @@ dependencies = [
 
 [[package]]
 name = "structopt-derive"
-version = "0.4.15"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7813934aecf5f51a54775e00068c237de98489463968231a51746bbbc03f9c10"
+checksum = "134d838a2c9943ac3125cf6df165eda53493451b719f3255b2a26b85f772d0ba"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -6884,9 +6895,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.10.1"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92036be488bb6594459f2e03b60e42df6f937fe6ca5c5ffdcb539c6b84dc40f5"
+checksum = "b4efe6fc2395938c8155973d7be49fe8d03a843726e285e100a8a383cc0154ce"
 dependencies = [
  "autocfg",
  "bytes 1.1.0",
@@ -7676,6 +7687,7 @@ dependencies = [
  "dnsmsg-parser",
  "dyn-clone",
  "encoding_rs",
+ "enrichment",
  "evmap",
  "exitcode",
  "fakedata",
@@ -7845,7 +7857,6 @@ dependencies = [
 name = "vector_core"
 version = "0.1.0"
 dependencies = [
- "arc-swap",
  "async-graphql",
  "async-trait",
  "atomig",
@@ -7856,6 +7867,7 @@ dependencies = [
  "db-key",
  "derivative",
  "dyn-clone",
+ "enrichment",
  "env-test-util",
  "futures 0.3.17",
  "getset",
@@ -7874,6 +7886,7 @@ dependencies = [
  "pest_derive",
  "pin-project 1.0.8",
  "pretty_assertions",
+ "proptest",
  "prost",
  "prost-build",
  "prost-types",
@@ -7918,7 +7931,6 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 name = "vrl"
 version = "0.1.0"
 dependencies = [
- "arc-swap",
  "bytes 1.1.0",
  "indoc",
  "lookup",
@@ -7954,7 +7966,6 @@ dependencies = [
 name = "vrl-compiler"
 version = "0.1.0"
 dependencies = [
- "arc-swap",
  "bitflags",
  "bytes 1.1.0",
  "chrono",
