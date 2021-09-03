@@ -391,7 +391,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh humio start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib "::humio::.*::integration_tests::"
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh humio stop
 endif

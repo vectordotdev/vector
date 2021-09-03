@@ -112,7 +112,7 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{ComponentId, GlobalOptions, SinkContext, SourceContext},
+        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
         event::Event,
         event::{
             metric::{MetricKind, MetricValue},
@@ -228,7 +228,7 @@ mod test {
 
         let server = config
             .build(SourceContext {
-                id: ComponentId::from("default"),
+                id: ComponentKey::from("default"),
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,
@@ -266,7 +266,7 @@ mod test {
 
         let server = config
             .build(SourceContext {
-                id: ComponentId::from("default"),
+                id: ComponentKey::from("default"),
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,
