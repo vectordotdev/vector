@@ -1,7 +1,12 @@
 [sources.in]
 type = "generator"
+format = "json"
+interval = 2
 
-[sources.stdout]
+[sinks.stdout]
 type = "console"
 target = "stdout"
 encoding.codec = "json"
+
+[api]
+enabled = true

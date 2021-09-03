@@ -42,7 +42,7 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
-    pub fn new(mode: Mode, encoding: EncodingConfig<Encoding>) -> Self {
+    pub const fn new(mode: Mode, encoding: EncodingConfig<Encoding>) -> Self {
         SocketSinkConfig { mode, encoding }
     }
 

@@ -31,7 +31,7 @@ impl Opts {
         Opts::from_clap(&app.get_matches())
     }
 
-    pub fn log_level(&self) -> &'static str {
+    pub const fn log_level(&self) -> &'static str {
         let (quiet_level, verbose_level) = match self.sub_command {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))

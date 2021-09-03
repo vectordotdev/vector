@@ -51,7 +51,7 @@ _values: {
 // * `deprecated` - The component will be removed in a future version.
 #DevelopmentStatus: "beta" | "stable" | "deprecated"
 
-#EncodingCodec: "json" | "ndjson" | "text"
+#EncodingCodec: "json" | "logfmt" | "ndjson" | "text"
 
 #Endpoint: {
 	description: string

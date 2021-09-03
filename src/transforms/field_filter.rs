@@ -60,7 +60,7 @@ pub struct FieldFilter {
 }
 
 impl FieldFilter {
-    pub fn new(field_name: String, value: String) -> Self {
+    pub const fn new(field_name: String, value: String) -> Self {
         Self { field_name, value }
     }
 }

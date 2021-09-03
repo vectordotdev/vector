@@ -47,14 +47,15 @@ pub struct StatsdSocketError<T> {
 }
 
 impl<T> StatsdSocketError<T> {
-    fn new(r#type: StatsdSocketErrorType, error: T) -> Self {
+    const fn new(r#type: StatsdSocketErrorType, error: T) -> Self {
         Self { r#type, error }
     }
 
-    pub fn bind(error: T) -> Self {
+    pub const fn bind(error: T) -> Self {
         Self::new(StatsdSocketErrorType::Bind, error)
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn read(error: T) -> Self {
         Self::new(StatsdSocketErrorType::Read, error)
     }
