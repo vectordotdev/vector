@@ -29,7 +29,7 @@ components: sinks: loki: {
 				codec: {
 					enabled: true
 					default: "json"
-					enum: ["json", "text"]
+					enum: ["json", "logfmt",  "text"]
 				}
 			}
 			proxy: enabled: true

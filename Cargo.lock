@@ -6208,6 +6208,7 @@ dependencies = [
  "derivative",
  "nom 6.1.2",
  "serde",
+ "serde_json",
  "snafu",
  "tracing 0.1.26",
 ]
