@@ -57,7 +57,9 @@ pub type BoxedFramer = Box<dyn Framer + Send + Sync>;
 #[typetag::serde(tag = "method")]
 pub trait FramingConfig: Debug + DynClone + Send + Sync {
     /// Builds a framer from this configuration.
-    fn build(&self) -> BoxedFramer;
+    ///
+    /// Fails if the configuration is invalid.
+    fn build(&self) -> crate::Result<BoxedFramer>;
 }
 
 dyn_clone::clone_trait_object!(FramingConfig);

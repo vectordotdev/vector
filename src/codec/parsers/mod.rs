@@ -33,7 +33,9 @@ pub type BoxedParser = Box<dyn Parser + Send + Sync>;
 #[typetag::serde(tag = "codec")]
 pub trait ParserConfig: Debug + DynClone + Send + Sync {
     /// Builds a parser from this configuration.
-    fn build(&self) -> BoxedParser;
+    ///
+    /// Fails if the configuration is invalid.
+    fn build(&self) -> crate::Result<BoxedParser>;
 }
 
 dyn_clone::clone_trait_object!(ParserConfig);

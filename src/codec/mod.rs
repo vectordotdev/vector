@@ -130,23 +130,26 @@ impl DecodingConfig {
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    pub fn build(&self) -> Decoder {
+    ///
+    /// Fails if any of the provided `framing` or `decoding` configs fail to
+    /// build.
+    pub fn build(&self) -> crate::Result<Decoder> {
         // Build the framer or use a newline delimited decoder if not provided.
         let framer: BoxedFramer = self
             .framing
             .as_ref()
             .map(|config| config.build())
             .unwrap_or_else(|| {
-                todo!("Fallback to newline delimited framer is not implemented yet.")
-            });
+                Err("Fallback to newline delimited framer is not implemented yet.".into())
+            })?;
 
         // Build the parser or use a plain bytes parser if not provided.
         let parser: BoxedParser = self
             .decoding
             .as_ref()
             .map(|config| config.build())
-            .unwrap_or_else(|| todo!("Fallback to bytes parser is not implemented yet."));
+            .unwrap_or_else(|| Err("Fallback to bytes parser is not implemented yet.".into()))?;
 
-        Decoder::new(framer, parser)
+        Ok(Decoder::new(framer, parser))
     }
 }
