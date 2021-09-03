@@ -6,12 +6,12 @@ pub struct Ewma {
 }
 
 impl Ewma {
-    pub fn new(alpha: f64) -> Self {
+    pub const fn new(alpha: f64) -> Self {
         let average = None;
         Self { average, alpha }
     }
 
-    pub fn average(&self) -> Option<f64> {
+    pub const fn average(&self) -> Option<f64> {
         self.average
     }
 
@@ -19,7 +19,7 @@ impl Ewma {
     pub fn update(&mut self, point: f64) -> f64 {
         let average = match self.average {
             None => point,
-            Some(avg) => point * self.alpha + avg * (1.0 - self.alpha),
+            Some(avg) => point.mul_add(self.alpha, avg * (1.0 - self.alpha)),
         };
         self.average = Some(average);
         average
@@ -40,12 +40,12 @@ pub struct MeanVariance {
 }
 
 impl EwmaVar {
-    pub fn new(alpha: f64) -> Self {
+    pub const fn new(alpha: f64) -> Self {
         let state = None;
         Self { state, alpha }
     }
 
-    pub fn state(&self) -> Option<MeanVariance> {
+    pub const fn state(&self) -> Option<MeanVariance> {
         self.state
     }
 
@@ -68,7 +68,7 @@ impl EwmaVar {
                 let increment = self.alpha * difference;
                 (
                     state.mean + increment,
-                    (1.0 - self.alpha) * (state.variance + difference * increment),
+                    (1.0 - self.alpha) * difference.mul_add(increment, state.variance),
                 )
             }
         };
@@ -92,7 +92,7 @@ impl Mean {
         self.mean += (point - self.mean) / self.count as f64;
     }
 
-    pub fn average(&self) -> Option<f64> {
+    pub const fn average(&self) -> Option<f64> {
         match self.count {
             0 => None,
             _ => Some(self.mean),

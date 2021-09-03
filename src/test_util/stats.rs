@@ -123,7 +123,7 @@ impl LevelTimeHistogram {
         self.level
     }
 
-    pub fn level(&self) -> usize {
+    pub const fn level(&self) -> usize {
         self.level
     }
 }

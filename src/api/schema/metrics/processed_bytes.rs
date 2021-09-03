@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 pub struct ProcessedBytesTotal(Metric);
 
 impl ProcessedBytesTotal {
-    pub fn new(m: Metric) -> Self {
+    pub const fn new(m: Metric) -> Self {
         Self(m)
     }
 
@@ -87,7 +87,7 @@ pub struct ComponentProcessedBytesThroughput {
 
 impl ComponentProcessedBytesThroughput {
     /// Returns a new `ComponentProcessedBytesThroughput`, set to the provided id/throughput values
-    pub fn new(component_key: ComponentKey, throughput: i64) -> Self {
+    pub const fn new(component_key: ComponentKey, throughput: i64) -> Self {
         Self {
             component_key,
             throughput,

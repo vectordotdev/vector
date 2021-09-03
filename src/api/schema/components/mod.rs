@@ -41,7 +41,7 @@ pub enum ComponentKind {
 }
 
 impl Component {
-    fn get_component_key(&self) -> &ComponentKey {
+    const fn get_component_key(&self) -> &ComponentKey {
         match self {
             Component::Source(c) => &c.0.component_key,
             Component::Transform(c) => &c.0.component_key,
@@ -49,7 +49,7 @@ impl Component {
         }
     }
 
-    fn get_component_kind(&self) -> ComponentKind {
+    const fn get_component_kind(&self) -> ComponentKind {
         match self {
             Component::Source(_) => ComponentKind::Source,
             Component::Transform(_) => ComponentKind::Transform,
@@ -117,7 +117,7 @@ impl ComponentsQuery {
         filter: Option<ComponentsFilter>,
         sort: Option<Vec<sort::SortField<ComponentsSortFieldName>>>,
     ) -> relay::ConnectionResult<Component> {
-        let filter = filter.unwrap_or_else(ComponentsFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut components = filter_items(state::get_components().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {
@@ -142,7 +142,7 @@ impl ComponentsQuery {
         filter: Option<source::SourcesFilter>,
         sort: Option<Vec<sort::SortField<source::SourcesSortFieldName>>>,
     ) -> relay::ConnectionResult<source::Source> {
-        let filter = filter.unwrap_or_else(source::SourcesFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut sources = filter_items(state::get_sources().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {
@@ -167,7 +167,7 @@ impl ComponentsQuery {
         filter: Option<transform::TransformsFilter>,
         sort: Option<Vec<sort::SortField<transform::TransformsSortFieldName>>>,
     ) -> relay::ConnectionResult<transform::Transform> {
-        let filter = filter.unwrap_or_else(transform::TransformsFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut transforms = filter_items(state::get_transforms().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {
@@ -192,7 +192,7 @@ impl ComponentsQuery {
         filter: Option<sink::SinksFilter>,
         sort: Option<Vec<sort::SortField<sink::SinksSortFieldName>>>,
     ) -> relay::ConnectionResult<sink::Sink> {
-        let filter = filter.unwrap_or_else(sink::SinksFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut sinks = filter_items(state::get_sinks().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {

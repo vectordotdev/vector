@@ -38,7 +38,7 @@ impl ComponentKey {
         self.id.as_str()
     }
 
-    pub fn scope(&self) -> &ComponentScope {
+    pub const fn scope(&self) -> &ComponentScope {
         &self.scope
     }
 
@@ -53,7 +53,7 @@ impl ComponentKey {
         Self::pipeline(id, &self.id)
     }
 
-    pub fn is_global(&self) -> bool {
+    pub const fn is_global(&self) -> bool {
         matches!(self.scope, ComponentScope::Global)
     }
 }

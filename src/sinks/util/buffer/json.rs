@@ -15,7 +15,7 @@ pub struct JsonArrayBuffer {
 }
 
 impl JsonArrayBuffer {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    pub const fn new(settings: BatchSize<Self>) -> Self {
         Self {
             buffer: Vec::new(),
             total_bytes: 0,

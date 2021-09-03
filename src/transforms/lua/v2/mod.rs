@@ -91,15 +91,15 @@ impl LuaConfig {
         Lua::new(self).map(Transform::task)
     }
 
-    pub fn input_type(&self) -> DataType {
+    pub const fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub fn transform_type(&self) -> &'static str {
+    pub const fn transform_type(&self) -> &'static str {
         "lua"
     }
 }
