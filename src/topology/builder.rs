@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{ComponentId, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
+    config::{ComponentKey, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
     event::Event,
     internal_events::{EventIn, EventOut},
     shutdown::SourceShutdownCoordinator,
@@ -28,13 +28,13 @@ lazy_static! {
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentId, (buffers::BufferInputCloner<Event>, Vec<ComponentId>)>,
-    pub outputs: HashMap<ComponentId, fanout::ControlChannel>,
-    pub tasks: HashMap<ComponentId, Task>,
-    pub source_tasks: HashMap<ComponentId, Task>,
-    pub healthchecks: HashMap<ComponentId, Task>,
+    pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<ComponentKey>)>,
+    pub outputs: HashMap<ComponentKey, fanout::ControlChannel>,
+    pub tasks: HashMap<ComponentKey, Task>,
+    pub source_tasks: HashMap<ComponentKey, Task>,
+    pub healthchecks: HashMap<ComponentKey, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
-    pub detach_triggers: HashMap<ComponentId, Trigger>,
+    pub detach_triggers: HashMap<ComponentKey, Trigger>,
     pub enrichment_tables: enrichment::TableRegistry,
 }
 
@@ -42,7 +42,7 @@ pub struct Pieces {
 pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
-    mut buffers: HashMap<ComponentId, BuiltBuffer>,
+    mut buffers: HashMap<ComponentKey, BuiltBuffer>,
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();

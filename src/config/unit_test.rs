@@ -1,6 +1,6 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
 use crate::config::{
-    self, ComponentId, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
+    self, ComponentKey, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
 };
 use crate::{
     conditions::Condition,
@@ -64,21 +64,21 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
 
 pub struct UnitTest {
     pub name: String,
-    inputs: Vec<(Vec<ComponentId>, Event)>,
-    transforms: IndexMap<ComponentId, UnitTestTransform>,
+    inputs: Vec<(Vec<ComponentKey>, Event)>,
+    transforms: IndexMap<ComponentKey, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
-    no_outputs_from: Vec<ComponentId>,
+    no_outputs_from: Vec<ComponentKey>,
     globals: GlobalOptions,
 }
 
 struct UnitTestTransform {
     transform: Transform,
     config: Box<dyn TransformConfig>,
-    next: Vec<ComponentId>,
+    next: Vec<ComponentKey>,
 }
 
 struct UnitTestCheck {
-    extract_from: ComponentId,
+    extract_from: ComponentKey,
     conditions: Vec<Box<dyn Condition>>,
 }
 
@@ -109,10 +109,10 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
 }
 
 fn walk(
-    node: &ComponentId,
+    node: &ComponentKey,
     mut inputs: Vec<Event>,
-    transforms: &mut IndexMap<ComponentId, UnitTestTransform>,
-    aggregated_results: &mut HashMap<ComponentId, (Vec<Event>, Vec<Event>)>,
+    transforms: &mut IndexMap<ComponentKey, UnitTestTransform>,
+    aggregated_results: &mut HashMap<ComponentKey, (Vec<Event>, Vec<Event>)>,
     globals: &GlobalOptions,
 ) {
     let mut results = Vec::new();
@@ -272,10 +272,10 @@ impl UnitTest {
 //------------------------------------------------------------------------------
 
 fn links_to_a_leaf(
-    target: &ComponentId,
-    leaves: &IndexMap<ComponentId, ()>,
-    link_checked: &mut IndexMap<ComponentId, bool>,
-    transform_outputs: &IndexMap<ComponentId, IndexMap<ComponentId, ()>>,
+    target: &ComponentKey,
+    leaves: &IndexMap<ComponentKey, ()>,
+    link_checked: &mut IndexMap<ComponentKey, bool>,
+    transform_outputs: &IndexMap<ComponentKey, IndexMap<ComponentKey, ()>>,
 ) -> bool {
     if *link_checked.get(target).unwrap_or(&false) {
         return true;
@@ -297,11 +297,11 @@ fn links_to_a_leaf(
 /// Reduces a collection of transforms into a set that only contains those that
 /// link between our root (test input) and a set of leaves (test outputs).
 fn reduce_transforms(
-    roots: Vec<ComponentId>,
-    leaves: &IndexMap<ComponentId, ()>,
-    transform_outputs: &mut IndexMap<ComponentId, IndexMap<ComponentId, ()>>,
+    roots: Vec<ComponentKey>,
+    leaves: &IndexMap<ComponentKey, ()>,
+    transform_outputs: &mut IndexMap<ComponentKey, IndexMap<ComponentKey, ()>>,
 ) {
-    let mut link_checked: IndexMap<ComponentId, bool> = IndexMap::new();
+    let mut link_checked: IndexMap<ComponentKey, bool> = IndexMap::new();
 
     if roots
         .iter()
@@ -325,7 +325,7 @@ fn reduce_transforms(
     });
 }
 
-fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<ComponentId>, Event), String> {
+fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<ComponentKey>, Event), String> {
     let target = config.get_inputs(&input.insert_at);
 
     match input.type_str.as_ref() {
@@ -367,7 +367,7 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<ComponentId>, 
 fn build_inputs(
     config: &Config,
     definition: &TestDefinition,
-) -> Result<Vec<(Vec<ComponentId>, Event)>, Vec<String>> {
+) -> Result<Vec<(Vec<ComponentKey>, Event)>, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
 
@@ -409,7 +409,7 @@ async fn build_unit_test(
 
     // Maps transform names with their output targets (transforms that use it as
     // an input).
-    let mut transform_outputs: IndexMap<ComponentId, IndexMap<ComponentId, ()>> = config
+    let mut transform_outputs: IndexMap<ComponentKey, IndexMap<ComponentKey, ()>> = config
         .transforms
         .iter()
         .map(|(k, _)| (k.clone(), IndexMap::new()))
@@ -437,7 +437,7 @@ async fn build_unit_test(
         return Err(errors);
     }
 
-    let mut leaves: IndexMap<ComponentId, ()> = IndexMap::new();
+    let mut leaves: IndexMap<ComponentKey, ()> = IndexMap::new();
     definition.outputs.iter().for_each(|o| {
         leaves.insert(o.extract_from.clone(), ());
     });
@@ -461,7 +461,7 @@ async fn build_unit_test(
     let context = TransformContext::new_with_globals(config.global.clone());
 
     // Build reduced transforms.
-    let mut transforms: IndexMap<ComponentId, UnitTestTransform> = IndexMap::new();
+    let mut transforms: IndexMap<ComponentKey, UnitTestTransform> = IndexMap::new();
     for (id, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(id) {
             match transform_config.inner.build(&context).await {

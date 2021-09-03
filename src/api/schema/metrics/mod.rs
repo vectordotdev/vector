@@ -12,7 +12,7 @@ mod uptime;
 #[cfg(feature = "sources-host_metrics")]
 mod host;
 
-use crate::config::ComponentId;
+use crate::config::ComponentKey;
 
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
@@ -99,7 +99,7 @@ impl MetricsSubscription {
                 m.into_iter()
                     .map(|(m, throughput)| {
                         ComponentProcessedEventsThroughput::new(
-                            ComponentId::from((
+                            ComponentKey::from((
                                 m.tag_value("pipeline_id"),
                                 m.tag_value("component_id").unwrap(),
                             )),
@@ -152,7 +152,7 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentEventsInThroughput::new(
-                        ComponentId::from((
+                        ComponentKey::from((
                             m.tag_value("pipeline_id"),
                             m.tag_value("component_id").unwrap(),
                         )),
@@ -201,7 +201,7 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentEventsOutThroughput::new(
-                        ComponentId::from((
+                        ComponentKey::from((
                             m.tag_value("pipeline_id"),
                             m.tag_value("component_id").unwrap(),
                         )),
@@ -262,7 +262,7 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentProcessedBytesThroughput::new(
-                        ComponentId::from((
+                        ComponentKey::from((
                             m.tag_value("pipeline_id"),
                             m.tag_value("component_id").unwrap(),
                         )),

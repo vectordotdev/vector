@@ -1,6 +1,6 @@
 use super::{
     format::{deserialize, Format},
-    ComponentId, TransformOuter,
+    ComponentKey, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -89,7 +89,7 @@ impl Pipelines {
         }
     }
 
-    pub fn into_scoped_transforms(self) -> Vec<(ComponentId, PipelineTransform)> {
+    pub fn into_scoped_transforms(self) -> Vec<(ComponentKey, PipelineTransform)> {
         self.0
             .into_iter()
             .map(|(pipeline_id, pipeline)| pipeline.into_scoped_transforms(&pipeline_id))
@@ -103,7 +103,7 @@ pub struct PipelineTransform {
     #[serde(flatten)]
     pub inner: TransformOuter,
     #[serde(default)]
-    pub outputs: Vec<ComponentId>,
+    pub outputs: Vec<ComponentKey>,
 }
 
 impl PipelineTransform {
@@ -134,11 +134,11 @@ impl PipelineTransform {
 #[serde(deny_unknown_fields)]
 pub struct Pipeline {
     #[serde(default)]
-    pub transforms: IndexMap<ComponentId, PipelineTransform>,
+    pub transforms: IndexMap<ComponentKey, PipelineTransform>,
 }
 
 impl Pipeline {
-    fn into_scoped_transforms(self, pipeline_id: &str) -> Vec<(ComponentId, PipelineTransform)> {
+    fn into_scoped_transforms(self, pipeline_id: &str) -> Vec<(ComponentKey, PipelineTransform)> {
         let transform_keys: HashSet<_> = self
             .transforms
             .keys()
