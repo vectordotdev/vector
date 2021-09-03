@@ -136,20 +136,7 @@
         </span>
 
         {{ with $v.examples }}
-        {{ $json := . | jsonify (dict "indent" "  ") }}
-        <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
-          <span class="flex justify-between items-center">
-            <span class="text-sm">
-              Examples
-            </span>
-
-            {{ template "config-toggler" (dict "size" 4) }}
-          </span>
-
-          <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
-            {{ highlight $json "json" "" }}
-          </div>
-        </div>
+        {{ template "config-examples" (dict "examples" .) }}
         {{ end }}
         {{ end }}
         {{ end }}
@@ -165,20 +152,7 @@
       {{ end }}
 
       {{ with $v.examples }}
-      {{ $json := . | jsonify (dict "indent" "  ") }}
-      <div x-data="{ open: false }" class="mt-3.5 border rounded py-2 px-3 dark:border-gray-700">
-        <span class="flex justify-between items-center">
-          <span class="text-sm">
-            Examples
-          </span>
-
-          {{ template "config-toggler" (dict "size" 4) }}
-        </span>
-
-        <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
-          {{ highlight $json "json" "" }}
-        </div>
-      </div>
+      {{ template "config-examples" (dict "examples" .) }}
       {{ end }}
       {{ end }}
 
@@ -1432,6 +1406,23 @@
     {{ end }}
   </tbody>
 </table>
+{{ end }}
+
+{{ define "config-examples" }}
+{{ $json := .examples | jsonify (dict "indent" "  ") }}
+<div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
+  <span class="flex justify-between items-center">
+    <span class="text-sm">
+      Examples
+    </span>
+
+    {{ template "config-toggler" (dict "size" 4) }}
+  </span>
+
+  <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
+    {{ highlight $json "json" "" }}
+  </div>
+</div>
 {{ end }}
 
 {{ define "config-toggler" }}
