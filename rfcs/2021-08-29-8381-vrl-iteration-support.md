@@ -310,7 +310,7 @@ For the chosen proposal to work, there are two separate concepts that need to
 be implemented:
 
 - closure-support for functions
-- limited lexical scoping
+- lexical scoping
 
 Let's discuss these one by one, before we arrive at the final part, implementing
 the `map` function that uses both concepts.
@@ -405,6 +405,22 @@ However, while the above syntax would be _new_ and thus not a breaking change,
 for existing code, adding lexical scoping _would_ be a breaking change:
 
 ```coffee
+{
+  foo = "baz"
+}
+
+foo
+```
+
+Previously, `foo` would return `"baz"` when the program runs, but with lexical
+scoping, the compiler returns an "undefined variable" compilation error instead.
+
+This is a breaking change, but because it results in a compilation error, there
+will not be any unexpected runtime behavior for this case.
+
+There is one additional case that _will_ result in a change in runtime behavior:
+
+```coffee
 foo = "bar"
 
 {
@@ -414,44 +430,23 @@ foo = "bar"
 foo
 ```
 
-Previously, `foo` would return `"baz"` when the program runs, but with lexical
-scoping, it would be set to `"bar"` instead (depending on if we also added
-let-bindings or not).
+Previously, `foo` would be set to `"baz"`, while lexical scoping means `foo`
+outside the block will stay at `"bar"`. While we'll treat this as a breaking
+change, we consider this pattern unlikely to be present in production code, and
+so we accept this change in VRL.
 
-Because of this breaking change, this RFC proposes we add lexical scoping
-selectively, function-closures _will_ have _partial_ lexical scoping, anything else
-_won't_.
+In terms of exact rules, the following applies to lexical scoping in VRL:
 
-What this means for function-closures is best demonstrated as an example:
-
-```coffee
-value1 = 1
-
-map(.) |key, value2| {
-  value1 = 1.1
-  value3 = 3
-
-  [key, value2]
-}
-
-value1
-value2
-value3
-```
-
-In the above example, `value1` returns `1.1`, `value2` returns an "undefined
-variable" error at compile-time, and `value3` returns `3`. In other words, lexical-scoping
-_only_ applies to the provided closure variables, _not_ to any variables defined
-inside the closure itself.
-
-This prevents people from accidentally overwriting previous variables, unless
-they explicitly do so within the closure-block, which is how it currently works
-in regular blocks as well.
-
-While there is _some_ inconsistency here, the inconsistency is well-isolated, it
-prevents us from having to introduce a breaking change right now, and it also
-still leaves open the option of adding lexical scoping before a 1.0 release of
-VRL.
+- A VRL program has a single "root" scope, to which any unnested code belongs.
+- A new scope is created by using the block (`{ ... }`) expression.
+- Nested block expressions result in nested scopes.
+- Function-closures also create a new scope.
+- Any variable defined in a higher-level scope is accessible in nested scopes.
+- Any variable defined in a lower-level scope _cannot_ be accessed in parent
+  scopes.
+- If a variable with the same identifier is overwritten in a lower-level scope,
+  higher-level scopes will keep access to the original value assigned to that
+  variable.
 
 #### Returning Two-Element Array
 
