@@ -8024,6 +8024,7 @@ dependencies = [
  "grok",
  "hex",
  "hostname",
+ "indexmap",
  "lazy_static",
  "lookup",
  "md-5",
