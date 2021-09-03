@@ -135,7 +135,7 @@ components: sources: journald: {
 				options: {
 					"*": {
 						common:		 false
-						description: "The set of field values to match in journal entries that are to monitor."
+						description: "The set of field values to match in journal entries that are to be included."
 						required:	 false
 						type: array: {
 							default: []
