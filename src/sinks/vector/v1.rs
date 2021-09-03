@@ -23,7 +23,7 @@ pub struct VectorConfig {
 }
 
 impl VectorConfig {
-    pub fn new(
+    pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
@@ -37,7 +37,7 @@ impl VectorConfig {
         }
     }
 
-    pub fn from_address(address: String) -> Self {
+    pub const fn from_address(address: String) -> Self {
         Self::new(address, None, None, None)
     }
 }
@@ -68,15 +68,15 @@ impl VectorConfig {
         sink_config.build(cx, |event| Some(encode_event(event)))
     }
 
-    pub(super) fn input_type(&self) -> DataType {
+    pub(super) const fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn sink_type(&self) -> &'static str {
+    pub(super) const fn sink_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(super) fn resources(&self) -> Vec<Resource> {
+    pub(super) const fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 }

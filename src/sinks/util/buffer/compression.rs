@@ -20,14 +20,14 @@ impl Compression {
         Compression::Gzip(None)
     }
 
-    pub fn content_encoding(&self) -> Option<&'static str> {
+    pub const fn content_encoding(&self) -> Option<&'static str> {
         match self {
             Self::None => None,
             Self::Gzip(_) => Some("gzip"),
         }
     }
 
-    pub fn extension(&self) -> &'static str {
+    pub const fn extension(&self) -> &'static str {
         match self {
             Self::None => "log",
             Self::Gzip(_) => "log.gz",

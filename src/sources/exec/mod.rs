@@ -92,28 +92,28 @@ impl Default for ExecConfig {
     }
 }
 
-fn default_maximum_buffer_size() -> usize {
+const fn default_maximum_buffer_size() -> usize {
     // 1MB
     1000000
 }
 
-fn default_exec_interval_secs() -> u64 {
+const fn default_exec_interval_secs() -> u64 {
     60
 }
 
-fn default_respawn_interval_secs() -> u64 {
+const fn default_respawn_interval_secs() -> u64 {
     5
 }
 
-fn default_respawn_on_exit() -> bool {
+const fn default_respawn_on_exit() -> bool {
     true
 }
 
-fn default_include_stderr() -> bool {
+const fn default_include_stderr() -> bool {
     true
 }
 
-fn default_events_per_line() -> bool {
+const fn default_events_per_line() -> bool {
     true
 }
 
@@ -149,21 +149,21 @@ impl ExecConfig {
         self.command.join(" ")
     }
 
-    fn exec_interval_secs_or_default(&self) -> u64 {
+    const fn exec_interval_secs_or_default(&self) -> u64 {
         match &self.scheduled {
             None => default_exec_interval_secs(),
             Some(config) => config.exec_interval_secs,
         }
     }
 
-    fn respawn_on_exit_or_default(&self) -> bool {
+    const fn respawn_on_exit_or_default(&self) -> bool {
         match &self.streaming {
             None => default_respawn_on_exit(),
             Some(config) => config.respawn_on_exit,
         }
     }
 
-    fn respawn_interval_secs_or_default(&self) -> u64 {
+    const fn respawn_interval_secs_or_default(&self) -> u64 {
         match &self.streaming {
             None => default_respawn_interval_secs(),
             Some(config) => config.respawn_interval_secs,

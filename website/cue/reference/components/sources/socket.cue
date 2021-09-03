@@ -122,7 +122,7 @@ components: sources: socket: {
 		shutdown_timeout_secs: {
 			common:        false
 			description:   "The timeout before a connection is forcefully closed during shutdown."
-			relevant_when: "mode = `tcp``"
+			relevant_when: "mode = `tcp`"
 			required:      false
 			warnings: []
 			type: uint: {

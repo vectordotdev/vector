@@ -2,7 +2,7 @@
 mod body_decoding;
 mod encoding_config;
 #[cfg(any(feature = "sources-file", feature = "sources-kafka"))]
-pub(crate) mod finalizer;
+pub mod finalizer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
 #[cfg(feature = "sources-utils-http")]
@@ -16,13 +16,13 @@ mod unix_datagram;
 mod unix_stream;
 
 #[cfg(any(feature = "sources-http"))]
-pub(crate) use self::body_decoding::{decode_body, Encoding};
+pub use self::body_decoding::{decode_body, Encoding};
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
-pub(crate) use self::http::add_query_parameters;
+pub use self::http::add_query_parameters;
 #[cfg(feature = "sources-prometheus")]
-pub(crate) use self::http::decode;
+pub use self::http::decode;
 #[cfg(feature = "sources-utils-http")]
-pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
+pub use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]

@@ -1,5 +1,5 @@
 use super::EncodedEvent;
-use crate::event::EventFinalizers;
+use crate::{event::EventFinalizers, internal_events::LargeEventDropped};
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -27,8 +27,9 @@ pub struct BatchConfig {
 }
 
 impl BatchConfig {
-    // This is used internally by new_relic_logs sink, else it could be pub(super) too
-    pub fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
+    // This is used internally by new_relic_logs sink, else it could be
+    // pub(super) too
+    pub const fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
         let max_bytes = match (self.max_bytes, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
             (Some(bytes), None) => Some(bytes),
@@ -42,7 +43,7 @@ impl BatchConfig {
         })
     }
 
-    pub(super) fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
+    pub(super) const fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
         match self.max_bytes {
@@ -51,7 +52,7 @@ impl BatchConfig {
         }
     }
 
-    pub(super) fn use_size_as_events(&self) -> Result<Self, BatchError> {
+    pub(super) const fn use_size_as_events(&self) -> Result<Self, BatchError> {
         let max_events = match (self.max_events, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
             (Some(events), None) => Some(events),
@@ -180,7 +181,7 @@ impl<B> Default for BatchSettings<B> {
 }
 
 pub(super) fn err_event_too_large<T>(length: usize, max_length: usize) -> PushResult<T> {
-    error!(message = "Event larger than batch max_bytes, dropping.", batch_max_bytes = %max_length, length = %length, internal_log_rate_secs = 1);
+    emit!(LargeEventDropped { length, max_length });
     PushResult::Ok(false)
 }
 
@@ -291,10 +292,11 @@ impl<B: Batch> From<B> for StatefulBatch<B> {
 }
 
 impl<B> StatefulBatch<B> {
-    pub fn was_full(&self) -> bool {
+    pub const fn was_full(&self) -> bool {
         self.was_full
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_inner(self) -> B {
         self.inner
     }

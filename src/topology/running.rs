@@ -6,7 +6,7 @@ use crate::topology::{
 };
 use crate::{
     buffers,
-    config::{ComponentId, Config, ConfigDiff, HealthcheckOptions, Resource},
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::TaskOutput},
@@ -25,12 +25,12 @@ use tracing::Instrument;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<ComponentId, buffers::BufferInputCloner<Event>>,
-    outputs: HashMap<ComponentId, ControlChannel>,
-    source_tasks: HashMap<ComponentId, TaskHandle>,
-    tasks: HashMap<ComponentId, TaskHandle>,
+    inputs: HashMap<ComponentKey, buffers::BufferInputCloner<Event>>,
+    outputs: HashMap<ComponentKey, ControlChannel>,
+    source_tasks: HashMap<ComponentKey, TaskHandle>,
+    tasks: HashMap<ComponentKey, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
-    detach_triggers: HashMap<ComponentId, DisabledTrigger>,
+    detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
     pub(crate) config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
@@ -81,7 +81,7 @@ impl RunningTopology {
         let mut wait_handles = Vec::new();
         // We need a Vec here since source components have two tasks. One for
         // pump in self.tasks, and the other for source in self.source_tasks.
-        let mut check_handles = HashMap::<ComponentId, Vec<_>>::new();
+        let mut check_handles = HashMap::<ComponentKey, Vec<_>>::new();
 
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
@@ -260,7 +260,7 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_config: &Config,
-    ) -> HashMap<ComponentId, BuiltBuffer> {
+    ) -> HashMap<ComponentKey, BuiltBuffer> {
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -509,7 +509,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_sink(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+    fn spawn_sink(&mut self, id: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "sink",
@@ -526,7 +526,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_transform(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+    fn spawn_transform(&mut self, id: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "transform",
@@ -543,7 +543,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_source(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+    fn spawn_source(&mut self, id: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(id).unwrap();
         let span = error_span!(
             "source",
@@ -568,11 +568,11 @@ impl RunningTopology {
             .insert(id.clone(), tokio::spawn(source_task));
     }
 
-    fn remove_outputs(&mut self, id: &ComponentId) {
+    fn remove_outputs(&mut self, id: &ComponentKey) {
         self.outputs.remove(id);
     }
 
-    async fn remove_inputs(&mut self, id: &ComponentId) {
+    async fn remove_inputs(&mut self, id: &ComponentKey) {
         self.inputs.remove(id);
         self.detach_triggers.remove(id);
 
@@ -591,7 +591,7 @@ impl RunningTopology {
         }
     }
 
-    async fn setup_outputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+    async fn setup_outputs(&mut self, id: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let mut output = new_pieces.outputs.remove(id).unwrap();
 
         for (sink_id, sink) in &self.config.sinks {
@@ -620,7 +620,7 @@ impl RunningTopology {
         self.outputs.insert(id.clone(), output);
     }
 
-    async fn setup_inputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+    async fn setup_inputs(&mut self, id: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(id).unwrap();
 
         for input in inputs {
@@ -640,7 +640,7 @@ impl RunningTopology {
             .map(|trigger| self.detach_triggers.insert(id.clone(), trigger.into()));
     }
 
-    async fn replace_inputs(&mut self, id: &ComponentId, new_pieces: &mut builder::Pieces) {
+    async fn replace_inputs(&mut self, id: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(id).unwrap();
 
         let sink_inputs = self.config.sinks.get(id).map(|s| &s.inputs);
@@ -691,7 +691,7 @@ impl RunningTopology {
             .map(|trigger| self.detach_triggers.insert(id.clone(), trigger.into()));
     }
 
-    async fn detach_inputs(&mut self, id: &ComponentId) {
+    async fn detach_inputs(&mut self, id: &ComponentKey) {
         self.inputs.remove(id);
         self.detach_triggers.remove(id);
 
@@ -712,7 +712,7 @@ impl RunningTopology {
     }
 
     /// Borrows the Config
-    pub fn config(&self) -> &Config {
+    pub const fn config(&self) -> &Config {
         &self.config
     }
 

@@ -1,3 +1,4 @@
+use crate::config::ComponentKey;
 use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
@@ -5,7 +6,7 @@ use chrono::{DateTime, Utc};
 pub struct ProcessedBytesTotal(Metric);
 
 impl ProcessedBytesTotal {
-    pub fn new(m: Metric) -> Self {
+    pub const fn new(m: Metric) -> Self {
         Self(m)
     }
 
@@ -41,7 +42,7 @@ impl From<Metric> for ProcessedBytesTotal {
 }
 
 pub struct ComponentProcessedBytesTotal {
-    component_id: String,
+    component_key: ComponentKey,
     metric: Metric,
 }
 
@@ -49,12 +50,13 @@ impl ComponentProcessedBytesTotal {
     /// Returns a new `ComponentProcessedBytesTotal` struct, which is a GraphQL type. The
     /// component id is hoisted for clear field resolution in the resulting payload
     pub fn new(metric: Metric) -> Self {
-        let component_id = metric.tag_value("component_id").expect(
+        let component_key = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
+        let component_key = ComponentKey::from((metric.tag_value("pipeline_id"), component_key));
 
         Self {
-            component_id,
+            component_key,
             metric,
         }
     }
@@ -64,7 +66,12 @@ impl ComponentProcessedBytesTotal {
 impl ComponentProcessedBytesTotal {
     /// Component id
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.component_key.id()
+    }
+
+    /// Pipeline id
+    async fn pipeline_id(&self) -> Option<&str> {
+        self.component_key.pipeline_str()
     }
 
     /// Bytes processed total metric
@@ -74,15 +81,15 @@ impl ComponentProcessedBytesTotal {
 }
 
 pub struct ComponentProcessedBytesThroughput {
-    component_id: String,
+    component_key: ComponentKey,
     throughput: i64,
 }
 
 impl ComponentProcessedBytesThroughput {
     /// Returns a new `ComponentProcessedBytesThroughput`, set to the provided id/throughput values
-    pub fn new(component_id: String, throughput: i64) -> Self {
+    pub const fn new(component_key: ComponentKey, throughput: i64) -> Self {
         Self {
-            component_id,
+            component_key,
             throughput,
         }
     }
@@ -92,7 +99,12 @@ impl ComponentProcessedBytesThroughput {
 impl ComponentProcessedBytesThroughput {
     /// Component id
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.component_key.id()
+    }
+
+    /// Pipeline id
+    async fn pipeline_id(&self) -> Option<&str> {
+        self.component_key.pipeline_str()
     }
 
     /// Bytes processed throughput

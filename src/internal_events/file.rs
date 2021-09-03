@@ -2,7 +2,7 @@ use super::InternalEvent;
 use metrics::gauge;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
-pub(crate) use self::source::*;
+pub use self::source::*;
 
 #[derive(Debug)]
 pub struct FileOpen {

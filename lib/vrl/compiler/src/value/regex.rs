@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 #[derive(Debug, Clone)]
@@ -6,6 +7,12 @@ pub struct Regex(regex::Regex);
 impl PartialEq for Regex {
     fn eq(&self, other: &Self) -> bool {
         self.0.as_str() == other.0.as_str()
+    }
+}
+
+impl Hash for Regex {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.as_str().hash(state)
     }
 }
 

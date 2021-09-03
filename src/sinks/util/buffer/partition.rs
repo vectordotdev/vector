@@ -31,7 +31,7 @@ pub struct PartitionInnerBuffer<T, K> {
 }
 
 impl<T, K> PartitionBuffer<T, K> {
-    pub fn new(inner: T) -> Self {
+    pub const fn new(inner: T) -> Self {
         Self { inner, key: None }
     }
 }
@@ -82,10 +82,11 @@ where
 }
 
 impl<T, K> PartitionInnerBuffer<T, K> {
-    pub fn new(inner: T, key: K) -> Self {
+    pub const fn new(inner: T, key: K) -> Self {
         Self { inner, key }
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_parts(self) -> (T, K) {
         (self.inner, self.key)
     }

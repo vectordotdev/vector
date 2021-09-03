@@ -4,11 +4,11 @@ use std::fmt;
 use std::marker::PhantomData;
 pub use vector_core::serde::skip_serializing_if_default;
 
-pub fn default_true() -> bool {
+pub const fn default_true() -> bool {
     true
 }
 
-pub fn default_false() -> bool {
+pub const fn default_false() -> bool {
     false
 }
 

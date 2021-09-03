@@ -2,17 +2,22 @@ use crate::event::{LogEvent, Value};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum MergeStrategy {
     Discard,
+    Retain,
     Sum,
     Max,
     Min,
     Array,
     Concat,
     ConcatNewline,
+    ShortestArray,
+    LongestArray,
+    FlatUnique,
 }
 
 //------------------------------------------------------------------------------
@@ -23,13 +28,41 @@ struct DiscardMerger {
 }
 
 impl DiscardMerger {
-    fn new(v: Value) -> Self {
+    const fn new(v: Value) -> Self {
         Self { v }
     }
 }
 
 impl ReduceValueMerger for DiscardMerger {
     fn add(&mut self, _v: Value) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(k, self.v);
+        Ok(())
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct RetainMerger {
+    v: Value,
+}
+
+impl RetainMerger {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
+    fn new(v: Value) -> Self {
+        Self { v }
+    }
+}
+
+impl ReduceValueMerger for RetainMerger {
+    fn add(&mut self, v: Value) -> Result<(), String> {
+        if Value::Null != v {
+            self.v = v;
+        }
         Ok(())
     }
 
@@ -133,13 +166,127 @@ impl ReduceValueMerger for ArrayMerger {
 //------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
+struct LongestArrayMerger {
+    v: Vec<Value>,
+}
+
+impl LongestArrayMerger {
+    fn new(v: Vec<Value>) -> Self {
+        Self { v }
+    }
+}
+
+impl ReduceValueMerger for LongestArrayMerger {
+    fn add(&mut self, v: Value) -> Result<(), String> {
+        if let Value::Array(a) = v {
+            if a.len() > self.v.len() {
+                self.v = a;
+            }
+            Ok(())
+        } else {
+            Err(format!(
+                "expected array value, found: '{}'",
+                v.to_string_lossy()
+            ))
+        }
+    }
+
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(k, Value::Array(self.v));
+        Ok(())
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct ShortestArrayMerger {
+    v: Vec<Value>,
+}
+
+impl ShortestArrayMerger {
+    fn new(v: Vec<Value>) -> Self {
+        Self { v }
+    }
+}
+
+impl ReduceValueMerger for ShortestArrayMerger {
+    fn add(&mut self, v: Value) -> Result<(), String> {
+        if let Value::Array(a) = v {
+            if a.len() < self.v.len() {
+                self.v = a;
+            }
+            Ok(())
+        } else {
+            Err(format!(
+                "expected array value, found: '{}'",
+                v.to_string_lossy()
+            ))
+        }
+    }
+
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(k, Value::Array(self.v));
+        Ok(())
+    }
+}
+
+//------------------------------------------------------------------------------
+#[derive(Debug, Clone)]
+struct FlatUniqueMerger {
+    v: HashSet<Value>,
+}
+
+#[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
+fn insert_value(h: &mut HashSet<Value>, v: Value) {
+    match v {
+        Value::Map(m) => {
+            for (_, v) in m {
+                h.insert(v);
+            }
+        }
+        Value::Array(vec) => {
+            for v in vec {
+                h.insert(v);
+            }
+        }
+        _ => {
+            h.insert(v);
+        }
+    }
+}
+
+impl FlatUniqueMerger {
+    #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
+    fn new(v: Value) -> Self {
+        let mut h = HashSet::default();
+        insert_value(&mut h, v);
+        Self { v: h }
+    }
+}
+
+impl ReduceValueMerger for FlatUniqueMerger {
+    fn add(&mut self, v: Value) -> Result<(), String> {
+        insert_value(&mut self.v, v);
+        Ok(())
+    }
+
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(k, Value::Array(self.v.into_iter().collect()));
+        Ok(())
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
 struct TimestampWindowMerger {
     started: DateTime<Utc>,
     latest: DateTime<Utc>,
 }
 
 impl TimestampWindowMerger {
-    fn new(v: DateTime<Utc>) -> Self {
+    const fn new(v: DateTime<Utc>) -> Self {
         Self {
             started: v,
             latest: v,
@@ -195,7 +342,7 @@ struct AddNumbersMerger {
 }
 
 impl AddNumbersMerger {
-    fn new(v: NumberMergerValue) -> Self {
+    const fn new(v: NumberMergerValue) -> Self {
         Self { v }
     }
 }
@@ -240,7 +387,7 @@ struct MaxNumberMerger {
 }
 
 impl MaxNumberMerger {
-    fn new(v: NumberMergerValue) -> Self {
+    const fn new(v: NumberMergerValue) -> Self {
         Self { v }
     }
 }
@@ -301,7 +448,7 @@ struct MinNumberMerger {
 }
 
 impl MinNumberMerger {
-    fn new(v: NumberMergerValue) -> Self {
+    const fn new(v: NumberMergerValue) -> Self {
         Self { v }
     }
 }
@@ -418,7 +565,23 @@ pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceVal
             )),
         },
         MergeStrategy::Array => Ok(Box::new(ArrayMerger::new(v))),
+        MergeStrategy::ShortestArray => match v {
+            Value::Array(a) => Ok(Box::new(ShortestArrayMerger::new(a))),
+            _ => Err(format!(
+                "expected array value, found: '{}'",
+                v.to_string_lossy()
+            )),
+        },
+        MergeStrategy::LongestArray => match v {
+            Value::Array(a) => Ok(Box::new(LongestArrayMerger::new(a))),
+            _ => Err(format!(
+                "expected array value, found: '{}'",
+                v.to_string_lossy()
+            )),
+        },
         MergeStrategy::Discard => Ok(Box::new(DiscardMerger::new(v))),
+        MergeStrategy::Retain => Ok(Box::new(RetainMerger::new(v))),
+        MergeStrategy::FlatUnique => Ok(Box::new(FlatUniqueMerger::new(v))),
     }
 }
 
@@ -431,67 +594,100 @@ mod test {
     #[test]
     fn initial_values() {
         assert!(get_value_merger("foo".into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger("foo".into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger("foo".into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger("foo".into(), &MergeStrategy::Min).is_err());
         assert!(get_value_merger("foo".into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::LongestArray).is_err());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger("foo".into(), &MergeStrategy::Concat).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(42.into(), &MergeStrategy::Sum).is_ok());
         assert!(get_value_merger(42.into(), &MergeStrategy::Min).is_ok());
         assert!(get_value_merger(42.into(), &MergeStrategy::Max).is_ok());
         assert!(get_value_merger(42.into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::LongestArray).is_err());
+        assert!(get_value_merger(42.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(42.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(42.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(42.into(), &MergeStrategy::FlatUnique).is_ok());
 
-        assert!(get_value_merger(4.2.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Sum).is_ok());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Min).is_ok());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Max).is_ok());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::LongestArray).is_err());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(true.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(true.into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(true.into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::Min).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(true.into(), &MergeStrategy::LongestArray).is_err());
+        assert!(get_value_merger(true.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(true.into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Min).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::LongestArray).is_err());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Min).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::LongestArray).is_ok());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::ShortestArray).is_ok());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Concat).is_ok());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Min).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::LongestArray).is_err());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Retain).is_ok());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Sum).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Min).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::LongestArray).is_err());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::FlatUnique).is_ok());
     }
 
     #[test]
@@ -499,6 +695,10 @@ mod test {
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Discard),
             Ok("foo".into())
+        );
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::Retain),
+            Ok("bar".into())
         );
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Array),
@@ -571,6 +771,58 @@ mod test {
             merge(json!([]).into(), 42.into(), &MergeStrategy::Concat),
             Ok(json!([42]).into())
         );
+
+        assert_eq!(
+            merge(
+                json!([34]).into(),
+                json!([42, 43]).into(),
+                &MergeStrategy::ShortestArray
+            ),
+            Ok(json!([34]).into())
+        );
+        assert_eq!(
+            merge(
+                json!([34]).into(),
+                json!([42, 43]).into(),
+                &MergeStrategy::LongestArray
+            ),
+            Ok(json!([42, 43]).into())
+        );
+
+        let v = merge(34.into(), 43.into(), &MergeStrategy::FlatUnique).unwrap();
+        if let Value::Array(v) = v.clone() {
+            let v: Vec<_> = v
+                .into_iter()
+                .map(|i| {
+                    if let Value::Integer(i) = i {
+                        i
+                    } else {
+                        panic!("Bad value");
+                    }
+                })
+                .collect();
+            assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
+            assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
+        } else {
+            panic!("Not array");
+        }
+        let v = merge(v, 34.into(), &MergeStrategy::FlatUnique).unwrap();
+        if let Value::Array(v) = v {
+            let v: Vec<_> = v
+                .into_iter()
+                .map(|i| {
+                    if let Value::Integer(i) = i {
+                        i
+                    } else {
+                        panic!("Bad value");
+                    }
+                })
+                .collect();
+            assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
+            assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
+        } else {
+            panic!("Not array");
+        }
     }
 
     fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {
