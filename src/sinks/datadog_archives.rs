@@ -94,6 +94,8 @@ const KEY_TEMPLATE: &'static str = "/dt=%Y%m%d/hour=%H/";
 
 impl DatadogArchivesSinkConfig {
     pub fn new(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        // we use lower default limits, because we send 100mb batches,
+        // thus no need in the the higher number of outcoming requests
         let request = self.request.unwrap_with(&TowerRequestConfig {
             concurrency: Concurrency::Fixed(50),
             rate_limit_num: Some(250),
