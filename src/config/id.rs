@@ -58,10 +58,6 @@ impl ComponentKey {
         }
     }
 
-    pub fn scope(&self) -> &ComponentScope {
-        &self.scope
-    }
-
     pub fn into_pipeline(self, id: &str) -> Self {
         Self::pipeline(id, &self.id)
     }
