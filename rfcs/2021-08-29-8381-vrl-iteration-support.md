@@ -23,7 +23,6 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
     * [Lexical Scoping](#lexical-scoping)
     * [Returning Two-Element Array](#returning-two-element-array)
       * [Tuple Type](#tuple-type)
-    * [Parser Ambiguity](#parser-ambiguity)
 * [Rationale](#rationale)
 * [Drawbacks](#drawbacks)
 * [Prior Art](#prior-art)
@@ -143,7 +142,7 @@ Let's take a look at this function in action:
 # Recursively map all `.tags` to their new values.
 #
 # A copy of the object is returned, with the key/value changes applied.
-.tags = map(.tags, recursive: true) |tag, value| {
+.tags = map(.tags, recursive: true) { |tag, value|
     # `value` can be a boolean, or any other value. We enforce it to be
     # a boolean.
     value = bool!(value) ?? false
@@ -160,7 +159,7 @@ Let's take a look at this function in action:
 }
 
 # Map all IP addresses in `.ips`.
-.ips = map(.ips) |index, ip| {
+.ips = map(.ips) { |index, ip|
     # Enforce `ip` to be a string.
     ip = string(ip) ?? "unknown"
 
@@ -203,7 +202,7 @@ Let's start by looking at the function signature when iterating over an object
 below, but to keep the signature simple at first, we'll start with objects):
 
 ```coffee
-map(value: OBJECT, recursive: BOOLEAN) |<key variable>, <value variable>| [EXPRESSION, EXPRESSION] -> OBJECT
+map(value: OBJECT, recursive: BOOLEAN) { |<key variable>, <value variable>| [EXPRESSION, EXPRESSION] } -> OBJECT
 ```
 
 Let's break this down:
@@ -215,7 +214,7 @@ Let's break this down:
     nested objects. It defaults to `false`.
 - A closure-like expression is expected as part of the function call, but after
   the closing `)`.
-  - This takes the form of `|...| expression`.
+  - This takes the form of `{ |...| expression }`.
   - When iterating over an object, `|...|` has to represent two variables, one
     for the key, and one for the value (f.e. `|key, value|`).
   - The expression has to return a 2-element `array`
@@ -229,7 +228,7 @@ Here's a simplified example on how to use the function:
 ```
 
 ```coffee
-. = map(.) |key, value| {
+. = map(.) { |key, value|
     key = upcase(key)
     value = !value
 
@@ -241,17 +240,11 @@ Here's a simplified example on how to use the function:
 { "FOO": false, "BAR": true }
 ```
 
-Note that we use a `block` expression which returns an `array` literal. We could
-also collapse this example into a single-line, given that the `block` expression
-can be swapped for a direct `array` literal, and the fact that we can use other
-expressions as values inside the array:
+As an example, the shortest form to write the above example in would be:
 
 ```coffee
-. = map(.) |key, value| [upcase(key), !value]
+. = map(.) { |k,v| [upcase(k), !v] }
 ```
-
-These two examples are identical, one is more verbose and potentially more
-readable, but they result in the same outcome.
 
 The object under iteration is not mutated, instead a copy of the value is
 iterated, and mutated, returning a new object or array after iteration
@@ -262,7 +255,7 @@ completes.
 The signature for array iteration is as follows:
 
 ```coffee
-map(value: ARRAY, recursive: BOOLEAN) |<index variable>, <value variable>| EXPRESSION -> ARRAY
+map(value: ARRAY, recursive: BOOLEAN) { |<index variable>, <value variable>| EXPRESSION } -> ARRAY
 ```
 
 This is nearly identical to the object signature, except that it takes an array,
@@ -276,7 +269,7 @@ Here's an example:
 ```
 
 ```coffee
-. = map(.) |index, value| {
+. = map(.) { |index, value|
     value + "_" + to_string!(index)
 }
 ```
@@ -291,7 +284,7 @@ This proposal favors adding a _mapping_ function over _for-loop syntax_. That
 is, the RFC proposes:
 
 ```coffee
-map(.) |key, value| [upcase(key), value]
+map(.) { |key, value| [upcase(key), value] }
 ```
 
 over:
@@ -330,7 +323,7 @@ as a stand-alone argument to their function call.
 this:
 
 ```coffee
-map(.) |k, v| {
+map(.) { |k, v|
   [k, v]
 }
 ```
@@ -338,7 +331,7 @@ map(.) |k, v| {
 over this:
 
 ```coffee
-map(., |k, v| {
+map(., { |k, v|
   [k, v]
 })
 ```
@@ -350,7 +343,7 @@ call_.
 That is, we don't want to allow this:
 
 ```coffee
-my_closure = |k, v| [k, v]
+my_closure = { |k, v| [k, v] }
 map(., my_closure)
 ```
 
@@ -389,7 +382,7 @@ comes to top of mind again.
 The reason for that, is the following example:
 
 ```coffee
-map(.) |key, value| {
+map(.) { |key, value|
   key = upcase(key)
 
   [key, value]
@@ -461,7 +454,7 @@ We require the `map` function closure to return a two-element `array` type.
 Without this requirement, mapping would work as follows:
 
 ```coffee
-map(.) |key, _| {
+map(.) { |key, _|
   key = upcase(key)
 }
 ```
@@ -486,7 +479,7 @@ Instead, the `map` function-closure is required to return a two-element array of
 values of the object record, e.g.:
 
 ```coffee
-map(.) |key, value| {
+map(.) { |key, value|
   key = upcase(key)
 
   # The array return-value clearly defines the eventual key and value values.
@@ -500,7 +493,7 @@ Alternatively, we could introduce a new `tuple` type to define the return-type
 of the closure:
 
 ```coffee
-map(.) |key, value| {
+map(.) { |key, value|
   key = upcase(key)
 
   (key, value)
@@ -520,22 +513,6 @@ VRL itself.
 Since there isn't a clear benefit at this moment to using a tuple over
 a two-element array, the choice is made to forgo adding the tuple type at this
 moment.
-
-#### Parser Ambiguity
-
-TODO, figure out how to handle parser ambiguity.
-
-That is, these are identical:
-
-```coffee
-# merge the result of `fn(a)` with `b` and `c`
-fn(a) | b | c
-```
-
-```coffee
-# call `fn(a)` with closure `|b| c`
-fn(a) |b| c
-```
 
 ## Rationale
 
