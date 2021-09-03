@@ -27,15 +27,17 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 * [Drawbacks](#drawbacks)
 * [Prior Art](#prior-art)
 * [Alternatives](#alternatives)
+  * [Closure Syntax](#closure-syntax)
   * [For-Loop](#for-loop)
 * [Outstanding Questions](#outstanding-questions)
 * [Plan Of Attack](#plan-of-attack)
 * [Future Improvements](#future-improvements)
-    * [Iteration Control-Flow](#iteration-control-flow)
-    * [Specialized Iteration Functions](#specialized-iteration-functions)
-    * [Schema Support](#schema-support)
-    * [Pipeline Operator Support](#pipeline-operator-support)
-    * [Dynamic Field Assignment Support](#dynamic-field-assignment-support)
+  * [Iteration Control-Flow](#iteration-control-flow)
+  * [Specialized Iteration Functions](#specialized-iteration-functions)
+  * [Schema Support](#schema-support)
+  * [Pipeline Operator Support](#pipeline-operator-support)
+  * [Dynamic Field Assignment Support](#dynamic-field-assignment-support)
+  * [Short-Hand Object Notation](#short-hand-object-notation)
 
 <!-- vim-markdown-toc -->
 
@@ -639,7 +641,7 @@ object if you can't use `.`, and goes against the rules as laid out in the
 
 ## Future Improvements
 
-#### Iteration Control-Flow
+### Iteration Control-Flow
 
 While likely desirable, this RFC intentionally avoids control-flow operations
 inside iterators.
@@ -657,7 +659,7 @@ They are likely to be one of the first enhancements to this feature, though:
 }
 ```
 
-#### Specialized Iteration Functions
+### Specialized Iteration Functions
 
 Once this RFC is implemented, additional iteration capability can be expanded by
 adding new functions to the standard library.
@@ -687,7 +689,7 @@ Or ensuring all elements adhere to a condition:
 Some additional suggestions include `flatten`, `partition`, `fold`, `any`,
 `find`, `max`, `min`, etc...
 
-#### Schema Support
+### Schema Support
 
 Once [schema support][] lands, writing iterators can become less verbose.
 
@@ -711,7 +713,7 @@ Can be written as follows, when applying the correct schema:
 Because a type schema could guarantee the compiler that `.ips` is an array, with
 only string items.
 
-#### Pipeline Operator Support
+### Pipeline Operator Support
 
 Once the [pipeline operations][] land, we can further expand the above example
 as follows:
@@ -720,7 +722,7 @@ as follows:
 .private_and_public_ips = filter(.ip) |_, ip| is_ip(ip) |> partition() |_, ip| starts_with(ip, "180.14")
 ```
 
-#### Dynamic Field Assignment Support
+### Dynamic Field Assignment Support
 
 Once [dynamic field assignment][] lands, you can dynamically move fields as
 well:
