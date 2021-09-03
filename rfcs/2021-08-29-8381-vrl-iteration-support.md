@@ -27,7 +27,6 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 * [Drawbacks](#drawbacks)
 * [Prior Art](#prior-art)
 * [Alternatives](#alternatives)
-  * [Closure Syntax](#closure-syntax)
   * [For-Loop](#for-loop)
 * [Outstanding Questions](#outstanding-questions)
 * [Plan Of Attack](#plan-of-attack)
