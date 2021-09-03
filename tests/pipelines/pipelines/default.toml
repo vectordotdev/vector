@@ -1,0 +1,13 @@
+[transforms.first]
+type = "remap"
+inputs = ["in"]
+source = """
+.went_though_first_transform = true
+"""
+[transforms.second]
+type = "remap"
+inputs = ["first"]
+outputs = ["stdout"]
+source = """
+.went_though_second_transform = true
+"""

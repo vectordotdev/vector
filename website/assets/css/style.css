@@ -30,6 +30,17 @@
   }
 }
 
+.hover\:underline {
+  border-bottom: 1px solid transparent;
+}
+
+@variants hover {
+  .underline {
+    text-decoration: none;
+    border-bottom: 1px solid #f44af5;
+  }
+}
+
 [x-cloak] {
   display: none !important;
 }
@@ -276,4 +287,8 @@
   margin-right: 0.4em;
   padding-bottom: 1px;
   width: 20px;
+}
+
+footer ion-icon[name="logo-github"]:hover {
+  @apply dark:text-gray-500
 }

@@ -136,6 +136,7 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(feature = "api-client")]
                         SubCommand::Tap(t) => tap::cmd(&t).await,
+
                         SubCommand::Validate(v) => validate::validate(&v, color).await,
                         #[cfg(feature = "vrl-cli")]
                         SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),

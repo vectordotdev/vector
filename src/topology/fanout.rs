@@ -1,4 +1,4 @@
-use crate::config::ComponentId;
+use crate::config::ComponentKey;
 use crate::event::Event;
 use futures::{channel::mpsc, future, stream::Fuse, Sink, Stream, StreamExt};
 use std::{
@@ -10,10 +10,10 @@ use std::{
 pub type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
 
 pub enum ControlMessage {
-    Add(ComponentId, RouterSink),
-    Remove(ComponentId),
+    Add(ComponentKey, RouterSink),
+    Remove(ComponentKey),
     /// Will stop accepting events until Some with given id is replaced.
-    Replace(ComponentId, Option<RouterSink>),
+    Replace(ComponentKey, Option<RouterSink>),
 }
 
 impl fmt::Debug for ControlMessage {
@@ -30,7 +30,7 @@ impl fmt::Debug for ControlMessage {
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
-    sinks: Vec<(ComponentId, Option<Pin<RouterSink>>)>,
+    sinks: Vec<(ComponentKey, Option<Pin<RouterSink>>)>,
     i: usize,
     control_channel: Fuse<mpsc::UnboundedReceiver<ControlMessage>>,
 }
@@ -48,7 +48,7 @@ impl Fanout {
         (fanout, control_tx)
     }
 
-    pub fn add(&mut self, id: ComponentId, sink: RouterSink) {
+    pub fn add(&mut self, id: ComponentKey, sink: RouterSink) {
         assert!(
             !self.sinks.iter().any(|(n, _)| n == &id),
             "Duplicate output id in fanout"
@@ -57,7 +57,7 @@ impl Fanout {
         self.sinks.push((id, Some(sink.into())));
     }
 
-    fn remove(&mut self, id: &ComponentId) {
+    fn remove(&mut self, id: &ComponentKey) {
         let i = self.sinks.iter().position(|(n, _)| n == id);
         let i = i.expect("Didn't find output in fanout");
 
@@ -72,7 +72,7 @@ impl Fanout {
         }
     }
 
-    fn replace(&mut self, id: ComponentId, sink: Option<RouterSink>) {
+    fn replace(&mut self, id: ComponentKey, sink: Option<RouterSink>) {
         if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &id) {
             *existing = sink.map(Into::into);
         } else {
@@ -192,7 +192,7 @@ impl Sink<Event> for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::{config::ComponentId, event::Event, test_util::collect_ready};
+    use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
     use futures::{channel::mpsc, stream, FutureExt, Sink, SinkExt, StreamExt};
     use std::{
         pin::Pin,
@@ -209,8 +209,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a);
-        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), tx_a);
+        fanout.add(ComponentKey::from("b"), tx_b);
 
         let recs = make_events(2);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -231,9 +231,9 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a);
-        fanout.add(ComponentId::from("b"), tx_b);
-        fanout.add(ComponentId::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), tx_a);
+        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -260,8 +260,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a);
-        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), tx_a);
+        fanout.add(ComponentKey::from("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -270,7 +270,7 @@ mod tests {
 
         let (tx_c, rx_c) = mpsc::unbounded();
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
-        fanout.add(ComponentId::from("c"), tx_c);
+        fanout.add(ComponentKey::from("c"), tx_c);
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -288,8 +288,8 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a);
-        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), tx_a);
+        fanout.add(ComponentKey::from("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -297,7 +297,7 @@ mod tests {
         fanout.send(recs[1].clone()).await.unwrap();
 
         fanout_control
-            .send(ControlMessage::Remove(ComponentId::from("b")))
+            .send(ControlMessage::Remove(ComponentKey::from("b")))
             .await
             .unwrap();
 
@@ -318,9 +318,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a);
-        fanout.add(ComponentId::from("b"), tx_b);
-        fanout.add(ComponentId::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), tx_a);
+        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -329,7 +329,7 @@ mod tests {
         sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
         fanout_control
-            .send(ControlMessage::Remove(ComponentId::from("c")))
+            .send(ControlMessage::Remove(ComponentKey::from("c")))
             .await
             .unwrap();
 
@@ -353,9 +353,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a);
-        fanout.add(ComponentId::from("b"), tx_b);
-        fanout.add(ComponentId::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), tx_a);
+        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -364,7 +364,7 @@ mod tests {
         sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
         fanout_control
-            .send(ControlMessage::Remove(ComponentId::from("b")))
+            .send(ControlMessage::Remove(ComponentKey::from("b")))
             .await
             .unwrap();
 
@@ -388,9 +388,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a);
-        fanout.add(ComponentId::from("b"), tx_b);
-        fanout.add(ComponentId::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), tx_a);
+        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("c"), tx_c);
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -400,7 +400,7 @@ mod tests {
         // The send_all task will be blocked on sending rec1 because of b right now.
 
         fanout_control
-            .send(ControlMessage::Remove(ComponentId::from("a")))
+            .send(ControlMessage::Remove(ComponentKey::from("a")))
             .await
             .unwrap();
 
@@ -432,8 +432,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a1);
-        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), tx_a1);
+        fanout.add(ComponentKey::from("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -442,7 +442,7 @@ mod tests {
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
-        fanout.replace(ComponentId::from("a"), Some(tx_a2));
+        fanout.replace(ComponentKey::from("a"), Some(tx_a2));
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -460,8 +460,8 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentId::from("a"), tx_a1);
-        fanout.add(ComponentId::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), tx_a1);
+        fanout.add(ComponentKey::from("b"), tx_b);
 
         let recs = make_events(3);
 
@@ -470,13 +470,16 @@ mod tests {
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
-        fanout.replace(ComponentId::from("a"), None);
+        fanout.replace(ComponentKey::from("a"), None);
 
         futures::join!(
             async {
                 sleep(Duration::from_millis(100)).await;
                 fanout_control
-                    .send(ControlMessage::Replace(ComponentId::from("a"), Some(tx_a2)))
+                    .send(ControlMessage::Replace(
+                        ComponentKey::from("a"),
+                        Some(tx_a2),
+                    ))
                     .await
                     .unwrap();
             },
@@ -533,7 +536,7 @@ mod tests {
         let mut rx_channels = vec![];
 
         for (i, mode) in modes.iter().enumerate() {
-            let id = ComponentId::from(format!("{}", i));
+            let id = ComponentKey::from(format!("{}", i));
             match *mode {
                 Some(when) => {
                     let tx = AlwaysErrors { when };

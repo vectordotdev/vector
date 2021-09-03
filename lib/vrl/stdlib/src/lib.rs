@@ -50,8 +50,6 @@ mod format_int;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
-#[cfg(feature = "get_enrichment_table_record")]
-mod get_enrichment_table_record;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
@@ -226,6 +224,8 @@ mod to_timestamp;
 mod to_unix_timestamp;
 #[cfg(feature = "truncate")]
 mod truncate;
+#[cfg(feature = "unique")]
+mod unique;
 #[cfg(feature = "unnest")]
 mod unnest;
 #[cfg(feature = "upcase")]
@@ -289,8 +289,6 @@ pub use format_int::FormatInt;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
-#[cfg(feature = "get_enrichment_table_record")]
-pub use get_enrichment_table_record::GetEnrichmentTableRecord;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
@@ -455,6 +453,8 @@ pub use to_timestamp::ToTimestamp;
 pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
+#[cfg(feature = "unique")]
+pub use unique::Unique;
 #[cfg(feature = "unnest")]
 pub use unnest::Unnest;
 #[cfg(feature = "upcase")]
@@ -502,8 +502,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
-        #[cfg(feature = "get_enrichment_table_record")]
-        Box::new(GetEnrichmentTableRecord),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "float")]
@@ -692,6 +690,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToUnixTimestamp),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
+        #[cfg(feature = "unique")]
+        Box::new(Unique),
         #[cfg(feature = "unnest")]
         Box::new(Unnest),
         #[cfg(feature = "upcase")]

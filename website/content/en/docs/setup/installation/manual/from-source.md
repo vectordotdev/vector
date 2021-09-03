@@ -102,7 +102,7 @@ Start Vector. After these steps, a binary `vector.exe` in `target\release` would
 
 ### Docker
 
-You can build statically linked binaries of Vector for Linux using Docker. If you do so, the dependencies listed in the previous section aren't needed, as all of them would be automatically pulled by Docker.
+You can build statically linked binaries of Vector for Linux using [`cross`][] in Docker. If you do so, the dependencies listed in the previous section aren't needed, as all of them would be automatically pulled by Docker.
 
 First, download Vector's source:
 
@@ -118,17 +118,19 @@ mkdir -p vector && \
   tar xzf - -C vector --strip-components=1
 ```
 
-Then build Vector using Docker:
+Second, [install cross][cross].
+
+And then build Vector using [`cross`][]:
 
 ```shell
 # Linux (x86_64)
-PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
+PASS_FEATURES=default-cmake make package-x86_64-unknown-linux-musl-all
 
 # Linux (ARM64)
-PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
+PASS_FEATURES=default-cmake make package-aarch64-unknown-linux-musl-all
 
 # Linux (ARMv7)
-PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
+PASS_FEATURES=default-cmake make package-armv7-unknown-linux-muslueabihf-all
 ```
 
 The command above builds a Docker image with a Rust toolchain for a Linux target for the corresponding architecture using `musl` as the C library, then starts a container from this image, and then builds inside the container. The target binary is located at `target/<target triple>/release/vector` as in the previous case.
@@ -255,7 +257,6 @@ Name | Description
 | `transforms-sample`                                  | Enables building the [`sample` transform](/docs/reference/configuration/transforms/sample)
 | `transforms-route`                                   | Enables building the [`route` transform](/docs/reference/configuration/transforms/route)
 | `transforms-tag_cardinality_limit`                   | Enables building the [`tag_cardinality_limit` transform](/docs/reference/configuration/transforms/tag_cardinality_limit)
-| `transforms-wasm`                                    | Enables building the [`wasm` transform](/docs/reference/configuration/transforms/wasm)
 | `sinks-aws_cloudwatch_logs`                          | Enables building the [`aws_cloudwatch_logs` sink](/docs/reference/configuration/sinks/aws_cloudwatch_logs)
 | `sinks-aws_cloudwatch_metrics`                       | Enables building the [`aws_cloudwatch_metrics` sink](/docs/reference/configuration/sinks/aws_cloudwatch_metrics)
 | `sinks-aws_kinesis_firehose`                         | Enables building the [`aws_kinesis_firehose` sink](/docs/reference/configuration/sinks/aws_kinesis_firehose)
@@ -295,6 +296,7 @@ Name | Description
 
 [buffer]: /docs/reference/glossary/#buffer
 [configuration]: /docs/reference/configuration
+[cross]: https://github.com/rust-embedded/cross
 [data_dir]: /docs/reference/configuration/global-options/#data_dir
 [docker_logs]: /docs/reference/configuration/sources/docker_logs
 [jemalloc]: https://github.com/jemalloc/jemalloc

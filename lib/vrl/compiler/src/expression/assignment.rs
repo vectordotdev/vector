@@ -21,7 +21,7 @@ impl Assignment {
     ) -> Result<Self, Error> {
         let (span, variant) = node.take();
 
-        match variant {
+        let variant = match variant {
             Variant::Single { target, expr } => {
                 let target_span = target.span();
                 let expr_span = expr.span();
@@ -60,12 +60,10 @@ impl Assignment {
 
                 target.insert_type_def(state, type_def, value);
 
-                let variant = Variant::Single {
+                Variant::Single {
                     target,
                     expr: Box::new(expr),
-                };
-
-                Ok(Self { variant })
+                }
             }
 
             Variant::Infallible { ok, err, expr, .. } => {
@@ -125,16 +123,16 @@ impl Assignment {
 
                 err.insert_type_def(state, type_def, None);
 
-                let variant = Variant::Infallible {
+                Variant::Infallible {
                     ok,
                     err,
                     expr: Box::new(expr),
                     default,
-                };
-
-                Ok(Self { variant })
+                }
             }
-        }
+        };
+
+        Ok(Self { variant })
     }
 
     pub(crate) fn noop() -> Self {

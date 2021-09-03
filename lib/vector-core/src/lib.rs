@@ -24,7 +24,6 @@
 #[cfg(feature = "api")]
 pub mod api;
 pub mod config;
-pub mod enrichment;
 pub mod event;
 pub mod mapping;
 pub mod metrics;
@@ -35,7 +34,10 @@ mod test_util;
 pub mod transform;
 pub use buffers;
 mod byte_size_of;
+pub mod partition;
 pub mod serde;
+pub mod stream;
+pub mod time;
 
 pub use byte_size_of::ByteSizeOf;
 use std::path::PathBuf;

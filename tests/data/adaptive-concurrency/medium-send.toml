@@ -18,7 +18,7 @@ mode = [4, 5]
 mean = [4.0, 4.5]
 
 [controller.concurrency_limit]
-max = [8, 8]
+max = [9, 9]
 
 [controller.observed_rtt]
 min = [0.100, 0.102]
