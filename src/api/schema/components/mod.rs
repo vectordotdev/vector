@@ -459,7 +459,7 @@ mod tests {
         let expectations = ["devnull", "gen1", "gen2", "gen3", "parse_json"];
 
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_key().to_string(), *component_id);
+            assert_eq!(components[i].get_component_key().id(), *component_id);
         }
     }
 
@@ -475,7 +475,7 @@ mod tests {
         let expectations = ["parse_json", "gen3", "gen2", "gen1", "devnull"];
 
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_key().to_string(), *component_id);
+            assert_eq!(components[i].get_component_key().id(), *component_id);
         }
     }
 
@@ -533,7 +533,7 @@ mod tests {
 
         let expectations = ["d", "e", "f", "g", "c", "a", "b"];
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_key().to_string(), *component_id);
+            assert_eq!(components[i].get_component_key().id(), *component_id);
         }
     }
 }

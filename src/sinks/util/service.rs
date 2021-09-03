@@ -61,14 +61,13 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
-    #[serde(default)]
-    #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
+    #[serde(default, skip_serializing_if = "ConcurrencyOption::is_none")]
     pub concurrency: T, // 1024
     /// The same as concurrency but with old deprecated name.
     /// Alias couldn't be used because of <https://github.com/serde-rs/serde/issues/1504>
-    #[serde(default)]
-    #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
+    #[serde(default, skip_serializing_if = "ConcurrencyOption::is_none")]
     pub in_flight_limit: T, // 1024
     pub timeout_secs: Option<u64>,             // 1 minute
     pub rate_limit_duration_secs: Option<u64>, // 1 second

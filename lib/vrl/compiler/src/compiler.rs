@@ -42,10 +42,6 @@ impl<'a> Compiler<'a> {
             expressions,
             fallible: self.fallible,
             abortable: self.abortable,
-            enrichment_tables: self
-                .state
-                .get_enrichment_tables()
-                .map(|table| table.as_readonly()),
         })
     }
 
@@ -365,7 +361,12 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_variable(&mut self, node: Node<ast::Ident>) -> Variable {
-        Variable::new(node.into_inner(), self.state)
+        let (span, ident) = node.take();
+
+        Variable::new(span, ident.clone(), self.state).unwrap_or_else(|err| {
+            self.errors.push(Box::new(err));
+            Variable::noop(ident)
+        })
     }
 
     fn compile_unary(&mut self, node: Node<ast::Unary>) -> Unary {
