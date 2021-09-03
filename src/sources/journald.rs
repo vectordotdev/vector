@@ -58,7 +58,12 @@ enum BuildError {
     #[snafu(display("Cannot use both `units` and `include_units`"))]
     BothUnitsAndIncludeUnits,
     #[snafu(display(
-        "The Journal field/value pair {:?}:{:?} is duplicated in both include_matches and exclude_matches (or include_units and exclude_units).",
+        "The unit {:?} is duplicated in both include_units and exclude_units",
+        unit
+    ))]
+    DuplicatedUnit { unit: String },
+    #[snafu(display(
+        "The Journal field/value pair {:?}:{:?} is duplicated in both include_matches and exclude_matches.",
         field,
         value,
     ))]
@@ -132,6 +137,15 @@ impl SourceConfig for JournaldConfig {
             .globals
             // source are only global, name can be used for subdir
             .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.id.as_str())?;
+
+        if let Some(unit) = self
+            .include_units
+            .iter()
+            .find(|unit| self.exclude_units.contains(unit))
+        {
+            let unit = unit.into();
+            return Err(BuildError::DuplicatedUnit { unit }.into());
+        }
 
         let include_matches = self.merged_include_matches()?;
         let exclude_matches = self.merged_exclude_matches();
