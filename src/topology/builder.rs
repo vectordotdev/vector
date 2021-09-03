@@ -272,9 +272,8 @@ pub async fn build_pieces(
 
         let task = Task::new(id.clone(), typetag, sink);
 
-        let component_name = id.to_string();
-        let component_id = id.id().to_string();
-        let component_scope = id.scope().to_string();
+        // to avoid lifecycle issues
+        let component_id = id.clone();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -290,10 +289,10 @@ pub async fn build_pieces(
                                 %error,
                                 component_kind = "sink",
                                 component_type = typetag,
-                                %component_id,
-                                %component_scope,
+                                component_id = ?component_id.id(),
+                                component_scope = ?component_id.scope(),
                                 // maintained for compatibility
-                                %component_name,
+                                component_name = ?component_id.id(),
                             );
                             Err(())
                         }
@@ -302,10 +301,10 @@ pub async fn build_pieces(
                                 msg = "Healthcheck: timeout.",
                                 component_kind = "sink",
                                 component_type = typetag,
-                                %component_id,
-                                %component_scope,
+                                component_id = ?component_id.id(),
+                                component_scope = ?component_id.scope(),
                                 // maintained for compatibility
-                                %component_name,
+                                component_name = ?component_id.id(),
                             );
                             Err(())
                         }
