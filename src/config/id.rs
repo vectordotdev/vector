@@ -7,7 +7,7 @@ use std::{
     fmt,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ComponentScope {
     Global,
     Pipeline(String),
@@ -120,7 +120,11 @@ impl Serialize for ComponentId {
 
 impl Ord for ComponentId {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
+        if self.scope == other.scope {
+            self.id.cmp(&other.id)
+        } else {
+            self.scope.cmp(&other.scope)
+        }
     }
 }
 
@@ -179,5 +183,16 @@ mod tests {
         assert_eq!(item.id(), "bar");
         assert_eq!(item.scope, ComponentScope::Pipeline("foo".into()));
         assert_eq!(item.to_string(), "foo.bar");
+    }
+
+    #[test]
+    fn ordering() {
+        let global_baz = ComponentId::from("baz");
+        let yolo_bar = ComponentId::from("yolo.bar");
+        let foo_bar = ComponentId::from("foo.bar");
+        let foo_baz = ComponentId::from("foo.baz");
+        let mut list = vec![&foo_baz, &yolo_bar, &global_baz, &foo_bar];
+        list.sort();
+        assert_eq!(list, vec![&global_baz, &foo_bar, &foo_baz, &yolo_bar]);
     }
 }
