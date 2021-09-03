@@ -26,7 +26,7 @@ use vector_core::event::EventStatus;
 use vector_core::event::{Event, EventFinalizers, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
-use vector_core::stream::batcher::{Batcher, BatcherTimer};
+use vector_core::stream::batcher::Batcher;
 
 mod builder;
 mod errors;
@@ -101,9 +101,9 @@ struct EventPartitioner {}
 
 impl Partitioner for EventPartitioner {
     type Item = Event;
-    type Key = Arc<str>;
+    type Key = Option<Arc<str>>;
 
-    fn partition(&self, item: &Self::Item) -> Option<Self::Key> {
+    fn partition(&self, item: &Self::Item) -> Self::Key {
         item.metadata().datadog_api_key().clone()
     }
 }
@@ -267,7 +267,7 @@ where
             Batcher::new(
                 input,
                 EventPartitioner::default(),
-                BatcherTimer::new(self.timeout),
+                self.timeout,
                 NonZeroUsize::new(MAX_PAYLOAD_ARRAY).unwrap(),
                 None,
             )
