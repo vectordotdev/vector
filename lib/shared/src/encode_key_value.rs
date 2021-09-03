@@ -21,6 +21,12 @@ impl Error for EncodingError {
     }
 }
 
+/// Encodes input to key value format with specified
+/// delimiters in field order where unspecified fields
+/// will follow after them. Flattens_boolean values
+/// to only a key if true.
+///
+/// Fails if V contains non String map keys.
 pub fn to_string<V: Serialize>(
     input: BTreeMap<String, V>,
     fields_order: &[String],
@@ -515,6 +521,7 @@ impl<'a> SerializeMap for KeyedKeyValueSerializer<'a> {
 mod tests {
     use super::*;
     use crate::btreemap;
+    use serde::*;
     use serde_json::{json, Value};
 
     #[test]
@@ -725,5 +732,25 @@ mod tests {
             .unwrap(),
             "event=log log.file.path=encode_key_value.rs agent.name=vector"
         )
+    }
+
+    #[test]
+    fn non_string_keys() {
+        #[derive(Serialize)]
+        struct IntegerMap(BTreeMap<i32, String>);
+
+        assert!(&to_string::<IntegerMap>(
+            btreemap! {
+                "inner_map" => IntegerMap(btreemap!{
+                    0 => "Hello",
+                    1 => "World"
+                })
+            },
+            &[],
+            "=",
+            " ",
+            true
+        )
+        .is_err())
     }
 }
