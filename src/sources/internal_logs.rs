@@ -100,7 +100,7 @@ mod tests {
     #[tokio::test]
     async fn receives_logs() {
         let start = chrono::Utc::now();
-        trace::init(false, false, "debug", false);
+        trace::init(false, false, "debug");
         trace::reset_early_buffer();
         error!(message = "Before source started.");
 
