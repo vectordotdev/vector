@@ -15,6 +15,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     http::{Auth, HttpClient, MaybeAuth},
+    internal_events::{LokiEventUnlabeled, LokiEventsProcessed, TemplateRenderingFailed},
     sinks::util::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -188,12 +189,12 @@ impl HttpSink for LokiSink {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let tenant_id = self.tenant_id.as_ref().and_then(|t| {
             t.render_string(&event)
-                .map_err(|missing| {
-                    error!(
-                        message = "Error rendering `tenant_id` template.",
-                        ?missing,
-                        internal_log_rate_secs = 30
-                    );
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("tenant_id"),
+                        drop_event: false,
+                    })
                 })
                 .ok()
         });
@@ -243,6 +244,7 @@ impl HttpSink for LokiSink {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
+            emit!(LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -264,6 +266,10 @@ impl HttpSink for LokiSink {
         let tenant_id = key.tenant_id;
 
         let body = serde_json::to_vec(&json).unwrap();
+
+        emit!(LokiEventsProcessed {
+            byte_size: body.len(),
+        });
 
         let uri = format!("{}loki/api/v1/push", self.endpoint.uri);
 
