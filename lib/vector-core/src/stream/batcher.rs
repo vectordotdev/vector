@@ -360,8 +360,9 @@ mod test {
     use crate::partition::Partitioner;
     use crate::stream::batcher::{Batcher, ExpirationQueue};
     use crate::time::KeyedTimer;
+    use futures::future::poll_fn;
     use futures::task::noop_waker;
-    use futures::{stream, Stream};
+    use futures::{stream, FutureExt, Stream};
     use pin_project::pin_project;
     use proptest::prelude::*;
     use std::collections::{HashMap, HashSet};
@@ -369,6 +370,7 @@ mod test {
     use std::pin::Pin;
     use std::task::{Context, Poll};
     use std::time::Duration;
+    use tokio::time::advance;
 
     #[derive(Debug)]
     /// A test keyed timer
@@ -637,45 +639,44 @@ mod test {
         }
     }
 
-    // TOBY: This is what I had in mind for testing the concrete
-    // implementation. It's a simple unit test and if it behaves like the
-    // test-variant of KeyedTimer then the whole setup works, or at least we
-    // have better confidence of that. Currently crashes, complaining about no
-    // reactor running hence the unfinished nature. Considering that we need to
-    // pass an explicit context through to poll I've left this as merely a
-    // sketch. Hopefully you had a notion here.
-    #[test]
-    fn expiration_queue_impl_keyed_timer() {
+    // WIP: this currently won't run because we're pointed to a git checkout of tokio-util, which
+    // uses a path-based dependency on tokio; since we use versioned tokio, this creates a mismatch
+    // between the thread-local variables/globals that the timer code uses to find the current
+    // runtime, and as such, `DelayQueue` will never find the right runtime
+    //
+    // we need to get tokio-util 0.6.8 released
+    #[tokio::test(start_paused = true)]
+    async fn expiration_queue_impl_keyed_timer() {
         // Asserts that ExpirationQueue properly implements KeyedTimer. We are
         // primarily concerned with whether expiration is properly observed.
         let timeout = Duration::from_millis(100); // 1/10 of a second, an
                                                   // eternity
-        let waker = noop_waker();
-        let mut cx = Context::from_waker(&waker);
+
         let mut expiration_queue: ExpirationQueue<u8> = ExpirationQueue::new(timeout);
 
         // If the queue is empty assert that when we poll for expired entries
         // nothing comes back.
         assert_eq!(0, expiration_queue.len());
-        assert!(matches!(
-            expiration_queue.poll_expired(&mut cx),
-            Poll::Ready(None)
-        ));
+        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
+        assert!(matches!(result, Some(None)));
 
         // Insert an item key into the queue. Assert that the size of the queue
-        // has grown, sleep for longer than the timeout and poll for the expired
-        // key. It's tempting to immediately poll here but that risks a race
-        // condition.
+        // has grown, assert that the queue still does not believe the item has expired, and _then_
+        // advance time enough to allow it to expire, and assert that it has.
         expiration_queue.insert(128);
         assert_eq!(1, expiration_queue.len());
-        // TODO add sleeping, then poll for expiration after the nap
+
+        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
+        assert!(matches!(result, Some(None)));
+
+        advance(timeout + Duration::from_nanos(1)).await;
+        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
+        assert!(matches!(result, Some(Some(128))));
 
         // Now we poll assured that the queue has emptied out again.
         assert_eq!(0, expiration_queue.len());
-        assert!(matches!(
-            expiration_queue.poll_expired(&mut cx),
-            Poll::Ready(None)
-        ));
+        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
+        assert!(matches!(result, Some(None)));
 
         // Finally, blitz a handful of items into the queue, assert its size,
         // clear the queue and assert it as being empty.
@@ -685,9 +686,7 @@ mod test {
         assert_eq!(3, expiration_queue.len());
         expiration_queue.clear();
         assert_eq!(0, expiration_queue.len());
-        assert!(matches!(
-            expiration_queue.poll_expired(&mut cx),
-            Poll::Ready(None)
-        ));
+        let result = poll_fn(|cx| expiration_queue.poll_expired(cx)).now_or_never();
+        assert!(matches!(result, Some(None)));
     }
 }
