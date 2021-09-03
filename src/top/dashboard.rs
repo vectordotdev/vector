@@ -148,8 +148,8 @@ impl<'a> Widgets<'a> {
         // Data columns
         let items = state.iter().map(|(_, r)| {
             let mut data = vec![
-                r.id.id().to_string(),
-                r.id.pipeline_str().unwrap_or_default().into(),
+                r.key.id().to_string(),
+                r.key.pipeline_str().unwrap_or_default().into(),
                 r.kind.clone(),
                 r.component_type.clone(),
             ];

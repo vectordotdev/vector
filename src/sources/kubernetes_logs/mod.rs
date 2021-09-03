@@ -14,7 +14,7 @@ use crate::kubernetes as k8s;
 use crate::kubernetes::hash_value::HashKey;
 use crate::{
     config::{
-        ComponentId, DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig,
+        ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig,
         SourceContext, SourceDescription,
     },
     shutdown::ShutdownSignal,
@@ -205,7 +205,7 @@ impl Source {
     fn new(
         config: &Config,
         globals: &GlobalOptions,
-        id: &ComponentId,
+        id: &ComponentKey,
         proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;

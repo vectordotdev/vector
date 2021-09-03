@@ -918,7 +918,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "COMPONENT_ID"
+              "name": "COMPONENT_KEY"
             },
             {
               "deprecationReason": null,
@@ -3279,9 +3279,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Gets a configured component by component_id",
+              "description": "Gets a configured component by component_key",
               "isDeprecated": false,
-              "name": "componentByComponentId",
+              "name": "componentByComponentKey",
               "type": {
                 "kind": "INTERFACE",
                 "name": "Component",
@@ -3714,7 +3714,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "COMPONENT_ID"
+              "name": "COMPONENT_KEY"
             },
             {
               "deprecationReason": null,
@@ -4232,7 +4232,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "COMPONENT_ID"
+              "name": "COMPONENT_KEY"
             },
             {
               "deprecationReason": null,
@@ -5686,7 +5686,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "COMPONENT_ID"
+              "name": "COMPONENT_KEY"
             },
             {
               "deprecationReason": null,

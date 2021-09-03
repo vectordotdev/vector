@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, pipeline::Pipelines, ComponentId, DataType, Resource};
+use super::{builder::ConfigBuilder, pipeline::Pipelines, ComponentKey, DataType, Resource};
 use std::collections::HashMap;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -47,31 +47,31 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     // Helper for below
     fn tagged<'a>(
         tag: &'static str,
-        iter: impl Iterator<Item = &'a ComponentId>,
-    ) -> impl Iterator<Item = (&'static str, &'a ComponentId)> {
+        iter: impl Iterator<Item = &'a ComponentKey>,
+    ) -> impl Iterator<Item = (&'static str, &'a ComponentKey)> {
         iter.map(move |x| (tag, x))
     }
 
     // Check for non-unique names across sources, sinks, and transforms
-    let mut id_uses = HashMap::<&ComponentId, Vec<&'static str>>::new();
+    let mut used_keys = HashMap::<&ComponentKey, Vec<&'static str>>::new();
     for (ctype, id) in tagged("source", config.sources.keys())
         .chain(tagged("transform", config.transforms.keys()))
         .chain(tagged("sink", config.sinks.keys()))
     {
-        let uses = id_uses.entry(id).or_default();
+        let uses = used_keys.entry(id).or_default();
         uses.push(ctype);
     }
 
-    for component_id in id_uses.keys() {
-        if component_id.id().contains('.') {
+    for component_key in used_keys.keys() {
+        if component_key.id().contains('.') {
             errors.push(format!(
                 "Component name \"{}\" should not contain a \".\"",
-                component_id.id()
+                component_key.id()
             ));
         }
     }
 
-    for (id, uses) in id_uses.into_iter().filter(|(_id, uses)| uses.len() > 1) {
+    for (id, uses) in used_keys.into_iter().filter(|(_id, uses)| uses.len() > 1) {
         errors.push(format!(
             "More than one component with name \"{}\" ({}).",
             id,
@@ -83,17 +83,17 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let sink_inputs = config
         .sinks
         .iter()
-        .map(|(id, sink)| ("sink", id.clone(), sink.inputs.clone()));
+        .map(|(key, sink)| ("sink", key.clone(), sink.inputs.clone()));
     let transform_inputs = config
         .transforms
         .iter()
-        .map(|(id, transform)| ("transform", id.clone(), transform.inputs.clone()));
-    for (output_type, id, inputs) in sink_inputs.chain(transform_inputs) {
+        .map(|(key, transform)| ("transform", key.clone(), transform.inputs.clone()));
+    for (output_type, key, inputs) in sink_inputs.chain(transform_inputs) {
         if inputs.is_empty() {
             errors.push(format!(
                 "{} \"{}\" has no inputs",
                 capitalize(output_type),
-                id
+                key
             ));
         }
 
@@ -101,7 +101,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
                 errors.push(format!(
                     "Input \"{}\" for {} \"{}\" doesn't exist.",
-                    input, output_type, id
+                    input, output_type, key
                 ));
             }
         }
@@ -182,30 +182,30 @@ enum Node {
     Transform {
         in_ty: DataType,
         out_ty: DataType,
-        inputs: Vec<ComponentId>,
+        inputs: Vec<ComponentKey>,
     },
     Sink {
         ty: DataType,
-        inputs: Vec<ComponentId>,
+        inputs: Vec<ComponentKey>,
     },
 }
 
 #[derive(Default)]
 struct Graph {
-    nodes: HashMap<ComponentId, Node>,
+    nodes: HashMap<ComponentKey, Node>,
 }
 
 impl Graph {
-    fn add_source<I: Into<ComponentId>>(&mut self, id: I, ty: DataType) {
+    fn add_source<I: Into<ComponentKey>>(&mut self, id: I, ty: DataType) {
         self.nodes.insert(id.into(), Node::Source { ty });
     }
 
-    fn add_transform<I: Into<ComponentId>>(
+    fn add_transform<I: Into<ComponentKey>>(
         &mut self,
         id: I,
         in_ty: DataType,
         out_ty: DataType,
-        inputs: Vec<impl Into<ComponentId>>,
+        inputs: Vec<impl Into<ComponentKey>>,
     ) {
         let inputs = self.clean_inputs(inputs);
         self.nodes.insert(
@@ -218,17 +218,17 @@ impl Graph {
         );
     }
 
-    fn add_sink<I: Into<ComponentId>>(
+    fn add_sink<I: Into<ComponentKey>>(
         &mut self,
         id: I,
         ty: DataType,
-        inputs: Vec<impl Into<ComponentId>>,
+        inputs: Vec<impl Into<ComponentKey>>,
     ) {
         let inputs = self.clean_inputs(inputs);
         self.nodes.insert(id.into(), Node::Sink { ty, inputs });
     }
 
-    fn paths(&self) -> Result<Vec<Vec<ComponentId>>, Vec<String>> {
+    fn paths(&self) -> Result<Vec<Vec<ComponentKey>>, Vec<String>> {
         let mut errors = Vec::new();
 
         let nodes = self
@@ -255,7 +255,7 @@ impl Graph {
         }
     }
 
-    fn clean_inputs(&self, inputs: Vec<impl Into<ComponentId>>) -> Vec<ComponentId> {
+    fn clean_inputs(&self, inputs: Vec<impl Into<ComponentKey>>) -> Vec<ComponentKey> {
         inputs.into_iter().map(Into::into).collect()
     }
 
@@ -322,10 +322,10 @@ impl From<&ConfigBuilder> for Graph {
 }
 
 fn paths_rec(
-    nodes: &HashMap<ComponentId, Node>,
-    node: &ComponentId,
-    mut path: Vec<ComponentId>,
-) -> Result<Vec<Vec<ComponentId>>, String> {
+    nodes: &HashMap<ComponentKey, Node>,
+    node: &ComponentKey,
+    mut path: Vec<ComponentKey>,
+) -> Result<Vec<Vec<ComponentKey>>, String> {
     if let Some(i) = path.iter().position(|p| p == node) {
         let mut segment = path.split_off(i);
         segment.push(node.into());
@@ -378,7 +378,7 @@ mod test {
     #[test]
     fn paths_detects_cycles() {
         let mut graph = Graph::default();
-        graph.add_source(ComponentId::from("in"), DataType::Log);
+        graph.add_source(ComponentKey::from("in"), DataType::Log);
         graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
         graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
         graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
@@ -414,7 +414,7 @@ mod test {
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
         graph.add_transform(
-            ComponentId::from("in"),
+            ComponentKey::from("in"),
             DataType::Log,
             DataType::Log,
             vec!["in"],
