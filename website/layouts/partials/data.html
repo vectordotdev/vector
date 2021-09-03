@@ -92,6 +92,7 @@
             </span>
           </div>
           {{ end }}
+
           {{/* Default value */}}
           {{ range $k, $v := $v.type }}
           {{ with $v.enum }}
@@ -185,6 +186,15 @@
         {{ template "default" . }}
       </div>
       {{ end }}
+      {{ end }}
+
+      {{/* "Relevant when" conditions */}}
+      {{ with .relevant_when }}
+      <div class="mt-2 text-sm flex justify-end">
+        <span>
+          Relevant when: <code>{{ . }}</code>
+        </span>
+      </div>
       {{ end }}
     </div>
     {{ end }}
