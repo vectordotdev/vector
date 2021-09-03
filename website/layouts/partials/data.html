@@ -136,7 +136,7 @@
         </span>
 
         {{ with $v.examples }}
-        {{ template "config-examples" (dict "examples" .) }}
+        {{ template "config-array-examples" (dict "examples" .) }}
         {{ end }}
         {{ end }}
         {{ end }}
@@ -1409,6 +1409,25 @@
 {{ end }}
 
 {{ define "config-examples" }}
+<div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
+  <span class="flex justify-between items-center">
+    <span class="text-sm">
+      Examples
+    </span>
+
+    {{ template "config-toggler" (dict "size" 4) }}
+  </span>
+
+  <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
+    {{ range .examples }}
+    {{ $json := . | jsonify (dict "indent" "  ") }}
+    {{ highlight $json "json" "" }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "config-array-examples" }}
 {{ $json := .examples | jsonify (dict "indent" "  ") }}
 <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
   <span class="flex justify-between items-center">
