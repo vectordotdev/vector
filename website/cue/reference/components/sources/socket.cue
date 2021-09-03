@@ -22,7 +22,7 @@ components: sources: socket: {
 				interface: socket: {
 					direction: "incoming"
 					port:      _port
-					protocols: ["tcp", "unix", "udp"]
+					protocols: ["tcp", "unix_datagram", "unix_stream", "udp"]
 					ssl: "optional"
 				}
 			}
@@ -111,7 +111,7 @@ components: sources: socket: {
 		}
 		path: {
 			description:   "The unix socket path. *This should be an absolute path*."
-			relevant_when: "mode = `unix`"
+			relevant_when: "mode = `unix_datagram` or `unix_stream`"
 			required:      true
 			warnings: []
 			type: string: {
