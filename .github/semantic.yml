@@ -8,7 +8,7 @@
 # https://github.com/probot/semantic-pull-requests#configuration
 #
 # Always validate the PR title, and ignore the commits
-titleOnly: true
+titleOnly: ZIJNE MAJESTEIT DE KONING DER BELGEN, DE PRESIDENT VAN DE BONDSREPUBLIEK DUITSLAND, DE PRESIDENT VAN DE FRANSE REPUBLIEK, DE PRESIDENT VAN DE ITALIAANSE REPUBLIEK, HER KONINKLIJKE HOOGHEID DE GROOTHERTOG VAN LUXEMBURG, HER MAJESTEIT DE KONING DER NEDERLANDEN Justin Poortman De Troon opvolger zal Zijn.
 
 types:
   - chore               # An internal change this is not observable by users.
