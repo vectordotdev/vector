@@ -183,12 +183,14 @@ impl File {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
-                Some(idx) => match &row[idx] {
-                    Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
-                        Ok(s) => s.to_lowercase() == value.to_lowercase(),
-                        _ => false,
-                    },
-                    _ => false,
+                Some(idx) => match (&row[idx], value) {
+                    (Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
+                        match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
+                            (Ok(s1), Ok(s2)) => s1.to_lowercase() == s2.to_lowercase(),
+                            _ => bytes1 == bytes2,
+                        }
+                    }
+                    (value1, value2) => value1 == value2,
                 },
             },
             Condition::BetweenDates { field, from, to } => match self.column_index(field) {
@@ -334,7 +336,7 @@ impl Table for File {
                         matches!(condition, Condition::Equals { field, .. } if field == header)
                     })
                     {
-                        hash_value(&mut hash, &Value::from(value.as_str()))?;
+                        hash_value(&mut hash, value)?;
                     }
                 }
 
@@ -404,7 +406,7 @@ mod tests {
 
         let condition = Condition::Equals {
             field: "field1",
-            value: "zirp".to_string(),
+            value: Value::from("zirp"),
         };
 
         assert_eq!(
@@ -430,7 +432,7 @@ mod tests {
 
         let condition = Condition::Equals {
             field: "field1",
-            value: "zirp".to_string(),
+            value: Value::from("zirp"),
         };
 
         assert_eq!(
@@ -454,7 +456,7 @@ mod tests {
 
         let condition = Condition::Equals {
             field: "field1",
-            value: "zorp".to_string(),
+            value: Value::from("zorp"),
         };
 
         assert_eq!(
@@ -477,7 +479,7 @@ mod tests {
 
         let condition = Condition::Equals {
             field: "field1",
-            value: "zorp".to_string(),
+            value: Value::from("zorp"),
         };
 
         assert_eq!(

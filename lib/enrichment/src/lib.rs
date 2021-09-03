@@ -4,20 +4,20 @@ pub mod tables;
 #[cfg(test)]
 mod test_util;
 
-use std::collections::BTreeMap;
-
 use dyn_clone::DynClone;
+use std::collections::BTreeMap;
+use vrl_core::Value;
 
 pub use tables::{TableRegistry, TableSearch};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Condition<'a> {
     Equals {
         field: &'a str,
-        value: String,
+        value: Value,
     },
     BetweenDates {
         field: &'a str,

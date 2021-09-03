@@ -212,10 +212,10 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
-    use shared::btreemap;
-
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
+    use shared::btreemap;
+    use vrl_core::Value;
 
     #[test]
     fn tables_loaded() {
@@ -259,7 +259,7 @@ mod tests {
                 "dummy1",
                 &[Condition::Equals {
                     field: "thing",
-                    value: "thang".to_string(),
+                    value: Value::from("thang"),
                 }],
                 None
             )
@@ -300,7 +300,7 @@ mod tests {
                 "dummy1",
                 &[Condition::Equals {
                     field: "thing",
-                    value: "thang".to_string(),
+                    value: Value::from("thang"),
                 }],
                 None
             )

@@ -65,7 +65,7 @@ impl ConditionToEvaluate {
         Ok(match self {
             Self::Equals { field, value } => Condition::Equals {
                 field: field.as_ref(),
-                value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned(),
+                value: value.resolve(ctx)?,
             },
             Self::BetweenDates { field, from, to } => Condition::BetweenDates {
                 field: field.as_ref(),

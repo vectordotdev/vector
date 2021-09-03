@@ -50,7 +50,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 vec![
                     Condition::Equals {
                         field: "field-0",
-                        value: format!("data-0-{}", (size - 1) / 10 * 10),
+                        value: Value::from(format!("data-0-{}", (size - 1) / 10 * 10)),
                     },
                     Condition::BetweenDates {
                         field: "field-1",
@@ -66,11 +66,11 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 vec![
                     Condition::Equals {
                         field: "field-2",
-                        value: format!("data-2-{}", size - 1),
+                        value: Value::from(format!("data-2-{}", size - 1)),
                     },
                     Condition::Equals {
                         field: "field-9",
-                        value: format!("data-9-{}", size - 1),
+                        value: Value::from(format!("data-9-{}", size - 1)),
                     },
                 ],
                 file.add_index(&["field-2", "field-9"]).unwrap(),
