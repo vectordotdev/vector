@@ -38,6 +38,10 @@ impl ComponentKey {
         self.id.as_str()
     }
 
+    pub fn scope(&self) -> &ComponentScope {
+        &self.scope
+    }
+
     pub fn pipeline_str(&self) -> Option<&str> {
         match self.scope {
             ComponentScope::Pipeline(ref value) => Some(value.as_str()),

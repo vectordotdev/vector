@@ -63,15 +63,15 @@ impl TapPayload {
 /// `Event`s. If these are of type `Event::LogEvent`, they are relayed to the tap client.
 pub struct TapSink {
     tap_tx: TapSender,
-    component_id: ComponentKey,
+    component_key: ComponentKey,
     buffer: VecDeque<LogEvent>,
 }
 
 impl TapSink {
-    pub fn new(tap_tx: TapSender, component_id: ComponentKey) -> Self {
+    pub fn new(tap_tx: TapSender, component_key: ComponentKey) -> Self {
         Self {
             tap_tx,
-            component_id,
+            component_key,
             // Pre-allocate space of 100 events, which matches the default `limit` typically
             // provided to a tap subscription. If there's a higher log volume, this will block
             // until the upstream event handler has processed the event. Generally, there should
@@ -113,13 +113,15 @@ impl Sink<Event> for TapSink {
             // full, return pending to reattempt later.
             match self
                 .tap_tx
-                .try_send(TapPayload::Log(self.component_id.clone(), ev))
+                .try_send(TapPayload::Log(self.component_key.clone(), ev))
             {
                 Err(tokio_mpsc::error::TrySendError::Closed(payload)) => {
                     debug!(
                         message = "Couldn't send log event.",
                         payload = ?payload,
-                        component_id = ?self.component_id);
+                        component_id = ?self.component_key.id(),
+                        component_scope = ?self.component_key.scope(),
+                    );
 
                     break;
                 }
@@ -227,23 +229,23 @@ async fn tap_handler(
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
-                for (component_id, mut control_tx) in outputs.iter() {
+                for (component_key, mut control_tx) in outputs.iter() {
                     match patterns
                         .iter()
-                        .filter(|pattern| pattern.matches_glob(&component_id.to_string()))
+                        .filter(|pattern| pattern.matches_glob(&component_key.to_string()))
                         .collect_vec()
                     {
                         found if !found.is_empty() => {
                             debug!(
                                 message="Component matched.",
-                                ?component_id, ?patterns, matched = ?found
+                                ?component_key, ?patterns, matched = ?found
                             );
 
                             // (Re)connect the sink. This is necessary because a sink may be
                             // reconfigured with the same id as a previous, and we are not
                             // getting involved in config diffing at this point.
                             let sink_id = Uuid::new_v4().to_string();
-                            let sink = TapSink::new(tx.clone(), component_id.clone());
+                            let sink = TapSink::new(tx.clone(), component_key.clone());
 
                             // Attempt to connect the sink.
                             match control_tx
@@ -252,19 +254,19 @@ async fn tap_handler(
                             {
                                 Ok(_) => {
                                     debug!(
-                                        message = "Sink connected.", ?sink_id, ?component_id,
+                                        message = "Sink connected.", ?sink_id, ?component_key,
                                     );
 
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
                                     sinks
-                                        .insert(component_id.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::global(&sink_id)));
+                                        .insert(component_key.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::global(&sink_id)));
                                 }
                                 Err(error) => {
                                     error!(
                                         message = "Couldn't connect sink.",
                                         ?error,
-                                        ?component_id,
+                                        ?component_key,
                                         ?sink_id,
                                     );
                                 }
@@ -274,7 +276,7 @@ async fn tap_handler(
                         }
                         _ => {
                             debug!(
-                                message="Component not matched.", ?component_id, ?patterns
+                                message="Component not matched.", ?component_key, ?patterns
                             );
                         }
                     }

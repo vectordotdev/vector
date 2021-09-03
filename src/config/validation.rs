@@ -53,25 +53,25 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     // Check for non-unique names across sources, sinks, and transforms
-    let mut id_uses = HashMap::<&ComponentKey, Vec<&'static str>>::new();
+    let mut used_keys = HashMap::<&ComponentKey, Vec<&'static str>>::new();
     for (ctype, id) in tagged("source", config.sources.keys())
         .chain(tagged("transform", config.transforms.keys()))
         .chain(tagged("sink", config.sinks.keys()))
     {
-        let uses = id_uses.entry(id).or_default();
+        let uses = used_keys.entry(id).or_default();
         uses.push(ctype);
     }
 
-    for component_id in id_uses.keys() {
-        if component_id.id().contains('.') {
+    for component_key in used_keys.keys() {
+        if component_key.id().contains('.') {
             errors.push(format!(
                 "Component name \"{}\" should not contain a \".\"",
-                component_id.id()
+                component_key.id()
             ));
         }
     }
 
-    for (id, uses) in id_uses.into_iter().filter(|(_id, uses)| uses.len() > 1) {
+    for (id, uses) in used_keys.into_iter().filter(|(_id, uses)| uses.len() > 1) {
         errors.push(format!(
             "More than one component with name \"{}\" ({}).",
             id,
@@ -83,17 +83,17 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let sink_inputs = config
         .sinks
         .iter()
-        .map(|(id, sink)| ("sink", id.clone(), sink.inputs.clone()));
+        .map(|(key, sink)| ("sink", key.clone(), sink.inputs.clone()));
     let transform_inputs = config
         .transforms
         .iter()
-        .map(|(id, transform)| ("transform", id.clone(), transform.inputs.clone()));
-    for (output_type, id, inputs) in sink_inputs.chain(transform_inputs) {
+        .map(|(key, transform)| ("transform", key.clone(), transform.inputs.clone()));
+    for (output_type, key, inputs) in sink_inputs.chain(transform_inputs) {
         if inputs.is_empty() {
             errors.push(format!(
                 "{} \"{}\" has no inputs",
                 capitalize(output_type),
-                id
+                key
             ));
         }
 
@@ -101,7 +101,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
                 errors.push(format!(
                     "Input \"{}\" for {} \"{}\" doesn't exist.",
-                    input, output_type, id
+                    input, output_type, key
                 ));
             }
         }
