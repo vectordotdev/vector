@@ -1,3 +1,4 @@
+use crate::config::ComponentId;
 use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
@@ -41,7 +42,7 @@ impl From<Metric> for EventsOutTotal {
 }
 
 pub struct ComponentEventsOutTotal {
-    component_id: String,
+    component_id: ComponentId,
     metric: Metric,
 }
 
@@ -52,6 +53,7 @@ impl ComponentEventsOutTotal {
         let component_id = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
+        let component_id = ComponentId::from((metric.tag_value("pipeline_id"), component_id));
 
         Self {
             component_id,
@@ -64,7 +66,12 @@ impl ComponentEventsOutTotal {
 impl ComponentEventsOutTotal {
     /// Component id
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.component_id.id()
+    }
+
+    /// Pipeline id
+    async fn pipeline_id(&self) -> Option<&str> {
+        self.component_id.pipeline_str()
     }
 
     /// Total outgoing events metric
@@ -74,13 +81,13 @@ impl ComponentEventsOutTotal {
 }
 
 pub struct ComponentEventsOutThroughput {
-    component_id: String,
+    component_id: ComponentId,
     throughput: i64,
 }
 
 impl ComponentEventsOutThroughput {
     /// Returns a new `ComponentEventsOutThroughput`, set to the provided id/throughput values
-    pub fn new(component_id: String, throughput: i64) -> Self {
+    pub fn new(component_id: ComponentId, throughput: i64) -> Self {
         Self {
             component_id,
             throughput,
@@ -92,7 +99,12 @@ impl ComponentEventsOutThroughput {
 impl ComponentEventsOutThroughput {
     /// Component id
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.component_id.id()
+    }
+
+    /// Pipeline id
+    async fn pipeline_id(&self) -> Option<&str> {
+        self.component_id.pipeline_str()
     }
 
     /// Events processed throughput

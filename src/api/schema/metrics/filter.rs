@@ -148,7 +148,7 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 pub fn by_component_id(component_id: &ComponentId) -> Vec<Metric> {
     capture_metrics(&GLOBAL_CONTROLLER)
         .filter_map(|m| {
-            m.tag_matches("component_id", component_id.as_str())
+            m.tag_matches("component_id", &component_id.to_string())
                 .then(|| m)
         })
         .collect()

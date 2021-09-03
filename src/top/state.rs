@@ -1,7 +1,8 @@
+use crate::config::ComponentId;
 use std::collections::btree_map::BTreeMap;
 use tokio::sync::mpsc;
 
-type IdentifiedMetric = (String, i64);
+type IdentifiedMetric = (ComponentId, i64);
 
 #[derive(Debug)]
 pub enum EventType {
@@ -15,17 +16,17 @@ pub enum EventType {
     /// Interval + identified metric
     ProcessedBytesThroughputs(i64, Vec<IdentifiedMetric>),
     ComponentAdded(ComponentRow),
-    ComponentRemoved(String),
+    ComponentRemoved(ComponentId),
 }
 
-pub type State = BTreeMap<String, ComponentRow>;
+pub type State = BTreeMap<ComponentId, ComponentRow>;
 pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
 pub type StateRx = mpsc::Receiver<State>;
 
 #[derive(Debug, Clone)]
 pub struct ComponentRow {
-    pub id: String,
+    pub id: ComponentId,
     pub kind: String,
     pub component_type: String,
     pub processed_bytes_total: i64,

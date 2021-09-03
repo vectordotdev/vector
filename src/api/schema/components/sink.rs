@@ -43,7 +43,7 @@ impl filter::CustomFilter<Sink> for SinksFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(sink.get_component_id().as_str()))),
+                .all(|f| f.filter_value(&sink.get_component_id().to_string()))),
             self.component_type
                 .as_ref()
                 .map(|f| f.iter().all(|f| f.filter_value(sink.get_component_type())))
@@ -79,7 +79,12 @@ impl sort::SortableByField<SinksSortFieldName> for Sink {
 impl Sink {
     /// Sink component_id
     pub async fn component_id(&self) -> &str {
-        self.get_component_id().as_str()
+        self.get_component_id().id()
+    }
+
+    /// Sink component_id
+    pub async fn pipeline_id(&self) -> Option<&str> {
+        self.get_component_id().pipeline_str()
     }
 
     /// Sink type
@@ -156,7 +161,7 @@ mod tests {
         sort::by_fields(&mut sinks, &fields);
 
         for (i, component_id) in ["db", "webserver", "zip_drive"].iter().enumerate() {
-            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sinks[i].get_component_id().to_string(), *component_id);
         }
     }
 
@@ -170,7 +175,7 @@ mod tests {
         sort::by_fields(&mut sinks, &fields);
 
         for (i, component_id) in ["zip_drive", "webserver", "db"].iter().enumerate() {
-            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sinks[i].get_component_id().to_string(), *component_id);
         }
     }
 
@@ -184,7 +189,7 @@ mod tests {
         sort::by_fields(&mut sinks, &fields);
 
         for (i, component_id) in ["db", "zip_drive", "webserver"].iter().enumerate() {
-            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sinks[i].get_component_id().to_string(), *component_id);
         }
     }
 
@@ -198,7 +203,7 @@ mod tests {
         sort::by_fields(&mut sinks, &fields);
 
         for (i, component_id) in ["webserver", "zip_drive", "db"].iter().enumerate() {
-            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sinks[i].get_component_id().to_string(), *component_id);
         }
     }
 }

@@ -215,7 +215,7 @@ async fn tap_handler(
                 // round of matches when sending notifications.
                 let last_matches = patterns
                     .iter()
-                    .filter(|pattern| sinks.keys().any(|id| pattern.matches_glob(id.as_str())))
+                    .filter(|pattern| sinks.keys().any(|id| pattern.matches_glob(&id.to_string())))
                     .collect::<HashSet<_>>();
 
                 // Cache of matched patterns. A `HashSet` is used here to ignore repetition.
@@ -230,7 +230,7 @@ async fn tap_handler(
                 for (component_id, mut control_tx) in outputs.iter() {
                     match patterns
                         .iter()
-                        .filter(|pattern| pattern.matches_glob(component_id.as_str()))
+                        .filter(|pattern| pattern.matches_glob(&component_id.to_string()))
                         .collect_vec()
                     {
                         found if !found.is_empty() => {
@@ -371,12 +371,12 @@ mod tests {
         for notification in notifications.into_iter() {
             match notification {
                 Some(TapPayload::Notification(returned_id, TapNotification::Matched))
-                    if returned_id.as_str() == pattern_matched =>
+                    if returned_id.to_string() == pattern_matched =>
                 {
                     continue
                 }
                 Some(TapPayload::Notification(returned_id, TapNotification::NotMatched))
-                    if returned_id.as_str() == pattern_not_matched =>
+                    if returned_id.to_string() == pattern_not_matched =>
                 {
                     continue
                 }
@@ -388,7 +388,7 @@ mod tests {
         // to ensure the event handler has been initialized.
         let log_event = Event::new_empty_log();
         let metric_event = Event::from(Metric::new(
-            id.as_str(),
+            id.to_string(),
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         ));

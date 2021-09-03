@@ -1,4 +1,4 @@
-use crate::{enrichment, Expression};
+use crate::Expression;
 use std::iter::IntoIterator;
 use std::ops::Deref;
 
@@ -7,7 +7,6 @@ pub struct Program {
     pub(crate) expressions: Vec<Box<dyn Expression>>,
     pub(crate) fallible: bool,
     pub(crate) abortable: bool,
-    pub(crate) enrichment_tables: Option<Box<dyn enrichment::TableSearch + Send + Sync>>,
 }
 
 impl Program {
@@ -25,12 +24,6 @@ impl Program {
     /// statement in the source.
     pub fn can_abort(&self) -> bool {
         self.abortable
-    }
-
-    pub fn enrichment_tables(&self) -> Option<&(dyn enrichment::TableSearch + Send + Sync)> {
-        self.enrichment_tables
-            .as_ref()
-            .map(|tables| tables.as_ref())
     }
 }
 

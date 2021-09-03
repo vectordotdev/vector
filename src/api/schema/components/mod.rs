@@ -24,6 +24,7 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "component_id", type = "String"),
+    field(name = "pipeline_id", type = "Option<&str>"),
     field(name = "component_type", type = "String")
 )]
 pub enum Component {
@@ -69,7 +70,7 @@ impl filter::CustomFilter<Component> for ComponentsFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(component.get_component_id().as_str()))),
+                .all(|f| f.filter_value(&component.get_component_id().to_string()))),
             self.component_kind.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(component.get_component_kind())))
@@ -207,8 +208,16 @@ impl ComponentsQuery {
     }
 
     /// Gets a configured component by component_id
-    async fn component_by_component_id(&self, component_id: String) -> Option<Component> {
-        let id = ComponentId::from(component_id);
+    async fn component_by_component_id(
+        &self,
+        pipeline_id: Option<String>,
+        component_id: String,
+    ) -> Option<Component> {
+        let id = if let Some(pipeline_id) = pipeline_id {
+            ComponentId::pipeline(&pipeline_id, &component_id)
+        } else {
+            ComponentId::global(&component_id)
+        };
         component_by_component_id(&id)
     }
 }
@@ -450,7 +459,7 @@ mod tests {
         let expectations = ["devnull", "gen1", "gen2", "gen3", "parse_json"];
 
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id().as_str(), *component_id);
+            assert_eq!(components[i].get_component_id().id(), *component_id);
         }
     }
 
@@ -466,7 +475,7 @@ mod tests {
         let expectations = ["parse_json", "gen3", "gen2", "gen1", "devnull"];
 
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id().as_str(), *component_id);
+            assert_eq!(components[i].get_component_id().id(), *component_id);
         }
     }
 
@@ -524,7 +533,7 @@ mod tests {
 
         let expectations = ["d", "e", "f", "g", "c", "a", "b"];
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id().as_str(), *component_id);
+            assert_eq!(components[i].get_component_id().id(), *component_id);
         }
     }
 }
