@@ -156,6 +156,8 @@ Let's take a look at this function in action:
     # Mapping an object requires you to return a two-element array, the first
     # being the string to which the key is set, the second the value of the
     # record.
+    #
+    # This invariant will be checked at compile-time.
     [tag, value]
 }
 
@@ -367,6 +369,9 @@ There are several reasons for rejecting this functionality:
 Instead, the closure-syntax is tied to a function call, and can only be added to
 functions that explicitly expose their ability to take a closure with `x`
 arguments that returns `y` value.
+
+The return type of a closure is checked at compile-time, including the
+requirement in `map` for a two-element array.
 
 #### Lexical Scoping
 
