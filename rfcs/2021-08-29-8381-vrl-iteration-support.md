@@ -373,6 +373,11 @@ arguments that returns `y` value.
 The return type of a closure is checked at compile-time, including the
 requirement in `map` for a two-element array.
 
+The variable names used to access the provided closure values (e.g. `|key,
+value|`) are checked at compile-time to make sure you are actually using the
+variables (to avoid potential variable name typo's). This behaves the same to
+any other "unused variable assignment" checks happening at compile-time.
+
 #### Lexical Scoping
 
 Lexical scoping (variables being accessible within a given scope, instead of
