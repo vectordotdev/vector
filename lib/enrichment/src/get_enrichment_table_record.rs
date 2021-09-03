@@ -1,4 +1,5 @@
 use crate::{Condition, IndexHandle, TableRegistry, TableSearch};
+use std::collections::BTreeMap;
 use vrl_core::{
     diagnostic::{Label, Span},
     prelude::*,
@@ -7,14 +8,12 @@ use vrl_core::{
 #[derive(Debug)]
 pub enum Error {
     TablesNotLoaded,
-    InvalidCondition,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::TablesNotLoaded => write!(f, "enrichment tables not loaded"),
-            Error::InvalidCondition => write!(f, "invalid condition specified"),
         }
     }
 }
@@ -23,10 +22,7 @@ impl std::error::Error for Error {}
 
 impl DiagnosticError for Error {
     fn code(&self) -> usize {
-        match self {
-            Error::TablesNotLoaded => 111,
-            Error::InvalidCondition => 112,
-        }
+        111
     }
 
     fn labels(&self) -> Vec<Label> {
@@ -37,42 +33,7 @@ impl DiagnosticError for Error {
                     Span::default(),
                 )]
             }
-            Error::InvalidCondition => {
-                vec![Label::primary(
-                    "enrichment table error: invalid condition specified".to_string(),
-                    Span::default(),
-                )]
-            }
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum ConditionToEvaluate {
-    Equals {
-        field: String,
-        value: expression::Expr,
-    },
-    BetweenDates {
-        field: String,
-        from: expression::Expr,
-        to: expression::Expr,
-    },
-}
-
-impl ConditionToEvaluate {
-    fn to_condition(&self, ctx: &mut Context) -> std::result::Result<Condition, ExpressionError> {
-        Ok(match self {
-            Self::Equals { field, value } => Condition::Equals {
-                field: field.as_ref(),
-                value: value.resolve(ctx)?,
-            },
-            Self::BetweenDates { field, from, to } => Condition::BetweenDates {
-                field: field.as_ref(),
-                from: from.resolve(ctx)?.try_timestamp()?,
-                to: to.resolve(ctx)?.try_timestamp()?,
-            },
-        })
     }
 }
 
@@ -105,7 +66,7 @@ impl Function for GetEnrichmentTableRecord {
     fn compile(&self, state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let registry = state
             .get_external_context::<TableRegistry>()
-            .ok_or_else(|| Box::new(Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+            .ok_or(Box::new(Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
 
         let tables = registry
             .table_ids()
@@ -118,47 +79,7 @@ impl Function for GetEnrichmentTableRecord {
             .try_bytes_utf8_lossy()
             .expect("table is not valid utf8")
             .into_owned();
-
-        /*
-         An example of a search condition:
-        {
-            "field1": .value,
-            "field2": { "from": .date1, "to": .date2 }
-        }
-
-        field1 is an exact search, field2 is searched against a date range.
-        */
-
         let condition = arguments.required_object("condition")?;
-
-        let condition = condition
-            .iter()
-            .map(|(field, expr)| {
-                Ok(match expr {
-                    expression::Expr::Container(expression::Container {
-                        variant: expression::Variant::Object(object),
-                    }) => ConditionToEvaluate::BetweenDates {
-                        field: field.clone(),
-                        from: object
-                            .get("from")
-                            .ok_or_else(|| {
-                                Box::new(Error::InvalidCondition) as Box<dyn DiagnosticError>
-                            })?
-                            .clone(),
-                        to: object
-                            .get("to")
-                            .ok_or_else(|| {
-                                Box::new(Error::InvalidCondition) as Box<dyn DiagnosticError>
-                            })?
-                            .clone(),
-                    },
-                    _ => ConditionToEvaluate::Equals {
-                        field: field.clone(),
-                        value: expr.clone(),
-                    },
-                })
-            })
-            .collect::<std::result::Result<Vec<_>, Box<dyn DiagnosticError>>>()?;
 
         Ok(Box::new(GetEnrichmentTableRecordFn {
             table,
@@ -172,7 +93,7 @@ impl Function for GetEnrichmentTableRecord {
 #[derive(Debug, Clone)]
 pub struct GetEnrichmentTableRecordFn {
     table: String,
-    condition: Vec<ConditionToEvaluate>,
+    condition: BTreeMap<String, expression::Expr>,
     index: Option<IndexHandle>,
     enrichment_tables: TableSearch,
 }
@@ -182,7 +103,12 @@ impl Expression for GetEnrichmentTableRecordFn {
         let condition = self
             .condition
             .iter()
-            .map(|condition| condition.to_condition(ctx))
+            .map(|(key, value)| {
+                Ok(Condition::Equals {
+                    field: key,
+                    value: value.resolve(ctx)?,
+                })
+            })
             .collect::<Result<Vec<Condition>>>()?;
 
         let data = self
@@ -203,11 +129,7 @@ impl Expression for GetEnrichmentTableRecordFn {
                 let fields = self
                     .condition
                     .iter()
-                    .filter_map(|condition| match condition {
-                        // We can only index fields for an Equals condition
-                        ConditionToEvaluate::Equals { field, .. } => Some(field.as_ref()),
-                        _ => None,
-                    })
+                    .map(|(field, _)| field.as_ref())
                     .collect::<Vec<_>>();
                 let index = table.add_index(&self.table, &fields)?;
 
@@ -230,20 +152,19 @@ impl Expression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test_util::get_table_registry;
-    use shared::TimeZone;
-    use std::collections::BTreeMap;
+
+    use super::*;
+    use shared::{btreemap, TimeZone};
 
     #[test]
     fn find_table_row() {
         let registry = get_table_registry();
         let func = GetEnrichmentTableRecordFn {
             table: "dummy1".to_string(),
-            condition: vec![ConditionToEvaluate::Equals {
-                field: "field".to_string(),
-                value: expression::Literal::from("value").into(),
-            }],
+            condition: btreemap! {
+                "field" =>  expression::Literal::from("value"),
+            },
             index: Some(IndexHandle(999)),
             enrichment_tables: registry.as_readonly(),
         };
@@ -266,16 +187,15 @@ mod tests {
 
         let mut func = GetEnrichmentTableRecordFn {
             table: "dummy1".to_string(),
-            condition: vec![ConditionToEvaluate::Equals {
-                field: "field".to_string(),
-                value: expression::Literal::from("value").into(),
-            }],
+            condition: btreemap! {
+                "field" =>  expression::Literal::from("value"),
+            },
             index: None,
             enrichment_tables: registry.as_readonly(),
         };
 
         let mut compiler = state::Compiler::new();
-        compiler.add_external_context(vec![Box::new(registry)]);
+        compiler.set_external_context(Some(Box::new(registry)));
 
         assert_eq!(Ok(()), func.update_state(&mut compiler));
         assert_eq!(Some(IndexHandle(0)), func.index);

@@ -15,7 +15,7 @@ chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
-enrichment = { path = "../enrichment" }
+enrichment = { path = "../enrichment", optional = true }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
@@ -39,7 +39,7 @@ serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.67", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
-tokio = { version = "1.10.1", default-features = false }
+tokio = { version = "1.11.0", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
 toml = { version = "0.5.8", default-features = false }
 tracing = { version = "0.1.26", default-features = false }
@@ -57,15 +57,16 @@ prost-build = "0.8"
 criterion = { version = "0.3.5", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1.0.3"
+proptest = "1.0"
 pretty_assertions = "0.7.2"
 tokio-test = "0.4.2"
 
 [features]
-default = []
 api = ["async-graphql"]
-lua = ["mlua", "tokio-stream"]
-vrl = ["vrl-core"]
+default = []
 disk-buffer = ["buffers/disk-buffer"]
+lua = ["mlua", "tokio-stream"]
+vrl = ["vrl-core", "enrichment"]
 
 [[bench]]
 name = "lookup"

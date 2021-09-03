@@ -3,7 +3,6 @@ pub mod tables;
 
 #[cfg(test)]
 mod test_util;
-
 use dyn_clone::DynClone;
 use std::collections::BTreeMap;
 use vrl_core::Value;
