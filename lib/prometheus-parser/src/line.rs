@@ -249,7 +249,7 @@ impl Metric {
 
         let build_string = fold_many0(
             parse_string_fragment,
-            || String::new(),
+            String::new,
             |mut result, fragment| {
                 match fragment {
                     StringFragment::Literal(s) => result.push_str(s),
