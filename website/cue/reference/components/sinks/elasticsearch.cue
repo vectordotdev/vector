@@ -175,7 +175,7 @@ components: sinks: elasticsearch: {
 							Automatically routes events by deriving the data stream name using specific event fields with the `data_stream.type-data_stream.dataset-data_stream.namespace` format.
 
 							If enabled, the data_stream.* event fields will take precedence over the data_stream.type, data_stream.dataset, and data_stream.namespace settings, but will fall back to them if any of the fields are missing from the event.
-						"""
+							"""
 						required: false
 						warnings: []
 						type: bool: default: true
