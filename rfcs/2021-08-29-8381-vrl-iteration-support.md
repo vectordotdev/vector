@@ -23,6 +23,10 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
     * [Lexical Scoping](#lexical-scoping)
     * [Returning Two-Element Array](#returning-two-element-array)
       * [Tuple Type](#tuple-type)
+    * [Parser Changes](#parser-changes)
+    * [Compiler Changes](#compiler-changes)
+    * [Function Trait](#function-trait)
+    * [Expression Trait](#expression-trait)
 * [Rationale](#rationale)
 * [Drawbacks](#drawbacks)
 * [Prior Art](#prior-art)
@@ -524,6 +528,340 @@ VRL itself.
 Since there isn't a clear benefit at this moment to using a tuple over
 a two-element array, the choice is made to forgo adding the tuple type at this
 moment.
+
+#### Parser Changes
+
+Because the closure syntax will be tied to function calls, we don't need to add
+a new top-level node type to the abstract syntax tree (AST). Instead, we need to
+extend the existing `FunctionCall` type to support an optional closure:
+
+```rust
+pub struct FunctionCall {
+    pub ident: Node<Ident>,
+    pub abort_on_error: bool,
+    pub arguments: Vec<Node<FunctionArgument>>,
+}
+```
+
+We'll modify the type to this:
+
+```rust
+pub struct FunctionCall {
+    pub ident: Ident,
+    pub abort_on_error: bool,
+    pub arguments: Vec<FunctionArgument>,
+    pub closure: Option<FunctionClosure>,
+}
+
+pub struct FunctionClosure {
+    pub variables: Vec<Ident>,
+    pub block: Block,
+}
+```
+
+Next, we need to teach the parser to parse optional closures for function calls.
+
+The existing [LALRPOP][] grammar:
+
+```rust
+FunctionCall: FunctionCall = {
+    <ident: Sp<"function call">> <abort_on_error: "!"?> "("
+        NonterminalNewline*
+        <arguments: CommaMultiline<Sp<FunctionArgument>>?>
+    ")" => { /* ... */ },
+};
+```
+
+Is updated to support optional closures:
+
+```rust
+FunctionCall: FunctionCall = {
+    <ident: Sp<"function call">> <abort_on_error: "!"?> "("
+        NonterminalNewline*
+        <arguments: CommaMultiline<Sp<FunctionArgument>>?>
+    ")" <closure: FunctionClosure?> => { /* ... */ },
+};
+
+#[inline]
+FunctionClosure: FunctionClosure = {
+    "{"
+      "|" <variables: CommaList<"identifier">?> "|" NonterminalNewline*
+      <expressions: Exprs>
+    "}" => FunctionClosure { variables, block: Block(expressions) },
+};
+```
+
+This will allow the parser to unambiguously parse optional function closures,
+and add them as nodes to the program AST.
+
+[lalrpop]: https://lalrpop.github.io/lalrpop/
+
+#### Compiler Changes
+
+Once the parser knows how to parse function closures, the compiler needs to
+interpret them.
+
+To start, we need to update the `FunctionCall` expression:
+
+```rust
+pub struct FunctionCall {
+    expr: Box<dyn Expression>,
+    abort_on_error: bool,
+    maybe_fallible_arguments: bool,
+
+    // new addition
+    closure: Option<FunctionClosure>,
+}
+
+pub struct FunctionClosure {
+    variables: Vec<dyn Expression>,
+    block: Block,
+}
+```
+
+We also need to update `compile_function_call` (not expanded here), to translate
+the AST to updated `FunctionCall` expression type.
+
+#### Function Trait
+
+The bulk of the work needs to happen in the `Function` trait:
+
+```rust
+pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+
+pub trait Function: Sync + fmt::Debug {
+    /// The identifier by which the function can be called.
+    fn identifier(&self) -> &'static str;
+
+    /// One or more examples demonstrating usage of the function in VRL source
+    /// code.
+    fn examples(&self) -> &'static [Example];
+
+    /// Compile a [`Function`] into a type that can be resolved to an
+    /// [`Expression`].
+    ///
+    /// This function is called at compile-time for any `Function` used in the
+    /// program.
+    ///
+    /// At runtime, the `Expression` returned by this function is executed and
+    /// resolved to its final [`Value`].
+    fn compile(&self, state: &super::State, arguments: ArgumentList) -> Compiled;
+
+    /// An optional list of parameters the function accepts.
+    ///
+    /// This list is used at compile-time to check function arity, keyword names
+    /// and argument type definition.
+    fn parameters(&self) -> &'static [Parameter] {
+        &[]
+    }
+}
+```
+
+First, we're going to have to extend the `compile` method to take an optional
+`Closure`:
+
+```rust
+fn compile(&self, state: &super::State, arguments: ArgumentList, closure: Option<FunctionClosure>) -> Compiled;
+```
+
+This will require us to update all currently existing function implementations,
+but this is a mechanical change, as no existing functions can deal with closures
+right now, so all of them will add `_closure: Option<Closure>` to their method
+implementation, to indicate to the reader/Rust compiler that the closure
+variable is unused.
+
+Next, we need to have a way for the function definition to tell the compiler
+a few questions:
+
+1. Does this function accept a closure?
+2. If it does, how many variable names does it accept?
+3. What type will the variables have at runtime?
+4. What return type must the closure resolve to?
+
+To resolve these questions, function definitions must implement a new method:
+
+```rust
+fn closure(&self) -> Option<closure::Definition> {
+    None
+}
+```
+
+With `closure::Definition` defined as such:
+
+```rust
+mod closure {
+    /// The definition of a function-closure block a function expects to
+    /// receive.
+    struct Definition {
+        inputs: Vec<Input>,
+    }
+
+    /// One input variant for a function-closure.
+    ///
+    /// A closure can support different variable input shapes, depending on the
+    /// type of a given parameter of the function.
+    ///
+    /// For example, the `map` function takes either an `Object` or an `Array`
+    /// for the `value` parameter, and the closure it takes either accepts
+    /// `|key, value|`, where "key" is always a string, or `|index, value|` where
+    /// "index" is always a number, depending on the parameter input type.
+    struct Input {
+        /// The parameter name upon which this closure input variant depends on.
+        parameter: &'static str,
+
+        /// The value kind this closure input expects from the parameter.
+        kind: value::Kind,
+
+        /// The list of variables attached to this closure input type.
+        variables: Vec<Variable>,
+
+        /// The return type this input variant expects the closure to have.
+        output: Output,
+    }
+
+    /// One variable input for a closure.
+    ///
+    /// For example, in `{ |foo, bar| ... }`, `foo` and `bar` are each
+    /// a `ClosureVariable`.
+    struct Variable {
+        /// The value kind this variable will return when called.
+        kind: value::Kind,
+    }
+
+    enum Output {
+        Array {
+            /// The number, and kind of elements expected.
+            elements: Vec<value::Kind>,
+        }
+
+        Object {
+            /// The field names, and value kinds expected.
+            fields: HashMap<&'static str, value::Kind,
+        }
+
+        Scalar {
+            /// The expected scalar kind.
+            kind: value::Kind,
+        }
+
+        Any,
+    }
+}
+```
+
+As shown above, the default trait implementation for this new method returns
+`None`, which means any function (the vast majority) that doesn't accept
+a closure can forgo implementing this method, and continue to work as normal.
+
+In the case of the `map` function, we'd implement it like so:
+
+```rust
+fn closure(&self) -> Option<closure::Definition> {
+    let field = closure::Variable { kind: kind::String };
+    let index = closure::Variable { kind: kind::Integer };
+    let value = closure::Variable { kind: kind::Any };
+
+    let object = closure::Input {
+        parameter: "value",
+        kind: kind::Object,
+        variables: vec![field, value],
+        output: closure::Output::Array {
+            elements: vec![kind::String, kind::Any],
+        }
+    };
+
+    let array = closure::Input {
+        parameter: "value",
+        kind: kind::Array,
+        variables: vec![index, value],
+        output: closure::Output::Any,
+    };
+
+    Some(closure::Definition {
+        inputs: vec![object, array],
+    })
+}
+```
+
+With the above in place, `map` can now iterate over both objects and arrays, and
+depending on which type is detected at compile-time, the closure attached to the
+function call can make guarantees about which type the first variable name will
+have.
+
+For example:
+
+```coffee
+. = { "foo": true }
+. = map(.) { |key, value| [key, value] }
+```
+
+```coffee
+. = ["foo", true]
+. = map(.) { |_index, value| value }
+```
+
+In the first example, because the compiler knows `map` receives an object as its
+first argument, it can guarantee that `key` will be a string, and `value` of
+"any" type. Additionally, it can show a compile-time error if the last
+expression in the block is not an array, with two elements, and the first
+element being of the string kind.
+
+The second example is similar, except that it accepts any return value, and
+guarantees that the first variable is a number (the index of the value in the
+array).
+
+Note that for the above to work, the compiler must know the _exact_ type
+provided to (in this case) the `value` function parameter. It can't be _either
+array or object_, it has to be exactly one of the two. Operators can guarantee
+this by using `to_object`, etc.
+
+#### Expression Trait
+
+With all of this in place, the `map` function can compile its expression given
+the closure details, and run the closure multiple times to completion, doing something
+like this:
+
+```rust
+fn resolve(&self, ctx: &mut Context) -> Result<Value, Error> {
+    let run = |key, value| {
+        // TODO: handle variable scope stack
+        ctx.variables.insert(key, value);
+        let closure_value = self.closure.resolve(self)?;
+        ctx.variables.remove(key);
+
+        Ok(closure_value)
+    };
+
+    let result = match self.value.resolve(ctx)? {
+        Value::Object(object) => {
+            let mut result = BTreeMap::default();
+
+            for (key, value) in object.into_iter() {
+                let v = run(key, value)?.try_array()?;
+                result.insert(v[0], v[1]);
+            }
+
+            result.into()
+        }
+        Value::Array(array) => {
+            let mut result = Vec::with_capacity(array.len());
+
+            for (index, value) in array.into_iter().enumerate() {
+                let v = run(index, value)?;
+                result.push(v);
+            }
+
+            result.into()
+        }
+        _ => unreachable!("expected object or array"),
+    };
+
+    Ok(result)
+}
+```
+
+This should get us most of the way towards adding function-closure support to
+VRL, and using that support in the initial `map` function to do its work.
 
 ## Rationale
 
