@@ -47,7 +47,7 @@ pub struct S3SinkConfig {
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
     #[serde(flatten)]
-    options: S3Options,
+    pub options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
@@ -58,7 +58,7 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
-    assume_role: Option<String>,
+    pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
@@ -174,7 +174,7 @@ impl SinkConfig for S3SinkConfig {
 }
 
 #[derive(Debug, Snafu)]
-enum HealthcheckError {
+pub enum HealthcheckError {
     #[snafu(display("Invalid credentials"))]
     InvalidCredentials,
     #[snafu(display("Unknown bucket: {:?}", bucket))]
@@ -185,9 +185,10 @@ enum HealthcheckError {
 
 impl S3SinkConfig {
     pub fn build_processor(&self, client: S3Client, cx: SinkContext) -> crate::Result<VectorSink> {
-        // Build our S3 client/service, which is what we'll ultimately feed requests into in order
-        // to ship files to S3.  We build this here in order to configure the client/service with
-        // retries, concurrency limits, rate limits, and whatever else the client should have.
+        // Build our S3 client/service, which is what we'll ultimately feed
+        // requests into in order to ship files to S3.  We build this here in
+        // order to configure the client/service with retries, concurrency
+        // limits, rate limits, and whatever else the client should have.
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)

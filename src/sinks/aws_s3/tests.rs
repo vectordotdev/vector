@@ -1,18 +1,25 @@
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
-    use crate::{
-        assert_downcast_matches,
-        test_util::{random_lines_with_stream, random_string},
-    };
+    use crate::config::SinkContext;
+    use crate::rusoto::RegionOrEndpoint;
+    use crate::sinks::aws_s3::config::{Encoding, HealthcheckError, S3Options};
+    use crate::sinks::aws_s3::S3SinkConfig;
+    use crate::sinks::util::BatchConfig;
+    use crate::sinks::util::Compression;
+    use crate::sinks::util::TowerRequestConfig;
+    use crate::test_util::{random_lines_with_stream, random_string};
     use bytes::{Buf, BytesMut};
     use flate2::read::MultiGzDecoder;
-    use futures::Stream;
+    use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
-    use rusoto_core::region::Region;
+    use rusoto_core::{region::Region, RusotoError};
+    use rusoto_s3::S3Client;
+    use rusoto_s3::S3;
     use std::io::{BufRead, BufReader};
-    use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent};
+    use tokio_stream::StreamExt;
+    use vector_core::config::proxy::ProxyConfig;
+    use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
     #[tokio::test]
     async fn s3_insert_message_into() {
@@ -25,7 +32,7 @@ mod integration_tests {
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
         let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.new(client, cx).unwrap();
+        let sink = config.build_processor(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
@@ -60,7 +67,7 @@ mod integration_tests {
         };
         let prefix = config.key_prefix.clone();
         let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.new(client, cx).unwrap();
+        let sink = config.build_processor(client, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -82,12 +89,12 @@ mod integration_tests {
         let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 3);
 
-        let response_lines = stream::iter(keys)
-            .fold(Vec::new(), |mut acc, key| async {
-                acc.push(get_lines(get_object(&bucket, key).await).await);
-                acc
-            })
-            .await;
+        let mut response_lines: Vec<Vec<String>> = Vec::new();
+        let mut key_stream = stream::iter(keys);
+        while let Some(key) = key_stream.next().await {
+            let lines: Vec<String> = get_lines(get_object(&bucket, key).await).await;
+            response_lines.push(lines);
+        }
 
         assert_eq!(&lines[00..10], response_lines[0].as_slice());
         assert_eq!(&lines[10..20], response_lines[1].as_slice());
@@ -110,7 +117,7 @@ mod integration_tests {
 
         let prefix = config.key_prefix.clone();
         let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.new(client, cx).unwrap();
+        let sink = config.build_processor(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 500);
         sink.run(events).await.unwrap();
@@ -119,21 +126,23 @@ mod integration_tests {
         let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 6);
 
-        let response_lines = stream::iter(keys).fold(Vec::new(), |mut acc, key| async {
+        let mut response_lines: Vec<String> = Vec::new();
+        let mut key_stream = stream::iter(keys);
+        while let Some(key) = key_stream.next().await {
             assert!(key.ends_with(".log.gz"));
 
             let obj = get_object(&bucket, key).await;
             assert_eq!(obj.content_encoding, Some("gzip".to_string()));
 
-            acc.append(&mut get_gzipped_lines(obj).await);
-            acc
-        });
+            response_lines.append(&mut get_gzipped_lines(obj).await);
+        }
 
-        assert_eq!(lines, response_lines.await);
+        assert_eq!(lines, response_lines);
     }
 
-    // NOTE: this test doesn't actually validate anything because localstack doesn't enforce the
-    // required Content-MD5 header on the request for buckets with object lock enabled
+    // NOTE: this test doesn't actually validate anything because localstack
+    // doesn't enforce the required Content-MD5 header on the request for
+    // buckets with object lock enabled
     // https://github.com/localstack/localstack/issues/4166
     #[tokio::test]
     async fn s3_insert_message_into_object_lock() {
@@ -164,7 +173,7 @@ mod integration_tests {
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
         let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.new(client, cx).unwrap();
+        let sink = config.build_processor(client, cx).unwrap();
 
         let (lines, events, mut receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
@@ -196,7 +205,7 @@ mod integration_tests {
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
         let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.new(client, cx).unwrap();
+        let sink = config.build_processor(client, cx).unwrap();
 
         let (_lines, events, mut receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
@@ -214,7 +223,7 @@ mod integration_tests {
 
         let config = config(&bucket, 1);
         let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        config.healthcheck(client).await.unwrap();
+        config.build_healthcheck(client).unwrap();
     }
 
     #[tokio::test]
@@ -222,11 +231,9 @@ mod integration_tests {
         let config = config("s3_healthchecks_invalid_bucket", 1);
 
         let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        assert_downcast_matches!(
-            config.healthcheck(client).await.unwrap_err(),
-            HealthcheckError,
-            HealthcheckError::UnknownBucket { .. }
-        );
+        // TODO we should be more explicit here but the error comes out as a
+        // boxed dynamic, unsure how to coerce properly.
+        assert!(config.build_healthcheck(client).is_err());
     }
 
     fn client() -> S3Client {
@@ -349,7 +356,7 @@ mod integration_tests {
         let bytes = obj
             .body
             .unwrap()
-            .fold(BytesMut::new(), |mut store, bytes| async move {
+            .fold(BytesMut::new(), |mut store, bytes| {
                 store.extend_from_slice(&bytes.unwrap());
                 store
             })
