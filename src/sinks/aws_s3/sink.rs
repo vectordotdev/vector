@@ -224,17 +224,22 @@ where
 }
 
 fn build_request(key: String, batch: Vec<Event>, options: &S3RequestOptions) -> S3Request {
-    // Generate the filename for this batch, which involves a surprising amount of code.
+    // Generate the filename for this batch, which involves a surprising amount
+    // of code.
     let filename = {
         /*
-        Since this is generic over the partitioner, for purposes of unit tests, we can't get the compiler to
-        let us define a conversion trait such that we can get &Event from &P::Item, or I at least don't know
-        how to trivially do that.  I'm leaving this snippet here because it embodies the prior TODO comment
-        of using the timestamp of the last event in the batch rather than the current time.
+        Since this is generic over the partitioner, for purposes of unit tests,
+        we can't get the compiler to let us define a conversion trait such that
+        we can get &Event from &P::Item, or I at least don't know how to
+        trivially do that.  I'm leaving this snippet here because it embodies
+        the prior TODO comment of using the timestamp of the last event in the
+        batch rather than the current time.
 
-        Now that I think of it... is that even right?  Do customers want logs with timestamps in them related
-        to the last event contained within, or do they want timestamps that include when the file was generated
-        and dropped into the bucket?  My gut says "time when the log dropped" but maybe not...
+        Now that I think of it... is that even right?  Do customers want logs
+        with timestamps in them related to the last event contained within, or
+        do they want timestamps that include when the file was generated and
+        dropped into the bucket?  My gut says "time when the log dropped" but
+        maybe not...
 
         let last_event_ts = batch
             .items()
@@ -275,11 +280,11 @@ fn build_request(key: String, batch: Vec<Event>, options: &S3RequestOptions) -> 
         .as_ref()
         .cloned()
         .unwrap_or_else(|| options.compression.extension().into());
-    let key = format!("{}{}.{}", key, filename, extension);
+    let key = format!("{}/{}.{}", key, filename, extension);
 
-    // Process our events. This does all of the necessary encoding rule application, as well as
-    // encoding and compressing the events.  We're handed back a tidy `Bytes` instance we can send
-    // directly to S3.
+    // Process our events. This does all of the necessary encoding rule
+    // application, as well as encoding and compressing the events.  We're
+    // handed back a tidy `Bytes` instance we can send directly to S3.
     //
     // TODO: we need to do something with these
     let batch_size = batch.len();
@@ -410,7 +415,7 @@ mod tests {
         type Key = &'static str;
 
         fn partition(&self, _: &Self::Item) -> Self::Key {
-            "foo"
+            "key"
         }
     }
 
