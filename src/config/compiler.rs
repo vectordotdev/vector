@@ -1,5 +1,5 @@
 use super::{builder::ConfigBuilder, validation, ComponentKey, Config, ExpandType, TransformOuter};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -110,7 +110,7 @@ fn expand_globs(config: &mut ConfigBuilder) {
         .keys()
         .chain(config.transforms.keys())
         .cloned()
-        .collect::<Vec<ComponentKey>>();
+        .collect::<IndexSet<ComponentKey>>();
 
     for (id, transform) in config.transforms.iter_mut() {
         expand_globs_inner(&mut transform.inputs, id, &candidates);
@@ -140,7 +140,7 @@ impl InputMatcher {
 fn expand_globs_inner(
     inputs: &mut Vec<ComponentKey>,
     id: &ComponentKey,
-    candidates: &[ComponentKey],
+    candidates: &IndexSet<ComponentKey>,
 ) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
@@ -150,10 +150,17 @@ fn expand_globs_inner(
                 warn!(message = "Invalid glob pattern for input.", component_id = %id, %error);
                 InputMatcher::String(raw_input.to_string())
             });
+        let mut matched = false;
         for input in candidates {
             if matcher.matches(&input.to_string()) && input != id {
+                matched = true;
                 inputs.push(input.clone())
             }
+        }
+        // If it didn't work as a glob pattern, leave it in the inputs as-is. This lets us give
+        // more accurate error messages about non-existent inputs.
+        if !matched {
+            inputs.push(raw_input)
         }
     }
 }
