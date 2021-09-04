@@ -19,6 +19,7 @@
 mod tests;
 
 mod config;
+mod healthcheck;
 mod log_api;
 
 use crate::config::SinkDescription;

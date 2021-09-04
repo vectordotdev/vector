@@ -6,7 +6,7 @@ use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigurat
 use crate::sinks::util::Compression;
 use async_trait::async_trait;
 use flate2::write::GzEncoder;
-use futures::future::{poll_fn, FutureExt};
+use futures::future::FutureExt;
 use futures::stream::BoxStream;
 use futures::Future;
 use futures::StreamExt;
@@ -22,8 +22,7 @@ use std::sync::Arc;
 use tokio::time::Duration;
 use tower::retry::Policy;
 use tower::Service;
-use vector_core::event::EventStatus;
-use vector_core::event::{Event, EventFinalizers, Value};
+use vector_core::event::{Event, EventFinalizers, EventStatus, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::batcher::Batcher;
@@ -223,7 +222,7 @@ where
 
 impl<Client> LogApi<Client>
 where
-    Client: Service<Request<Body>> + Send + Unpin,
+    Client: Service<Request<Body>, Response = http::Response<Body>> + Send + Unpin,
     Client::Future: Send,
     Client::Response: Send + Debug,
     Client::Error: Send + Debug,
@@ -249,11 +248,6 @@ where
         let host_key = self.log_schema_host_key;
         let message_key = self.log_schema_message_key;
         let timestamp_key = self.log_schema_timestamp_key;
-
-        // Before we start we need to prime the pump on our http client.
-        poll_fn(|cx| self.http_client.poll_ready(cx))
-            .await
-            .map_err(|_e| ())?;
 
         let input = input.map(|mut event| {
             let log = event.as_mut_log();
