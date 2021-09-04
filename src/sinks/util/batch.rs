@@ -363,13 +363,9 @@ impl Batch for () {
         true
     }
 
-    fn fresh(&self) -> Self {
-        ()
-    }
+    fn fresh(&self) -> Self {}
 
-    fn finish(self) -> Self::Output {
-        ()
-    }
+    fn finish(self) -> Self::Output {}
 
     fn num_items(&self) -> usize {
         0

@@ -8,7 +8,7 @@ license = "MPL-2.0"
 
 [dependencies]
 bytes = "1.1.0"
-tokio-util = { version = "0.6.7", features = ["codec"] }
+tokio-util = { version = "0.6.8", features = ["codec"] }
 tracing = "0.1.26"
 
 [dev-dependencies]

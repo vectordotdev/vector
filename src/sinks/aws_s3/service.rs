@@ -28,7 +28,7 @@ pub struct S3Request {
 
 impl Finalizable for S3Request {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::replace(&mut self.finalizers, EventFinalizers::default())
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -45,7 +45,7 @@ pub struct S3Service {
 }
 
 impl S3Service {
-    pub fn new(client: S3Client) -> S3Service {
+    pub const fn new(client: S3Client) -> S3Service {
         S3Service { client }
     }
 }
@@ -118,8 +118,5 @@ fn bytes_to_bytestream(buf: Bytes) -> ByteStream {
     // We _have_ to provide the size hint, because without it, Rusoto can't generate the
     // Content-Length header which is required for the S3 PutObject API call.
     let len = buf.len();
-    ByteStream::new_with_size(
-        Box::pin(stream::once(async move { Ok(Bytes::from(buf)) })),
-        len,
-    )
+    ByteStream::new_with_size(Box::pin(stream::once(async move { Ok(buf) })), len)
 }

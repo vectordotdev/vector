@@ -9,16 +9,16 @@ use crate::{internal_events::TemplateRenderingFailed, template::Template};
 pub struct KeyPartitioner(Template);
 
 impl KeyPartitioner {
-    pub fn new(template: Template) -> Self {
+    pub const fn new(template: Template) -> Self {
         Self(template)
     }
 }
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = String;
+    type Key = Option<String>;
 
-    fn partition(&self, item: &Self::Item) -> Option<Self::Key> {
+    fn partition(&self, item: &Self::Item) -> Self::Key {
         self.0
             .render_string(item)
             .map_err(|error| {

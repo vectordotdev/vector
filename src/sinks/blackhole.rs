@@ -95,12 +95,14 @@ impl StreamSink for BlackholeSink {
         // Spin up a task that does the periodic reporting.  This is decoupled from the main sink so
         // that rate limiting support can be added more simply without having to interleave it with
         // the printing.
-        let total_events = self.total_events.clone();
-        let total_raw_bytes = self.total_raw_bytes.clone();
+        let total_events = Arc::clone(&self.total_events);
+        let total_raw_bytes = Arc::clone(&self.total_raw_bytes);
         let interval_dur = Duration::from_secs(self.config.print_interval_secs);
+        let (shutdown, mut tripwire) = watch::channel(());
 
         tokio::spawn(async move {
             let mut print_interval = interval(interval_dur);
+            loop {
                 select! {
                     _ = print_interval.tick() => {
                         info!({

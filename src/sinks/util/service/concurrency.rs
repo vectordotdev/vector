@@ -23,7 +23,7 @@ impl Concurrency {
         }
     }
 
-    pub fn parse_concurrency(&self, default: &Self) -> Option<usize> {
+    pub const fn parse_concurrency(&self, default: &Self) -> Option<usize> {
         match self.if_none(*default) {
             Concurrency::None => Some(1024),
             Concurrency::Adaptive => None,
@@ -32,7 +32,7 @@ impl Concurrency {
     }
 }
 
-pub fn concurrency_is_none(concurrency: &Concurrency) -> bool {
+pub const fn concurrency_is_none(concurrency: &Concurrency) -> bool {
     matches!(concurrency, Concurrency::None)
 }
 

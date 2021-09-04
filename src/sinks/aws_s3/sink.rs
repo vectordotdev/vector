@@ -42,7 +42,7 @@ use vector_core::{
     buffers::Acker,
     event::{EventFinalizers, Finalizable},
     sink::StreamSink,
-    stream::batcher::{Batcher, BatcherTimer},
+    stream::batcher::Batcher,
 };
 
 use super::{config::S3RequestOptions, partitioner::KeyPartitioner, service::S3Request};
@@ -113,11 +113,10 @@ where
             io.await;
         });
 
-        let batcher_timer = BatcherTimer::new(self.batch_timeout);
         let batcher = Batcher::new(
             input,
             partitioner,
-            batcher_timer,
+            self.batch_timeout,
             self.batch_size_bytes,
             self.batch_size_events,
         );
@@ -128,7 +127,7 @@ where
                 Some(key) => {
                     // We could push this down to the I/O task if we wanted to.
                     let request = build_request(key, batch, &self.options);
-                    if let Err(_) = io_tx.send(request).await {
+                    if io_tx.send(request).await.is_err() {
                         // TODO: change this to "error! + return Err" after initial testing/debugging
                         trace!(
                             "sink I/O channel should not be closed before sink itself is closed"
@@ -410,8 +409,8 @@ mod tests {
         type Item = Event;
         type Key = &'static str;
 
-        fn partition(&self, _: &Self::Item) -> Option<Self::Key> {
-            None
+        fn partition(&self, _: &Self::Item) -> Self::Key {
+            "foo"
         }
     }
 
@@ -472,10 +471,7 @@ mod tests {
         let partitioner = TestPartitioner::default();
 
         let event = "hello world".into();
-        let partition_key = partitioner
-            .partition(&event)
-            .expect("event should not fail to partition")
-            .to_string();
+        let partition_key = partitioner.partition(&event).to_string();
         let finished_batch = vec![event];
 
         let settings = S3RequestOptions {
