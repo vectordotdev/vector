@@ -128,18 +128,20 @@ where
                     // We could push this down to the I/O task if we wanted to.
                     let request = build_request(key, batch, &self.options);
                     if io_tx.send(request).await.is_err() {
-                        // TODO: change this to "error! + return Err" after initial testing/debugging
+                        // TODO: change this to "error! + return Err" after
+                        // initial testing/debugging
                         trace!(
-                            "sink I/O channel should not be closed before sink itself is closed"
+                            "Sink I/O channel should not be closed before sink itself is closed."
                         );
                         panic!("boom 1")
                     }
                 }
                 // Partitioning failed for one or more events.
                 //
-                // TODO: this might b e where we would insert something like the proposed error
-                // handling/dead letter queue stuff; events that _we_ can't handle, but some other
-                // component may be able to salvage
+                // TODO: this might b e where we would insert something like the
+                // proposed error handling/dead letter queue stuff; events that
+                // _we_ can't handle, but some other component may be able to
+                // salvage
                 None => continue,
             }
         }
