@@ -493,21 +493,21 @@ mod tests {
 
         let settings = S3RequestOptions {
             filename_extension: None,
-            ..settings.clone()
+            ..settings
         };
         let req = build_request(partition_key.clone(), finished_batch.clone(), &settings);
         assert_eq!(req.key, "key/date.log");
 
         let settings = S3RequestOptions {
             compression: Compression::gzip_default(),
-            ..settings.clone()
+            ..settings
         };
         let req = build_request(partition_key.clone(), finished_batch.clone(), &settings);
         assert_eq!(req.key, "key/date.log.gz");
 
         let settings = S3RequestOptions {
             filename_append_uuid: true,
-            ..settings.clone()
+            ..settings
         };
         let req = build_request(partition_key, finished_batch, &settings);
         assert_ne!(req.key, "key/date.log.gz");
