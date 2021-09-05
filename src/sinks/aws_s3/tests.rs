@@ -3,7 +3,7 @@
 mod integration_tests {
     use crate::config::SinkContext;
     use crate::rusoto::RegionOrEndpoint;
-    use crate::sinks::aws_s3::config::{Encoding, HealthcheckError, S3Options};
+    use crate::sinks::aws_s3::config::{Encoding, S3Options};
     use crate::sinks::aws_s3::S3SinkConfig;
     use crate::sinks::util::BatchConfig;
     use crate::sinks::util::Compression;
