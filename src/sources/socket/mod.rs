@@ -320,6 +320,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore] // see issue #9046
     async fn tcp_with_tls_intermediate_ca() {
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
