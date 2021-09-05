@@ -126,8 +126,9 @@ mod tests {
     use super::*;
     use crate::event::Event;
     use http::HeaderValue;
-    use httpmock::{Method, MockServer};
     use std::path::PathBuf;
+    use wiremock::matchers::{body_string, header, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
     async fn test_build_request_compression_none_returns_expected_request() {
@@ -209,17 +210,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_sink_sink_calls_expected_endpoint() {
-        let server = MockServer::start();
+        let mock_server = MockServer::start().await;
 
-        let mock_collector = server.mock(|when, then| {
-            when.method(Method::POST)
-                .path("/stub-path")
-                .body("test encoded event");
-            then.status(200);
-        });
+        Mock::given(method("POST"))
+            .and(path("/stub-path"))
+            .and(body_string("test encoded event"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&mock_server)
+            .await;
 
         let stub_sink = StubSink {
-            endpoint: server.base_url(),
+            endpoint: mock_server.uri(),
         };
 
         let (sink, _) = build_sink(
@@ -230,7 +231,7 @@ mod tests {
             BatchConfig::default(),
             Compression::None,
             Acker::Null,
-            &server.base_url(),
+            &mock_server.uri(),
             "token",
         )
         .unwrap();
@@ -239,20 +240,18 @@ mod tests {
 
         sink.send(Event::from("test event")).await.unwrap();
         sink.flush().await.unwrap();
-
-        mock_collector.assert()
     }
 
     #[tokio::test]
     async fn test_build_sink_healthcheck_200_response_returns_ok() {
-        let server = MockServer::start();
+        let mock_server = MockServer::start().await;
 
-        let _ = server.mock(|when, then| {
-            when.method(Method::GET)
-                .path("/services/collector/health/1.0")
-                .header("Authorization", "Splunk token");
-            then.status(200);
-        });
+        Mock::given(method("GET"))
+            .and(path("/services/collector/health/1.0"))
+            .and(header("Authorization", "Splunk token"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&mock_server)
+            .await;
 
         let (_, healthcheck) = build_sink(
             StubSink::default(),
@@ -262,7 +261,7 @@ mod tests {
             BatchConfig::default(),
             Compression::None,
             Acker::Null,
-            &server.base_url(),
+            &mock_server.uri(),
             "token",
         )
         .unwrap();
@@ -272,14 +271,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_sink_healthcheck_400_response_returns_error() {
-        let server = MockServer::start();
+        let mock_server = MockServer::start().await;
 
-        let _ = server.mock(|when, then| {
-            when.method(Method::GET)
-                .path("/services/collector/health/1.0")
-                .header("Authorization", "Splunk token");
-            then.status(400);
-        });
+        Mock::given(method("GET"))
+            .and(path("/services/collector/health/1.0"))
+            .and(header("Authorization", "Splunk token"))
+            .respond_with(ResponseTemplate::new(400))
+            .mount(&mock_server)
+            .await;
 
         let (_, healthcheck) = build_sink(
             StubSink::default(),
@@ -289,7 +288,7 @@ mod tests {
             BatchConfig::default(),
             Compression::None,
             Acker::Null,
-            &server.base_url(),
+            &mock_server.uri(),
             "token",
         )
         .unwrap();
@@ -302,14 +301,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_sink_healthcheck_503_response_returns_error() {
-        let server = MockServer::start();
+        let mock_server = MockServer::start().await;
 
-        let _ = server.mock(|when, then| {
-            when.method(Method::GET)
-                .path("/services/collector/health/1.0")
-                .header("Authorization", "Splunk token");
-            then.status(503);
-        });
+        Mock::given(method("GET"))
+            .and(path("/services/collector/health/1.0"))
+            .and(header("Authorization", "Splunk token"))
+            .respond_with(ResponseTemplate::new(503))
+            .mount(&mock_server)
+            .await;
 
         let (_, healthcheck) = build_sink(
             StubSink::default(),
@@ -319,7 +318,7 @@ mod tests {
             BatchConfig::default(),
             Compression::None,
             Acker::Null,
-            &server.base_url(),
+            &mock_server.uri(),
             "token",
         )
         .unwrap();
@@ -332,14 +331,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_build_sink_healthcheck_500_response_returns_error() {
-        let server = MockServer::start();
+        let mock_server = MockServer::start().await;
 
-        let _ = server.mock(|when, then| {
-            when.method(Method::GET)
-                .path("/services/collector/health/1.0")
-                .header("Authorization", "Splunk token");
-            then.status(500);
-        });
+        Mock::given(method("GET"))
+            .and(path("/services/collector/health/1.0"))
+            .and(header("Authorization", "Splunk token"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&mock_server)
+            .await;
 
         let (_, healthcheck) = build_sink(
             StubSink::default(),
@@ -349,7 +348,7 @@ mod tests {
             BatchConfig::default(),
             Compression::None,
             Acker::Null,
-            &server.base_url(),
+            &mock_server.uri(),
             "token",
         )
         .unwrap();
