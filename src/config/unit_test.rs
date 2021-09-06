@@ -15,16 +15,9 @@ pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     pipeline_paths: &[PathBuf],
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    config::init_log_schema(paths, false)?;
+    config::init_log_schema(paths, pipeline_paths, false)?;
 
-    let pipelines = if pipeline_paths.is_empty() {
-        let pipeline_paths = super::loading::pipeline_paths_from_config_paths(paths);
-        super::loading::load_pipelines_from_paths(&pipeline_paths)?
-    } else {
-        super::loading::load_pipelines_from_paths(pipeline_paths)?
-    };
-    let (mut config, _) = super::loading::load_builder_from_paths(paths)?;
-    config.set_pipelines(pipelines);
+    let (config, _) = super::loading::load_builder_and_pipelines_from_paths(paths, pipeline_paths)?;
 
     build_unit_tests(config).await
 }

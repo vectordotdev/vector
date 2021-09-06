@@ -146,21 +146,13 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    config::init_log_schema(&paths, true)
+    config::init_log_schema(&paths, &opts.pipeline_dirs, true)
         .map_err(&mut report_error)
         .ok()?;
-    let pipelines = if opts.pipeline_dirs.is_empty() {
-        let pipeline_paths = config::pipeline_paths_from_config_paths(&paths);
-        config::load_pipelines_from_paths(&pipeline_paths)
-    } else {
-        config::load_pipelines_from_paths(&opts.pipeline_dirs)
-    }
-    .map_err(&mut report_error)
-    .ok()?;
-    let (mut builder, load_warnings) = config::load_builder_from_paths(&paths)
-        .map_err(&mut report_error)
-        .ok()?;
-    builder.set_pipelines(pipelines);
+    let (builder, load_warnings) =
+        config::load_builder_and_pipelines_from_paths(&paths, &opts.pipeline_dirs)
+            .map_err(&mut report_error)
+            .ok()?;
 
     // Build
     let (config, build_warnings) = builder

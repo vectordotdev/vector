@@ -101,14 +101,8 @@ pub fn load_from_paths(
     config_paths: &[ConfigPath],
     pipeline_paths: &[PathBuf],
 ) -> Result<Config, Vec<String>> {
-    let pipelines = if pipeline_paths.is_empty() {
-        let pipeline_paths = pipeline_paths_from_config_paths(config_paths);
-        load_pipelines_from_paths(&pipeline_paths)?
-    } else {
-        load_pipelines_from_paths(pipeline_paths)?
-    };
-    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    builder.set_pipelines(pipelines);
+    let (builder, load_warnings) =
+        load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
@@ -125,14 +119,8 @@ pub async fn load_from_paths_with_provider(
     pipeline_paths: &[PathBuf],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
-    let pipelines = if pipeline_paths.is_empty() {
-        let pipeline_paths = pipeline_paths_from_config_paths(config_paths);
-        load_pipelines_from_paths(&pipeline_paths)?
-    } else {
-        load_pipelines_from_paths(pipeline_paths)?
-    };
-    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    builder.set_pipelines(pipelines);
+    let (mut builder, load_warnings) =
+        load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
@@ -151,7 +139,7 @@ pub async fn load_from_paths_with_provider(
     Ok(new_config)
 }
 
-pub fn pipeline_paths_from_config_paths(config_paths: &[ConfigPath]) -> Vec<PathBuf> {
+fn pipeline_paths_from_config_paths(config_paths: &[ConfigPath]) -> Vec<PathBuf> {
     config_paths
         .iter()
         .filter_map(|path| path.pipeline_dir())
@@ -159,11 +147,27 @@ pub fn pipeline_paths_from_config_paths(config_paths: &[ConfigPath]) -> Vec<Path
         .collect()
 }
 
-pub fn load_pipelines_from_paths(pipeline_paths: &[PathBuf]) -> Result<Pipelines, Vec<String>> {
+fn load_pipelines_from_paths(pipeline_paths: &[PathBuf]) -> Result<Pipelines, Vec<String>> {
     Pipelines::load_from_paths(pipeline_paths)
 }
 
-pub fn load_builder_from_paths(
+pub fn load_builder_and_pipelines_from_paths(
+    config_paths: &[ConfigPath],
+    pipeline_paths: &[PathBuf],
+) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+    let pipelines = if pipeline_paths.is_empty() {
+        let pipeline_paths = pipeline_paths_from_config_paths(config_paths);
+        load_pipelines_from_paths(&pipeline_paths)?
+    } else {
+        load_pipelines_from_paths(pipeline_paths)?
+    };
+    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    builder.set_pipelines(pipelines);
+
+    Ok((builder, load_warnings))
+}
+
+fn load_builder_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     let mut inputs = Vec::new();
