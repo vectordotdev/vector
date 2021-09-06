@@ -15,6 +15,9 @@ impl FramingConfig for LengthDelimitedDecoderConfig {
 }
 
 /// A codec for handling bytes sequences whose length is encoded in a frame head.
+///
+/// Currently, this expects a length header in 32-bit MSB by default; options to
+/// control the format of the header can be added in the future.
 #[derive(Debug)]
 pub struct LengthDelimitedCodec(tokio_util::codec::LengthDelimitedCodec);
 
