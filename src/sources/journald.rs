@@ -1,5 +1,5 @@
 use crate::{
-    codec::{BoxedFramingError, CharacterDelimitedCodec},
+    codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},

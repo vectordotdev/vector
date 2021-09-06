@@ -1,5 +1,5 @@
 use crate::{
-    codec::{BoxedFramingError, CharacterDelimitedCodec},
+    codecs::{BoxedFramingError, CharacterDelimitedCodec},
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},

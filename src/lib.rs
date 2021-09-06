@@ -38,7 +38,7 @@ pub mod app;
 pub mod async_read;
 pub mod buffers;
 #[cfg(feature = "codecs")]
-pub mod codec;
+pub mod codecs;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod graph;

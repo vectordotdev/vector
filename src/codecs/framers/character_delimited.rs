@@ -1,4 +1,4 @@
-use crate::codec::{BoxedFramer, BoxedFramingError, FramingConfig};
+use crate::codecs::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::{cmp, io, usize};

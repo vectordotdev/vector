@@ -1,5 +1,5 @@
 use crate::{
-    codec::CharacterDelimitedCodec,
+    codecs::CharacterDelimitedCodec,
     config::log_schema,
     event::{Event, LogEvent},
     sources::util::http::ErrorMessage,

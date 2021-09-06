@@ -1,5 +1,5 @@
 use crate::{
-    codec::{CharacterDelimitedCodec, FramingError},
+    codecs::{CharacterDelimitedCodec, FramingError},
     config::log_schema,
     event::Event,
     internal_events::aws_s3::source::{

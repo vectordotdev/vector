@@ -1,5 +1,5 @@
 use crate::{
-    codec::CharacterDelimitedCodec,
+    codecs::CharacterDelimitedCodec,
     event::Event,
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
