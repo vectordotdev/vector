@@ -14,10 +14,9 @@ pub struct IndexHandle(pub usize);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Condition<'a> {
-    Equals {
-        field: &'a str,
-        value: Value,
-    },
+    /// Condition exactly matches the field value.
+    Equals { field: &'a str, value: Value },
+    /// The date in the field is between from and to (inclusive).
     BetweenDates {
         field: &'a str,
         from: chrono::DateTime<chrono::Utc>,

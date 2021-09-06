@@ -231,7 +231,7 @@ impl Value {
         }
     }
 
-    /// Converts the Value into a byte representation regardless of it's original type.
+    /// Converts the Value into a byte representation regardless of its original type.
     /// Object and Array are currently not supported, although technically there's no reason why it
     /// couldn't in future should the need arise.
     pub fn encode_as_bytes(&self) -> Result<Bytes, String> {

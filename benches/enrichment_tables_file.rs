@@ -11,10 +11,10 @@ criterion_group!(
 );
 criterion_main!(benches);
 
-/// Returns the text of the column at the given position
+/// Returns the text of the column at the given position.
 fn column(col: usize, row: usize) -> Value {
     if col == 0 {
-        // A column that is duplicated across 10 rows
+        // A column that is duplicated across 10 rows.
         Value::from(format!("data-0-{}", row / 10 * 10))
     } else if col == 1 {
         // And a final column with a date, each of the above duplicated row should have
@@ -31,14 +31,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     let setup = |size, date_range| {
         let data = (0..size)
             .map(|row| {
-                // Add 8 columns
+                // Add 8 columns.
                 (0..10).map(|col| column(col, row)).collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
 
         let mut file = File::new(
             data,
-            // Headers
+            // Headers.
             (0..10)
                 .map(|header| format!("field-{}", header))
                 .collect::<Vec<_>>(),

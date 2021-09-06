@@ -122,8 +122,7 @@ impl EnrichmentTableConfig for FileConfig {
         } else {
             // If there are no headers in the datafile we make headers as the numerical index of
             // the column.
-            let mut dataiter = reader.records();
-            match dataiter.next() {
+            match reader.records().next() {
                 Some(Ok(row)) => (0..row.len()).map(|idx| idx.to_string()).collect(),
                 _ => Vec::new(),
             }
@@ -187,7 +186,8 @@ impl File {
                     (Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
                         match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
                             (Ok(s1), Ok(s2)) => s1.to_lowercase() == s2.to_lowercase(),
-                            _ => bytes1 == bytes2,
+                            (Err(_), Err(_)) => bytes1 == bytes2,
+                            _ => false,
                         }
                     }
                     (value1, value2) => value1 == value2,
@@ -256,7 +256,7 @@ impl File {
         Ok(index)
     }
 
-    /// Sequentially searches through the iterator for the given condition
+    /// Sequentially searches through the iterator for the given condition.
     fn sequential<'a, I>(
         &'a self,
         data: I,
