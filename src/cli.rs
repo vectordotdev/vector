@@ -188,7 +188,7 @@ impl RootOpts {
         .collect()
     }
 
-    pub fn pipeline_paths(&self) -> &Vec<PathBuf> {
+    pub const fn pipeline_paths(&self) -> &Vec<PathBuf> {
         &self.pipeline_dirs
     }
 }
