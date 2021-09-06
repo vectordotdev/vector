@@ -299,7 +299,7 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     metrics
 }
 
-fn init_roots() {
+const fn init_roots() {
     #[cfg(target_os = "linux")]
     {
         use std::sync::Once;

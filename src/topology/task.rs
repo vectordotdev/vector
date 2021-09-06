@@ -39,12 +39,12 @@ impl Task {
         }
     }
 
-    const pub fn key(&self) -> &ComponentKey {
+    pub const fn key(&self) -> &ComponentKey {
         &self.key
     }
 
     pub fn typetag(&self) -> &str {
-        &self.typetag
+        self.typetag.as_str()
     }
 }
 
