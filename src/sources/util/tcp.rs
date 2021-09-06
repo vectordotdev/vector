@@ -256,7 +256,7 @@ async fn handle_stream<T>(
                         }
                     }
                     Some(Err(error)) => {
-                        if <<T as TcpSource>::Error as TcpError>::is_fatal(&error) {
+                        if !<<T as TcpSource>::Error as TcpError>::can_continue(&error) {
                             warn!(message = "Failed to read data from TCP source.", %error);
                             break;
                         }

@@ -46,10 +46,10 @@ impl From<std::io::Error> for Error {
 }
 
 impl TcpError for Error {
-    fn is_fatal(&self) -> bool {
+    fn can_continue(&self) -> bool {
         match self {
-            Self::FramingError(error) => error.is_fatal(),
-            Self::ParsingError(_) => false,
+            Self::FramingError(error) => error.can_continue(),
+            Self::ParsingError(_) => true,
         }
     }
 }

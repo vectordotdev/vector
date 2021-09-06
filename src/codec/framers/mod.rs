@@ -40,8 +40,8 @@ impl From<LinesCodecError> for BoxedFramingError {
 pub type BoxedFramingError = Box<dyn FramingError>;
 
 impl TcpError for BoxedFramingError {
-    fn is_fatal(&self) -> bool {
-        self.as_ref().is_fatal()
+    fn can_continue(&self) -> bool {
+        self.as_ref().can_continue()
     }
 }
 

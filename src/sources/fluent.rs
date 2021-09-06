@@ -125,12 +125,12 @@ impl std::fmt::Display for DecodeError {
 }
 
 impl TcpError for DecodeError {
-    fn is_fatal(&self) -> bool {
+    fn can_continue(&self) -> bool {
         match self {
-            DecodeError::IO(_) => true,
-            DecodeError::Decode(_) => false,
-            DecodeError::UnknownCompression(_) => false,
-            DecodeError::UnexpectedValue(_) => false,
+            DecodeError::IO(_) => false,
+            DecodeError::Decode(_) => true,
+            DecodeError::UnknownCompression(_) => true,
+            DecodeError::UnexpectedValue(_) => true,
         }
     }
 }

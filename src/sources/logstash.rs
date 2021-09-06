@@ -162,15 +162,15 @@ pub enum DecodeError {
 }
 
 impl TcpError for DecodeError {
-    fn is_fatal(&self) -> bool {
+    fn can_continue(&self) -> bool {
         use DecodeError::*;
 
         match self {
-            IO { .. } => true,
-            UnknownProtocolVersion { .. } => true,
-            UnknownFrameType { .. } => true,
-            JsonFrameFailedDecode { .. } => false,
-            DecompressionFailed { .. } => false,
+            IO { .. } => false,
+            UnknownProtocolVersion { .. } => false,
+            UnknownFrameType { .. } => false,
+            JsonFrameFailedDecode { .. } => true,
+            DecompressionFailed { .. } => true,
         }
     }
 }
