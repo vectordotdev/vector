@@ -31,7 +31,7 @@ where
     B: 'static,
 {
     /// Create a new [`ApiWatcher`].
-    pub fn new(client: Client, request_builder: B) -> Self {
+    pub const fn new(client: Client, request_builder: B) -> Self {
         Self {
             client,
             request_builder,

@@ -51,7 +51,7 @@ _values: {
 // * `deprecated` - The component will be removed in a future version.
 #DevelopmentStatus: "beta" | "stable" | "deprecated"
 
-#EncodingCodec: "json" | "ndjson" | "text"
+#EncodingCodec: "json" | "logfmt" | "ndjson" | "text"
 
 #Endpoint: {
 	description: string
@@ -225,7 +225,7 @@ _values: {
 	}
 }
 
-#Protocol: "http" | "tcp" | "udp" | "unix"
+#Protocol: "http" | "tcp" | "udp" | "unix" | "unix_datagram" | "unix_stream"
 
 #Service: {
 	// `description` describes the components with a single paragraph.

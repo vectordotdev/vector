@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 /// order they are received from the source*. The type `T` is the
 /// source-specific data associated with each entry to be used to
 /// complete the finalization.
-pub(crate) struct OrderedFinalizer<T> {
+pub struct OrderedFinalizer<T> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
 }
 

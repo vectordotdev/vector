@@ -1,8 +1,16 @@
-use super::{builder::ConfigBuilder, validation, ComponentId, Config, ExpandType, TransformOuter};
-use indexmap::IndexMap;
+use super::{builder::ConfigBuilder, validation, ComponentKey, Config, ExpandType, TransformOuter};
+use indexmap::{IndexMap, IndexSet};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
+
+    if let Err(pipeline_errors) = validation::check_pipelines(&builder.pipelines) {
+        errors.extend(pipeline_errors);
+    }
+
+    if let Err(merge_errors) = builder.merge_pipelines() {
+        errors.extend(merge_errors);
+    }
 
     let expansions = expand_macros(&mut builder)?;
 
@@ -36,7 +44,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
                 sinks: builder.sinks,
                 transforms: builder.transforms,
                 tests: builder.tests,
-                pipelines: builder.pipelines,
                 expansions,
             },
             warnings,
@@ -50,7 +57,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 /// configs. Performs those expansions and records the relevant metadata.
 pub(super) fn expand_macros(
     config: &mut ConfigBuilder,
-) -> Result<IndexMap<ComponentId, Vec<ComponentId>>, Vec<String>> {
+) -> Result<IndexMap<ComponentKey, Vec<ComponentKey>>, Vec<String>> {
     let mut expanded_transforms = IndexMap::new();
     let mut expansions = IndexMap::new();
     let mut errors = Vec::new();
@@ -67,7 +74,7 @@ pub(super) fn expand_macros(
             let mut inputs = t.inputs.clone();
 
             for (name, child) in expanded {
-                let full_name = ComponentId::from(format!("{}.{}", k, name));
+                let full_name = ComponentKey::from(format!("{}.{}", k, name));
 
                 expanded_transforms.insert(
                     full_name.clone(),
@@ -103,7 +110,7 @@ fn expand_globs(config: &mut ConfigBuilder) {
         .keys()
         .chain(config.transforms.keys())
         .cloned()
-        .collect::<Vec<ComponentId>>();
+        .collect::<IndexSet<ComponentKey>>();
 
     for (id, transform) in config.transforms.iter_mut() {
         expand_globs_inner(&mut transform.inputs, id, &candidates);
@@ -130,7 +137,11 @@ impl InputMatcher {
     }
 }
 
-fn expand_globs_inner(inputs: &mut Vec<ComponentId>, id: &ComponentId, candidates: &[ComponentId]) {
+fn expand_globs_inner(
+    inputs: &mut Vec<ComponentKey>,
+    id: &ComponentKey,
+    candidates: &IndexSet<ComponentKey>,
+) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
         let matcher = glob::Pattern::new(&raw_input.to_string())
@@ -139,10 +150,17 @@ fn expand_globs_inner(inputs: &mut Vec<ComponentId>, id: &ComponentId, candidate
                 warn!(message = "Invalid glob pattern for input.", component_id = %id, %error);
                 InputMatcher::String(raw_input.to_string())
             });
+        let mut matched = false;
         for input in candidates {
             if matcher.matches(&input.to_string()) && input != id {
+                matched = true;
                 inputs.push(input.clone())
             }
+        }
+        // If it didn't work as a glob pattern, leave it in the inputs as-is. This lets us give
+        // more accurate error messages about non-existent inputs.
+        if !matched {
+            inputs.push(raw_input)
         }
     }
 }
@@ -239,42 +257,42 @@ mod test {
         assert_eq!(
             config
                 .transforms
-                .get(&ComponentId::from("foos"))
+                .get(&ComponentKey::from("foos"))
                 .map(|item| item.inputs.clone())
                 .unwrap(),
-            vec![ComponentId::from("foo1"), ComponentId::from("foo2")]
+            vec![ComponentKey::from("foo1"), ComponentKey::from("foo2")]
         );
         assert_eq!(
             config
                 .sinks
-                .get(&ComponentId::from("baz"))
+                .get(&ComponentKey::from("baz"))
                 .map(|item| item.inputs.clone())
                 .unwrap(),
-            vec![ComponentId::from("foos"), ComponentId::from("bar")]
+            vec![ComponentKey::from("foos"), ComponentKey::from("bar")]
         );
         assert_eq!(
             config
                 .sinks
-                .get(&ComponentId::from("quux"))
+                .get(&ComponentKey::from("quux"))
                 .map(|item| item.inputs.clone())
                 .unwrap(),
             vec![
-                ComponentId::from("foo1"),
-                ComponentId::from("foo2"),
-                ComponentId::from("bar"),
-                ComponentId::from("foos")
+                ComponentKey::from("foo1"),
+                ComponentKey::from("foo2"),
+                ComponentKey::from("bar"),
+                ComponentKey::from("foos")
             ]
         );
         assert_eq!(
             config
                 .sinks
-                .get(&ComponentId::from("quix"))
+                .get(&ComponentKey::from("quix"))
                 .map(|item| item.inputs.clone())
                 .unwrap(),
             vec![
-                ComponentId::from("foo1"),
-                ComponentId::from("foo2"),
-                ComponentId::from("foos")
+                ComponentKey::from("foo1"),
+                ComponentKey::from("foo2"),
+                ComponentKey::from("foos")
             ]
         );
     }

@@ -2,19 +2,20 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    enrichment, function, state, type_def::Index, value, Context, Expression, Function, Program,
-    Target, Value,
+    function, state, type_def::Index, value, Context, Expression, Function, Program, Target, Value,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
+use std::any::Any;
 
 /// Compile a given source into the final [`Program`].
 pub fn compile(
     source: &str,
-    enrichment_tables: Box<dyn enrichment::TableSetup>,
     fns: &[Box<dyn Function>],
+    external_context: Option<Box<dyn Any>>,
 ) -> compiler::Result {
-    let mut state = state::Compiler::new_with_enrichment_tables(enrichment_tables);
+    let mut state = state::Compiler::new();
+    state.set_external_context(external_context);
 
     compile_with_state(source, fns, &mut state)
 }

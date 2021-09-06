@@ -1,10 +1,10 @@
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use enrichment::{Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hasher;
 use std::path::PathBuf;
 use tracing::trace;
-use vector_core::enrichment::{Condition, IndexHandle, Table};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -37,7 +37,7 @@ struct FileConfig {
     file: FileC,
 }
 
-fn default_delimiter() -> char {
+const fn default_delimiter() -> char {
     ','
 }
 
@@ -263,14 +263,14 @@ mod tests {
     fn seahash() {
         // Ensure we can separate fields to create a distinct hash.
         let mut one = seahash::SeaHasher::default();
-        one.write("norknoog".as_bytes());
+        one.write(b"norknoog");
         one.write_u8(0);
-        one.write("donk".as_bytes());
+        one.write(b"donk");
 
         let mut two = seahash::SeaHasher::default();
-        two.write("nork".as_bytes());
+        two.write(b"nork");
         one.write_u8(0);
-        two.write("noogdonk".as_bytes());
+        two.write(b"noogdonk");
 
         assert_ne!(one.finish(), two.finish());
     }

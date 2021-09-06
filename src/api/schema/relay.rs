@@ -25,7 +25,7 @@ pub struct Base64Cursor {
 }
 
 impl Base64Cursor {
-    fn new(index: usize) -> Self {
+    const fn new(index: usize) -> Self {
         Self {
             name: "Cursor",
             index,
@@ -56,8 +56,9 @@ impl Base64Cursor {
         Ok(Self::new(index))
     }
 
-    /// Increment and return the index. Uses saturating_add to avoid overflow issues.
-    fn increment(&self) -> usize {
+    /// Increment and return the index. Uses saturating_add to avoid overflow
+    /// issues.
+    const fn increment(&self) -> usize {
         self.index.saturating_add(1)
     }
 }
@@ -100,7 +101,7 @@ pub struct Params {
 }
 
 impl Params {
-    pub fn new(
+    pub const fn new(
         after: Option<String>,
         before: Option<String>,
         first: Option<i32>,

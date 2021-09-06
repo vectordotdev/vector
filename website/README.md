@@ -74,6 +74,18 @@ The Algolia configuration for the site is controlled via the [`algolia.json`](./
 
 > Everything needed to configure Algolia search for vector.dev is in this repo; you should never make manual configuration changes through the Algolia dashboard.
 
+#### De-indexing pages
+
+If you need to prevent a page from being indexed, you can add `noindex: true` to the page's metadata. Here's an
+example:
+
+```yaml
+---
+title: Don't index me, bro
+noindex: true
+---
+```
+
 ### Icons
 
 vector.dev uses two different icon sets for different purposes:

@@ -1,0 +1,5 @@
+cognitive-complexity-threshold = 75
+
+# for `disallowed_method`:
+# https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_method
+disallowed-methods = []

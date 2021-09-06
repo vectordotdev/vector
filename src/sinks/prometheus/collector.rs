@@ -366,7 +366,7 @@ impl MetricCollector for TimeSeries {
     }
 }
 
-fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType {
+const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType {
     use proto::MetricType;
     match metric_value {
         MetricValue::Counter { .. } => MetricType::Counter,
