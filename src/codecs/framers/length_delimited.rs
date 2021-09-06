@@ -53,14 +53,14 @@ impl Decoder for LengthDelimitedCodec {
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.0
             .decode(src)
-            .map(|bytes| bytes.map(Into::into))
+            .map(|bytes| bytes.map(BytesMut::freeze))
             .map_err(Into::into)
     }
 
     fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.0
             .decode_eof(src)
-            .map(|bytes| bytes.map(Into::into))
+            .map(|bytes| bytes.map(BytesMut::freeze))
             .map_err(Into::into)
     }
 }
