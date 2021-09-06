@@ -2,9 +2,11 @@
 
 mod character_delimited;
 mod length_delimited;
+mod newline_delimited;
 
 pub use character_delimited::{CharacterDelimitedCodec, CharacterDelimitedDecoderConfig};
 pub use length_delimited::{LengthDelimitedCodec, LengthDelimitedDecoderConfig};
+pub use newline_delimited::{NewlineDelimitedCodec, NewlineDelimitedDecoderConfig};
 
 use crate::sources::util::TcpError;
 use ::bytes::Bytes;
