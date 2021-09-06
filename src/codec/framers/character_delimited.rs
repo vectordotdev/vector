@@ -138,16 +138,12 @@ impl Decoder for CharacterDelimitedCodec {
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Self::Error> {
-        let frame = match self.decode(buf)? {
-            Some(frame) => Some(frame),
-            None if !buf.is_empty() && !self.is_discarding => {
-                let frame = buf.split_to(buf.len());
+        let frame = self.decode(buf)?.or_else(|| {
+            (!buf.is_empty() && !self.is_discarding).then(|| {
                 self.next_index = 0;
-
-                Some(frame.into())
-            }
-            _ => None,
-        };
+                buf.split_to(buf.len()).into()
+            })
+        });
 
         Ok(frame)
     }
