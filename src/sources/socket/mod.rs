@@ -511,14 +511,14 @@ mod test {
 
     async fn init_udp_inner(
         sender: Pipeline,
-        source_id: &ComponentKey,
+        source_key: &ComponentKey,
         shutdown_signal: ShutdownSignal,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let address = next_addr();
 
         let server = SocketConfig::from(UdpConfig::from_address(address))
             .build(SourceContext {
-                id: source_id.clone(),
+                key: source_key.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,

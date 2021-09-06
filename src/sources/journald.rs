@@ -136,7 +136,7 @@ impl SourceConfig for JournaldConfig {
         let data_dir = cx
             .globals
             // source are only global, name can be used for subdir
-            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.id.to_string())?;
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
         if let Some(unit) = self
             .include_units
