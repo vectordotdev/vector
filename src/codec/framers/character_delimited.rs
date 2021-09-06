@@ -10,6 +10,8 @@ pub struct CharacterDelimitedDecoderConfig {
     /// The character that delimits byte sequences.
     delimiter: char,
     /// The maximum length of the byte buffer.
+    ///
+    /// This length does *not* include the trailing delimiter.
     max_length: Option<usize>,
 }
 
