@@ -99,7 +99,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
-            .fallible()
+            .infallible()
             .add_object::<(), Kind>(map! { (): Kind::Bytes })
     }
 }
