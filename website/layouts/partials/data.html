@@ -1758,10 +1758,12 @@
 {{ end }}
 
 {{ define "code" }}
-{{ if or (reflect.IsMap .) (reflect.IsSlice .) }}
+{{ if or (reflect.IsMap .) (reflect.IsSlice .) }} {{/* If a map or array, highlight as JSON */}}
 {{ $json := . | jsonify (dict "indent" "  ") }}
 {{ highlight $json "json" "" }}
-{{ else }}
+{{ else if hasPrefix . "```" }} {{/* If a code sample, translate into Markdown */}}
+{{ . | markdownify }}
+{{ else }} {{/* If just a plain old string, use Ruby syntax highlighting as a best guess */}}
 {{ highlight . "ruby" "" }}
 {{ end }}
 {{ end }}
