@@ -80,8 +80,6 @@ where
     pub(crate) last_compaction: Instant,
     // Pending read from the LevelDB datasbase
     pub(crate) pending_read: Option<JoinHandle<Vec<(Key, Vec<u8>)>>>,
-    //pub(crate) in_flight_reads: usize,
-    //pub(crate) total_reads: usize,
     pub(crate) phantom: PhantomData<T>,
 }
 
@@ -127,33 +125,25 @@ where
                                 .collect::<Vec<_>>()
                         });
 
-                        //trace!("queued up blocking read at offset={} (in-flight={}, total-reads={})",
-                        //    this.read_offset, this.in_flight_reads, this.total_reads);
-
                         // Store the handle, and let the loop come back around.
                         this.pending_read = Some(handle);
-                        //this.in_flight_reads += 1;
-                        //this.total_reads += 1;
                     }
-                    Some(mut handle) => {
-                        match Pin::new(&mut handle).poll(cx) {
-                            Poll::Ready(r) => {
-                                match r {
-                                    Ok(items) => this.buffer.extend(items),
-                                    Err(e) => error!("error during read: {}", e),
-                                }
-
-                                this.pending_read = None;
-                                //this.in_flight_reads -= 1;
-
-                                break;
+                    Some(mut handle) => match Pin::new(&mut handle).poll(cx) {
+                        Poll::Ready(r) => {
+                            match r {
+                                Ok(items) => this.buffer.extend(items),
+                                Err(e) => error!("error during read: {}", e),
                             }
-                            Poll::Pending => {
-                                this.pending_read = Some(handle);
-                                return Poll::Pending;
-                            }
+
+                            this.pending_read = None;
+
+                            break;
                         }
-                    }
+                        Poll::Pending => {
+                            this.pending_read = Some(handle);
+                            return Poll::Pending;
+                        }
+                    },
                 }
             }
 
@@ -178,7 +168,6 @@ where
             // There are no writers left
             Poll::Ready(None)
         } else {
-            //trace!("going to sleep");
             Poll::Pending
         }
     }

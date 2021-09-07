@@ -1178,37 +1178,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "console-api"
-version = "0.1.0"
-source = "git+https://github.com/tokio-rs/console#3c04f65b4e92ce69db5eafc309d39a98f861beef"
-dependencies = [
- "prost",
- "prost-types",
- "tonic",
- "tonic-build",
- "tracing-core 0.1.19",
-]
-
-[[package]]
-name = "console-subscriber"
-version = "0.1.0"
-source = "git+https://github.com/tokio-rs/console#3c04f65b4e92ce69db5eafc309d39a98f861beef"
-dependencies = [
- "console-api",
- "futures 0.3.17",
- "hdrhistogram",
- "serde",
- "serde_json",
- "thread_local",
- "tokio",
- "tokio-stream",
- "tonic",
- "tracing 0.1.26",
- "tracing-core 0.1.19",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "const_fn"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2646,19 +2615,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 dependencies = [
  "ahash",
-]
-
-[[package]]
-name = "hdrhistogram"
-version = "7.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faa51471caf8069812385974ce947bf4b71a806d7e5a0d1f710af57d6a9a45ad"
-dependencies = [
- "base64 0.13.0",
- "byteorder",
- "flate2",
- "nom 6.1.2",
- "num-traits",
 ]
 
 [[package]]
@@ -6961,7 +6917,6 @@ dependencies = [
  "pin-project-lite",
  "signal-hook-registry",
  "tokio-macros",
- "tracing 0.1.26",
  "winapi 0.3.9",
 ]
 
@@ -7728,7 +7683,6 @@ dependencies = [
  "cidr-utils",
  "codec",
  "colored",
- "console-subscriber",
  "criterion",
  "crossterm 0.21.0",
  "csv",
