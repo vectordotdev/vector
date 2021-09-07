@@ -9,6 +9,7 @@ pub struct NewlineDelimitedDecoderConfig {
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
+    #[serde(default)]
     max_length: Option<usize>,
 }
 
