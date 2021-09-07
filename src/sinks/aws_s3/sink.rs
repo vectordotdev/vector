@@ -109,9 +109,7 @@ where
             .expect("same sink should not be run twice");
 
         let io = run_io(io_rx, service, acker).in_current_span();
-        let _ = tokio::spawn(async move {
-            io.await;
-        });
+        let _ = tokio::spawn(io);
 
         let batcher = Batcher::new(
             input,
