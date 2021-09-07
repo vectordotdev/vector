@@ -154,7 +154,8 @@ components: sinks: [Name=string]: {
 			if features.send.encoding.enabled {
 				encoding: {
 					description: "Configures the encoding specific sink behavior."
-					required:    true
+					required:    false
+					common:      true
 					type: object: options: {
 						if features.send.encoding.codec.enabled {
 							codec: {
@@ -244,6 +245,9 @@ components: sinks: [Name=string]: {
 					common:      false
 					description: "Configures the sink request behavior."
 					required:    false
+					if features.send.request.relevant_when != _|_ {
+						relevant_when: features.send.request.relevant_when
+					}
 					type: object: {
 						examples: []
 						options: {
@@ -266,11 +270,13 @@ components: sinks: [Name=string]: {
 											required:    false
 											type: float: default: 0.7
 										}
-										rtt_threshold_ratio: {
-											common:      false
-											description: "When comparing the past RTT average to the current measurements, we ignore changes that are less than this ratio higher than the past RTT. Valid values are greater than or equal to 0. Larger values cause the algorithm to ignore larger increases in the RTT."
-											required:    false
-											type: float: default: 0.05
+										rtt_deviation_scale: {
+											common: false
+											description: """
+                                                When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
+                                            """
+											required: false
+											type: float: default: 2.0
 										}
 									}
 								}
@@ -368,15 +374,19 @@ components: sinks: [Name=string]: {
 		}
 
 		if features.send != _|_ {
-			if features.send.send_buffer_size != _|_ {
+			if features.send.send_buffer_bytes != _|_ {
 				send_buffer_bytes: {
 					common:      false
 					description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
 					required:    false
 					type: uint: {
+						default: null
 						examples: [65536]
+						unit: "bytes"
 					}
-					relevant_when: features.send.send_buffer_bytes.relevant_when
+					if features.send.send_buffer_bytes.relevant_when != _|_ {
+						relevant_when: features.send.send_buffer_bytes.relevant_when
+					}
 				}
 			}
 
@@ -524,14 +534,8 @@ components: sinks: [Name=string]: {
 
 								We highly recommend enabling this feature as it improves
 								performance and reliability of Vector and the systems it
-								communicates with.
-
-								To enable, set the `request.concurrency` option to `adaptive`:
-
-								```toml title="vector.toml"
-								[sinks.my-sink]
-								  request.concurrency = "adaptive"
-								```
+								communicates with. As such, we have made it the default,
+								and no further configuration is required.
 								"""
 						},
 						{
@@ -593,5 +597,6 @@ components: sinks: [Name=string]: {
 	telemetry: metrics: {
 		events_in_total:  components.sources.internal_metrics.output.metrics.events_in_total
 		events_out_total: components.sources.internal_metrics.output.metrics.events_out_total
+		utilization:      components.sources.internal_metrics.output.metrics.utilization
 	}
 }

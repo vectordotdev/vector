@@ -13,7 +13,7 @@ use leveldb::database::{
     options::{Options, ReadOptions},
     Database,
 };
-use reader::Reader;
+pub use reader::Reader;
 use snafu::ResultExt;
 use std::fmt::Debug;
 use std::{

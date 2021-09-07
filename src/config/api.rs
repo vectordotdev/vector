@@ -24,18 +24,18 @@ impl Default for Options {
     }
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     false
 }
 
 /// By default, the API binds to 127.0.0.1:8686. This function should remain public;
 /// `vector top`  will use it to determine which to connect to by default, if no URL
-/// override is provided
+/// override is provided.
 pub fn default_address() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
 }
 
-fn default_playground() -> bool {
+const fn default_playground() -> bool {
     true
 }
 

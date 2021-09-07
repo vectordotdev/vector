@@ -13,7 +13,7 @@ use futures::{stream, SinkExt, StreamExt};
 use glob::{Pattern, PatternError};
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
-use heim::{units::time::second, Error};
+use heim::units::time::second;
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -26,6 +26,8 @@ use std::path::Path;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 
+#[cfg(target_os = "linux")]
+mod cgroups;
 mod cpu;
 mod disk;
 mod filesystem;
@@ -35,6 +37,8 @@ mod network;
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum Collector {
+    #[cfg(target_os = "linux")]
+    Cgroups,
     Cpu,
     Disk,
     Filesystem,
@@ -69,6 +73,9 @@ pub struct HostMetricsConfig {
     #[serde(default)]
     namespace: Namespace,
 
+    #[cfg(target_os = "linux")]
+    #[serde(default)]
+    cgroups: cgroups::CgroupsConfig,
     #[serde(default)]
     disk: disk::DiskConfig,
     #[serde(default)]
@@ -133,6 +140,10 @@ impl HostMetricsConfig {
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
         let mut metrics = Vec::new();
+        #[cfg(target_os = "linux")]
+        if self.has_collector(Collector::Cgroups) {
+            metrics.extend(add_collector("cgroups", self.cgroups_metrics().await));
+        }
         if self.has_collector(Collector::Cpu) {
             metrics.extend(add_collector("cpu", self.cpu_metrics().await));
         }
@@ -265,10 +276,20 @@ impl HostMetricsConfig {
     }
 }
 
-pub(self) async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Option<T> {
+pub(self) fn filter_result_sync<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
+where
+    E: std::error::Error,
+{
     result
         .map_err(|error| error!(message, %error, internal_log_rate_secs = 60))
         .ok()
+}
+
+pub(self) async fn filter_result<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
+where
+    E: std::error::Error,
+{
+    filter_result_sync(result, message)
 }
 
 fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
@@ -278,6 +299,7 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     metrics
 }
 
+#[allow(clippy::missing_const_for_fn)]
 fn init_roots() {
     #[cfg(target_os = "linux")]
     {
@@ -474,6 +496,8 @@ pub(self) mod tests {
         let all_metrics_count = HostMetricsConfig::default().capture_metrics().await.count();
 
         for collector in &[
+            #[cfg(target_os = "linux")]
+            Collector::Cgroups,
             Collector::Cpu,
             Collector::Disk,
             Collector::Filesystem,

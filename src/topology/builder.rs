@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{ComponentId, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
+    config::{ComponentKey, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
     event::Event,
     internal_events::{EventIn, EventOut},
     shutdown::SourceShutdownCoordinator,
@@ -22,20 +22,19 @@ use std::{
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
-use vector_core::enrichment;
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentId, (buffers::BufferInputCloner<Event>, Vec<ComponentId>)>,
-    pub outputs: HashMap<ComponentId, fanout::ControlChannel>,
-    pub tasks: HashMap<ComponentId, Task>,
-    pub source_tasks: HashMap<ComponentId, Task>,
-    pub healthchecks: HashMap<ComponentId, Task>,
+    pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<ComponentKey>)>,
+    pub outputs: HashMap<ComponentKey, fanout::ControlChannel>,
+    pub tasks: HashMap<ComponentKey, Task>,
+    pub source_tasks: HashMap<ComponentKey, Task>,
+    pub healthchecks: HashMap<ComponentKey, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
-    pub detach_triggers: HashMap<ComponentId, Trigger>,
+    pub detach_triggers: HashMap<ComponentKey, Trigger>,
     pub enrichment_tables: enrichment::TableRegistry,
 }
 
@@ -43,7 +42,7 @@ pub struct Pieces {
 pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
-    mut buffers: HashMap<ComponentId, BuiltBuffer>,
+    mut buffers: HashMap<ComponentKey, BuiltBuffer>,
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
@@ -70,7 +69,7 @@ pub async fn build_pieces(
                 continue;
             }
         };
-        enrichment_tables.insert(name.as_str().to_string(), table);
+        enrichment_tables.insert(name.to_string(), table);
     }
 
     // Build sources
@@ -343,7 +342,7 @@ pub async fn build_pieces(
     }
 }
 
-fn filter_event_type(event: &Event, data_type: DataType) -> bool {
+const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
     match data_type {
         DataType::Any => true,
         DataType::Log => matches!(event, Event::Log(_)),

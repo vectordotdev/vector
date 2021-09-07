@@ -3,7 +3,7 @@ use crate::template::TemplateParseError;
 use metrics::counter;
 use std::num::ParseFloatError;
 
-pub(crate) struct LogToMetricFieldNull<'a> {
+pub struct LogToMetricFieldNull<'a> {
     pub field: &'a str,
 }
 
@@ -23,7 +23,7 @@ impl<'a> InternalEvent for LogToMetricFieldNull<'a> {
     }
 }
 
-pub(crate) struct LogToMetricFieldNotFound<'a> {
+pub struct LogToMetricFieldNotFound<'a> {
     pub field: &'a str,
 }
 
@@ -43,7 +43,7 @@ impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
     }
 }
 
-pub(crate) struct LogToMetricParseFloatError<'a> {
+pub struct LogToMetricParseFloatError<'a> {
     pub field: &'a str,
     pub error: ParseFloatError,
 }
@@ -65,7 +65,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     }
 }
 
-pub(crate) struct LogToMetricTemplateParseError {
+pub struct LogToMetricTemplateParseError {
     pub error: TemplateParseError,
 }
 

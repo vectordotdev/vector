@@ -29,6 +29,7 @@ use crate::internal_events::{
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
+    pub pipeline_paths: Vec<PathBuf>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -116,6 +117,7 @@ impl Application {
 
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
+            let pipeline_paths = root_opts.pipeline_paths();
             let watch_config = root_opts.watch_config;
             let require_healthy = root_opts.require_healthy;
 
@@ -136,6 +138,7 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(feature = "api-client")]
                         SubCommand::Tap(t) => tap::cmd(&t).await,
+
                         SubCommand::Validate(v) => validate::validate(&v, color).await,
                         #[cfg(feature = "vrl-cli")]
                         SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),
@@ -160,17 +163,25 @@ impl Application {
                     paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
-                config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
+                config::init_log_schema(&config_paths, pipeline_paths, true)
+                    .map_err(handle_config_errors)?;
 
-                let mut config =
-                    config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
-                        .await
-                        .map_err(handle_config_errors)?;
+                let mut config = config::load_from_paths_with_provider(
+                    &config_paths,
+                    pipeline_paths,
+                    &mut signal_handler,
+                )
+                .await
+                .map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
                 }
                 config.healthchecks.set_require_healthy(require_healthy);
+
+                #[cfg(feature = "datadog-pipelines")]
+                // Augment config to enable observability within Datadog, if applicable.
+                config::datadog::try_attach(&mut config);
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -185,6 +196,7 @@ impl Application {
 
                 Ok(ApplicationConfig {
                     config_paths,
+                    pipeline_paths: pipeline_paths.clone(),
                     topology,
                     graceful_crash,
                     #[cfg(feature = "api")]
@@ -254,6 +266,10 @@ impl Application {
                                 match config_builder.build().map_err(handle_config_errors) {
                                     Ok(mut new_config) => {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
+
+                                        #[cfg(feature = "datadog-pipelines")]
+                                        config::datadog::try_attach(&mut new_config);
+
                                         match topology
                                             .reload_config_and_respawn(new_config)
                                             .await
@@ -285,13 +301,18 @@ impl Application {
                             SignalTo::ReloadFromDisk => {
                                 // Reload paths
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
+
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider(&config_paths, opts.pipeline_paths(), &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 
                                 if let Some(mut new_config) = new_config {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
+
+                                    #[cfg(feature = "datadog-pipelines")]
+                                    config::datadog::try_attach(&mut new_config);
+
                                     match topology
                                         .reload_config_and_respawn(new_config)
                                         .await

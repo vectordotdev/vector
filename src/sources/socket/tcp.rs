@@ -34,12 +34,12 @@ fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
 impl TcpConfig {
-    pub fn new(
+    pub const fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         max_length: usize,

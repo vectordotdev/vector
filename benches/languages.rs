@@ -56,18 +56,6 @@ fn benchmark_add_fields(c: &mut Criterion) {
                   hooks.process = "process"
             "#},
         ),
-        (
-            "wasm",
-            indoc! {r#"
-                [transforms.last]
-                  type = "wasm"
-                  inputs = ["in"]
-                  module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
-                  artifact_cache = "target/artifacts/"
-                  options.four = 4
-                  options.five = 5
-            "#},
-        ),
     ];
 
     let input = "";
@@ -115,16 +103,6 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   end
                   """
                   hooks.process = "process"
-            "#},
-        ),
-        (
-            "wasm",
-            indoc! {r#"
-                [transforms.last]
-                  type = "wasm"
-                  inputs = ["in"]
-                  module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
-                  artifact_cache = "target/artifacts/"
             "#},
         ),
     ];
@@ -187,16 +165,6 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   end
                   """
                   hooks.process = "process"
-            "#},
-        ),
-        (
-            "wasm",
-            indoc! {r#"
-                [transforms.last]
-                  type = "wasm"
-                  inputs = ["in"]
-                  module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
-                  artifact_cache = "target/artifacts/"
             "#},
         ),
     ];
@@ -289,16 +257,6 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   hooks.process = "process"
             "#},
         ),
-        (
-            "wasm",
-            indoc! {r#"
-                [transforms.last]
-                  type = "wasm"
-                  inputs = ["in"]
-                  module = "tests/data/wasm/multifaceted/target/wasm32-wasi/release/multifaceted.wasm"
-                  artifact_cache = "target/artifacts/"
-            "#},
-        ),
     ];
 
     let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
@@ -373,8 +331,12 @@ fn benchmark_configs(
                     config.push_str(&transform_config);
                     config.push_str(&sink_config);
 
-                    let config = config::load_from_str(&config, Some(config::Format::Toml))
-                        .expect(&format!("invalid TOML configuration: {}", &config));
+                    let config = config::load_from_str(
+                        &config,
+                        Some(config::Format::Toml),
+                        Default::default(),
+                    )
+                    .expect(&format!("invalid TOML configuration: {}", &config));
                     let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);

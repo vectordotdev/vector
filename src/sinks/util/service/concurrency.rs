@@ -27,7 +27,7 @@ impl ConcurrencyOption for Option<usize> {
 impl ConcurrencyOption for Concurrency {
     fn parse_concurrency(&self, default: &Self) -> Option<usize> {
         match self.if_none(*default) {
-            Concurrency::None => Some(1024),
+            Concurrency::None => None,
             Concurrency::Adaptive => None,
             Concurrency::Fixed(limit) => Some(limit),
         }
@@ -52,7 +52,7 @@ impl Default for Concurrency {
 }
 
 impl Concurrency {
-    pub fn if_none(self, other: Self) -> Self {
+    pub const fn if_none(self, other: Self) -> Self {
         match self {
             Self::None => other,
             _ => self,

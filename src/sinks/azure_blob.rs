@@ -247,7 +247,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
 }
 
 impl Compression {
-    pub fn content_type(&self) -> &'static str {
+    pub const fn content_type(&self) -> &'static str {
         match self {
             Self::None => "text/plain",
             Self::Gzip(_) => "application/gzip",

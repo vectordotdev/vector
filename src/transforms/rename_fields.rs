@@ -60,7 +60,7 @@ impl TransformConfig for RenameFieldsConfig {
 
 impl RenameFields {
     pub fn new(fields: IndexMap<String, String>, drop_empty: bool) -> crate::Result<Self> {
-        Ok(RenameFields { fields, drop_empty })
+        Ok(Self { fields, drop_empty })
     }
 }
 

@@ -60,7 +60,7 @@ impl TransformConfig for AddTagsConfig {
 }
 
 impl AddTags {
-    pub fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
+    pub const fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
         AddTags { tags, overwrite }
     }
 }
