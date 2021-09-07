@@ -1,8 +1,10 @@
+pub mod find_enrichment_table_records;
 pub mod get_enrichment_table_record;
 pub mod tables;
 
 #[cfg(test)]
 mod test_util;
+mod vrl_util;
 use dyn_clone::DynClone;
 use std::collections::BTreeMap;
 use vrl_core::Value;
@@ -38,6 +40,15 @@ pub trait Table: DynClone {
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String>;
 
+    /// Search the enrichment table data with the given condition.
+    /// All conditions must match (AND).
+    /// Can return multiple matched records
+    fn find_table_rows<'a>(
+        &self,
+        condition: &'a [Condition<'a>],
+        index: Option<IndexHandle>,
+    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String>;
+
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.
     ///
@@ -51,6 +62,8 @@ dyn_clone::clone_trait_object!(Table);
 pub fn vrl_functions() -> Vec<Box<dyn vrl_core::Function>> {
     vec![
         Box::new(get_enrichment_table_record::GetEnrichmentTableRecord)
+            as Box<dyn vrl_core::Function>,
+        Box::new(find_enrichment_table_records::FindEnrichmentTableRecords)
             as Box<dyn vrl_core::Function>,
     ]
 }

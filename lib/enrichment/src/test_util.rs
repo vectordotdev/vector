@@ -36,6 +36,14 @@ impl Table for DummyEnrichmentTable {
         Ok(self.data.clone())
     }
 
+    fn find_table_rows(
+        &self,
+        _condition: &[Condition],
+        _index: Option<IndexHandle>,
+    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+        Ok(vec![self.data.clone()])
+    }
+
     fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
         let mut indexes = self.indexes.lock().unwrap();
         indexes.push(fields.iter().map(|s| (*s).to_string()).collect());

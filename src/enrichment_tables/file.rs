@@ -278,6 +278,30 @@ impl File {
             }
         })
     }
+
+    fn indexed<'a>(
+        &'a self,
+        condition: &'a [Condition<'a>],
+        handle: IndexHandle,
+    ) -> Result<Option<&'a Vec<usize>>, String> {
+        // The index to use has been passed, we can use this to search the data.
+        // We are assuming that the caller has passed an index that represents the fields
+        // being passed in the condition.
+        let mut hash = seahash::SeaHasher::default();
+
+        for header in self.headers.iter() {
+            if let Some(Condition::Equals { value, .. }) = condition.iter().find(
+                |condition| matches!(condition, Condition::Equals { field, .. } if field == header),
+            ) {
+                hash_value(&mut hash, value)?;
+            }
+        }
+
+        let key = hash.finish();
+
+        let IndexHandle(handle) = handle;
+        Ok(self.indexes[handle].1.get(&key))
+    }
 }
 
 /// Adds the bytes from the given value to the hash.
@@ -329,33 +353,39 @@ impl Table for File {
                 // No index has been passed so we need to do a Sequential Scan.
                 single_or_err(self.sequential(self.data.iter(), condition))
             }
-            Some(IndexHandle(handle)) => {
-                // The index to use has been passed, we can use this to search the data.
-                // We are assuming that the caller has passed an index that represents the fields
-                // being passed in the condition.
-                let mut hash = seahash::SeaHasher::default();
-
-                for header in self.headers.iter() {
-                    if let Some(Condition::Equals { value, .. }) = condition.iter().find(|condition|
-                    {
-                        matches!(condition, Condition::Equals { field, .. } if field == header)
-                    })
-                    {
-                        hash_value(&mut hash, value)?;
-                    }
-                }
-
-                let key = hash.finish();
-
-                let result = self.indexes[handle]
-                    .1
-                    .get(&key)
+            Some(handle) => {
+                let result = self
+                    .indexed(condition, handle)?
                     .ok_or_else(|| "no rows found in index".to_string())?
                     .iter()
                     .map(|idx| &self.data[*idx]);
 
                 // Perform a sequential scan over the indexed result.
                 single_or_err(self.sequential(result, condition))
+            }
+        }
+    }
+
+    fn find_table_rows<'a>(
+        &self,
+        condition: &'a [Condition<'a>],
+        index: Option<IndexHandle>,
+    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+        match index {
+            None => {
+                // No index has been passed so we need to do a Sequential Scan.
+                Ok(self.sequential(self.data.iter(), condition).collect())
+            }
+            Some(handle) => {
+                // Perform a sequential scan over the indexed result.
+                Ok(self
+                    .sequential(
+                        self.indexed(condition, handle)?
+                            .iter()
+                            .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
+                        condition,
+                    )
+                    .collect())
             }
         }
     }
@@ -476,6 +506,39 @@ mod tests {
                 "field2" => "zurp",
             }),
             file.find_table_row(&[condition], Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_rows_with_index() {
+        let mut file = File::new(
+            vec![
+                vec!["zip".into(), "zup".into()],
+                vec!["zirp".into(), "zurp".into()],
+                vec!["zip".into(), "zoop".into()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(&["field1"]).unwrap();
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("zip"),
+        };
+
+        assert_eq!(
+            Ok(vec![
+                btreemap! {
+                    "field1" => "zip",
+                    "field2" => "zup",
+                },
+                btreemap! {
+                    "field1" => "zip",
+                    "field2" => "zoop",
+                }
+            ]),
+            file.find_table_rows(&[condition], Some(handle))
         );
     }
 
