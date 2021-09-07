@@ -9,13 +9,15 @@ use crate::{
 };
 use indexmap::IndexMap;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
-pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
-    config::init_log_schema(paths, false)?;
+pub async fn build_unit_tests_main(
+    paths: &[ConfigPath],
+    pipeline_paths: &[PathBuf],
+) -> Result<Vec<UnitTest>, Vec<String>> {
+    config::init_log_schema(paths, pipeline_paths, false)?;
 
-    let pipelines = super::loading::load_pipelines_from_paths(paths)?;
-    let (mut config, _) = super::loading::load_builder_from_paths(paths)?;
-    config.set_pipelines(pipelines);
+    let (config, _) = super::loading::load_builder_and_pipelines_from_paths(paths, pipeline_paths)?;
 
     build_unit_tests(config).await
 }
