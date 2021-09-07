@@ -14,13 +14,13 @@ enum PickerState {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Picker {
+pub struct Picker {
     timezone: TimeZone,
     state: PickerState,
 }
 
 impl Picker {
-    pub(crate) fn new(timezone: TimeZone) -> Self {
+    pub(crate) const fn new(timezone: TimeZone) -> Self {
         let state = PickerState::Init;
         Self { timezone, state }
     }

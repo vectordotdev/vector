@@ -22,7 +22,7 @@ pub struct Data {
 pub struct Transform(pub Data);
 
 impl Transform {
-    pub fn get_component_key(&self) -> &ComponentKey {
+    pub const fn get_component_key(&self) -> &ComponentKey {
         &self.0.component_key
     }
     pub fn get_component_type(&self) -> &str {

@@ -82,7 +82,7 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
 }
 
 impl ConfigPath {
-    pub fn as_dir(&self) -> Option<&PathBuf> {
+    pub const fn as_dir(&self) -> Option<&PathBuf> {
         match self {
             Self::Dir(path) => Some(path),
             _ => None,
@@ -167,7 +167,7 @@ pub struct SourceOuter {
     pub(super) inner: Box<dyn SourceConfig>,
 }
 
-fn default_acknowledgements() -> bool {
+const fn default_acknowledgements() -> bool {
     false
 }
 
@@ -302,7 +302,7 @@ impl SinkOuter {
         }
     }
 
-    pub fn proxy(&self) -> &ProxyConfig {
+    pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
     }
 }
@@ -379,11 +379,11 @@ impl SinkContext {
         self.acker.clone()
     }
 
-    pub fn globals(&self) -> &GlobalOptions {
+    pub const fn globals(&self) -> &GlobalOptions {
         &self.globals
     }
 
-    pub fn proxy(&self) -> &ProxyConfig {
+    pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
     }
 }
@@ -445,11 +445,11 @@ pub enum Protocol {
 }
 
 impl Resource {
-    pub fn tcp(addr: SocketAddr) -> Self {
+    pub const fn tcp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Tcp)
     }
 
-    pub fn udp(addr: SocketAddr) -> Self {
+    pub const fn udp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Udp)
     }
 

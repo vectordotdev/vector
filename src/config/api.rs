@@ -24,7 +24,7 @@ impl Default for Options {
     }
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     false
 }
 
@@ -35,7 +35,7 @@ pub fn default_address() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
 }
 
-fn default_playground() -> bool {
+const fn default_playground() -> bool {
     true
 }
 

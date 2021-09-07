@@ -32,12 +32,12 @@ impl Default for Options {
 }
 
 /// By default, the Datadog feature is enabled.
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     false
 }
 
 /// By default, report to Datadog every 5 seconds.
-fn default_reporting_interval_secs() -> u64 {
+const fn default_reporting_interval_secs() -> u64 {
     5
 }
 

@@ -183,7 +183,7 @@ pub struct RusotoBody {
 }
 
 impl<T> HttpClient<T> {
-    pub fn new(client: T) -> Self {
+    pub const fn new(client: T) -> Self {
         HttpClient { client }
     }
 }

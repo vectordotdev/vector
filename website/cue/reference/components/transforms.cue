@@ -13,5 +13,6 @@ components: transforms: [Name=string]: {
 	telemetry: metrics: {
 		events_in_total:  components.sources.internal_metrics.output.metrics.events_in_total
 		events_out_total: components.sources.internal_metrics.output.metrics.events_out_total
+		utilization:      components.sources.internal_metrics.output.metrics.utilization
 	}
 }

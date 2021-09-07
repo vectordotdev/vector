@@ -9,7 +9,7 @@ pub struct State(Option<String>);
 
 impl State {
     /// Create a new resource version [`State`].
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(None)
     }
 

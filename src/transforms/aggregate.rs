@@ -21,7 +21,7 @@ pub struct AggregateConfig {
     pub interval_ms: u64,
 }
 
-fn default_interval_ms() -> u64 {
+const fn default_interval_ms() -> u64 {
     10 * 1000
 }
 

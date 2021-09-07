@@ -79,6 +79,34 @@ components: sources: journald: {
 				}
 			}
 		}
+		exclude_matches: {
+			common:      true
+			description: "This list contains sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source. If `exclude_units` is specified, it will be merged into this list."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: [
+					{
+						_SYSTEMD_UNIT: ["sshd.servcie", "ntpd.service"]
+						_TRANSPORT: ["kernel"]
+					},
+				]
+				options: {
+					"*": {
+						common:		   false
+						description: "The set of field values to match in journal entries that are to be excluded."
+						required:	   false
+						type: array: {
+							default: []
+							items: type: string: {
+								examples: ["sshd.servcie", "ntpd.service"]
+								syntax: "literal"
+							}
+						}
+					}
+				}
+			}
+		}
 		include_units: {
 			common:      true
 			description: "The list of unit names to monitor. If empty or not present, all units are accepted. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
@@ -89,6 +117,34 @@ components: sources: journald: {
 				items: type: string: {
 					examples: ["ntpd", "sysinit.target"]
 					syntax: "literal"
+				}
+			}
+		}
+		include_matches: {
+			common:      true
+			description: "This list contains sets of field/value pairs to monitor. If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: [
+					{
+						_SYSTEMD_UNIT: ["sshd.servcie", "ntpd.service"]
+						_TRANSPORT: ["kernel"]
+					},
+				]
+				options: {
+					"*": {
+						common:		 false
+						description: "The set of field values to match in journal entries that are to be included."
+						required:	 false
+						type: array: {
+							default: []
+							items: type: string: {
+								examples: ["sshd.servcie", "ntpd.service"]
+								syntax: "literal"
+							}
+						}
+					}
 				}
 			}
 		}

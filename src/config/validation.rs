@@ -97,13 +97,26 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             ));
         }
 
+        let mut frequencies = HashMap::new();
         for input in inputs {
+            let entry = frequencies.entry(input.clone()).or_insert(0usize);
+            *entry += 1;
             if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
                 errors.push(format!(
-                    "Input \"{}\" for {} \"{}\" doesn't exist.",
+                    "Input \"{}\" for {} \"{}\" doesn't match any components.",
                     input, output_type, key
                 ));
             }
+        }
+
+        for (dup, count) in frequencies.into_iter().filter(|(_name, count)| *count > 1) {
+            errors.push(format!(
+                "{} \"{}\" has input \"{}\" duplicated {} times",
+                capitalize(output_type),
+                key,
+                dup,
+                count,
+            ));
         }
     }
 
