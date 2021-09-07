@@ -4,9 +4,9 @@ components: transforms: aggregate: {
 	title: "Aggregate"
 
 	description: """
-			Aggregates multiple metric events into a single metric event based
-			on a defined interval window. This helps to reduce metric volume at
-			the cost of granularity.
+		Aggregates multiple metric events into a single metric event based
+		on a defined interval window. This helps to reduce metric volume at
+		the cost of granularity.
 		"""
 
 	classes: {
