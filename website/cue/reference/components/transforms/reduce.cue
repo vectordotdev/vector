@@ -72,6 +72,21 @@ components: transforms: reduce: {
 				unit:    "milliseconds"
 			}
 		}
+		flushes_when: {
+      common: false
+      description: """
+        A condition used to distinguish when all state held by reducer should be flushed.
+        """
+      required: false
+      warnings: []
+      type: string: {
+        default: null
+        examples: [
+          #".exit_code != null"#,
+        ]
+        syntax: "literal"
+      }
+    }
 		group_by: {
 			common:      true
 			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."

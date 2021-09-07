@@ -40,6 +40,7 @@ pub struct ReduceConfig {
     /// reduce.
     pub ends_when: Option<AnyCondition>,
     pub starts_when: Option<AnyCondition>,
+    pub flushes_when: Option<AnyCondition>,
 }
 
 inventory::submit! {
@@ -152,6 +153,7 @@ pub struct Reduce {
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
     starts_when: Option<Box<dyn Condition>>,
+    flushes_when: Option<Box<dyn Condition>>,
 }
 
 impl Reduce {
@@ -173,6 +175,11 @@ impl Reduce {
             .as_ref()
             .map(|c| c.build(enrichment_tables))
             .transpose()?;
+        let flushes_when = config
+            .flushes_when
+            .as_ref()
+            .map(|c| c.build(enrichment_tables))
+            .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
 
         Ok(Reduce {
@@ -183,6 +190,7 @@ impl Reduce {
             reduce_merge_states: HashMap::new(),
             ends_when,
             starts_when,
+            flushes_when,
         })
     }
 
@@ -229,6 +237,11 @@ impl Reduce {
             .as_ref()
             .map(|c| c.check(&event))
             .unwrap_or(false);
+        let flushes_here = self
+            .flushes_when
+            .as_ref()
+            .map(|c| c.check(&event))
+            .unwrap_or(false);
 
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
@@ -249,6 +262,15 @@ impl Reduce {
                     .flush()
                     .into(),
             })
+        } else if flushes_here {
+            for (_, state) in self.reduce_merge_states.drain() {
+                output.push(state.flush().into());
+            }
+            output.push(
+                ReduceState::new(event, &self.merge_strategies)
+                    .flush()
+                    .into(),
+            );
         } else {
             self.push_or_new_reduce_state(event, discriminant)
         }
@@ -309,6 +331,7 @@ mod test {
         config::TransformConfig,
         event::{LogEvent, Value},
     };
+    use futures::SinkExt;
     use serde_json::json;
 
     #[test]
@@ -560,5 +583,55 @@ merge_strategies.bar = "concat"
         assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
         assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
         assert_eq!(output_2.metadata(), &metadata_2);
+    }
+
+    #[tokio::test]
+    async fn reduce_and_flush() {
+        let reduce = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "request_id" ]
+
+[flushes_when]
+  type = "check_fields"
+  "test_end.exists" = true
+"#,
+        )
+        .unwrap()
+        .build(&TransformContext::default())
+        .await
+        .unwrap();
+        let reduce = reduce.into_task();
+
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("counter", 1);
+        e_1.insert("request_id", "1");
+        let metadata_1 = e_1.metadata().clone();
+
+        let mut e_2 = LogEvent::from("test message 2");
+        e_2.insert("counter", 2);
+        e_2.insert("request_id", "2");
+        let metadata_2 = e_2.metadata().clone();
+
+        let mut e_3 = LogEvent::from("test message 3");
+        e_3.insert("counter", 3);
+        e_3.insert("request_id", "1");
+
+        let mut e_4 = LogEvent::from("test message 4");
+        e_4.insert("test_end", "yep");
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = reduce.transform(Box::pin(rx));
+
+        tx.send(e_1.into()).await.unwrap();
+        tx.send(e_2.into()).await.unwrap();
+        tx.send(e_3.into()).await.unwrap();
+
+        let res = tokio::time::timeout(Duration::from_secs(1), out_stream.next()).await;
+        assert!(res.is_err());
+
+        tx.send(e_4.into()).await.unwrap();
+
+        out_stream.next().await.unwrap().into_log();
+        out_stream.next().await.unwrap().into_log();
     }
 }
