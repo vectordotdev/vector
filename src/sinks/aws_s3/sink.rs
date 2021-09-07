@@ -289,8 +289,6 @@ fn build_request(key: String, batch: Vec<Event>, options: &S3RequestOptions) -> 
     // Process our events. This does all of the necessary encoding rule
     // application, as well as encoding and compressing the events.  We're
     // handed back a tidy `Bytes` instance we can send directly to S3.
-    //
-    // TODO: we need to do something with these
     let batch_size = batch.len();
     let (body, finalizers) = process_event_batch(batch, &options.encoding, options.compression);
 
