@@ -20,7 +20,7 @@ pub mod parser;
 #[cfg(unix)]
 mod unix;
 
-use parser::parse;
+use parser::{parse, ParseError};
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
 
@@ -133,16 +133,19 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-pub(self) fn parse_event(line: &str) -> Option<Event> {
-    match parse(line) {
+pub(self) fn parse_event(bytes: Bytes) -> Option<Event> {
+    match std::str::from_utf8(&bytes)
+        .map_err(ParseError::InvalidUtf8)
+        .and_then(parse)
+    {
         Ok(metric) => {
             emit!(StatsdEventReceived {
-                byte_size: line.len()
+                byte_size: bytes.len()
             });
             Some(Event::Metric(metric))
         }
         Err(error) => {
-            emit!(StatsdInvalidRecord { error, text: line });
+            emit!(StatsdInvalidRecord { error, bytes });
             None
         }
     }
@@ -174,7 +177,10 @@ async fn statsd_udp(
         match frame {
             Ok((bytes, _sock)) => {
                 let packet = String::from_utf8_lossy(bytes.as_ref());
-                let metrics = packet.lines().filter_map(parse_event).map(Ok);
+                let metrics = packet
+                    .lines()
+                    .filter_map(|line| parse_event(Bytes::copy_from_slice(line.as_bytes())))
+                    .map(Ok);
 
                 // Need `boxed` to resolve a lifetime issue
                 // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
@@ -205,8 +211,7 @@ impl TcpSource for StatsdTcpSource {
     }
 
     fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
-        let line = String::from_utf8_lossy(line.as_ref());
-        parse_event(&line)
+        parse_event(line)
     }
 }
 
