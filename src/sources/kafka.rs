@@ -1,14 +1,16 @@
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
+    codecs::{self, DecodingConfig},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    event::{BatchNotifier, Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{stream, FutureExt, SinkExt, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -19,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use vector_core::event::{BatchNotifier, LogEvent, Value};
+use tokio_util::codec::Decoder;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -58,6 +60,8 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+    #[serde(flatten)]
+    decoding: DecodingConfig,
 }
 
 const fn default_session_timeout_ms() -> u64 {
@@ -119,6 +123,7 @@ impl SourceConfig for KafkaSourceConfig {
             self.partition_key.clone(),
             self.offset_key.clone(),
             self.headers_key.clone(),
+            self.decoding.build()?,
             cx.shutdown,
             cx.out,
             cx.acknowledgements,
@@ -141,6 +146,7 @@ async fn kafka_source(
     partition_key: String,
     offset_key: String,
     headers_key: String,
+    mut decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
     acknowledgements: bool,
@@ -161,16 +167,10 @@ async fn kafka_source(
                     byte_size: msg.payload_len()
                 });
 
-                let payload = match msg.payload() {
+                let mut payload = match msg.payload() {
                     None => continue, // skip messages with empty payload
-                    Some(payload) => payload,
+                    Some(payload) => BytesMut::from(payload),
                 };
-                let mut log = LogEvent::default();
-
-                log.insert(
-                    log_schema().message_key(),
-                    Value::from(Bytes::from(payload.to_owned())),
-                );
 
                 // Extract timestamp from kafka message
                 let timestamp = msg
@@ -178,22 +178,11 @@ async fn kafka_source(
                     .to_millis()
                     .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                     .unwrap_or_else(Utc::now);
-                log.insert(log_schema().timestamp_key(), timestamp);
-
-                // Add source type
-                log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
 
                 let msg_key = msg
                     .key()
                     .map(|key| Value::from(String::from_utf8_lossy(key).to_string()))
                     .unwrap_or(Value::Null);
-                log.insert(&key_field, msg_key);
-
-                log.insert(&topic_key, Value::from(msg.topic().to_string()));
-
-                log.insert(&partition_key, Value::from(msg.partition()));
-
-                log.insert(&offset_key, Value::from(msg.offset()));
 
                 let mut headers_map = BTreeMap::new();
                 if let Some(headers) = msg.headers() {
@@ -208,18 +197,44 @@ async fn kafka_source(
                         }
                     }
                 }
-                log.insert(&headers_key, Value::from(headers_map));
+
+                let msg_topic = msg.topic().to_string();
+                let msg_partition = msg.partition();
+                let msg_offset = msg.offset();
+
+                let mut events = Vec::new();
+
+                while let Ok(Some((next, _))) = decoder.decode_eof(&mut payload) {
+                    for mut event in next {
+                        if let Event::Log(ref mut log) = event {
+                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
+                            log.insert(log_schema().timestamp_key(), timestamp);
+                            log.insert(&key_field, msg_key.clone());
+                            log.insert(&topic_key, Value::from(msg_topic.clone()));
+                            log.insert(&partition_key, Value::from(msg_partition));
+                            log.insert(&offset_key, Value::from(msg_offset));
+                            log.insert(&headers_key, Value::from(headers_map.clone()));
+                        }
+
+                        events.push(event);
+                    }
+                }
 
                 match &mut finalizer {
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let log = log.with_batch_notifier(&batch);
-                        match out.send(log.into()).await {
+                        let mut events = stream::iter(
+                            events
+                                .into_iter()
+                                .map(|event: Event| event.with_batch_notifier(&batch)),
+                        )
+                        .map(Ok);
+                        match out.send_all(&mut events).await {
                             Err(error) => error!(message = "Error sending to sink.", %error),
                             Ok(_) => finalizer.add(msg.into(), receiver),
                         }
                     }
-                    None => match out.send(log.into()).await {
+                    None => match out.send_all(&mut stream::iter(events).map(Ok)).await {
                         Err(error) => error!(message = "Error sending to sink.", %error),
                         Ok(_) => {
                             if let Err(error) = consumer.store_offset(&msg) {
@@ -444,6 +459,7 @@ mod integration_test {
             config.partition_key,
             config.offset_key,
             config.headers_key,
+            codecs::Decoder::default(),
             shutdown,
             tx,
             acknowledgements,
