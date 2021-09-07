@@ -43,6 +43,28 @@ components: _aws: {
 							syntax: "literal"
 						}
 					}
+					credentials_file: {
+						category:    "Auth"
+						common:      false
+						description: "The path to AWS credentials file. Used for AWS authentication when communicating with AWS services."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["/path/to/aws/credentials"]
+							syntax: "literal"
+						}
+					}
+					profile: {
+						category:    "Auth"
+						common:      false
+						description: "The AWS profile name to find credentials from a file."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["develop"]
+							syntax: "literal"
+						}
+					}
 				}
 			}
 		}
