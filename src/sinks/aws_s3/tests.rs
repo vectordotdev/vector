@@ -90,6 +90,11 @@ mod integration_tests {
         });
 
         sink.run(stream::iter(events)).await.unwrap();
+        // It's possible that the internal machinery of the sink is still
+        // spinning up. We pause here to give the batch time to wind
+        // through. Waiting is preferable to adding synchronization into the
+        // actual sync code for the sole benefit of these tests.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 3);
@@ -250,11 +255,8 @@ mod integration_tests {
     #[tokio::test]
     async fn s3_healthchecks_invalid_bucket() {
         let config = config("s3_healthchecks_invalid_bucket", 1);
-
         let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        // TODO we should be more explicit here but the error comes out as a
-        // boxed dynamic, unsure how to coerce properly.
-        assert!(config.build_healthcheck(client).is_err());
+        assert!(config.build_healthcheck(client).unwrap().await.is_err());
     }
 
     fn client() -> S3Client {
@@ -275,7 +277,7 @@ mod integration_tests {
     fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         S3SinkConfig {
             bucket: bucket.to_string(),
-            key_prefix: Some(random_string(10) + "/date=%F/"),
+            key_prefix: Some(random_string(10) + "/date=%F"),
             filename_time_format: None,
             filename_append_uuid: None,
             filename_extension: None,

@@ -244,12 +244,14 @@ impl S3SinkConfig {
     pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
         let bucket = self.bucket.clone();
         let healthcheck = async move {
-            let req = client.head_bucket(HeadBucketRequest {
-                bucket: bucket.clone(),
-                expected_bucket_owner: None,
-            });
+            let req = client
+                .head_bucket(HeadBucketRequest {
+                    bucket: bucket.clone(),
+                    expected_bucket_owner: None,
+                })
+                .await;
 
-            match req.await {
+            match req {
                 Ok(_) => Ok(()),
                 Err(error) => Err(match error {
                     RusotoError::Unknown(resp) => match resp.status {
