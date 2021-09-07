@@ -299,6 +299,7 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     metrics
 }
 
+#[allow(clippy::missing_const_for_fn)]
 fn init_roots() {
     #[cfg(target_os = "linux")]
     {
