@@ -341,7 +341,7 @@ pub fn process_event_batch(
         // This is a best guess, because encoding could add a good chunk of
         // overhead to the raw, in-memory representation of an event, but if
         // we're compressing, then we should end up net below the capacity.
-        let buffer = Vec::new();
+        let buffer = Vec::with_capacity(1_024);
         match compression {
             Compression::None => Writer::Plain(buffer),
             Compression::Gzip(level) => {
