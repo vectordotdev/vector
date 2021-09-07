@@ -126,12 +126,10 @@ where
                     // We could push this down to the I/O task if we wanted to.
                     let request = build_request(key, batch, &self.options);
                     if io_tx.send(request).await.is_err() {
-                        // TODO: change this to "error! + return Err" after
-                        // initial testing/debugging
-                        trace!(
+                        error!(
                             "Sink I/O channel should not be closed before sink itself is closed."
                         );
-                        panic!("boom 1")
+                        return Err(());
                     }
                 }
                 // Partitioning failed for one or more events.
