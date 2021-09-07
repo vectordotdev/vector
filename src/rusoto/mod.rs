@@ -33,6 +33,7 @@ pub mod auth;
 pub mod region;
 pub use auth::AwsAuthentication;
 pub use region::{region_from_endpoint, RegionOrEndpoint};
+use rusoto_core::credential::ProfileProvider;
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
 
@@ -98,6 +99,7 @@ pub enum AwsCredentialsProvider {
     Default(AutoRefreshingProvider<CustomChainProvider>),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
     Static(StaticProvider),
+    File(AutoRefreshingProvider<ProfileProvider>),
 }
 
 impl fmt::Debug for AwsCredentialsProvider {
@@ -106,6 +108,7 @@ impl fmt::Debug for AwsCredentialsProvider {
             Self::Default(_) => "default",
             Self::Role(_) => "role",
             Self::Static(_) => "static",
+            Self::File(_) => "file",
         };
 
         f.debug_tuple("AwsCredentialsProvider")
@@ -158,6 +161,15 @@ impl AwsCredentialsProvider {
             secret_key.into(),
         ))
     }
+
+    pub fn new_with_credentials_file(credentials_file: &str, profile: &str) -> crate::Result<Self> {
+        let creds = AutoRefreshingProvider::new(ProfileProvider::with_configuration(
+            credentials_file,
+            profile,
+        ))
+        .context(InvalidAwsCredentials)?;
+        Ok(Self::File(creds))
+    }
 }
 
 #[async_trait]
@@ -167,6 +179,7 @@ impl ProvideAwsCredentials for AwsCredentialsProvider {
             Self::Default(p) => p.credentials(),
             Self::Role(p) => p.credentials(),
             Self::Static(p) => p.credentials(),
+            Self::File(p) => p.credentials(),
         };
         fut.await
     }
