@@ -1,14 +1,15 @@
 use crate::{
+    codecs::DecodingConfig,
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::Bytes;
-use futures::{channel::mpsc, executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
+use bytes::{Bytes, BytesMut};
+use futures::{channel::mpsc, executor, SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
+use tokio_util::codec::Decoder;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -16,13 +17,16 @@ pub struct StdinConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
+    #[serde(flatten)]
+    pub decoding: DecodingConfig,
 }
 
 impl Default for StdinConfig {
     fn default() -> Self {
         StdinConfig {
             max_length: default_max_length(),
-            host_key: None,
+            host_key: Default::default(),
+            decoding: Default::default(),
         }
     }
 }
@@ -75,6 +79,7 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
+    let mut decoder = config.decoding.build()?;
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
@@ -94,38 +99,38 @@ where
         let mut out =
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error));
 
-        let res = receiver
+        let mut lines = receiver
             .take_until(shutdown)
-            .map_err(|error| emit!(StdinReadFailed { error }))
-            .map_ok(move |line| {
-                emit!(StdinEventReceived {
-                    byte_size: line.len()
-                });
-                create_event(Bytes::from(line), &host_key, &hostname)
-            })
-            .forward(&mut out)
-            .inspect(|_| info!("Finished sending."))
-            .await;
+            .map_err(|error| emit!(StdinReadFailed { error }));
+
+        while let Some(Ok(line)) = lines.next().await {
+            emit!(StdinEventReceived {
+                byte_size: line.len()
+            });
+
+            let mut bytes = BytesMut::from(line.as_bytes());
+
+            while let Ok(Some((events, _))) = decoder.decode_eof(&mut bytes) {
+                for mut event in events {
+                    let log = event.as_mut_log();
+
+                    log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
+
+                    if let Some(hostname) = &hostname {
+                        log.insert(&host_key, hostname.clone());
+                    }
+
+                    let _ = out.send(event).await;
+                }
+            }
+        }
+
+        info!("Finished sending.");
 
         let _ = out.flush().await; // error emitted by sink_map_err
 
-        res
+        Ok(())
     }))
-}
-
-fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
-    let mut event = Event::from(line);
-
-    // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("stdin"));
-
-    if let Some(hostname) = &hostname {
-        event.as_mut_log().insert(host_key, hostname.clone());
-    }
-
-    event
 }
 
 #[cfg(test)]
@@ -137,20 +142,6 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StdinConfig>();
-    }
-
-    #[test]
-    fn stdin_create_event() {
-        let line = Bytes::from("hello world");
-        let host_key = "host".to_string();
-        let hostname = Some("Some.Machine".to_string());
-
-        let event = create_event(line, &host_key, &hostname);
-        let log = event.into_log();
-
-        assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "stdin".into());
     }
 
     #[tokio::test]
