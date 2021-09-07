@@ -154,7 +154,8 @@ components: sinks: [Name=string]: {
 			if features.send.encoding.enabled {
 				encoding: {
 					description: "Configures the encoding specific sink behavior."
-					required:    true
+					required:    false
+					common:      true
 					type: object: options: {
 						if features.send.encoding.codec.enabled {
 							codec: {
@@ -596,5 +597,6 @@ components: sinks: [Name=string]: {
 	telemetry: metrics: {
 		events_in_total:  components.sources.internal_metrics.output.metrics.events_in_total
 		events_out_total: components.sources.internal_metrics.output.metrics.events_out_total
+		utilization:      components.sources.internal_metrics.output.metrics.utilization
 	}
 }

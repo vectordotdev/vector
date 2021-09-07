@@ -34,7 +34,7 @@ enum Errors {
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct RemoteWriteConfig {
+pub struct RemoteWriteConfig {
     pub endpoint: String,
 
     pub default_namespace: Option<String>,

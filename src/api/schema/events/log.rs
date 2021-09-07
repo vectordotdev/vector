@@ -12,7 +12,7 @@ pub struct Log {
 }
 
 impl Log {
-    pub fn new(component_key: ComponentKey, event: event::LogEvent) -> Self {
+    pub const fn new(component_key: ComponentKey, event: event::LogEvent) -> Self {
         Self {
             component_key,
             event,

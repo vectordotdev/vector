@@ -48,7 +48,7 @@ impl MaybeTlsSettings {
     }
 }
 
-pub(crate) struct MaybeTlsListener {
+pub struct MaybeTlsListener {
     listener: TcpListener,
     acceptor: Option<SslAcceptor>,
 }
@@ -115,7 +115,7 @@ enum StreamState<S> {
 
 impl<S> MaybeTlsIncomingStream<S> {
     #[cfg_attr(not(feature = "listenfd"), allow(dead_code))]
-    pub fn peer_addr(&self) -> SocketAddr {
+    pub const fn peer_addr(&self) -> SocketAddr {
         self.peer_addr
     }
 
@@ -140,7 +140,7 @@ impl<S> MaybeTlsIncomingStream<S> {
     }
 
     #[cfg(feature = "sources-vector")]
-    pub(crate) fn ssl_stream(&self) -> Option<&SslStream<S>> {
+    pub(crate) const fn ssl_stream(&self) -> Option<&SslStream<S>> {
         use super::MaybeTls;
 
         match &self.state {

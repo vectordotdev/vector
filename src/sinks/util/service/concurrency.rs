@@ -52,7 +52,7 @@ impl Default for Concurrency {
 }
 
 impl Concurrency {
-    pub fn if_none(self, other: Self) -> Self {
+    pub const fn if_none(self, other: Self) -> Self {
         match self {
             Self::None => other,
             _ => self,

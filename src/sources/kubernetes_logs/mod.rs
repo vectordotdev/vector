@@ -521,11 +521,11 @@ fn default_path_exclusion() -> Vec<PathBuf> {
     vec![PathBuf::from("**/*.gz"), PathBuf::from("**/*.tmp")]
 }
 
-fn default_max_read_bytes() -> usize {
+const fn default_max_read_bytes() -> usize {
     2048
 }
 
-fn default_max_line_bytes() -> usize {
+const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
     // https://github.com/timberio/vector/issues/6967
     //
@@ -538,11 +538,11 @@ fn default_max_line_bytes() -> usize {
     32 * 1024 // 32 KiB
 }
 
-fn default_glob_minimum_cooldown_ms() -> usize {
-    60000
+const fn default_glob_minimum_cooldown_ms() -> usize {
+    60_000
 }
 
-fn default_fingerprint_lines() -> usize {
+const fn default_fingerprint_lines() -> usize {
     1
 }
 

@@ -51,7 +51,7 @@ pub struct UdpSinkConfig {
 }
 
 impl UdpSinkConfig {
-    pub fn from_address(address: String) -> Self {
+    pub const fn from_address(address: String) -> Self {
         Self {
             address,
             send_buffer_bytes: None,
@@ -95,7 +95,7 @@ struct UdpConnector {
 }
 
 impl UdpConnector {
-    fn new(host: String, port: u16, send_buffer_bytes: Option<usize>) -> Self {
+    const fn new(host: String, port: u16, send_buffer_bytes: Option<usize>) -> Self {
         Self {
             host,
             port,
@@ -103,7 +103,7 @@ impl UdpConnector {
         }
     }
 
-    fn fresh_backoff() -> ExponentialBackoff {
+    const fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
         ExponentialBackoff::from_millis(2)
             .factor(250)
@@ -168,7 +168,7 @@ pub struct UdpService {
 }
 
 impl UdpService {
-    fn new(connector: UdpConnector) -> Self {
+    const fn new(connector: UdpConnector) -> Self {
         Self {
             connector,
             state: UdpServiceState::Disconnected,

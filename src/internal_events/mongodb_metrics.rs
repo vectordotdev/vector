@@ -4,7 +4,7 @@ use mongodb::{bson, error::Error as MongoError};
 use std::time::Instant;
 
 #[derive(Debug)]
-pub(crate) struct MongoDbMetricsEventsReceived<'a> {
+pub struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
     pub uri: &'a str,
 }

@@ -41,7 +41,7 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
-    pub fn from_address(address: SocketAddr) -> Self {
+    pub const fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
             receive_buffer_bytes: None,
@@ -62,6 +62,7 @@ struct TcpConfig {
 
 impl TcpConfig {
     #[cfg(all(test, feature = "sinks-prometheus"))]
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -73,7 +74,7 @@ impl TcpConfig {
     }
 }
 
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 

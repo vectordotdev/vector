@@ -27,7 +27,7 @@ mod prelude {
 // function as expected. This is a bug in the implementation.
 macro_rules! unexpected_type {
     ($value:expr) => {
-        unreachable!("unexpected value type: '{}'", $value.kind());
+        unreachable!("unexpected value type: '{}'", $value.kind())
     };
 }
 

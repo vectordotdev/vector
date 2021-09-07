@@ -172,15 +172,15 @@ impl VectorConfig {
         Ok((VectorSink::Sink(Box::new(sink)), Box::pin(healthcheck)))
     }
 
-    pub(super) fn input_type(&self) -> DataType {
+    pub(super) const fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn sink_type(&self) -> &'static str {
+    pub(super) const fn sink_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(super) fn resources(&self) -> Vec<Resource> {
+    pub(super) const fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 }
