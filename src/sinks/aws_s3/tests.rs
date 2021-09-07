@@ -36,6 +36,11 @@ mod integration_tests {
 
         let (lines, events, mut receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
+        // It's possible that the internal machinery of the sink is still
+        // spinning up. We pause here to give the batch time to wind
+        // through. Waiting is preferable to adding synchronization into the
+        // actual sync code for the sole benefit of these tests.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -109,22 +114,28 @@ mod integration_tests {
 
         create_bucket(&bucket, false).await;
 
+        let batch_size = 1_000;
         let config = S3SinkConfig {
             compression: Compression::gzip_default(),
             filename_time_format: Some("%s%f".into()),
-            ..config(&bucket, 10000)
+            ..config(&bucket, batch_size)
         };
 
         let prefix = config.key_prefix.clone();
         let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.build_processor(client, cx).unwrap();
 
-        let (lines, events, mut receiver) = make_events_batch(100, 500);
+        let (lines, events, mut receiver) = make_events_batch(100, batch_size);
         sink.run(events).await.unwrap();
+        // It's possible that the internal machinery of the sink is still
+        // spinning up. We pause here to give the batch time to wind
+        // through. Waiting is preferable to adding synchronization into the
+        // actual sync code for the sole benefit of these tests.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
-        assert_eq!(keys.len(), 6);
+        assert_eq!(keys.len(), 1);
 
         let mut response_lines: Vec<String> = Vec::new();
         let mut key_stream = stream::iter(keys);
@@ -177,6 +188,11 @@ mod integration_tests {
 
         let (lines, events, mut receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
+        // It's possible that the internal machinery of the sink is still
+        // spinning up. We pause here to give the batch time to wind
+        // through. Waiting is preferable to adding synchronization into the
+        // actual sync code for the sole benefit of these tests.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -209,6 +225,11 @@ mod integration_tests {
 
         let (_lines, events, mut receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
+        // It's possible that the internal machinery of the sink is still
+        // spinning up. We pause here to give the batch time to wind
+        // through. Waiting is preferable to adding synchronization into the
+        // actual sync code for the sole benefit of these tests.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
 
         let objects = list_objects(&bucket, prefix.unwrap()).await;

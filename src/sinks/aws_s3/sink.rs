@@ -1,11 +1,3 @@
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    io::{self, Write},
-    num::NonZeroUsize,
-    time::Duration,
-};
-
 use crate::sinks::util::sink::ServiceLogic;
 use crate::{
     config::{log_schema, SinkContext},
@@ -27,6 +19,13 @@ use flate2::write::GzEncoder;
 use futures::{
     stream::{BoxStream, FuturesUnordered, StreamExt},
     FutureExt, TryFutureExt,
+};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    io::{self, Write},
+    num::NonZeroUsize,
+    time::Duration,
 };
 use tokio::{
     pin, select,
@@ -89,11 +88,12 @@ where
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        // All sinks do the same fundamental job: take in events, and ship them out.  Empirical
-        // testing shows that our number one priority for high throughput needs to be servicing I/O
-        // as soon as we possibly can.  In order to do that, we'll spin up a separate task that
-        // deals exclusively with I/O, while we deal with everything else here: batching, ordering,
-        // and so on.
+        // All sinks do the same fundamental job: take in events, and ship them
+        // out. Empirical testing shows that our number one priority for high
+        // throughput needs to be servicing I/O as soon as we possibly can.  In
+        // order to do that, we'll spin up a separate task that deals
+        // exclusively with I/O, while we deal with everything else here:
+        // batching, ordering, and so on.
         let (io_tx, io_rx) = channel(64);
         let service = self
             .service
@@ -138,11 +138,13 @@ where
                 }
                 // Partitioning failed for one or more events.
                 //
-                // TODO: this might b e where we would insert something like the
+                // TODO: this might be where we would insert something like the
                 // proposed error handling/dead letter queue stuff; events that
                 // _we_ can't handle, but some other component may be able to
                 // salvage
-                None => continue,
+                None => {
+                    continue;
+                }
             }
         }
 
@@ -167,8 +169,8 @@ where
     loop {
         select! {
             Some(req) = rx.recv() => {
-                // Rebind the variable to avoid a bug with the pattern matching in `select!`:
-                // https://github.com/tokio-rs/tokio/issues/4076
+                // Rebind the variable to avoid a bug with the pattern matching
+                // in `select!`: https://github.com/tokio-rs/tokio/issues/4076
                 let mut req = req;
                 let seqno = seq_head;
                 seq_head += 1;
@@ -181,14 +183,16 @@ where
                     message = "Submitting service request.",
                     in_flight_requests = in_flight.len()
                 );
-                // TODO: This likely need be parameterized, which builds a stronger case for
-                // following through with the comment mentioned below.
+                // TODO: This likely need be parameterized, which builds a
+                // stronger case for following through with the comment
+                // mentioned below.
                 let logic = StdServiceLogic::default();
-                // TODO: I'm not entirely happy with how we're smuggling batch_size/finalizers
-                // this far through, from the finished batch all the way through to the concrete
-                // request type...we lifted this code from `ServiceSink` directly, but we should
-                // probably treat it like `PartitionBatcher` and shove it into a single,
-                // encapsulated type instead.
+                // TODO: I'm not entirely happy with how we're smuggling
+                // batch_size/finalizers this far through, from the finished
+                // batch all the way through to the concrete request type...we
+                // lifted this code from `ServiceSink` directly, but we should
+                // probably treat it like `PartitionBatcher` and shove it into a
+                // single, encapsulated type instead.
                 let batch_size = req.batch_size;
                 let finalizers = req.take_finalizers();
 
@@ -338,9 +342,9 @@ pub fn process_event_batch(
 
     // Build our compressor first, so that we can encode directly into it.
     let mut writer = {
-        // This is a best guess, because encoding could add a good chunk of overhead to the raw,
-        // in-memory representation of an event, but if we're compressing, then we should end up
-        // net below the capacity.
+        // This is a best guess, because encoding could add a good chunk of
+        // overhead to the raw, in-memory representation of an event, but if
+        // we're compressing, then we should end up net below the capacity.
         let buffer = Vec::new();
         match compression {
             Compression::None => Writer::Plain(buffer),

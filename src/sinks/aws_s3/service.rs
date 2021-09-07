@@ -1,10 +1,9 @@
-use std::task::{Context, Poll};
-
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream};
 use md5::Digest;
 use rusoto_core::{ByteStream, RusotoError};
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
+use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::event::{EventFinalizers, Finalizable};
@@ -36,9 +35,10 @@ impl Response for PutObjectOutput {}
 
 /// Wrapper for the Rusoto S3 client.
 ///
-/// Provides a `tower::Service`-compatible wrapper around the native `rusoto_s3::S3Client`, allowing
-/// it to be composed within a Tower "stack", such that we can easily and transparently provide
-/// retries, concurrency limits, rate limits, and more.
+/// Provides a `tower::Service`-compatible wrapper around the native
+/// `rusoto_s3::S3Client`, allowing it to be composed within a Tower "stack",
+/// such that we can easily and transparently provide retries, concurrency
+/// limits, rate limits, and more.
 #[derive(Clone)]
 pub struct S3Service {
     client: S3Client,
@@ -104,7 +104,8 @@ impl Service<S3Request> for S3Service {
         Box::pin(async move {
             let result = client.put_object(request).in_current_span().await;
 
-            // TODO: This is fine for testing, but we should have a better pattern for this.
+            // TODO: This is fine for testing, but we should have a better
+            // pattern for this.
             emit!(S3EventsSent {
                 byte_size: body_len,
             });
@@ -115,8 +116,9 @@ impl Service<S3Request> for S3Service {
 }
 
 fn bytes_to_bytestream(buf: Bytes) -> ByteStream {
-    // We _have_ to provide the size hint, because without it, Rusoto can't generate the
-    // Content-Length header which is required for the S3 PutObject API call.
+    // We _have_ to provide the size hint, because without it, Rusoto can't
+    // generate the Content-Length header which is required for the S3 PutObject
+    // API call.
     let len = buf.len();
     ByteStream::new_with_size(Box::pin(stream::once(async move { Ok(buf) })), len)
 }
