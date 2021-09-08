@@ -6,7 +6,7 @@ apt-get install -y \
   apt-transport-https \
   wget
 
-# ubuntu 16.04 only has LLVM, but we need 9 for onig_sys
+# we need LLVM >= 3.9 for onig_sys/bindgen
 
 cat <<-EOF > /etc/apt/sources.list.d/llvm.list
 deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main

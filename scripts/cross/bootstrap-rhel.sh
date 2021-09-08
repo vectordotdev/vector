@@ -2,10 +2,7 @@
 
 yum makecache
 
-# Needed for llvm 9 required by onig_sys
-yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+# we need LLVM >= 3.9 for onig_sys/bindgen
 
-# needed by onig_sys
-yum install -y \
-      clang \
-      llvm
+yum install -y centos-release-scl
+yum install -y llvm-toolset-7
