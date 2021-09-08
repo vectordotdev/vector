@@ -1,4 +1,4 @@
-use super::super::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
+use crate::sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
 
 pub trait Partition<K> {
     fn partition(&self) -> K;

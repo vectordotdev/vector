@@ -23,7 +23,7 @@ split-debuginfo = "unpacked" # Faster debug builds on macOS
 # This results in roughly a 5% reduction in performance when compiling locally vs when
 # compiled via the CI pipeline.
 [profile.release]
-debug = false     # Do not include debug symbols in the executable.
+debug = false # Do not include debug symbols in the executable.
 
 [profile.bench]
 debug = true
@@ -116,7 +116,7 @@ futures = { version = "0.3.17", default-features = false, features = ["compat", 
 tokio = { version = "1.11.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
-tokio-util = { version = "0.6.7", default-features = false, features = ["codec", "time"] }
+tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time"] }
 
 # Tracing
 tracing = { version = "0.1.26", default-features = false }
