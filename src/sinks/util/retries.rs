@@ -165,15 +165,15 @@ impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
 }
 
 impl RetryAction {
-    pub fn is_retryable(&self) -> bool {
+    pub const fn is_retryable(&self) -> bool {
         matches!(self, RetryAction::Retry(_))
     }
 
-    pub fn is_not_retryable(&self) -> bool {
+    pub const fn is_not_retryable(&self) -> bool {
         matches!(self, RetryAction::DontRetry(_))
     }
 
-    pub fn is_successful(&self) -> bool {
+    pub const fn is_successful(&self) -> bool {
         matches!(self, RetryAction::Successful)
     }
 }
@@ -199,7 +199,7 @@ impl ExponentialBackoff {
     ///
     /// The resulting duration is calculated by taking the base to the `n`-th power,
     /// where `n` denotes the number of past attempts.
-    pub fn from_millis(base: u64) -> ExponentialBackoff {
+    pub const fn from_millis(base: u64) -> ExponentialBackoff {
         ExponentialBackoff {
             current: base,
             base,
@@ -213,13 +213,13 @@ impl ExponentialBackoff {
     /// For example, using a factor of `1000` will make each delay in units of seconds.
     ///
     /// Default factor is `1`.
-    pub fn factor(mut self, factor: u64) -> ExponentialBackoff {
+    pub const fn factor(mut self, factor: u64) -> ExponentialBackoff {
         self.factor = factor;
         self
     }
 
     /// Apply a maximum delay. No retry delay will be longer than this `Duration`.
-    pub fn max_delay(mut self, duration: Duration) -> ExponentialBackoff {
+    pub const fn max_delay(mut self, duration: Duration) -> ExponentialBackoff {
         self.max_delay = Some(duration);
         self
     }

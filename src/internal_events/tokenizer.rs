@@ -2,7 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct TokenizerFieldMissing<'a> {
+pub struct TokenizerFieldMissing<'a> {
     pub field: &'a str,
 }
 
@@ -21,7 +21,7 @@ impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct TokenizerConvertFailed<'a> {
+pub struct TokenizerConvertFailed<'a> {
     pub field: &'a str,
     pub error: crate::types::Error,
 }

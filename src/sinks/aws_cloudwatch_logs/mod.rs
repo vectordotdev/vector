@@ -540,6 +540,7 @@ impl RetryLogic for CloudwatchRetryLogic {
     type Error = CloudwatchError;
     type Response = ();
 
+    #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             CloudwatchError::Put(err) => match err {

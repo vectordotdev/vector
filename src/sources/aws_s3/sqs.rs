@@ -1,4 +1,5 @@
 use crate::{
+    codecs::{CharacterDelimitedCodec, FramingError},
     config::log_schema,
     event::Event,
     internal_events::aws_s3::source::{
@@ -12,7 +13,6 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use codec::BytesDelimitedCodec;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
@@ -103,7 +103,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to read all of s3://{}/{}: {}", bucket, key, source))]
     ReadObject {
-        source: std::io::Error,
+        source: Box<dyn FramingError>,
         bucket: String,
         key: String,
     },
@@ -406,9 +406,9 @@ impl IngestorProcess {
                 // prefer duplicate lines over message loss. Future work could include recording
                 // the offset of the object that has been read, but this would only be relevant in
                 // the case that the same vector instance processes the same message.
-                let mut read_error: Option<std::io::Error> = None;
+                let mut read_error: Option<Box<dyn FramingError>> = None;
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-                    FramedRead::new(object_reader, BytesDelimitedCodec::new(b'\n'))
+                    FramedRead::new(object_reader, CharacterDelimitedCodec::new('\n'))
                         .map(|res| {
                             res.map_err(|err| {
                                 read_error = Some(err);

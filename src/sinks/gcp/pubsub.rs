@@ -50,7 +50,7 @@ pub struct PubsubConfig {
     pub tls: Option<TlsOptions>,
 }
 
-fn default_skip_authentication() -> bool {
+const fn default_skip_authentication() -> bool {
     false
 }
 

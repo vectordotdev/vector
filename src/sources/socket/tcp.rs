@@ -1,4 +1,5 @@
 use crate::{
+    codecs::{BoxedFramingError, CharacterDelimitedCodec},
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},
@@ -6,7 +7,6 @@ use crate::{
     tls::TlsConfig,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
 
@@ -34,12 +34,12 @@ fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
 impl TcpConfig {
-    pub fn new(
+    pub const fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         max_length: usize,
@@ -78,11 +78,11 @@ pub struct RawTcpSource {
 }
 
 impl TcpSource for RawTcpSource {
-    type Error = std::io::Error;
-    type Decoder = BytesDelimitedCodec;
+    type Error = BoxedFramingError;
+    type Decoder = CharacterDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
-        BytesDelimitedCodec::new_with_max_length(b'\n', self.config.max_length)
+        CharacterDelimitedCodec::new_with_max_length('\n', self.config.max_length)
     }
 
     fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
