@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use shared::btreemap;
+use snafu::{ResultExt, Snafu};
 use std::io::{self};
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
@@ -22,6 +23,27 @@ pub(super) struct CgroupsConfig {
     base: Option<PathBuf>,
     groups: FilterList,
 }
+
+#[derive(Debug, Snafu)]
+enum CgroupsError {
+    #[snafu(display("Could not open cgroup data file {:?}.", filename))]
+    Opening {
+        filename: PathBuf,
+        source: io::Error,
+    },
+    #[snafu(display("Could not read cgroup data file {:?}.", filename))]
+    Reading {
+        filename: PathBuf,
+        source: io::Error,
+    },
+    #[snafu(display("Could not parse cgroup data file {:?}.", filename))]
+    Parsing {
+        filename: PathBuf,
+        source: ParseIntError,
+    },
+}
+
+type CgroupsResult<T> = Result<T, CgroupsError>;
 
 impl HostMetricsConfig {
     pub async fn cgroups_metrics(&self) -> Vec<Metric> {
@@ -50,7 +72,7 @@ impl HostMetricsConfig {
             };
             if let Some(cpu) = filter_result_sync(
                 cgroup.load_cpu(buffer).await,
-                "Failed to load/parse cgroups CPU statistics",
+                "Failed to load cgroups CPU statistics.",
             ) {
                 result.push(self.counter(
                     "cgroup_cpu_usage_seconds_total",
@@ -75,7 +97,7 @@ impl HostMetricsConfig {
             if !cgroup.is_root() {
                 if let Some(current) = filter_result_sync(
                     cgroup.load_memory_current(buffer).await,
-                    "Failed to load/parse cgroups current memory",
+                    "Failed to load cgroups current memory.",
                 ) {
                     result.push(self.gauge(
                         "cgroup_memory_current_bytes",
@@ -87,7 +109,7 @@ impl HostMetricsConfig {
 
                 if let Some(stat) = filter_result_sync(
                     cgroup.load_memory_stat(buffer).await,
-                    "Failed to load/parse cgroups memory statistics",
+                    "Failed to load cgroups memory statistics.",
                 ) {
                     result.push(self.gauge(
                         "cgroup_memory_anon_bytes",
@@ -106,7 +128,7 @@ impl HostMetricsConfig {
 
             if level < self.cgroups.levels {
                 if let Some(children) =
-                    filter_result_sync(cgroup.children().await, "Failed to load cgroups children")
+                    filter_result_sync(cgroup.children().await, "Failed to load cgroups children.")
                 {
                     for child in children {
                         if self.cgroups.groups.contains_path(Some(&child.name)) {
@@ -155,19 +177,22 @@ impl CGroup {
             .then(|| hybrid_root)
             .or_else(|| is_file(join_path(&base_dir, "cgroup.procs")).then(|| base_dir));
 
-        base_dir.and_then(|root| match base_group {
-            Some(group) => {
-                let group = group.as_ref();
-                let root = join_path(root, group);
-                is_dir(&root).then(|| CGroup {
+        base_dir.and_then(|root| {
+            debug!(message = "Detected cgroup base directory.", ?root);
+            match base_group {
+                Some(group) => {
+                    let group = group.as_ref();
+                    let root = join_path(root, group);
+                    is_dir(&root).then(|| CGroup {
+                        root,
+                        name: group.into(),
+                    })
+                }
+                None => Some(CGroup {
                     root,
-                    name: group.into(),
-                })
+                    name: "/".into(),
+                }),
             }
-            None => Some(CGroup {
-                root,
-                name: "/".into(),
-            }),
         })
     }
 
@@ -175,35 +200,49 @@ impl CGroup {
         self.name == Path::new("/")
     }
 
-    async fn load_cpu(&self, buffer: &mut String) -> io::Result<CpuStat> {
-        buffer.clear();
-        File::open(self.make_path("cpu.stat"))
-            .await?
-            .read_to_string(buffer)
-            .await?;
-        buffer.parse().map_err(map_parse_error)
+    async fn load_cpu(&self, buffer: &mut String) -> CgroupsResult<CpuStat> {
+        self.open_read_parse("cpu.stat", buffer).await
     }
 
     fn make_path(&self, filename: impl AsRef<Path>) -> PathBuf {
         join_path(&self.root, filename)
     }
 
-    async fn load_memory_current(&self, buffer: &mut String) -> io::Result<u64> {
+    async fn open_read(
+        &self,
+        filename: impl AsRef<Path>,
+        buffer: &mut String,
+    ) -> CgroupsResult<PathBuf> {
         buffer.clear();
-        File::open(self.make_path("memory.current"))
-            .await?
+        let filename = self.make_path(filename);
+        File::open(&filename)
+            .await
+            .with_context(|| Opening {
+                filename: filename.clone(),
+            })?
             .read_to_string(buffer)
-            .await?;
-        buffer.trim().parse().map_err(map_parse_error)
+            .await
+            .with_context(|| Reading {
+                filename: filename.clone(),
+            })?;
+        Ok(filename)
     }
 
-    async fn load_memory_stat(&self, buffer: &mut String) -> io::Result<MemoryStat> {
-        buffer.clear();
-        File::open(self.make_path("memory.stat"))
-            .await?
-            .read_to_string(buffer)
-            .await?;
-        buffer.parse().map_err(map_parse_error)
+    async fn open_read_parse<T: FromStr<Err = ParseIntError>>(
+        &self,
+        filename: impl AsRef<Path>,
+        buffer: &mut String,
+    ) -> CgroupsResult<T> {
+        let filename = self.open_read(filename, buffer).await?;
+        buffer.trim().parse().with_context(|| Parsing { filename })
+    }
+
+    async fn load_memory_current(&self, buffer: &mut String) -> CgroupsResult<u64> {
+        self.open_read_parse("memory.current", buffer).await
+    }
+
+    async fn load_memory_stat(&self, buffer: &mut String) -> CgroupsResult<MemoryStat> {
+        self.open_read_parse("memory.stat", buffer).await
     }
 
     async fn children(&self) -> io::Result<Vec<CGroup>> {
@@ -260,10 +299,6 @@ define_stat_struct! { MemoryStat(
     anon,
     file,
 )}
-
-fn map_parse_error(error: ParseIntError) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, error)
-}
 
 fn is_dir(path: impl AsRef<Path>) -> bool {
     std::fs::metadata(path.as_ref())
