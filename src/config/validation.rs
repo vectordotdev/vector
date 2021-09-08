@@ -17,14 +17,36 @@ pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 pub fn check_pipelines(pipelines: &Pipelines) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
 
-    for pipeline_id in pipelines.names() {
+    for (pipeline_id, pipeline) in pipelines.inner() {
         if pipeline_id.contains('.') {
             errors.push(format!(
                 "Pipeline name \"{}\" shouldn't container a '.'.",
                 pipeline_id
             ));
         }
+
+        if let Err(err) = check_names(pipeline.transforms.keys()) {
+            errors.extend(err);
+        }
     }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result<(), Vec<String>> {
+    let errors: Vec<_> = names
+        .filter(|component_key| component_key.id().contains('.'))
+        .map(|component_key| {
+            format!(
+                "Component name \"{}\" should not contain a \".\"",
+                component_key.id()
+            )
+        })
+        .collect();
 
     if errors.is_empty() {
         Ok(())
@@ -60,15 +82,6 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     {
         let uses = used_keys.entry(id).or_default();
         uses.push(ctype);
-    }
-
-    for component_key in used_keys.keys() {
-        if component_key.id().contains('.') {
-            errors.push(format!(
-                "Component name \"{}\" should not contain a \".\"",
-                component_key.id()
-            ));
-        }
     }
 
     for (id, uses) in used_keys.into_iter().filter(|(_id, uses)| uses.len() > 1) {

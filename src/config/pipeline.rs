@@ -22,11 +22,15 @@ impl Pipelines {
         self.0.keys()
     }
 
-    pub fn load_from_paths(paths: impl Iterator<Item = PathBuf>) -> Result<Pipelines, Vec<String>> {
+    pub const fn inner(&self) -> &IndexMap<String, Pipeline> {
+        &self.0
+    }
+
+    pub fn load_from_paths(paths: &[PathBuf]) -> Result<Pipelines, Vec<String>> {
         let mut index: IndexMap<String, Pipeline> = IndexMap::new();
         let mut errors: Vec<String> = Vec::new();
         for folder in paths {
-            match Self::load_from_folder(&folder) {
+            match Self::load_from_folder(folder) {
                 Ok(result) => {
                     for (key, value) in result.into_iter() {
                         index.insert(key, value);
@@ -169,6 +173,11 @@ impl Pipeline {
     #[cfg(test)]
     pub fn from_toml(input: &str) -> Self {
         deserialize(input, Some(Format::Toml)).unwrap()
+    }
+
+    #[cfg(test)]
+    pub fn from_json(input: &str) -> Self {
+        deserialize(input, Some(Format::Json)).unwrap()
     }
 }
 

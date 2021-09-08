@@ -74,7 +74,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
-    pub request: TowerRequestConfig<Option<usize>>,
+    pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
