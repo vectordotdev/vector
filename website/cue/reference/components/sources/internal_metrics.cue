@@ -991,10 +991,11 @@ components: sources: internal_metrics: {
 
 		// Helpful tag groupings
 		_component_tags: _internal_metrics_tags & {
-			component_kind: _component_kind
-			component_id:   _component_id
-			component_name: _component_name
-			component_type: _component_type
+			component_kind:  _component_kind
+			component_id:    _component_id
+			component_scope: _component_scope
+			component_name:  _component_name
+			component_type:  _component_type
 		}
 
 		// All available tags
@@ -1015,6 +1016,11 @@ components: sources: internal_metrics: {
 			description: "The Vector component ID."
 			required:    true
 			examples: ["my_source", "my_sink"]
+		}
+		_component_scope: {
+			description: "The Vector component scope."
+			required:    true
+			examples: ["global", "pipeline:appname"]
 		}
 		_component_name: {
 			description: "Deprecated, use `component_id` instead. The value is the same as `component_id`."
