@@ -21,9 +21,9 @@ use tower::{
     Service, ServiceBuilder,
 };
 
-pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
-pub type TowerBatchedSink<S, B, L> = BatchSink<Svc<S, L>, B>;
-pub type TowerPartitionSink<S, B, L, K> = PartitionBatchSink<Svc<S, L>, B, K>;
+pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
+pub type TowerBatchedSink<S, B, RL, SL> = BatchSink<Svc<S, RL>, B, SL>;
+pub type TowerPartitionSink<S, B, RL, K, SL> = PartitionBatchSink<Svc<S, RL>, B, K, SL>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -312,12 +312,12 @@ impl TowerRequestSettings {
         let policy = self.retry_policy(retry_logic.clone());
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
-            .retry(policy)
             .layer(AdaptiveConcurrencyLimitLayer::new(
                 self.concurrency,
                 self.adaptive_concurrency,
                 retry_logic,
             ))
+            .retry(policy)
             .timeout(self.timeout)
             .service(service)
     }

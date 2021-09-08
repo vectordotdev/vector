@@ -27,6 +27,7 @@ use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::pin::Pin;
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
@@ -161,11 +162,7 @@ impl SinkConfig for TestConfig {
 
         // Dig deep to get at the internal controller statistics
         let stats = Arc::clone(
-            &sink
-                .get_ref()
-                .get_ref()
-                .get_ref()
-                .get_ref()
+            &Pin::new(&sink.get_ref().get_ref().get_ref().get_ref())
                 .get_ref()
                 .controller
                 .stats,
