@@ -42,10 +42,6 @@ impl<'a> Compiler<'a> {
             expressions,
             fallible: self.fallible,
             abortable: self.abortable,
-            enrichment_tables: self
-                .state
-                .get_enrichment_tables()
-                .map(|table| table.as_readonly()),
         })
     }
 

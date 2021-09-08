@@ -1,4 +1,5 @@
 use crate::{
+    codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
@@ -7,7 +8,6 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::TimeZone;
-use codec::BytesDelimitedCodec;
 use futures::{future, stream::BoxStream, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use nix::{
@@ -62,6 +62,12 @@ enum BuildError {
         unit
     ))]
     DuplicatedUnit { unit: String },
+    #[snafu(display(
+        "The Journal field/value pair {:?}:{:?} is duplicated in both include_matches and exclude_matches.",
+        field,
+        value,
+    ))]
+    DuplicatedMatches { field: String, value: String },
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -71,6 +77,8 @@ pub struct JournaldConfig {
     pub units: Vec<String>,
     pub include_units: Vec<String>,
     pub exclude_units: Vec<String>,
+    pub include_matches: HashMap<String, HashSet<String>>,
+    pub exclude_matches: HashMap<String, HashSet<String>>,
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
@@ -80,6 +88,34 @@ pub struct JournaldConfig {
     remap_priority: bool,
 }
 
+impl JournaldConfig {
+    fn merged_include_matches(&self) -> crate::Result<Matches> {
+        let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
+            (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
+            (true, false) => {
+                warn!("The `units` setting is deprecated, use `include_units` instead.");
+                &self.units
+            }
+            (false, _) => &self.include_units,
+        };
+
+        Ok(Self::merge_units(&self.include_matches, include_units))
+    }
+
+    fn merged_exclude_matches(&self) -> Matches {
+        Self::merge_units(&self.exclude_matches, &self.exclude_units)
+    }
+
+    fn merge_units(matches: &Matches, units: &[String]) -> Matches {
+        let mut matches = matches.clone();
+        for unit in units {
+            let entry = matches.entry(String::from(SYSTEMD_UNIT));
+            entry.or_default().insert(fixup_unit(unit));
+        }
+        matches
+    }
+}
+
 inventory::submit! {
     SourceDescription::new::<JournaldConfig>("journald")
 }
@@ -87,6 +123,7 @@ inventory::submit! {
 impl_generate_config_from_default!(JournaldConfig);
 
 type Record = HashMap<String, String>;
+type Matches = HashMap<String, HashSet<String>>;
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "journald")]
@@ -99,26 +136,22 @@ impl SourceConfig for JournaldConfig {
         let data_dir = cx
             .globals
             // source are only global, name can be used for subdir
-            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.id.as_str())?;
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
-        let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
-            (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
-            (true, false) => {
-                warn!("The `units` setting is deprecated, use `include_units` instead.");
-                &self.units
-            }
-            (false, _) => &self.include_units,
-        };
-
-        let include_units: HashSet<String> = include_units.iter().map(|s| fixup_unit(s)).collect();
-        let exclude_units: HashSet<String> =
-            self.exclude_units.iter().map(|s| fixup_unit(s)).collect();
-        if let Some(unit) = include_units
+        if let Some(unit) = self
+            .include_units
             .iter()
-            .find(|unit| exclude_units.contains(&unit[..]))
+            .find(|unit| self.exclude_units.contains(unit))
         {
             let unit = unit.into();
             return Err(BuildError::DuplicatedUnit { unit }.into());
+        }
+
+        let include_matches = self.merged_include_matches()?;
+        let exclude_matches = self.merged_exclude_matches();
+
+        if let Some((field, value)) = find_duplicate_match(&include_matches, &exclude_matches) {
+            return Err(BuildError::DuplicatedMatches { field, value }.into());
         }
 
         let mut checkpoint_path = data_dir;
@@ -145,8 +178,8 @@ impl SourceConfig for JournaldConfig {
 
         Ok(Box::pin(
             JournaldSource {
-                include_units,
-                exclude_units,
+                include_matches,
+                exclude_matches,
                 checkpoint_path,
                 batch_size,
                 remap_priority: self.remap_priority,
@@ -166,8 +199,8 @@ impl SourceConfig for JournaldConfig {
 }
 
 struct JournaldSource {
-    include_units: HashSet<String>,
-    exclude_units: HashSet<String>,
+    include_matches: Matches,
+    exclude_matches: Matches,
     checkpoint_path: PathBuf,
     batch_size: usize,
     remap_priority: bool,
@@ -254,7 +287,7 @@ impl JournaldSource {
     /// Return `true` if should restart `journalctl`.
     async fn run_stream<'a>(
         &'a mut self,
-        mut stream: BoxStream<'static, io::Result<Bytes>>,
+        mut stream: BoxStream<'static, Result<Bytes, BoxedFramingError>>,
         checkpointer: &'a mut Checkpointer,
         cursor: &'a mut Option<String>,
     ) -> bool {
@@ -293,8 +326,7 @@ impl JournaldSource {
 
                 saw_record = true;
 
-                let unit = record.get(&*SYSTEMD_UNIT);
-                if filter_unit(unit, &self.include_units, &self.exclude_units) {
+                if filter_matches(&record, &self.include_matches, &self.exclude_matches) {
                     continue;
                 }
 
@@ -339,8 +371,10 @@ impl JournaldSource {
 type StartJournalctlFn = Box<
     dyn Fn(
             &Option<String>, // cursor
-        ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)>
-        + Send
+        ) -> crate::Result<(
+            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
+            StopJournalctlFn,
+        )> + Send
         + Sync,
 >;
 
@@ -348,12 +382,15 @@ type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
     command: &mut Command,
-) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
+) -> crate::Result<(
+    BoxStream<'static, Result<Bytes, BoxedFramingError>>,
+    StopJournalctlFn,
+)> {
     let mut child = command.spawn().context(JournalctlSpawn)?;
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),
-        BytesDelimitedCodec::new(b'\n'),
+        CharacterDelimitedCodec::new('\n'),
     )
     .boxed();
 
@@ -489,19 +526,39 @@ fn remap_priority(priority: &mut JsonValue) {
     }
 }
 
-/// Should the given unit name be filtered (excluded)?
-fn filter_unit(
-    unit: Option<&String>,
-    includes: &HashSet<String>,
-    excludes: &HashSet<String>,
-) -> bool {
-    match (unit, includes.is_empty(), excludes.is_empty()) {
-        (None, empty, _) => !empty,
-        (Some(_), true, true) => false,
-        (Some(unit), false, true) => !includes.contains(unit),
-        (Some(unit), true, false) => excludes.contains(unit),
-        (Some(unit), false, false) => !includes.contains(unit) || excludes.contains(unit),
+fn filter_matches(record: &Record, includes: &Matches, excludes: &Matches) -> bool {
+    match (includes.is_empty(), excludes.is_empty()) {
+        (true, true) => false,
+        (false, true) => !contains_match(record, includes),
+        (true, false) => contains_match(record, excludes),
+        (false, false) => !contains_match(record, includes) || contains_match(record, excludes),
     }
+}
+
+fn contains_match(record: &Record, matches: &Matches) -> bool {
+    let f = move |(field, value)| {
+        matches
+            .get(field)
+            .map(|x| x.contains(value))
+            .unwrap_or(false)
+    };
+    record.iter().any(f)
+}
+
+fn find_duplicate_match(a_matches: &Matches, b_matches: &Matches) -> Option<(String, String)> {
+    for (a_key, a_values) in a_matches {
+        if let Some(b_values) = b_matches.get(a_key.as_str()) {
+            for (a, b) in a_values
+                .iter()
+                .flat_map(|x| std::iter::repeat(x).zip(b_values.iter()))
+            {
+                if a == b {
+                    return Some((a_key.into(), b.into()));
+                }
+            }
+        }
+    }
+    None
 }
 
 struct Checkpointer {
@@ -599,10 +656,7 @@ mod tests {
         task::{Context, Poll},
     };
     use tempfile::tempdir;
-    use tokio::{
-        io,
-        time::{sleep, timeout, Duration},
-    };
+    use tokio::time::{sleep, timeout, Duration};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -611,6 +665,7 @@ mod tests {
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"}
 {"_SYSTEMD_UNIT":"syslog.service","MESSAGE":"Non-ASCII in other field","__CURSOR":"5","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3","SYSLOG_RAW":[194,191,87,111,114,108,100,63]}
 {"_SYSTEMD_UNIT":"NetworkManager.service","MESSAGE":"<info>  [1608278027.6016] dhcp-init: Using DHCP client 'dhclient'","__CURSOR":"6","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"6","SYSLOG_FACILITY":["DHCP4","DHCP6"]}
+{"PRIORITY":"5","SYSLOG_FACILITY":"0","SYSLOG_IDENTIFIER":"kernel","_TRANSPORT":"kernel","__REALTIME_TIMESTAMP":"1578529839140006","MESSAGE":"audit log"}
 "#;
 
     struct FakeJournal {
@@ -618,7 +673,7 @@ mod tests {
     }
 
     impl FakeJournal {
-        fn next(&mut self) -> Option<io::Result<Bytes>> {
+        fn next(&mut self) -> Option<Result<Bytes, BoxedFramingError>> {
             let mut line = String::new();
             match self.reader.read_line(&mut line) {
                 Ok(0) => None,
@@ -626,13 +681,13 @@ mod tests {
                     line.pop();
                     Some(Ok(Bytes::from(line)))
                 }
-                Err(err) => Some(Err(err)),
+                Err(err) => Some(Err(err.into())),
             }
         }
     }
 
     impl Stream for FakeJournal {
-        type Item = io::Result<Bytes>;
+        type Item = Result<Bytes, BoxedFramingError>;
 
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
             Poll::Ready(Pin::into_inner(self).next())
@@ -642,7 +697,10 @@ mod tests {
     impl FakeJournal {
         fn new(
             checkpoint: &Option<String>,
-        ) -> (BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn) {
+        ) -> (
+            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
+            StopJournalctlFn,
+        ) {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -659,7 +717,17 @@ mod tests {
         }
     }
 
-    async fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
+    async fn run_with_units(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
+        let include_matches = create_unit_matches(iunits.to_vec());
+        let exclude_matches = create_unit_matches(xunits.to_vec());
+        run_journal(include_matches, exclude_matches, cursor).await
+    }
+
+    async fn run_journal(
+        include_matches: Matches,
+        exclude_matches: Matches,
+        cursor: Option<&str>,
+    ) -> Vec<Event> {
         let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -678,12 +746,9 @@ mod tests {
                 .expect("Could not set checkpoint");
         }
 
-        let include_units: HashSet<String> = iunits.iter().map(|&s| s.into()).collect();
-        let exclude_units: HashSet<String> = xunits.iter().map(|&s| s.into()).collect();
-
         let source = JournaldSource {
-            include_units,
-            exclude_units,
+            include_matches,
+            exclude_matches,
             checkpoint_path,
             batch_size: DEFAULT_BATCH_SIZE,
             remap_priority: true,
@@ -701,10 +766,30 @@ mod tests {
         timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
     }
 
+    fn create_unit_matches<S: Into<String>>(units: Vec<S>) -> Matches {
+        let units: HashSet<String> = units.into_iter().map(Into::into).collect();
+        let mut map = HashMap::new();
+        if !units.is_empty() {
+            map.insert(String::from(SYSTEMD_UNIT), units);
+        }
+        map
+    }
+
+    fn create_matches<S: Into<String>>(conditions: Vec<(S, S)>) -> Matches {
+        let mut matches: Matches = HashMap::new();
+        for (field, value) in conditions {
+            matches
+                .entry(field.into())
+                .or_default()
+                .insert(value.into());
+        }
+        matches
+    }
+
     #[tokio::test]
     async fn reads_journal() {
-        let received = run_journal(&[], &[], None).await;
-        assert_eq!(received.len(), 7);
+        let received = run_with_units(&[], &[], None).await;
+        assert_eq!(received.len(), 8);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -722,16 +807,15 @@ mod tests {
 
     #[tokio::test]
     async fn includes_units() {
-        let received = run_journal(&["unit.service"], &[], None).await;
+        let received = run_with_units(&["unit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
-        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
     #[tokio::test]
     async fn excludes_units() {
-        let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
-        assert_eq!(received.len(), 5);
+        let received = run_with_units(&[], &["unit.service", "badunit.service"], None).await;
+        assert_eq!(received.len(), 6);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -747,23 +831,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn includes_matches() {
+        let matches = create_matches(vec![("PRIORITY", "ERR")]);
+        let received = run_journal(matches, HashMap::new(), None).await;
+        assert_eq!(received.len(), 2);
+        assert_eq!(
+            message(&received[0]),
+            Value::Bytes("Different timestamps".into())
+        );
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140005000));
+        assert_eq!(
+            message(&received[1]),
+            Value::Bytes("Non-ASCII in other field".into())
+        );
+        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+    }
+
+    #[tokio::test]
+    async fn includes_kernel() {
+        let matches = create_matches(vec![("_TRANSPORT", "kernel")]);
+        let received = run_journal(matches, HashMap::new(), None).await;
+        assert_eq!(received.len(), 1);
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140006000));
+        assert_eq!(message(&received[0]), Value::Bytes("audit log".into()));
+    }
+
+    #[tokio::test]
+    async fn excludes_matches() {
+        let matches = create_matches(vec![("PRIORITY", "INFO"), ("PRIORITY", "DEBUG")]);
+        let received = run_journal(HashMap::new(), matches, None).await;
+        assert_eq!(received.len(), 5);
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140003000));
+        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140004000));
+        assert_eq!(timestamp(&received[2]), value_ts(1578529839, 140005000));
+        assert_eq!(timestamp(&received[3]), value_ts(1578529839, 140005000));
+        assert_eq!(timestamp(&received[4]), value_ts(1578529839, 140006000));
+    }
+
+    #[tokio::test]
     async fn handles_checkpoint() {
-        let received = run_journal(&[], &[], Some("1")).await;
-        assert_eq!(received.len(), 6);
+        let received = run_with_units(&[], &[], Some("1")).await;
+        assert_eq!(received.len(), 7);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
     #[tokio::test]
     async fn parses_array_messages() {
-        let received = run_journal(&["badunit.service"], &[], None).await;
+        let received = run_with_units(&["badunit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
     }
 
     #[tokio::test]
     async fn parses_array_fields() {
-        let received = run_journal(&["syslog.service"], &[], None).await;
+        let received = run_with_units(&["syslog.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(
             received[0].as_log()["SYSLOG_RAW"],
@@ -773,7 +895,7 @@ mod tests {
 
     #[tokio::test]
     async fn parses_string_sequences() {
-        let received = run_journal(&["NetworkManager.service"], &[], None).await;
+        let received = run_with_units(&["NetworkManager.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(
             received[0].as_log()["SYSLOG_FACILITY"],
@@ -783,32 +905,98 @@ mod tests {
 
     #[tokio::test]
     async fn handles_missing_timestamp() {
-        let received = run_journal(&["stdout"], &[], None).await;
+        let received = run_with_units(&["stdout"], &[], None).await;
         assert_eq!(received.len(), 2);
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
     }
 
     #[test]
-    fn filter_unit_works_correctly() {
-        let empty: HashSet<String> = vec![].into_iter().collect();
-        let includes: HashSet<String> = vec!["one", "two"].into_iter().map(Into::into).collect();
-        let excludes: HashSet<String> = vec!["foo", "bar"].into_iter().map(Into::into).collect();
+    fn filter_matches_works_correctly() {
+        let empty: Matches = HashMap::new();
+        let includes = create_unit_matches(vec!["one", "two"]);
+        let excludes = create_unit_matches(vec!["foo", "bar"]);
 
-        assert!(!filter_unit(None, &empty, &empty));
-        assert!(filter_unit(None, &includes, &empty));
-        assert!(!filter_unit(None, &empty, &excludes));
-        assert!(filter_unit(None, &includes, &excludes));
-        let one = String::from("one");
-        assert!(!filter_unit(Some(&one), &empty, &empty));
-        assert!(!filter_unit(Some(&one), &includes, &empty));
-        assert!(!filter_unit(Some(&one), &empty, &excludes));
-        assert!(!filter_unit(Some(&one), &includes, &excludes));
-        let two = String::from("bar");
-        assert!(!filter_unit(Some(&two), &empty, &empty));
-        assert!(filter_unit(Some(&two), &includes, &empty));
-        assert!(filter_unit(Some(&two), &empty, &excludes));
-        assert!(filter_unit(Some(&two), &includes, &excludes));
+        let zero = HashMap::new();
+        assert!(!filter_matches(&zero, &empty, &empty));
+        assert!(filter_matches(&zero, &includes, &empty));
+        assert!(!filter_matches(&zero, &empty, &excludes));
+        assert!(filter_matches(&zero, &includes, &excludes));
+        let mut one = HashMap::new();
+        one.insert(String::from(SYSTEMD_UNIT), String::from("one"));
+        assert!(!filter_matches(&one, &empty, &empty));
+        assert!(!filter_matches(&one, &includes, &empty));
+        assert!(!filter_matches(&one, &empty, &excludes));
+        assert!(!filter_matches(&one, &includes, &excludes));
+        let mut two = HashMap::new();
+        two.insert(String::from(SYSTEMD_UNIT), String::from("bar"));
+        assert!(!filter_matches(&two, &empty, &empty));
+        assert!(filter_matches(&two, &includes, &empty));
+        assert!(filter_matches(&two, &empty, &excludes));
+        assert!(filter_matches(&two, &includes, &excludes));
+    }
+
+    #[test]
+    fn merges_units_and_matches_option() {
+        let include_units = vec!["one", "two"].into_iter().map(String::from).collect();
+        let include_matches = create_matches(vec![
+            ("_SYSTEMD_UNIT", "three.service"),
+            ("_TRANSPORT", "kernel"),
+        ]);
+
+        let exclude_units = vec!["foo", "bar"].into_iter().map(String::from).collect();
+        let exclude_matches = create_matches(vec![
+            ("_SYSTEMD_UNIT", "baz.service"),
+            ("PRIORITY", "DEBUG"),
+        ]);
+
+        let journald_config = JournaldConfig {
+            include_units,
+            include_matches,
+            exclude_units,
+            exclude_matches,
+            ..Default::default()
+        };
+
+        let hashset =
+            |v: &[&str]| -> HashSet<String> { v.to_vec().into_iter().map(String::from).collect() };
+
+        let matches = journald_config.merged_include_matches().unwrap();
+        let units = matches.get("_SYSTEMD_UNIT").unwrap();
+        assert_eq!(
+            units,
+            &hashset(&["one.service", "two.service", "three.service"])
+        );
+        let units = matches.get("_TRANSPORT").unwrap();
+        assert_eq!(units, &hashset(&["kernel"]));
+
+        let matches = journald_config.merged_exclude_matches();
+        let units = matches.get("_SYSTEMD_UNIT").unwrap();
+        assert_eq!(
+            units,
+            &hashset(&["foo.service", "bar.service", "baz.service"])
+        );
+        let units = matches.get("PRIORITY").unwrap();
+        assert_eq!(units, &hashset(&["DEBUG"]));
+    }
+
+    #[test]
+    fn find_duplicate_match_works_correctly() {
+        let include_matches = create_matches(vec![("_TRANSPORT", "kernel")]);
+        let exclude_matches = create_matches(vec![("_TRANSPORT", "kernel")]);
+        let (field, value) = find_duplicate_match(&include_matches, &exclude_matches).unwrap();
+        assert_eq!(field, "_TRANSPORT");
+        assert_eq!(value, "kernel");
+
+        let empty = HashMap::new();
+        let actual = find_duplicate_match(&empty, &empty);
+        assert!(actual.is_none());
+
+        let actual = find_duplicate_match(&include_matches, &empty);
+        assert!(actual.is_none());
+
+        let actual = find_duplicate_match(&empty, &exclude_matches);
+        assert!(actual.is_none());
     }
 
     #[test]

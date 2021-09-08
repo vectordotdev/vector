@@ -55,7 +55,7 @@ pub enum RequestError {
 impl warp::reject::Reject for RequestError {}
 
 impl RequestError {
-    pub fn status(&self) -> StatusCode {
+    pub const fn status(&self) -> StatusCode {
         use RequestError::*;
         match *self {
             AccessKeyMissing { .. } => StatusCode::UNAUTHORIZED,

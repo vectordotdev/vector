@@ -3,7 +3,7 @@ use metrics::counter;
 use serde_json::Error;
 
 #[derive(Debug)]
-pub(crate) struct MetricToLogFailedSerialize {
+pub struct MetricToLogFailedSerialize {
     pub error: Error,
 }
 

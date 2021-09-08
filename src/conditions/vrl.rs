@@ -6,7 +6,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
-use vector_core::enrichment;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Value};
 
@@ -45,12 +44,13 @@ impl ConditionConfig for VrlConfig {
             .into_iter()
             .filter(|f| f.identifier() != "del")
             .filter(|f| f.identifier() != "only_fields")
+            .chain(enrichment::vrl_functions().into_iter())
             .collect::<Vec<_>>();
 
         let program = vrl::compile(
             &self.source,
-            Box::new(enrichment_tables.clone()),
             &functions,
+            Some(Box::new(enrichment_tables.clone())),
         )
         .map_err(|diagnostics| {
             Formatter::new(&self.source, diagnostics)

@@ -1,3 +1,4 @@
+use pretty_assertions::assert_eq;
 use std::collections::HashMap;
 use vector::{
     config::{self, ConfigDiff, Format},
@@ -178,7 +179,7 @@ async fn bad_type() {
     feature = "sinks-socket"
 ))]
 #[tokio::test]
-async fn nonexistant_input() {
+async fn bad_inputs() {
     let err = load(
         r#"
         [sources.in]
@@ -187,6 +188,15 @@ async fn nonexistant_input() {
         address = "127.0.0.1:1235"
 
         [transforms.sample]
+        type = "sample"
+        inputs = []
+        rate = 10
+        key_field = "message"
+        exclude = """
+            contains!(.message, "error")
+        """
+
+        [transforms.sample2]
         type = "sample"
         inputs = ["qwerty"]
         rate = 10
@@ -198,7 +208,7 @@ async fn nonexistant_input() {
         [sinks.out]
         type = "socket"
         mode = "tcp"
-        inputs = ["asdf"]
+        inputs = ["asdf", "in", "in"]
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
@@ -208,11 +218,13 @@ async fn nonexistant_input() {
     .unwrap_err();
 
     assert_eq!(
-        err,
         vec![
-            "Sink \"out\" has no inputs",
-            "Transform \"sample\" has no inputs"
-        ]
+            "Input \"asdf\" for sink \"out\" doesn't match any components.",
+            "Sink \"out\" has input \"in\" duplicated 2 times",
+            "Input \"qwerty\" for transform \"sample2\" doesn't match any components.",
+            "Transform \"sample\" has no inputs",
+        ],
+        err,
     );
 }
 

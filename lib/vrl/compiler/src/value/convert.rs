@@ -230,6 +230,27 @@ impl Value {
             }),
         }
     }
+
+    /// Converts the Value into a byte representation regardless of its original type.
+    /// Object and Array are currently not supported, although technically there's no reason why it
+    /// couldn't in future should the need arise.
+    pub fn encode_as_bytes(&self) -> Result<Bytes, String> {
+        match self {
+            Value::Bytes(bytes) => Ok(bytes.clone()),
+            Value::Integer(i) => Ok(Bytes::copy_from_slice(&i.to_le_bytes())),
+            Value::Float(f) => Ok(Bytes::copy_from_slice(&f.into_inner().to_le_bytes())),
+            Value::Boolean(b) => Ok(if *b {
+                Bytes::copy_from_slice(&[1_u8])
+            } else {
+                Bytes::copy_from_slice(&[0_u8])
+            }),
+            Value::Object(_o) => Err("cannot convert object to bytes.".to_string()),
+            Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
+            Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
+            Value::Regex(r) => Ok(r.to_string().into()),
+            Value::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
+        }
+    }
 }
 
 impl From<Bytes> for Value {

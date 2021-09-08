@@ -154,7 +154,8 @@ components: sinks: [Name=string]: {
 			if features.send.encoding.enabled {
 				encoding: {
 					description: "Configures the encoding specific sink behavior."
-					required:    true
+					required:    false
+					common:      true
 					type: object: options: {
 						if features.send.encoding.codec.enabled {
 							codec: {
@@ -533,14 +534,8 @@ components: sinks: [Name=string]: {
 
 								We highly recommend enabling this feature as it improves
 								performance and reliability of Vector and the systems it
-								communicates with.
-
-								To enable, set the `request.concurrency` option to `adaptive`:
-
-								```toml title="vector.toml"
-								[sinks.my-sink]
-								  request.concurrency = "adaptive"
-								```
+								communicates with. As such, we have made it the default,
+								and no further configuration is required.
 								"""
 						},
 						{
@@ -602,5 +597,6 @@ components: sinks: [Name=string]: {
 	telemetry: metrics: {
 		events_in_total:  components.sources.internal_metrics.output.metrics.events_in_total
 		events_out_total: components.sources.internal_metrics.output.metrics.events_out_total
+		utilization:      components.sources.internal_metrics.output.metrics.utilization
 	}
 }

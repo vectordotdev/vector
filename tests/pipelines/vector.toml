@@ -1,7 +1,17 @@
 [sources.in]
 type = "generator"
+format = "json"
+interval = 2
 
-[sources.stdout]
+[sources.metrics]
+type = "internal_metrics"
+scrape_interval_secs = 2
+
+[sinks.stdout]
 type = "console"
+inputs = ["metrics"]
 target = "stdout"
 encoding.codec = "json"
+
+[api]
+enabled = true

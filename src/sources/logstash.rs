@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpIsErrorFatal, TcpSource};
+use super::util::{SocketListenAddr, TcpError, TcpSource};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
@@ -140,7 +140,7 @@ struct LogstashDecoder {
 }
 
 impl LogstashDecoder {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             state: LogstashDecoderReadState::ReadProtocol,
         }
@@ -161,16 +161,16 @@ pub enum DecodeError {
     DecompressionFailed { source: io::Error },
 }
 
-impl TcpIsErrorFatal for DecodeError {
-    fn is_error_fatal(&self) -> bool {
+impl TcpError for DecodeError {
+    fn can_continue(&self) -> bool {
         use DecodeError::*;
 
         match self {
-            IO { .. } => true,
-            UnknownProtocolVersion { .. } => true,
-            UnknownFrameType { .. } => true,
-            JsonFrameFailedDecode { .. } => false,
-            DecompressionFailed { .. } => false,
+            IO { .. } => false,
+            UnknownProtocolVersion { .. } => false,
+            UnknownFrameType { .. } => false,
+            JsonFrameFailedDecode { .. } => true,
+            DecompressionFailed { .. } => true,
         }
     }
 }

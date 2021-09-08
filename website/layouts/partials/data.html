@@ -37,6 +37,16 @@
           {{ partial "badge.html" (dict "word" $k "color" "gray") }}
           {{ end }}
 
+          {{ with $v.syntax }}
+          {{ if eq . "remap_boolean_expression" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
+          {{ else if eq . "remap_program" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+          {{ else }}
+          {{ partial "badge.html" (dict "word" . "color" "gray") }}
+          {{ end }}
+          {{ end }}
+
           {{ if $v.enum }}
           {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
           {{ end }}
@@ -49,6 +59,9 @@
       </div>
 
       {{ range $k, $v := $v.type }}
+
+
+
       {{ if eq $k "object" }} {{/* Object (with sub-configs) */}}
       <div class="mt-4 border dark:border-gray-700 rounded flex flex-col divide-y dark:divide-gray-700">
         {{ range $k, $v := $v.options }}
@@ -92,6 +105,7 @@
             </span>
           </div>
           {{ end }}
+
           {{/* Default value */}}
           {{ range $k, $v := $v.type }}
           {{ with $v.enum }}
@@ -106,7 +120,6 @@
           </div>
           {{ end }}
 
-
           {{ if or $v.default (eq $v.default false) }}
           <div class="mt-4">
             {{ template "default" . }}
@@ -116,6 +129,41 @@
         </div>
         {{ end }}
       </div>
+      {{ else if eq $k "array" }} {{/* Array */}}
+      {{ with $v.items }}
+      <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
+        {{ range $k, $v := . }}
+        {{ range $k, $v := . }}
+        <span class="flex justify-between items-center">
+          <span class="font-semibold">
+            Array
+          </span>
+
+          <span class="flex items-center space-x-1">
+            {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+          </span>
+        </span>
+
+        {{ with $v.examples }}
+        {{ template "config-array-examples" (dict "examples" .) }}
+        {{ end }}
+        {{ end }}
+        {{ end }}
+      </div>
+      {{ end }}
+      {{ else }} {{/* Non-arrays/objects */}}
+      {{ if eq $v.syntax "template" }}
+      <div class="mt-4 text-sm">
+        <strong>Note</strong>: This parameter supports Vector's
+        <a href="/docs/reference/configuration/template-syntax">template syntax</a>, which enables you to use
+        dynamic per-event values.
+      </div>
+      {{ end }}
+
+      {{ with $v.examples }}
+      {{ template "config-examples" (dict "examples" .) }}
+      {{ end }}
       {{ end }}
 
       {{/* Enum */}}
@@ -137,45 +185,6 @@
         </div>
       </div>
       {{ end }}
-
-      {{/* Array */}}
-      {{ if eq $k "array" }}
-      {{ with $v.items }}
-      <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
-        {{ range $k, $v := . }}
-        {{ range $k, $v := . }}
-        <span class="flex justify-between items-center">
-          <span class="font-semibold">
-            Array
-          </span>
-
-          <span class="flex items-center space-x-1">
-            {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
-          </span>
-        </span>
-
-        {{ with $v.examples }}
-        {{ $json := . | jsonify (dict "indent" "  ") }}
-        <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
-          <span class="flex justify-between items-center">
-            <span class="text-sm">
-              Examples
-            </span>
-
-            {{ template "config-toggler" (dict "size" 4) }}
-          </span>
-
-          <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
-            {{ highlight $json "json" "" }}
-          </div>
-        </div>
-        {{ end }}
-        {{ end }}
-        {{ end }}
-      </div>
-      {{ end }}
-      {{ end }}
       {{ end }}
 
       {{/* Default value */}}
@@ -185,6 +194,15 @@
         {{ template "default" . }}
       </div>
       {{ end }}
+      {{ end }}
+
+      {{/* "Relevant when" conditions */}}
+      {{ with .relevant_when }}
+      <div class="mt-2 text-sm flex justify-end">
+        <span>
+          Relevant when: <code>{{ . }}</code>
+        </span>
+      </div>
       {{ end }}
     </div>
     {{ end }}
@@ -1400,6 +1418,42 @@
 </table>
 {{ end }}
 
+{{ define "config-examples" }}
+<div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
+  <span class="flex justify-between items-center">
+    <span class="text-sm">
+      Examples
+    </span>
+
+    {{ template "config-toggler" (dict "size" 4) }}
+  </span>
+
+  <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
+    {{ range .examples }}
+    {{ $json := . | jsonify (dict "indent" "  ") }}
+    {{ highlight $json "json" "" }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "config-array-examples" }}
+{{ $json := .examples | jsonify (dict "indent" "  ") }}
+<div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
+  <span class="flex justify-between items-center">
+    <span class="text-sm">
+      Examples
+    </span>
+
+    {{ template "config-toggler" (dict "size" 4) }}
+  </span>
+
+  <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
+    {{ highlight $json "json" "" }}
+  </div>
+</div>
+{{ end }}
+
 {{ define "config-toggler" }}
 {{ $size := .size | default 4 }}
 <a @click="open = !open" class="cursor-pointer">
@@ -1714,10 +1768,12 @@
 {{ end }}
 
 {{ define "code" }}
-{{ if or (reflect.IsMap .) (reflect.IsSlice .) }}
+{{ if or (reflect.IsMap .) (reflect.IsSlice .) }} {{/* If a map or array, highlight as JSON */}}
 {{ $json := . | jsonify (dict "indent" "  ") }}
 {{ highlight $json "json" "" }}
-{{ else }}
+{{ else if hasPrefix . "```" }} {{/* If a code sample, translate into Markdown */}}
+{{ . | markdownify }}
+{{ else }} {{/* If just a plain old string, use Ruby syntax highlighting as a best guess */}}
 {{ highlight . "ruby" "" }}
 {{ end }}
 {{ end }}

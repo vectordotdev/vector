@@ -14,7 +14,6 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-use vector_core::enrichment;
 
 mod merge_strategy;
 
