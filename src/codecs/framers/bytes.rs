@@ -41,7 +41,7 @@ impl Decoder for BytesCodec {
         Ok(if src.is_empty() {
             None
         } else {
-            let frame = src.split_to(src.len());
+            let frame = src.split();
             Some(frame.freeze())
         })
     }
