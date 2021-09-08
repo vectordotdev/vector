@@ -170,6 +170,11 @@ impl Pipeline {
     pub fn from_toml(input: &str) -> Self {
         deserialize(input, Some(Format::Toml)).unwrap()
     }
+
+    #[cfg(test)]
+    pub fn from_json(input: &str) -> Self {
+        deserialize(input, Some(Format::Json)).unwrap()
+    }
 }
 
 #[cfg(test)]

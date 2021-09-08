@@ -151,7 +151,7 @@ impl<'de> Visitor<'de> for ComponentKeyVisitor {
     where
         E: de::Error,
     {
-        Ok(ComponentKey::from(value))
+        Ok(ComponentKey::global(value))
     }
 }
 
