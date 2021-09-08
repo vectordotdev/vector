@@ -12,6 +12,7 @@ inputs = ["start"]
     fields.foo = "bar"
     fields.foobar = "baz"
     [[transforms.simple_compound.steps]]
+    id = "final"
     type = "add_fields"
     fields.foo = "barbaz"
     fields.foobarbaz = "qux"
@@ -24,7 +25,7 @@ inputs = ["start"]
     value = "message"
 
     [[tests.outputs]]
-    extract_from = "simple_compound.step1"
+    extract_from = "simple_compound.final"
     [[tests.outputs.conditions]]
         type = "check_fields"
         "foo.equals" = "barbaz"
