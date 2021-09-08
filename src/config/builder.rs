@@ -273,6 +273,12 @@ impl ConfigBuilder {
         crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
             .unwrap()
     }
+
+    #[cfg(test)]
+    pub fn from_json(input: &str) -> Self {
+        crate::config::format::deserialize(input, Some(crate::config::format::Format::Json))
+            .unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -393,5 +399,108 @@ mod tests {
         builder.set_pipelines(pipelines);
         let config = builder.build().unwrap();
         assert_eq!(config.transforms.len(), 2);
+    }
+
+    #[test]
+    fn component_with_dot() {
+        let builder = ConfigBuilder::from_json(
+            r#"{
+            "sources": {
+                "log.with.dots": {
+                    "type": "generator",
+                    "format": "syslog"
+                }
+            },
+            "sinks": {
+                "print": {
+                    "inputs": ["log.with.dots"],
+                    "type": "console",
+                    "encoding": {
+                        "codec": "json"
+                    }
+                }
+            }
+        }"#,
+        );
+        let errors = builder.build().unwrap_err();
+        assert_eq!(
+            errors[0],
+            "Component name \"log.with.dots\" should not contain a \".\""
+        );
+    }
+
+    #[test]
+    fn pipeline_component_with_dot() {
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "foo".into(),
+            Pipeline::from_json(
+                r#"
+        {
+            "transforms": {
+                "remap.with.dots": {
+                    "inputs": ["logs"],
+                    "type": "remap",
+                    "source": "",
+                    "outputs": ["print"]
+                }
+            }
+        }
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        let mut builder = ConfigBuilder::from_toml(
+            r#"
+        [sources.logs]
+        type = "generator"
+        format = "syslog"
+
+        [sinks.print]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        builder.set_pipelines(pipelines);
+        let errors = builder.build().unwrap_err();
+        assert_eq!(
+            errors[0],
+            "Component name \"remap.with.dots\" should not contain a \".\""
+        );
+    }
+
+    #[test]
+    fn pipeline_with_dot() {
+        let mut pipelines = IndexMap::new();
+        pipelines.insert(
+            "foo.bar".into(),
+            Pipeline::from_toml(
+                r#"
+        [transforms.remap]
+        inputs = ["logs"]
+        type = "remap"
+        source = ""
+        outputs = ["print"]
+        "#,
+            ),
+        );
+        let pipelines = Pipelines::from(pipelines);
+        let mut builder = ConfigBuilder::from_toml(
+            r#"
+        [sources.logs]
+        type = "generator"
+        format = "syslog"
+
+        [sinks.print]
+        type = "console"
+        encoding.codec = "json"
+        "#,
+        );
+        builder.set_pipelines(pipelines);
+        let errors = builder.build().unwrap_err();
+        assert_eq!(
+            errors[0],
+            "Pipeline name \"foo.bar\" shouldn't container a '.'."
+        );
     }
 }

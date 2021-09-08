@@ -4,6 +4,19 @@ use indexmap::{IndexMap, IndexSet};
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
+    // component names should not have dots in the configuration file
+    // but components can expand (like route) to have components with a dot
+    // so this check should be done before expanding components
+    if let Err(name_errors) = validation::check_names(
+        builder
+            .transforms
+            .keys()
+            .chain(builder.sources.keys())
+            .chain(builder.sinks.keys()),
+    ) {
+        errors.extend(name_errors);
+    }
+
     if let Err(pipeline_errors) = validation::check_pipelines(&builder.pipelines) {
         errors.extend(pipeline_errors);
     }
@@ -74,7 +87,7 @@ pub(super) fn expand_macros(
             let mut inputs = t.inputs.clone();
 
             for (name, child) in expanded {
-                let full_name = ComponentKey::from(format!("{}.{}", k, name));
+                let full_name = ComponentKey::global(format!("{}.{}", k, name));
 
                 expanded_transforms.insert(
                     full_name.clone(),
