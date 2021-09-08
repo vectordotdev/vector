@@ -42,7 +42,7 @@ pub struct CharacterDelimitedCodec {
 }
 
 impl CharacterDelimitedCodec {
-    /// Returns a `CharacterDelimitedCodec` with the specified delimiter.
+    /// Creates a `CharacterDelimitedCodec` with the specified delimiter.
     pub const fn new(delimiter: char) -> Self {
         CharacterDelimitedCodec {
             delimiter,
@@ -52,7 +52,9 @@ impl CharacterDelimitedCodec {
         }
     }
 
-    /// Returns a `CharacterDelimitedCodec` with a maximum frame length limit.
+    /// Creates a `CharacterDelimitedCodec` with a maximum frame length limit.
+    ///
+    /// Any frames longer than `max_length` bytes will be discarded entirely.
     pub const fn new_with_max_length(delimiter: char, max_length: usize) -> Self {
         CharacterDelimitedCodec {
             max_length,
