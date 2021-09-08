@@ -236,8 +236,13 @@ pub fn udp(
 fn event_from_bytes(host_key: &str, default_host: Option<Bytes>, bytes: Bytes) -> Option<Event> {
     let byte_size = bytes.len();
     let parser = SyslogParser;
-    let events = parser.parse(bytes).ok()?;
-    let mut event = events[0].clone();
+    let mut events = parser.parse(bytes).ok()?;
+    assert_eq!(
+        events.len(),
+        1,
+        "syslog parser parses exactly one message from a byte string",
+    );
+    let mut event = events.remove(0);
     let log = event.as_mut_log();
 
     log.insert(log_schema().source_type_key(), Bytes::from("syslog"));
