@@ -45,7 +45,7 @@ pub(crate) struct SplunkInvalidMetricReceived<'a> {
 impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "Invalid metric received; dropping event.",
+            message = "Invalid metric received kind; dropping event.",
             value = ?self.value,
             kind = ?self.kind,
             internal_log_rate_secs = 30,
@@ -53,7 +53,7 @@ impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "invalid_metric");
+        counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
     }
 }
 

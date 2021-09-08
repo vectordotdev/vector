@@ -97,7 +97,7 @@ impl GenerateConfig for HecSinkMetricsConfig {
         toml::Value::try_from(Self {
             default_namespace: None,
             token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
-            endpoint: "endpoint".to_owned(),
+            endpoint: "http://localhost:8088".to_owned(),
             host_key: host_key(),
             index: None,
             sourcetype: None,
