@@ -1,5 +1,5 @@
 use crate::{
-    codecs::{BoxedFramingError, CharacterDelimitedCodec},
+    codecs::{BoxedFramingError, NewlineDelimitedCodec},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -10,11 +10,11 @@ use crate::{
     udp, Pipeline,
 };
 use bytes::Bytes;
-use futures::{stream, SinkExt, StreamExt, TryFutureExt};
+use futures::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
-use tokio_util::{codec::BytesCodec, udp::UdpFramed};
+use tokio_util::udp::UdpFramed;
 
 pub mod parser;
 #[cfg(unix)]
@@ -172,20 +172,16 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let mut stream = UdpFramed::new(socket, BytesCodec::new()).take_until(shutdown);
+    let mut stream = UdpFramed::new(socket, NewlineDelimitedCodec::new()).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
             Ok((bytes, _sock)) => {
-                let packet = String::from_utf8_lossy(bytes.as_ref());
-                let metrics = packet
-                    .lines()
-                    .filter_map(|line| parse_event(Bytes::copy_from_slice(line.as_bytes())))
-                    .map(Ok);
+                let metric = match parse_event(bytes) {
+                    Some(metric) => metric,
+                    None => continue,
+                };
 
-                // Need `boxed` to resolve a lifetime issue
-                // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
-                let mut metrics = stream::iter(metrics).boxed();
-                if let Err(error) = out.send_all(&mut metrics).await {
+                if let Err(error) = out.send(metric).await {
                     error!(message = "Error sending metric.", %error);
                     break;
                 }
@@ -204,10 +200,10 @@ struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
     type Error = BoxedFramingError;
-    type Decoder = CharacterDelimitedCodec;
+    type Decoder = NewlineDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
-        CharacterDelimitedCodec::new('\n')
+        NewlineDelimitedCodec::new()
     }
 
     fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
