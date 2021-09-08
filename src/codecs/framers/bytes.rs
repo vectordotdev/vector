@@ -38,14 +38,20 @@ impl Decoder for BytesCodec {
     type Error = BoxedFramingError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let frame = src.split_to(src.len());
-        Ok(Some(frame.freeze()))
+        Ok(if src.is_empty() {
+            None
+        } else {
+            let frame = src.split_to(src.len());
+            Some(frame.freeze())
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::StreamExt;
+    use tokio_util::codec::FramedRead;
 
     #[test]
     fn decode_frame() {
@@ -53,13 +59,17 @@ mod tests {
         let mut decoder = BytesCodec::new();
 
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "some bytes");
+        assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
 
-    #[test]
-    fn decode_frame_empty() {
-        let mut input = BytesMut::from("");
-        let mut decoder = BytesCodec::new();
+    #[tokio::test]
+    async fn decode_frame_reader() {
+        let input: &[u8] = b"foo";
+        let decoder = BytesCodec::new();
 
-        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "");
+        let mut reader = FramedRead::new(input, decoder);
+
+        assert_eq!(reader.next().await.unwrap().unwrap(), "foo");
+        assert!(reader.next().await.is_none());
     }
 }
