@@ -10,7 +10,11 @@ metrics from a Vector perspective so they can be benefit from Vector capabilitie
 
 ## Cross cutting concerns
 
-Some known issues should be handled by the work described here, and should not be worked on alone: #7283, #8626 & #8493.
+Some known issues are connected to the work described here: [#7283](https://github.com/timberio/vector/issues/7283),
+[#8493](https://github.com/timberio/vector/issues/8493) & [#8626](https://github.com/timberio/vector/issues/8626). This
+mostly concerns the ability to store/manipulate distribution using sketches, send those to Datadog using the DDSketch
+representation. Other metrics sinks would possibly benefit from having distribution stored internally with sketches as
+this would provide better aggregation and accuracy.
 
 ## Scope
 
@@ -27,6 +31,8 @@ Some known issues should be handled by the work described here, and should not b
 - Anything not related to metrics
   - Processing API validation requests
   - Processing other kind of payloads: traces, event, etc.
+- Shipping sketches to Datadog in the `datadog_metrics` sinks, it is required reach a fully functionnal situation but
+  this is not the goal of this RFC that focus on receiving metrics from Datadog Agents.
 
 ## Pain
 
@@ -48,7 +54,7 @@ https://vector.mycompany.tld` to forward metrics to a Vector deployement. Howeve
 non-metric payloads to be sent to Vector, while it seems not an option to change the Datadog Agent behavior, those
 non-metric payload should still be forwarded to Datadog.
 
-The `dd_url` endpoint configuration has a [conditionnal
+The `dd_url` endpoint configuration has a [conditional
 behavior](https://github.com/DataDog/datadog-agent/blob/main/pkg/config/config.go#L1199-L1201) (also
 [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/forwarder_health.go#L131-L143)). I.e. if
 `dd_url` contains a known pattern (i.e. it has a suffix that matches a Datadog site) some extra hostname manipulation
@@ -135,12 +141,27 @@ The implementation would the consist in:
 - Vector has its own vector-to-vector protocol that serve a similar purpose but the idea is to enable Vector to receive
   Datadog metrics from unmodified Datadog Agents so that is probably not an option
 - There are many [ways](https://edoliberty.github.io/papers/streamingQuantiles.pdf) of implementing quantile sketches
+- Opentelemetry is moving to official support sketches on a [general
+  basis](https://github.com/open-telemetry/opentelemetry-specification/issues/982).
 
 ## Alternatives
 
 - Use an alternate protocol between Datadog Agents and Vector (Like Prometheus, Statds or Vector own protocol)
 - For sketches, we could flatten sketches and compute usual derived metrics (min/max/average/count/some percentile) and
   send those as gauge/count, but it would prevent (or at least impact) existing distribution/sketches user
+- Regarding how we support route and the fact that Vector would have to support non-metric payload, an alternate
+  solution would be to push for a Datadog Agent change with a new override (let's say `dd_metrics_url` that would only
+  divert request to `/api/v1/series` & `/api/beta/sketches` to a specific endpoints. This however highlights that Vector
+  & the Datadog Agent will then need to follow a compatbility matrix:
+  1. If the Agent is upgrade with a new metric route (let's say for v2 intake migration), the user will need to also
+     upgrade Vector so it supports this route.
+  2. Existing fleet of Agents will need to be upgraded to be able to send metrics to Vector.
+
+  While #2 is not really a major issue as this would be a one shot upgrade if required, #1 may be more bothersome as the
+  issue will always be there. A somehow hacky solution would be to leverage the [documented
+  haproxy](https://docs.datadoghq.com/agent/proxy/?tab=agentv6v7#haproxy) setup for Agent to divert selected routes to
+  Vector, but it would have the advantage of resolving any migrations, not-yet-supported-metric-route in Vector and
+  alleviate the need of modifying the Agent.
 
 ## Outstanding Questions
 
@@ -159,7 +180,10 @@ The implementation would the consist in:
 - [ ] Extend Vector to support sketches following the DDSketch paper, implement sketches forwarding in the
   `datadog_metrics` sinks.
 - [ ] Support `/api/beta/sketches` route, again in the `datadog_agent`, and validate the `Agent->Vector->Datadog`
-  scenario for sketches/distributions.
+  scenario for sketches/distributions. This would also required sending sketches from the `datadog_metrics` sinks, this
+  is not directly addressed by this RFC but it is tracked in the following issues:
+  [#7283](https://github.com/timberio/vector/issues/7283), [#8493](https://github.com/timberio/vector/issues/8493) &
+  [#8626](https://github.com/timberio/vector/issues/8626).
 
 ## Future Improvements
 
