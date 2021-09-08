@@ -712,7 +712,7 @@ impl RunningTopology {
     }
 
     /// Borrows the Config
-    pub fn config(&self) -> &Config {
+    pub const fn config(&self) -> &Config {
         &self.config
     }
 

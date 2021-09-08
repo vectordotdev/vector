@@ -3,14 +3,14 @@ use metrics::counter;
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)] // some features only use some variants
-pub(crate) enum SocketMode {
+pub enum SocketMode {
     Tcp,
     Udp,
     Unix,
 }
 
 impl SocketMode {
-    fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::Tcp => "tcp",
             Self::Udp => "udp",
@@ -20,7 +20,7 @@ impl SocketMode {
 }
 
 #[derive(Debug)]
-pub(crate) struct SocketEventReceived {
+pub struct SocketEventReceived {
     pub mode: SocketMode,
     pub byte_size: usize,
 }
@@ -37,7 +37,7 @@ impl InternalEvent for SocketEventReceived {
 }
 
 #[derive(Debug)]
-pub(crate) struct SocketEventsSent {
+pub struct SocketEventsSent {
     pub mode: SocketMode,
     pub count: u64,
     pub byte_size: usize,
@@ -54,7 +54,7 @@ impl InternalEvent for SocketEventsSent {
 }
 
 #[derive(Debug)]
-pub(crate) struct SocketReceiveError {
+pub struct SocketReceiveError {
     pub mode: SocketMode,
     pub error: std::io::Error,
 }

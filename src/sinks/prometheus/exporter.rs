@@ -76,7 +76,7 @@ fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
 }
 
-fn default_flush_period_secs() -> u64 {
+const fn default_flush_period_secs() -> u64 {
     60
 }
 

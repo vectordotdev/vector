@@ -53,7 +53,7 @@ struct FileConfig {
     schema: HashMap<String, SchemaType>,
 }
 
-fn default_delimiter() -> char {
+const fn default_delimiter() -> char {
     ','
 }
 
@@ -383,14 +383,14 @@ mod tests {
     fn seahash() {
         // Ensure we can separate fields to create a distinct hash.
         let mut one = seahash::SeaHasher::default();
-        one.write("norknoog".as_bytes());
+        one.write(b"norknoog");
         one.write_u8(0);
-        one.write("donk".as_bytes());
+        one.write(b"donk");
 
         let mut two = seahash::SeaHasher::default();
-        two.write("nork".as_bytes());
+        two.write(b"nork");
         one.write_u8(0);
-        two.write("noogdonk".as_bytes());
+        two.write(b"noogdonk");
 
         assert_ne!(one.finish(), two.finish());
     }

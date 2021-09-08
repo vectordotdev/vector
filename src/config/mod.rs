@@ -40,8 +40,8 @@ pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::ComponentKey;
 pub use loading::{
-    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    load_pipelines_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load, load_builder_and_pipelines_from_paths, load_from_paths, load_from_paths_with_provider,
+    load_from_str, merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
@@ -52,10 +52,14 @@ pub use vector_core::config::{log_schema, LogSchema};
 /// Once this is done, configurations can be correctly loaded using
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
+pub fn init_log_schema(
+    config_paths: &[ConfigPath],
+    pipeline_paths: &[PathBuf],
+    deny_if_set: bool,
+) -> Result<(), Vec<String>> {
     vector_core::config::init_log_schema(
         || {
-            let (builder, _) = load_builder_from_paths(config_paths)?;
+            let (builder, _) = load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
             Ok(builder.global.log_schema)
         },
         deny_if_set,
@@ -78,7 +82,7 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
 }
 
 impl ConfigPath {
-    pub fn as_dir(&self) -> Option<&PathBuf> {
+    pub const fn as_dir(&self) -> Option<&PathBuf> {
         match self {
             Self::Dir(path) => Some(path),
             _ => None,
@@ -163,7 +167,7 @@ pub struct SourceOuter {
     pub(super) inner: Box<dyn SourceConfig>,
 }
 
-fn default_acknowledgements() -> bool {
+const fn default_acknowledgements() -> bool {
     false
 }
 
@@ -298,7 +302,7 @@ impl SinkOuter {
         }
     }
 
-    pub fn proxy(&self) -> &ProxyConfig {
+    pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
     }
 }
@@ -375,11 +379,11 @@ impl SinkContext {
         self.acker.clone()
     }
 
-    pub fn globals(&self) -> &GlobalOptions {
+    pub const fn globals(&self) -> &GlobalOptions {
         &self.globals
     }
 
-    pub fn proxy(&self) -> &ProxyConfig {
+    pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
     }
 }
@@ -441,11 +445,11 @@ pub enum Protocol {
 }
 
 impl Resource {
-    pub fn tcp(addr: SocketAddr) -> Self {
+    pub const fn tcp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Tcp)
     }
 
-    pub fn udp(addr: SocketAddr) -> Self {
+    pub const fn udp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Udp)
     }
 

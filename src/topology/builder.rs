@@ -342,7 +342,7 @@ pub async fn build_pieces(
     }
 }
 
-fn filter_event_type(event: &Event, data_type: DataType) -> bool {
+const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
     match data_type {
         DataType::Any => true,
         DataType::Log => matches!(event, Event::Log(_)),

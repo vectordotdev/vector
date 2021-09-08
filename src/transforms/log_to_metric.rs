@@ -88,7 +88,7 @@ impl MetricConfig {
     }
 }
 
-fn default_increment_by_value() -> bool {
+const fn default_increment_by_value() -> bool {
     false
 }
 
@@ -137,7 +137,7 @@ impl TransformConfig for LogToMetricConfig {
 }
 
 impl LogToMetric {
-    pub fn new(config: LogToMetricConfig) -> Self {
+    pub const fn new(config: LogToMetricConfig) -> Self {
         LogToMetric { config }
     }
 }

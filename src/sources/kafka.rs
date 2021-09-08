@@ -60,19 +60,19 @@ pub struct KafkaSourceConfig {
     auth: KafkaAuthConfig,
 }
 
-fn default_session_timeout_ms() -> u64 {
+const fn default_session_timeout_ms() -> u64 {
     10000 // default in librdkafka
 }
 
-fn default_socket_timeout_ms() -> u64 {
+const fn default_socket_timeout_ms() -> u64 {
     60000 // default in librdkafka
 }
 
-fn default_fetch_wait_max_ms() -> u64 {
+const fn default_fetch_wait_max_ms() -> u64 {
     100 // default in librdkafka
 }
 
-fn default_commit_interval_ms() -> u64 {
+const fn default_commit_interval_ms() -> u64 {
     5000 // default in librdkafka
 }
 
