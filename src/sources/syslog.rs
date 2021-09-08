@@ -139,8 +139,8 @@ impl SourceConfig for SyslogConfig {
                 cx.shutdown,
                 cx.out,
                 |host_key, default_host, bytes| {
-                    // Guaranteed to be valid UTF-8 by `OctetCountingCodec`.
-                    let line = std::str::from_utf8(&bytes).unwrap();
+                    let line = std::str::from_utf8(&bytes)
+                        .expect("valid UTF-8 guaranteed by OctetCountingCodec");
                     Some(event_from_str(host_key, default_host, line))
                 },
             )),
@@ -180,8 +180,8 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
-        // Guaranteed to be valid UTF-8 by `OctetCountingCodec`.
-        let line = std::str::from_utf8(&frame).unwrap();
+        let line =
+            std::str::from_utf8(&frame).expect("valid UTF-8 guaranteed by OctetCountingCodec");
         Some(event_from_str(&self.host_key, Some(host), line))
     }
 }
