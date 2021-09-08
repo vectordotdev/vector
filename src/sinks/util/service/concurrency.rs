@@ -2,42 +2,6 @@ use serde::de::{self, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
 
-pub trait ConcurrencyOption {
-    fn parse_concurrency(&self, default: &Self) -> Option<usize>;
-    fn is_none(&self) -> bool;
-    fn is_some(&self) -> bool {
-        !self.is_none()
-    }
-}
-
-impl ConcurrencyOption for Option<usize> {
-    fn parse_concurrency(&self, default: &Self) -> Option<usize> {
-        let limit = match self {
-            None => *default,
-            Some(x) => Some(*x),
-        };
-        limit.or(Some(1024))
-    }
-
-    fn is_none(&self) -> bool {
-        matches!(self, None)
-    }
-}
-
-impl ConcurrencyOption for Concurrency {
-    fn parse_concurrency(&self, default: &Self) -> Option<usize> {
-        match self.if_none(*default) {
-            Concurrency::None => None,
-            Concurrency::Adaptive => None,
-            Concurrency::Fixed(limit) => Some(limit),
-        }
-    }
-
-    fn is_none(&self) -> bool {
-        matches!(self, Concurrency::None)
-    }
-}
-
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Serialize)]
 pub enum Concurrency {
     None,
@@ -58,6 +22,18 @@ impl Concurrency {
             _ => self,
         }
     }
+
+    pub const fn parse_concurrency(&self, default: &Self) -> Option<usize> {
+        match self.if_none(*default) {
+            Concurrency::None => Some(1024),
+            Concurrency::Adaptive => None,
+            Concurrency::Fixed(limit) => Some(limit),
+        }
+    }
+}
+
+pub const fn concurrency_is_none(concurrency: &Concurrency) -> bool {
+    matches!(concurrency, Concurrency::None)
 }
 
 impl<'de> Deserialize<'de> for Concurrency {
