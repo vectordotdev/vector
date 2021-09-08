@@ -159,7 +159,10 @@ impl_generate_config_from_default!(FileConfig);
 pub struct File {
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
-    indexes: Vec<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>>,
+    indexes: Vec<(
+        Vec<usize>,
+        HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>,
+    )>,
 }
 
 impl File {
@@ -211,18 +214,10 @@ impl File {
             .collect()
     }
 
-    /// Creates an index with the given fields.
-    /// Uses seahash to create a hash of the data that is used as the key in a hashmap lookup to
-    /// the index of the row in the data.
-    ///
-    /// Ensure fields that are searched via a comparison are not included in the index!
-    fn index_data(
-        &self,
-        index: &[&str],
-    ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, String> {
+    /// Order the fields in the index according to the position they are found in the header.
+    fn normalize_index_fields(&self, index: &[&str]) -> Vec<usize> {
         // Get the positions of the fields we are indexing
-        let fieldidx = self
-            .headers
+        self.headers
             .iter()
             .enumerate()
             .filter_map(|(idx, col)| {
@@ -232,8 +227,18 @@ impl File {
                     None
                 }
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    }
 
+    /// Creates an index with the given fields.
+    /// Uses seahash to create a hash of the data that is used as the key in a hashmap lookup to
+    /// the index of the row in the data.
+    ///
+    /// Ensure fields that are searched via a comparison are not included in the index!
+    fn index_data(
+        &self,
+        field_idx: &[usize],
+    ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, String> {
         let mut index = HashMap::with_capacity_and_hasher(
             self.data.len(),
             hash_hasher::HashBuildHasher::default(),
@@ -241,7 +246,7 @@ impl File {
 
         for (idx, row) in self.data.iter().enumerate() {
             let mut hash = seahash::SeaHasher::default();
-            for idx in &fieldidx {
+            for idx in field_idx {
                 hash_value(&mut hash, &row[*idx])?;
             }
 
@@ -343,6 +348,7 @@ impl Table for File {
                 let key = hash.finish();
 
                 let result = self.indexes[handle]
+                    .1
                     .get(&key)
                     .ok_or_else(|| "no rows found in index".to_string())?
                     .iter()
@@ -355,10 +361,20 @@ impl Table for File {
     }
 
     fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
-        self.indexes.push(self.index_data(fields)?);
+        let normalized = self.normalize_index_fields(fields);
+        match self.indexes.iter().position(|index| index.0 == normalized) {
+            Some(pos) => {
+                // This index already exists.
+                Ok(IndexHandle(pos))
+            }
+            None => {
+                let index = self.index_data(&normalized)?;
+                self.indexes.push((normalized, index));
 
-        // The returned index handle is the position of the index in our list of indexes.
-        Ok(IndexHandle(self.indexes.len() - 1))
+                // The returned index handle is the position of the index in our list of indexes.
+                Ok(IndexHandle(self.indexes.len() - 1))
+            }
+        }
     }
 }
 
@@ -417,6 +433,24 @@ mod tests {
             }),
             file.find_table_row(&[condition], None)
         );
+    }
+
+    #[test]
+    fn duplicate_indexes() {
+        let mut file = File::new(
+            Vec::new(),
+            vec![
+                "field1".to_string(),
+                "field2".to_string(),
+                "field3".to_string(),
+            ],
+        );
+
+        let handle1 = file.add_index(&["field2", "field3"]);
+        let handle2 = file.add_index(&["field3", "field2"]);
+
+        assert_eq!(handle1, handle2);
+        assert_eq!(1, file.indexes.len());
     }
 
     #[test]
