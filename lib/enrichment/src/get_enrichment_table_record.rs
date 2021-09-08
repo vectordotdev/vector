@@ -1,6 +1,6 @@
 use crate::{
     vrl_util::{self, add_index},
-    Condition, IndexHandle, TableRegistry, TableSearch,
+    Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 use std::collections::BTreeMap;
 use vrl_core::prelude::*;
@@ -23,6 +23,11 @@ impl Function for GetEnrichmentTableRecord {
                 keyword: "condition",
                 kind: kind::OBJECT,
                 required: true,
+            },
+            Parameter {
+                keyword: "case_sensitive",
+                kind: kind::BOOLEAN,
+                required: false,
             },
         ]
     }
@@ -49,10 +54,25 @@ impl Function for GetEnrichmentTableRecord {
             .into_owned();
         let condition = arguments.required_object("condition")?;
 
+        let case_sensitive = arguments
+            .optional_literal("case_sensitive")?
+            .map(|literal| literal.to_value().try_boolean())
+            .transpose()
+            .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
+            .map(|case_sensitive| {
+                if case_sensitive {
+                    Case::Sensitive
+                } else {
+                    Case::Insensitive
+                }
+            })
+            .unwrap_or(Case::Sensitive);
+
         Ok(Box::new(GetEnrichmentTableRecordFn {
             table,
             condition,
             index: None,
+            case_sensitive,
             enrichment_tables: registry.as_readonly(),
         }))
     }
@@ -63,6 +83,7 @@ pub struct GetEnrichmentTableRecordFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
     index: Option<IndexHandle>,
+    case_sensitive: Case,
     enrichment_tables: TableSearch,
 }
 
@@ -79,9 +100,12 @@ impl Expression for GetEnrichmentTableRecordFn {
             })
             .collect::<Result<Vec<Condition>>>()?;
 
-        let data = self
-            .enrichment_tables
-            .find_table_row(&self.table, &condition, self.index)?;
+        let data = self.enrichment_tables.find_table_row(
+            &self.table,
+            self.case_sensitive,
+            &condition,
+            self.index,
+        )?;
 
         Ok(Value::Object(data))
     }
@@ -90,7 +114,12 @@ impl Expression for GetEnrichmentTableRecordFn {
         &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        self.index = Some(add_index(state, &self.table, &self.condition)?);
+        self.index = Some(add_index(
+            state,
+            &self.table,
+            self.case_sensitive,
+            &self.condition,
+        )?);
         Ok(())
     }
 
@@ -117,6 +146,7 @@ mod tests {
                 "field" =>  expression::Literal::from("value"),
             },
             index: Some(IndexHandle(999)),
+            case_sensitive: Case::Sensitive,
             enrichment_tables: registry.as_readonly(),
         };
 
@@ -142,6 +172,7 @@ mod tests {
                 "field" =>  expression::Literal::from("value"),
             },
             index: None,
+            case_sensitive: Case::Sensitive,
             enrichment_tables: registry.as_readonly(),
         };
 

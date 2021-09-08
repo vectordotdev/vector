@@ -29,6 +29,8 @@
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
 //! can be searched.
 
+use crate::Case;
+
 use super::{Condition, IndexHandle, Table};
 use arc_swap::ArcSwap;
 use std::collections::{BTreeMap, HashMap};
@@ -127,14 +129,19 @@ impl TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
-    pub fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<IndexHandle, String> {
+    pub fn add_index(
+        &mut self,
+        table: &str,
+        case: Case,
+        fields: &[&str],
+    ) -> Result<IndexHandle, String> {
         let mut locked = self.loading.lock().unwrap();
 
         match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
                 None => Err(format!("table '{}' not loaded", table)),
-                Some(table) => table.add_index(fields),
+                Some(table) => table.add_index(case, fields),
             },
         }
     }
@@ -165,6 +172,7 @@ impl TableSearch {
     pub fn find_table_row<'a>(
         &self,
         table: &str,
+        case: Case,
         condition: &'a [Condition<'a>],
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
@@ -172,7 +180,7 @@ impl TableSearch {
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_row(condition, index),
+                Some(table) => table.find_table_row(case, condition, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -185,6 +193,7 @@ impl TableSearch {
     pub fn find_table_rows<'a>(
         &self,
         table: &str,
+        case: Case,
         condition: &'a [Condition<'a>],
         index: Option<IndexHandle>,
     ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String> {
@@ -192,7 +201,7 @@ impl TableSearch {
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_rows(condition, index),
+                Some(table) => table.find_table_rows(case, condition, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -258,7 +267,10 @@ mod tests {
         tables.insert("dummy1".to_string(), Box::new(dummy));
         let mut registry = super::TableRegistry::default();
         registry.load(tables);
-        assert_eq!(Ok(IndexHandle(0)), registry.add_index("dummy1", &["erk"]));
+        assert_eq!(
+            Ok(IndexHandle(0)),
+            registry.add_index("dummy1", Case::Sensitive, &["erk"])
+        );
 
         let indexes = indexes.lock().unwrap();
         assert_eq!(vec!["erk".to_string()], *indexes[0]);
@@ -277,6 +289,7 @@ mod tests {
             Err("finish_load not called".to_string()),
             tables.find_table_row(
                 "dummy1",
+                Case::Sensitive,
                 &[Condition::Equals {
                     field: "thing",
                     value: Value::from("thang"),
@@ -296,7 +309,7 @@ mod tests {
         registry.finish_load();
         assert_eq!(
             Err("finish_load has been called".to_string()),
-            registry.add_index("dummy1", &["erk"])
+            registry.add_index("dummy1", Case::Sensitive, &["erk"])
         );
     }
 
@@ -318,6 +331,7 @@ mod tests {
             }),
             tables_search.find_table_row(
                 "dummy1",
+                Case::Sensitive,
                 &[Condition::Equals {
                     field: "thing",
                     value: Value::from("thang"),
