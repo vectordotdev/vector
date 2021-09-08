@@ -35,7 +35,7 @@ pub struct DatadogEventsConfig {
     tls: Option<TlsConfig>,
 
     #[serde(default)]
-    request: TowerRequestConfig<Concurrency>,
+    request: TowerRequestConfig,
 }
 
 fn default_site() -> String {

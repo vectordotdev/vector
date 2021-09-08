@@ -38,10 +38,10 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
-pub use id::ComponentKey;
+pub use id::{ComponentKey, ComponentScope};
 pub use loading::{
-    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    load_pipelines_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load, load_builder_and_pipelines_from_paths, load_from_paths, load_from_paths_with_provider,
+    load_from_str, merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
@@ -52,10 +52,14 @@ pub use vector_core::config::{log_schema, LogSchema};
 /// Once this is done, configurations can be correctly loaded using
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
+pub fn init_log_schema(
+    config_paths: &[ConfigPath],
+    pipeline_paths: &[PathBuf],
+    deny_if_set: bool,
+) -> Result<(), Vec<String>> {
     vector_core::config::init_log_schema(
         || {
-            let (builder, _) = load_builder_from_paths(config_paths)?;
+            let (builder, _) = load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
             Ok(builder.global.log_schema)
         },
         deny_if_set,
@@ -193,7 +197,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub id: ComponentKey,
+    pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -204,14 +208,14 @@ pub struct SourceContext {
 impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
-        id: &ComponentKey,
+        key: &ComponentKey,
         out: Pipeline,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(id);
+        let (shutdown_signal, _) = shutdown.register_source(key);
         (
             Self {
-                id: id.clone(),
+                key: key.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -225,7 +229,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            id: ComponentKey::from("default"),
+            key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,

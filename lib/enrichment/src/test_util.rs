@@ -4,10 +4,11 @@ use std::{
     collections::{BTreeMap, HashMap},
     sync::{Arc, Mutex},
 };
+use vrl_core::Value;
 
 #[derive(Debug, Clone)]
 pub(crate) struct DummyEnrichmentTable {
-    data: BTreeMap<String, String>,
+    data: BTreeMap<String, Value>,
     indexes: Arc<Mutex<Vec<Vec<String>>>>,
 }
 
@@ -19,7 +20,7 @@ impl DummyEnrichmentTable {
     pub(crate) fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
         Self {
             data: btreemap! {
-                "field".to_string() => "result".to_string()
+                "field".to_string() => Value::from("result"),
             },
             indexes,
         }
@@ -31,7 +32,7 @@ impl Table for DummyEnrichmentTable {
         &self,
         _condition: &[Condition],
         _index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, String>, String> {
+    ) -> Result<BTreeMap<String, Value>, String> {
         Ok(self.data.clone())
     }
 
