@@ -8259,7 +8259,7 @@ checksum = "33807c11bd2c5a3896c36042ef2ca9663795bb7e4af2fe87474a159ea72c2159"
 dependencies = [
  "async-trait",
  "deadpool",
- "futures 0.3.16",
+ "futures 0.3.17",
  "futures-timer",
  "http-types",
  "hyper",

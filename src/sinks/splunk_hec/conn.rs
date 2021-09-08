@@ -567,8 +567,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "splunk-integration-tests")]
+#[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests {
     use super::*;
     use crate::{assert_downcast_matches, tls::TlsSettings};
@@ -618,8 +617,7 @@ mod integration_tests {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "splunk-integration-tests")]
+#[cfg(all(test, feature = "splunk-integration-tests"))]
 pub mod integration_test_helpers {
     use crate::test_util::retry_until;
     use serde_json::Value as JsonValue;

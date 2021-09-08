@@ -39,8 +39,8 @@ pub struct HecSinkMetricsConfig {
 #[derive(Serialize, Debug, PartialEq)]
 #[serde(untagged)]
 enum FieldValue<'a> {
-    Str(Cow<'a, str>),
     Float(f64),
+    Str(Cow<'a, str>),
 }
 
 impl<'a> From<&'a str> for FieldValue<'a> {
@@ -259,7 +259,6 @@ impl HecSinkMetricsConfig {
     }
 }
 
-#[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -565,8 +564,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "splunk-integration-tests")]
+#[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests {
     use super::*;
     use crate::{

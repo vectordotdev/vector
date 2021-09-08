@@ -344,8 +344,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "splunk-integration-tests")]
+#[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests {
     use super::*;
     use crate::{
