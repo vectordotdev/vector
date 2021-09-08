@@ -214,7 +214,7 @@ impl File {
             .collect()
     }
 
-    /// Order the fields in the index according to the position they are found in the header
+    /// Order the fields in the index according to the position they are found in the header.
     fn normalize_index_fields(&self, index: &[&str]) -> Vec<usize> {
         // Get the positions of the fields we are indexing
         self.headers
@@ -237,7 +237,7 @@ impl File {
     /// Ensure fields that are searched via a comparison are not included in the index!
     fn index_data(
         &self,
-        fieldidx: &[usize],
+        field_idx: &[usize],
     ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, String> {
         let mut index = HashMap::with_capacity_and_hasher(
             self.data.len(),
@@ -246,7 +246,7 @@ impl File {
 
         for (idx, row) in self.data.iter().enumerate() {
             let mut hash = seahash::SeaHasher::default();
-            for idx in fieldidx {
+            for idx in field_idx {
                 hash_value(&mut hash, &row[*idx])?;
             }
 
@@ -364,7 +364,7 @@ impl Table for File {
         let normalized = self.normalize_index_fields(fields);
         match self.indexes.iter().position(|index| index.0 == normalized) {
             Some(pos) => {
-                // This index already exists
+                // This index already exists.
                 Ok(IndexHandle(pos))
             }
             None => {
