@@ -1,8 +1,10 @@
 #![deny(missing_docs)]
 
 mod character_delimited;
+mod length_delimited;
 
 pub use character_delimited::{CharacterDelimitedCodec, CharacterDelimitedDecoderConfig};
+pub use length_delimited::{LengthDelimitedCodec, LengthDelimitedDecoderConfig};
 
 use crate::sources::util::TcpError;
 use ::bytes::Bytes;
