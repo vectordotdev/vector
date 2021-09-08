@@ -1471,16 +1471,18 @@ mod tests {
             [transforms.foo]
               inputs = ["input"]
               type = "compound"
-              [transforms.foo.nested.step1]
+              [[transforms.foo.steps]]
+                id = "step1"
                 type = "log_to_metric"
-                [[transforms.foo.nested.step1.metrics]]
+                [[transforms.foo.steps.metrics]]
                   type = "counter"
                   field = "c"
                   name = "sum"
                   namespace = "ns"
-              [transforms.foo.nested.step2]
+              [[transforms.foo.steps]]
+                id = "step2"
                 type = "log_to_metric"
-                [[transforms.foo.nested.step2.metrics]]
+                [[transforms.foo.steps.metrics]]
                   type = "counter"
                   field = "c"
                   name = "sum"
