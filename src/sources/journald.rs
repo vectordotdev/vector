@@ -1,4 +1,5 @@
 use crate::{
+    codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
@@ -7,7 +8,6 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::TimeZone;
-use codec::BytesDelimitedCodec;
 use futures::{future, stream::BoxStream, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use nix::{
@@ -287,7 +287,7 @@ impl JournaldSource {
     /// Return `true` if should restart `journalctl`.
     async fn run_stream<'a>(
         &'a mut self,
-        mut stream: BoxStream<'static, io::Result<Bytes>>,
+        mut stream: BoxStream<'static, Result<Bytes, BoxedFramingError>>,
         checkpointer: &'a mut Checkpointer,
         cursor: &'a mut Option<String>,
     ) -> bool {
@@ -371,8 +371,10 @@ impl JournaldSource {
 type StartJournalctlFn = Box<
     dyn Fn(
             &Option<String>, // cursor
-        ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)>
-        + Send
+        ) -> crate::Result<(
+            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
+            StopJournalctlFn,
+        )> + Send
         + Sync,
 >;
 
@@ -380,12 +382,15 @@ type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
     command: &mut Command,
-) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
+) -> crate::Result<(
+    BoxStream<'static, Result<Bytes, BoxedFramingError>>,
+    StopJournalctlFn,
+)> {
     let mut child = command.spawn().context(JournalctlSpawn)?;
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),
-        BytesDelimitedCodec::new(b'\n'),
+        CharacterDelimitedCodec::new('\n'),
     )
     .boxed();
 
@@ -651,10 +656,7 @@ mod tests {
         task::{Context, Poll},
     };
     use tempfile::tempdir;
-    use tokio::{
-        io,
-        time::{sleep, timeout, Duration},
-    };
+    use tokio::time::{sleep, timeout, Duration};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -671,7 +673,7 @@ mod tests {
     }
 
     impl FakeJournal {
-        fn next(&mut self) -> Option<io::Result<Bytes>> {
+        fn next(&mut self) -> Option<Result<Bytes, BoxedFramingError>> {
             let mut line = String::new();
             match self.reader.read_line(&mut line) {
                 Ok(0) => None,
@@ -679,13 +681,13 @@ mod tests {
                     line.pop();
                     Some(Ok(Bytes::from(line)))
                 }
-                Err(err) => Some(Err(err)),
+                Err(err) => Some(Err(err.into())),
             }
         }
     }
 
     impl Stream for FakeJournal {
-        type Item = io::Result<Bytes>;
+        type Item = Result<Bytes, BoxedFramingError>;
 
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
             Poll::Ready(Pin::into_inner(self).next())
@@ -695,7 +697,10 @@ mod tests {
     impl FakeJournal {
         fn new(
             checkpoint: &Option<String>,
-        ) -> (BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn) {
+        ) -> (
+            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
+            StopJournalctlFn,
+        ) {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };

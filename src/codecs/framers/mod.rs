@@ -1,5 +1,10 @@
 #![deny(missing_docs)]
 
+mod character_delimited;
+
+pub use character_delimited::{CharacterDelimitedCodec, CharacterDelimitedDecoderConfig};
+
+use crate::sources::util::TcpError;
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
 use std::fmt::Debug;
@@ -7,7 +12,11 @@ use tokio_util::codec::LinesCodecError;
 
 /// An error that occurred while producing byte frames from a byte stream / byte
 /// message.
-pub trait FramingError: std::error::Error + Send + Sync {}
+///
+/// It requires conformance to `TcpError` so that we can determine whether the
+/// error is recoverable or if trying to continue will lead to hanging up the
+/// TCP source indefinitely.
+pub trait FramingError: std::error::Error + TcpError + Send + Sync {}
 
 impl std::error::Error for BoxedFramingError {}
 
@@ -29,6 +38,12 @@ impl From<LinesCodecError> for BoxedFramingError {
 
 /// A `Box` containing a `FramingError`.
 pub type BoxedFramingError = Box<dyn FramingError>;
+
+impl TcpError for BoxedFramingError {
+    fn can_continue(&self) -> bool {
+        self.as_ref().can_continue()
+    }
+}
 
 /// Produce byte frames from a byte stream / byte message.
 pub trait Framer:

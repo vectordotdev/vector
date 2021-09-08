@@ -1,5 +1,5 @@
-use crate::udp;
 use crate::{
+    codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -7,10 +7,9 @@ use crate::{
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    udp, Pipeline,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
 use futures::{stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -198,11 +197,11 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = std::io::Error;
-    type Decoder = BytesDelimitedCodec;
+    type Error = BoxedFramingError;
+    type Decoder = CharacterDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
-        BytesDelimitedCodec::new(b'\n')
+        CharacterDelimitedCodec::new('\n')
     }
 
     fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
