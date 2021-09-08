@@ -982,9 +982,9 @@ mod tests {
                 type = "check_fields"
                 "message.eq" = "test swimlane 2"
 
-              [transforms.bar]
-                inputs = ["foo.first"]
-                type = "add_fields"
+            [transforms.bar]
+              inputs = ["foo.first"]
+              type = "add_fields"
               [transforms.bar.fields]
                 new_field = "new field added"
 
