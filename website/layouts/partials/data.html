@@ -37,6 +37,16 @@
           {{ partial "badge.html" (dict "word" $k "color" "gray") }}
           {{ end }}
 
+          {{ with $v.syntax }}
+          {{ if eq . "remap_boolean_expression" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
+          {{ else if eq . "remap_program" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+          {{ else }}
+          {{ partial "badge.html" (dict "word" . "color" "gray") }}
+          {{ end }}
+          {{ end }}
+
           {{ if $v.enum }}
           {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
           {{ end }}
