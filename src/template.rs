@@ -87,11 +87,11 @@ impl TryFrom<Cow<'_, str>> for Template {
     }
 }
 
-fn is_error(item: &Item) -> bool {
+const fn is_error(item: &Item) -> bool {
     matches!(item, Item::Error)
 }
 
-fn is_dynamic(item: &Item) -> bool {
+const fn is_dynamic(item: &Item) -> bool {
     match item {
         Item::Fixed(_) => true,
         Item::Numeric(_, _) => true,
@@ -140,7 +140,7 @@ impl Template {
         }
     }
 
-    pub fn is_dynamic(&self) -> bool {
+    pub const fn is_dynamic(&self) -> bool {
         self.has_fields || self.has_ts
     }
 

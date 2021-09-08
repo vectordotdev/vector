@@ -170,6 +170,7 @@ struct LokiSink {
 }
 
 impl LokiSink {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     fn new(config: LokiConfig) -> Self {
         Self {
             endpoint: config.endpoint,

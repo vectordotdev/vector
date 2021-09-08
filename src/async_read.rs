@@ -33,7 +33,7 @@ pub struct AllowReadUntil<S, F> {
 }
 
 impl<S, F> AllowReadUntil<S, F> {
-    pub fn get_ref(&self) -> &S {
+    pub const fn get_ref(&self) -> &S {
         &self.reader
     }
 
@@ -82,7 +82,7 @@ mod tests {
         let mut reader = BufReader::new(read_file);
         let mut writer = BufWriter::new(write_file);
 
-        writer.write_all("First line\n".as_bytes()).await.unwrap();
+        writer.write_all(b"First line\n").await.unwrap();
         writer.flush().await.unwrap();
 
         // Test one of the AsyncBufRead extension functions
@@ -91,7 +91,7 @@ mod tests {
 
         assert_eq!("First line\n", line_one);
 
-        writer.write_all("Second line\n".as_bytes()).await.unwrap();
+        writer.write_all(b"Second line\n").await.unwrap();
         writer.flush().await.unwrap();
 
         let mut line_two = String::new();
@@ -115,7 +115,7 @@ mod tests {
         let mut reader = BufReader::new(read_file);
         let mut writer = BufWriter::new(write_file);
 
-        writer.write_all("First line\n".as_bytes()).await.unwrap();
+        writer.write_all(b"First line\n").await.unwrap();
         writer.flush().await.unwrap();
 
         // Test one of the AsyncBufRead extension functions
@@ -126,7 +126,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        writer.write_all("Second line\n".as_bytes()).await.unwrap();
+        writer.write_all(b"Second line\n").await.unwrap();
         writer.flush().await.unwrap();
 
         let mut line_two = String::new();

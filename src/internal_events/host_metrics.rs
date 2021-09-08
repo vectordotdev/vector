@@ -1,7 +1,7 @@
 use super::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct HostMetricsEventReceived {
+pub struct HostMetricsEventReceived {
     pub count: usize,
 }
 

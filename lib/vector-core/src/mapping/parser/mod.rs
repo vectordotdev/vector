@@ -36,7 +36,7 @@ macro_rules! unexpected_parser_syntax {
             "unexpected parser rule: {:#?}\n\n {:#?}",
             $pair.as_rule(),
             $pair
-        );
+        )
     };
 }
 
