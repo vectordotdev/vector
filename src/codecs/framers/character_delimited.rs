@@ -18,13 +18,12 @@ pub struct CharacterDelimitedDecoderConfig {
 #[typetag::serde(name = "character_delimited")]
 impl FramingConfig for CharacterDelimitedDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(
-            self.max_length
-                .map(|max_length| {
-                    CharacterDelimitedCodec::new_with_max_length(self.delimiter, max_length)
-                })
-                .unwrap_or_else(|| CharacterDelimitedCodec::new(self.delimiter)),
-        ))
+        Ok(Box::new(match self.max_length {
+            Some(max_length) => {
+                CharacterDelimitedCodec::new_with_max_length(self.delimiter, max_length)
+            }
+            None => CharacterDelimitedCodec::new(self.delimiter),
+        }))
     }
 }
 
