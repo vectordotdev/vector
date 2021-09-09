@@ -112,7 +112,7 @@ mod tests {
     use shared::{btreemap, TimeZone};
 
     #[test]
-    fn find_table_row() {
+    fn find_table_rows() {
         let registry = get_table_registry();
         let func = FindEnrichmentTableRecordsFn {
             table: "dummy1".to_string(),
@@ -132,7 +132,7 @@ mod tests {
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(value![value! ({ "field": "result" })]), got);
+        assert_eq!(Ok(value![vec![value!({ "field": "result" })]]), got);
     }
 
     #[test]
