@@ -91,6 +91,7 @@ mod tests {
     use crate::{event::Event, test_util::collect_ready, trace};
     use futures::channel::mpsc;
     use tokio::time::{sleep, Duration};
+    use vector_core::event::Value;
 
     #[test]
     fn generates_config() {
@@ -99,17 +100,21 @@ mod tests {
 
     #[tokio::test]
     async fn receives_logs() {
+        let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
         trace::reset_early_buffer();
-        error!(message = "Before source started.");
+        error!(message = "Before source started.", %test_id);
 
         let rx = start_source().await;
 
-        error!(message = "After source started.");
+        error!(message = "After source started.", %test_id);
 
         sleep(Duration::from_millis(1)).await;
-        let events = collect_ready(rx).await;
+        let mut events = collect_ready(rx).await;
+        events.retain(|event| {
+            event.as_log().get("test_id") == Some(&Value::from(test_id.to_string()))
+        });
 
         let end = chrono::Utc::now();
 
