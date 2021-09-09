@@ -981,13 +981,17 @@ components: {
 					List of hosts to avoid proxying globally.
 
 					Allowed patterns here include:
-						- Domain names. For example, `example.com` will match requests to to `example.com`
-						- Wildcard domains. For example, `.example.com` will match requests to `example.com` and its subdomains
-						- IP addresses. For example, `127.0.0.1` will match requests to 127.0.0.1
-						- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
-						- `*` will match all hosts
 
-					If another no_proxy value is set in the configuration file or at a component level, this one will be overridden.
+					Pattern | Example match
+					:-------|:-------------
+					Domain names | `example.com` matches requests to `example.com`
+					Wildcard domains | `.example.come` matches requests to `example.com` and its subdomains
+					IP addresses | `127.0.0.1` matches requests to `127.0.0.1`
+					[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
+					Splat | `*` matches all hosts
+
+					If another `no_proxy` value is set in the configuration file or at a component level, this
+					one is overridden.
 
 					The lowercase variant has priority over the uppercase one.
 					"""

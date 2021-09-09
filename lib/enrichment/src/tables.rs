@@ -172,12 +172,7 @@ impl TableSearch {
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_row(condition, index).map(|table| {
-                    table
-                        .iter()
-                        .map(|(key, value)| (key.to_string(), value.as_str().into()))
-                        .collect()
-                }),
+                Some(table) => table.find_table_row(condition, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -217,10 +212,10 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
-    use shared::btreemap;
-
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
+    use shared::btreemap;
+    use vrl_core::Value;
 
     #[test]
     fn tables_loaded() {
@@ -264,7 +259,7 @@ mod tests {
                 "dummy1",
                 &[Condition::Equals {
                     field: "thing",
-                    value: "thang".to_string(),
+                    value: Value::from("thang"),
                 }],
                 None
             )
@@ -305,7 +300,7 @@ mod tests {
                 "dummy1",
                 &[Condition::Equals {
                     field: "thing",
-                    value: "thang".to_string(),
+                    value: Value::from("thang"),
                 }],
                 None
             )

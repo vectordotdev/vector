@@ -3,19 +3,25 @@ pub mod tables;
 
 #[cfg(test)]
 mod test_util;
-
-use std::collections::BTreeMap;
-
 use dyn_clone::DynClone;
+use std::collections::BTreeMap;
+use vrl_core::Value;
 
 pub use tables::{TableRegistry, TableSearch};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Condition<'a> {
-    Equals { field: &'a str, value: String },
+    /// Condition exactly matches the field value.
+    Equals { field: &'a str, value: Value },
+    /// The date in the field is between from and to (inclusive).
+    BetweenDates {
+        field: &'a str,
+        from: chrono::DateTime<chrono::Utc>,
+        to: chrono::DateTime<chrono::Utc>,
+    },
 }
 
 /// Enrichment tables represent additional data sources that can be used to enrich the event data
@@ -30,7 +36,7 @@ pub trait Table: DynClone {
         &self,
         condition: &'a [Condition<'a>],
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, String>, String>;
+    ) -> Result<BTreeMap<String, vrl_core::Value>, String>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.
