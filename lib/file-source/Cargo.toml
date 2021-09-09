@@ -36,7 +36,8 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "1.7"
+# pinned due to https://github.com/tkaitchuck/aHash/issues/95
+version = "~1.6.2"
 default-features = false
 features = ["serde"]
 
