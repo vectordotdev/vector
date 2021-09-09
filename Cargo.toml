@@ -218,7 +218,7 @@ exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.21", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
-grok = { version = "1.1.0", default-features = false, optional = true }
+grok = { version = "1.2.0", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.4", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
@@ -470,7 +470,7 @@ sources-socket = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-udp",
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
 sources-statsd = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-udp", "sources-utils-unix", "tokio-util/net", "codecs"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "syslog_loose"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "syslog_loose", "codecs"]
 sources-utils-http = ["snap", "sources-utils-tls", "warp"]
 sources-utils-tcp-keepalive = []
 sources-utils-tcp-socket = []
