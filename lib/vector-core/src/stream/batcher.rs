@@ -28,7 +28,7 @@ pub struct ExpirationQueue<K> {
 impl<K> ExpirationQueue<K> {
     /// Creates a new `ExpirationQueue`.
     ///
-    /// `timeout is used for all insertions and resets.
+    /// `timeout` is used for all insertions and resets.
     pub fn new(timeout: Duration) -> Self {
         Self {
             timeout,

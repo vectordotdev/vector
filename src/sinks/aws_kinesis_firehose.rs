@@ -461,15 +461,14 @@ mod integration_tests {
         let hits = response["hits"]["hits"]
             .as_array()
             .expect("Elasticsearch response does not include hits->hits");
-        let input = input
+        let mut input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
-            .collect::<Vec<_>>();
+            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap());
         for hit in hits {
             let hit = hit
                 .get("_source")
                 .expect("Elasticsearch hit missing _source");
-            assert!(input.contains(hit));
+            assert!(input.any(|e| &e == hit));
         }
     }
 
