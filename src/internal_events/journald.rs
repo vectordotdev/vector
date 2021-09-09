@@ -12,7 +12,7 @@ impl InternalEvent for JournaldEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_in_total", 1);
+        counter!("received_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

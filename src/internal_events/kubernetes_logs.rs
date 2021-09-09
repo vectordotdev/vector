@@ -20,14 +20,14 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
     fn emit_metrics(&self) {
         match self.pod_name {
             Some(name) => {
-                counter!("events_in_total", 1, "pod_name" => name.to_owned());
+                counter!("received_events_total", 1, "pod_name" => name.to_owned());
                 counter!(
                     "processed_bytes_total", self.byte_size as u64,
                     "pod_name" => name.to_owned()
                 );
             }
             None => {
-                counter!("events_in_total", 1);
+                counter!("received_events_total", 1);
                 counter!("processed_bytes_total", self.byte_size as u64);
             }
         }

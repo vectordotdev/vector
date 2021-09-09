@@ -17,7 +17,7 @@ impl<'a> InternalEvent for ApacheMetricsEventReceived<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "events_in_total", self.count as u64,
+            "received_events_total", self.count as u64,
             "uri" => self.uri.to_owned(),
         );
         counter!(
