@@ -27,9 +27,7 @@ remap: functions: find: {
 			type: ["integer"]
 		},
 	]
-	internal_failure_reasons: [
-		"Unable to find any matching term."
-	]
+	internal_failure_reasons: []
 	return: types: ["integer"]
 
 	examples: [
@@ -46,6 +44,13 @@ remap: functions: find: {
 					find("foobar", r'b.r')
 				"""#
 			return: 3
+		},
+		{
+			title: "No matches"
+			source: #"""
+					find("foobar", "baz")
+				"""#
+			return: -1
 		},
 		{
 			title: "With an offset"
