@@ -3,7 +3,8 @@ package metadata
 remap: functions: find: {
 	category: "String"
 	description: """
-		Determines whether the elements in the `value` matches the `pattern` and returns its position or -1.
+		Determines the start position of the first found element in `value`,
+		from left to right, that matches the `pattern` or returns -1 if not found.
 		"""
 
 	arguments: [
