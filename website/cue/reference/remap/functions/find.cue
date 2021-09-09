@@ -10,7 +10,7 @@ remap: functions: find: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The string to find the substring in."
+			description: "The string to find the pattern in."
 			required:    true
 			type: ["string"]
 		},
