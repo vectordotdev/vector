@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 use serde_json::Error;
 
@@ -32,6 +33,27 @@ impl InternalEvent for SplunkEventEncodeError {
 
     fn emit_metrics(&self) {
         counter!("encode_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SplunkInvalidMetricReceived<'a> {
+    pub value: &'a MetricValue,
+    pub kind: &'a MetricKind,
+}
+
+impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Invalid metric received kind; dropping event.",
+            value = ?self.value,
+            kind = ?self.kind,
+            internal_log_rate_secs = 30,
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
     }
 }
 
