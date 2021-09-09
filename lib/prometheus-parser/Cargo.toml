@@ -9,7 +9,8 @@ license = "MPL-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-indexmap = "1.7.0"
+# pinned due to https://github.com/tkaitchuck/aHash/issues/95
+indexmap = "~1.6.2"
 nom = "6.0.1"
 num_enum = "0.5.4"
 prost = "0.8"
