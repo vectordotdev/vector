@@ -24,10 +24,10 @@ pub fn build_unix_datagram_source<D>(
     decoder: D,
     shutdown: ShutdownSignal,
     out: Pipeline,
-    build_event: impl Fn(&str, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
+    build_event: impl Fn(&str, Option<Bytes>, Bytes) -> Option<Event> + Clone + Send + Sync + 'static,
 ) -> Source
 where
-    D: Decoder<Item = String> + Clone + Send + 'static,
+    D: Decoder<Item = Bytes> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     Box::pin(async move {
@@ -64,10 +64,10 @@ async fn listen<D>(
     mut decoder: D,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
-    build_event: impl Fn(&str, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
+    build_event: impl Fn(&str, Option<Bytes>, Bytes) -> Option<Event> + Clone + Send + Sync + 'static,
 ) -> Result<(), ()>
 where
-    D: Decoder<Item = String> + Clone + Send + 'static,
+    D: Decoder<Item = Bytes> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
@@ -91,8 +91,8 @@ where
                 let received_from: Option<Bytes> =
                     path.map(|p| p.to_string_lossy().into_owned().into());
 
-                while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
-                    if let Some(event) = build_event(&host_key, received_from.clone(), &line) {
+                while let Ok(Some(bytes)) = decoder.decode_eof(&mut payload) {
+                    if let Some(event) = build_event(&host_key, received_from.clone(), bytes) {
                         out.send(event).await?;
                     }
                 }
