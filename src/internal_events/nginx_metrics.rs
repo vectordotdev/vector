@@ -4,7 +4,7 @@ use metrics::{counter, histogram};
 use std::time::Instant;
 
 #[derive(Debug)]
-pub(crate) struct NginxMetricsEventsReceived<'a> {
+pub struct NginxMetricsEventsReceived<'a> {
     pub count: usize,
     pub uri: &'a str,
 }

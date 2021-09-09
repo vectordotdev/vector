@@ -126,7 +126,7 @@ docker run \
   -d \
   -v ~/vector.toml:/etc/vector/vector.toml:ro \
   -p 8686:8686 \
-  timberio/vector:0.13.1-alpine
+  timberio/vector:{{< version >}}-alpine
 ```
 {{< /tab >}}
 {{< tab title="Stop" >}}
@@ -163,10 +163,15 @@ To get Vector running on [Kubernetes] using the [Helm] package manager:
 
 Once Vector is running in Kubernetes, you can manage it using [kubectl]:
 
-{{< tabs default="Restart" >}}
-{{< tab title="Restart" >}}
+{{< tabs default="Restart Agent" >}}
+{{< tab title="Restart Agent" >}}
 ```shell
 kubectl rollout restart --namespace vector daemonset/vector-agent
+```
+{{< /tab >}}
+{{< tab title="Restart Aggregator" >}}
+```shell
+kubectl rollout restart --namespace vector statefulset/vector-aggregator
 ```
 {{< /tab >}}
 {{< /tabs >}}

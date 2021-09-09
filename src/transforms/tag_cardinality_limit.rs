@@ -59,15 +59,15 @@ pub struct TagCardinalityLimit {
     accepted_tags: HashMap<String, TagValueSet>,
 }
 
-fn default_limit_exceeded_action() -> LimitExceededAction {
+const fn default_limit_exceeded_action() -> LimitExceededAction {
     LimitExceededAction::DropTag
 }
 
-fn default_value_limit() -> u32 {
+const fn default_value_limit() -> u32 {
     500
 }
 
-fn default_cache_size() -> usize {
+const fn default_cache_size() -> usize {
     5000 * 1024 // 5KB
 }
 
@@ -155,7 +155,7 @@ impl TagValueSet {
         }
     }
 
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.num_elements
     }
 
@@ -172,20 +172,21 @@ impl TagValueSet {
 }
 
 impl TagCardinalityLimit {
-    fn new(config: TagCardinalityLimitConfig) -> TagCardinalityLimit {
-        TagCardinalityLimit {
+    fn new(config: TagCardinalityLimitConfig) -> Self {
+        Self {
             config,
             accepted_tags: HashMap::new(),
         }
     }
 
-    /// Takes in key and a value corresponding to a tag on an incoming Metric Event.
-    /// If that value is already part of set of accepted values for that key, then simply returns
-    /// true.  If that value is not yet part of the accepted values for that key, checks whether
-    /// we have hit the value_limit for that key yet and if not adds the value to the set of
-    /// accepted values for the key and returns true, otherwise returns false.  A false return
-    /// value indicates to the caller that the value is not accepted for this key, and the
-    /// configured limit_exceeded_action should be taken.
+    /// Takes in key and a value corresponding to a tag on an incoming Metric
+    /// Event.  If that value is already part of set of accepted values for that
+    /// key, then simply returns true.  If that value is not yet part of the
+    /// accepted values for that key, checks whether we have hit the value_limit
+    /// for that key yet and if not adds the value to the set of accepted values
+    /// for the key and returns true, otherwise returns false.  A false return
+    /// value indicates to the caller that the value is not accepted for this
+    /// key, and the configured limit_exceeded_action should be taken.
     fn try_accept_tag(&mut self, key: &str, value: Cow<'_, String>) -> bool {
         if !self.accepted_tags.contains_key(key) {
             self.accepted_tags.insert(

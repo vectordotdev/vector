@@ -21,14 +21,17 @@ pub struct InternalMetricsConfig {
 }
 
 impl InternalMetricsConfig {
-    // TODO: Remove this annotation once it's actually being used.
-    #[allow(dead_code)]
     /// Override the default namespace.
-    fn namespace<T: Into<String>>(namespace: T) -> Self {
+    pub fn namespace<T: Into<String>>(namespace: T) -> Self {
         Self {
             namespace: Some(namespace.into()),
             ..Self::default()
         }
+    }
+
+    /// Set the interval to collect internal metrics.
+    pub fn scrape_interval_secs(&mut self, value: u64) {
+        self.scrape_interval_secs = value;
     }
 }
 

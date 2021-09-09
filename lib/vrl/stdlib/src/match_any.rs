@@ -39,7 +39,7 @@ impl Function for MatchAny {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let patterns = arguments.required_array("patterns")?;
 

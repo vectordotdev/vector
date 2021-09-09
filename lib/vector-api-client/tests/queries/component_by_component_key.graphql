@@ -1,0 +1,7 @@
+query ComponentByComponentKeyQuery($pipelineId: String, $componentId: String!) {
+    componentByComponentKey(pipelineId: $pipelineId, componentId: $componentId) {
+        __typename
+        pipelineId
+        componentId
+    }
+}

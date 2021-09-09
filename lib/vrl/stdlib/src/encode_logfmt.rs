@@ -24,7 +24,7 @@ impl Function for EncodeLogfmt {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         // The encode_logfmt function is just an alias for `encode_key_value` with the following
         // parameters for the delimiters.
         let key_value_delimiter = expr!("=");

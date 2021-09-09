@@ -18,7 +18,10 @@ impl_generate_config_from_default!(IsMetricConfig);
 
 #[typetag::serde(name = "is_metric")]
 impl ConditionConfig for IsMetricConfig {
-    fn build(&self) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        _enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         Ok(Box::new(IsMetric {}))
     }
 }
@@ -59,7 +62,7 @@ mod test {
 
     #[test]
     fn is_metric_basic() {
-        let cond = IsMetricConfig {}.build().unwrap();
+        let cond = IsMetricConfig {}.build(&Default::default()).unwrap();
 
         assert!(!cond.check(&Event::from("just a log")));
         assert!(cond.check(&Event::from(Metric::new(

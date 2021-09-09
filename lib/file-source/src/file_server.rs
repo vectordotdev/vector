@@ -269,10 +269,6 @@ where
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line() {
-                    if line.is_empty() {
-                        break;
-                    }
-
                     let sz = line.len();
                     trace!(
                         message = "Read bytes.",

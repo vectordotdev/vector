@@ -14,7 +14,7 @@ use crate::kubernetes as k8s;
 use crate::kubernetes::hash_value::HashKey;
 use crate::{
     config::{
-        ComponentId, DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig,
+        ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig,
         SourceContext, SourceDescription,
     },
     shutdown::ShutdownSignal,
@@ -166,7 +166,7 @@ const COMPONENT_ID: &str = "kubernetes_logs";
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Source::new(self, &cx.globals, &cx.id, &cx.proxy)?;
+        let source = Source::new(self, &cx.globals, &cx.key, &cx.proxy)?;
         Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
@@ -205,7 +205,7 @@ impl Source {
     fn new(
         config: &Config,
         globals: &GlobalOptions,
-        id: &ComponentId,
+        key: &ComponentKey,
         proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
@@ -217,8 +217,7 @@ impl Source {
         };
         let client = k8s::client::Client::new(k8s_config, proxy)?;
 
-        let data_dir =
-            globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), id.as_str())?;
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = prepare_exclude_paths(config)?;
@@ -521,11 +520,11 @@ fn default_path_exclusion() -> Vec<PathBuf> {
     vec![PathBuf::from("**/*.gz"), PathBuf::from("**/*.tmp")]
 }
 
-fn default_max_read_bytes() -> usize {
+const fn default_max_read_bytes() -> usize {
     2048
 }
 
-fn default_max_line_bytes() -> usize {
+const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
     // https://github.com/timberio/vector/issues/6967
     //
@@ -538,11 +537,11 @@ fn default_max_line_bytes() -> usize {
     32 * 1024 // 32 KiB
 }
 
-fn default_glob_minimum_cooldown_ms() -> usize {
-    60000
+const fn default_glob_minimum_cooldown_ms() -> usize {
+    60_000
 }
 
-fn default_fingerprint_lines() -> usize {
+const fn default_fingerprint_lines() -> usize {
     1
 }
 

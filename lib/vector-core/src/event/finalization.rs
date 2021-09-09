@@ -323,6 +323,16 @@ impl EventStatus {
     }
 }
 
+/// An object that can be finalized.
+pub trait Finalizable {
+    /// Consumes the finalizers of this object.
+    ///
+    /// Typically used for coalescing the finalizers of multiple items, such as
+    /// when batching finalizable objects where all finalizations will be
+    /// processed when the batch itself is processed.
+    fn take_finalizers(&mut self) -> EventFinalizers;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

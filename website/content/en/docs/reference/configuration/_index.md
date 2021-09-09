@@ -205,7 +205,7 @@ Vector interpolates environment variables within your configuration file with th
 type = "add_fields"
 
 [transforms.add_host.fields]
-host = "${HOSTNAME}"
+host = "${HOSTNAME}" # or "$HOSTNAME"
 environment = "${ENV:-development}" # default value when not present
 ```
 
@@ -219,7 +219,7 @@ option = "${ENV_VAR:-default}"
 
 #### Escaping
 
-You can escape environment variables by prefacing them with a `$` character. For example `$${HOSTNAME}` is treated literally in the above environment variable example.
+You can escape environment variables by prefacing them with a `$` character. For example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above environment variable example.
 
 ### Formats
 

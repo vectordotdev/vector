@@ -8,7 +8,7 @@ pub struct SizedBytesCodec {
 }
 
 impl SizedBytesCodec {
-    pub fn new_with_max_length(max_length: usize) -> Self {
+    pub const fn new_with_max_length(max_length: usize) -> Self {
         SizedBytesCodec { max_length }
     }
 }

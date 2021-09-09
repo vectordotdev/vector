@@ -50,18 +50,28 @@ fn default_config(address: &str) -> VectorConfig {
     }
 }
 
-/// grpc doesn't like an address without a scheme, so we default to http if one isn't specified in
-/// the address.
-fn default_http(address: &str) -> crate::Result<Uri> {
+/// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
+/// specified in the address.
+fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
     let uri: Uri = address.parse()?;
     if uri.scheme().is_none() {
-        // Default the scheme to http.
+        // Default the scheme to http or https.
         let mut parts = uri.into_parts();
-        parts.scheme = Some(
-            "http"
-                .parse()
-                .unwrap_or_else(|_| unreachable!("http should be valid")),
-        );
+
+        parts.scheme = if tls {
+            Some(
+                "https"
+                    .parse()
+                    .unwrap_or_else(|_| unreachable!("https should be valid")),
+            )
+        } else {
+            Some(
+                "http"
+                    .parse()
+                    .unwrap_or_else(|_| unreachable!("http should be valid")),
+            )
+        };
+
         if parts.path_and_query.is_none() {
             parts.path_and_query = Some(
                 "/".parse()
@@ -127,7 +137,7 @@ impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
 impl VectorConfig {
     pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
-        let uri = default_http(&self.address)?;
+        let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
         let client = new_client(&tls)?;
 
@@ -162,15 +172,15 @@ impl VectorConfig {
         Ok((VectorSink::Sink(Box::new(sink)), Box::pin(healthcheck)))
     }
 
-    pub(super) fn input_type(&self) -> DataType {
+    pub(super) const fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn sink_type(&self) -> &'static str {
+    pub(super) const fn sink_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(super) fn resources(&self) -> Vec<Resource> {
+    pub(super) const fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 }
@@ -378,6 +388,18 @@ mod tests {
         sink.run(events).await.unwrap();
         drop(trigger);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+    }
+
+    #[test]
+    fn test_with_default_scheme() {
+        assert_eq!(
+            with_default_scheme("0.0.0.0", false).unwrap().to_string(),
+            "http://0.0.0.0/"
+        );
+        assert_eq!(
+            with_default_scheme("0.0.0.0", true).unwrap().to_string(),
+            "https://0.0.0.0/"
+        );
     }
 
     async fn get_received(

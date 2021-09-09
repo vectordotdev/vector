@@ -1,4 +1,4 @@
-use crate::config::ComponentId;
+use crate::config::ComponentKey;
 use crate::{stream::tripwire_handler, trigger::DisabledTrigger};
 use futures::{future, ready, FutureExt};
 use std::{
@@ -92,9 +92,9 @@ impl ShutdownSignal {
 
 #[derive(Debug, Default)]
 pub struct SourceShutdownCoordinator {
-    shutdown_begun_triggers: HashMap<ComponentId, Trigger>,
-    shutdown_force_triggers: HashMap<ComponentId, Trigger>,
-    shutdown_complete_tripwires: HashMap<ComponentId, Tripwire>,
+    shutdown_begun_triggers: HashMap<ComponentKey, Trigger>,
+    shutdown_force_triggers: HashMap<ComponentKey, Trigger>,
+    shutdown_complete_tripwires: HashMap<ComponentKey, Tripwire>,
 }
 
 impl SourceShutdownCoordinator {
@@ -103,7 +103,7 @@ impl SourceShutdownCoordinator {
     /// that will be notified if the Source should be forcibly shut down.
     pub fn register_source(
         &mut self,
-        id: &ComponentId,
+        id: &ComponentKey,
     ) -> (ShutdownSignal, impl Future<Output = ()>) {
         let (shutdown_begun_trigger, shutdown_begun_tripwire) = Tripwire::new();
         let (force_shutdown_trigger, force_shutdown_tripwire) = Tripwire::new();
@@ -126,7 +126,7 @@ impl SourceShutdownCoordinator {
     }
 
     /// Takes ownership of all internal state for the given source from another ShutdownCoordinator.
-    pub fn takeover_source(&mut self, id: &ComponentId, other: &mut Self) {
+    pub fn takeover_source(&mut self, id: &ComponentKey, other: &mut Self) {
         let existing = self.shutdown_begun_triggers.insert(
             id.clone(),
             other.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
@@ -227,7 +227,7 @@ impl SourceShutdownCoordinator {
     /// before `deadline` and had to be force-shutdown.
     pub fn shutdown_source(
         &mut self,
-        id: &ComponentId,
+        id: &ComponentKey,
         deadline: Instant,
     ) -> impl Future<Output = bool> {
         let begin_shutdown_trigger = self.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
@@ -278,7 +278,7 @@ impl SourceShutdownCoordinator {
     fn shutdown_source_complete(
         shutdown_complete_tripwire: Tripwire,
         shutdown_force_trigger: Trigger,
-        id: ComponentId,
+        id: ComponentKey,
         deadline: Instant,
     ) -> impl Future<Output = bool> {
         async move {
@@ -311,7 +311,7 @@ mod test {
     #[tokio::test]
     async fn shutdown_coordinator_shutdown_source_clean() {
         let mut shutdown = SourceShutdownCoordinator::default();
-        let id = ComponentId::from("test");
+        let id = ComponentKey::from("test");
 
         let (shutdown_signal, _) = shutdown.register_source(&id);
 
@@ -327,7 +327,7 @@ mod test {
     #[tokio::test]
     async fn shutdown_coordinator_shutdown_source_force() {
         let mut shutdown = SourceShutdownCoordinator::default();
-        let id = ComponentId::from("test");
+        let id = ComponentKey::from("test");
 
         let (_shutdown_signal, force_shutdown_tripwire) = shutdown.register_source(&id);
 

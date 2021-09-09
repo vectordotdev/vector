@@ -51,7 +51,7 @@ struct FrameStreamState {
     is_bidirectional: bool,
 }
 impl FrameStreamState {
-    fn new() -> Self {
+    const fn new() -> Self {
         FrameStreamState {
             expect_control_frame: false,
             //first control frame should be READY (if bidirectional -- if unidirectional first will be START)
@@ -93,7 +93,7 @@ impl ControlHeader {
         }
     }
 
-    fn to_u32(self) -> u32 {
+    const fn to_u32(self) -> u32 {
         match self {
             ControlHeader::Accept => 0x01,
             ControlHeader::Start => 0x02,
@@ -118,7 +118,7 @@ impl ControlField {
             }
         }
     }
-    fn to_u32(&self) -> u32 {
+    const fn to_u32(&self) -> u32 {
         match self {
             ControlField::ContentType => 0x01,
         }
@@ -593,7 +593,7 @@ mod test {
         FrameHandler,
     };
     use crate::{
-        config::{log_schema, ComponentId},
+        config::{log_schema, ComponentKey},
         test_util::{collect_n, collect_n_stream},
     };
     use crate::{event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
@@ -715,7 +715,7 @@ mod test {
         JoinHandle<Result<(), ()>>,
         SourceShutdownCoordinator,
     ) {
-        let source_id = ComponentId::from(source_id);
+        let source_id = ComponentKey::from(source_id);
         let socket_path = frame_handler.socket_path();
         let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(&source_id);
@@ -800,7 +800,7 @@ mod test {
     async fn signal_shutdown(source_name: &str, shutdown: &mut SourceShutdownCoordinator) {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let id = ComponentId::from(source_name);
+        let id = ComponentKey::from(source_name);
         let shutdown_complete = shutdown.shutdown_source(&id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);

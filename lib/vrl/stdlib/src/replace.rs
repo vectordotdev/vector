@@ -53,7 +53,7 @@ impl Function for Replace {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
         let with = arguments.required("with");

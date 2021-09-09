@@ -13,7 +13,7 @@ use leveldb::database::{
     options::{Options, ReadOptions},
     Database,
 };
-use reader::Reader;
+pub use reader::Reader;
 use snafu::ResultExt;
 use std::fmt::Debug;
 use std::{
@@ -135,6 +135,7 @@ where
             unacked_sizes: VecDeque::new(),
             buffer: VecDeque::new(),
             last_compaction: Instant::now(),
+            pending_read: None,
             phantom: PhantomData,
         };
         // Compact on every start

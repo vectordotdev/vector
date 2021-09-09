@@ -1,5 +1,5 @@
-use crate::udp;
 use crate::{
+    codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -7,10 +7,9 @@ use crate::{
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    udp, Pipeline,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
 use futures::{stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -41,7 +40,7 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
-    pub fn from_address(address: SocketAddr) -> Self {
+    pub const fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
             receive_buffer_bytes: None,
@@ -62,6 +61,7 @@ struct TcpConfig {
 
 impl TcpConfig {
     #[cfg(all(test, feature = "sinks-prometheus"))]
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -73,7 +73,7 @@ impl TcpConfig {
     }
 }
 
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
@@ -197,11 +197,11 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = std::io::Error;
-    type Decoder = BytesDelimitedCodec;
+    type Error = BoxedFramingError;
+    type Decoder = CharacterDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
-        BytesDelimitedCodec::new(b'\n')
+        CharacterDelimitedCodec::new('\n')
     }
 
     fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {

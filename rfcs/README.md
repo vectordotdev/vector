@@ -13,11 +13,12 @@ Vector uses the RFC process to formalize discussion around _substantial_ changes
 1. [Process](#process)
    1. [Before creating an RFC](#before-creating-an-rfc)
    1. [Creating an RFC](#creating-an-rfc)
-   1. [Accepting an RFC](#accepting-an-rfc)
+   1. [Getting an RFC accepted](#getting-an-rfc-accepted)
    1. [Implementing an RFC](#implementing-an-rfc)
 1. [FAQ](#faq)
    1. [What if I'm unsure about the solution?](#what-if-im-unsure-about-the-solution)
    1. [What if I need to investigate and feel out solutions?](#what-if-i-need-to-investigate-and-feel-out-solutions)
+   1. [How long should it take to obtain consensus?](#how-long-should-it-take-to-obtain-consensus)
 
 <!-- /MarkdownTOC -->
 
@@ -97,8 +98,9 @@ more info navigating your solution.
 1. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
 1. Submit your RFC as a pull request and tag reviewers for approval.
 
-### Accepting an RFC
+### Getting an RFC accepted
 
+1. Schedule a "last call" meeting for your RFC. This should be 1 week after opening your pull request. The purpose is to efficiently obtain consensus.
 1. At least 3 Vector team members must approve your RFC in the form of pull request approvals.
 1. Once approved, self-merge your RFC, or ask a Vector team member to do it for you.
 
@@ -121,3 +123,9 @@ demonstrating intent over conceptual discussions.
 This is expected. RFCs are the time to discuss with the Vector team and experiement with code-level spikes. It is not
 uncommon for RFCs to span one or two sprints, but they should not take longer than two sprints. Generally, if an RFC
 takes two sprints it involves many cross cutting concerns that result in incremental RFCs.
+
+### How long should it take to obtain consensus?
+
+Barring any substantial changes due to feedback, it should not take longer than a week to obtain consensus. For most
+RFCs it should only take a few days if reviews are timely. Please nudge your reviewers if they have not reviewed
+your RFC in 48 hours.

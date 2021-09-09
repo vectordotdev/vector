@@ -23,7 +23,7 @@ impl Function for MatchArray {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
         let all = arguments.optional("all");

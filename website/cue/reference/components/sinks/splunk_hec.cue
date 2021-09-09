@@ -107,7 +107,7 @@ components: sinks: splunk_hec: {
 		}
 		index: {
 			common:      false
-			description: "The name of the index where send the events to. If not specified, the default index is used."
+			description: "The name of the index where to send the events to. If not specified, the default index is used."
 			required:    false
 			warnings: []
 			type: string: {

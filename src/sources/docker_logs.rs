@@ -702,7 +702,7 @@ struct ContainerState {
 
 impl ContainerState {
     /// It's ContainerLogInfo pair must be created exactly once.
-    fn new_running() -> Self {
+    const fn new_running() -> Self {
         ContainerState {
             info: None,
             running: true,
@@ -719,7 +719,7 @@ impl ContainerState {
         self.running = false;
     }
 
-    fn is_running(&self) -> bool {
+    const fn is_running(&self) -> bool {
         self.running
     }
 
@@ -759,7 +759,7 @@ struct ContainerLogInfo {
 impl ContainerLogInfo {
     /// Container docker ID
     /// Unix timestamp of event which created this struct
-    fn new(id: ContainerId, metadata: ContainerMetadata, created: DateTime<Utc>) -> Self {
+    const fn new(id: ContainerId, metadata: ContainerMetadata, created: DateTime<Utc>) -> Self {
         ContainerLogInfo {
             id,
             created,

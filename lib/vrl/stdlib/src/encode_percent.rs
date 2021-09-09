@@ -67,7 +67,7 @@ impl Function for EncodePercent {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let ascii_sets = vec![
             value!("NON_ALPHANUMERIC"),
             value!("CONTROLS"),

@@ -68,3 +68,26 @@ where
         self.as_ref().map_or(0, |x| x.allocated_bytes())
     }
 }
+
+macro_rules! num {
+    ($t:ty) => {
+        impl ByteSizeOf for $t {
+            fn allocated_bytes(&self) -> usize {
+                0
+            }
+        }
+    };
+}
+
+num!(u8);
+num!(u16);
+num!(u32);
+num!(u64);
+num!(u128);
+num!(i8);
+num!(i16);
+num!(i32);
+num!(i64);
+num!(i128);
+num!(f32);
+num!(f64);

@@ -27,7 +27,7 @@ remap: {
 		examples?: [remap.#Example, ...remap.#Example]
 	}
 
-	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Convert" | "Debug" | "Enumerate" | "Event" | "Hash" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
+	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Convert" | "Debug" | "Enrichment" | "Enumerate" | "Event" | "Hash" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
 
 	// A helper array for generating docs. At some point, we should generate this from the
 	// #FunctionCategory enum if CUE adds support for that.

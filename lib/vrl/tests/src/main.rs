@@ -125,7 +125,7 @@ fn main() {
 
         let state = state::Runtime::default();
         let mut runtime = Runtime::new(state);
-        let program = vrl::compile(&test.source, &stdlib::all());
+        let program = vrl::compile(&test.source, &stdlib::all(), None);
 
         let want = test.result.clone();
         let timezone = cmd.timezone();

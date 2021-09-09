@@ -37,13 +37,13 @@ impl GenerateConfig for SampleConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
             self.rate,
             self.key_field.clone(),
             self.exclude
                 .as_ref()
-                .map(|condition| condition.build())
+                .map(|condition| condition.build(&context.enrichment_tables))
                 .transpose()?,
         )))
     }
@@ -154,7 +154,7 @@ mod tests {
         VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
         }
-        .build()
+        .build(&Default::default())
         .unwrap()
     }
 

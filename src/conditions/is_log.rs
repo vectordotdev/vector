@@ -18,7 +18,10 @@ impl_generate_config_from_default!(IsLogConfig);
 
 #[typetag::serde(name = "is_log")]
 impl ConditionConfig for IsLogConfig {
-    fn build(&self) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        _enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         Ok(Box::new(IsLog {}))
     }
 }
@@ -59,7 +62,7 @@ mod test {
 
     #[test]
     fn is_log_basic() {
-        let cond = IsLogConfig {}.build().unwrap();
+        let cond = IsLogConfig {}.build(&Default::default()).unwrap();
 
         assert!(cond.check(&Event::from("just a log")));
         assert!(!cond.check(&Event::from(Metric::new(

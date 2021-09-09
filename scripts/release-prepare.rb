@@ -25,7 +25,7 @@ require_relative "util/version"
 #
 
 ROOT = ".."
-RELEASE_REFERENCE_DIR = File.join(ROOT, "docs", "cue", "reference", "releases")
+RELEASE_REFERENCE_DIR = File.join(ROOT, "website", "cue", "reference", "releases")
 TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 

@@ -1,5 +1,5 @@
 use super::{sink, source, transform, Component};
-use crate::config::ComponentId;
+use crate::config::ComponentKey;
 use lazy_static::lazy_static;
 use std::{
     collections::{HashMap, HashSet},
@@ -9,12 +9,12 @@ use std::{
 pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
 
 lazy_static! {
-    pub static ref COMPONENTS: Arc<RwLock<HashMap<ComponentId, Component>>> =
+    pub static ref COMPONENTS: Arc<RwLock<HashMap<ComponentKey, Component>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
 /// Filter components with the provided `map_func`
-pub fn filter_components<T>(map_func: impl Fn((&ComponentId, &Component)) -> Option<T>) -> Vec<T> {
+pub fn filter_components<T>(map_func: impl Fn((&ComponentKey, &Component)) -> Option<T>) -> Vec<T> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
@@ -25,7 +25,7 @@ pub fn filter_components<T>(map_func: impl Fn((&ComponentId, &Component)) -> Opt
 
 /// Returns all components
 pub fn get_components() -> Vec<Component> {
-    filter_components(|(_component_id, components)| Some(components.clone()))
+    filter_components(|(_component_key, components)| Some(components.clone()))
 }
 
 /// Filters components, and returns a clone of sources
@@ -52,28 +52,28 @@ pub fn get_sinks() -> Vec<sink::Sink> {
     })
 }
 
-/// Returns the current component component_ids as a HashSet
-pub fn get_component_ids() -> HashSet<ComponentId> {
+/// Returns the current component component_keys as a HashSet
+pub fn get_component_keys() -> HashSet<ComponentKey> {
     COMPONENTS
         .read()
         .expect(INVARIANT)
         .keys()
         .cloned()
-        .collect::<HashSet<ComponentId>>()
+        .collect::<HashSet<ComponentKey>>()
 }
 
-/// Gets a component by component_id
-pub fn component_by_component_id(component_id: &ComponentId) -> Option<Component> {
+/// Gets a component by component_key
+pub fn component_by_component_key(component_key: &ComponentKey) -> Option<Component> {
     Some(
         COMPONENTS
             .read()
             .expect(INVARIANT)
-            .get(component_id)?
+            .get(component_key)?
             .clone(),
     )
 }
 
 /// Overwrites component state with new components.
-pub fn update(new_components: HashMap<ComponentId, Component>) {
+pub fn update(new_components: HashMap<ComponentKey, Component>) {
     *COMPONENTS.write().expect(INVARIANT) = new_components
 }

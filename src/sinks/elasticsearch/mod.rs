@@ -166,11 +166,11 @@ impl DataStreamConfig {
         Template::try_from("default").expect("couldn't build default namespace template")
     }
 
-    fn default_auto_routing() -> bool {
+    const fn default_auto_routing() -> bool {
         true
     }
 
-    fn default_sync_fields() -> bool {
+    const fn default_sync_fields() -> bool {
         true
     }
 
@@ -322,14 +322,14 @@ pub enum BulkAction {
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
 impl BulkAction {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
         }
     }
 
-    pub fn as_json_pointer(&self) -> &'static str {
+    pub const fn as_json_pointer(&self) -> &'static str {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
@@ -449,7 +449,7 @@ impl ElasticSearchCommonMode {
         }
     }
 
-    fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
+    const fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
         match self {
             Self::DataStream(value) => Some(value),
             _ => None,

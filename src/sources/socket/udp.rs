@@ -1,13 +1,12 @@
-use crate::udp;
 use crate::{
+    codecs::CharacterDelimitedCodec,
     event::Event,
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::Source,
-    Pipeline,
+    udp, Pipeline,
 };
 use bytes::{Bytes, BytesMut};
-use codec::BytesDelimitedCodec;
 use futures::SinkExt;
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
@@ -90,7 +89,7 @@ pub fn udp(
 
                     // UDP processes messages per payload, where messages are separated by newline
                     // and stretch to end of payload.
-                    let mut decoder = BytesDelimitedCodec::new(b'\n');
+                    let mut decoder = CharacterDelimitedCodec::new('\n');
                     while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
                         let mut event = Event::from(line);
 

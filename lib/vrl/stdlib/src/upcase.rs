@@ -24,7 +24,7 @@ impl Function for Upcase {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(UpcaseFn { value }))

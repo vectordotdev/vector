@@ -12,7 +12,6 @@ use snafu::{ResultExt, Snafu};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use vector_core::enrichment;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -61,7 +60,6 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
-    enrichment_tables: enrichment::TableSearch,
 }
 
 impl Remap {
@@ -84,15 +82,21 @@ impl Remap {
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
 
-        let program = vrl::compile(&source, &vrl_stdlib::all())
-            .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
+        let mut functions = vrl_stdlib::all();
+        functions.append(&mut enrichment::vrl_functions());
+
+        let program = vrl::compile(
+            &source,
+            &functions,
+            Some(Box::new(enrichment_tables.clone())),
+        )
+        .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         Ok(Remap {
             program,
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
-            enrichment_tables: enrichment_tables.as_readonly(),
         })
     }
 }

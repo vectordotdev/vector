@@ -44,7 +44,7 @@ impl Function for Log {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let levels = vec![
             "trace".into(),
             "debug".into(),

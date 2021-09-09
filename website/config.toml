@@ -85,6 +85,12 @@ twitter_handle = "vectordotdev"
 github_repo = "timberio/vector"
 discord = "https://chat.vector.dev"
 
+# Datadog configuration
+[params.datadog_config]
+application_id = "0b95923b-b06d-445b-893f-a861e93d6ea3"
+client_token = "puba5f23a97d613091ae2ca8c0f4a135af4"
+service_name = "vector"
+
 ## Menus
 
 # Main page doc links
@@ -236,14 +242,19 @@ url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
 weight = 1
 
 [[languages.en.menus.meta]]
-name = "Release"
-url = "https://github.com/timberio/vector/blob/master/RELEASING.md"
+name = "Security"
+url = "https://github.com/timberio/vector/security/policy"
 weight = 2
 
 [[languages.en.menus.meta]]
-name = "Security"
-url = "https://github.com/timberio/vector/security/policy"
+name = "Releases"
+url = "https://github.com/timberio/vector/blob/master/RELEASES.md"
 weight = 3
+
+[[languages.en.menus.meta]]
+name = "Versioning"
+url = "https://github.com/timberio/vector/blob/master/VERSIONING.md"
+weight = 4
 
 # Buttons in "community" section on main page
 [[languages.en.menus.community]]

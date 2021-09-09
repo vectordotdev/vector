@@ -25,7 +25,7 @@ impl Function for Sha1 {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(Sha1Fn { value }))

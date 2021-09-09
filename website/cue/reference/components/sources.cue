@@ -113,15 +113,19 @@ components: sources: [Name=string]: {
 		}
 
 		if features.receive != _|_ {
-			if features.receive.receive_buffer_size != _|_ {
-				send_buffer_bytes: {
+			if features.receive.receive_buffer_bytes != _|_ {
+				receive_buffer_bytes: {
 					common:      false
 					description: "Configures the receive buffer size using the `SO_RCVBUF` option on the socket."
 					required:    false
 					type: uint: {
+						default: null
 						examples: [65536]
+						unit: "bytes"
 					}
-					relevant_when: features.receive.receive_buffer_bytes.relevant_when
+					if features.receive.receive_buffer_bytes.relevant_when != _|_ {
+						relevant_when: features.receive.receive_buffer_bytes.relevant_when
+					}
 				}
 			}
 

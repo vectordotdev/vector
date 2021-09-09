@@ -12,7 +12,7 @@ shared = { path = "../../shared", default-features = false, features = ["convers
 lookup = { path = "../../lookup" }
 
 bitflags = "1"
-bytes = "1.0.0"
+bytes = "1.1.0"
 chrono = "0.4"
 dyn-clone = "1.0.4"
 lalrpop-util = "0.19"

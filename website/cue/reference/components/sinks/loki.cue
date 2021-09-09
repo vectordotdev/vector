@@ -29,13 +29,13 @@ components: sinks: loki: {
 				codec: {
 					enabled: true
 					default: "json"
-					enum: ["json", "text"]
+					enum: ["json", "logfmt",  "text"]
 				}
 			}
 			proxy: enabled: true
 			request: {
 				enabled:     true
-				concurrency: 1
+				concurrency: 5
 				headers:     false
 			}
 			tls: {
@@ -190,15 +190,6 @@ components: sinks: loki: {
 				"""
 		}
 
-		concurrency: {
-			title: "Concurrency"
-			body: """
-				To make sure logs arrive at Loki in a correct order,
-				the `loki` sink only sends one request at a time.
-				Setting `request.concurrency` will not have any effects.
-				"""
-		}
-
 		event_ordering: {
 			title: "Event Ordering"
 			body: """
@@ -209,5 +200,14 @@ components: sinks: loki: {
 				increasing timestamp.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
+		events_out_total:          components.sources.internal_metrics.output.metrics.events_out_total
+		events_discarded_total:    components.sources.internal_metrics.output.metrics.events_discarded_total
+		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processing_errors_total:   components.sources.internal_metrics.output.metrics.processing_errors_total
+		streams_total:			   components.sources.internal_metrics.output.metrics.streams_total
 	}
 }

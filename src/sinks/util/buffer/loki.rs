@@ -8,7 +8,10 @@ use super::{
     err_event_too_large, json::BoxedRawValue, Batch, BatchConfig, BatchError, BatchSettings,
     BatchSize, PushResult,
 };
-use crate::sinks::loki::OutOfOrderAction;
+use crate::{
+    internal_events::{LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten, LokiUniqueStream},
+    sinks::loki::OutOfOrderAction,
+};
 use dashmap::DashMap;
 use serde_json::{json, value::to_raw_value};
 use std::collections::HashMap;
@@ -54,23 +57,36 @@ impl From<&LokiEvent> for LokiEncodedEvent {
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub tenant_id: Option<String>,
+    labels: String,
+}
+
+impl PartitionKey {
+    pub fn new(tenant_id: Option<String>, labels: &mut Labels) -> Self {
+        // Let's join all of the labels to single string so that
+        // cloning requires only single allocation.
+        // That requires sorting to ensure uniqueness, but
+        // also choosing a separator that isn't likely to be
+        // used in either name or value.
+        labels.sort();
+        PartitionKey {
+            tenant_id,
+            labels: labels.iter().flat_map(|(a, b)| [a, "→", b, "∇"]).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct GlobalTimestamps {
-    map: Arc<DashMap<PartitionKey, HashMap<Labels, i64>>>,
+    map: Arc<DashMap<PartitionKey, i64>>,
 }
 
 impl GlobalTimestamps {
-    pub fn take(&self, partition: &PartitionKey) -> HashMap<Labels, i64> {
-        self.map
-            .remove(partition)
-            .map(|(_k, v)| v)
-            .unwrap_or_default()
+    pub fn take(&self, partition: &PartitionKey) -> Option<i64> {
+        self.map.remove(partition).map(|(_k, v)| v)
     }
 
-    pub fn insert(&self, partition: PartitionKey, map: HashMap<Labels, i64>) {
-        self.map.insert(partition, map);
+    pub fn insert(&self, partition: PartitionKey, timestamp: i64) {
+        self.map.insert(partition, timestamp);
     }
 }
 
@@ -78,17 +94,17 @@ impl GlobalTimestamps {
 pub struct LokiBuffer {
     num_bytes: usize,
     num_items: usize,
-    streams: HashMap<Labels, Vec<LokiEncodedEvent>>,
+    stream: Vec<LokiEncodedEvent>,
     settings: BatchSize<Self>,
 
-    partition: Option<PartitionKey>,
-    latest_timestamps: Option<HashMap<Labels, i64>>,
+    partition: Option<(PartitionKey, Labels)>,
+    latest_timestamp: Option<Option<i64>>,
     global_timestamps: GlobalTimestamps,
     out_of_order_action: OutOfOrderAction,
 }
 
 impl LokiBuffer {
-    pub fn new(
+    pub const fn new(
         settings: BatchSize<Self>,
         global_timestamps: GlobalTimestamps,
         out_of_order_action: OutOfOrderAction,
@@ -96,16 +112,16 @@ impl LokiBuffer {
         Self {
             num_bytes: WRAPPER_OVERHEAD,
             num_items: 0,
-            streams: HashMap::new(),
+            stream: Vec::new(),
             settings,
             partition: None,
-            latest_timestamps: None,
+            latest_timestamp: None,
             global_timestamps,
             out_of_order_action,
         }
     }
 
-    fn is_full(&self) -> bool {
+    const fn is_full(&self) -> bool {
         self.num_bytes >= self.settings.bytes || self.num_items >= self.settings.events
     }
 }
@@ -129,31 +145,23 @@ impl Batch for LokiBuffer {
         item.labels.sort_unstable();
 
         let partition = &item.partition;
-        if self.latest_timestamps.is_none() {
-            self.partition = Some(item.partition.clone());
-            self.latest_timestamps = Some(self.global_timestamps.take(partition));
+        if self.latest_timestamp.is_none() {
+            self.partition = Some((item.partition.clone(), item.labels.clone()));
+            self.latest_timestamp = Some(self.global_timestamps.take(partition));
         }
+        // TODO: gauge/count of labels.
         let latest_timestamp = self
-            .latest_timestamps
-            .as_ref()
+            .latest_timestamp
             .unwrap()
-            .get(&item.labels)
-            .cloned()
             .unwrap_or(item.event.timestamp);
         if item.event.timestamp < latest_timestamp {
             match self.out_of_order_action {
                 OutOfOrderAction::Drop => {
-                    warn!(
-                        msg = "Received out-of-order event; dropping event.",
-                        internal_log_rate_secs = 30
-                    );
+                    emit!(LokiOutOfOrderEventDropped);
                     return PushResult::Ok(self.is_full());
                 }
                 OutOfOrderAction::RewriteTimestamp => {
-                    warn!(
-                        msg = "Received out-of-order event, rewriting timestamp.",
-                        internal_log_rate_secs = 30
-                    );
+                    emit!(LokiOutOfOrderEventRewritten);
                     item.event.timestamp = latest_timestamp;
                 }
             }
@@ -178,20 +186,19 @@ impl Batch for LokiBuffer {
         {
             PushResult::Overflow(item)
         } else {
-            let new_bytes = match self.streams.get_mut(&item.labels) {
-                // Label exists, and we checked the size, just add it
-                Some(stream) => {
-                    stream.push(event);
+            let new_bytes = match self.stream.is_empty() {
+                // Event was already added, and we checked the size, just add it
+                false => {
+                    self.stream.push(event);
                     event_len + 1
                 }
-                None => {
+                true => {
                     // Have to verify label size doesn't cause overflow
-                    let new_bytes =
-                        labels_len + event_len + if self.streams.is_empty() { 0 } else { 1 };
+                    let new_bytes = labels_len + event_len;
                     if self.num_bytes + new_bytes > self.settings.bytes {
                         return PushResult::Overflow(item);
                     } else {
-                        self.streams.insert(item.labels, vec![event]);
+                        self.stream.push(event);
                         new_bytes
                     }
                 }
@@ -203,7 +210,7 @@ impl Batch for LokiBuffer {
     }
 
     fn is_empty(&self) -> bool {
-        self.streams.is_empty()
+        self.stream.is_empty()
     }
 
     fn fresh(&self) -> Self {
@@ -215,51 +222,31 @@ impl Batch for LokiBuffer {
     }
 
     fn finish(self) -> Self::Output {
-        let mut latest_timestamps = self.latest_timestamps.expect("Batch is empty");
-        let streams_json = self
-            .streams
-            .into_iter()
-            .map(|(labels, mut events)| {
-                // Sort events by timestamp
-                events.sort_by_key(|e| e.timestamp);
+        let (partition, labels) = self.partition.expect("Batch is empty");
 
-                latest_timestamps.insert(
-                    labels.clone(),
-                    events.last().expect("Batch is empty").timestamp,
-                );
+        let mut events = self.stream;
+        // Sort events by timestamp
+        events.sort_by_key(|e| e.timestamp);
 
-                let labels = labels.into_iter().collect::<HashMap<_, _>>();
-                let events = events.into_iter().map(|e| e.encoded).collect::<Vec<_>>();
+        let latest_timestamp = events.last().expect("Batch is empty").timestamp;
+        let events = events.into_iter().map(|e| e.encoded).collect::<Vec<_>>();
 
-                (
-                    to_raw_value(&labels).expect("JSON encoding should never fail"),
-                    events,
-                )
-            })
-            .collect::<Vec<_>>();
-        self.global_timestamps
-            .insert(self.partition.expect("Bacth is empty"), latest_timestamps);
+        let labels = labels
+            .iter()
+            .map(|&(ref key, ref value)| (key, value))
+            .collect::<HashMap<_, _>>();
+        let stream = to_raw_value(&labels).expect("JSON encoding should never fail");
 
-        // This is just to guarantee stable key ordering for tests
-        #[cfg(test)]
-        let streams_json = {
-            let mut streams_json = streams_json;
-            streams_json.sort_unstable_by_key(|s| s.0.to_string());
-            streams_json
-        };
-
-        let streams_json = streams_json
-            .into_iter()
-            .map(|(stream, events)| {
-                json!({
-                    "stream": stream,
-                    "values": events,
-                })
-            })
-            .collect::<Vec<_>>();
+        self.global_timestamps.insert(partition, latest_timestamp);
+        if self.latest_timestamp == Some(None) {
+            emit!(LokiUniqueStream);
+        }
 
         json!({
-            "streams": streams_json,
+            "streams": vec![json!({
+                "stream": stream,
+                "values": events,
+            })]
         })
     }
 
@@ -295,7 +282,7 @@ mod tests {
         );
         assert!(matches!(
             buffer.push(LokiRecord {
-                partition: PartitionKey { tenant_id: None },
+                partition: PartitionKey::new(None, &mut vec![("label1".into(), "value1".into())]),
                 labels: vec![("label1".into(), "value1".into())],
                 event: LokiEvent {
                     timestamp: 123456789,
@@ -306,39 +293,10 @@ mod tests {
         ));
 
         assert_eq!(buffer.num_items, 1);
-        assert_eq!(buffer.streams.len(), 1);
+        assert!(!buffer.stream.is_empty());
         test_finish(
             buffer,
             r#"{"streams":[{"stream":{"label1":"value1"},"values":[["123456789","this is an event"]]}]}"#,
-        );
-    }
-
-    #[test]
-    fn insert_multiple_streams() {
-        let mut buffer = LokiBuffer::new(
-            BatchSettings::default().size,
-            Default::default(),
-            Default::default(),
-        );
-        for n in 1..4 {
-            assert!(matches!(
-                buffer.push(LokiRecord {
-                    partition: PartitionKey { tenant_id: None },
-                    labels: vec![("asdf".into(), format!("value{}", n))],
-                    event: LokiEvent {
-                        timestamp: 123456780 + n,
-                        event: format!("event #{}", n),
-                    },
-                }),
-                PushResult::Ok(false)
-            ));
-        }
-
-        assert_eq!(buffer.num_items, 3);
-        assert_eq!(buffer.streams.len(), 3);
-        test_finish(
-            buffer,
-            r#"{"streams":[{"stream":{"asdf":"value1"},"values":[["123456781","event #1"]]},{"stream":{"asdf":"value2"},"values":[["123456782","event #2"]]},{"stream":{"asdf":"value3"},"values":[["123456783","event #3"]]}]}"#,
         );
     }
 
@@ -352,7 +310,7 @@ mod tests {
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
-                    partition: PartitionKey { tenant_id: None },
+                    partition: PartitionKey::new(None, &mut vec![("asdf".into(), "value1".into())]),
                     labels: vec![("asdf".into(), "value1".into())],
                     event: LokiEvent {
                         timestamp: 123456780 + n,
@@ -364,7 +322,7 @@ mod tests {
         }
 
         assert_eq!(buffer.num_items, 3);
-        assert_eq!(buffer.streams.len(), 1);
+        assert!(!buffer.stream.is_empty());
         test_finish(
             buffer,
             r#"{"streams":[{"stream":{"asdf":"value1"},"values":[["123456781","event #1"],["123456782","event #2"],["123456783","event #3"]]}]}"#,
