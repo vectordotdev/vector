@@ -1,10 +1,12 @@
 #![deny(missing_docs)]
 
+mod bytes;
 mod character_delimited;
 mod length_delimited;
 mod newline_delimited;
 mod octet_counting;
 
+pub use self::bytes::{BytesCodec, BytesDecoderConfig};
 pub use character_delimited::{CharacterDelimitedCodec, CharacterDelimitedDecoderConfig};
 pub use length_delimited::{LengthDelimitedCodec, LengthDelimitedDecoderConfig};
 pub use newline_delimited::{NewlineDelimitedCodec, NewlineDelimitedDecoderConfig};
