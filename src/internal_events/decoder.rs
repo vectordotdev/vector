@@ -3,7 +3,7 @@ use metrics::counter;
 
 #[derive(Debug)]
 pub struct DecoderFramingFailed<'a> {
-    pub error: &'a crate::codec::BoxedFramingError,
+    pub error: &'a crate::codecs::BoxedFramingError,
 }
 
 impl<'a> InternalEvent for DecoderFramingFailed<'a> {

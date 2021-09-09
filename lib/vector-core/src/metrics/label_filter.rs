@@ -11,5 +11,6 @@ impl LabelFilter for VectorLabelFilter {
             || key == "component_type"
             || key == "component_kind"
             || key == "component_name"
+            || key == "component_scope"
     }
 }

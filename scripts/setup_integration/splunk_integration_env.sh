@@ -20,6 +20,7 @@ ACTION=$1
 
 start_podman () {
   podman pod create --replace --name vector-test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089
+  wait_for_splunk
   podman run -d --pod=vector-test-integration-splunk \
     --name splunk timberio/splunk-hec-test:minus_compose
 }
@@ -28,6 +29,8 @@ start_docker () {
   docker network create vector-test-integration-splunk
   docker run -d --network=vector-test-integration-splunk -p 8088:8088 -p 8000:8000 \
    -p 8089:8089 --name splunk timberio/splunk-hec-test:minus_compose
+  wait_for_splunk
+  docker exec splunk /opt/splunk/bin/splunk add index testmetrics -datatype metric
 }
 
 stop_podman () {
@@ -39,6 +42,23 @@ stop_podman () {
 stop_docker () {
   docker rm --force splunk 2>/dev/null; true
   docker network rm vector-test-integration-splunk 2>/dev/null; true
+}
+
+wait_for_splunk () {
+  for _ in {1..20}
+  do
+    if curl -sf http://localhost:8088/services/collector/health > /dev/null
+    then
+      echo "Splunk HEC ready"
+      return
+    fi
+
+    echo "Waiting for Splunk HEC to start..."
+    sleep 1
+  done
+
+  echo "Timed out waiting for Splunk HEC to start"
+  exit 1
 }
 
 echo "Running $ACTION action for Splunk integration tests environment"

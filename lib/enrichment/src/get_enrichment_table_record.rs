@@ -106,7 +106,7 @@ impl Expression for GetEnrichmentTableRecordFn {
             .map(|(key, value)| {
                 Ok(Condition::Equals {
                     field: key,
-                    value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned(),
+                    value: value.resolve(ctx)?,
                 })
             })
             .collect::<Result<Vec<Condition>>>()?;

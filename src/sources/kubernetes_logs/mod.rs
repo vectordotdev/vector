@@ -166,7 +166,7 @@ const COMPONENT_ID: &str = "kubernetes_logs";
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Source::new(self, &cx.globals, &cx.id, &cx.proxy)?;
+        let source = Source::new(self, &cx.globals, &cx.key, &cx.proxy)?;
         Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
@@ -205,7 +205,7 @@ impl Source {
     fn new(
         config: &Config,
         globals: &GlobalOptions,
-        id: &ComponentKey,
+        key: &ComponentKey,
         proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
@@ -217,8 +217,7 @@ impl Source {
         };
         let client = k8s::client::Client::new(k8s_config, proxy)?;
 
-        let data_dir =
-            globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), &id.to_string())?;
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = prepare_exclude_paths(config)?;

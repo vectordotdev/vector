@@ -117,6 +117,19 @@ pub struct RootOpts {
     )]
     pub config_paths_yaml: Vec<PathBuf>,
 
+    /// Read pipeline configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "pipeline-dir",
+        short = "P",
+        long,
+        env = "VECTOR_PIPELINE_DIR",
+        use_delimiter(true)
+    )]
+    pub pipeline_dirs: Vec<PathBuf>,
+
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
     pub require_healthy: Option<bool>,
@@ -173,6 +186,10 @@ impl RootOpts {
                 .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
         )
         .collect()
+    }
+
+    pub const fn pipeline_paths(&self) -> &Vec<PathBuf> {
+        &self.pipeline_dirs
     }
 }
 

@@ -1491,10 +1491,9 @@ mod integration_tests {
             let hits = response["hits"]["hits"]
                 .as_array_mut()
                 .expect("Elasticsearch response does not include hits->hits");
-            let input = input
+            let mut input = input
                 .into_iter()
-                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
-                .collect::<Vec<_>>();
+                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap());
 
             for hit in hits {
                 let hit = hit
@@ -1507,7 +1506,7 @@ mod integration_tests {
                     let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
                     obj.insert(log_schema().timestamp_key().into(), timestamp);
                 }
-                assert!(input.contains(hit));
+                assert!(input.any(|e| &e == hit));
             }
         }
     }
