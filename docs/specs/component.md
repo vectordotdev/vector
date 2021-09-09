@@ -171,7 +171,7 @@ downstream target regardless if the transmission was successful or not.
   * MUST increment the `sent_bytes_total` counter by the defined value with the
     defined properties as metric tags.
 * Logs
-  * MUST log a `Bytes received.` message at the `trace` level with the
+  * MUST log a `Bytes sent.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
 #### Error
