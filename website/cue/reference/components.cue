@@ -22,8 +22,10 @@ components: {
 		}
 		development: #DevelopmentStatus
 
-		// `egress_method` documents how the component outputs events.
-		egress_method: #EgressMethod
+		if Args.kind != "enrichment_table" {
+			// `egress_method` documents how the component outputs events.
+			egress_method: #EgressMethod
+		}
 
 		if Args.kind == "sink" {
 			// `service_providers` specify the service providers that support
@@ -35,7 +37,9 @@ components: {
 			service_providers: [string, ...string] | *[]
 		}
 
-		stateful: bool
+		if Args.kind != "enrichment_table" {
+			stateful: bool
+		}
 	}
 
 	#Component: {
@@ -138,7 +142,7 @@ components: {
 	}
 
 	// `#ComponentKind` represent the kind of component.
-	#ComponentKind: "sink" | "source" | "transform"
+	#ComponentKind: "sink" | "source" | "transform" | "enrichment_table"
 
 	#Components: [Type=string]: #Component & {
 		type: Type
