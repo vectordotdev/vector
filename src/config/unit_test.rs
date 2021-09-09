@@ -1,7 +1,6 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
 use crate::config::{
-    self, ComponentKey, ConfigDiff, ConfigPath, GlobalOptions, TransformConfig,
-    TransformContext,
+    self, ComponentKey, ConfigDiff, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
 };
 use crate::{
     conditions::Condition,
