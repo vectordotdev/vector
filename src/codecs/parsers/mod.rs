@@ -4,8 +4,12 @@
 #![deny(missing_docs)]
 
 mod bytes;
+#[cfg(feature = "sources-syslog")]
+mod syslog;
 
 pub use self::bytes::{BytesParser, BytesParserConfig};
+#[cfg(feature = "sources-syslog")]
+pub use self::syslog::{SyslogParser, SyslogParserConfig};
 
 use crate::event::Event;
 use ::bytes::Bytes;
