@@ -649,6 +649,7 @@ mod test {
     }
 
     #[tokio::test(start_paused = true)]
+    #[allow(clippy::semicolon_if_nothing_returned)] // https://github.com/rust-lang/rust-clippy/issues/7438
     async fn expiration_queue_impl_keyed_timer() {
         // Asserts that ExpirationQueue properly implements KeyedTimer. We are
         // primarily concerned with whether expiration is properly observed.
