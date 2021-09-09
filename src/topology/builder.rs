@@ -27,6 +27,35 @@ lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
 }
 
+pub async fn load_enrichment_tables<'a>(
+    config: &'a super::Config,
+    diff: &'a ConfigDiff,
+) -> (&'static enrichment::TableRegistry, Vec<String>) {
+    let mut enrichment_tables = HashMap::new();
+
+    let mut errors = vec![];
+
+    // Build enrichment tables
+    for (name, table) in config
+        .enrichment_tables
+        .iter()
+        .filter(|(name, _)| diff.enrichment_tables.contains_new(name))
+    {
+        let table = match table.inner.build(&config.global).await {
+            Ok(table) => table,
+            Err(error) => {
+                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
+                continue;
+            }
+        };
+        enrichment_tables.insert(name.to_string(), table);
+    }
+
+    ENRICHMENT_TABLES.load(enrichment_tables);
+
+    (&ENRICHMENT_TABLES, errors)
+}
+
 pub struct Pieces {
     pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<ComponentKey>)>,
     pub outputs: HashMap<ComponentKey, fanout::ControlChannel>,
@@ -54,23 +83,8 @@ pub async fn build_pieces(
 
     let mut errors = vec![];
 
-    let mut enrichment_tables = HashMap::new();
-
-    // Build enrichment tables
-    for (name, table) in config
-        .enrichment_tables
-        .iter()
-        .filter(|(name, _)| diff.enrichment_tables.contains_new(name))
-    {
-        let table = match table.inner.build(&config.global).await {
-            Ok(table) => table,
-            Err(error) => {
-                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
-                continue;
-            }
-        };
-        enrichment_tables.insert(name.to_string(), table);
-    }
+    let (enrichment_tables, enrichment_errors) = load_enrichment_tables(&config, diff).await;
+    errors.extend(enrichment_errors);
 
     // Build sources
     for (key, source) in config
@@ -126,11 +140,9 @@ pub async fn build_pieces(
         source_tasks.insert(key.clone(), server);
     }
 
-    ENRICHMENT_TABLES.load(enrichment_tables);
-
     let context = TransformContext {
         globals: config.global.clone(),
-        enrichment_tables: ENRICHMENT_TABLES.clone(),
+        enrichment_tables: enrichment_tables.clone(),
     };
 
     // Build transforms
