@@ -42,10 +42,3 @@ encoding.codec = "json"
 #[api]
 #enabled = true
 #address = "127.0.0.1:8686"
-
-[sinks.datadog_audit_archives]
-type = "datadog_archives"
-service = "aws_s3"
-inputs = ["parse_logs"]
-bucket = "vladimir-vector-archives"
-key_prefix = "logs/audit"
