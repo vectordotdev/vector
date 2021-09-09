@@ -3,7 +3,7 @@ use metrics::counter;
 use serde_json::Error;
 
 #[derive(Debug)]
-pub(crate) struct JsonParserFailedParse<'a> {
+pub struct JsonParserFailedParse<'a> {
     pub field: &'a str,
     pub value: &'a str,
     pub error: Error,
@@ -39,7 +39,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct JsonParserTargetExists<'a> {
+pub struct JsonParserTargetExists<'a> {
     pub target_field: &'a str,
 }
 

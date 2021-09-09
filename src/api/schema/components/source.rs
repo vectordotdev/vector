@@ -47,6 +47,7 @@ pub enum SourcesSortFieldName {
 pub struct Source(pub Data);
 
 impl Source {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn get_component_key(&self) -> &ComponentKey {
         &self.0.component_key
     }

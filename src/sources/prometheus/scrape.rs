@@ -39,7 +39,7 @@ struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
-pub fn default_scrape_interval_secs() -> u64 {
+pub const fn default_scrape_interval_secs() -> u64 {
     15
 }
 

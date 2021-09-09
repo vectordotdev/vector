@@ -13,6 +13,15 @@ pub enum ComponentScope {
     Pipeline(String),
 }
 
+impl fmt::Display for ComponentScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Global => write!(f, "global"),
+            Self::Pipeline(name) => write!(f, "pipeline:{}", name),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentKey {
     id: String,
@@ -38,7 +47,7 @@ impl ComponentKey {
         self.id.as_str()
     }
 
-    pub fn scope(&self) -> &ComponentScope {
+    pub const fn scope(&self) -> &ComponentScope {
         &self.scope
     }
 
@@ -53,7 +62,7 @@ impl ComponentKey {
         Self::pipeline(id, &self.id)
     }
 
-    pub fn is_global(&self) -> bool {
+    pub const fn is_global(&self) -> bool {
         matches!(self.scope, ComponentScope::Global)
     }
 }
@@ -151,7 +160,7 @@ impl<'de> Visitor<'de> for ComponentKeyVisitor {
     where
         E: de::Error,
     {
-        Ok(ComponentKey::from(value))
+        Ok(ComponentKey::global(value))
     }
 }
 

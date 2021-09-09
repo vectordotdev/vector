@@ -6,13 +6,13 @@ use crate::{
 };
 use async_stream::stream;
 use lazy_static::lazy_static;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 lazy_static! {
-    static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =
-        Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
+    static ref GLOBAL_CONTROLLER: &'static Controller =
+        get_controller().expect("Metrics system not initialized. Please report.");
 }
 
 /// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically

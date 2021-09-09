@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 pub struct ErrorsTotal(Metric);
 
 impl ErrorsTotal {
-    pub fn new(m: Metric) -> Self {
+    pub const fn new(m: Metric) -> Self {
         Self(m)
     }
 }
