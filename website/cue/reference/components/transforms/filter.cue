@@ -4,7 +4,7 @@ components: transforms: filter: {
 	title: "Filter"
 
 	description: """
-		Filters events based on a set of conditions.
+		Filters events based on a set of conditions using VRL or [Datadog Search Syntax](\(urls.datadog_search_syntax)).
 		"""
 
 	classes: {
@@ -42,11 +42,13 @@ components: transforms: filter: {
 				"""
 			required: true
 			warnings: []
-			type: string: {
-				examples: [
-					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-				]
-				syntax: "remap_boolean_expression"
+			type: {
+				string: {
+					examples: [
+						#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+					]
+					syntax: "remap_boolean_expression"
+				}
 			}
 		}
 	}
@@ -65,9 +67,42 @@ components: transforms: filter: {
 
 	examples: [
 		{
+			title: "Using Datadog Search Syntax"
+			configuration: {
+				condition: {
+					type:   "datadog_search"
+					source: #"*stack"#
+				}
+			}
+			input: [
+				{
+					log: {
+						message: "This line won't match..."
+					}
+				},
+				{
+					log: {
+						message: "Needle in a haystack"
+					}
+				},
+				{
+					log: {
+						message: "... and neither will this one"
+					}
+				},
+			]
+			output: [
+				{
+					log: {
+						message: "Needle in a haystack"
+					}
+				},
+			]
+		},
+		{
 			title: "Drop debug logs"
 			configuration: {
-				condition: #".level == "debug""#
+				condition: #".level != "debug""#
 			}
 			input: [
 				{
