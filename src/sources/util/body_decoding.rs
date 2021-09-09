@@ -103,7 +103,7 @@ fn json_error(s: String) -> ErrorMessage {
     ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
 }
 
-fn json_value_to_type_string(value: &JsonValue) -> &'static str {
+const fn json_value_to_type_string(value: &JsonValue) -> &'static str {
     match value {
         JsonValue::Object(_) => "Object",
         JsonValue::Array(_) => "Array",

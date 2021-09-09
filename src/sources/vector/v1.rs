@@ -27,12 +27,12 @@ pub struct VectorConfig {
     receive_buffer_bytes: Option<usize>,
 }
 
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
 impl VectorConfig {
-    pub fn from_address(address: SocketListenAddr) -> Self {
+    pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
             keepalive: None,
@@ -67,11 +67,11 @@ impl VectorConfig {
         )
     }
 
-    pub(super) fn output_type(&self) -> DataType {
+    pub(super) const fn output_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn source_type(&self) -> &'static str {
+    pub(super) const fn source_type(&self) -> &'static str {
         "vector"
     }
 
@@ -112,7 +112,7 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{ComponentId, GlobalOptions, SinkContext, SourceContext},
+        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
         event::Event,
         event::{
             metric::{MetricKind, MetricValue},
@@ -228,7 +228,7 @@ mod test {
 
         let server = config
             .build(SourceContext {
-                id: ComponentId::from("default"),
+                id: ComponentKey::from("default"),
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,
@@ -266,7 +266,7 @@ mod test {
 
         let server = config
             .build(SourceContext {
-                id: ComponentId::from("default"),
+                id: ComponentKey::from("default"),
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,

@@ -2,7 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct GrokParserFailedMatch<'a> {
+pub struct GrokParserFailedMatch<'a> {
     pub value: &'a str,
 }
 
@@ -23,7 +23,7 @@ impl InternalEvent for GrokParserFailedMatch<'_> {
 }
 
 #[derive(Debug)]
-pub(crate) struct GrokParserMissingField<'a> {
+pub struct GrokParserMissingField<'a> {
     pub field: &'a str,
 }
 
@@ -40,7 +40,7 @@ impl InternalEvent for GrokParserMissingField<'_> {
 }
 
 #[derive(Debug)]
-pub(crate) struct GrokParserConversionFailed<'a> {
+pub struct GrokParserConversionFailed<'a> {
     pub name: &'a str,
     pub error: crate::types::Error,
 }

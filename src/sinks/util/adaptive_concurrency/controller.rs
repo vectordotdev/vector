@@ -10,7 +10,7 @@ use crate::{
         AdaptiveConcurrencyObservedRtt,
     },
     sinks::util::retries::{RetryAction, RetryLogic},
-    stats::{Ewma, Mean},
+    stats::{EwmaVar, Mean, MeanVariance},
 };
 use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -35,7 +35,7 @@ pub(super) struct Controller<L> {
 pub(super) struct Inner {
     pub(super) current_limit: usize,
     in_flight: usize,
-    past_rtt: Ewma,
+    past_rtt: EwmaVar,
     next_update: Instant,
     current_rtt: Mean,
     had_back_pressure: bool,
@@ -70,7 +70,7 @@ impl<L> Controller<L> {
             inner: Arc::new(Mutex::new(Inner {
                 current_limit,
                 in_flight: 0,
-                past_rtt: Ewma::new(settings.ewma_alpha),
+                past_rtt: EwmaVar::new(settings.ewma_alpha),
                 next_update: instant_now(),
                 current_rtt: Default::default(),
                 had_back_pressure: false,
@@ -82,10 +82,6 @@ impl<L> Controller<L> {
     }
 
     pub(super) fn acquire(&self) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
-        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
-        if inner.in_flight >= inner.current_limit {
-            inner.reached_limit = true;
-        }
         Arc::clone(&self.semaphore).acquire()
     }
 
@@ -99,6 +95,10 @@ impl<L> Controller<L> {
         }
 
         inner.in_flight += 1;
+        if inner.in_flight >= inner.current_limit {
+            inner.reached_limit = true;
+        }
+
         emit!(AdaptiveConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
@@ -142,7 +142,17 @@ impl<L> Controller<L> {
         }
         let current_rtt = inner.current_rtt.average();
 
-        match inner.past_rtt.average() {
+        // When the RTT values are all exactly the same, as for the
+        // "constant link" test, the average calculation above produces
+        // results either the exact value or that value plus epsilon,
+        // depending on the number of samples. This ends up throttling
+        // aggressively due to the high side falling outside of the
+        // calculated deviance. Rounding these values forces the
+        // differences to zero.
+        #[cfg(test)]
+        let current_rtt = current_rtt.map(|c| (c * 1000000.0).round() / 1000000.0);
+
+        match inner.past_rtt.state() {
             None => {
                 // No past measurements, set up initial values.
                 if let Some(current_rtt) = current_rtt {
@@ -176,8 +186,8 @@ impl<L> Controller<L> {
                     if let Some(current_rtt) = current_rtt {
                         past_rtt = inner.past_rtt.update(current_rtt);
                     }
-                    inner.next_update = now + Duration::from_secs_f64(past_rtt);
-                    inner.current_rtt.reset();
+                    inner.next_update = now + Duration::from_secs_f64(past_rtt.mean);
+                    inner.current_rtt = Default::default();
                     inner.had_back_pressure = false;
                     inner.reached_limit = false;
                 }
@@ -185,8 +195,14 @@ impl<L> Controller<L> {
         }
     }
 
-    fn manage_limit(&self, inner: &mut MutexGuard<Inner>, past_rtt: f64, current_rtt: Option<f64>) {
-        let threshold = past_rtt * self.settings.rtt_threshold_ratio;
+    fn manage_limit(
+        &self,
+        inner: &mut MutexGuard<Inner>,
+        past_rtt: MeanVariance,
+        current_rtt: Option<f64>,
+    ) {
+        let past_rtt_deviation = past_rtt.variance.sqrt();
+        let threshold = past_rtt_deviation * self.settings.rtt_deviation_scale;
 
         // Normal quick responses trigger an increase in the
         // concurrency limit. Note that we only check this if we had
@@ -196,7 +212,7 @@ impl<L> Controller<L> {
             && inner.reached_limit
             && !inner.had_back_pressure
             && current_rtt.is_some()
-            && current_rtt.unwrap() <= past_rtt + threshold / 10.0
+            && current_rtt.unwrap() <= past_rtt.mean
         {
             // Increase (additive) the current concurrency limit
             self.semaphore.add_permits(1);
@@ -206,7 +222,7 @@ impl<L> Controller<L> {
         // to increasing response times, trigger a decrease in the
         // concurrency limit.
         else if inner.current_limit > 1
-            && (inner.had_back_pressure || current_rtt.unwrap_or(0.0) >= past_rtt + threshold)
+            && (inner.had_back_pressure || current_rtt.unwrap_or(0.0) >= past_rtt.mean + threshold)
         {
             // Decrease (multiplicative) the current concurrency limit
             let to_forget = inner.current_limit
@@ -219,7 +235,8 @@ impl<L> Controller<L> {
             reached_limit: inner.reached_limit,
             had_back_pressure: inner.had_back_pressure,
             current_rtt: current_rtt.map(Duration::from_secs_f64),
-            past_rtt: Duration::from_secs_f64(past_rtt),
+            past_rtt: Duration::from_secs_f64(past_rtt.mean),
+            past_rtt_deviation: Duration::from_secs_f64(past_rtt_deviation),
         });
     }
 }

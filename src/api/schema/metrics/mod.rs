@@ -12,6 +12,8 @@ mod uptime;
 #[cfg(feature = "sources-host_metrics")]
 mod host;
 
+use crate::config::ComponentKey;
+
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
 use tokio_stream::{Stream, StreamExt};
@@ -97,7 +99,10 @@ impl MetricsSubscription {
                 m.into_iter()
                     .map(|(m, throughput)| {
                         ComponentProcessedEventsThroughput::new(
-                            m.tag_value("component_id").unwrap(),
+                            ComponentKey::from((
+                                m.tag_value("pipeline_id"),
+                                m.tag_value("component_id").unwrap(),
+                            )),
                             throughput as i64,
                         )
                     })
@@ -147,7 +152,10 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentEventsInThroughput::new(
-                        m.tag_value("component_id").unwrap(),
+                        ComponentKey::from((
+                            m.tag_value("pipeline_id"),
+                            m.tag_value("component_id").unwrap(),
+                        )),
                         throughput as i64,
                     )
                 })
@@ -193,7 +201,10 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentEventsOutThroughput::new(
-                        m.tag_value("component_id").unwrap(),
+                        ComponentKey::from((
+                            m.tag_value("pipeline_id"),
+                            m.tag_value("component_id").unwrap(),
+                        )),
                         throughput as i64,
                     )
                 })
@@ -251,7 +262,10 @@ impl MetricsSubscription {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentProcessedBytesThroughput::new(
-                        m.tag_value("component_id").unwrap(),
+                        ComponentKey::from((
+                            m.tag_value("pipeline_id"),
+                            m.tag_value("component_id").unwrap(),
+                        )),
                         throughput as i64,
                     )
                 })

@@ -4,6 +4,7 @@ query ComponentsQuery($first: Int!) {
             node {
                 __typename
                 componentId
+                pipelineId
                 componentType
                 ... on Source {
                     metrics {

@@ -1,5 +1,5 @@
 use crate::buffers::{Acker, EventStream};
-use crate::config::ComponentId;
+use crate::config::ComponentKey;
 use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use std::{
@@ -22,12 +22,12 @@ pub enum TaskOutput {
 pub struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
-    id: ComponentId,
+    id: ComponentKey,
     typetag: String,
 }
 
 impl Task {
-    pub fn new<S, Fut>(id: ComponentId, typetag: S, inner: Fut) -> Self
+    pub fn new<S, Fut>(id: ComponentKey, typetag: S, inner: Fut) -> Self
     where
         S: Into<String>,
         Fut: Future<Output = Result<TaskOutput, ()>> + Send + 'static,
@@ -39,7 +39,7 @@ impl Task {
         }
     }
 
-    pub fn id(&self) -> &ComponentId {
+    pub const fn id(&self) -> &ComponentKey {
         &self.id
     }
 

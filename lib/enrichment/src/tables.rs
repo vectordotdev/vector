@@ -29,15 +29,18 @@
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
 //! can be searched.
 
-use super::{IndexHandle, Table};
+use super::{Condition, IndexHandle, Table};
 use arc_swap::ArcSwap;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
+/// A hashmap of name => implementation of an enrichment table.
+type TableMap = HashMap<String, Box<dyn Table + Send + Sync>>;
+
 #[derive(Clone, Default)]
 pub struct TableRegistry {
-    loading: Arc<Mutex<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
-    tables: Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
+    loading: Arc<Mutex<Option<TableMap>>>,
+    tables: Arc<ArcSwap<Option<TableMap>>>,
 }
 
 impl TableRegistry {
@@ -70,7 +73,7 @@ impl TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
-    pub fn load(&self, mut tables: HashMap<String, Box<dyn Table + Send + Sync>>) {
+    pub fn load(&self, mut tables: TableMap) {
         let mut loading = self.loading.lock().unwrap();
         let existing = self.tables.load();
         if let Some(existing) = &**existing {
@@ -100,16 +103,7 @@ impl TableRegistry {
         let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
     }
-}
 
-impl std::fmt::Debug for TableRegistry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt_enrichment_table(f, "TableRegistry", &self.tables)
-    }
-}
-
-#[cfg(feature = "vrl")]
-impl vrl_core::enrichment::TableSetup for TableRegistry {
     /// Return a list of the available tables that we can write to.
     ///
     /// This only works in the writing stage and will acquire a lock to retrieve
@@ -118,7 +112,7 @@ impl vrl_core::enrichment::TableSetup for TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
-    fn table_ids(&self) -> Vec<String> {
+    pub fn table_ids(&self) -> Vec<String> {
         let locked = self.loading.lock().unwrap();
         match *locked {
             Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
@@ -133,7 +127,7 @@ impl vrl_core::enrichment::TableSetup for TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
-    fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<IndexHandle, String> {
+    pub fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<IndexHandle, String> {
         let mut locked = self.loading.lock().unwrap();
 
         match *locked {
@@ -147,8 +141,14 @@ impl vrl_core::enrichment::TableSetup for TableRegistry {
 
     /// Returns a cheaply clonable struct through that provides lock free read
     /// access to the enrichment tables.
-    fn as_readonly(&self) -> Box<dyn vrl_core::enrichment::TableSearch + Send + Sync> {
-        Box::new(TableSearch(self.tables.clone()))
+    pub fn as_readonly(&self) -> TableSearch {
+        TableSearch(self.tables.clone())
+    }
+}
+
+impl std::fmt::Debug for TableRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt_enrichment_table(f, "TableRegistry", &self.tables)
     }
 }
 
@@ -156,16 +156,16 @@ impl vrl_core::enrichment::TableSetup for TableRegistry {
 /// `vrl::EnrichmentTableSearch` trait. Cloning this object is designed to be
 /// cheap. The underlying data will be shared by all clones.
 #[derive(Clone, Default)]
-pub struct TableSearch(Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>);
+pub struct TableSearch(Arc<ArcSwap<Option<TableMap>>>);
 
-impl vrl_core::enrichment::TableSearch for TableSearch {
+impl TableSearch {
     /// Search the given table to find the data.
     ///
     /// If we are in the writing stage, this function will return an error.
-    fn find_table_row<'a>(
+    pub fn find_table_row<'a>(
         &self,
         table: &str,
-        condition: &'a [vrl_core::enrichment::Condition<'a>],
+        condition: &'a [Condition<'a>],
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
         let tables = self.0.load();
@@ -195,7 +195,7 @@ impl std::fmt::Debug for TableSearch {
 fn fmt_enrichment_table(
     f: &mut std::fmt::Formatter<'_>,
     name: &'static str,
-    tables: &Arc<ArcSwap<Option<HashMap<String, Box<dyn Table + Send + Sync>>>>>,
+    tables: &Arc<ArcSwap<Option<TableMap>>>,
 ) -> std::fmt::Result {
     let tables = tables.load();
     match **tables {
@@ -215,53 +215,16 @@ fn fmt_enrichment_table(
     }
 }
 
-#[cfg(all(feature = "vrl", test))]
+#[cfg(test)]
 mod tests {
-    use super::*;
     use shared::btreemap;
-    use std::sync::{Arc, Mutex};
-    use vrl_core::enrichment::{Condition, TableSetup};
 
-    #[derive(Debug, Clone)]
-    struct DummyEnrichmentTable {
-        data: BTreeMap<String, String>,
-        indexes: Arc<Mutex<Vec<Vec<String>>>>,
-    }
-
-    impl DummyEnrichmentTable {
-        fn new() -> Self {
-            Self::new_with_index(Arc::new(Mutex::new(Vec::new())))
-        }
-
-        fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
-            Self {
-                data: btreemap! {
-                    "field".to_string() => "result".to_string()
-                },
-                indexes,
-            }
-        }
-    }
-
-    impl Table for DummyEnrichmentTable {
-        fn find_table_row(
-            &self,
-            _condition: &[Condition],
-            _index: Option<vrl_core::enrichment::IndexHandle>,
-        ) -> Result<BTreeMap<String, String>, String> {
-            Ok(self.data.clone())
-        }
-
-        fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
-            let mut indexes = self.indexes.lock().unwrap();
-            indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
-            Ok(IndexHandle(indexes.len() - 1))
-        }
-    }
+    use super::*;
+    use crate::test_util::DummyEnrichmentTable;
 
     #[test]
     fn tables_loaded() {
-        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        let mut tables: TableMap = HashMap::new();
         tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
         tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
 
@@ -274,7 +237,7 @@ mod tests {
 
     #[test]
     fn can_add_indexes() {
-        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        let mut tables: TableMap = HashMap::new();
         let indexes = Arc::new(Mutex::new(Vec::new()));
         let dummy = DummyEnrichmentTable::new_with_index(indexes.clone());
         tables.insert("dummy1".to_string(), Box::new(dummy));
@@ -288,7 +251,7 @@ mod tests {
 
     #[test]
     fn can_not_find_table_row_before_finish() {
-        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        let mut tables: TableMap = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
         let registry = super::TableRegistry::default();
@@ -310,7 +273,7 @@ mod tests {
 
     #[test]
     fn can_not_add_indexes_after_finish() {
-        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        let mut tables: TableMap = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
         let mut registry = super::TableRegistry::default();
@@ -324,7 +287,7 @@ mod tests {
 
     #[test]
     fn can_find_table_row_after_finish() {
-        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        let mut tables: TableMap = HashMap::new();
         let dummy = DummyEnrichmentTable::new();
         tables.insert("dummy1".to_string(), Box::new(dummy));
 
@@ -351,7 +314,7 @@ mod tests {
 
     #[test]
     fn can_reload() {
-        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        let mut tables: TableMap = HashMap::new();
         tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
 
         let registry = super::TableRegistry::default();
@@ -364,7 +327,7 @@ mod tests {
         // After we finish load there are no tables in the list
         assert!(registry.table_ids().is_empty());
 
-        let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        let mut tables: TableMap = HashMap::new();
         tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
 
         // A load should put both tables back into the list.

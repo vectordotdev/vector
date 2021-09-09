@@ -16,6 +16,8 @@ shared vision of good user experience -- the purpose of this document.
    1. [Be opinionated & reduce decisions](#be-opinionated--reduce-decisions)
    1. [Build momentum with consistency](#build-momentum-with-consistency)
 1. [Guidelines](#guidelines)
+   1. [Defaults](#defaults)
+      1. [Don't lose data](#dont-lose-data)
    1. [Logical boundaries](#logical-boundaries)
       1. [Source & sink boundaries](#source--sink-boundaries)
       1. [Transform boundaries](#transform-boundaries)
@@ -86,6 +88,20 @@ Examples:
 ## Guidelines
 
 The following guidelines help to uphold the above principles.
+
+### Defaults
+
+#### Don't lose data
+
+When presented with the choice to trade data loss for another benefit, like
+performance, Vector should retain data by default. Data loss is unacceptable
+for most Vector users and trading it for benefits like performance should be
+an opt-in choice by the user.
+
+Examples:
+
+- Choose back pressure over shedding load
+- Retry failed requests in sinks until the service recovers
 
 ### Logical boundaries
 

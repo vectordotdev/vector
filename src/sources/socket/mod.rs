@@ -162,7 +162,7 @@ mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{
-            log_schema, ComponentId, GlobalOptions, SinkContext, SourceConfig, SourceContext,
+            log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
         event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
@@ -372,7 +372,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
-        let source_id = ComponentId::from("tcp_shutdown_simple");
+        let source_id = ComponentKey::from("tcp_shutdown_simple");
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
         let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
@@ -409,7 +409,7 @@ mod test {
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
         let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
-        let source_id = ComponentId::from("tcp_shutdown_infinite_stream");
+        let source_id = ComponentKey::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
         let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
@@ -492,7 +492,7 @@ mod test {
 
     async fn init_udp_with_shutdown(
         sender: Pipeline,
-        source_id: &ComponentId,
+        source_id: &ComponentKey,
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (shutdown_signal, _) = shutdown.register_source(source_id);
@@ -502,7 +502,7 @@ mod test {
     async fn init_udp(sender: Pipeline) -> SocketAddr {
         let (addr, _handle) = init_udp_inner(
             sender,
-            &ComponentId::from("default"),
+            &ComponentKey::from("default"),
             ShutdownSignal::noop(),
         )
         .await;
@@ -511,7 +511,7 @@ mod test {
 
     async fn init_udp_inner(
         sender: Pipeline,
-        source_id: &ComponentId,
+        source_id: &ComponentKey,
         shutdown_signal: ShutdownSignal,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let address = next_addr();
@@ -616,7 +616,7 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_simple() {
         let (tx, rx) = Pipeline::new_test();
-        let source_id = ComponentId::from("udp_shutdown_simple");
+        let source_id = ComponentKey::from("udp_shutdown_simple");
 
         let mut shutdown = SourceShutdownCoordinator::default();
         let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
@@ -642,7 +642,7 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_infinite_stream() {
         let (tx, rx) = Pipeline::new_test();
-        let source_id = ComponentId::from("udp_shutdown_infinite_stream");
+        let source_id = ComponentKey::from("udp_shutdown_infinite_stream");
 
         let mut shutdown = SourceShutdownCoordinator::default();
         let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;

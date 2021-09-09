@@ -1,4 +1,5 @@
 use super::state;
+use crate::config::ComponentKey;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 use vector_api_client::{
@@ -17,9 +18,10 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_added;
+            let key = ComponentKey::from((c.pipeline_id, c.component_id));
             let _ = tx
                 .send(state::EventType::ComponentAdded(state::ComponentRow {
-                    id: c.component_id,
+                    key,
                     kind: c.on.to_string(),
                     component_type: c.component_type,
                     events_in_total: 0,
@@ -46,9 +48,8 @@ async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) 
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_removed;
-            let _ = tx
-                .send(state::EventType::ComponentRemoved(c.component_id))
-                .await;
+            let id = ComponentKey::from(&c.component_id);
+            let _ = tx.send(state::EventType::ComponentRemoved(id)).await;
         }
     }
 }
@@ -66,7 +67,12 @@ async fn events_in_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, i
             let _ = tx
                 .send(state::EventType::EventsInTotals(
                     c.into_iter()
-                        .map(|c| (c.component_id, c.metric.events_in_total as i64))
+                        .map(|c| {
+                            (
+                                ComponentKey::from(&c.component_id),
+                                c.metric.events_in_total as i64,
+                            )
+                        })
                         .collect(),
                 ))
                 .await;
@@ -88,7 +94,7 @@ async fn events_in_throughputs(client: Arc<SubscriptionClient>, tx: state::Event
                 .send(state::EventType::EventsInThroughputs(
                     interval,
                     c.into_iter()
-                        .map(|c| (c.component_id, c.throughput))
+                        .map(|c| (ComponentKey::from(&c.component_id), c.throughput))
                         .collect(),
                 ))
                 .await;
@@ -109,7 +115,12 @@ async fn events_out_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, 
             let _ = tx
                 .send(state::EventType::EventsOutTotals(
                     c.into_iter()
-                        .map(|c| (c.component_id, c.metric.events_out_total as i64))
+                        .map(|c| {
+                            (
+                                ComponentKey::from(&c.component_id),
+                                c.metric.events_out_total as i64,
+                            )
+                        })
                         .collect(),
                 ))
                 .await;
@@ -135,7 +146,7 @@ async fn events_out_throughputs(
                 .send(state::EventType::EventsOutThroughputs(
                     interval,
                     c.into_iter()
-                        .map(|c| (c.component_id, c.throughput))
+                        .map(|c| (ComponentKey::from(&c.component_id), c.throughput))
                         .collect(),
                 ))
                 .await;
@@ -160,7 +171,12 @@ async fn processed_bytes_totals(
             let _ = tx
                 .send(state::EventType::ProcessedBytesTotals(
                     c.into_iter()
-                        .map(|c| (c.component_id, c.metric.processed_bytes_total as i64))
+                        .map(|c| {
+                            (
+                                ComponentKey::from(&c.component_id),
+                                c.metric.processed_bytes_total as i64,
+                            )
+                        })
                         .collect(),
                 ))
                 .await;
@@ -186,7 +202,7 @@ async fn processed_bytes_throughputs(
                 .send(state::EventType::ProcessedBytesThroughputs(
                     interval,
                     c.into_iter()
-                        .map(|c| (c.component_id, c.throughput))
+                        .map(|c| (ComponentKey::from(&c.component_id), c.throughput))
                         .collect(),
                 ))
                 .await;
@@ -243,10 +259,11 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
         .flat_map(|d| {
             d.into_iter().filter_map(|edge| {
                 let d = edge?.node;
+                let key = ComponentKey::from((d.pipeline_id, d.component_id));
                 Some((
-                    d.component_id.clone(),
+                    key.clone(),
                     state::ComponentRow {
-                        id: d.component_id,
+                        key,
                         kind: d.on.to_string(),
                         component_type: d.component_type,
                         events_in_total: d.on.events_in_total(),

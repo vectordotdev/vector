@@ -78,7 +78,7 @@ async fn closed_source() {
         "out1",
         &["trans"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );
@@ -86,7 +86,7 @@ async fn closed_source() {
         "out2",
         &["trans"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );
@@ -106,7 +106,7 @@ async fn closed_source() {
         "out1",
         &["trans"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );
@@ -141,7 +141,7 @@ async fn remove_sink() {
         "out1",
         &["trans"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );
@@ -149,7 +149,7 @@ async fn remove_sink() {
         "out2",
         &["trans"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );
@@ -168,7 +168,7 @@ async fn remove_sink() {
         "out1",
         &["trans"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );
@@ -206,7 +206,7 @@ async fn remove_transform() {
         "out1",
         &["trans1"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );
@@ -214,7 +214,7 @@ async fn remove_transform() {
         "out2",
         &["trans2"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );
@@ -233,7 +233,7 @@ async fn remove_transform() {
         "out1",
         &["trans1"],
         BlackholeConfig {
-            print_amount: 1000,
+            print_interval_secs: 10,
             rate: None,
         },
     );

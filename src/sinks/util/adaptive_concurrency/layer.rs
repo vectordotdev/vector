@@ -5,7 +5,7 @@ use tower::Layer;
 /// Enforces a limit on the concurrent number of requests the underlying
 /// service can handle.
 #[derive(Debug, Clone)]
-pub(crate) struct AdaptiveConcurrencyLimitLayer<L> {
+pub struct AdaptiveConcurrencyLimitLayer<L> {
     concurrency: Option<usize>,
     options: AdaptiveConcurrencySettings,
     logic: L,
@@ -13,7 +13,11 @@ pub(crate) struct AdaptiveConcurrencyLimitLayer<L> {
 
 impl<L> AdaptiveConcurrencyLimitLayer<L> {
     /// Create a new concurrency limit layer.
-    pub fn new(concurrency: Option<usize>, options: AdaptiveConcurrencySettings, logic: L) -> Self {
+    pub const fn new(
+        concurrency: Option<usize>,
+        options: AdaptiveConcurrencySettings,
+        logic: L,
+    ) -> Self {
         AdaptiveConcurrencyLimitLayer {
             concurrency,
             options,

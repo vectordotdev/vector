@@ -15,6 +15,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     http::{Auth, HttpClient, MaybeAuth},
+    internal_events::{LokiEventUnlabeled, LokiEventsProcessed, TemplateRenderingFailed},
     sinks::util::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -27,6 +28,7 @@ use crate::{
 };
 use futures::{FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
+use shared::encode_logfmt;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -70,6 +72,7 @@ pub enum OutOfOrderAction {
 enum Encoding {
     Json,
     Text,
+    Logfmt,
 }
 
 inventory::submit! {
@@ -167,6 +170,7 @@ struct LokiSink {
 }
 
 impl LokiSink {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     fn new(config: LokiConfig) -> Self {
         Self {
             endpoint: config.endpoint,
@@ -188,12 +192,12 @@ impl HttpSink for LokiSink {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let tenant_id = self.tenant_id.as_ref().and_then(|t| {
             t.render_string(&event)
-                .map_err(|missing| {
-                    error!(
-                        message = "Error rendering `tenant_id` template.",
-                        ?missing,
-                        internal_log_rate_secs = 30
-                    );
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("tenant_id"),
+                        drop_event: false,
+                    })
                 })
                 .ok()
         });
@@ -231,18 +235,24 @@ impl HttpSink for LokiSink {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
         let event = match &self.encoding.codec() {
-            Encoding::Json => serde_json::to_string(&log).expect("json encoding should never fail"),
+            Encoding::Json => {
+                serde_json::to_string(&log).expect("json encoding should never fail.")
+            }
 
             Encoding::Text => log
                 .get(log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
+
+            Encoding::Logfmt => encode_logfmt::to_string(log.into_parts().0)
+                .expect("Logfmt encoding should never fail."),
         };
 
         // If no labels are provided we set our own default
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
+            emit!(LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -264,6 +274,10 @@ impl HttpSink for LokiSink {
         let tenant_id = key.tenant_id;
 
         let body = serde_json::to_vec(&json).unwrap();
+
+        emit!(LokiEventsProcessed {
+            byte_size: body.len(),
+        });
 
         let uri = format!("{}loki/api/v1/push", self.endpoint.uri);
 
@@ -632,6 +646,33 @@ mod integration_tests {
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log()).unwrap();
             assert_eq!(output, &expected_json);
+        }
+    }
+
+    #[tokio::test]
+    async fn logfmt() {
+        let (stream, sink) = build_sink("logfmt").await;
+
+        let events = random_lines(100)
+            .take(10)
+            .map(Event::from)
+            .collect::<Vec<_>>();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events.clone().into_iter().map(
+                move |event| Ok(event.into_log().with_batch_notifier(&batch).into()),
+            )))
+            .await
+            .unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(events.len(), outputs.len());
+        for (i, output) in outputs.iter().enumerate() {
+            let expected_logfmt =
+                encode_logfmt::to_string(events[i].clone().into_log().into_parts().0).unwrap();
+            assert_eq!(output, &expected_logfmt);
         }
     }
 

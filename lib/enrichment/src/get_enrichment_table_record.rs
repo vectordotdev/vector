@@ -1,5 +1,41 @@
+use crate::{Condition, IndexHandle, TableRegistry, TableSearch};
 use std::collections::BTreeMap;
-use vrl::{enrichment, prelude::*};
+use vrl_core::{
+    diagnostic::{Label, Span},
+    prelude::*,
+};
+
+#[derive(Debug)]
+pub enum Error {
+    TablesNotLoaded,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::TablesNotLoaded => write!(f, "enrichment tables not loaded"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        111
+    }
+
+    fn labels(&self) -> Vec<Label> {
+        match self {
+            Error::TablesNotLoaded => {
+                vec![Label::primary(
+                    "enrichment table error: tables not loaded".to_string(),
+                    Span::default(),
+                )]
+            }
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetEnrichmentTableRecord;
@@ -28,17 +64,15 @@ impl Function for GetEnrichmentTableRecord {
     }
 
     fn compile(&self, state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
-        let tables = state
-            .get_enrichment_tables()
-            .as_ref()
-            .map(|tables| {
-                tables
-                    .table_ids()
-                    .into_iter()
-                    .map(Value::from)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_else(Vec::new);
+        let registry = state
+            .get_external_context::<TableRegistry>()
+            .ok_or(Box::new(Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+
+        let tables = registry
+            .table_ids()
+            .into_iter()
+            .map(Value::from)
+            .collect::<Vec<_>>();
 
         let table = arguments
             .required_enum("table", &tables)?
@@ -51,6 +85,7 @@ impl Function for GetEnrichmentTableRecord {
             table,
             condition,
             index: None,
+            enrichment_tables: registry.as_readonly(),
         }))
     }
 }
@@ -59,7 +94,8 @@ impl Function for GetEnrichmentTableRecord {
 pub struct GetEnrichmentTableRecordFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
-    index: Option<enrichment::IndexHandle>,
+    index: Option<IndexHandle>,
+    enrichment_tables: TableSearch,
 }
 
 impl Expression for GetEnrichmentTableRecordFn {
@@ -68,18 +104,17 @@ impl Expression for GetEnrichmentTableRecordFn {
             .condition
             .iter()
             .map(|(key, value)| {
-                Ok(enrichment::Condition::Equals {
+                Ok(Condition::Equals {
                     field: key,
                     value: value.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned(),
                 })
             })
-            .collect::<Result<Vec<enrichment::Condition>>>()?;
+            .collect::<Result<Vec<Condition>>>()?;
 
-        let tables = ctx
-            .get_enrichment_tables()
-            .ok_or("enrichment tables not loaded")?;
+        let data = self
+            .enrichment_tables
+            .find_table_row(&self.table, &condition, self.index)?;
 
-        let data = tables.find_table_row(&self.table, &condition, self.index)?;
         Ok(Value::Object(data))
     }
 
@@ -87,7 +122,9 @@ impl Expression for GetEnrichmentTableRecordFn {
         &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        match state.get_enrichment_tables_mut() {
+        let mut registry = state.get_external_context_mut::<TableRegistry>();
+
+        match registry {
             Some(ref mut table) => {
                 let fields = self
                     .condition
@@ -115,95 +152,52 @@ impl Expression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_util::get_table_registry;
+
     use super::*;
     use shared::{btreemap, TimeZone};
-    use vrl::enrichment;
-
-    #[derive(Clone, Debug)]
-    struct DummyEnrichmentTable;
-
-    impl enrichment::TableSetup for DummyEnrichmentTable {
-        fn table_ids(&self) -> Vec<String> {
-            vec!["table".to_string()]
-        }
-
-        fn add_index(
-            &mut self,
-            table: &str,
-            fields: &[&str],
-        ) -> std::result::Result<enrichment::IndexHandle, String> {
-            assert_eq!("table", table);
-            assert_eq!(vec!["field"], fields);
-
-            Ok(enrichment::IndexHandle(999))
-        }
-
-        fn as_readonly(&self) -> Box<dyn enrichment::TableSearch + Send + Sync> {
-            Box::new(self.clone())
-        }
-    }
-
-    impl enrichment::TableSearch for DummyEnrichmentTable {
-        fn find_table_row<'a>(
-            &self,
-            table: &str,
-            condition: &'a [enrichment::Condition<'a>],
-            index: Option<enrichment::IndexHandle>,
-        ) -> std::result::Result<BTreeMap<String, Value>, String> {
-            assert_eq!(table, "table");
-            assert_eq!(
-                condition,
-                vec![enrichment::Condition::Equals {
-                    field: "field",
-                    value: "value".to_string(),
-                }]
-            );
-            assert_eq!(index, Some(enrichment::IndexHandle(999)));
-
-            Ok(btreemap! {
-                "field".to_string() => "value".to_string(),
-                "field2".to_string() => "value2".to_string(),
-            })
-        }
-    }
 
     #[test]
     fn find_table_row() {
+        let registry = get_table_registry();
         let func = GetEnrichmentTableRecordFn {
-            table: "table".to_string(),
+            table: "dummy1".to_string(),
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
             },
-            index: Some(enrichment::IndexHandle(999)),
+            index: Some(IndexHandle(999)),
+            enrichment_tables: registry.as_readonly(),
         };
 
         let tz = TimeZone::default();
-        let enrichment_tables =
-            Some(&DummyEnrichmentTable as &(dyn vrl::enrichment::TableSearch + Send + Sync));
-
         let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz, enrichment_tables);
+        let mut runtime_state = vrl_core::state::Runtime::default();
+        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+
+        registry.finish_load();
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(value! ({ "field": "value", "field2": "value2" })), got);
+        assert_eq!(Ok(value! ({ "field": "result" })), got);
     }
 
     #[test]
     fn add_indexes() {
+        let registry = get_table_registry();
+
         let mut func = GetEnrichmentTableRecordFn {
-            table: "table".to_string(),
+            table: "dummy1".to_string(),
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
             },
             index: None,
+            enrichment_tables: registry.as_readonly(),
         };
 
-        let mut compiler =
-            state::Compiler::new_with_enrichment_tables(Box::new(DummyEnrichmentTable));
+        let mut compiler = state::Compiler::new();
+        compiler.set_external_context(Some(Box::new(registry)));
 
         assert_eq!(Ok(()), func.update_state(&mut compiler));
-        assert_eq!(Some(enrichment::IndexHandle(999)), func.index);
+        assert_eq!(Some(IndexHandle(0)), func.index);
     }
 }

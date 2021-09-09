@@ -3,10 +3,10 @@ use metrics::counter;
 use serde_json::Error;
 
 #[cfg(feature = "sources-splunk_hec")]
-pub(crate) use self::source::*;
+pub use self::source::*;
 
 #[derive(Debug)]
-pub(crate) struct SplunkEventSent {
+pub struct SplunkEventSent {
     pub byte_size: usize,
 }
 
@@ -17,7 +17,7 @@ impl InternalEvent for SplunkEventSent {
 }
 
 #[derive(Debug)]
-pub(crate) struct SplunkEventEncodeError {
+pub struct SplunkEventEncodeError {
     pub error: Error,
 }
 
@@ -42,7 +42,7 @@ mod source {
     use metrics::counter;
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHecEventReceived;
+    pub struct SplunkHecEventReceived;
 
     impl InternalEvent for SplunkHecEventReceived {
         fn emit_logs(&self) {
@@ -55,7 +55,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHecRequestReceived<'a> {
+    pub struct SplunkHecRequestReceived<'a> {
         pub path: &'a str,
     }
 
@@ -74,7 +74,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHecRequestBodyInvalid {
+    pub struct SplunkHecRequestBodyInvalid {
         pub error: std::io::Error,
     }
 
@@ -91,7 +91,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHecRequestError {
+    pub struct SplunkHecRequestError {
         pub(crate) error: ApiError,
     }
 
