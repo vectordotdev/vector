@@ -83,7 +83,7 @@ pub async fn build_pieces(
 
     let mut errors = vec![];
 
-    let (enrichment_tables, enrichment_errors) = load_enrichment_tables(&config, diff).await;
+    let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
     errors.extend(enrichment_errors);
 
     // Build sources

@@ -462,7 +462,7 @@ async fn build_unit_test(
     );
 
     let diff = ConfigDiff::initial(config);
-    let (enrichment_tables, tables_errors) = load_enrichment_tables(&config, &diff).await;
+    let (enrichment_tables, tables_errors) = load_enrichment_tables(config, &diff).await;
 
     errors.extend(tables_errors);
 
