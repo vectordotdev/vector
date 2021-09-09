@@ -48,6 +48,7 @@ jobs:
           all_but_latest: true # can cancel workflows scheduled later
 
   test-integration:
+    name: Integration - Linux, ${{ matrix.test }}
     runs-on: ubuntu-20.04
     if: |
       !github.event.pull_request
@@ -77,9 +78,6 @@ jobs:
          - test: 'redis'
          - test: 'splunk'
          - test: 'dnstap'
-   steps:
-     name: Integration - Linux, ${{ matrix.test }}
-     runs-on: ubuntu-20.04
      steps:
        - uses: actions/checkout@v2
        - run: make ci-sweep
