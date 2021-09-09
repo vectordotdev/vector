@@ -241,7 +241,7 @@ mlua = { version = "0.6.2", default-features = false, features = ["lua54", "send
 mongodb = { version = "2.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.9.18", default-features = false, optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
-nom = { version = "6.1.2", default-features = false, optional = true }
+nom = { version = "7.0.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
 once_cell = { version = "1.8", default-features = false }
