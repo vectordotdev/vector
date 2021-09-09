@@ -4063,7 +4063,7 @@ checksum = "7ffd9d26838a953b4af82cbeb9f1592c6798916983959be223a7124e992742c1"
 dependencies = [
  "memchr",
  "minimal-lexical",
- "version_check 0.9.3",
+ "version_check",
 ]
 
 [[package]]
@@ -7977,6 +7977,19 @@ dependencies = [
  "test-case",
  "thiserror",
  "vrl-diagnostic",
+]
+
+[[package]]
+name = "vrl-server"
+version = "0.1.0"
+dependencies = [
+ "http",
+ "serde",
+ "structopt",
+ "tokio",
+ "vrl",
+ "vrl-stdlib",
+ "warp",
 ]
 
 [[package]]

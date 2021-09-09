@@ -1,0 +1,16 @@
+[package]
+name = "vrl-server"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+license = "MPL-2.0"
+
+[dependencies]
+http = "0.2.4"
+serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+stdlib = { package = "vrl-stdlib", path = "../stdlib" }
+structopt = "0.3.23"
+tokio = { version = "1.11.0", default-features = false, features = ["full"] }
+vrl = { path = "../core" }
+warp = { version = "0.3.1", default-features = false, optional = true }
