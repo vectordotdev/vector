@@ -71,6 +71,7 @@ default = [
     "exists",
     "find",
     "flatten",
+    "flat_map",
     "float",
     "floor",
     "format_int",
@@ -138,6 +139,7 @@ default = [
     "redact",
     "remove",
     "replace",
+    "reverse",
     "reverse_dns",
     "round",
     "set",
@@ -192,6 +194,7 @@ exists = []
 find = []
 find_table_row = []
 flatten = []
+flat_map = []
 float = []
 floor = []
 format_int = []
@@ -258,8 +261,9 @@ parse_xml = ["roxmltree", "lazy_static", "regex"]
 push = []
 redact = ["lazy_static", "regex"]
 remove = ["shared/btreemap"]
-replace = []
+reverse = []
 reverse_dns = ["dns-lookup"]
+replace = []
 round = []
 set = ["shared/btreemap"]
 sha1 = ["sha-1", "hex"]

@@ -40,6 +40,8 @@ mod ends_with;
 mod exists;
 #[cfg(feature = "find")]
 mod find;
+#[cfg(feature = "flat_map")]
+mod flat_map;
 #[cfg(feature = "flatten")]
 mod flatten;
 #[cfg(feature = "float")]
@@ -184,6 +186,8 @@ mod redact;
 mod remove;
 #[cfg(feature = "replace")]
 mod replace;
+#[cfg(feature = "reverse")]
+mod reverse;
 #[cfg(feature = "reverse_dns")]
 mod reverse_dns;
 #[cfg(feature = "round")]
@@ -291,6 +295,8 @@ pub use ends_with::EndsWith;
 pub use exists::Exists;
 #[cfg(feature = "find")]
 pub use find::Find;
+#[cfg(feature = "flat_map")]
+pub use flat_map::FlatMap;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
 #[cfg(feature = "float")]
@@ -427,8 +433,6 @@ pub use redact::Redact;
 pub use remove::Remove;
 #[cfg(feature = "replace")]
 pub use replace::Replace;
-#[cfg(feature = "reverse_dns")]
-pub use reverse_dns::ReverseDns;
 #[cfg(feature = "round")]
 pub use round::Round;
 #[cfg(feature = "set")]
@@ -528,6 +532,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Exists),
         #[cfg(feature = "find")]
         Box::new(Find),
+        #[cfg(feature = "find")]
+        Box::new(FlatMap),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "float")]
@@ -668,8 +674,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Remove),
         #[cfg(feature = "replace")]
         Box::new(Replace),
-        #[cfg(feature = "reverse_dns")]
-        Box::new(ReverseDns),
         #[cfg(feature = "round")]
         Box::new(Round),
         #[cfg(feature = "set")]
