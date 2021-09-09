@@ -135,6 +135,9 @@ impl Metric {
             value(f64::INFINITY, tag("+Inf")),
             value(f64::NEG_INFINITY, tag("-Inf")),
             value(f64::NAN, tag("Nan")),
+            // Note see https://github.com/Geal/nom/issues/1384
+            // This shouldn't be necessary if that issue is remedied.
+            value(f64::NAN, tag("NaN")),
             double,
         ))(input)
         .map_err(|_: NomError| {
