@@ -5,10 +5,7 @@ use crate::{
     sinks::{
         aws_s3::config::Encoding,
         util::{
-            buffer::GZIP_FAST,
-            encoding::{EncodingConfig, EncodingConfiguration},
-            sink::StdServiceLogic,
-            Compression,
+            buffer::GZIP_FAST, encoding::EncodingConfiguration, sink::StdServiceLogic, Compression,
         },
     },
 };
@@ -319,7 +316,7 @@ impl S3RequestBuilder for S3RequestOptions {
 
 pub fn process_event_batch(
     batch: Vec<Event>,
-    encoding: &mut EncodingConfiguration<Encoding>,
+    encoding: &mut dyn EncodingConfiguration<Encoding>,
     compression: Compression,
 ) -> (Bytes, EventFinalizers) {
     enum Writer {
@@ -385,7 +382,7 @@ pub fn process_event_batch(
 
 fn encode_event(
     mut event: Event,
-    encoding: &mut EncodingConfiguration<Encoding>,
+    encoding: &mut dyn EncodingConfiguration<Encoding>,
     mut writer: &mut dyn Write,
 ) -> io::Result<()> {
     encoding.apply_rules(&mut event);
@@ -412,7 +409,7 @@ fn encode_event(
 mod tests {
     use std::{collections::BTreeMap, io::Cursor};
 
-    use crate::sinks::aws_s3::config::S3Options;
+    use crate::{sinks::aws_s3::config::S3Options, sinks::util::encoding::EncodingConfig};
     use vector_core::partition::Partitioner;
 
     use super::*;

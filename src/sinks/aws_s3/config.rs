@@ -256,7 +256,7 @@ pub fn create_client(
     let region = region.try_into()?;
     let client = rusoto::client(proxy)?;
 
-    let creds = auth.build(&region, assume_role.clone())?;
+    let creds = auth.build(&region, assume_role)?;
 
     Ok(S3Client::new_with(client, creds, region))
 }

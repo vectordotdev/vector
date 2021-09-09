@@ -3,42 +3,36 @@ use std::{
     time::Duration,
 };
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use chrono::{SecondsFormat, Utc};
-use futures::{stream, FutureExt, SinkExt, StreamExt};
 use rand::{thread_rng, Rng};
-use rusoto_s3::{PutObjectOutput, S3Client};
+use rusoto_s3::S3Client;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use tower::{util::BoxService, ServiceBuilder};
+use tower::ServiceBuilder;
 use uuid::Uuid;
 
 use vector_core::event::Event;
 
-use crate::config::GenerateConfig;
-use crate::event::PathComponent;
-use crate::sinks::aws_s3::config::{Encoding, S3RequestOptions, DEFAULT_REQUEST_LIMITS};
-use crate::sinks::aws_s3::service::S3Service;
-use crate::sinks::aws_s3::sink::{process_event_batch, S3RequestBuilder};
-use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat};
-use crate::sinks::VectorSink;
 use crate::{
+    config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
-    internal_events::TemplateRenderingFailed,
+    event::PathComponent,
     rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         aws_s3::{
             self,
-            config::{S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass},
+            config::{
+                Encoding, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
+                DEFAULT_REQUEST_LIMITS,
+            },
             partitioner::KeyPartitioner,
-            service::S3Request,
-            sink::S3Sink,
+            service::{S3Request, S3Service},
+            sink::{process_event_batch, S3RequestBuilder, S3Sink},
         },
-        util::{
-            service::Map, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
-            PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-            TowerRequestConfig, TowerRequestSettings,
-        },
+        util::encoding::{EncodingConfiguration, TimestampFormat},
+        util::{Compression, ServiceBuilderExt, TowerRequestConfig},
+        VectorSink,
     },
     template::Template,
 };
@@ -101,7 +95,7 @@ enum ConfigError {
     UnsupportedStorageClass { storage_class: String },
 }
 
-const KEY_TEMPLATE: &'static str = "/dt=%Y%m%d/hour=%H/";
+const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
 
 impl DatadogArchivesSinkConfig {
     fn new(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
@@ -189,7 +183,7 @@ impl DatadogArchivesSinkConfig {
     }
 }
 
-const RESERVED_ATTRIBUTES: [&'static str; 10] = [
+const RESERVED_ATTRIBUTES: [&str; 10] = [
     "_id", "date", "message", "host", "source", "service", "status", "tags", "trace_id", "span_id",
 ];
 
@@ -391,7 +385,7 @@ mod tests {
         encoding.apply_custom_rules(&mut event);
 
         let log = event.into_log();
-        let id1 = validate_event_id(&log);
+        validate_event_id(&log);
 
         assert_eq!(log.as_map().len(), 5); // _id, message, date, service, attributes
         assert_eq!(
@@ -535,7 +529,7 @@ mod tests {
         assert_eq!(uuid1.len(), 36);
 
         // check the the second batch has a different UUID
-        let mut log2 = Event::new_empty_log();
+        let log2 = Event::new_empty_log();
 
         let key = key_partitioner
             .partition(&log2)
