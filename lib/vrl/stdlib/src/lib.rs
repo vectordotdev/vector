@@ -464,10 +464,10 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
-        #[cfg(feature = "array")]
-        Box::new(Array),
         #[cfg(feature = "append")]
         Box::new(Append),
+        #[cfg(feature = "array")]
+        Box::new(Array),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "assert_eq")]
@@ -580,12 +580,18 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         //Box::new(OnlyFields),
         #[cfg(feature = "object")]
         Box::new(Object),
+        #[cfg(feature = "parse_apache_log")]
+        Box::new(ParseApacheLog),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
         #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
         Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
         Box::new(ParseAwsVpcFlowLog),
+        #[cfg(feature = "parse_common_log")]
+        Box::new(ParseCommonLog),
+        #[cfg(feature = "parse_csv")]
+        Box::new(ParseCsv),
         #[cfg(feature = "parse_duration")]
         Box::new(ParseDuration),
         #[cfg(feature = "parse_glog")]
@@ -596,12 +602,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseInt),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
-        #[cfg(feature = "parse_apache_log")]
-        Box::new(ParseApacheLog),
-        #[cfg(feature = "parse_common_log")]
-        Box::new(ParseCommonLog),
-        #[cfg(feature = "parse_csv")]
-        Box::new(ParseCsv),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
         #[cfg(feature = "parse_klog")]
@@ -634,12 +634,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
-        #[cfg(feature = "match")]
-        Box::new(Match),
-        #[cfg(feature = "match_any")]
-        Box::new(MatchAny),
-        #[cfg(feature = "match_array")]
-        Box::new(MatchArray),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "replace")]
