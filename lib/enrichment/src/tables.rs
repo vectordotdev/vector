@@ -178,6 +178,26 @@ impl TableSearch {
             Err("finish_load not called".to_string())
         }
     }
+
+    /// Search the enrichment table data with the given condition.
+    /// All conditions must match (AND).
+    /// Can return multiple matched records
+    pub fn find_table_rows<'a>(
+        &self,
+        table: &str,
+        condition: &'a [Condition<'a>],
+        index: Option<IndexHandle>,
+    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String> {
+        let tables = self.0.load();
+        if let Some(ref tables) = **tables {
+            match tables.get(table) {
+                None => Err(format!("table {} not loaded", table)),
+                Some(table) => table.find_table_rows(condition, index),
+            }
+        } else {
+            Err("finish_load not called".to_string())
+        }
+    }
 }
 
 impl std::fmt::Debug for TableSearch {
