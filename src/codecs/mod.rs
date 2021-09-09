@@ -149,16 +149,14 @@ impl DecodingConfig {
             .framing
             .as_ref()
             .map(|config| config.build())
-            .unwrap_or_else(|| {
-                Err("Fallback to newline delimited framer is not implemented yet.".into())
-            })?;
+            .unwrap_or_else(|| NewlineDelimitedDecoderConfig::new().build())?;
 
         // Build the parser or use a plain bytes parser if not provided.
         let parser: BoxedParser = self
             .decoding
             .as_ref()
             .map(|config| config.build())
-            .unwrap_or_else(|| Err("Fallback to bytes parser is not implemented yet.".into()))?;
+            .unwrap_or_else(|| BytesParserConfig::new().build())?;
 
         Ok(Decoder::new(framer, parser))
     }

@@ -1,5 +1,5 @@
 use crate::{
-    codecs::{BoxedFramingError, CharacterDelimitedCodec},
+    codecs::{BoxedFramingError, NewlineDelimitedCodec},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -10,17 +10,17 @@ use crate::{
     udp, Pipeline,
 };
 use bytes::Bytes;
-use futures::{stream, SinkExt, StreamExt, TryFutureExt};
+use futures::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
-use tokio_util::{codec::BytesCodec, udp::UdpFramed};
+use tokio_util::udp::UdpFramed;
 
 pub mod parser;
 #[cfg(unix)]
 mod unix;
 
-use parser::parse;
+use parser::{parse, ParseError};
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
 
@@ -133,16 +133,19 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-pub(self) fn parse_event(line: &str) -> Option<Event> {
-    match parse(line) {
+pub(self) fn parse_event(bytes: Bytes) -> Option<Event> {
+    match std::str::from_utf8(&bytes)
+        .map_err(ParseError::InvalidUtf8)
+        .and_then(parse)
+    {
         Ok(metric) => {
             emit!(StatsdEventReceived {
-                byte_size: line.len()
+                byte_size: bytes.len()
             });
             Some(Event::Metric(metric))
         }
         Err(error) => {
-            emit!(StatsdInvalidRecord { error, text: line });
+            emit!(StatsdInvalidRecord { error, bytes });
             None
         }
     }
@@ -169,17 +172,16 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let mut stream = UdpFramed::new(socket, BytesCodec::new()).take_until(shutdown);
+    let mut stream = UdpFramed::new(socket, NewlineDelimitedCodec::new()).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
             Ok((bytes, _sock)) => {
-                let packet = String::from_utf8_lossy(bytes.as_ref());
-                let metrics = packet.lines().filter_map(parse_event).map(Ok);
+                let metric = match parse_event(bytes) {
+                    Some(metric) => metric,
+                    None => continue,
+                };
 
-                // Need `boxed` to resolve a lifetime issue
-                // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
-                let mut metrics = stream::iter(metrics).boxed();
-                if let Err(error) = out.send_all(&mut metrics).await {
+                if let Err(error) = out.send(metric).await {
                     error!(message = "Error sending metric.", %error);
                     break;
                 }
@@ -198,15 +200,14 @@ struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
     type Error = BoxedFramingError;
-    type Decoder = CharacterDelimitedCodec;
+    type Decoder = NewlineDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
-        CharacterDelimitedCodec::new('\n')
+        NewlineDelimitedCodec::new()
     }
 
     fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
-        let line = String::from_utf8_lossy(line.as_ref());
-        parse_event(&line)
+        parse_event(line)
     }
 }
 
