@@ -29,5 +29,7 @@ async fn main() {
 
     let routes = resolve.or(functions).recover(handle_err);
 
+    println!("starting up the server on port {}", opts.port);
+
     warp::serve(routes).run(([127, 0, 0, 1], opts.port)).await;
 }
