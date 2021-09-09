@@ -78,20 +78,20 @@ jobs:
          - test: 'redis'
          - test: 'splunk'
          - test: 'dnstap'
-      steps:
-        - uses: actions/checkout@v2
-        - run: make ci-sweep
-        - uses: actions/cache@v2.1.4
-          with:
-            path: |
-              ~/.cargo/registry
-              ~/.cargo/git
-            key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-        - run: bash scripts/environment/prepare.sh
-        - run: echo "::add-matcher::.github/matchers/rust.json"
-        - run: make slim-builds
-        - run: make test-integration-${{ matrix.test }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-integration-${{ matrix.test }}
 
   test-integration-check:
     name: test-integration-check
