@@ -112,9 +112,8 @@ mod tests {
 
         sleep(Duration::from_millis(1)).await;
         let mut events = collect_ready(rx).await;
-        events.retain(|event| {
-            event.as_log().get("test_id") == Some(&Value::from(test_id.to_string()))
-        });
+        let test_id = Value::from(test_id.to_string());
+        events.retain(|event| event.as_log().get("test_id") == Some(&test_id));
 
         let end = chrono::Utc::now();
 
