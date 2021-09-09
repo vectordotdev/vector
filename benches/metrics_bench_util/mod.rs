@@ -35,7 +35,7 @@ fn disable_metrics_tracing_integration() {
 
 #[inline]
 fn boot() {
-    vector::trace::init(false, false, "warn", false);
+    vector::trace::init(false, false, "warn");
     vector::metrics::init().expect("metrics initialization failed");
 }
 
