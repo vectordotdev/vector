@@ -3,10 +3,12 @@
 mod character_delimited;
 mod length_delimited;
 mod newline_delimited;
+mod octet_counting;
 
 pub use character_delimited::{CharacterDelimitedCodec, CharacterDelimitedDecoderConfig};
 pub use length_delimited::{LengthDelimitedCodec, LengthDelimitedDecoderConfig};
 pub use newline_delimited::{NewlineDelimitedCodec, NewlineDelimitedDecoderConfig};
+pub use octet_counting::{OctetCountingCodec, OctetCountingDecoderConfig};
 
 use crate::sources::util::TcpError;
 use ::bytes::Bytes;
