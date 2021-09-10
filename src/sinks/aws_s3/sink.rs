@@ -51,8 +51,8 @@ pub struct S3Sink<S> {
     acker: Option<Acker>,
     service: Option<S>,
     partitioner: Option<KeyPartitioner>,
-    batch_size_bytes: NonZeroUsize,
-    batch_size_events: Option<NonZeroUsize>,
+    batch_size_bytes: Option<NonZeroUsize>,
+    batch_size_events: NonZeroUsize,
     batch_timeout: Duration,
     options: S3RequestOptions,
 }
@@ -62,8 +62,8 @@ impl<S> S3Sink<S> {
         cx: SinkContext,
         service: S,
         partitioner: KeyPartitioner,
-        batch_size_bytes: NonZeroUsize,
-        batch_size_events: Option<NonZeroUsize>,
+        batch_size_bytes: Option<NonZeroUsize>,
+        batch_size_events: NonZeroUsize,
         batch_timeout: Duration,
         options: S3RequestOptions,
     ) -> Self {
@@ -71,8 +71,8 @@ impl<S> S3Sink<S> {
             acker: Some(cx.acker()),
             service: Some(service),
             partitioner: Some(partitioner),
-            batch_size_bytes,
             batch_size_events,
+            batch_size_bytes,
             batch_timeout,
             options,
         }
