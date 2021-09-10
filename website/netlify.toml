@@ -1,9 +1,5 @@
 [build]
-base = "website"
 publish = "public"
-
-# Reinstate this when we figure out how to target this better
-#ignore = "./scripts/build-ignore.sh"
 
 [build.environment]
 HUGO_VERSION = "0.84.0"
