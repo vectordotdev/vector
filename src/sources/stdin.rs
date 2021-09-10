@@ -1,15 +1,15 @@
 use crate::{
     codecs::DecodingConfig,
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{StdinEventReceived, StdinReadFailed},
+    internal_events::StdinEventsReceived,
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use futures::{channel::mpsc, executor, SinkExt, StreamExt, TryStreamExt};
+use bytes::Bytes;
+use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
-use tokio_util::codec::Decoder;
+use tokio_util::{codec::FramedRead, io::StreamReader};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -67,7 +67,7 @@ impl SourceConfig for StdinConfig {
 }
 
 pub fn stdin_source<R>(
-    stdin: R,
+    mut stdin: R,
     config: StdinConfig,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -79,7 +79,7 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
-    let mut decoder = config.decoding.build()?;
+    let decoder = config.decoding.build()?;
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
@@ -91,8 +91,18 @@ where
     thread::spawn(move || {
         info!("Capturing STDIN.");
 
-        for line in stdin.lines() {
-            if executor::block_on(sender.send(line)).is_err() {
+        loop {
+            let (buffer, len) = match stdin.fill_buf() {
+                Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), Some(buffer.len())),
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) => (Err(error), None),
+            };
+
+            if let Some(len) = len {
+                stdin.consume(len);
+            }
+
+            if executor::block_on(sender.send(buffer)).is_err() {
                 // receiver has closed so we should shutdown
                 return;
             }
@@ -103,39 +113,35 @@ where
         let mut out =
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error));
 
-        let mut lines = receiver
-            .take_until(shutdown)
-            .map_err(|error| emit!(StdinReadFailed { error }));
+        let stream = StreamReader::new(receiver);
+        let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
 
-        while let Some(Ok(line)) = lines.next().await {
-            emit!(StdinEventReceived {
-                byte_size: line.len()
-            });
+        loop {
+            match stream.next().await {
+                Some(Ok((events, byte_size))) => {
+                    emit!(StdinEventsReceived {
+                        byte_size,
+                        count: events.len()
+                    });
 
-            let mut bytes = BytesMut::from(line.as_bytes());
+                    for mut event in events {
+                        let log = event.as_mut_log();
 
-            loop {
-                match decoder.decode_eof(&mut bytes) {
-                    Ok(Some((events, _))) => {
-                        for mut event in events {
-                            let log = event.as_mut_log();
+                        log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
 
-                            log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
-
-                            if let Some(hostname) = &hostname {
-                                log.insert(&host_key, hostname.clone());
-                            }
-
-                            let _ = out.send(event).await;
+                        if let Some(hostname) = &hostname {
+                            log.insert(&host_key, hostname.clone());
                         }
-                    }
-                    Ok(None) => break,
-                    Err(_) => {
-                        // Error is logged by `crate::codecs::Decoder`, no
-                        // further handling is needed here.
-                        break;
+
+                        let _ = out.send(event).await;
                     }
                 }
+                Some(Err(_)) => {
+                    // Error is logged by `crate::codecs::Decoder`, no
+                    // further handling is needed here.
+                    continue;
+                }
+                None => break,
             }
         }
 
