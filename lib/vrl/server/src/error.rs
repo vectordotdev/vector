@@ -7,13 +7,13 @@ use warp::reply::{json, with_status as status, Json, Reply};
 
 #[derive(Serialize)]
 struct Error {
-    error: String,
+    message: String,
 }
 
 impl Error {
     fn new(msg: &str) -> Self {
         Self {
-            error: msg.to_owned(),
+            message: msg.to_owned(),
         }
     }
 

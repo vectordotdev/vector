@@ -6,10 +6,6 @@ edition = "2018"
 publish = false
 license = "MPL-2.0"
 
-[[bin]]
-name = "vrl-server"
-path = "src/main.rs"
-
 [dependencies]
 http = "0.2.4"
 serde = { version = "1.0.130", default-features = false, features = ["derive"] }

@@ -1,0 +1,90 @@
+openapi: 3.0.3
+info:
+  version: 0.1.0
+  title: Vector Remap Language web server
+  description: |
+    An HTTP server for running Vector Remap Language (VRL) programs against observability events.
+  license: MPL-2.0
+paths:
+  /resolve:
+    post:
+      summary: Run VRL program against an event
+      description: Compute the outcome of an observability event against against a VRL program
+      requestBody:
+        description: Program plus event
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Input'
+      responses:
+        '200':
+          description: Event and program successfully resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+  /functions:
+    get:
+      summary: Display VRL functions
+      description: |
+        Fetch a list of currently available VRL functions.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FunctionList'
+components:
+  schemas:
+    Error:
+      description: Failed resolution
+      type: object
+      properties:
+        error:
+          schema:
+            type: string
+      required:
+        - error
+    Event:
+      description: The input observability event (as a JSON object)
+      type: object
+    FunctionList:
+      description: The listing of available VRL functions
+      type: array
+      items:
+        type: string
+    Program:
+      description: The VRL program to run against the supplied event
+      type: string
+    Input:
+      description: The full payload (Vector event plus VRL program) to resolve
+      type: object
+      properties:
+        event:
+          schema:
+            $ref: '#/components/schemas/Event'
+        program:
+          schema:
+            $ref: '#/components/schemas/Program'
+      required:
+        - event
+        - program
+    Result:
+      description: Event plus program resolution result
+      oneOf:
+        - $ref: '#/components/schemas/Error'
+        - $ref: '#/components/schemas/Success'
+    Success:
+      description: Successful resolution
+      type: object
+      properties:
+        output:
+          schema:
+            type: string
+        result:
+          schema:
+            type: object
+      required:
+        - output
+        - result

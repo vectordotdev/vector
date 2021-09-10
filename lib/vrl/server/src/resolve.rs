@@ -14,7 +14,7 @@ pub struct Input {
 #[serde(rename_all = "lowercase")]
 pub enum Outcome {
     Success { output: Value, result: Value },
-    Error { error: String },
+    Error(String),
 }
 
 pub async fn resolve_vrl_input(input: Input) -> Result<impl Reply, Infallible> {
@@ -32,7 +32,7 @@ fn resolve(mut input: Input) -> Outcome {
         Ok(program) => program,
         Err(diagnostics) => {
             let msg = Formatter::new(&input.program, diagnostics).to_string();
-            return Outcome::Error { error: msg };
+            return Outcome::Error(msg);
         }
     };
 
@@ -41,8 +41,6 @@ fn resolve(mut input: Input) -> Outcome {
             output: result,
             result: event.clone(),
         },
-        Err(err) => Outcome::Error {
-            error: err.to_string(),
-        },
+        Err(err) => Outcome::Error(err.to_string()),
     }
 }
