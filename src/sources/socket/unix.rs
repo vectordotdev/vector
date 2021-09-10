@@ -1,4 +1,5 @@
 use crate::{
+    codecs::NewlineDelimitedCodec,
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
@@ -11,7 +12,6 @@ use crate::{
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tokio_util::codec::LinesCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -40,9 +40,9 @@ impl UnixConfig {
 * Function to pass to build_unix_*_source, specific to the basic unix source.
 * Takes a single line of a received message and builds an Event object.
 **/
-fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Event {
-    let byte_size = line.len();
-    let mut event = Event::from(line);
+fn build_event(host_key: &str, received_from: Option<Bytes>, bytes: Bytes) -> Event {
+    let byte_size = bytes.len();
+    let mut event = Event::from(bytes);
     event.as_mut_log().insert(
         crate::config::log_schema().source_type_key(),
         Bytes::from("socket"),
@@ -68,10 +68,10 @@ pub(super) fn unix_datagram(
         path,
         max_length,
         host_key,
-        LinesCodec::new_with_max_length(max_length),
+        NewlineDelimitedCodec::new_with_max_length(max_length),
         shutdown,
         out,
-        |host_key, received_from, line| Some(build_event(host_key, received_from, line)),
+        |host_key, received_from, bytes| Some(build_event(host_key, received_from, bytes)),
     )
 }
 
@@ -84,7 +84,7 @@ pub(super) fn unix_stream(
 ) -> Source {
     build_unix_stream_source(
         path,
-        LinesCodec::new_with_max_length(max_length),
+        NewlineDelimitedCodec::new_with_max_length(max_length),
         host_key,
         shutdown,
         out,

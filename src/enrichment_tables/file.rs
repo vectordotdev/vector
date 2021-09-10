@@ -53,7 +53,7 @@ struct FileConfig {
     schema: HashMap<String, SchemaType>,
 }
 
-fn default_delimiter() -> char {
+const fn default_delimiter() -> char {
     ','
 }
 
@@ -213,7 +213,7 @@ impl File {
             .collect()
     }
 
-    /// Order the fields in the index according to the position they are found in the header
+    /// Order the fields in the index according to the position they are found in the header.
     fn normalize_index_fields(&self, index: &[&str]) -> Vec<usize> {
         // Get the positions of the fields we are indexing
         self.headers
@@ -301,11 +301,8 @@ impl File {
         }
 
         let key = hash.finish();
-
         let IndexHandle(handle) = handle;
-        let res = self.indexes[handle].2.get(&key);
-
-        Ok(res)
+        Ok(self.indexes[handle].2.get(&key))
     }
 }
 
@@ -413,7 +410,6 @@ impl Table for File {
             None => {
                 let index = self.index_data(&normalized, case)?;
                 self.indexes.push((case, normalized, index));
-
                 // The returned index handle is the position of the index in our list of indexes.
                 Ok(IndexHandle(self.indexes.len() - 1))
             }
@@ -442,14 +438,14 @@ mod tests {
     fn seahash() {
         // Ensure we can separate fields to create a distinct hash.
         let mut one = seahash::SeaHasher::default();
-        one.write("norknoog".as_bytes());
+        one.write(b"norknoog");
         one.write_u8(0);
-        one.write("donk".as_bytes());
+        one.write(b"donk");
 
         let mut two = seahash::SeaHasher::default();
-        two.write("nork".as_bytes());
+        two.write(b"nork");
         one.write_u8(0);
-        two.write("noogdonk".as_bytes());
+        two.write(b"noogdonk");
 
         assert_ne!(one.finish(), two.finish());
     }
@@ -661,6 +657,78 @@ mod tests {
                 "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
             }),
             file.find_table_row(Case::Sensitive, &conditions, Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_rows_with_index() {
+        let mut file = File::new(
+            vec![
+                vec!["zip".into(), "zup".into()],
+                vec!["zirp".into(), "zurp".into()],
+                vec!["zip".into(), "zoop".into()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(&["field1"]).unwrap();
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("zip"),
+        };
+
+        assert_eq!(
+            Ok(vec![
+                btreemap! {
+                    "field1" => "zip",
+                    "field2" => "zup",
+                },
+                btreemap! {
+                    "field1" => "zip",
+                    "field2" => "zoop",
+                }
+            ]),
+            file.find_table_rows(&[condition], Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_row_with_dates() {
+        let mut file = File::new(
+            vec![
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(chrono::Utc.ymd(2015, 12, 7).and_hms(0, 0, 0)),
+                ],
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
+                ],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(&["field1"]).unwrap();
+
+        let conditions = [
+            Condition::Equals {
+                field: "field1",
+                value: "zip".into(),
+            },
+            Condition::BetweenDates {
+                field: "field2",
+                from: chrono::Utc.ymd(2016, 1, 1).and_hms(0, 0, 0),
+                to: chrono::Utc.ymd(2017, 1, 1).and_hms(0, 0, 0),
+            },
+        ];
+
+        assert_eq!(
+            Ok(btreemap! {
+                "field1" => "zip",
+                "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
+            }),
+            file.find_table_row(&conditions, Some(handle))
         );
     }
 

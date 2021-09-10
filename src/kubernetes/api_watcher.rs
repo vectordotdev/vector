@@ -31,7 +31,7 @@ where
     B: 'static,
 {
     /// Create a new [`ApiWatcher`].
-    pub fn new(client: Client, request_builder: B) -> Self {
+    pub const fn new(client: Client, request_builder: B) -> Self {
         Self {
             client,
             request_builder,
@@ -210,13 +210,13 @@ mod tests {
 
     use super::*;
     use futures::StreamExt;
-    use httpmock::MockServer;
-    use httpmock::{Method::GET, Then, When};
     use k8s_openapi::WatchOptional;
     use k8s_openapi::{
         api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status, WatchEvent},
     };
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     macro_rules! assert_matches {
         ($expression:expr, $($pattern:tt)+) => {
@@ -231,37 +231,40 @@ mod tests {
     #[tokio::test]
     async fn test_invocation_errors() {
         let proxy = ProxyConfig::default();
-        let cases: Vec<(Box<dyn FnOnce(When, Then)>, _, _)> = vec![
+        let cases: Vec<(_, _, _)> = vec![
             // Desync.
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(410)
-                        .header("Content-Type", "application/json")
-                        .body("body");
-                }),
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(410)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string("body"),
+                    ),
                 Some(StatusCode::GONE),
                 true,
             ),
             // Other error.
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(400)
-                        .header("Content-Type", "application/json")
-                        .body("body");
-                }),
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(400)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string("body"),
+                    ),
                 Some(StatusCode::BAD_REQUEST),
                 false,
             ),
         ];
 
-        for (mock_config, expected_bad_status, expected_is_desync) in cases {
-            let server = MockServer::start_async().await;
-            let mock = server.mock_async(mock_config).await;
+        for (mock, expected_bad_status, expected_is_desync) in cases {
+            let mock_server = MockServer::start().await;
+
+            mock.mount(&mock_server).await;
 
             let config = client::Config {
-                base: server.base_url().parse().unwrap(),
+                base: mock_server.uri().parse().unwrap(),
                 token: Some("SOMEGARBAGETOKEN".to_string()),
                 tls_options: TlsOptions::default(),
             };
@@ -303,7 +306,6 @@ mod tests {
                 actual_is_desync, expected_is_desync,
                 "actual left, expected right"
             );
-            mock.assert_async().await;
         }
     }
 
@@ -312,17 +314,18 @@ mod tests {
     async fn test_stream_errors() {
         let proxy = ProxyConfig::default();
         let cases: Vec<(
-            Box<dyn FnOnce(When, Then)>,
+            _,
             Vec<Box<dyn FnOnce(Result<WatchEvent<Pod>, watcher::stream::Error<stream::Error>>)>>,
         )> = vec![
             // Tests a healthy stream
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(
-                            r#"{
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(
+                                r#"{
                                 "type": "ADDED",
                                 "object": {
                                     "kind": "Pod",
@@ -341,8 +344,8 @@ mod tests {
                                     }
                                 }
                             }"#,
-                        );
-                }),
+                            ),
+                    ),
                 vec![
                     Box::new(|item| {
                         assert_eq!(
@@ -372,12 +375,13 @@ mod tests {
             ),
             // Desync error at start of stream.
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(
-                            r#"{
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(
+                                r#"{
                                 "type": "ERROR",
                                 "object": {
                                     "apiVersion": "v1",
@@ -389,8 +393,8 @@ mod tests {
                                     "status": "Failure"
                                 }
                             }"#,
-                        );
-                }),
+                            ),
+                    ),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
                     assert_matches!(
@@ -403,12 +407,13 @@ mod tests {
             ),
             // Desync error mid-stream.
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(
-                            r#"{
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(
+                                r#"{
                                 "type": "ADDED",
                                 "object": {
                                     "kind": "Pod",
@@ -429,8 +434,8 @@ mod tests {
                                     "status": "Failure"
                                 }
                             }"#,
-                        );
-                }),
+                            ),
+                    ),
                 vec![
                     Box::new(|item| {
                         assert_eq!(
@@ -457,12 +462,13 @@ mod tests {
             ),
             // Desync error with items after it.
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(
-                            r#"{
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(
+                                r#"{
                                 "type": "ERROR",
                                 "object": {
                                     "apiVersion": "v1",
@@ -483,8 +489,8 @@ mod tests {
                                     }
                                 }
                             }"#,
-                        );
-                }),
+                            ),
+                    ),
                 vec![
                     Box::new(|item| {
                         let error = item.unwrap_err();
@@ -511,12 +517,13 @@ mod tests {
             ),
             // Non-desync Stream Error
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(
-                            r#"{
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(
+                                r#"{
                             "type": "ERROR",
                             "object": {
                                 "apiVersion": "v1",
@@ -528,8 +535,8 @@ mod tests {
                                 "status": "Failure"
                             }
                         }"#,
-                        );
-                }),
+                            ),
+                    ),
                 vec![Box::new(|item| {
                     assert_eq!(
                         item.unwrap(),
@@ -545,20 +552,23 @@ mod tests {
             ),
             // No body in response
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200).header("Content-Type", "application/json");
-                }),
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json"),
+                    ),
                 vec![],
             ),
             // Bad JSON from API
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(r#"not valid json"#);
-                }),
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(r#"not valid json"#),
+                    ),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
                     assert_matches!(error, watcher::stream::Error::Recoverable {
@@ -572,12 +582,13 @@ mod tests {
             ),
             // Valid JSON of Invalid Response API
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(r#"{"a":"b"}"#);
-                }),
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(r#"{"a":"b"}"#),
+                    ),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
                     assert_matches!(error, watcher::stream::Error::Recoverable {
@@ -591,12 +602,13 @@ mod tests {
             ),
             // Non-standard object type
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(
-                            r#"{
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(
+                                r#"{
                                 "type": "nonstandard_type",
                                 "object": {
                                     "kind": "Status",
@@ -606,8 +618,8 @@ mod tests {
                                     }
                                 }
                             }"#,
-                        );
-                }),
+                            ),
+                    ),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
                     assert_matches!(error, watcher::stream::Error::Recoverable {
@@ -621,12 +633,13 @@ mod tests {
             ),
             // Incorrect object type
             (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(200)
-                        .header("Content-Type", "application/json")
-                        .body(
-                            r#"{
+                Mock::given(method("GET"))
+                    .and(path("/api/v1/pods"))
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .append_header("Content-Type", "application/json")
+                            .set_body_string(
+                                r#"{
                                 "type": "MODIFIED",
                                 "object": {
                                     "kind": "StatefulSet",
@@ -636,8 +649,8 @@ mod tests {
                                     }
                                 }
                             }"#,
-                        );
-                }),
+                            ),
+                    ),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
                     assert_matches!(error, watcher::stream::Error::Recoverable {
@@ -651,12 +664,13 @@ mod tests {
             ),
         ];
 
-        for (mock_config, assertions) in cases {
-            let server = MockServer::start_async().await;
-            let mock = server.mock_async(mock_config).await;
+        for (mock, assertions) in cases {
+            let mock_server = MockServer::start().await;
+
+            mock.mount(&mock_server).await;
 
             let config = client::Config {
-                base: server.base_url().parse().unwrap(),
+                base: mock_server.uri().parse().unwrap(),
                 token: Some("SOMEGARBAGETOKEN".to_string()),
                 tls_options: TlsOptions::default(),
             };
@@ -682,7 +696,6 @@ mod tests {
                 assertion(item);
             }
             assert!(stream.next().await.is_none(), "expected to cover the whole stream with assertion, but got some items after all assertions passed");
-            mock.assert_async().await;
         }
     }
 }

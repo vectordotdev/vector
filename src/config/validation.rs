@@ -17,14 +17,36 @@ pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 pub fn check_pipelines(pipelines: &Pipelines) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
 
-    for pipeline_id in pipelines.names() {
+    for (pipeline_id, pipeline) in pipelines.inner() {
         if pipeline_id.contains('.') {
             errors.push(format!(
                 "Pipeline name \"{}\" shouldn't container a '.'.",
                 pipeline_id
             ));
         }
+
+        if let Err(err) = check_names(pipeline.transforms.keys()) {
+            errors.extend(err);
+        }
     }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result<(), Vec<String>> {
+    let errors: Vec<_> = names
+        .filter(|component_key| component_key.id().contains('.'))
+        .map(|component_key| {
+            format!(
+                "Component name \"{}\" should not contain a \".\"",
+                component_key.id()
+            )
+        })
+        .collect();
 
     if errors.is_empty() {
         Ok(())
@@ -62,15 +84,6 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         uses.push(ctype);
     }
 
-    for component_key in used_keys.keys() {
-        if component_key.id().contains('.') {
-            errors.push(format!(
-                "Component name \"{}\" should not contain a \".\"",
-                component_key.id()
-            ));
-        }
-    }
-
     for (id, uses) in used_keys.into_iter().filter(|(_id, uses)| uses.len() > 1) {
         errors.push(format!(
             "More than one component with name \"{}\" ({}).",
@@ -97,13 +110,26 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             ));
         }
 
+        let mut frequencies = HashMap::new();
         for input in inputs {
+            let entry = frequencies.entry(input.clone()).or_insert(0usize);
+            *entry += 1;
             if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
                 errors.push(format!(
-                    "Input \"{}\" for {} \"{}\" doesn't exist.",
+                    "Input \"{}\" for {} \"{}\" doesn't match any components.",
                     input, output_type, key
                 ));
             }
+        }
+
+        for (dup, count) in frequencies.into_iter().filter(|(_name, count)| *count > 1) {
+            errors.push(format!(
+                "{} \"{}\" has input \"{}\" duplicated {} times",
+                capitalize(output_type),
+                key,
+                dup,
+                count,
+            ));
         }
     }
 

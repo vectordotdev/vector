@@ -1,11 +1,11 @@
 use crate::{
+    codecs::CharacterDelimitedCodec,
     config::log_schema,
     event::{Event, LogEvent},
     sources::util::http::ErrorMessage,
 };
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use tokio_util::codec::Decoder;
@@ -26,7 +26,7 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
     let mut body = BytesMut::new();
     body.extend_from_slice(&buf);
 
-    let mut decoder = BytesDelimitedCodec::new(b'\n');
+    let mut decoder = CharacterDelimitedCodec::new('\n');
     std::iter::from_fn(move || {
         match decoder.decode_eof(&mut body) {
             Err(error) => Some(Err(ErrorMessage::new(
@@ -103,7 +103,7 @@ fn json_error(s: String) -> ErrorMessage {
     ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
 }
 
-fn json_value_to_type_string(value: &JsonValue) -> &'static str {
+const fn json_value_to_type_string(value: &JsonValue) -> &'static str {
     match value {
         JsonValue::Object(_) => "Object",
         JsonValue::Array(_) => "Array",

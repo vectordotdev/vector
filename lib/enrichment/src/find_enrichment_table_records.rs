@@ -159,7 +159,7 @@ mod tests {
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(value![value! ({ "field": "result" })]), got);
+        assert_eq!(Ok(value![vec![value!({ "field": "result" })]]), got);
     }
 
     #[test]

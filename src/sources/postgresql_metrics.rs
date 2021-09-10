@@ -186,7 +186,7 @@ struct PostgresqlClient {
 }
 
 impl PostgresqlClient {
-    fn new(config: Config, tls_config: Option<PostgresqlMetricsTlsConfig>) -> Self {
+    const fn new(config: Config, tls_config: Option<PostgresqlMetricsTlsConfig>) -> Self {
         Self {
             config,
             tls_config,

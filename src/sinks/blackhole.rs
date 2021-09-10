@@ -41,7 +41,7 @@ pub struct BlackholeConfig {
     pub rate: Option<usize>,
 }
 
-fn default_print_interval_secs() -> u64 {
+const fn default_print_interval_secs() -> u64 {
     1
 }
 

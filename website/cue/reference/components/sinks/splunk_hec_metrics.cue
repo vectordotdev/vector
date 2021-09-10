@@ -1,12 +1,12 @@
 package metadata
 
-components: sinks: splunk_hec: {
-	title: "Splunk HEC"
+components: sinks: splunk_hec_metrics: {
+	title: "Splunk HEC metrics"
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "stable"
+		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Splunk"]
 		stateful: false
@@ -28,15 +28,8 @@ components: sinks: splunk_hec: {
 				algorithms: ["gzip"]
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
-			encoding: {
-				enabled: true
-				codec: {
-					enabled: true
-					default: null
-					enum: ["json", "text"]
-				}
-			}
-			proxy: enabled: true
+			encoding: enabled: false
+			proxy: enabled:    true
 			request: {
 				enabled: true
 				headers: false
@@ -83,6 +76,19 @@ components: sinks: splunk_hec: {
 	}
 
 	configuration: {
+		default_namespace: {
+			common: false
+			description: """
+				Used as a namespace for metrics that don't have it.
+				A namespace will be prefixed to a metric's name.
+				"""
+			required: false
+			type: string: {
+				default: null
+				examples: ["service"]
+				syntax: "literal"
+			}
+		}
 		endpoint: {
 			description: "The base URL of the Splunk instance."
 			required:    true
@@ -94,9 +100,9 @@ components: sinks: splunk_hec: {
 		host_key: {
 			common:      true
 			description: """
-				The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
+        				The name of the field to be used as the hostname sent to Splunk HEC. This overrides the
+        				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
+        				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -106,7 +112,7 @@ components: sinks: splunk_hec: {
 			}
 		}
 		index: {
-			common:      false
+			common:      true
 			description: "The name of the index where send the events to. If not specified, the default index is used."
 			required:    false
 			warnings: []
@@ -116,22 +122,9 @@ components: sinks: splunk_hec: {
 				syntax: "template"
 			}
 		}
-		indexed_fields: {
-			common:      true
-			description: "Fields to be [added to Splunk index](\(urls.splunk_hec_indexed_fields))."
-			required:    false
-			warnings: []
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["field1", "field2"]
-					syntax: "field_path"
-				}
-			}
-		}
 		source: {
-			common:      false
-			description: "The source of events sent to this sink. Typically the filename the logs originated from. If unset, the Splunk collector will set it."
+			common:      true
+			description: "The source of events sent to this sink. If unset, the Splunk collector will set it."
 			required:    false
 			warnings: []
 			type: string: {
@@ -141,7 +134,7 @@ components: sinks: splunk_hec: {
 			}
 		}
 		sourcetype: {
-			common:      false
+			common:      true
 			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
 			required:    false
 			warnings: []
@@ -163,16 +156,20 @@ components: sinks: splunk_hec: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
+		logs: false
+		metrics: {
+			counter:      true
+			distribution: false
+			gauge:        true
+			histogram:    false
+			set:          false
+			summary:      false
+		}
 	}
 
 	telemetry: metrics: {
-		encode_errors_total:       components.sources.internal_metrics.output.metrics.encode_errors_total
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		processing_errors_total:   components.sources.internal_metrics.output.metrics.processing_errors_total
-		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:    components.sources.internal_metrics.output.metrics.processed_events_total
-		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
+		encode_errors_total:     components.sources.internal_metrics.output.metrics.encode_errors_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
 	}
 }

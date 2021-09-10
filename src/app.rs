@@ -29,6 +29,7 @@ use crate::internal_events::{
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
+    pub pipeline_paths: Vec<PathBuf>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -83,15 +84,12 @@ impl Application {
             LogFormat::Json => true,
         };
 
-        let enable_datadog_tracing = root_opts.enable_datadog_tracing;
-
         metrics::init().expect("metrics initialization failed");
+        trace::init(color, json, &level);
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
-                // Unforunately we can't `error!` here because we haven't yet called `trace::init`,
-                // and we can't call that without a runtime available.
-                println!("Config error: The `threads` argument must be greater or equal to 1.");
+                error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             }
         }
@@ -104,18 +102,9 @@ impl Application {
                 .expect("Unable to create async runtime")
         };
 
-        // We need a runtime to initiate the datadog tracing exporter
-        rt.block_on(async move {
-            trace::init(color, json, &level, enable_datadog_tracing);
-            info!(
-                message = "Log level is enabled.",
-                ?level,
-                ?enable_datadog_tracing
-            );
-        });
-
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
+            let pipeline_paths = root_opts.pipeline_paths();
             let watch_config = root_opts.watch_config;
             let require_healthy = root_opts.require_healthy;
 
@@ -145,6 +134,8 @@ impl Application {
                     return Err(code);
                 };
 
+                info!(message = "Log level is enabled.", level = ?level);
+
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 
                 if watch_config {
@@ -161,12 +152,16 @@ impl Application {
                     paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
-                config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
+                config::init_log_schema(&config_paths, pipeline_paths, true)
+                    .map_err(handle_config_errors)?;
 
-                let mut config =
-                    config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
-                        .await
-                        .map_err(handle_config_errors)?;
+                let mut config = config::load_from_paths_with_provider(
+                    &config_paths,
+                    pipeline_paths,
+                    &mut signal_handler,
+                )
+                .await
+                .map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -190,6 +185,7 @@ impl Application {
 
                 Ok(ApplicationConfig {
                     config_paths,
+                    pipeline_paths: pipeline_paths.clone(),
                     topology,
                     graceful_crash,
                     #[cfg(feature = "api")]
@@ -296,7 +292,7 @@ impl Application {
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider(&config_paths, opts.pipeline_paths(), &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 
@@ -361,8 +357,6 @@ impl Application {
                 }
                 _ => unreachable!(),
             }
-
-            opentelemetry::global::shutdown_tracer_provider();
         });
     }
 }

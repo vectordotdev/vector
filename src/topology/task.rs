@@ -1,5 +1,5 @@
 use crate::buffers::{Acker, EventStream};
-use crate::config::ComponentKey;
+use crate::config::{ComponentKey, ComponentScope};
 use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use std::{
@@ -22,25 +22,33 @@ pub enum TaskOutput {
 pub struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
-    id: ComponentKey,
+    key: ComponentKey,
     typetag: String,
 }
 
 impl Task {
-    pub fn new<S, Fut>(id: ComponentKey, typetag: S, inner: Fut) -> Self
+    pub fn new<S, Fut>(key: ComponentKey, typetag: S, inner: Fut) -> Self
     where
         S: Into<String>,
         Fut: Future<Output = Result<TaskOutput, ()>> + Send + 'static,
     {
         Self {
             inner: inner.boxed(),
-            id,
+            key,
             typetag: typetag.into(),
         }
     }
 
-    pub fn id(&self) -> &ComponentKey {
-        &self.id
+    pub const fn key(&self) -> &ComponentKey {
+        &self.key
+    }
+
+    pub fn id(&self) -> &str {
+        self.key.id()
+    }
+
+    pub const fn scope(&self) -> &ComponentScope {
+        self.key.scope()
     }
 
     pub fn typetag(&self) -> &str {
@@ -60,7 +68,8 @@ impl Future for Task {
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
-            .field("id", &self.id.to_string())
+            .field("id", &self.key.id().to_string())
+            .field("scope", &self.scope().to_string())
             .field("typetag", &self.typetag)
             .finish()
     }

@@ -51,7 +51,7 @@ struct FrameStreamState {
     is_bidirectional: bool,
 }
 impl FrameStreamState {
-    fn new() -> Self {
+    const fn new() -> Self {
         FrameStreamState {
             expect_control_frame: false,
             //first control frame should be READY (if bidirectional -- if unidirectional first will be START)
@@ -93,7 +93,7 @@ impl ControlHeader {
         }
     }
 
-    fn to_u32(self) -> u32 {
+    const fn to_u32(self) -> u32 {
         match self {
             ControlHeader::Accept => 0x01,
             ControlHeader::Start => 0x02,
@@ -118,7 +118,7 @@ impl ControlField {
             }
         }
     }
-    fn to_u32(&self) -> u32 {
+    const fn to_u32(&self) -> u32 {
         match self {
             ControlField::ContentType => 0x01,
         }

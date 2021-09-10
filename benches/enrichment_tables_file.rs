@@ -87,14 +87,11 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     };
 
     group.bench_function("enrichment_tables/file_date_10", |b| {
-        let (file, index, condition, expected) = setup(10, true, Case::Sensitive);
+        let (file, index, condition, expected) = setup(10, true);
         b.iter_batched(
             || (&file, &condition, expected.clone()),
             |(file, condition, expected)| {
-                assert_eq!(
-                    Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, Some(index))
-                )
+                assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
             },
             BatchSize::SmallInput,
         );

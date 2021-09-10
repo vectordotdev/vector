@@ -27,8 +27,9 @@ pub struct BatchConfig {
 }
 
 impl BatchConfig {
-    // This is used internally by new_relic_logs sink, else it could be pub(super) too
-    pub fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
+    // This is used internally by new_relic_logs sink, else it could be
+    // pub(super) too
+    pub const fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
         let max_bytes = match (self.max_bytes, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
             (Some(bytes), None) => Some(bytes),
@@ -42,7 +43,7 @@ impl BatchConfig {
         })
     }
 
-    pub(super) fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
+    pub(super) const fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
         match self.max_bytes {
@@ -51,7 +52,7 @@ impl BatchConfig {
         }
     }
 
-    pub(super) fn use_size_as_events(&self) -> Result<Self, BatchError> {
+    pub(super) const fn use_size_as_events(&self) -> Result<Self, BatchError> {
         let max_events = match (self.max_events, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
             (Some(events), None) => Some(events),
@@ -86,11 +87,8 @@ impl BatchConfig {
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derivative(Copy(bound = ""))]
-#[derivative(Default(bound = ""))]
 pub struct BatchSize<B> {
-    #[derivative(Default(value = "usize::max_value()"))]
     pub bytes: usize,
-    #[derivative(Default(value = "usize::max_value()"))]
     pub events: usize,
     // This type marker is used to drive type inference, which allows us
     // to call the right Batch::get_settings_defaults without explicitly
@@ -98,10 +96,25 @@ pub struct BatchSize<B> {
     _type_marker: PhantomData<B>,
 }
 
+impl<B> BatchSize<B> {
+    pub const fn const_default() -> Self {
+        BatchSize {
+            bytes: usize::max_value(),
+            events: usize::max_value(),
+            _type_marker: PhantomData,
+        }
+    }
+}
+
+impl<B> Default for BatchSize<B> {
+    fn default() -> Self {
+        BatchSize::const_default()
+    }
+}
+
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derivative(Copy(bound = ""))]
-#[derivative(Default(bound = ""))]
 pub struct BatchSettings<B> {
     pub size: BatchSize<B>,
     pub timeout: Duration,
@@ -114,6 +127,13 @@ impl<B: Batch> BatchSettings<B> {
 }
 
 impl<B> BatchSettings<B> {
+    pub const fn const_default() -> Self {
+        BatchSettings {
+            size: BatchSize::const_default(),
+            timeout: Duration::from_nanos(0),
+        }
+    }
+
     // Fake the builder pattern
     pub const fn bytes(self, bytes: u64) -> Self {
         Self {
@@ -151,6 +171,12 @@ impl<B> BatchSettings<B> {
             },
             timeout: self.timeout,
         }
+    }
+}
+
+impl<B> Default for BatchSettings<B> {
+    fn default() -> Self {
+        BatchSettings::const_default()
     }
 }
 
@@ -266,10 +292,11 @@ impl<B: Batch> From<B> for StatefulBatch<B> {
 }
 
 impl<B> StatefulBatch<B> {
-    pub fn was_full(&self) -> bool {
+    pub const fn was_full(&self) -> bool {
         self.was_full
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_inner(self) -> B {
         self.inner
     }
@@ -314,5 +341,33 @@ impl<B: Batch> Batch for StatefulBatch<B> {
 
     fn num_items(&self) -> usize {
         self.inner.num_items()
+    }
+}
+
+impl Batch for () {
+    type Input = ();
+    type Output = ();
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(config.get_settings_or_default(defaults))
+    }
+
+    fn push(&mut self, _item: Self::Input) -> PushResult<Self::Input> {
+        PushResult::Ok(false)
+    }
+
+    fn is_empty(&self) -> bool {
+        true
+    }
+
+    fn fresh(&self) -> Self {}
+
+    fn finish(self) -> Self::Output {}
+
+    fn num_items(&self) -> usize {
+        0
     }
 }
