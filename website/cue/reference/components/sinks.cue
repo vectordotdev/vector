@@ -163,6 +163,10 @@ components: sinks: [Name=string]: {
 								required:    true
 								type: string: {
 									examples: features.send.encoding.codec.enum
+									enum: {
+										json: "Array of JSON objects, which must be a JSON array containing JSON objects."
+										text: "Newline-delimited text, with each line forming a message."
+										}
 									syntax:   "literal"
 								}
 							}
