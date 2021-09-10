@@ -97,7 +97,7 @@ impl DatadogLogsConfig {
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
-        let batch_timeout = self.batch.timeout_secs.map(|x| Duration::from_secs(x));
+        let batch_timeout = self.batch.timeout_secs.map(Duration::from_secs);
 
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
@@ -115,7 +115,7 @@ impl DatadogLogsConfig {
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let healthcheck =
-            healthcheck(client.clone(), self.get_uri(), self.default_api_key.clone()).boxed();
+            healthcheck(client, self.get_uri(), self.default_api_key.clone()).boxed();
         Ok(healthcheck)
     }
 
