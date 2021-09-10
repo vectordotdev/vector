@@ -69,22 +69,23 @@ impl<S> LogSinkBuilder<S> {
         }
     }
 
-    pub fn log_schema(mut self, log_schema: &'static LogSchema) -> Self {
+    pub const fn log_schema(mut self, log_schema: &'static LogSchema) -> Self {
         self.log_schema = Some(log_schema);
         self
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn encoding(mut self, encoding: EncodingConfigWithDefault<Encoding>) -> Self {
         self.encoding = encoding;
         self
     }
 
-    pub fn compression(mut self, compression: Compression) -> Self {
+    pub const fn compression(mut self, compression: Compression) -> Self {
         self.compression = Some(compression);
         self
     }
 
-    pub fn batch_timeout(mut self, duration: Option<Duration>) -> Self {
+    pub const fn batch_timeout(mut self, duration: Option<Duration>) -> Self {
         self.timeout = duration;
         self
     }

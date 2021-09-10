@@ -84,7 +84,7 @@ pub struct LogApiService {
 }
 
 impl LogApiService {
-    pub fn new(client: HttpClient, uri: Uri) -> Self {
+    pub const fn new(client: HttpClient, uri: Uri) -> Self {
         Self { client, uri }
     }
 }

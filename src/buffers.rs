@@ -73,7 +73,7 @@ impl BufferConfig {
 
     /// Resources that the sink is using.
     #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
-    pub fn resources(&self, sink_id: &str) -> Vec<Resource> {
+    pub const fn resources(&self, sink_id: &str) -> Vec<Resource> {
         match self {
             BufferConfig::Memory { .. } => Vec::new(),
             #[cfg(feature = "disk-buffer")]
