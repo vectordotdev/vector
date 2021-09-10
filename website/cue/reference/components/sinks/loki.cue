@@ -28,8 +28,7 @@ components: sinks: loki: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: "json"
-					enum: ["json", "logfmt",  "text"]
+					enum: ["json", "logfmt", "text"]
 				}
 			}
 			proxy: enabled: true
@@ -203,11 +202,11 @@ components: sinks: loki: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total:          components.sources.internal_metrics.output.metrics.events_out_total
-		events_discarded_total:    components.sources.internal_metrics.output.metrics.events_discarded_total
-		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processing_errors_total:   components.sources.internal_metrics.output.metrics.processing_errors_total
-		streams_total:			   components.sources.internal_metrics.output.metrics.streams_total
+		events_in_total:         components.sources.internal_metrics.output.metrics.events_in_total
+		events_out_total:        components.sources.internal_metrics.output.metrics.events_out_total
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
+		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		streams_total:           components.sources.internal_metrics.output.metrics.streams_total
 	}
 }
