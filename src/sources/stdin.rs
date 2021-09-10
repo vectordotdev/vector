@@ -110,17 +110,27 @@ where
 
             let mut bytes = BytesMut::from(line.as_bytes());
 
-            while let Ok(Some((events, _))) = decoder.decode_eof(&mut bytes) {
-                for mut event in events {
-                    let log = event.as_mut_log();
+            loop {
+                match decoder.decode_eof(&mut bytes) {
+                    Ok(Some((events, _))) => {
+                        for mut event in events {
+                            let log = event.as_mut_log();
 
-                    log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                            log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
 
-                    if let Some(hostname) = &hostname {
-                        log.insert(&host_key, hostname.clone());
+                            if let Some(hostname) = &hostname {
+                                log.insert(&host_key, hostname.clone());
+                            }
+
+                            let _ = out.send(event).await;
+                        }
                     }
-
-                    let _ = out.send(event).await;
+                    Ok(None) => break,
+                    Err(_) => {
+                        // Error is logged by `crate::codecs::Decoder`, no
+                        // further handling is needed here.
+                        break;
+                    }
                 }
             }
         }
