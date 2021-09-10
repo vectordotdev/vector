@@ -25,6 +25,10 @@ impl InternalEvent for PrometheusEventReceived {
             "uri" => format!("{}",self.uri),
         );
         counter!(
+            "events_in_total", self.count as u64,
+            "uri" => format!("{}",self.uri),
+        );
+        counter!(
             "processed_bytes_total", self.byte_size as u64,
             "uri" => format!("{}",self.uri),
         );

@@ -22,6 +22,10 @@ impl InternalEvent for ExecEventReceived<'_> {
             "command" => self.command.to_owned(),
         );
         counter!(
+            "events_in_total", 1,
+            "command" => self.command.to_owned(),
+        );
+        counter!(
             "processed_bytes_total", self.byte_size as u64,
             "command" => self.command.to_owned(),
         );
