@@ -206,10 +206,16 @@ impl File {
         })
     }
 
-    fn add_columns(&self, row: &[Value]) -> BTreeMap<String, Value> {
+    fn add_columns(&self, select: Option<&[String]>, row: &[Value]) -> BTreeMap<String, Value> {
         self.headers
             .iter()
             .zip(row)
+            .filter(|(header, _)| {
+                select
+                    .map(|select| select.contains(header))
+                    // If no select is passed, we assume all columns are included
+                    .unwrap_or(true)
+            })
             .map(|(header, col)| (header.clone(), col.clone()))
             .collect()
     }
@@ -266,13 +272,14 @@ impl File {
         &'a self,
         data: I,
         condition: &'a [Condition<'a>],
+        select: Option<&'a [String]>,
     ) -> impl Iterator<Item = BTreeMap<String, Value>> + 'a
     where
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
         data.filter_map(move |row| {
             if self.row_equals(condition, &*row) {
-                Some(self.add_columns(&*row))
+                Some(self.add_columns(select, &*row))
             } else {
                 None
             }
@@ -346,12 +353,13 @@ impl Table for File {
     fn find_table_row<'a>(
         &self,
         condition: &'a [Condition<'a>],
+        select: Option<&'a [String]>,
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, Value>, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
-                single_or_err(self.sequential(self.data.iter(), condition))
+                single_or_err(self.sequential(self.data.iter(), condition, select))
             }
             Some(handle) => {
                 let result = self
@@ -361,7 +369,7 @@ impl Table for File {
                     .map(|idx| &self.data[*idx]);
 
                 // Perform a sequential scan over the indexed result.
-                single_or_err(self.sequential(result, condition))
+                single_or_err(self.sequential(result, condition, select))
             }
         }
     }
@@ -369,12 +377,15 @@ impl Table for File {
     fn find_table_rows<'a>(
         &self,
         condition: &'a [Condition<'a>],
+        select: Option<&'a [String]>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<BTreeMap<String, Value>>, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
-                Ok(self.sequential(self.data.iter(), condition).collect())
+                Ok(self
+                    .sequential(self.data.iter(), condition, select)
+                    .collect())
             }
             Some(handle) => {
                 // Perform a sequential scan over the indexed result.
@@ -384,6 +395,7 @@ impl Table for File {
                             .iter()
                             .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
                         condition,
+                        select,
                     )
                     .collect())
             }
@@ -461,7 +473,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(&[condition], None)
+            file.find_table_row(&[condition], None, None)
         );
     }
 
@@ -505,7 +517,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(&[condition], Some(handle))
+            file.find_table_row(&[condition], None, Some(handle))
         );
     }
 
@@ -538,7 +550,48 @@ mod tests {
                     "field2" => "zoop",
                 }
             ]),
-            file.find_table_rows(&[condition], Some(handle))
+            file.find_table_rows(&[condition], None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn selects_columns() {
+        let mut file = File::new(
+            vec![
+                vec!["zip".into(), "zup".into(), "zoop".into()],
+                vec!["zirp".into(), "zurp".into(), "zork".into()],
+                vec!["zip".into(), "zoop".into(), "zibble".into()],
+            ],
+            vec![
+                "field1".to_string(),
+                "field2".to_string(),
+                "field3".to_string(),
+            ],
+        );
+
+        let handle = file.add_index(&["field1"]).unwrap();
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("zip"),
+        };
+
+        assert_eq!(
+            Ok(vec![
+                btreemap! {
+                    "field1" => "zip",
+                    "field3" => "zoop",
+                },
+                btreemap! {
+                    "field1" => "zip",
+                    "field3" => "zibble",
+                }
+            ]),
+            file.find_table_rows(
+                &[condition],
+                Some(&["field1".to_string(), "field3".to_string()]),
+                Some(handle)
+            )
         );
     }
 
@@ -577,7 +630,7 @@ mod tests {
                 "field1" => "zip",
                 "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
             }),
-            file.find_table_row(&conditions, Some(handle))
+            file.find_table_row(&conditions, None, Some(handle))
         );
     }
 
@@ -598,7 +651,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(&[condition], None)
+            file.find_table_row(&[condition], None, None)
         );
     }
 
@@ -621,7 +674,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found in index".to_string()),
-            file.find_table_row(&[condition], Some(handle))
+            file.find_table_row(&[condition], None, Some(handle))
         );
     }
 }

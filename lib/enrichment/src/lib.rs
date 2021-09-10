@@ -37,6 +37,7 @@ pub trait Table: DynClone {
     fn find_table_row<'a>(
         &self,
         condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String>;
 
@@ -46,6 +47,7 @@ pub trait Table: DynClone {
     fn find_table_rows<'a>(
         &self,
         condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String>;
 

@@ -90,7 +90,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         b.iter_batched(
             || (&file, &condition, expected.clone()),
             |(file, condition, expected)| {
-                assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
+                assert_eq!(
+                    Ok(expected),
+                    file.find_table_row(condition, None, Some(index))
+                )
             },
             BatchSize::SmallInput,
         );
@@ -101,7 +104,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         b.iter_batched(
             || (&file, index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
-                assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
+                assert_eq!(
+                    Ok(expected),
+                    file.find_table_row(condition, None, Some(index))
+                )
             },
             BatchSize::SmallInput,
         );
@@ -112,7 +118,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         b.iter_batched(
             || (&file, &condition, expected.clone()),
             |(file, condition, expected)| {
-                assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
+                assert_eq!(
+                    Ok(expected),
+                    file.find_table_row(condition, None, Some(index))
+                )
             },
             BatchSize::SmallInput,
         );
@@ -123,7 +132,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         b.iter_batched(
             || (&file, index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
-                assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
+                assert_eq!(
+                    Ok(expected),
+                    file.find_table_row(condition, None, Some(index))
+                )
             },
             BatchSize::SmallInput,
         );
@@ -134,7 +146,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         b.iter_batched(
             || (&file, &condition, expected.clone()),
             |(file, condition, expected)| {
-                assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
+                assert_eq!(
+                    Ok(expected),
+                    file.find_table_row(condition, None, Some(index))
+                )
             },
             BatchSize::SmallInput,
         );
@@ -145,7 +160,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         b.iter_batched(
             || (&file, index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
-                assert_eq!(Ok(expected), file.find_table_row(condition, Some(index)))
+                assert_eq!(
+                    Ok(expected),
+                    file.find_table_row(condition, None, Some(index))
+                )
             },
             BatchSize::SmallInput,
         );

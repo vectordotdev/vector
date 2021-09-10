@@ -31,6 +31,7 @@ impl Table for DummyEnrichmentTable {
     fn find_table_row(
         &self,
         _condition: &[Condition],
+        _select: Option<&[String]>,
         _index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, Value>, String> {
         Ok(self.data.clone())
@@ -39,6 +40,7 @@ impl Table for DummyEnrichmentTable {
     fn find_table_rows(
         &self,
         _condition: &[Condition],
+        _select: Option<&[String]>,
         _index: Option<IndexHandle>,
     ) -> Result<Vec<BTreeMap<String, Value>>, String> {
         Ok(vec![self.data.clone()])

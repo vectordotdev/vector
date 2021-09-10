@@ -24,6 +24,11 @@ impl Function for GetEnrichmentTableRecord {
                 kind: kind::OBJECT,
                 required: true,
             },
+            Parameter {
+                keyword: "select",
+                kind: kind::ARRAY,
+                required: false,
+            },
         ]
     }
 
@@ -49,10 +54,33 @@ impl Function for GetEnrichmentTableRecord {
             .into_owned();
         let condition = arguments.required_object("condition")?;
 
+        let select = arguments
+            .optional_array("select")?
+            .map(|select| {
+                select
+                    .into_iter()
+                    .map(|expr| {
+                        let err = || vrl_core::function::Error::ExpectedStaticExpression {
+                            keyword: "select",
+                            expr: expr.clone(),
+                        };
+
+                        let value = expr.as_value().ok_or_else(err)?;
+
+                        Ok(value
+                            .try_bytes_utf8_lossy()
+                            .map_err(|_| err())?
+                            .into_owned())
+                    })
+                    .collect::<std::result::Result<Vec<_>, vrl_core::function::Error>>()
+            })
+            .transpose()?;
+
         Ok(Box::new(GetEnrichmentTableRecordFn {
             table,
             condition,
             index: None,
+            select,
             enrichment_tables: registry.as_readonly(),
         }))
     }
@@ -63,6 +91,7 @@ pub struct GetEnrichmentTableRecordFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
     index: Option<IndexHandle>,
+    select: Option<Vec<String>>,
     enrichment_tables: TableSearch,
 }
 
@@ -79,9 +108,12 @@ impl Expression for GetEnrichmentTableRecordFn {
             })
             .collect::<Result<Vec<Condition>>>()?;
 
-        let data = self
-            .enrichment_tables
-            .find_table_row(&self.table, &condition, self.index)?;
+        let data = self.enrichment_tables.find_table_row(
+            &self.table,
+            &condition,
+            self.select.as_ref().map(|select| select.as_ref()),
+            self.index,
+        )?;
 
         Ok(Value::Object(data))
     }
@@ -117,6 +149,7 @@ mod tests {
                 "field" =>  expression::Literal::from("value"),
             },
             index: Some(IndexHandle(999)),
+            select: None,
             enrichment_tables: registry.as_readonly(),
         };
 
@@ -142,6 +175,7 @@ mod tests {
                 "field" =>  expression::Literal::from("value"),
             },
             index: None,
+            select: None,
             enrichment_tables: registry.as_readonly(),
         };
 
