@@ -28,7 +28,6 @@ components: sinks: loki: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: "json"
 					enum: ["json", "text"]
 				}
 			}

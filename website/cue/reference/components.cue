@@ -350,7 +350,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						default: #EncodingCodec | null
+						batched: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
