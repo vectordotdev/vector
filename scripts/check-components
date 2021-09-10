@@ -1,0 +1,258 @@
+#!/usr/bin/ruby
+# coding: utf-8
+
+require 'find'
+
+COMMON_EVENTS = ['EventsReceived', 'EventsSent']
+SOURCE_EVENTS = ['BytesReceived'] + COMMON_EVENTS
+SINK_EVENTS = COMMON_EVENTS + ['BytesSent']
+# Transforms implicitly handle the common events in the topology, and
+# have no other emit requirements.
+TRANSFORM_EVENTS = []
+
+$error_count = 0
+
+def hash_array_add(hash, key, item)
+  arr = hash.fetch(key, Array::new)
+  arr.append(item)
+  hash[key] = arr
+end
+
+# Reduce a path to a component name, used to group all the emits for a
+# component that may be split over multiple files.
+def path_component(path)
+  parts = path.split('/')
+  parts.shift # Drop the leading 'src'
+  group = parts.shift
+  component = parts.shift
+
+  # Skip the top-level module files and utilities
+  if component == 'mod.rs' or component == 'util'
+    return nil
+  end
+
+  if component == 'gcp'
+    component = "gcp_#{parts.shift}"
+  end
+
+  if component.end_with? '.rs'
+    component = component[..-4]
+  end
+  return "#{group}/#{component}"
+end
+
+# A class to hold error reports and common functionality
+class Event
+  def initialize(name)
+    @path = nil
+    @name = name
+    @reports = []
+    @members = []
+    @counters = []
+    @logs = []
+  end
+
+  def path(path)
+    @path = path
+  end
+
+  def members(list)
+    @members = list
+  end
+
+  def add_counter(name, tags)
+    @counters.append(name)
+  end
+
+  def add_log(type, message, parameters)
+    @logs.append([type, message, parameters])
+  end
+
+  def validate
+    # Check BytesReceived events (for sources)
+    if @name.end_with? 'BytesReceived'
+      members_must_include(['byte_size'])
+      counters_must_include(['received_bytes_total'])
+    end
+
+    # Check EventsReceived events (common)
+    if @name.end_with? 'EventsReceived'
+      members_must_include(['count', 'byte_size'])
+      counters_must_include(['received_events_total', 'received_event_bytes_total'])
+    end
+
+    # Check EventsSent events (common)
+    if @name.end_with? 'EventsSent'
+      members_must_include(['count', 'bytes_sent'])
+      counters_must_include(['sent_events_total', 'sent_event_bytes_total'])
+    end
+
+    # Check BytesSent events (for sinks)
+    if @name.end_with? 'BytesSent'
+      members_must_include(['byte_size'])
+    end
+
+    has_errors = @logs.one? { |type, _, _| type == 'error' }
+
+    # Make sure Error events output an error
+    if has_errors or @name.end_with? 'Error'
+      append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
+      counters_must_include(['errors_total'])
+    end
+
+    # Make sure error events contain the right parameters
+    @logs.each { |type, message, parameters|
+      if type == 'error'
+        ['error', 'stage'].each { |parameter|
+          unless parameters.include? parameter
+            @reports.append("Error log MUST include parameter \"#{parameter}\".")
+          end
+        }
+      end
+    }
+
+    unless @reports.empty?
+      puts "#{@path}: Errors in event #{@name}:"
+      @reports.each { |report|
+        puts "    #{report}"
+        $error_count += 1
+      }
+    end
+  end
+
+  private
+
+  def append(report)
+    @reports.append(report)
+  end
+
+  def generic_must_contain(array, names, prefix, suffix)
+    names.each { |name|
+      unless array.include? name
+        @reports.append("#{prefix} MUST #{suffix} \"#{name}\".")
+      end
+    }
+  end
+
+  def counters_must_include(names)
+    generic_must_contain(@counters, names, 'This event', 'increment counter')
+    # TODO: Scan each counter for parameters
+  end
+
+  def members_must_include(names)
+    generic_must_contain(@members, names, 'This event', 'have a member named')
+  end
+end
+
+class Component
+  def initialize(name)
+    @name = name
+    @emits = []
+  end
+
+  def emits(array)
+    @emits += array
+  end
+
+  def validate
+    @missing = []
+    require_events(SOURCE_EVENTS) if @name.start_with? 'sources/'
+    require_events(TRANSFORM_EVENTS) if @name.start_with? 'transforms/'
+    require_events(SINK_EVENTS) if @name.start_with? 'sinks/'
+
+    if @missing.length > 0
+      puts "#{@name}: Missing required event:"
+      @missing.each { |event|
+        puts "    #{event}"
+        $error_count += 1
+      }
+    end
+  end
+
+  private
+
+  def require_events(names)
+    names.each { |name|
+      if @emits.none? { |event| event.end_with? name }
+        @missing.append(name)
+      end
+    }
+  end
+end
+
+$all_events = Hash::new { |hash, key| hash[key] = Event::new(key) }
+$all_components = Hash::new { |hash, key| hash[key] = Component::new(key) }
+
+# Scan sources and build internal structures
+Find.find('src') { |path|
+  if path.end_with? '.rs'
+    text = File.read(path)
+
+    # Check log message texts for correct formatting. See below for the
+    # full regex
+    text.scan(/(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^({)][^("]+)"/) {
+      |type, has_message_prefix, message|
+      reports = []
+      reports.append('Message must start with a capital.') unless message.match(/^[[:upper:]]/)
+      reports.append('Message must end with a period.') unless message.match(/\.$/)
+      unless reports.empty?
+        puts "#{path}: Errors in message \"#{message}\":"
+        reports.each { |report| puts "  #{report}" }
+        $error_count += 1
+      end
+    }
+
+    if path.start_with? 'src/internal_events/'
+      # Scan internal event structs for member names
+      text.scan(/[\n ]struct (\S+?)(?:<.+?>)? {\n(.+?)\n}\n/m) { |struct_name, members|
+        $all_events[struct_name].path(path)
+        member_names = members.scan(/ ([A-Za-z0-9_]+): /).map { |member,| member }
+        $all_events[struct_name].members(member_names)
+      }
+
+      # Scan internal event implementation blocks for logs and metrics
+      text.scan(/^impl InternalEvent for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n}$/m) { |event_name, block|
+        # Scan for counter names
+        # TODO: parse out tags
+        block.scan(/ counter!\("([^"]+)"/) { |name,|
+          $all_events[event_name].add_counter(name, [])
+        }
+
+        # Scan for log outputs and their parameters
+        block.scan(/
+                    (trace|debug|info|warn|error)! # The log type
+                    \(\s*(?:message\s*=\s*)? # Skip any leading "message =" bit
+                    "([^({)][^("]+)" # The log message text
+                    ([^;]*?) # Match the parameter list
+                    \)(?:;|\n\s*}) # Normally would end with simply ");", but some are missing the semicolon
+                   /mx) { |type, message, parameters|
+          parameters = parameters.scan(/([a-z0-9_]+) *= .|[?%]([a-z0-9_.]+)/) \
+                         .map { |assignment, simple| assignment or simple }
+
+          $all_events[event_name].add_log(type, message, parameters)
+        }
+      }
+
+    # Scan all the source, transform, and sink components for all
+    # internal events they emit, to be handled below.
+    elsif path.start_with? 'src/sinks/' or path.start_with? 'src/sources/' or path.start_with? 'src/transforms/'
+      component_name = path_component(path)
+
+      if component_name
+        emits = text.scan(/emit!\(([A-Za-z0-9]+)/).map { |name,| name }
+        $all_components[component_name].emits(emits)
+      end
+    end
+  end
+}
+
+$all_events.each_value { |event|
+  event.validate
+}
+
+$all_components.each_value { |component|
+  component.validate
+}
+
+puts "#{$error_count} error(s)"
+exit 1 if $error_count > 0
