@@ -7,7 +7,7 @@ use crate::{
     buffers,
     config::{ComponentKey, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
     event::Event,
-    internal_events::{EventIn, EventOut},
+    internal_events::{EventsReceived, EventsSent},
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
@@ -22,6 +22,7 @@ use std::{
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
+use vector_core::ByteSizeOf;
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
@@ -177,11 +178,19 @@ pub async fn build_pieces(
         let transform = match transform {
             Transform::Function(mut t) => input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
-                .inspect(|_| emit!(EventIn))
+                .inspect(|event| {
+                    emit!(EventsReceived {
+                        count: 1,
+                        byte_size: event.size_of(),
+                    })
+                })
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
-                    emit!(EventOut { count: buf.len() });
+                    emit!(EventsSent {
+                        count: buf.len(),
+                        byte_size: buf.iter().map(|event| event.size_of()).sum(),
+                    });
                     stream::iter(buf.into_iter()).map(Ok)
                 })
                 .forward(output)
@@ -189,11 +198,19 @@ pub async fn build_pieces(
             Transform::Task(t) => {
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventIn));
+                    .inspect(|event| {
+                        emit!(EventsReceived {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        })
+                    });
                 t.transform(Box::pin(filtered))
                     .map(Ok)
-                    .forward(output.with(|event| async {
-                        emit!(EventOut { count: 1 });
+                    .forward(output.with(|event: Event| async {
+                        emit!(EventsSent {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        });
                         Ok(event)
                     }))
                     .boxed()
@@ -271,7 +288,12 @@ pub async fn build_pieces(
             sink.run(
                 rx.by_ref()
                     .filter(|event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventIn))
+                    .inspect(|event| {
+                        emit!(EventsReceived {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        })
+                    })
                     .take_until_if(tripwire),
             )
             .await
