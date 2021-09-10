@@ -20,7 +20,8 @@ mod tests;
 
 mod config;
 mod healthcheck;
-mod log_api;
+mod service;
+mod sink;
 
 use crate::config::SinkDescription;
 use crate::sinks::datadog::logs::config::DatadogLogsConfig;
