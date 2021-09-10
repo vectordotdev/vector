@@ -83,7 +83,11 @@ where
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
-    // Start the background thread
+    // Spawn background thread with blocking I/O to process stdin.
+    //
+    // This is recommended by Tokio, as otherwise the process will not shut down
+    // until another newline is entered. See
+    // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
     thread::spawn(move || {
         info!("Capturing STDIN.");
 
