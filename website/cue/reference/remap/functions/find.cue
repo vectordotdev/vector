@@ -35,28 +35,28 @@ remap: functions: find: {
 		{
 			title: "Match text"
 			source: #"""
-					find("foobar", "foo")
+				find("foobar", "foo")
 				"""#
 			return: 0
 		},
 		{
 			title: "Match regex"
 			source: #"""
-					find("foobar", r'b.r')
+				find("foobar", r'b.r')
 				"""#
 			return: 3
 		},
 		{
 			title: "No matches"
 			source: #"""
-					find("foobar", "baz")
+				find("foobar", "baz")
 				"""#
 			return: -1
 		},
 		{
 			title: "With an offset"
 			source: #"""
-					find("foobarfoobarfoo", "bar", 4)
+				find("foobarfoobarfoo", "bar", 4)
 				"""#
 			return: 9
 		},
