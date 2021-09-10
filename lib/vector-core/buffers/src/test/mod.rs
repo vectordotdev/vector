@@ -9,6 +9,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 use tokio_test::task::spawn;
 
 #[tokio::test]
+#[allow(clippy::semicolon_if_nothing_returned)] // appears to be a false positive as there is a ;
 async fn drop_when_full() {
     future::lazy(|cx| {
         let (tx, rx) = mpsc::channel(2);

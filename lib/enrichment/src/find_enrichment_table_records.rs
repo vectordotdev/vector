@@ -1,6 +1,6 @@
 use crate::{
     vrl_util::{self, add_index},
-    Condition, IndexHandle, TableRegistry, TableSearch,
+    Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 use std::collections::BTreeMap;
 use vrl_core::prelude::*;
@@ -27,6 +27,11 @@ impl Function for FindEnrichmentTableRecords {
             Parameter {
                 keyword: "select",
                 kind: kind::ARRAY,
+                required: false,
+            },
+            Parameter {
+                keyword: "case_sensitive",
+                kind: kind::BOOLEAN,
                 required: false,
             },
         ]
@@ -76,11 +81,26 @@ impl Function for FindEnrichmentTableRecords {
             })
             .transpose()?;
 
+        let case_sensitive = arguments
+            .optional_literal("case_sensitive")?
+            .map(|literal| literal.to_value().try_boolean())
+            .transpose()
+            .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
+            .map(|case_sensitive| {
+                if case_sensitive {
+                    Case::Sensitive
+                } else {
+                    Case::Insensitive
+                }
+            })
+            .unwrap_or(Case::Sensitive);
+
         Ok(Box::new(FindEnrichmentTableRecordsFn {
             table,
             condition,
             index: None,
             select,
+            case_sensitive,
             enrichment_tables: registry.as_readonly(),
         }))
     }
@@ -92,6 +112,7 @@ pub struct FindEnrichmentTableRecordsFn {
     condition: BTreeMap<String, expression::Expr>,
     index: Option<IndexHandle>,
     select: Option<Vec<String>>,
+    case_sensitive: Case,
     enrichment_tables: TableSearch,
 }
 
@@ -112,6 +133,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
             .enrichment_tables
             .find_table_rows(
                 &self.table,
+                self.case_sensitive,
                 &condition,
                 self.select.as_ref().map(|select| select.as_ref()),
                 self.index,
@@ -127,14 +149,19 @@ impl Expression for FindEnrichmentTableRecordsFn {
         &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        self.index = Some(add_index(state, &self.table, &self.condition)?);
+        self.index = Some(add_index(
+            state,
+            &self.table,
+            self.case_sensitive,
+            &self.condition,
+        )?);
         Ok(())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
-            .infallible()
-            .add_object::<(), Kind>(map! { (): Kind::Bytes })
+            .fallible()
+            .array_mapped::<(), Kind>(map! { (): Kind::Object })
     }
 }
 
@@ -146,7 +173,7 @@ mod tests {
     use shared::{btreemap, TimeZone};
 
     #[test]
-    fn find_table_rows() {
+    fn find_table_row() {
         let registry = get_table_registry();
         let func = FindEnrichmentTableRecordsFn {
             table: "dummy1".to_string(),
@@ -155,6 +182,7 @@ mod tests {
             },
             index: Some(IndexHandle(999)),
             select: None,
+            case_sensitive: Case::Sensitive,
             enrichment_tables: registry.as_readonly(),
         };
 
@@ -181,6 +209,7 @@ mod tests {
             },
             index: None,
             select: None,
+            case_sensitive: Case::Sensitive,
             enrichment_tables: registry.as_readonly(),
         };
 

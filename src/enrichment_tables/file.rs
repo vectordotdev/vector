@@ -1,6 +1,6 @@
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 use bytes::Bytes;
-use enrichment::{Condition, IndexHandle, Table};
+use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use shared::{conversion::Conversion, datetime::TimeZone};
 use std::collections::{BTreeMap, HashMap};
@@ -160,6 +160,7 @@ pub struct File {
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
     indexes: Vec<(
+        Case,
         Vec<usize>,
         HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>,
     )>,
@@ -178,22 +179,20 @@ impl File {
         self.headers.iter().position(|header| header == col)
     }
 
-    /// Currently all matches are case insensitive.
-    /// TODO We want to add a configuration option to allow for case sensitive searches. This will
-    /// allow for more performant matches.
-    fn row_equals(&self, condition: &[Condition], row: &[Value]) -> bool {
+    /// Does the given row match all the conditions specified?
+    fn row_equals(&self, case: Case, condition: &[Condition], row: &[Value]) -> bool {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
-                Some(idx) => match (&row[idx], value) {
-                    (Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
+                Some(idx) => match (case, &row[idx], value) {
+                    (Case::Insensitive, Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
                         match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
                             (Ok(s1), Ok(s2)) => s1.to_lowercase() == s2.to_lowercase(),
                             (Err(_), Err(_)) => bytes1 == bytes2,
                             _ => false,
                         }
                     }
-                    (value1, value2) => value1 == value2,
+                    (_, value1, value2) => value1 == value2,
                 },
             },
             Condition::BetweenDates { field, from, to } => match self.column_index(field) {
@@ -243,7 +242,8 @@ impl File {
     /// Ensure fields that are searched via a comparison are not included in the index!
     fn index_data(
         &self,
-        field_idx: &[usize],
+        fieldidx: &[usize],
+        case: Case,
     ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, String> {
         let mut index = HashMap::with_capacity_and_hasher(
             self.data.len(),
@@ -252,8 +252,9 @@ impl File {
 
         for (idx, row) in self.data.iter().enumerate() {
             let mut hash = seahash::SeaHasher::default();
-            for idx in field_idx {
-                hash_value(&mut hash, &row[*idx])?;
+
+            for idx in fieldidx {
+                hash_value(&mut hash, case, &row[*idx])?;
             }
 
             let key = hash.finish();
@@ -271,6 +272,7 @@ impl File {
     fn sequential<'a, I>(
         &'a self,
         data: I,
+        case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
     ) -> impl Iterator<Item = BTreeMap<String, Value>> + 'a
@@ -278,7 +280,7 @@ impl File {
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
         data.filter_map(move |row| {
-            if self.row_equals(condition, &*row) {
+            if self.row_equals(case, condition, &*row) {
                 Some(self.add_columns(select, &*row))
             } else {
                 None
@@ -288,6 +290,7 @@ impl File {
 
     fn indexed<'a>(
         &'a self,
+        case: Case,
         condition: &'a [Condition<'a>],
         handle: IndexHandle,
     ) -> Result<Option<&'a Vec<usize>>, String> {
@@ -300,29 +303,30 @@ impl File {
             if let Some(Condition::Equals { value, .. }) = condition.iter().find(
                 |condition| matches!(condition, Condition::Equals { field, .. } if field == header),
             ) {
-                hash_value(&mut hash, value)?;
+                hash_value(&mut hash, case, value)?;
             }
         }
 
         let key = hash.finish();
 
         let IndexHandle(handle) = handle;
-        Ok(self.indexes[handle].1.get(&key))
+        Ok(self.indexes[handle].2.get(&key))
     }
 }
 
 /// Adds the bytes from the given value to the hash.
 /// Each field is terminated by a `0` value to separate the fields
-fn hash_value(hasher: &mut seahash::SeaHasher, value: &Value) -> Result<(), String> {
+fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Result<(), String> {
     match value {
-        Value::Bytes(bytes) => {
-            hasher.write(
+        Value::Bytes(bytes) => match case {
+            Case::Sensitive => hasher.write(bytes),
+            Case::Insensitive => hasher.write(
                 std::str::from_utf8(bytes)
                     .map_err(|_| "column contains invalid utf".to_string())?
                     .to_lowercase()
                     .as_bytes(),
-            );
-        }
+            ),
+        },
         value => {
             let bytes: bytes::Bytes = value.encode_as_bytes()?;
             hasher.write(&bytes);
@@ -352,6 +356,7 @@ where
 impl Table for File {
     fn find_table_row<'a>(
         &self,
+        case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
         index: Option<IndexHandle>,
@@ -359,23 +364,24 @@ impl Table for File {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
-                single_or_err(self.sequential(self.data.iter(), condition, select))
+                single_or_err(self.sequential(self.data.iter(), case, condition, select))
             }
             Some(handle) => {
                 let result = self
-                    .indexed(condition, handle)?
+                    .indexed(case, condition, handle)?
                     .ok_or_else(|| "no rows found in index".to_string())?
                     .iter()
                     .map(|idx| &self.data[*idx]);
 
                 // Perform a sequential scan over the indexed result.
-                single_or_err(self.sequential(result, condition, select))
+                single_or_err(self.sequential(result, case, condition, select))
             }
         }
     }
 
     fn find_table_rows<'a>(
         &self,
+        case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
         index: Option<IndexHandle>,
@@ -384,16 +390,17 @@ impl Table for File {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
                 Ok(self
-                    .sequential(self.data.iter(), condition, select)
+                    .sequential(self.data.iter(), case, condition, select)
                     .collect())
             }
             Some(handle) => {
                 // Perform a sequential scan over the indexed result.
                 Ok(self
                     .sequential(
-                        self.indexed(condition, handle)?
+                        self.indexed(case, condition, handle)?
                             .iter()
                             .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
+                        case,
                         condition,
                         select,
                     )
@@ -402,17 +409,20 @@ impl Table for File {
         }
     }
 
-    fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
         let normalized = self.normalize_index_fields(fields);
-        match self.indexes.iter().position(|index| index.0 == normalized) {
+        match self
+            .indexes
+            .iter()
+            .position(|index| index.0 == case && index.1 == normalized)
+        {
             Some(pos) => {
-                // This index already exists.
+                // This index already exists
                 Ok(IndexHandle(pos))
             }
             None => {
-                let index = self.index_data(&normalized)?;
-                self.indexes.push((normalized, index));
-
+                let index = self.index_data(&normalized, case)?;
+                self.indexes.push((case, normalized, index));
                 // The returned index handle is the position of the index in our list of indexes.
                 Ok(IndexHandle(self.indexes.len() - 1))
             }
@@ -473,7 +483,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(&[condition], None, None)
+            file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
     }
 
@@ -488,8 +498,8 @@ mod tests {
             ],
         );
 
-        let handle1 = file.add_index(&["field2", "field3"]);
-        let handle2 = file.add_index(&["field3", "field2"]);
+        let handle1 = file.add_index(Case::Sensitive, &["field2", "field3"]);
+        let handle2 = file.add_index(Case::Sensitive, &["field3", "field2"]);
 
         assert_eq!(handle1, handle2);
         assert_eq!(1, file.indexes.len());
@@ -505,7 +515,7 @@ mod tests {
             vec!["field1".to_string(), "field2".to_string()],
         );
 
-        let handle = file.add_index(&["field1"]).unwrap();
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
 
         let condition = Condition::Equals {
             field: "field1",
@@ -517,12 +527,12 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(&[condition], None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
     }
 
     #[test]
-    fn finds_rows_with_index() {
+    fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
             vec![
                 vec!["zip".into(), "zup".into()],
@@ -532,12 +542,7 @@ mod tests {
             vec!["field1".to_string(), "field2".to_string()],
         );
 
-        let handle = file.add_index(&["field1"]).unwrap();
-
-        let condition = Condition::Equals {
-            field: "field1",
-            value: Value::from("zip"),
-        };
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
 
         assert_eq!(
             Ok(vec![
@@ -550,7 +555,28 @@ mod tests {
                     "field2" => "zoop",
                 }
             ]),
-            file.find_table_rows(&[condition], None, Some(handle))
+            file.find_table_rows(
+                Case::Sensitive,
+                &[Condition::Equals {
+                    field: "field1",
+                    value: Value::from("zip"),
+                }],
+                None,
+                Some(handle)
+            )
+        );
+
+        assert_eq!(
+            Ok(vec![]),
+            file.find_table_rows(
+                Case::Sensitive,
+                &[Condition::Equals {
+                    field: "field1",
+                    value: Value::from("ZiP"),
+                }],
+                None,
+                Some(handle)
+            )
         );
     }
 
@@ -569,7 +595,7 @@ mod tests {
             ],
         );
 
-        let handle = file.add_index(&["field1"]).unwrap();
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
 
         let condition = Condition::Equals {
             field: "field1",
@@ -588,8 +614,67 @@ mod tests {
                 }
             ]),
             file.find_table_rows(
+                Case::Sensitive,
                 &[condition],
                 Some(&["field1".to_string(), "field3".to_string()]),
+                Some(handle)
+            )
+        );
+    }
+
+    #[test]
+    fn finds_rows_with_index_case_insensitive() {
+        let mut file = File::new(
+            vec![
+                vec!["zip".into(), "zup".into()],
+                vec!["zirp".into(), "zurp".into()],
+                vec!["zip".into(), "zoop".into()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(Case::Insensitive, &["field1"]).unwrap();
+
+        assert_eq!(
+            Ok(vec![
+                btreemap! {
+                    "field1" => "zip",
+                    "field2" => "zup",
+                },
+                btreemap! {
+                    "field1" => "zip",
+                    "field2" => "zoop",
+                }
+            ]),
+            file.find_table_rows(
+                Case::Insensitive,
+                &[Condition::Equals {
+                    field: "field1",
+                    value: Value::from("zip"),
+                }],
+                None,
+                Some(handle)
+            )
+        );
+
+        assert_eq!(
+            Ok(vec![
+                btreemap! {
+                    "field1" => "zip",
+                    "field2" => "zup",
+                },
+                btreemap! {
+                    "field1" => "zip",
+                    "field2" => "zoop",
+                }
+            ]),
+            file.find_table_rows(
+                Case::Insensitive,
+                &[Condition::Equals {
+                    field: "field1",
+                    value: Value::from("ZiP"),
+                }],
+                None,
                 Some(handle)
             )
         );
@@ -611,7 +696,7 @@ mod tests {
             vec!["field1".to_string(), "field2".to_string()],
         );
 
-        let handle = file.add_index(&["field1"]).unwrap();
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
 
         let conditions = [
             Condition::Equals {
@@ -630,7 +715,7 @@ mod tests {
                 "field1" => "zip",
                 "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
             }),
-            file.find_table_row(&conditions, None, Some(handle))
+            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
         );
     }
 
@@ -651,7 +736,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(&[condition], None, None)
+            file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
     }
 
@@ -665,7 +750,7 @@ mod tests {
             vec!["field1".to_string(), "field2".to_string()],
         );
 
-        let handle = file.add_index(&["field1"]).unwrap();
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
 
         let condition = Condition::Equals {
             field: "field1",
@@ -674,7 +759,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found in index".to_string()),
-            file.find_table_row(&[condition], None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
     }
 }

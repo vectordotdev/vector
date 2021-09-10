@@ -6,7 +6,7 @@ use vrl_core::{
     prelude::*,
 };
 
-use crate::{IndexHandle, TableRegistry};
+use crate::{Case, IndexHandle, TableRegistry};
 
 #[derive(Debug)]
 pub enum Error {
@@ -44,6 +44,7 @@ impl DiagnosticError for Error {
 pub(crate) fn add_index(
     state: &mut state::Compiler,
     tablename: &str,
+    case: Case,
     condition: &BTreeMap<String, expression::Expr>,
 ) -> std::result::Result<IndexHandle, ExpressionError> {
     let mut registry = state.get_external_context_mut::<TableRegistry>();
@@ -54,7 +55,7 @@ pub(crate) fn add_index(
                 .iter()
                 .map(|(field, _)| field.as_ref())
                 .collect::<Vec<_>>();
-            let index = table.add_index(tablename, &fields)?;
+            let index = table.add_index(tablename, case, &fields)?;
 
             Ok(index)
         }

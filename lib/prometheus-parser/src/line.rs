@@ -135,6 +135,9 @@ impl Metric {
             value(f64::INFINITY, tag("+Inf")),
             value(f64::NEG_INFINITY, tag("-Inf")),
             value(f64::NAN, tag("Nan")),
+            // Note see https://github.com/Geal/nom/issues/1384
+            // This shouldn't be necessary if that issue is remedied.
+            value(f64::NAN, tag("NaN")),
             double,
         ))(input)
         .map_err(|_: NomError| {
@@ -249,7 +252,7 @@ impl Metric {
 
         let build_string = fold_many0(
             parse_string_fragment,
-            String::new(),
+            String::new,
             |mut result, fragment| {
                 match fragment {
                     StringFragment::Literal(s) => result.push_str(s),

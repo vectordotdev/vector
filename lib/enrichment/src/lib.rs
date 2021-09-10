@@ -26,6 +26,12 @@ pub enum Condition<'a> {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Case {
+    Sensitive,
+    Insensitive,
+}
+
 /// Enrichment tables represent additional data sources that can be used to enrich the event data
 /// passing through Vector.
 pub trait Table: DynClone {
@@ -36,6 +42,7 @@ pub trait Table: DynClone {
     /// Errors if no rows, or more than 1 row is found.
     fn find_table_row<'a>(
         &self,
+        case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
@@ -46,6 +53,7 @@ pub trait Table: DynClone {
     /// Can return multiple matched records
     fn find_table_rows<'a>(
         &self,
+        case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
@@ -56,7 +64,7 @@ pub trait Table: DynClone {
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String>;
+    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String>;
 }
 
 dyn_clone::clone_trait_object!(Table);

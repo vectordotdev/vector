@@ -1,5 +1,6 @@
 use chrono::prelude::*;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use enrichment::Case;
 use std::collections::BTreeMap;
 use vector::enrichment_tables::{file::File, Condition, Table};
 use vrl::Value;
@@ -28,7 +29,7 @@ fn column(col: usize, row: usize) -> Value {
 fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     let mut group = c.benchmark_group("enrichment_tables_file");
 
-    let setup = |size, date_range| {
+    let setup = |size, date_range, case| {
         let data = (0..size)
             .map(|row| {
                 // Add 8 columns.
@@ -58,7 +59,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                         to: Utc.ymd(2013, 7, 1).and_hms(0, 0, 0),
                     },
                 ],
-                file.add_index(&["field-0"]).unwrap(),
+                file.add_index(case, &["field-0"]).unwrap(),
                 5,
             )
         } else {
@@ -73,7 +74,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                         value: Value::from(format!("data-9-{}", size - 1)),
                     },
                 ],
-                file.add_index(&["field-2", "field-9"]).unwrap(),
+                file.add_index(case, &["field-2", "field-9"]).unwrap(),
                 1,
             )
         };
@@ -86,27 +87,41 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     };
 
     group.bench_function("enrichment_tables/file_date_10", |b| {
-        let (file, index, condition, expected) = setup(10, true);
+        let (file, index, condition, expected) = setup(10, true, Case::Sensitive);
         b.iter_batched(
             || (&file, &condition, expected.clone()),
             |(file, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
         );
     });
 
-    group.bench_function("enrichment_tables/file_hashindex_10", |b| {
-        let (file, index, condition, expected) = setup(10, false);
+    group.bench_function("enrichment_tables/file_hashindex_sensitive_10", |b| {
+        let (file, index, condition, expected) = setup(10, false, Case::Sensitive);
         b.iter_batched(
             || (&file, index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                )
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/file_hashindex_insensitive_10", |b| {
+        let (file, index, condition, expected) = setup(10, false, Case::Insensitive);
+        b.iter_batched(
+            || (&file, index, &condition, expected.clone()),
+            |(file, index, condition, expected)| {
+                assert_eq!(
+                    Ok(expected),
+                    file.find_table_row(Case::Insensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -114,27 +129,41 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_date_1_000", |b| {
-        let (file, index, condition, expected) = setup(1_000, true);
+        let (file, index, condition, expected) = setup(1_000, true, Case::Sensitive);
         b.iter_batched(
             || (&file, &condition, expected.clone()),
             |(file, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
         );
     });
 
-    group.bench_function("enrichment_tables/file_hashindex_1_000", |b| {
-        let (file, index, condition, expected) = setup(1_000, false);
+    group.bench_function("enrichment_tables/file_hashindex_sensitive_1_000", |b| {
+        let (file, index, condition, expected) = setup(1_000, false, Case::Sensitive);
         b.iter_batched(
             || (&file, index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                )
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/file_hashindex_insensitive_1_000", |b| {
+        let (file, index, condition, expected) = setup(1_000, false, Case::Insensitive);
+        b.iter_batched(
+            || (&file, index, &condition, expected.clone()),
+            |(file, index, condition, expected)| {
+                assert_eq!(
+                    Ok(expected),
+                    file.find_table_row(Case::Insensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -142,30 +171,50 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_date_1_000_000", |b| {
-        let (file, index, condition, expected) = setup(1_000_000, true);
+        let (file, index, condition, expected) = setup(1_000_000, true, Case::Sensitive);
         b.iter_batched(
             || (&file, &condition, expected.clone()),
             |(file, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
         );
     });
 
-    group.bench_function("enrichment_tables/file_hashindex_1_000_000", |b| {
-        let (file, index, condition, expected) = setup(1_000_000, false);
-        b.iter_batched(
-            || (&file, index, &condition, expected.clone()),
-            |(file, index, condition, expected)| {
-                assert_eq!(
-                    Ok(expected),
-                    file.find_table_row(condition, None, Some(index))
-                )
-            },
-            BatchSize::SmallInput,
-        );
-    });
+    group.bench_function(
+        "enrichment_tables/file_hashindex_sensitive_1_000_000",
+        |b| {
+            let (file, index, condition, expected) = setup(1_000_000, false, Case::Sensitive);
+            b.iter_batched(
+                || (&file, index, &condition, expected.clone()),
+                |(file, index, condition, expected)| {
+                    assert_eq!(
+                        Ok(expected),
+                        file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                    )
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+
+    group.bench_function(
+        "enrichment_tables/file_hashindex_insensitive_1_000_000",
+        |b| {
+            let (file, index, condition, expected) = setup(1_000_000, false, Case::Insensitive);
+            b.iter_batched(
+                || (&file, index, &condition, expected.clone()),
+                |(file, index, condition, expected)| {
+                    assert_eq!(
+                        Ok(expected),
+                        file.find_table_row(Case::Insensitive, condition, None, Some(index))
+                    )
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
 }

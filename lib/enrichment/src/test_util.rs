@@ -1,4 +1,4 @@
-use crate::{Condition, IndexHandle, Table, TableRegistry};
+use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 use shared::btreemap;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -30,6 +30,7 @@ impl DummyEnrichmentTable {
 impl Table for DummyEnrichmentTable {
     fn find_table_row(
         &self,
+        _case: Case,
         _condition: &[Condition],
         _select: Option<&[String]>,
         _index: Option<IndexHandle>,
@@ -39,6 +40,7 @@ impl Table for DummyEnrichmentTable {
 
     fn find_table_rows(
         &self,
+        _case: Case,
         _condition: &[Condition],
         _select: Option<&[String]>,
         _index: Option<IndexHandle>,
@@ -46,7 +48,7 @@ impl Table for DummyEnrichmentTable {
         Ok(vec![self.data.clone()])
     }
 
-    fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
         let mut indexes = self.indexes.lock().unwrap();
         indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
         Ok(IndexHandle(indexes.len() - 1))
