@@ -32,7 +32,7 @@ components: sinks: gcp_cloud_storage: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
+					batched: true
 					enum: ["ndjson", "text"]
 				}
 			}

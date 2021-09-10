@@ -203,9 +203,9 @@ impl S3SinkConfig {
             .unwrap_or_else(|| DEFAULT_KEY_PREFIX.into())
             .try_into()?;
         let partitioner = KeyPartitioner::new(key_prefix);
-        let batch_size_bytes = NonZeroUsize::new(batch_settings.size.bytes)
-            .ok_or("batch, in bytes, max be greater than 0")?;
-        let batch_size_events = NonZeroUsize::new(batch_settings.size.events);
+        let batch_size_bytes = NonZeroUsize::new(batch_settings.size.bytes);
+        let batch_size_events = NonZeroUsize::new(batch_settings.size.events)
+            .ok_or("batch events must be greater than 0")?;
         let batch_timeout = batch_settings.timeout;
 
         // And now collect all of the S3-specific options and configuration knobs.

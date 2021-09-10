@@ -32,7 +32,7 @@ components: sinks: http: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
+					batched: true
 					enum: ["json", "ndjson", "text"]
 				}
 			}

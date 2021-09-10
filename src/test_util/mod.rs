@@ -112,7 +112,7 @@ pub fn trace_init() {
 
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels, false);
+    trace::init(color, false, &levels);
 }
 
 pub async fn send_lines(

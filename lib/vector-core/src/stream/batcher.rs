@@ -28,7 +28,7 @@ pub struct ExpirationQueue<K> {
 impl<K> ExpirationQueue<K> {
     /// Creates a new `ExpirationQueue`.
     ///
-    /// `timeout is used for all insertions and resets.
+    /// `timeout` is used for all insertions and resets.
     pub fn new(timeout: Duration) -> Self {
         Self {
             timeout,
@@ -649,6 +649,7 @@ mod test {
     }
 
     #[tokio::test(start_paused = true)]
+    #[allow(clippy::semicolon_if_nothing_returned)] // https://github.com/rust-lang/rust-clippy/issues/7438
     async fn expiration_queue_impl_keyed_timer() {
         // Asserts that ExpirationQueue properly implements KeyedTimer. We are
         // primarily concerned with whether expiration is properly observed.

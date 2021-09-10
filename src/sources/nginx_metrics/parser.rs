@@ -1,10 +1,8 @@
 use nom::{
-    bytes::complete::tag,
-    combinator::all_consuming,
+    bytes::complete::{tag, take_while_m_n},
+    combinator::{all_consuming, map_res},
     error::ErrorKind,
-    map_res, named,
     sequence::{preceded, terminated, tuple},
-    take_while_m_n,
 };
 use snafu::Snafu;
 use std::convert::TryFrom;
@@ -26,6 +24,13 @@ pub struct NginxStubStatus {
     pub waiting: usize,
 }
 
+fn get_usize(input: &str) -> nom::IResult<&str, usize, nom::error::Error<&str>> {
+    map_res(
+        take_while_m_n(1, 20, |c: char| c.is_digit(10)),
+        |s: &str| s.parse::<usize>(),
+    )(input)
+}
+
 impl<'a> TryFrom<&'a str> for NginxStubStatus {
     type Error = ParseError;
 
@@ -33,14 +38,6 @@ impl<'a> TryFrom<&'a str> for NginxStubStatus {
     // https://github.com/nginx/nginx/blob/master/src/http/modules/ngx_http_stub_status_module.c#L137-L145
     fn try_from(input: &'a str) -> Result<Self, Self::Error> {
         // `usize::MAX` eq `18446744073709551615` (20 characters)
-        named!(
-            get_usize<&str, usize>,
-            map_res!(
-                take_while_m_n!(1, 20, |c: char| c.is_digit(10)),
-                |s: &str| s.parse::<usize>()
-            )
-        );
-
         match all_consuming(tuple((
             preceded(tag("Active connections: "), get_usize),
             preceded(tag(" \nserver accepts handled requests\n "), get_usize),
