@@ -3,6 +3,7 @@ use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     internal_events::StdinEventsReceived,
     shutdown::ShutdownSignal,
+    sources::util::TcpError,
     Pipeline,
 };
 use bytes::Bytes;
@@ -136,10 +137,14 @@ where
                         let _ = out.send(event).await;
                     }
                 }
-                Some(Err(_)) => {
+                Some(Err(error)) => {
                     // Error is logged by `crate::codecs::Decoder`, no
                     // further handling is needed here.
-                    continue;
+                    if error.can_continue() {
+                        continue;
+                    } else {
+                        break;
+                    }
                 }
                 None => break,
             }
