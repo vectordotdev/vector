@@ -33,7 +33,6 @@ components: sinks: kafka: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
 					enum: ["json", "text"]
 				}
 			}
