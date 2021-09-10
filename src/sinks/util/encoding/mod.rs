@@ -150,9 +150,6 @@ pub trait EncodingConfiguration<E> {
         self.apply_only_fields(event);
         self.apply_timestamp_format(event);
     }
-
-    /// Apply any custom transformations to the provided event.
-    fn apply_custom_rules(&mut self, _event: &mut Event) {}
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]

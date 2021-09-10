@@ -1,5 +1,9 @@
 use std::{
-    collections::BTreeMap, collections::HashSet, convert::TryFrom, num::NonZeroUsize,
+    collections::BTreeMap,
+    collections::HashSet,
+    convert::TryFrom,
+    io::{self, Write},
+    num::NonZeroUsize,
     time::Duration,
 };
 
@@ -14,27 +18,33 @@ use uuid::Uuid;
 
 use vector_core::event::Event;
 
+use crate::sinks::s3_common;
 use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
     event::PathComponent,
     rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
-        aws_s3::{
-            self,
+        s3_common::{
             config::{
-                Encoding, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
-                DEFAULT_REQUEST_LIMITS,
+                build_healthcheck, create_client, S3CannedAcl, S3RetryLogic,
+                S3ServerSideEncryption, S3StorageClass,
             },
             partitioner::KeyPartitioner,
             service::{S3Request, S3Service},
-            sink::{process_event_batch, S3RequestBuilder, S3Sink},
+            sink::{process_event_batch, S3EventEncoding, S3RequestBuilder, S3Sink},
         },
         util::encoding::{EncodingConfiguration, TimestampFormat},
+        util::Concurrency,
         util::{Compression, ServiceBuilderExt, TowerRequestConfig},
         VectorSink,
     },
     template::Template,
+};
+
+const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
+    TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
+        .rate_limit_num(250)
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -102,19 +112,11 @@ impl DatadogArchivesSinkConfig {
         match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
-                let client = aws_s3::config::create_client(
-                    &s3_config.region,
-                    &s3_config.auth,
-                    None,
-                    &cx.proxy,
-                )?;
+                let client = create_client(&s3_config.region, &s3_config.auth, None, &cx.proxy)?;
                 let svc = self
                     .build_s3_sink(&s3_config.options, client.clone(), cx)
                     .map_err(|error| format!("{}", error))?;
-                Ok((
-                    svc,
-                    aws_s3::config::build_healthcheck(self.bucket.clone(), client)?,
-                ))
+                Ok((svc, build_healthcheck(self.bucket.clone(), client)?))
             }
 
             service => Err(Box::new(ConfigError::UnsupportedService {
@@ -168,7 +170,7 @@ impl DatadogArchivesSinkConfig {
         let sink = S3Sink::new(
             cx,
             service,
-            Box::new(request_builder),
+            request_builder,
             partitioner,
             batch_size_bytes,
             batch_size_events,
@@ -194,59 +196,46 @@ struct DatadogArchivesSinkEncoding {
     id_seq_number: u32,
 }
 
-impl EncodingConfiguration<Encoding> for DatadogArchivesSinkEncoding {
-    fn codec(&self) -> &Encoding {
-        &Encoding::Ndjson
-    }
-    fn schema(&self) -> &Option<String> {
-        &None
-    }
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
-        &None
-    }
-    fn except_fields(&self) -> &Option<Vec<String>> {
-        &None
-    }
-    fn timestamp_format(&self) -> &Option<TimestampFormat> {
-        &None
-    }
-
+impl S3EventEncoding for DatadogArchivesSinkEncoding {
     /// Applies the following transformations to align event's schema with DD:
     /// - `_id` is generated in the sink(format described below);
     /// - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current time if missing;
     /// - `message`,`host` are set from the corresponding Global Log Schema mappings;
     /// - `source`, `service`, `status`, `tags` and other reserved attributes are left as is;
     /// - the rest of the fields is moved to `attributes`.
-    fn apply_custom_rules(&mut self, event: &mut Event) {
-        if let Event::Log(log_event) = event {
-            log_event.insert("_id", self.generate_log_id());
+    fn encode_event(&mut self, event: Event, mut writer: &mut dyn Write) -> io::Result<()> {
+        let mut log_event = event.into_log();
 
-            let timestamp = log_event
-                .remove(crate::config::log_schema().timestamp_key())
-                .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
-            log_event.insert(
-                "date",
-                timestamp
-                    .as_timestamp()
-                    .cloned()
-                    .unwrap_or_else(chrono::Utc::now)
-                    .to_rfc3339_opts(SecondsFormat::Millis, true),
-            );
-            log_event.rename_key_flat(crate::config::log_schema().message_key(), "message");
-            log_event.rename_key_flat(crate::config::log_schema().host_key(), "host");
+        log_event.insert("_id", self.generate_log_id());
 
-            let mut attributes = BTreeMap::new();
-            let custom_attributes: Vec<String> = log_event
-                .keys()
-                .filter(|path| !self.reserved_attributes.contains(path.as_str()))
-                .collect();
-            for path in custom_attributes {
-                if let Some(value) = log_event.remove(&path) {
-                    attributes.insert(path, value);
-                }
+        let timestamp = log_event
+            .remove(crate::config::log_schema().timestamp_key())
+            .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
+        log_event.insert(
+            "date",
+            timestamp
+                .as_timestamp()
+                .cloned()
+                .unwrap_or_else(chrono::Utc::now)
+                .to_rfc3339_opts(SecondsFormat::Millis, true),
+        );
+        log_event.rename_key_flat(crate::config::log_schema().message_key(), "message");
+        log_event.rename_key_flat(crate::config::log_schema().host_key(), "host");
+
+        let mut attributes = BTreeMap::new();
+        let custom_attributes: Vec<String> = log_event
+            .keys()
+            .filter(|path| !self.reserved_attributes.contains(path.as_str()))
+            .collect();
+        for path in custom_attributes {
+            if let Some(value) = log_event.remove(&path) {
+                attributes.insert(path, value);
             }
-            log_event.insert("attributes", attributes);
         }
+        log_event.insert("attributes", attributes);
+
+        let _ = serde_json::to_writer(&mut writer, &log_event)?;
+        writer.write_all(b"\n")
     }
 }
 
@@ -291,7 +280,7 @@ struct DatadogS3RequestBuilder {
 }
 
 impl S3RequestBuilder for DatadogS3RequestBuilder {
-    fn build_request(&self, key: String, batch: Vec<Event>) -> S3Request {
+    fn build_request(&mut self, key: String, batch: Vec<Event>) -> S3Request {
         let filename = Uuid::new_v4().to_string();
 
         let key = format!(
@@ -320,7 +309,7 @@ impl S3RequestBuilder for DatadogS3RequestBuilder {
             bucket: self.bucket.clone(),
             key,
             content_encoding: Compression::gzip_default().content_encoding(),
-            options: aws_s3::config::S3Options {
+            options: s3_common::config::S3Options {
                 acl: s3_options.acl,
                 grant_full_control: s3_options.grant_full_control,
                 grant_read: s3_options.grant_read,
@@ -364,6 +353,7 @@ mod tests {
     use super::*;
     use crate::event::LogEvent;
     use chrono::DateTime;
+    use std::{collections::BTreeMap, io::Cursor};
     use vector_core::partition::Partitioner;
 
     #[test]
@@ -381,40 +371,50 @@ mod tests {
             .expect("invalid test case")
             .with_timezone(&Utc);
         log_mut.insert("timestamp", timestamp);
+
+        let mut writer = Cursor::new(Vec::new());
         let mut encoding = default_encoding();
-        encoding.apply_custom_rules(&mut event);
+        encoding.encode_event(event, &mut writer);
 
-        let log = event.into_log();
-        validate_event_id(&log);
+        let encoded = writer.into_inner();
+        let json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(encoded.as_slice()).unwrap();
 
-        assert_eq!(log.as_map().len(), 5); // _id, message, date, service, attributes
+        validate_event_id(
+            &json
+                .get("_id")
+                .expect("_id not found")
+                .as_str()
+                .expect("_id is not a string"),
+        );
+
+        assert_eq!(json.len(), 5); // _id, message, date, service, attributes
         assert_eq!(
-            String::from_utf8_lossy(
-                log.get("message")
-                    .expect("message not found")
-                    .as_bytes()
-                    .as_ref()
-            ),
+            json.get("message")
+                .expect("message not found")
+                .as_str()
+                .expect("message is not a string"),
             "test message"
         );
         assert_eq!(
-            String::from_utf8_lossy(log.get("date").expect("date not found").as_bytes().as_ref()),
+            json.get("date")
+                .expect("date not found")
+                .as_str()
+                .expect("date is not a string"),
             "2021-08-23T16:00:27.879Z"
         );
         assert_eq!(
-            String::from_utf8_lossy(
-                log.get("service")
-                    .expect("service not found")
-                    .as_bytes()
-                    .as_ref()
-            ),
+            json.get("service")
+                .expect("service not found")
+                .as_str()
+                .expect("service is not a string"),
             "test-service"
         );
 
-        let attributes = log
+        let attributes = json
             .get("attributes")
             .expect("attributes not found")
-            .as_map()
+            .as_object()
             .expect("attributes is not an object");
         assert_eq!(attributes.len(), 1);
         assert_eq!(
@@ -422,7 +422,8 @@ mod tests {
                 attributes
                     .get("not_a_reserved_attribute")
                     .expect("not_a_reserved_attribute wasn't moved to attributes")
-                    .as_bytes()
+                    .as_str()
+                    .expect("not_a_reserved_attribute is not a string")
                     .as_ref()
             ),
             "value"
@@ -448,34 +449,52 @@ mod tests {
 
     #[test]
     fn generates_valid_id() {
-        let mut log1 = Event::from("test event 1");
+        let log1 = Event::from("test event 1");
         let mut encoding = default_encoding();
-        encoding.apply_custom_rules(&mut log1);
+        let mut writer = Cursor::new(Vec::new());
         let mut encoding = default_encoding();
-        let id1 = validate_event_id(&log1.into_log());
+        encoding.encode_event(log1, &mut writer);
+        let encoded = writer.into_inner();
+        let json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(encoded.as_slice()).unwrap();
+        let id1 = json
+            .get("_id")
+            .expect("_id not found")
+            .as_str()
+            .expect("_id is not a string");
+        validate_event_id(id1);
 
         // check that id is different for the next event
-        let mut log2 = Event::from("test event 2");
-        encoding.apply_custom_rules(&mut log2);
-        let id2 = validate_event_id(&log2.into_log());
+        let log2 = Event::from("test event 2");
+        let mut writer = Cursor::new(Vec::new());
+        encoding.encode_event(log2, &mut writer);
+        let encoded = writer.into_inner();
+        let json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(encoded.as_slice()).unwrap();
+        let id2 = json
+            .get("_id")
+            .expect("_id not found")
+            .as_str()
+            .expect("_id is not a string");
+        validate_event_id(id2);
         assert_ne!(id1, id2)
     }
 
     #[test]
     fn generates_date_if_missing() {
         let mut log = Event::from("test message");
+        let mut writer = Cursor::new(Vec::new());
         let mut encoding = default_encoding();
-        encoding.apply_custom_rules(&mut log);
+        encoding.encode_event(log, &mut writer);
+        let encoded = writer.into_inner();
+        let json: BTreeMap<String, serde_json::Value> =
+            serde_json::from_slice(encoded.as_slice()).unwrap();
 
         let date = DateTime::parse_from_rfc3339(
-            String::from_utf8_lossy(
-                log.into_log()
-                    .get("date")
-                    .expect("date not found")
-                    .as_bytes()
-                    .as_ref(),
-            )
-            .as_ref(),
+            json.get("date")
+                .expect("date not found")
+                .as_str()
+                .expect("date is not a string"),
         )
         .expect("date is not in an rfc3339 format");
 
@@ -487,8 +506,7 @@ mod tests {
     /// - 18 bytes,
     /// - base64-encoded,
     /// - first 6 bytes - a "now" timestamp in millis
-    fn validate_event_id(event: &LogEvent) -> String {
-        let id = event.get("_id").expect("_id not found").as_bytes();
+    fn validate_event_id(id: &str) {
         let bytes = base64::decode(id).expect("_id is not base64-encoded");
         assert_eq!(bytes.len(), 18);
         let mut timestamp: [u8; 8] = [0; 8];
@@ -498,7 +516,6 @@ mod tests {
         let timestamp = i64::from_be_bytes(timestamp);
         // check that it is a recent timestamp in millis
         assert!(Utc::now().timestamp_millis() - timestamp < 1000);
-        String::from_utf8_lossy(&bytes).to_string()
     }
 
     #[test]
@@ -513,7 +530,7 @@ mod tests {
             .partition(&log)
             .expect("key wasn't provided");
 
-        let request_builder = DatadogS3RequestBuilder {
+        let mut request_builder = DatadogS3RequestBuilder {
             bucket: "dd-logs".into(),
             key_prefix: Some("audit".into()),
             aws_s3: S3Config::default(),
@@ -537,11 +554,6 @@ mod tests {
         let req = request_builder.build_request(key, vec![log2]);
         let uuid2 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
         assert_ne!(uuid1, uuid2);
-    }
-
-    #[test]
-    fn encoding_is_json() {
-        assert_eq!(default_encoding().codec(), &Encoding::Ndjson);
     }
 
     #[tokio::test]
