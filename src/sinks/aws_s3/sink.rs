@@ -115,8 +115,8 @@ where
             input,
             partitioner,
             self.batch_timeout,
-            self.batch_size_bytes,
             self.batch_size_events,
+            self.batch_size_bytes,
         );
         pin!(batcher);
 
