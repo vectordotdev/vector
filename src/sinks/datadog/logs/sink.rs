@@ -11,9 +11,11 @@ use futures::future::FutureExt;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
 use futures_util::stream::FuturesUnordered;
+use metrics::gauge;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::hash::BuildHasherDefault;
 use std::io::Write;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -23,6 +25,7 @@ use tokio::sync::oneshot;
 use tokio::{pin, select};
 use tower::{Service, ServiceExt};
 use tracing_futures::Instrument;
+use twox_hash::XxHash64;
 use vector_core::buffers::Acker;
 use vector_core::config::{log_schema, LogSchema};
 use vector_core::event::{Event, EventFinalizers, Finalizable, Value};
@@ -289,13 +292,14 @@ where
     S::Error: Debug + Into<crate::Error> + Send,
 {
     let in_flight = FuturesUnordered::new();
-    let mut pending_acks = HashMap::new();
+    let mut pending_acks: HashMap<u64, usize, BuildHasherDefault<XxHash64>> = HashMap::default();
     let mut seq_head: u64 = 0;
     let mut seq_tail: u64 = 0;
 
     pin!(in_flight);
 
     loop {
+        gauge!("inflight_requests", in_flight.len() as f64);
         select! {
             Some(req) = rx.recv() => {
                 // Rebind the variable to avoid a bug with the pattern matching

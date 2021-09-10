@@ -114,8 +114,7 @@ impl DatadogLogsConfig {
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let healthcheck =
-            healthcheck(client, self.get_uri(), self.default_api_key.clone()).boxed();
+        let healthcheck = healthcheck(client, self.get_uri(), self.default_api_key.clone()).boxed();
         Ok(healthcheck)
     }
 
@@ -137,63 +136,6 @@ impl SinkConfig for DatadogLogsConfig {
         let sink = self.build_processor(client, cx)?;
         Ok((sink, healthcheck))
     }
-
-    //     let tls_settings = MaybeTlsSettings::from_config(
-    //         &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
-    //         false,
-    //     )?;
-
-    //     let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-    //     let client = HttpClient::new(tls_settings, cx.proxy())?;
-    //     let healthcheck =
-    //         healthcheck(client.clone(), self.get_uri(), self.default_api_key.clone()).boxed();
-
-    //     let mut client = ServiceBuilder::new()
-    //         .rate_limit(
-    //             request_settings.rate_limit_num,
-    //             request_settings.rate_limit_duration,
-    //         )
-    //         // Ideally we'd use ARC but the type constraints don't quite line
-    //         // up. We'll address that in a follow-up pull request.
-    //         //
-    //         // TODO we are supposed to call poll_ready before the Service is
-    //         // safe to call but once concurrency_limit is introduced the whole
-    //         // thing falls apart and vector dies with 'max requests in-flight;
-    //         // poll_ready must be called first'
-    //         //
-    //         // .concurrency_limit(1024)
-    //         .retry(LogApiRetry)
-    //         .timeout(request_settings.timeout)
-    //         .service(client);
-
-    //     // Before we start we need to prime the pump on our http client.
-    //     poll_fn(|cx| client.poll_ready(cx)).await?;
-
-    //     let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
-    //     let log_api = LogApi::new();
-    //     let log_api = if let Some(batch_timeout) = self.batch.timeout_secs {
-    //         log_api.batch_timeout(Duration::from_secs(batch_timeout))
-    //     } else {
-    //         log_api
-    //     };
-    //     let log_api = log_api
-    //         .bytes_stored_limit(
-    //             self.batch
-    //                 .max_bytes
-    //                 .map(|bytes| bytes as u64)
-    //                 .unwrap_or_else(|| bytesize::mib(5_u32) as u64),
-    //         )
-    //         .compression(self.compression.unwrap_or_default())
-    //         .datadog_uri(self.get_uri())
-    //         .default_api_key(default_api_key)
-    //         .encoding(self.encoding.clone())
-    //         .http_client(client)
-    //         .log_schema(vector_core::config::log_schema())
-    //         .build()?;
-    //     let sink = VectorSink::Stream(Box::new(log_api));
-
-    //     Ok((sink, healthcheck))
-    // }
 
     fn input_type(&self) -> DataType {
         DataType::Log
