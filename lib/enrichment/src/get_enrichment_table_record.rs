@@ -126,7 +126,7 @@ impl Expression for GetEnrichmentTableRecordFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
             .fallible()
-            .add_object::<(), Kind>(map! { (): Kind::Bytes })
+            .add_object::<(), Kind>(map! { (): Kind::all() })
     }
 }
 
