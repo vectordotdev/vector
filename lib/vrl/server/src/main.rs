@@ -18,6 +18,11 @@ struct Opts {
 async fn main() {
     let opts = Opts::from_args();
 
+    let cors = warp::cors()
+        .allow_any_origin()
+	.allow_headers(vec!["content-type"])
+        .allow_methods(vec!["GET", "POST"]);
+
     let resolve = warp::path("resolve")
         .and(warp::post())
         .and(warp::body::json())
@@ -27,7 +32,7 @@ async fn main() {
         .and(warp::get())
         .and_then(function_metadata);
 
-    let routes = resolve.or(functions).recover(handle_err);
+    let routes = resolve.or(functions).recover(handle_err).with(cors);
 
     println!("starting up the server on port {}", opts.port);
 
