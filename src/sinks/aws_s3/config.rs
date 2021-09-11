@@ -30,6 +30,7 @@ const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
 // thing, and I really just want batch settings detached from the types that will use them. :/
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
     BatchSettings::const_default()
+        .events(10_000)
         .bytes(10_000_000)
         .timeout(300)
 };

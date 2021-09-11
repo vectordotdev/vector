@@ -19,6 +19,7 @@ components: sinks: aws_s3: components._aws & {
 			batch: {
 				enabled:      true
 				common:       true
+				max_events:   10000
 				max_bytes:    10000000
 				timeout_secs: 300
 			}
