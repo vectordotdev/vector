@@ -234,7 +234,8 @@ where
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let (io_tx, io_rx) = channel(64);
+        let io_bandwidth = 64;
+        let (io_tx, io_rx) = channel(io_bandwidth);
         let service = self
             .service
             .take()
@@ -247,8 +248,9 @@ where
             .encoding
             .take()
             .expect("same sink should not be run twice");
-
-        let request_builder = RequestBuilder::new(encoding, self.compression, self.log_schema);
+        let default_api_key = Arc::clone(&self.default_api_key);
+        let compression = self.compression;
+        let log_schema = self.log_schema;
 
         let io = run_io(io_rx, service, acker).in_current_span();
         let _ = tokio::spawn(io);
@@ -259,22 +261,33 @@ where
             self.timeout,
             NonZeroUsize::new(MAX_PAYLOAD_ARRAY).unwrap(),
             NonZeroUsize::new(MAX_PAYLOAD_BYTES),
-        );
+        )
+        .map(|(maybe_key, batch)| {
+            let key = maybe_key.unwrap_or_else(|| Arc::clone(&default_api_key));
+            let request_builder = RequestBuilder::new(encoding.clone(), compression, log_schema);
+            tokio::spawn(async move { request_builder.build(key, batch) })
+        })
+        .buffer_unordered(io_bandwidth);
         pin!(batcher);
 
-        while let Some((key, batch)) = batcher.next().await {
-            let key = key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
-            match request_builder.build(key, batch) {
-                Ok(request) => {
-                    if io_tx.send(request).await.is_err() {
-                        error!(
+        while let Some(batch_join) = batcher.next().await {
+            match batch_join {
+                Ok(batch_request) => match batch_request {
+                    Ok(request) => {
+                        if io_tx.send(request).await.is_err() {
+                            error!(
                             "Sink I/O channel should not be closed before sink itself is closed."
                         );
+                            return Err(());
+                        }
+                    }
+                    Err(error) => {
+                        error!("Sink was unable to construct a payload body: {}", error);
                         return Err(());
                     }
-                }
+                },
                 Err(error) => {
-                    error!("Sink was unable to construct a payload body: {}", error);
+                    error!("Task failed to properly join: {}", error);
                     return Err(());
                 }
             }
