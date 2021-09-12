@@ -12,6 +12,9 @@ interpreted as described in [RFC 2119].
 1. [Introduction](#introduction)
 1. [Scope](#scope)
 1. [How to read this document](#how-to-read-this-document)
+1. [Naming](#naming)
+   1. [Source and sink naming](#source-and-sink-naming)
+   1. [Transform naming](#transform-naming)
 1. [Configuration](#configuration)
    1. [Options](#options)
       1. [`endpoint(s)`](#endpoints)
@@ -46,6 +49,22 @@ their telemetry by nature of being a Vector compoent.
 This document is written from the broad perspective of a Vector component.
 Unless otherwise stated, a section applies to all component types (sources,
 transforms, and sinks).
+
+## Naming
+
+To align with the [logical boundaries of components], component naming MUST
+follow the following guidelines.
+
+### Source and sink naming
+
+* MUST only contain ASCII alphanumeric, lowercase, and underscores
+* MUST be a noun named after the protocol or service that the component integrates with
+* MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`)
+
+### Transform naming
+
+* MUST only contain ASCII alphanumeric, lowercase, and underscores
+* MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`)
 
 ## Configuration
 
@@ -206,6 +225,7 @@ implement since errors are specific to the component.
 [Configuration Specification]: configuration.md
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [Instrumentation Sepcification]: instrumentation.md
+[logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/
 [RFC 2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
