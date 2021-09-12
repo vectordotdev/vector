@@ -14,7 +14,6 @@ interpreted as described in [RFC 2119].
 1. [How to read this document](#how-to-read-this-document)
 1. [Configuration](#configuration)
    1. [Options](#options)
-      1. [`address`](#address)
       1. [`endpoint(s)`](#endpoints)
 1. [Instrumentation](#instrumentation)
    1. [Batching](#batching)
@@ -50,6 +49,9 @@ transforms, and sinks).
 
 ## Configuration
 
+This section extends the [Configuration Specification] for component specific
+configuration.
+
 ### Options
 
 #### `endpoint(s)`
@@ -63,7 +65,8 @@ representing multiple endpoints.
 
 Vector components MUST be instrumented for optimal observability and monitoring.
 This is required to drive various interfaces that Vector users depend on to
-manage Vector installations in mission critical production environments.
+manage Vector installations in mission critical production environments. This
+section extends the [Instrumentation Sepcification].
 
 ### Batching
 
@@ -200,7 +203,9 @@ implement since errors are specific to the component.
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
 
+[Configuration Specification]: configuration.md
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[Instrumentation Sepcification]: instrumentation.md
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/
 [RFC 2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
