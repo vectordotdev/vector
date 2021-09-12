@@ -286,7 +286,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             compression: Compression::None,
             batch: BatchConfig {
-                max_bytes: Some(batch_size),
+                max_events: Some(batch_size),
                 timeout_secs: Some(5),
                 ..Default::default()
             },
