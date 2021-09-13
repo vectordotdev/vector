@@ -30,11 +30,11 @@ For metric naming, Vector broadly follows the
 [Prometheus metric naming standards]. Hence, a metric name:
 
 * MUST only contain ASCII alphanumeric, lowercase, and underscores
-* MUST follow the `<namespace>_<name>_<unit>_[total]` template
-  * `namespace` MUST be a _single_ word that groups metrics based on the source (e.g., `host`, `apache`)
+* MUST follow the `<name>_<unit>_[total]` template
   * `name` is one or more words that describes the measurement (e.g., `memory_rss`, `requests`)
   * `unit` MUST be a single [base unit] in plural form, if applicable (e.g., `seconds`, `bytes`)
   * Counters MUST end with `total` (e.g., `disk_written_bytes_total`, `http_requests_total`)
+* MUST NOT contain a namespace since the `internal_metrics` source sets a configurable namespace
 * SHOULD be broad in purpose and use use tags to differentiate characteristics of the measurement (e.g., `host_cpu_seconds_total{cpu="0",mode="idle"}`)
 
 [Prometheus metric naming standards]: https://prometheus.io/docs/practices/naming/
