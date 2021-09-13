@@ -1,4 +1,5 @@
 use crate::{
+    codecs::{self, LengthDelimitedCodec, Parser},
     config::{DataType, GenerateConfig, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
@@ -9,11 +10,11 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::LengthDelimitedCodec;
+use smallvec::{smallvec, SmallVec};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
@@ -81,28 +82,37 @@ impl VectorConfig {
 }
 
 #[derive(Debug, Clone)]
+struct VectorParser;
+
+impl Parser for VectorParser {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        let byte_size = bytes.len();
+        match proto::EventWrapper::decode(bytes).map(Event::from) {
+            Ok(event) => {
+                emit!(VectorEventReceived { byte_size });
+                Ok(smallvec![event])
+            }
+            Err(error) => {
+                emit!(VectorProtoDecodeError { error: &error });
+                Err(Box::new(error))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 struct VectorSource;
 
 impl TcpSource for VectorSource {
-    type Error = std::io::Error;
-    type Decoder = LengthDelimitedCodec;
+    type Error = codecs::Error;
+    type Item = SmallVec<[Event; 1]>;
+    type Decoder = codecs::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        LengthDelimitedCodec::new()
-    }
-
-    fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
-        let byte_size = frame.len();
-        match proto::EventWrapper::decode(frame).map(Event::from) {
-            Ok(event) => {
-                emit!(VectorEventReceived { byte_size });
-                Some(event)
-            }
-            Err(error) => {
-                emit!(VectorProtoDecodeError { error });
-                None
-            }
-        }
+        codecs::Decoder::new(
+            Box::new(LengthDelimitedCodec::new()),
+            Box::new(VectorParser),
+        )
     }
 }
 

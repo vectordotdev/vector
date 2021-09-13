@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::codecs;
 use metrics::counter;
 
 #[derive(Debug, Clone, Copy)]
@@ -20,14 +21,20 @@ impl SocketMode {
 }
 
 #[derive(Debug)]
-pub struct SocketEventReceived {
+pub struct SocketEventsReceived {
     pub mode: SocketMode,
     pub byte_size: usize,
+    pub count: usize,
 }
 
-impl InternalEvent for SocketEventReceived {
+impl InternalEvent for SocketEventsReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.", byte_size = %self.byte_size, mode = self.mode.as_str());
+        trace!(
+            message = "Received events.",
+            count = self.count,
+            byte_size = self.byte_size,
+            mode = self.mode.as_str()
+        );
     }
 
     fn emit_metrics(&self) {
@@ -55,12 +62,12 @@ impl InternalEvent for SocketEventsSent {
 }
 
 #[derive(Debug)]
-pub struct SocketReceiveError {
+pub struct SocketReceiveError<'a> {
     pub mode: SocketMode,
-    pub error: std::io::Error,
+    pub error: &'a codecs::Error,
 }
 
-impl InternalEvent for SocketReceiveError {
+impl<'a> InternalEvent for SocketReceiveError<'a> {
     fn emit_logs(&self) {
         error!(message = "Error receiving data.", error = ?self.error, mode = %self.mode.as_str());
     }

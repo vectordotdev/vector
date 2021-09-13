@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::codecs;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -20,7 +21,7 @@ impl InternalEvent for SyslogEventReceived {
 
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
-    pub error: std::io::Error,
+    pub error: codecs::Error,
 }
 
 impl InternalEvent for SyslogUdpReadError {

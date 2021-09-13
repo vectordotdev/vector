@@ -12,6 +12,7 @@ use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
+use smallvec::SmallVec;
 use socket2::SockRef;
 use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
@@ -62,13 +63,14 @@ where
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
     type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
-    type Decoder: Decoder<Error = Self::Error> + Send + 'static + Send;
+    type Item: Into<SmallVec<[Event; 1]>> + Send;
+    type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
+    fn handle_events(&self, _events: &mut [Event], _host: Bytes, _byte_size: usize) {}
 
-    fn build_ack(&self, _frame: &<Self::Decoder as Decoder>::Item) -> Bytes {
+    fn build_ack(&self, _item: &Self::Item) -> Bytes {
         Bytes::new()
     }
 
@@ -235,11 +237,11 @@ async fn handle_stream<T>(
             },
             res = reader.next() => {
                 match res {
-                    Some(Ok(frame)) => {
-                        let host = host.clone();
-                        let ack = source.build_ack(&frame);
-
-                        if let Some(event) = source.build_event(frame, host) {
+                    Some(Ok((item, byte_size))) => {
+                        let ack = source.build_ack(&item);
+                        let mut events = item.into();
+                        source.handle_events(&mut events, host.clone(), byte_size);
+                        for event in events {
                             match out.send(event).await {
                                 Ok(_) => {
                                     let stream = reader.get_mut();
