@@ -362,7 +362,7 @@ impl Line {
 fn parse_name(input: &str) -> IResult<String> {
     let input = trim_space(input);
     let (input, (a, b)) = pair(
-        take_while1(|c: char| c.is_alphabetic() || c == '_' || c == ':'),
+        take_while1(|c: char| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_' || c == ':'),
     )(input)
     .map_err(|_: NomError| ErrorKind::ParseNameError {
