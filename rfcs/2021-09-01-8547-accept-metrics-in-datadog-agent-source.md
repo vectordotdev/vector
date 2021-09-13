@@ -28,11 +28,10 @@ metrics from a Vector perspective so they can be benefit from Vector capabilitie
 
 ## Cross cutting concerns
 
-Some known issues are connected to the work described here: [#7283], [#8493] &
-[#8626]. This mostly concerns the ability to store/manipulate distribution using
-[sketches], send those to Datadog using the DDSketch representation. Other
-metrics sinks would possibly benefit from having distribution stored internally
-with sketches as this would provide better aggregation and accuracy.
+Some known issues are connected to the work described here: [#7283], [#8493] & [#8626]. This mostly concerns the ability
+to store/manipulate distribution using [sketches], send those to Datadog using the DDSketch representation. Other
+metrics sinks would possibly benefit from having distribution stored internally with sketches as this would provide
+better aggregation and accuracy.
 
 [#7283]: https://github.com/timberio/vector/issues/7283
 [#8493]: https://github.com/timberio/vector/issues/8493
@@ -72,16 +71,14 @@ with sketches as this would provide better aggregation and accuracy.
 - New configuration settings should be consistent with existing ones
 
 Regarding the Datadog Agent configuration, ideally it should be only a matter of configuring `dd_url:
-https://vector.mycompany.tld` to forward metrics to a Vector deployement. However configuring this will lead to some
-non-metric payloads to be sent to Vector, while it seems not an option to change the Datadog Agent behavior, those
-non-metric payload should still be forwarded to Datadog.
+https://vector.mycompany.tld` to forward metrics to a Vector deployement.
 
 The `dd_url` endpoint configuration has a [conditional
 behavior](https://github.com/DataDog/datadog-agent/blob/main/pkg/config/config.go#L1199-L1201) (also
 [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/forwarder_health.go#L131-L143)). I.e. if
 `dd_url` contains a known pattern (i.e. it has a suffix that matches a Datadog site) some extra hostname manipulation
-happens. But overal, this conditional can be ignore here and if we want unmodified Datadog Agent to use a `dd_url`
-pointing to a Vector deployement, the following route will have to be supported:
+happens. But overal, this conditional behavior can be ignored here and if we want unmodified Datadog Agent to use a
+`dd_url` pointing to a Vector deployement, the following route will have to be supported:
 - `/api/v1/validate` for API key validation
 - `/api/v1/check_run` for check submission
 - `/intake/` for events and metadata (possibly others)
@@ -96,6 +93,10 @@ Regarding the relative amount of requests:
 - `/api/v1/series` & `/api/beta/sketches` it accounts for the vast majority of requests, it relays everything received
   on the Dogstatsd socket by the Agent.
 - `/api/v1/check_run` depends on the number of checks, but it usually accounts for much less data than metrics.
+
+The aforementionned details highlight that current Datadog Agents cannot be configured to only send metrics to a certain
+endpoint and other kind of data have to be sent to the endoints. We could envision work in the Agent that would
+introduce another configurable endpoint. This is exposed in the [Alternatives](#alternatives) chapter.
 
 ### Implementation
 
@@ -133,7 +134,8 @@ The implementation would the consist in:
   the [Datadog Agent itself](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/telemetry.go#L20-L31)) to
   cover every metric type handled by this endpoint (count, gauge and rate) and:
     - Add support for missing fields in the `datadog_metrics` sinks
-    - The same value but different keys tags (Datadog allows `key:foo` & `key:bar` but Vector doesn't) maybe supported later if there is demand for it (see the note below).
+    - The same value but different keys tags (Datadog allows `key:foo` & `key:bar` but Vector doesn't) maybe supported
+      later if there is demand for it (see the note below).
     - Overall this is fairly straighforward
 - Handle the `/api/beta/sketches` route in the `datadog_agent` source to support sketches/distribution encoded using
   protobuf
@@ -142,15 +144,18 @@ The implementation would the consist in:
    - The sketches the agent ships is based on this [paper](http://www.vldb.org/pvldb/vol12/p2195-masson.pdf) whereas
      Vector uses what's called a summary inside the Agent, implementing the complete DDSketch support in Vector is
      probably a good idea as sketches have convenient properties for wide consistent aggregation and limited error. To
-     support smooth migration, full DDsktech support is mandatory, as customers that emit distribution metric from
-     Datadog Agent would need it to migrate to Vector aggegation.
+     support smooth migration, full DDsktech (or compatible sketch) support is mandatory, as customers that emit
+     distribution metric from Datadog Agent would need it to migrate to Vector aggegation. This RFC assumes there will
+     be a complete sketch metric (likely to be DDSketch) that would be compatible and support the following scenario
+     without loss of information: `(Agent Sketch) -> (Vector) -> (Datadog intake)`. This RFC focus on ingesting sketch
+     and not the rest of the flow.
 
 **Regarding the tagging issue:** A -possibly temporary- work-around would be to store incoming tags with the complete
 "key:value" string as the key and an empty value to store those in the extisting map Vector uses to store
 [tags](https://github.com/timberio/vector/blob/master/lib/vector-core/src/event/metric.rs#L60) and slightly rework the
-`datadog_metrics` sink not to append `:` if a tag key has the empty string as the corresponding value. However Datadog best
-practices can be followed with the current Vector data model, so unless something unforeseen or unexpected demand arise,
-Vector internal tag represention will not be changed following this RFC.
+`datadog_metrics` sink not to append `:` if a tag key has the empty string as the corresponding value. However Datadog
+best practices can be followed with the current Vector data model, so unless something unforeseen or unexpected demand
+arise, Vector internal tag representation will not be changed following this RFC.
 
 
 ## Rationale
@@ -162,7 +167,7 @@ Vector internal tag represention will not be changed following this RFC.
 
 ## Drawbacks
 
-- It arbitrary imposes internal sketches representation to follow the DDSketch paper.
+TBC
 
 ## Prior Art
 
@@ -180,7 +185,7 @@ Vector internal tag represention will not be changed following this RFC.
 - For sketches, we could flatten sketches and compute usual derived metrics (min/max/average/count/some percentile) and
   send those as gauge/count, but it would prevent (or at least impact) existing distribution/sketches user
 - Regarding how we support route and the fact that Vector would have to support non-metric payload, an alternate
-  solution would be to push for a Datadog Agent change with a new override (let's say `dd_metrics_url` that would only
+  solution would be to push for a Datadog Agent change with a new override (let's say `metrics_dd_url` that would only
   divert request to `/api/v1/series` & `/api/beta/sketches` to a specific endpoints. This however highlights that Vector
   & the Datadog Agent will then need to follow a compatbility matrix:
   1. If the Agent is upgrade with a new metric route (let's say for v2 intake migration), the user will need to also
@@ -196,7 +201,12 @@ Vector internal tag represention will not be changed following this RFC.
 ## Outstanding Questions
 
 - Datadog Agent configuration, diverting metrics to a custom endpoints will likely divert other kind of traffic, this
-  need to be clearly identified / discussed
+  need to be clearly identified / discussed. The question that need to be addressed is were the flexibility/URL routing
+  feature that's is needed here will be implemented. Three alternatives have been identified so far:
+  - In the Datadog Agent, it could then only send metric payload to Vector
+  - In Vector, then non-metric payload would be proxified/relayed to Datadog intake unprocessed
+  - In a middle layer (typically something like haproxy) that will have a configuration diverting metrics payload to
+    Vector and everything else to Datadog
 - Is there any other metrics type that could required some degree of adaptation, there is the non monotonic counter that
   exists in the agent but not in Vector that may require the introduction of a so-called `NonMonotonicCounter` in
   Vector.
