@@ -150,7 +150,7 @@ where
             allocated_bytes: 0,
             element_limit,
             allocation_limit,
-            elements: Vec::with_capacity(element_limit),
+            elements: Vec::with_capacity(128),
         }
     }
 
