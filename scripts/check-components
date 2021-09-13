@@ -10,8 +10,6 @@ SINK_EVENTS = COMMON_EVENTS + ['BytesSent']
 # have no other emit requirements.
 TRANSFORM_EVENTS = []
 
-$error_count = 0
-
 def hash_array_add(hash, key, item)
   arr = hash.fetch(key, Array::new)
   arr.append(item)
@@ -38,11 +36,15 @@ def path_component(path)
   if component.end_with? '.rs'
     component = component[..-4]
   end
-  return "#{group}/#{component}"
+  "#{group}/#{component}"
 end
 
 # A class to hold error reports and common functionality
 class Event
+  attr_accessor :path
+  attr_reader :name, :reports
+  attr_writer :members
+
   def initialize(name)
     @path = nil
     @name = name
@@ -50,14 +52,6 @@ class Event
     @members = []
     @counters = []
     @logs = []
-  end
-
-  def path(path)
-    @path = path
-  end
-
-  def members(list)
-    @members = list
   end
 
   def add_counter(name, tags)
@@ -68,7 +62,9 @@ class Event
     @logs.append([type, message, parameters])
   end
 
-  def validate
+  def valid?
+    @reports.clear
+
     # Check BytesReceived events (for sources)
     if @name.end_with? 'BytesReceived'
       members_must_include(['byte_size'])
@@ -101,96 +97,88 @@ class Event
     end
 
     # Make sure error events contain the right parameters
-    @logs.each { |type, message, parameters|
+    @logs.each do |type, message, parameters|
       if type == 'error'
-        ['error', 'stage'].each { |parameter|
+        ['error', 'stage'].each do |parameter|
           unless parameters.include? parameter
             @reports.append("Error log MUST include parameter \"#{parameter}\".")
           end
-        }
+        end
       end
-    }
-
-    unless @reports.empty?
-      puts "#{@path}: Errors in event #{@name}:"
-      @reports.each { |report|
-        puts "    #{report}"
-        $error_count += 1
-      }
     end
+
+    @reports.empty?
   end
 
   private
 
-  def append(report)
-    @reports.append(report)
-  end
+    def append(report)
+      @reports.append(report)
+    end
 
-  def generic_must_contain(array, names, prefix, suffix)
-    names.each { |name|
-      unless array.include? name
-        @reports.append("#{prefix} MUST #{suffix} \"#{name}\".")
+    def generic_must_contain(array, names, prefix, suffix)
+      names.each do |name|
+        unless array.include? name
+          @reports.append("#{prefix} MUST #{suffix} \"#{name}\".")
+        end
       end
-    }
-  end
+    end
 
-  def counters_must_include(names)
-    generic_must_contain(@counters, names, 'This event', 'increment counter')
-    # TODO: Scan each counter for parameters
-  end
+    def counters_must_include(names)
+      generic_must_contain(@counters, names, 'This event', 'increment counter')
+      # TODO: Scan each counter for parameters
+    end
 
-  def members_must_include(names)
-    generic_must_contain(@members, names, 'This event', 'have a member named')
-  end
+    def members_must_include(names)
+      generic_must_contain(@members, names, 'This event', 'have a member named')
+    end
 end
 
 class Component
+  attr_reader :missing, :name
+
   def initialize(name)
     @name = name
     @emits = []
+    @missing = []
   end
 
   def emits(array)
     @emits += array
   end
 
-  def validate
-    @missing = []
+  def valid?
+    @missing.clear
     require_events(SOURCE_EVENTS) if @name.start_with? 'sources/'
     require_events(TRANSFORM_EVENTS) if @name.start_with? 'transforms/'
     require_events(SINK_EVENTS) if @name.start_with? 'sinks/'
-
-    if @missing.length > 0
-      puts "#{@name}: Missing required event:"
-      @missing.each { |event|
-        puts "    #{event}"
-        $error_count += 1
-      }
-    end
+    @missing.empty?
   end
 
   private
 
-  def require_events(names)
-    names.each { |name|
-      if @emits.none? { |event| event.end_with? name }
-        @missing.append(name)
+    def require_events(names)
+      names.each do |name|
+        if @emits.none? { |event| event.end_with? name }
+          @missing.append(name)
+        end
       end
-    }
-  end
+    end
 end
 
 $all_events = Hash::new { |hash, key| hash[key] = Event::new(key) }
 $all_components = Hash::new { |hash, key| hash[key] = Component::new(key) }
 
+error_count = 0
+
 # Scan sources and build internal structures
-Find.find('src') { |path|
+Find.find('src') do |path|
   if path.end_with? '.rs'
     text = File.read(path)
 
     # Check log message texts for correct formatting. See below for the
     # full regex
-    text.scan(/(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^({)][^("]+)"/) {
+    text.scan(/(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^({)][^("]+)"/) do
       |type, has_message_prefix, message|
       reports = []
       reports.append('Message must start with a capital.') unless message.match(/^[[:upper:]]/)
@@ -198,25 +186,25 @@ Find.find('src') { |path|
       unless reports.empty?
         puts "#{path}: Errors in message \"#{message}\":"
         reports.each { |report| puts "  #{report}" }
-        $error_count += 1
+        error_count += 1
       end
-    }
+    end
 
     if path.start_with? 'src/internal_events/'
       # Scan internal event structs for member names
-      text.scan(/[\n ]struct (\S+?)(?:<.+?>)? {\n(.+?)\n}\n/m) { |struct_name, members|
-        $all_events[struct_name].path(path)
+      text.scan(/[\n ]struct (\S+?)(?:<.+?>)? {\n(.+?)\n}\n/m) do |struct_name, members|
+        $all_events[struct_name].path = path
         member_names = members.scan(/ ([A-Za-z0-9_]+): /).map { |member,| member }
-        $all_events[struct_name].members(member_names)
-      }
+        $all_events[struct_name].members = member_names
+      end
 
       # Scan internal event implementation blocks for logs and metrics
-      text.scan(/^impl InternalEvent for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n}$/m) { |event_name, block|
+      text.scan(/^impl InternalEvent for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n}$/m) do |event_name, block|
         # Scan for counter names
         # TODO: parse out tags
-        block.scan(/ counter!\("([^"]+)"/) { |name,|
+        block.scan(/ counter!\("([^"]+)"/) do |name,|
           $all_events[event_name].add_counter(name, [])
-        }
+        end
 
         # Scan for log outputs and their parameters
         block.scan(/
@@ -225,13 +213,13 @@ Find.find('src') { |path|
                     "([^({)][^("]+)" # The log message text
                     ([^;]*?) # Match the parameter list
                     \)(?:;|\n\s*}) # Normally would end with simply ");", but some are missing the semicolon
-                   /mx) { |type, message, parameters|
+                   /mx) do |type, message, parameters|
           parameters = parameters.scan(/([a-z0-9_]+) *= .|[?%]([a-z0-9_.]+)/) \
                          .map { |assignment, simple| assignment or simple }
 
           $all_events[event_name].add_log(type, message, parameters)
-        }
-      }
+        end
+      end
 
     # Scan all the source, transform, and sink components for all
     # internal events they emit, to be handled below.
@@ -244,15 +232,23 @@ Find.find('src') { |path|
       end
     end
   end
-}
+end
 
-$all_events.each_value { |event|
-  event.validate
-}
+$all_events.each_value do |event|
+  unless event.valid?
+    puts "#{event.path}: Errors in event #{event.name}:"
+    event.reports.each { |report| puts "    #{report}" }
+    error_count += 1
+  end
+end
 
-$all_components.each_value { |component|
-  component.validate
-}
+$all_components.each_value do |component|
+  unless component.valid?
+    puts "#{component.name}: Missing required event(s):"
+    component.missing.each { |event| puts "    #{event}" }
+    error_count += 1
+  end
+end
 
-puts "#{$error_count} error(s)"
-exit 1 if $error_count > 0
+puts "#{error_count} error(s)"
+exit 1 if error_count > 0
