@@ -58,8 +58,7 @@ with sketches as this would provide better aggregation and accuracy.
 
 ## Pain
 
-- Vector cannot fully aggregate Datadog Agent traffic
-- Inconsistency between Datadog logs vs. metrics support in Vector
+- Users cannot aggregate metrics from Datadog agents
 
 ## Proposal
 
