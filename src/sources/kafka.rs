@@ -6,11 +6,13 @@ use crate::{
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
+    sources::util::TcpError,
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
+use async_stream::stream;
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{stream, FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -21,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use tokio_util::codec::Decoder;
+use tokio_util::codec::FramedRead;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -146,7 +148,7 @@ async fn kafka_source(
     partition_key: String,
     offset_key: String,
     headers_key: String,
-    mut decoder: codecs::Decoder,
+    decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
     acknowledgements: bool,
@@ -167,9 +169,9 @@ async fn kafka_source(
                     byte_size: msg.payload_len()
                 });
 
-                let mut payload = match msg.payload() {
+                let payload = match msg.payload() {
                     None => continue, // skip messages with empty payload
-                    Some(payload) => BytesMut::from(payload),
+                    Some(payload) => payload.to_vec(),
                 };
 
                 // Extract timestamp from kafka message
@@ -202,39 +204,57 @@ async fn kafka_source(
                 let msg_partition = msg.partition();
                 let msg_offset = msg.offset();
 
-                let mut events = Vec::new();
+                let key_field = &key_field;
+                let topic_key = &topic_key;
+                let partition_key = &partition_key;
+                let offset_key = &offset_key;
+                let headers_key = &headers_key;
 
-                while let Ok(Some((next, _))) = decoder.decode_eof(&mut payload) {
-                    for mut event in next {
-                        if let Event::Log(ref mut log) = event {
-                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
-                            log.insert(log_schema().timestamp_key(), timestamp);
-                            log.insert(&key_field, msg_key.clone());
-                            log.insert(&topic_key, Value::from(msg_topic.clone()));
-                            log.insert(&partition_key, Value::from(msg_partition));
-                            log.insert(&offset_key, Value::from(msg_offset));
-                            log.insert(&headers_key, Value::from(headers_map.clone()));
+                let mut stream = FramedRead::new(payload.as_slice(), decoder.clone());
+                let mut stream = stream! {
+                    loop {
+                        match stream.next().await {
+                            Some(Ok((events, _))) => {
+                                for mut event in events {
+                                    if let Event::Log(ref mut log) = event {
+                                        log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
+                                        log.insert(log_schema().timestamp_key(), timestamp);
+                                        log.insert(key_field, msg_key.clone());
+                                        log.insert(topic_key, Value::from(msg_topic.clone()));
+                                        log.insert(partition_key, Value::from(msg_partition));
+                                        log.insert(offset_key, Value::from(msg_offset));
+                                        log.insert(headers_key, Value::from(headers_map.clone()));
+                                    }
+
+                                    yield event;
+                                }
+                            },
+                            Some(Err(error)) => {
+                                // Error is logged by `crate::codecs::Decoder`, no further handling
+                                // is needed here.
+                                if error.can_continue() {
+                                    continue;
+                                } else {
+                                    break;
+                                }
+                            }
+                            None => break,
                         }
-
-                        events.push(event);
                     }
                 }
+                .map(Ok)
+                .boxed();
 
                 match &mut finalizer {
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let mut events = stream::iter(
-                            events
-                                .into_iter()
-                                .map(|event: Event| event.with_batch_notifier(&batch)),
-                        )
-                        .map(Ok);
-                        match out.send_all(&mut events).await {
+                        let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
+                        match out.send_all(&mut stream).await {
                             Err(error) => error!(message = "Error sending to sink.", %error),
                             Ok(_) => finalizer.add(msg.into(), receiver),
                         }
                     }
-                    None => match out.send_all(&mut stream::iter(events).map(Ok)).await {
+                    None => match out.send_all(&mut stream).await {
                         Err(error) => error!(message = "Error sending to sink.", %error),
                         Ok(_) => {
                             if let Err(error) = consumer.store_offset(&msg) {
