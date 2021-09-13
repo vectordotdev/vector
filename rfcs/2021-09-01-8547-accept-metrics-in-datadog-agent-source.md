@@ -22,6 +22,7 @@ metrics from a Vector perspective so they can be benefit from Vector capabilitie
   * [Future Improvements](#future-improvements)
 
 ## Context
+
 - Vector is foreseen as a Datadog Agents aggregator, thus receiving metrics from Datadog Agents is a logical development
 - Vector has support to send metrics to Datadog, thus receiving metrics from Agent is a consistent feature to add
 
