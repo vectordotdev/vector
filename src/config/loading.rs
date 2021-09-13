@@ -187,9 +187,9 @@ fn load_builder_from_paths(
                     for res in readdir {
                         match res {
                             Ok(direntry) => {
-                                if let Some(file) = open_config(&direntry.path()) {
-                                    // skip any unknown file formats
-                                    if let Ok(format) = Format::from_path(direntry.path()) {
+                                // skip any unknown file formats
+                                if let Ok(format) = Format::from_path(direntry.path()) {
+                                    if let Some(file) = open_config(&direntry.path()) {
                                         inputs.push((file, Some(format)));
                                     }
                                 }
