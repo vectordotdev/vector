@@ -6,10 +6,10 @@ use std::collections::BTreeMap;
 use vrl_core::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct GetEnrichmentTableRecord;
-impl Function for GetEnrichmentTableRecord {
+pub struct FindEnrichmentTableRecords;
+impl Function for FindEnrichmentTableRecords {
     fn identifier(&self) -> &'static str {
-        "get_enrichment_table_record"
+        "find_enrichment_table_records"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -68,7 +68,7 @@ impl Function for GetEnrichmentTableRecord {
             })
             .unwrap_or(Case::Sensitive);
 
-        Ok(Box::new(GetEnrichmentTableRecordFn {
+        Ok(Box::new(FindEnrichmentTableRecordsFn {
             table,
             condition,
             index: None,
@@ -79,7 +79,7 @@ impl Function for GetEnrichmentTableRecord {
 }
 
 #[derive(Debug, Clone)]
-pub struct GetEnrichmentTableRecordFn {
+pub struct FindEnrichmentTableRecordsFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
     index: Option<IndexHandle>,
@@ -87,7 +87,7 @@ pub struct GetEnrichmentTableRecordFn {
     enrichment_tables: TableSearch,
 }
 
-impl Expression for GetEnrichmentTableRecordFn {
+impl Expression for FindEnrichmentTableRecordsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self
             .condition
@@ -100,14 +100,14 @@ impl Expression for GetEnrichmentTableRecordFn {
             })
             .collect::<Result<Vec<Condition>>>()?;
 
-        let data = self.enrichment_tables.find_table_row(
-            &self.table,
-            self.case_sensitive,
-            &condition,
-            self.index,
-        )?;
+        let data = self
+            .enrichment_tables
+            .find_table_rows(&self.table, self.case_sensitive, &condition, self.index)?
+            .into_iter()
+            .map(Value::Object)
+            .collect();
 
-        Ok(Value::Object(data))
+        Ok(Value::Array(data))
     }
 
     fn update_state(
@@ -126,7 +126,7 @@ impl Expression for GetEnrichmentTableRecordFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
             .fallible()
-            .add_object::<(), Kind>(map! { (): Kind::all() })
+            .array_mapped::<(), Kind>(map! { (): Kind::Object })
     }
 }
 
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn find_table_row() {
         let registry = get_table_registry();
-        let func = GetEnrichmentTableRecordFn {
+        let func = FindEnrichmentTableRecordsFn {
             table: "dummy1".to_string(),
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
@@ -159,14 +159,14 @@ mod tests {
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(value! ({ "field": "result" })), got);
+        assert_eq!(Ok(value![vec![value!({ "field": "result" })]]), got);
     }
 
     #[test]
     fn add_indexes() {
         let registry = get_table_registry();
 
-        let mut func = GetEnrichmentTableRecordFn {
+        let mut func = FindEnrichmentTableRecordsFn {
             table: "dummy1".to_string(),
             condition: btreemap! {
                 "field" =>  expression::Literal::from("value"),
