@@ -191,13 +191,6 @@ impl BatchStatusReceiver {
     pub fn try_recv(&mut self) -> Result<BatchStatus, oneshot::error::TryRecvError> {
         self.0.try_recv()
     }
-
-    /// Waits for receiver to resolve.
-    ///
-    /// If the sender drops before sending the batch status, returns `Err`.
-    pub async fn recv(self) -> Result<BatchStatus, oneshot::error::RecvError> {
-        self.0.await
-    }
 }
 
 /// A batch notifier contains the status of the current batch along with
