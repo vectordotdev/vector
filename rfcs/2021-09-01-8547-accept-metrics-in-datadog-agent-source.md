@@ -4,6 +4,23 @@ Currently the `datadog_agent` [source](https://vector.dev/docs/reference/configu
 supports logs. This RFC suggests to extend Vector to support receiving metrics from Datadog agents and ingest those as
 metrics from a Vector perspective so they can be benefit from Vector capabilities.
 
+  * [Context](#context)
+  * [Cross cutting concerns](#cross-cutting-concerns)
+  * [Scope](#scope)
+    + [In scope](#in-scope)
+    + [Out of scope](#out-of-scope)
+  * [Pain](#pain)
+  * [Proposal](#proposal)
+    + [User Experience](#user-experience)
+    + [Implementation](#implementation)
+  * [Rationale](#rationale)
+  * [Drawbacks](#drawbacks)
+  * [Prior Art](#prior-art)
+  * [Alternatives](#alternatives)
+  * [Outstanding Questions](#outstanding-questions)
+  * [Plan Of Attack](#plan-of-attack)
+  * [Future Improvements](#future-improvements)
+
 ## Context
 - Vector is foreseen as a Datadog Agents aggregator, thus receiving metrics from Datadog Agents is a logical development
 - Vector has support to send metrics to Datadog, thus receiving metrics from Agent is a consistent feature to add
@@ -66,7 +83,14 @@ pointing to a Vector deployement, the following route will have to be supported:
 - `/support/flare/` for support flare
 - `/api/v1/series` & `/api/beta/sketches` for metrics submission
 
-
+Regarding the relative amount of requests:
+- `/api/v1/validate` is requested at a periodic interval (10 seconds).
+- `/intake/` is requested at various (rather long)
+  [intervals](https://github.com/DataDog/datadog-agent/blob/main/pkg/metadata/helper.go#L12-L22).
+- `/support/flare/` is only used by users upon customer support request, but payloads can be rather large (>10MBytes).
+- `/api/v1/series` & `/api/beta/sketches` it accounts for the vast majority of requests, it relays everything received
+  on the Dogstatsd socket by the Agent.
+- `/api/v1/check_run` depends on the number of checks, but it usually accounts for much less data than metrics.
 
 ### Implementation
 
@@ -104,9 +128,8 @@ The implementation would the consist in:
   the [Datadog Agent itself](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/telemetry.go#L20-L31)) to
   cover every metric type handled by this endpoint (count, gauge and rate) and:
     - Add support for missing fields in the `datadog_metrics` sinks
-    - Align tag manipulation (Datadog allows `key:foo` & `key:bar`, and the tags are encoded as a list whereas Vector
-      encode those as a map).
-    - Overall this is fairly straighforward except for the tagging issue
+    - The same value but different keys tags (Datadog allows `key:foo` & `key:bar` but Vector doesn't) maybe supported later if there is demand for it (see the note below).
+    - Overall this is fairly straighforward
 - Handle the `/api/beta/sketches` route in the `datadog_agent` source to support sketches/distribution encoded using
   protobuf
    - Revamp the distribution metrics in the `datadog_metrics` sink to use sketches and the associated endpoint will
@@ -120,7 +143,9 @@ The implementation would the consist in:
 **Regarding the tagging issue:** A -possibly temporary- work-around would be to store incoming tags with the complete
 "key:value" string as the key and an empty value to store those in the extisting map Vector uses to store
 [tags](https://github.com/timberio/vector/blob/master/lib/vector-core/src/event/metric.rs#L60) and slightly rework the
-`datadog_metrics` sink not to append `:` if a tag key has the empty string as the corresponding value.
+`datadog_metrics` sink not to append `:` if a tag key has the empty string as the corresponding value. However Datadog best
+practices can be followed with the current Vector data model, so unless something unforeseen or unexpected demand arise,
+Vector internal tag represention will not be changed following this RFC.
 
 
 ## Rationale
