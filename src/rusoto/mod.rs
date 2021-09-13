@@ -360,6 +360,12 @@ pub fn is_retriable_error<T>(error: &RusotoError<T>) -> bool {
                 return true;
             }
 
+            if response.status.is_server_error()
+                || response.status == http::StatusCode::TOO_MANY_REQUESTS
+            {
+                return true;
+            }
+
             // Certain 400-level responses will contain an error code indicating that the request
             // should be retried. Since we don't retry 400-level responses by default, we'll look
             // for these specifically before falling back to more general heuristics. Because AWS
@@ -377,12 +383,7 @@ pub fn is_retriable_error<T>(error: &RusotoError<T>) -> bool {
                 RegexSet::new(&["RequestTimeout", "RequestExpired", "ThrottlingException"])
                     .expect("invalid regex")
             });
-            if response.status.is_client_error() && re.is_match(&response.body) {
-                return true;
-            }
-
-            response.status.is_server_error()
-                || response.status == http::StatusCode::TOO_MANY_REQUESTS
+            response.status.is_client_error() && re.is_match(&response.body)
         }
         _ => false,
     }
