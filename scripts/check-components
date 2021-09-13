@@ -4,10 +4,12 @@
 require 'find'
 
 COMMON_EVENTS = ['EventsReceived', 'EventsSent']
-SOURCE_EVENTS = ['BytesReceived'] + COMMON_EVENTS
-SINK_EVENTS = COMMON_EVENTS + ['BytesSent']
-# Transforms implicitly handle the common events in the topology, and
-# have no other emit requirements.
+# Sources implicitly emit EventsSent in the common pipeline code
+SOURCE_EVENTS = ['BytesReceived'] + COMMON_EVENTS - ['EventsSent']
+# Sinks implicitly emit EventsReceived in the common pipeline code
+SINK_EVENTS = COMMON_EVENTS + ['BytesSent'] - ['EventsReceived']
+# Transforms implicitly emit the common events in the topology, and have
+# no other emit requirements.
 TRANSFORM_EVENTS = []
 
 def hash_array_add(hash, key, item)
