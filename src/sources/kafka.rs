@@ -171,7 +171,7 @@ async fn kafka_source(
 
                 let payload = match msg.payload() {
                     None => continue, // skip messages with empty payload
-                    Some(payload) => payload.to_vec(),
+                    Some(payload) => payload,
                 };
 
                 // Extract timestamp from kafka message
@@ -210,7 +210,7 @@ async fn kafka_source(
                 let offset_key = &offset_key;
                 let headers_key = &headers_key;
 
-                let mut stream = FramedRead::new(payload.as_slice(), decoder.clone());
+                let mut stream = FramedRead::new(payload, decoder.clone());
                 let mut stream = stream! {
                     loop {
                         match stream.next().await {
@@ -251,7 +251,12 @@ async fn kafka_source(
                         let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
                         match out.send_all(&mut stream).await {
                             Err(error) => error!(message = "Error sending to sink.", %error),
-                            Ok(_) => finalizer.add(msg.into(), receiver),
+                            Ok(_) => {
+                                // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
+                                // here, when `stream` is dropped and runs the destructor [...]".
+                                drop(stream);
+                                finalizer.add(msg.into(), receiver);
+                            }
                         }
                     }
                     None => match out.send_all(&mut stream).await {
