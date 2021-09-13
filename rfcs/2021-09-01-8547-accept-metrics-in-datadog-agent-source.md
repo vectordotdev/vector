@@ -27,11 +27,16 @@ metrics from a Vector perspective so they can be benefit from Vector capabilitie
 
 ## Cross cutting concerns
 
-Some known issues are connected to the work described here: [#7283](https://github.com/timberio/vector/issues/7283),
-[#8493](https://github.com/timberio/vector/issues/8493) & [#8626](https://github.com/timberio/vector/issues/8626). This
-mostly concerns the ability to store/manipulate distribution using sketches, send those to Datadog using the DDSketch
-representation. Other metrics sinks would possibly benefit from having distribution stored internally with sketches as
-this would provide better aggregation and accuracy.
+Some known issues are connected to the work described here: [#7283], [#8493] &
+[#8626]. This mostly concerns the ability to store/manipulate distribution using
+[sketches], send those to Datadog using the DDSketch representation. Other
+metrics sinks would possibly benefit from having distribution stored internally
+with sketches as this would provide better aggregation and accuracy.
+
+[#7283]: https://github.com/timberio/vector/issues/7283
+[#8493]: https://github.com/timberio/vector/issues/8493
+[#8626]: https://github.com/timberio/vector/issues/8626
+[sketches]: http://www.vldb.org/pvldb/vol12/p2195-masson.pdf
 
 ## Scope
 
