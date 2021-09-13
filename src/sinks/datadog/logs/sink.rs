@@ -12,6 +12,7 @@ use futures::stream::BoxStream;
 use futures::{StreamExt, TryFutureExt};
 use futures_util::stream::FuturesUnordered;
 use metrics::gauge;
+use snafu::Snafu;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -155,6 +156,14 @@ struct RequestBuilder {
     log_schema_host_key: &'static str,
 }
 
+#[derive(Debug, Snafu)]
+pub enum RequestBuildError {
+    #[snafu(display("Encoded payload is greater than the max limit."))]
+    PayloadTooBig,
+    #[snafu(display("Failed to build payload with error: {}", error))]
+    Io { error: std::io::Error },
+}
+
 impl RequestBuilder {
     fn new(
         encoding: EncodingConfigWithDefault<Encoding>,
@@ -190,13 +199,20 @@ impl RequestBuilder {
         (members, finalizers)
     }
 
-    fn build(&self, api_key: Arc<str>, batch: Vec<Event>) -> Result<LogApiRequest, std::io::Error> {
+    fn build(
+        &self,
+        api_key: Arc<str>,
+        batch: Vec<Event>,
+    ) -> Result<LogApiRequest, RequestBuildError> {
         let (members, finalizers) = self.dissect_batch(batch);
 
         let total_members = members.len();
         assert!(total_members <= MAX_PAYLOAD_ARRAY);
         let body: Vec<u8> = serde_json::to_vec(&members).expect("failed to encode to json");
         let serialized_payload_bytes_len = body.len();
+        if serialized_payload_bytes_len > MAX_PAYLOAD_BYTES {
+            return Err(RequestBuildError::PayloadTooBig);
+        }
         metrics::histogram!(
             "encoded_payload_size_bytes",
             serialized_payload_bytes_len as f64
@@ -210,7 +226,9 @@ impl RequestBuilder {
                     flate2::Compression::new(level as u32),
                 );
 
-                encoder.write_all(&body)?;
+                encoder
+                    .write_all(&body)
+                    .map_err(|error| RequestBuildError::Io { error })?;
                 (encoder.finish().expect("failed to encode"), true)
             }
         };
