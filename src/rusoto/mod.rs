@@ -350,21 +350,11 @@ pub fn is_retriable_error<T>(error: &RusotoError<T>) -> bool {
             // This header is a direct indication that we should retry the request. Eventually it'd
             // be nice to actually schedule the retry after the given delay, but for now we just
             // check that it contains a positive value.
-            if response
+            let retry_header = response
                 .headers
                 .get("x-amz-retry-after")
                 .and_then(|value| value.parse::<isize>().ok())
-                .filter(|duration| *duration > 0)
-                .is_some()
-            {
-                return true;
-            }
-
-            if response.status.is_server_error()
-                || response.status == http::StatusCode::TOO_MANY_REQUESTS
-            {
-                return true;
-            }
+                .filter(|duration| *duration > 0);
 
             // Certain 400-level responses will contain an error code indicating that the request
             // should be retried. Since we don't retry 400-level responses by default, we'll look
@@ -383,7 +373,11 @@ pub fn is_retriable_error<T>(error: &RusotoError<T>) -> bool {
                 RegexSet::new(&["RequestTimeout", "RequestExpired", "ThrottlingException"])
                     .expect("invalid regex")
             });
-            response.status.is_client_error() && re.is_match(&response.body)
+
+            retry_header.is_some()
+                || response.status.is_server_error()
+                || response.status == http::StatusCode::TOO_MANY_REQUESTS
+                || (response.status.is_client_error() && re.is_match(&response.body))
         }
         _ => false,
     }
