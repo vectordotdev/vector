@@ -59,6 +59,11 @@ async fn start_test(
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
 
     let _ = sink.run(events).await.unwrap();
+    // It's possible that the internal machinery of the sink is still
+    // spinning up. We pause here to give the batch time to wind
+    // through. Waiting is preferable to adding synchronization into the
+    // actual sync code for the sole benefit of these tests.
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -105,7 +110,7 @@ async fn smoke() {
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure() {
-    let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Failed).await;
+    let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Errored).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
