@@ -93,7 +93,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             |(file, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -107,7 +107,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -121,7 +121,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Insensitive, condition, Some(index))
+                    file.find_table_row(Case::Insensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -135,7 +135,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             |(file, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -149,7 +149,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -163,7 +163,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Insensitive, condition, Some(index))
+                    file.find_table_row(Case::Insensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -177,7 +177,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             |(file, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
                 )
             },
             BatchSize::SmallInput,
@@ -193,7 +193,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 |(file, index, condition, expected)| {
                     assert_eq!(
                         Ok(expected),
-                        file.find_table_row(Case::Sensitive, condition, Some(index))
+                        file.find_table_row(Case::Sensitive, condition, None, Some(index))
                     )
                 },
                 BatchSize::SmallInput,
@@ -210,7 +210,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 |(file, index, condition, expected)| {
                     assert_eq!(
                         Ok(expected),
-                        file.find_table_row(Case::Insensitive, condition, Some(index))
+                        file.find_table_row(Case::Insensitive, condition, None, Some(index))
                     )
                 },
                 BatchSize::SmallInput,

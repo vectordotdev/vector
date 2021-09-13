@@ -174,13 +174,14 @@ impl TableSearch {
         table: &str,
         case: Case,
         condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_row(case, condition, index),
+                Some(table) => table.find_table_row(case, condition, select, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -195,13 +196,14 @@ impl TableSearch {
         table: &str,
         case: Case,
         condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_rows(case, condition, index),
+                Some(table) => table.find_table_rows(case, condition, select, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -294,6 +296,7 @@ mod tests {
                     field: "thing",
                     value: Value::from("thang"),
                 }],
+                None,
                 None
             )
         );
@@ -336,6 +339,7 @@ mod tests {
                     field: "thing",
                     value: Value::from("thang"),
                 }],
+                None,
                 None
             )
         );

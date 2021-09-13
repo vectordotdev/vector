@@ -205,10 +205,16 @@ impl File {
         })
     }
 
-    fn add_columns(&self, row: &[Value]) -> BTreeMap<String, Value> {
+    fn add_columns(&self, select: Option<&[String]>, row: &[Value]) -> BTreeMap<String, Value> {
         self.headers
             .iter()
             .zip(row)
+            .filter(|(header, _)| {
+                select
+                    .map(|select| select.contains(header))
+                    // If no select is passed, we assume all columns are included
+                    .unwrap_or(true)
+            })
             .map(|(header, col)| (header.clone(), col.clone()))
             .collect()
     }
@@ -268,13 +274,14 @@ impl File {
         data: I,
         case: Case,
         condition: &'a [Condition<'a>],
+        select: Option<&'a [String]>,
     ) -> impl Iterator<Item = BTreeMap<String, Value>> + 'a
     where
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
         data.filter_map(move |row| {
             if self.row_equals(case, condition, &*row) {
-                Some(self.add_columns(&*row))
+                Some(self.add_columns(select, &*row))
             } else {
                 None
             }
@@ -301,6 +308,7 @@ impl File {
         }
 
         let key = hash.finish();
+
         let IndexHandle(handle) = handle;
         Ok(self.indexes[handle].2.get(&key))
     }
@@ -350,12 +358,13 @@ impl Table for File {
         &self,
         case: Case,
         condition: &'a [Condition<'a>],
+        select: Option<&'a [String]>,
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, Value>, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
-                single_or_err(self.sequential(self.data.iter(), case, condition))
+                single_or_err(self.sequential(self.data.iter(), case, condition, select))
             }
             Some(handle) => {
                 let result = self
@@ -365,7 +374,7 @@ impl Table for File {
                     .map(|idx| &self.data[*idx]);
 
                 // Perform a sequential scan over the indexed result.
-                single_or_err(self.sequential(result, case, condition))
+                single_or_err(self.sequential(result, case, condition, select))
             }
         }
     }
@@ -374,12 +383,15 @@ impl Table for File {
         &self,
         case: Case,
         condition: &'a [Condition<'a>],
+        select: Option<&'a [String]>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<BTreeMap<String, Value>>, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
-                Ok(self.sequential(self.data.iter(), case, condition).collect())
+                Ok(self
+                    .sequential(self.data.iter(), case, condition, select)
+                    .collect())
             }
             Some(handle) => {
                 // Perform a sequential scan over the indexed result.
@@ -390,6 +402,7 @@ impl Table for File {
                             .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
                         case,
                         condition,
+                        select,
                     )
                     .collect())
             }
@@ -470,7 +483,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(Case::Sensitive, &[condition], None)
+            file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
     }
 
@@ -514,7 +527,7 @@ mod tests {
                 "field1" => "zirp",
                 "field2" => "zurp",
             }),
-            file.find_table_row(Case::Sensitive, &[condition], Some(handle))
+            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
     }
 
@@ -548,6 +561,7 @@ mod tests {
                     field: "field1",
                     value: Value::from("zip"),
                 }],
+                None,
                 Some(handle)
             )
         );
@@ -560,6 +574,49 @@ mod tests {
                     field: "field1",
                     value: Value::from("ZiP"),
                 }],
+                None,
+                Some(handle)
+            )
+        );
+    }
+
+    #[test]
+    fn selects_columns() {
+        let mut file = File::new(
+            vec![
+                vec!["zip".into(), "zup".into(), "zoop".into()],
+                vec!["zirp".into(), "zurp".into(), "zork".into()],
+                vec!["zip".into(), "zoop".into(), "zibble".into()],
+            ],
+            vec![
+                "field1".to_string(),
+                "field2".to_string(),
+                "field3".to_string(),
+            ],
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("zip"),
+        };
+
+        assert_eq!(
+            Ok(vec![
+                btreemap! {
+                    "field1" => "zip",
+                    "field3" => "zoop",
+                },
+                btreemap! {
+                    "field1" => "zip",
+                    "field3" => "zibble",
+                }
+            ]),
+            file.find_table_rows(
+                Case::Sensitive,
+                &[condition],
+                Some(&["field1".to_string(), "field3".to_string()]),
                 Some(handle)
             )
         );
@@ -595,6 +652,7 @@ mod tests {
                     field: "field1",
                     value: Value::from("zip"),
                 }],
+                None,
                 Some(handle)
             )
         );
@@ -616,6 +674,7 @@ mod tests {
                     field: "field1",
                     value: Value::from("ZiP"),
                 }],
+                None,
                 Some(handle)
             )
         );
@@ -656,7 +715,7 @@ mod tests {
                 "field1" => "zip",
                 "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
             }),
-            file.find_table_row(Case::Sensitive, &conditions, Some(handle))
+            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
         );
     }
 
@@ -677,7 +736,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], None)
+            file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
     }
 
@@ -700,7 +759,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found in index".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], Some(handle))
+            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
     }
 }

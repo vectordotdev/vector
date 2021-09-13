@@ -44,6 +44,7 @@ pub trait Table: DynClone {
         &self,
         case: Case,
         condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String>;
 
@@ -54,6 +55,7 @@ pub trait Table: DynClone {
         &self,
         case: Case,
         condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String>;
 
