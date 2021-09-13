@@ -59,27 +59,7 @@ impl Function for FindEnrichmentTableRecords {
             .into_owned();
         let condition = arguments.required_object("condition")?;
 
-        let select = arguments
-            .optional_array("select")?
-            .map(|select| {
-                select
-                    .into_iter()
-                    .map(|expr| {
-                        let err = || vrl_core::function::Error::ExpectedStaticExpression {
-                            keyword: "select",
-                            expr: expr.clone(),
-                        };
-
-                        let value = expr.as_value().ok_or_else(err)?;
-
-                        Ok(value
-                            .try_bytes_utf8_lossy()
-                            .map_err(|_| err())?
-                            .into_owned())
-                    })
-                    .collect::<std::result::Result<Vec<_>, vrl_core::function::Error>>()
-            })
-            .transpose()?;
+        let select = arguments.optional("select");
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
@@ -111,7 +91,7 @@ pub struct FindEnrichmentTableRecordsFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
     index: Option<IndexHandle>,
-    select: Option<Vec<String>>,
+    select: Option<Box<dyn Expression>>,
     case_sensitive: Case,
     enrichment_tables: TableSearch,
 }
@@ -129,13 +109,28 @@ impl Expression for FindEnrichmentTableRecordsFn {
             })
             .collect::<Result<Vec<Condition>>>()?;
 
+        let select = self
+            .select
+            .as_ref()
+            .map(|array| match array.resolve(ctx)? {
+                Value::Array(arr) => arr
+                    .iter()
+                    .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
+                    .collect::<std::result::Result<Vec<_>, _>>(),
+                value => Err(value::Error::Expected {
+                    got: value.kind(),
+                    expected: Kind::Array,
+                }),
+            })
+            .transpose()?;
+
         let data = self
             .enrichment_tables
             .find_table_rows(
                 &self.table,
                 self.case_sensitive,
                 &condition,
-                self.select.as_ref().map(|select| select.as_ref()),
+                select.as_ref().map(|select| select.as_ref()),
                 self.index,
             )?
             .into_iter()
