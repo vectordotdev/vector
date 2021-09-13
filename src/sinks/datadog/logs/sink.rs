@@ -36,6 +36,14 @@ use vector_core::stream::batcher::Batcher;
 
 const MAX_PAYLOAD_ARRAY: usize = 1_000;
 const MAX_PAYLOAD_BYTES: usize = 5_000_000;
+// The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
+// threshold the API will toss results. We previously serialized Events as they
+// came in -- a very CPU intensive process -- and to avoid that we only batch up
+// to 750KB below the max and then build our payloads. This does mean that in
+// some situations we'll kick out over-large payloads -- for instance, a string
+// of escaped double-quotes -- but we believe this should be very rare in
+// practice.
+const BATCH_GOAL_BYTES: usize = 4_250_000;
 
 #[derive(Default)]
 struct EventPartitioner {}
@@ -278,7 +286,7 @@ where
             EventPartitioner::default(),
             self.timeout,
             NonZeroUsize::new(MAX_PAYLOAD_ARRAY).unwrap(),
-            NonZeroUsize::new(MAX_PAYLOAD_BYTES),
+            NonZeroUsize::new(BATCH_GOAL_BYTES),
         )
         .map(|(maybe_key, batch)| {
             let key = maybe_key.unwrap_or_else(|| Arc::clone(&default_api_key));
