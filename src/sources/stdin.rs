@@ -6,6 +6,7 @@ use crate::{
     sources::util::TcpError,
     Pipeline,
 };
+use async_stream::stream;
 use bytes::Bytes;
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -117,45 +118,49 @@ where
 
         let stream = StreamReader::new(receiver);
         let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
+        let result = stream! {
+            loop {
+                match stream.next().await {
+                    Some(Ok((events, byte_size))) => {
+                        emit!(StdinEventsReceived {
+                            byte_size,
+                            count: events.len()
+                        });
 
-        loop {
-            match stream.next().await {
-                Some(Ok((events, byte_size))) => {
-                    emit!(StdinEventsReceived {
-                        byte_size,
-                        count: events.len()
-                    });
+                        for mut event in events {
+                            let log = event.as_mut_log();
 
-                    for mut event in events {
-                        let log = event.as_mut_log();
+                            log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
 
-                        log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                            if let Some(hostname) = &hostname {
+                                log.insert(&host_key, hostname.clone());
+                            }
 
-                        if let Some(hostname) = &hostname {
-                            log.insert(&host_key, hostname.clone());
+                            yield event;
                         }
-
-                        let _ = out.send(event).await;
                     }
-                }
-                Some(Err(error)) => {
-                    // Error is logged by `crate::codecs::Decoder`, no
-                    // further handling is needed here.
-                    if error.can_continue() {
-                        continue;
-                    } else {
-                        break;
+                    Some(Err(error)) => {
+                        // Error is logged by `crate::codecs::Decoder`, no
+                        // further handling is needed here.
+                        if error.can_continue() {
+                            continue;
+                        } else {
+                            break;
+                        }
                     }
+                    None => break,
                 }
-                None => break,
             }
         }
+        .map(Ok)
+        .forward(&mut out)
+        .await;
 
         info!("Finished sending.");
 
-        let _ = out.flush().await; // error emitted by sink_map_err
+        let _ = out.flush().await; // Error emitted by sink_map_err.
 
-        Ok(())
+        result
     }))
 }
 
