@@ -25,6 +25,11 @@ impl Function for GetEnrichmentTableRecord {
                 required: true,
             },
             Parameter {
+                keyword: "select",
+                kind: kind::ARRAY,
+                required: false,
+            },
+            Parameter {
                 keyword: "case_sensitive",
                 kind: kind::BOOLEAN,
                 required: false,
@@ -54,6 +59,8 @@ impl Function for GetEnrichmentTableRecord {
             .into_owned();
         let condition = arguments.required_object("condition")?;
 
+        let select = arguments.optional("select");
+
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
             .map(|literal| literal.to_value().try_boolean())
@@ -72,6 +79,7 @@ impl Function for GetEnrichmentTableRecord {
             table,
             condition,
             index: None,
+            select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
         }))
@@ -83,6 +91,7 @@ pub struct GetEnrichmentTableRecordFn {
     table: String,
     condition: BTreeMap<String, expression::Expr>,
     index: Option<IndexHandle>,
+    select: Option<Box<dyn Expression>>,
     case_sensitive: Case,
     enrichment_tables: TableSearch,
 }
@@ -100,10 +109,26 @@ impl Expression for GetEnrichmentTableRecordFn {
             })
             .collect::<Result<Vec<Condition>>>()?;
 
+        let select = self
+            .select
+            .as_ref()
+            .map(|array| match array.resolve(ctx)? {
+                Value::Array(arr) => arr
+                    .iter()
+                    .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
+                    .collect::<std::result::Result<Vec<_>, _>>(),
+                value => Err(value::Error::Expected {
+                    got: value.kind(),
+                    expected: Kind::Array,
+                }),
+            })
+            .transpose()?;
+
         let data = self.enrichment_tables.find_table_row(
             &self.table,
             self.case_sensitive,
             &condition,
+            select.as_ref().map(|select| select.as_ref()),
             self.index,
         )?;
 
@@ -120,6 +145,7 @@ impl Expression for GetEnrichmentTableRecordFn {
             self.case_sensitive,
             &self.condition,
         )?);
+
         Ok(())
     }
 
@@ -146,6 +172,7 @@ mod tests {
                 "field" =>  expression::Literal::from("value"),
             },
             index: Some(IndexHandle(999)),
+            select: None,
             case_sensitive: Case::Sensitive,
             enrichment_tables: registry.as_readonly(),
         };
@@ -172,6 +199,7 @@ mod tests {
                 "field" =>  expression::Literal::from("value"),
             },
             index: None,
+            select: None,
             case_sensitive: Case::Sensitive,
             enrichment_tables: registry.as_readonly(),
         };

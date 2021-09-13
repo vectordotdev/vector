@@ -32,6 +32,7 @@ impl Table for DummyEnrichmentTable {
         &self,
         _case: Case,
         _condition: &[Condition],
+        _select: Option<&[String]>,
         _index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, Value>, String> {
         Ok(self.data.clone())
@@ -41,6 +42,7 @@ impl Table for DummyEnrichmentTable {
         &self,
         _case: Case,
         _condition: &[Condition],
+        _select: Option<&[String]>,
         _index: Option<IndexHandle>,
     ) -> Result<Vec<BTreeMap<String, Value>>, String> {
         Ok(vec![self.data.clone()])

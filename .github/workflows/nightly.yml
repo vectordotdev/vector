@@ -231,7 +231,7 @@ jobs:
           mkdir -p /c/wix
           cd /c/wix
           curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
-          unzip wix-binaries.zip
+          unzip -o wix-binaries.zip
           rm wix-binaries.zip
       - run: choco install llvm
       - name: "Build archive"
