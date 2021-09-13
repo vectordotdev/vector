@@ -34,11 +34,20 @@ remap: functions: get_enrichment_table_record: {
 			type: ["object"]
 		},
 		{
+			name: "select"
+			description: '''
+				A subset of fields from the enrichment table to return. If not
+				specified all fields are returned.
+		  '''
+			required: false
+			type: ["array"]
+		},
+		{
 			name:        "case_sensitive"
 			description: "Should text fields match case exactly."
 			required:    false
 			type: ["boolean"]
-			default:     true
+			default: true
 		},
 	]
 	internal_failure_reasons: ["The row is not found.",
