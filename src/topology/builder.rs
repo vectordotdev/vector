@@ -171,7 +171,7 @@ pub async fn build_pieces(
                 when_full: vector_core::buffers::WhenFull::Block,
             })
             .unwrap();
-        let input_rx = crate::utilization::wrap(Pin::new(input_rx));
+        let mut input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
         let task = match transform {
             Transform::Function(mut t) => {
@@ -208,6 +208,51 @@ pub async fn build_pieces(
                     });
 
                 outputs.insert(key.clone(), control);
+
+                Task::new(key.clone(), typetag, transform)
+            }
+            Transform::FallibleFunction(mut t) => {
+                let (mut output, control) = Fanout::new();
+                let (mut errors_output, errors_control) = Fanout::new();
+
+                let transform = async move {
+                    while let Some(event) = input_rx.next().await {
+                        if !filter_event_type(&event, input_type) {
+                            continue;
+                        }
+                        emit!(&EventsReceived {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        });
+
+                        let mut buf = Vec::with_capacity(1);
+                        let mut err_buf = Vec::with_capacity(1);
+
+                        t.transform(&mut buf, &mut err_buf, event);
+                        // TODO: account for error outputs separately?
+                        emit!(&EventsSent {
+                            count: buf.len() + err_buf.len(),
+                            byte_size: buf.iter().map(|event| event.size_of()).sum::<usize>()
+                                + err_buf.iter().map(|event| event.size_of()).sum::<usize>(),
+                        });
+
+                        for event in buf {
+                            output.feed(event).await.expect("unit error");
+                        }
+                        output.flush().await.expect("unit error");
+                        for event in err_buf {
+                            errors_output.feed(event).await.expect("unit error");
+                        }
+                        errors_output.flush().await.expect("unit error");
+                    }
+
+                    debug!("Finished.");
+                    Ok(TaskOutput::Transform)
+                }
+                .boxed();
+
+                outputs.insert(key.clone(), control);
+                outputs.insert(key.join("errors"), errors_control);
 
                 Task::new(key.clone(), typetag, transform)
             }

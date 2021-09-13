@@ -75,6 +75,7 @@ impl Opts {
     }
 }
 
+// TODO: handle error outputs
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
