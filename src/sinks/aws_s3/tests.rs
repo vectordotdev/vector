@@ -91,7 +91,6 @@ mod integration_tests {
         tokio::time::sleep(Duration::from_secs(1)).await;
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
-        println!("{:?}", keys);
         assert_eq!(keys.len(), 3);
 
         let mut response_lines: Vec<Vec<String>> = Vec::new();
