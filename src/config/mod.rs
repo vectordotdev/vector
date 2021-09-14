@@ -26,6 +26,7 @@ pub mod component;
 pub mod datadog;
 mod diff;
 pub mod format;
+mod graph;
 mod id;
 mod loading;
 mod pipeline;
