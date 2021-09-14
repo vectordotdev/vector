@@ -7728,7 +7728,6 @@ dependencies = [
  "http",
  "serde",
  "shared",
- "structopt",
  "tokio",
  "vrl",
  "vrl-stdlib",

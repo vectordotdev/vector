@@ -1,17 +1,12 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use crate::error::handle_err;
 use crate::funcs::function_metadata;
 use crate::resolve::resolve_vrl_input;
 
-use structopt::StructOpt;
 use warp::Filter;
 
-#[derive(Debug, StructOpt)]
-pub struct Opts {
-    #[structopt(short = "p", long, default_value = "8080", env = "PORT")]
-    port: u16,
-}
-
-pub async fn serve(opts: Opts) {
+pub async fn serve() {
     let cors = warp::cors()
         .allow_any_origin()
         .allow_headers(vec!["content-type"])
@@ -28,7 +23,9 @@ pub async fn serve(opts: Opts) {
 
     let routes = resolve.or(functions).recover(handle_err).with(cors);
 
-    println!("starting up the server on port {}", opts.port);
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8080);
 
-    warp::serve(routes).run(([0, 0, 0, 0], opts.port)).await
+    println!("starting up the server on {}", addr.to_string());
+
+    warp::serve(routes).run(addr).await
 }

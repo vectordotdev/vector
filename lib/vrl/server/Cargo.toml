@@ -11,7 +11,6 @@ http = "0.2.4"
 serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 shared = { path = "../../shared", default-features = false }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
-structopt = "0.3.23"
 tokio = { version = "1.11.0", default-features = false, features = ["full"] }
 vrl = { path = "../core" }
 warp = "0.3.1"

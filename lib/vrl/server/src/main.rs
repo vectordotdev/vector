@@ -1,10 +1,6 @@
-use vrl_server::server::{serve, Opts};
-
-use structopt::StructOpt;
+use vrl_server::server::serve;
 
 #[tokio::main]
 async fn main() {
-    let opts = Opts::from_args();
-
-    serve(opts).await
+    serve().await
 }
