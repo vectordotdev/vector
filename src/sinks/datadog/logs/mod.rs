@@ -3,7 +3,7 @@
 //! This module contains the [`VectorSink`] instance that is responsible for
 //! taking a stream of [`Event`] instances and getting them flung out to the
 //! Datadog Log API. The log API is relatively generous in terms of its
-//! constraints, excepting that:
+//! constraints, except that:
 //!
 //!   * a 'payload' is comprised of no more than 1,000 array members
 //!   * a 'payload' may not be more than 5Mb in size, uncompressed and
