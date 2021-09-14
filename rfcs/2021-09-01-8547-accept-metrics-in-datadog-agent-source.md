@@ -17,6 +17,9 @@ metrics from a Vector perspective so they can be benefit from Vector capabilitie
   * [Drawbacks](#drawbacks)
   * [Prior Art](#prior-art)
   * [Alternatives](#alternatives)
+    + [For transport between Agents and Vector](#for-transport-between-agents-and-vector)
+    + [Flattening sketches](#flattening-sketches)
+    + [For Request routing](#for-request-routing)
   * [Outstanding Questions](#outstanding-questions)
   * [Plan Of Attack](#plan-of-attack)
   * [Future Improvements](#future-improvements)
@@ -95,8 +98,9 @@ Regarding the relative amount of requests:
 - `/api/v1/check_run` depends on the number of checks, but it usually accounts for much less data than metrics.
 
 The aforementionned details highlight that current Datadog Agents cannot be configured to only send metrics to a certain
-endpoint and other kind of data have to be sent to the endoints. We could envision work in the Agent that would
-introduce another configurable endpoint. This is exposed in the [Alternatives](#alternatives) chapter.
+endpoint and other kind of data have to be sent to another endoint. We could envision work in the Agent that would
+introduce another configurable endpoint. This is exposed in the [Alternatives](#alternatives)/[Outstanding
+Questions](#outstanding-questions) chapters.
 
 ### Implementation
 
@@ -125,7 +129,7 @@ model](https://vector.dev/docs/about/under-the-hood/architecture/data-model/metr
 representing it](https://github.com/timberio/vector/blob/master/lib/vector-core/src/event/metric.rs#L135-L169).
 
 
-The implementation would the consist in:
+The implementation would then consist in:
 
 - Implement in the `datadog_agent` source the ability to proxy all known route (see above) as-is directly to Datadog
   (this will require an new settings in the Vector source, something like `unused_payload_site: us3.datadoghq.com`). At
@@ -138,9 +142,9 @@ The implementation would the consist in:
       later if there is demand for it (see the note below).
     - Overall this is fairly straighforward
 - Handle the `/api/beta/sketches` route in the `datadog_agent` source to support sketches/distribution encoded using
-  protobuf
-   - Revamp the distribution metrics in the `datadog_metrics` sink to use sketches and the associated endpoint will
-     probably be a good idea.
+  protobuf, but once decoded those sketches will require internal support in Vector:
+   - Distribution metrics in the `datadog_metrics` sink would need to use sketches and the associated endpoint. This is
+     a prerequisite to support end-to-end sketches forwarding.
    - The sketches the agent ships is based on this [paper](http://www.vldb.org/pvldb/vol12/p2195-masson.pdf) whereas
      Vector uses what's called a summary inside the Agent, implementing the complete DDSketch support in Vector is
      probably a good idea as sketches have convenient properties for wide consistent aggregation and limited error. To
@@ -167,7 +171,15 @@ arise, Vector internal tag representation will not be changed following this RFC
 
 ## Drawbacks
 
-TBC
+Regarding how URL path will be handled in Vector (or outside) is likely to be a tradeoff, overall some flexibility is
+required to dispatch metric and non-metric payload that are sent by the agent to the current `dd_url` endpoint:
+- If the Agent only sent metrics payload to Vector, a new metric route might be introduce for any reason in the Agent,
+  this would require a Vector upgrade
+- If Vector could have a list of path to handle (to handle requests that contain metrics) and proxify non-metrics
+  payload & unknow path directly to Datadog. If Datadog Agent gets upgraded and emits metrics to a new path would allow
+  a degraded situation were Vector would miss the metrics, but metrics would still be sent to Datadog.
+- If a third party solution is used to dispatch metrics/non-metrics payload, managing this additional component will
+  complexify the deployment, Vector & Datadog Agent would then have no need for built-in flexibility.
 
 ## Prior Art
 
@@ -181,22 +193,38 @@ TBC
 
 ## Alternatives
 
-- Use an alternate protocol between Datadog Agents and Vector (Like Prometheus, Statds or Vector own protocol)
-- For sketches, we could flatten sketches and compute usual derived metrics (min/max/average/count/some percentile) and
-  send those as gauge/count, but it would prevent (or at least impact) existing distribution/sketches user
-- Regarding how we support route and the fact that Vector would have to support non-metric payload, an alternate
-  solution would be to push for a Datadog Agent change with a new override (let's say `metrics_dd_url` that would only
-  divert request to `/api/v1/series` & `/api/beta/sketches` to a specific endpoints. This however highlights that Vector
-  & the Datadog Agent will then need to follow a compatbility matrix:
-  1. If the Agent is upgrade with a new metric route (let's say for v2 intake migration), the user will need to also
-     upgrade Vector so it supports this route.
-  2. Existing fleet of Agents will need to be upgraded to be able to send metrics to Vector.
+### For transport between Agents and Vector
+The use an alternate protocol between Datadog Agents and Vector (Like Prometheus, Statds, OpenTelemetry or Vector own
+protocol) could be envisionned. This would call for a significant, yet possible with the current Agent architecture,
+addition, those changes would mostly be located in the
+[forwarder](https://github.com/DataDog/datadog-agent/tree/main/pkg/forwarder) and
+[serializer](https://github.com/DataDog/datadog-agent/tree/main/pkg/serializer) logic. This would imply a hugh chunk of
+work on the Agent side, require update to use the feature, probably also require some work on Vector side. The solution
+that would probably offer the most benefit would be to use OpenTelemetry as this is planned in Vector, it already has
+some support inside the Agent and but it does not support sketches as of today (this is probably coming anytime soon).
 
-  While #2 is not really a major issue as this would be a one shot upgrade if required, #1 may be more bothersome as the
-  issue will always be there. A somehow hacky solution would be to leverage the [documented
-  haproxy](https://docs.datadoghq.com/agent/proxy/?tab=agentv6v7#haproxy) setup for Agent to divert selected routes to
-  Vector, but it would have the advantage of resolving any migrations, not-yet-supported-metric-route in Vector and
-  alleviate the need of modifying the Agent.
+### Flattening sketches
+For sketches, we could flatten sketches and compute usual derived metrics (min/max/average/count/some percentiles) and
+send those as gauge/count, but it would prevent (or at least impact) existing distribution/sketches users. Moreover if
+instead of sketches only derived metrics are used a lot of the tagging flexiblity will be lost. By submitting tagged
+sketches to the Datadog intake, any tag selector can be used to compute a distribution based on the sketches that bear
+matching tag. This cannot be done without sending sketches. But flattening sketches would have the benefit of simplify
+the implementation in Vector and remove the prerequisite of having sketches support inside Vector.
+
+### For Request routing
+This is point is still being discussed. As stated in [Outstanding Questions](#outstanding-questions) there are 3
+alternatives solution currently envisionned. The current suggested one is to left the Agent untouched and handle
+everything in Vector. Alternatives to that are:
+1. pushing for a Datadog Agent change with a new override (let's say `metrics_dd_url` that would only divert request to
+   `/api/v1/series` & `/api/beta/sketches` to a specific endpoints. This however highlights that Vector & the Datadog
+   Agent will then need to follow a compatbility matrix:
+  * If the Agent is upgraded and introduce a new metric route (let's say for v2 intake migration), the user will need to
+    also upgrade Vector so it supports this route.
+  * Existing fleet of Agents will need to be upgraded to be able to send metrics to Vector.
+2. Use a third party middle layer (e.g. haproxy or similare). It could leverage the [documented
+   haproxy](https://docs.datadoghq.com/agent/proxy/?tab=agentv6v7#haproxy) setup for Agent to divert selected routes to
+   Vector, but it would have the advantage of resolving any migrations, not-yet-supported-metric-route in Vector and
+   alleviate the need of modifying the Agent.
 
 ## Outstanding Questions
 
@@ -210,6 +238,13 @@ TBC
 - Is there any other metrics type that could required some degree of adaptation, there is the non monotonic counter that
   exists in the agent but not in Vector that may require the introduction of a so-called `NonMonotonicCounter` in
   Vector.
+- Sketches shipped by the agent are generated with some [hardcoded
+  settings](https://github.com/DataDog/datadog-agent/blob/main/pkg/quantile/config.go#L8-L12) that needs to be known
+  (because they are not part of the [schema
+  used](https://github.com/DataDog/agent-payload/blob/master/proto/metrics/agent_payload.proto#L47-L81) to represent
+  sketches on wire) if some operations (most notably merging, maybe conversion to other sketches format if shipped to a
+  non-Datadog endpoint) are to be performed by Vector on those skeches. Even if those value are unlikely to change it is
+  worth discussing if the Agent should include those in sktech payloads.
 
 ## Plan Of Attack
 
