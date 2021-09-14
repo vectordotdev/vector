@@ -163,7 +163,39 @@ components: sinks: [Name=string]: {
 								required:    true
 								type: string: {
 									examples: features.send.encoding.codec.enum
-									syntax:   "literal"
+									let batched = features.send.encoding.codec.batched
+									enum: {
+										for codec in features.send.encoding.codec.enum {
+											if codec == "text" {
+												if batched {
+													text: "Newline delemited list of messages generated from the message key from each event."
+												}
+												if !batched {
+													text: "The message field from the event."
+												}
+											}
+											if codec == "logfmt" {
+												if batched {
+													logfmt: "Newline delemited list of events encoded by [logfmt]\(urls.logfmt)."
+												}
+												if !batched {
+													logfmt: "[logfmt]\(urls.logfmt) encoded event."
+												}
+											}
+											if codec == "json" {
+												if batched {
+													json: "Array of JSON encoded events, each element reprenting one event."
+												}
+												if !batched {
+													json: "JSON encoded event."
+												}
+											}
+											if codec == "ndjson" {
+												ndjson: "Newline delimited list of JSON encoded events."
+											}
+										}
+									}
+									syntax: "literal"
 								}
 							}
 						}

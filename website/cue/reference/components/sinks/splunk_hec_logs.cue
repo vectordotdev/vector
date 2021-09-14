@@ -33,7 +33,6 @@ components: sinks: splunk_hec_logs: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
 					enum: ["json", "text"]
 				}
 			}

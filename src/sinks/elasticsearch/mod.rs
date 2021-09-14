@@ -1491,9 +1491,12 @@ mod integration_tests {
             let hits = response["hits"]["hits"]
                 .as_array_mut()
                 .expect("Elasticsearch response does not include hits->hits");
-            let mut input = input
+            #[allow(clippy::needless_collect)]
+            // https://github.com/rust-lang/rust-clippy/issues/6909
+            let input = input
                 .into_iter()
-                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap());
+                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+                .collect::<Vec<_>>();
 
             for hit in hits {
                 let hit = hit
@@ -1506,7 +1509,7 @@ mod integration_tests {
                     let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
                     obj.insert(log_schema().timestamp_key().into(), timestamp);
                 }
-                assert!(input.any(|e| &e == hit));
+                assert!(input.contains(hit));
             }
         }
     }

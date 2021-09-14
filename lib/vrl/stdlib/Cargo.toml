@@ -23,7 +23,7 @@ hostname = { version = "0.3", optional = true }
 indexmap = { version = "~1.6.2", default-features = false, optional = true}
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
-nom = { version = "6", optional = true }
+nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
@@ -68,6 +68,7 @@ default = [
     "encode_percent",
     "ends_with",
     "exists",
+    "find",
     "flatten",
     "float",
     "floor",
@@ -182,6 +183,7 @@ encode_logfmt = ["encode_key_value"]
 encode_percent = ["percent-encoding"]
 ends_with = []
 exists = []
+find = []
 find_table_row = []
 flatten = []
 float = []
