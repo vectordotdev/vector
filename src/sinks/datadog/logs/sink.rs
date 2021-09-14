@@ -44,6 +44,7 @@ const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 // of escaped double-quotes -- but we believe this should be very rare in
 // practice.
 const BATCH_GOAL_BYTES: usize = 4_250_000;
+const BATCH_DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Default)]
 struct EventPartitioner {}
@@ -108,7 +109,7 @@ impl<S> LogSinkBuilder<S> {
             encoding: Some(self.encoding),
             acker: Some(self.context.acker()),
             service: Some(self.service),
-            timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(60)),
+            timeout: self.timeout.unwrap_or(BATCH_DEFAULT_TIMEOUT),
             compression: self.compression.unwrap_or_default(),
             log_schema: self.log_schema.unwrap_or_else(|| log_schema()),
         }
