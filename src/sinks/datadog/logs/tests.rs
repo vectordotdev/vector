@@ -55,17 +55,11 @@ async fn start_test(
     let (rx, _trigger, server) = build_test_server_status(addr, http_status);
     tokio::spawn(server);
 
-    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
 
     let _ = sink.run(events).await.unwrap();
-    // It's possible that the internal machinery of the sink is still
-    // spinning up. We pause here to give the batch time to wind
-    // through. Waiting is preferable to adding synchronization into the
-    // actual sync code for the sole benefit of these tests.
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
-    assert_eq!(receiver.try_recv(), Ok(batch_status));
+    assert_eq!(receiver.await, batch_status);
 
     (expected, rx)
 }
