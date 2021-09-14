@@ -6,5 +6,5 @@ use structopt::StructOpt;
 async fn main() {
     let opts = Opts::from_args();
 
-    serve(opts);
+    serve(opts).await
 }
