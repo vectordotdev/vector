@@ -363,7 +363,7 @@ fn parse_name(input: &str) -> IResult<String> {
     let input = trim_space(input);
     let (input, (a, b)) = pair(
         take_while1(|c: char| c.is_alphabetic() || c == '_'),
-        take_while(|c: char| c.is_alphanumeric() || c == '_'),
+        take_while(|c: char| c.is_alphanumeric() || c == '_' || c == ':'),
     )(input)
     .map_err(|_: NomError| ErrorKind::ParseNameError {
         input: input.to_owned(),
@@ -455,6 +455,11 @@ mod test {
 
         let input = wrap("99");
         assert!(parse_name(&input).is_err());
+
+        let input = wrap("consul_serf_events_consul:new_leader");
+        let (left, r) = parse_name(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r, "consul_serf_events_consul:new_leader");
     }
 
     #[test]

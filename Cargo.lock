@@ -79,9 +79,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.43"
+version = "1.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28ae2b3dec75a406790005a200b1bd89785afc02517a00ca99ecfe093ee9e6cf"
+checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
 
 [[package]]
 name = "approx"
@@ -2039,9 +2039,9 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "flate2"
-version = "1.0.21"
+version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80edafed416a46fb378521624fab1cfa2eb514784fd8921adbe8a8d8321da811"
+checksum = "1e6988e897c1c9c485f43b47a529cef42fde0547f9d8d41a7062518f1d8fc53f"
 dependencies = [
  "cfg-if 1.0.0",
  "crc32fast",
@@ -3528,7 +3528,7 @@ dependencies = [
  "metrics-util",
  "once_cell",
  "tracing 0.1.26",
- "tracing-core 0.1.19",
+ "tracing-core 0.1.20",
  "tracing-subscriber",
 ]
 
@@ -5855,9 +5855,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.8.20"
+version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad104641f3c958dab30eb3010e834c2622d1f3f4c530fef1dee20ad9485f3c09"
+checksum = "d8c608a35705a5d3cdc9fbe403147647ff34b921f8e833e49306df898f9b20af"
 dependencies = [
  "dtoa",
  "indexmap",
@@ -6884,7 +6884,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.15",
- "tracing-core 0.1.19",
+ "tracing-core 0.1.20",
 ]
 
 [[package]]
@@ -6918,9 +6918,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.19"
+version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ca517f43f0fb96e0c3072ed5c275fe5eece87e8cb52f4a77b69226d3b1c9df8"
+checksum = "46125608c26121c81b0c6d693eab5a420e416da7e43c426d2e8f7df8da8a3acf"
 dependencies = [
  "lazy_static",
 ]
@@ -6955,7 +6955,7 @@ dependencies = [
  "dashmap",
  "mock_instant",
  "tracing 0.1.26",
- "tracing-core 0.1.19",
+ "tracing-core 0.1.20",
  "tracing-subscriber",
 ]
 
@@ -6967,7 +6967,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.19",
+ "tracing-core 0.1.20",
 ]
 
 [[package]]
@@ -6977,7 +6977,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.19",
+ "tracing-core 0.1.20",
 ]
 
 [[package]]
@@ -6997,7 +6997,7 @@ dependencies = [
  "smallvec",
  "thread_local",
  "tracing 0.1.26",
- "tracing-core 0.1.19",
+ "tracing-core 0.1.20",
  "tracing-log",
  "tracing-serde",
 ]
@@ -7482,7 +7482,7 @@ dependencies = [
  "tower-layer",
  "tower-test",
  "tracing 0.1.26",
- "tracing-core 0.1.19",
+ "tracing-core 0.1.20",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -7579,7 +7579,7 @@ dependencies = [
  "tokio-util",
  "toml",
  "tracing 0.1.26",
- "tracing-core 0.1.19",
+ "tracing-core 0.1.20",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
