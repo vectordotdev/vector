@@ -30,5 +30,5 @@ pub async fn serve(opts: Opts) {
 
     println!("starting up the server on port {}", opts.port);
 
-    warp::serve(routes).run(([127, 0, 0, 1], opts.port)).await
+    warp::serve(routes).run(([0, 0, 0, 0], opts.port)).await
 }
