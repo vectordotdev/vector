@@ -177,7 +177,7 @@ async-graphql-warp = { version = "=2.6.4", default-features = false, optional = 
 itertools = { version = "0.10.1", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.21.0", default-features = false, optional = true }
+crossterm = { version = "0.21.0", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.16.0", optional = true, default-features = false, features = ["crossterm"] }

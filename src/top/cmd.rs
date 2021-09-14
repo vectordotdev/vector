@@ -64,7 +64,8 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 
     // Initialize the dashboard
     match init_dashboard(url.as_str(), opts, sender).await {
-        Ok(_) => exitcode::OK,
+        // Exit the process to clean up any lingering subscriptions.
+        Ok(_) => std::process::exit(0),
         _ => {
             eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
             exitcode::IOERR
