@@ -152,7 +152,7 @@ where
                     let start = time::Instant::now();
                     match checkpointer.write_checkpoints() {
                         Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
-                        Err(error) => emitter.emit_file_checkpoint_write_failed(error),
+                        Err(error) => emitter.emit_file_checkpoint_write_error(error),
                     }
                 })
                 .await
@@ -296,7 +296,7 @@ where
                                 }
                                 Err(error) => {
                                     // We will try again after some time.
-                                    self.emitter.emit_file_delete_failed(&watcher.path, error);
+                                    self.emitter.emit_file_delete_error(&watcher.path, error);
                                 }
                             }
                         }
@@ -425,7 +425,7 @@ where
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }
-            Err(error) => self.emitter.emit_file_watch_failed(&path, error),
+            Err(error) => self.emitter.emit_file_watch_error(&path, error),
         };
     }
 }

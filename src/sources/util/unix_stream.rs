@@ -2,7 +2,7 @@ use crate::{
     async_read::VecAsyncReadExt,
     emit,
     event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteFailed},
+    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
@@ -114,7 +114,7 @@ where
 
         // Delete socket file
         if let Err(error) = remove_file(&listen_path) {
-            emit!(UnixSocketFileDeleteFailed {
+            emit!(UnixSocketFileDeleteError {
                 path: &listen_path,
                 error
             });

@@ -125,11 +125,11 @@ impl Fingerprinter {
                 }
                 io::ErrorKind::NotFound => {
                     if !self.ignore_not_found {
-                        emitter.emit_file_fingerprint_read_failed(path, error);
+                        emitter.emit_file_fingerprint_read_error(path, error);
                     }
                 }
                 _ => {
-                    emitter.emit_file_fingerprint_read_failed(path, error);
+                    emitter.emit_file_fingerprint_read_error(path, error);
                 }
             })
             .ok()
@@ -468,7 +468,7 @@ mod test {
 
         fn emit_file_resumed(&self, _: &Path, _: u64) {}
 
-        fn emit_file_watch_failed(&self, _: &Path, _: Error) {
+        fn emit_file_watch_error(&self, _: &Path, _: Error) {
             panic!();
         }
 
@@ -476,11 +476,11 @@ mod test {
 
         fn emit_file_deleted(&self, _: &Path) {}
 
-        fn emit_file_delete_failed(&self, _: &Path, _: Error) {
+        fn emit_file_delete_error(&self, _: &Path, _: Error) {
             panic!();
         }
 
-        fn emit_file_fingerprint_read_failed(&self, _: &Path, _: Error) {
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {
             panic!();
         }
 
@@ -490,7 +490,7 @@ mod test {
             panic!();
         }
 
-        fn emit_file_checkpoint_write_failed(&self, _: Error) {
+        fn emit_file_checkpoint_write_error(&self, _: Error) {
             panic!();
         }
 
