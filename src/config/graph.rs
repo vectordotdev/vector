@@ -3,23 +3,20 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub enum Node {
-    Source {
-        ty: DataType,
-    },
-    Transform {
-        in_ty: DataType,
-        out_ty: DataType,
-        inputs: Vec<ComponentKey>,
-    },
-    Sink {
-        ty: DataType,
-        inputs: Vec<ComponentKey>,
-    },
+    Source { ty: DataType },
+    Transform { in_ty: DataType, out_ty: DataType },
+    Sink { ty: DataType },
+}
+
+struct Edge {
+    from: ComponentKey,
+    to: ComponentKey,
 }
 
 #[derive(Default)]
 pub struct Graph {
     nodes: HashMap<ComponentKey, Node>,
+    edges: Vec<Edge>,
 }
 
 impl Graph {
@@ -34,15 +31,16 @@ impl Graph {
         out_ty: DataType,
         inputs: Vec<impl Into<ComponentKey>>,
     ) {
+        let id = id.into();
         let inputs = self.clean_inputs(inputs);
-        self.nodes.insert(
-            id.into(),
-            Node::Transform {
-                in_ty,
-                out_ty,
-                inputs,
-            },
-        );
+        self.nodes
+            .insert(id.clone(), Node::Transform { in_ty, out_ty });
+        for from in inputs {
+            self.edges.push(Edge {
+                from,
+                to: id.clone(),
+            });
+        }
     }
 
     fn add_sink<I: Into<ComponentKey>>(
@@ -51,8 +49,15 @@ impl Graph {
         ty: DataType,
         inputs: Vec<impl Into<ComponentKey>>,
     ) {
+        let id = id.into();
         let inputs = self.clean_inputs(inputs);
-        self.nodes.insert(id.into(), Node::Sink { ty, inputs });
+        self.nodes.insert(id.clone(), Node::Sink { ty });
+        for from in inputs {
+            self.edges.push(Edge {
+                from,
+                to: id.clone(),
+            });
+        }
     }
 
     fn paths(&self) -> Result<Vec<Vec<ComponentKey>>, Vec<String>> {
@@ -66,7 +71,7 @@ impl Graph {
                 _ => None,
             })
             .flat_map(|node| {
-                paths_rec(&self.nodes, node, Vec::new()).unwrap_or_else(|err| {
+                paths_rec(&self, node, Vec::new()).unwrap_or_else(|err| {
                     errors.push(err);
                     Vec::new()
                 })
@@ -149,7 +154,7 @@ impl From<&ConfigBuilder> for Graph {
 }
 
 fn paths_rec(
-    nodes: &HashMap<ComponentKey, Node>,
+    graph: &Graph,
     node: &ComponentKey,
     mut path: Vec<ComponentKey>,
 ) -> Result<Vec<Vec<ComponentKey>>, String> {
@@ -169,15 +174,20 @@ fn paths_rec(
         ));
     }
     path.push(node.clone());
-    match nodes.get(node) {
+    match graph.nodes.get(node) {
         Some(Node::Source { .. }) | None => {
             path.reverse();
             Ok(vec![path])
         }
-        Some(Node::Transform { inputs, .. }) | Some(Node::Sink { inputs, .. }) => {
+        Some(Node::Transform { .. }) | Some(Node::Sink { .. }) => {
+            let inputs = graph
+                .edges
+                .iter()
+                .filter(|e| &e.to == node)
+                .map(|e| e.from.clone());
             let mut paths = Vec::new();
             for input in inputs {
-                match paths_rec(nodes, input, path.clone()) {
+                match paths_rec(graph, &input, path.clone()) {
                     Ok(mut p) => paths.append(&mut p),
                     Err(err) => {
                         return Err(err);
