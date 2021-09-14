@@ -20,7 +20,8 @@ futures = { version = "0.3.17", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "1.7.0", default-features = false, features = ["serde"] }
+# pinned due to https://github.com/tkaitchuck/aHash/issues/95
+indexmap = { version = "~1.6.2", default-features = false, features = ["serde"] }
 lazy_static = { version = "1.4.0", default-features = false }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.0", default-features = false, features = ["std"]}
@@ -44,7 +45,7 @@ tokio-stream = { version = "0.1", default-features = false, optional = true }
 tokio-util = { version = "0.6.8", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
 tracing = { version = "0.1.26", default-features = false }
-tracing-core = { version = "0.1.19", default-features = false }
+tracing-core = { version = "0.1.20", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.20", default-features = false }
 typetag = { version = "0.1.7", default-features = false }

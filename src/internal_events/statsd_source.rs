@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use bytes::Bytes;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -12,25 +13,26 @@ impl InternalEvent for StatsdEventReceived {
     }
 
     fn emit_metrics(&self) {
+        counter!("received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64,);
     }
 }
 
 #[derive(Debug)]
-pub struct StatsdInvalidRecord<'a> {
+pub struct StatsdInvalidRecord {
     pub error: crate::sources::statsd::parser::ParseError,
-    pub text: &'a str,
+    pub bytes: Bytes,
 }
 
-impl InternalEvent for StatsdInvalidRecord<'_> {
+impl InternalEvent for StatsdInvalidRecord {
     fn emit_logs(&self) {
-        error!(message = "Invalid packet from statsd, discarding.", error = ?self.error, text = %self.text);
+        error!(message = "Invalid packet from statsd, discarding.", error = ?self.error, bytes = %String::from_utf8_lossy(&self.bytes));
     }
 
     fn emit_metrics(&self) {
         counter!("invalid_record_total", 1,);
-        counter!("invalid_record_bytes_total", self.text.len() as u64,);
+        counter!("invalid_record_bytes_total", self.bytes.len() as u64);
     }
 }
 

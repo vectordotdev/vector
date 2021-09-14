@@ -17,6 +17,7 @@ mod integration_tests {
     use rusoto_s3::S3Client;
     use rusoto_s3::S3;
     use std::io::{BufRead, BufReader};
+    use std::time::Duration;
     use tokio_stream::StreamExt;
     use vector_core::config::proxy::ProxyConfig;
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
@@ -34,14 +35,9 @@ mod integration_tests {
         let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.build_processor(client, cx).unwrap();
 
-        let (lines, events, mut receiver) = make_events_batch(100, 10);
+        let (lines, events, receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
-        // It's possible that the internal machinery of the sink is still
-        // spinning up. We pause here to give the batch time to wind
-        // through. Waiting is preferable to adding synchronization into the
-        // actual sync code for the sole benefit of these tests.
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 1);
@@ -68,7 +64,7 @@ mod integration_tests {
             key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
             filename_time_format: Some("waitsforfullbatch".into()),
             filename_append_uuid: Some(false),
-            ..config(&bucket, 1010)
+            ..config(&bucket, 10)
         };
         let prefix = config.key_prefix.clone();
         let client = config.create_client(&cx.globals.proxy).unwrap();
@@ -90,11 +86,9 @@ mod integration_tests {
         });
 
         sink.run(stream::iter(events)).await.unwrap();
-        // It's possible that the internal machinery of the sink is still
-        // spinning up. We pause here to give the batch time to wind
-        // through. Waiting is preferable to adding synchronization into the
-        // actual sync code for the sole benefit of these tests.
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 3);
@@ -113,6 +107,10 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_gzip() {
+        // Here, we're creating a bunch of events, approximately 3000, while setting our batch size
+        // to 1000, and using gzip compression.  We test to ensure that all of the keys we end up
+        // writing represent the sum total of the lines: we expect 3 batches, each of which should
+        // have 1000 lines.
         let cx = SinkContext::new_test();
 
         let bucket = uuid::Uuid::new_v4().to_string();
@@ -120,6 +118,7 @@ mod integration_tests {
         create_bucket(&bucket, false).await;
 
         let batch_size = 1_000;
+        let batch_multiplier = 3;
         let config = S3SinkConfig {
             compression: Compression::gzip_default(),
             filename_time_format: Some("%s%f".into()),
@@ -130,17 +129,12 @@ mod integration_tests {
         let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.build_processor(client, cx).unwrap();
 
-        let (lines, events, mut receiver) = make_events_batch(100, batch_size);
+        let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
         sink.run(events).await.unwrap();
-        // It's possible that the internal machinery of the sink is still
-        // spinning up. We pause here to give the batch time to wind
-        // through. Waiting is preferable to adding synchronization into the
-        // actual sync code for the sole benefit of these tests.
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
-        assert_eq!(keys.len(), 1);
+        assert_eq!(keys.len(), batch_multiplier);
 
         let mut response_lines: Vec<String> = Vec::new();
         let mut key_stream = stream::iter(keys);
@@ -191,14 +185,9 @@ mod integration_tests {
         let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.build_processor(client, cx).unwrap();
 
-        let (lines, events, mut receiver) = make_events_batch(100, 10);
+        let (lines, events, receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
-        // It's possible that the internal machinery of the sink is still
-        // spinning up. We pause here to give the batch time to wind
-        // through. Waiting is preferable to adding synchronization into the
-        // actual sync code for the sole benefit of these tests.
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
         assert_eq!(keys.len(), 1);
@@ -228,14 +217,9 @@ mod integration_tests {
         let client = config.create_client(&cx.globals.proxy).unwrap();
         let sink = config.build_processor(client, cx).unwrap();
 
-        let (_lines, events, mut receiver) = make_events_batch(1, 1);
+        let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
-        // It's possible that the internal machinery of the sink is still
-        // spinning up. We pause here to give the batch time to wind
-        // through. Waiting is preferable to adding synchronization into the
-        // actual sync code for the sole benefit of these tests.
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+        assert_eq!(receiver.await, BatchStatus::Errored);
 
         let objects = list_objects(&bucket, prefix.unwrap()).await;
         assert_eq!(objects, None);
@@ -286,7 +270,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             compression: Compression::None,
             batch: BatchConfig {
-                max_bytes: Some(batch_size),
+                max_events: Some(batch_size),
                 timeout_secs: Some(5),
                 ..Default::default()
             },

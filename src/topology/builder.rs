@@ -7,7 +7,7 @@ use crate::{
     buffers,
     config::{ComponentKey, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
     event::Event,
-    internal_events::{EventIn, EventOut},
+    internal_events::{EventsReceived, EventsSent},
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
@@ -22,9 +22,39 @@ use std::{
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
+use vector_core::ByteSizeOf;
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
+}
+
+pub async fn load_enrichment_tables<'a>(
+    config: &'a super::Config,
+    diff: &'a ConfigDiff,
+) -> (&'static enrichment::TableRegistry, Vec<String>) {
+    let mut enrichment_tables = HashMap::new();
+
+    let mut errors = vec![];
+
+    // Build enrichment tables
+    for (name, table) in config
+        .enrichment_tables
+        .iter()
+        .filter(|(name, _)| diff.enrichment_tables.contains_new(name))
+    {
+        let table = match table.inner.build(&config.global).await {
+            Ok(table) => table,
+            Err(error) => {
+                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
+                continue;
+            }
+        };
+        enrichment_tables.insert(name.to_string(), table);
+    }
+
+    ENRICHMENT_TABLES.load(enrichment_tables);
+
+    (&ENRICHMENT_TABLES, errors)
 }
 
 pub struct Pieces {
@@ -54,39 +84,24 @@ pub async fn build_pieces(
 
     let mut errors = vec![];
 
-    let mut enrichment_tables = HashMap::new();
-
-    // Build enrichment tables
-    for (name, table) in config
-        .enrichment_tables
-        .iter()
-        .filter(|(name, _)| diff.enrichment_tables.contains_new(name))
-    {
-        let table = match table.inner.build(&config.global).await {
-            Ok(table) => table,
-            Err(error) => {
-                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
-                continue;
-            }
-        };
-        enrichment_tables.insert(name.to_string(), table);
-    }
+    let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
+    errors.extend(enrichment_errors);
 
     // Build sources
-    for (id, source) in config
+    for (key, source) in config
         .sources
         .iter()
-        .filter(|(id, _)| diff.sources.contains_new(id))
+        .filter(|(key, _)| diff.sources.contains_new(key))
     {
         let (tx, rx) = futures::channel::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.inner.source_type();
 
-        let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(id);
+        let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(key);
 
         let context = SourceContext {
-            id: id.clone(),
+            key: key.clone(),
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,
@@ -95,7 +110,7 @@ pub async fn build_pieces(
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
-                errors.push(format!("Source \"{}\": {}", id, error));
+                errors.push(format!("Source \"{}\": {}", key, error));
                 continue;
             }
             Ok(server) => server,
@@ -103,7 +118,7 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
         let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
-        let pump = Task::new(id.clone(), typetag, pump);
+        let pump = Task::new(key.clone(), typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
@@ -119,25 +134,23 @@ pub async fn build_pieces(
                 Err(_) => Err(()),
             }
         };
-        let server = Task::new(id.clone(), typetag, server);
+        let server = Task::new(key.clone(), typetag, server);
 
-        outputs.insert(id.clone(), control);
-        tasks.insert(id.clone(), pump);
-        source_tasks.insert(id.clone(), server);
+        outputs.insert(key.clone(), control);
+        tasks.insert(key.clone(), pump);
+        source_tasks.insert(key.clone(), server);
     }
-
-    ENRICHMENT_TABLES.load(enrichment_tables);
 
     let context = TransformContext {
         globals: config.global.clone(),
-        enrichment_tables: ENRICHMENT_TABLES.clone(),
+        enrichment_tables: enrichment_tables.clone(),
     };
 
     // Build transforms
-    for (id, transform) in config
+    for (key, transform) in config
         .transforms
         .iter()
-        .filter(|(id, _)| diff.transforms.contains_new(id))
+        .filter(|(key, _)| diff.transforms.contains_new(key))
     {
         let trans_inputs = &transform.inputs;
 
@@ -146,7 +159,7 @@ pub async fn build_pieces(
         let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(&context).await {
             Err(error) => {
-                errors.push(format!("Transform \"{}\": {}", id, error));
+                errors.push(format!("Transform \"{}\": {}", key, error));
                 continue;
             }
             Ok(transform) => transform,
@@ -165,11 +178,19 @@ pub async fn build_pieces(
         let transform = match transform {
             Transform::Function(mut t) => input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
-                .inspect(|_| emit!(EventIn))
+                .inspect(|event| {
+                    emit!(EventsReceived {
+                        count: 1,
+                        byte_size: event.size_of(),
+                    })
+                })
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
-                    emit!(EventOut { count: buf.len() });
+                    emit!(EventsSent {
+                        count: buf.len(),
+                        byte_size: buf.iter().map(|event| event.size_of()).sum(),
+                    });
                     stream::iter(buf.into_iter()).map(Ok)
                 })
                 .forward(output)
@@ -177,11 +198,19 @@ pub async fn build_pieces(
             Transform::Task(t) => {
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventIn));
+                    .inspect(|event| {
+                        emit!(EventsReceived {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        })
+                    });
                 t.transform(Box::pin(filtered))
                     .map(Ok)
-                    .forward(output.with(|event| async {
-                        emit!(EventOut { count: 1 });
+                    .forward(output.with(|event: Event| async {
+                        emit!(EventsSent {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        });
                         Ok(event)
                     }))
                     .boxed()
@@ -191,18 +220,18 @@ pub async fn build_pieces(
             debug!("Finished.");
             TaskOutput::Transform
         });
-        let task = Task::new(id.clone(), typetag, transform);
+        let task = Task::new(key.clone(), typetag, transform);
 
-        inputs.insert(id.clone(), (input_tx, trans_inputs.clone()));
-        outputs.insert(id.clone(), control);
-        tasks.insert(id.clone(), task);
+        inputs.insert(key.clone(), (input_tx, trans_inputs.clone()));
+        outputs.insert(key.clone(), control);
+        tasks.insert(key.clone(), task);
     }
 
     // Build sinks
-    for (id, sink) in config
+    for (key, sink) in config
         .sinks
         .iter()
-        .filter(|(id, _)| diff.sinks.contains_new(id))
+        .filter(|(key, _)| diff.sinks.contains_new(key))
     {
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
@@ -211,13 +240,13 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input_type();
 
-        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(id) {
+        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, id);
+            let buffer = sink.buffer.build(&config.global.data_dir, key);
             match buffer {
                 Err(error) => {
-                    errors.push(format!("Sink \"{}\": {}", id, error));
+                    errors.push(format!("Sink \"{}\": {}", key, error));
                     continue;
                 }
                 Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into()))), acker),
@@ -233,7 +262,7 @@ pub async fn build_pieces(
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
-                errors.push(format!("Sink \"{}\": {}", id, error));
+                errors.push(format!("Sink \"{}\": {}", key, error));
                 continue;
             }
             Ok(built) => built,
@@ -259,7 +288,12 @@ pub async fn build_pieces(
             sink.run(
                 rx.by_ref()
                     .filter(|event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventIn))
+                    .inspect(|event| {
+                        emit!(EventsReceived {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        })
+                    })
                     .take_until_if(tripwire),
             )
             .await
@@ -269,9 +303,9 @@ pub async fn build_pieces(
             })
         };
 
-        let task = Task::new(id.clone(), typetag, sink);
+        let task = Task::new(key.clone(), typetag, sink);
 
-        let component_id = id.to_string();
+        let component_key = key.clone();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -287,9 +321,10 @@ pub async fn build_pieces(
                                 %error,
                                 component_kind = "sink",
                                 component_type = typetag,
-                                %component_id,
+                                component_id = %component_key.id(),
+                                component_scope = %component_key.scope(),
                                 // maintained for compatibility
-                                component_name = %component_id,
+                                component_name = %component_key.id(),
                             );
                             Err(())
                         }
@@ -298,9 +333,10 @@ pub async fn build_pieces(
                                 msg = "Healthcheck: timeout.",
                                 component_kind = "sink",
                                 component_type = typetag,
-                                %component_id,
+                                component_id = %component_key.id(),
+                                component_scope = %component_key.scope(),
                                 // maintained for compatibility
-                                component_name = %component_id,
+                                component_name = %component_key.id(),
                             );
                             Err(())
                         }
@@ -312,12 +348,12 @@ pub async fn build_pieces(
             }
         };
 
-        let healthcheck_task = Task::new(id.clone(), typetag, healthcheck_task);
+        let healthcheck_task = Task::new(key.clone(), typetag, healthcheck_task);
 
-        inputs.insert(id.clone(), (tx, sink_inputs.clone()));
-        healthchecks.insert(id.clone(), healthcheck_task);
-        tasks.insert(id.clone(), task);
-        detach_triggers.insert(id.clone(), trigger);
+        inputs.insert(key.clone(), (tx, sink_inputs.clone()));
+        healthchecks.insert(key.clone(), healthcheck_task);
+        tasks.insert(key.clone(), task);
+        detach_triggers.insert(key.clone(), trigger);
     }
 
     // We should have all the data for the enrichment tables loaded now, so switch them over to

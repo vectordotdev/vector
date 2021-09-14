@@ -9,6 +9,7 @@ mod parsers;
 use crate::{
     event::Event,
     internal_events::{DecoderFramingFailed, DecoderParseFailed},
+    sources::util::TcpError,
 };
 use bytes::{Bytes, BytesMut};
 pub use framers::*;
@@ -41,6 +42,15 @@ impl std::error::Error for Error {}
 impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
         Self::FramingError(Box::new(error))
+    }
+}
+
+impl TcpError for Error {
+    fn can_continue(&self) -> bool {
+        match self {
+            Self::FramingError(error) => error.can_continue(),
+            Self::ParsingError(_) => true,
+        }
     }
 }
 
@@ -139,16 +149,14 @@ impl DecodingConfig {
             .framing
             .as_ref()
             .map(|config| config.build())
-            .unwrap_or_else(|| {
-                Err("Fallback to newline delimited framer is not implemented yet.".into())
-            })?;
+            .unwrap_or_else(|| NewlineDelimitedDecoderConfig::new().build())?;
 
         // Build the parser or use a plain bytes parser if not provided.
         let parser: BoxedParser = self
             .decoding
             .as_ref()
             .map(|config| config.build())
-            .unwrap_or_else(|| Err("Fallback to bytes parser is not implemented yet.".into()))?;
+            .unwrap_or_else(|| BytesParserConfig::new().build())?;
 
         Ok(Decoder::new(framer, parser))
     }

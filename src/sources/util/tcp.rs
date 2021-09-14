@@ -3,6 +3,7 @@ use crate::{
     event::Event,
     internal_events::{ConnectionOpen, OpenGauge, TcpSendAckError, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
+    sources::util::TcpError,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Pipeline,
@@ -18,7 +19,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::sleep,
 };
-use tokio_util::codec::{Decoder, FramedRead, LinesCodecError};
+use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
 
 async fn make_listener(
@@ -53,21 +54,6 @@ async fn make_listener(
         },
     }
 }
-pub trait IsErrorFatal {
-    fn is_error_fatal(&self) -> bool;
-}
-
-impl IsErrorFatal for LinesCodecError {
-    fn is_error_fatal(&self) -> bool {
-        false
-    }
-}
-
-impl IsErrorFatal for std::io::Error {
-    fn is_error_fatal(&self) -> bool {
-        true
-    }
-}
 
 pub trait TcpSource: Clone + Send + Sync + 'static
 where
@@ -75,7 +61,7 @@ where
 {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
-    type Error: From<io::Error> + IsErrorFatal + std::fmt::Debug + std::fmt::Display + Send;
+    type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
     type Decoder: Decoder<Error = Self::Error> + Send + 'static + Send;
 
     fn decoder(&self) -> Self::Decoder;
@@ -270,7 +256,7 @@ async fn handle_stream<T>(
                         }
                     }
                     Some(Err(error)) => {
-                        if <<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(&error) {
+                        if !<<T as TcpSource>::Error as TcpError>::can_continue(&error) {
                             warn!(message = "Failed to read data from TCP source.", %error);
                             break;
                         }

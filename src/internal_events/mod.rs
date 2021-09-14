@@ -29,6 +29,7 @@ mod batch;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
+mod common;
 #[cfg(feature = "transforms-concat")]
 mod concat;
 mod conditions;
@@ -133,7 +134,6 @@ mod tcp;
 mod template;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
-mod topology;
 mod udp;
 mod unix;
 mod vector;
@@ -165,6 +165,7 @@ pub use self::batch::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
+pub use self::common::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
 pub use self::conditions::*;
@@ -273,7 +274,6 @@ pub use self::tcp::*;
 pub use self::template::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
-pub use self::topology::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;

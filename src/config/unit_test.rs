@@ -1,10 +1,11 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
 use crate::config::{
-    self, ComponentKey, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
+    self, ComponentKey, ConfigDiff, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
 };
 use crate::{
     conditions::Condition,
     event::{Event, Value},
+    topology::builder::load_enrichment_tables,
     transforms::Transform,
 };
 use indexmap::IndexMap;
@@ -460,7 +461,15 @@ async fn build_unit_test(
         &mut transform_outputs,
     );
 
-    let context = TransformContext::new_with_globals(config.global.clone());
+    let diff = ConfigDiff::initial(config);
+    let (enrichment_tables, tables_errors) = load_enrichment_tables(config, &diff).await;
+
+    errors.extend(tables_errors);
+
+    let context = TransformContext {
+        globals: config.global.clone(),
+        enrichment_tables: enrichment_tables.clone(),
+    };
 
     // Build reduced transforms.
     let mut transforms: IndexMap<ComponentKey, UnitTestTransform> = IndexMap::new();
@@ -982,9 +991,9 @@ mod tests {
                 type = "check_fields"
                 "message.eq" = "test swimlane 2"
 
-              [transforms.bar]
-                inputs = ["foo.first"]
-                type = "add_fields"
+            [transforms.bar]
+              inputs = ["foo.first"]
+              type = "add_fields"
               [transforms.bar.fields]
                 new_field = "new field added"
 
@@ -1471,16 +1480,18 @@ mod tests {
             [transforms.foo]
               inputs = ["input"]
               type = "compound"
-              [transforms.foo.nested.step1]
+              [[transforms.foo.steps]]
+                id = "step1"
                 type = "log_to_metric"
-                [[transforms.foo.nested.step1.metrics]]
+                [[transforms.foo.steps.metrics]]
                   type = "counter"
                   field = "c"
                   name = "sum"
                   namespace = "ns"
-              [transforms.foo.nested.step2]
+              [[transforms.foo.steps]]
+                id = "step2"
                 type = "log_to_metric"
-                [[transforms.foo.nested.step2.metrics]]
+                [[transforms.foo.steps.metrics]]
                   type = "counter"
                   field = "c"
                   name = "sum"
