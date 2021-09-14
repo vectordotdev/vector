@@ -69,12 +69,12 @@ pub struct LogSinkBuilder<S> {
 }
 
 impl<S> LogSinkBuilder<S> {
-    pub fn new(service: S, context: SinkContext) -> Self {
+    pub fn new(service: S, context: SinkContext, api_key: Arc<str>) -> Self {
         Self {
             encoding: Default::default(),
             service,
             context,
-            default_api_key: None,
+            default_api_key: Some(api_key),
             timeout: None,
             compression: None,
             log_schema: None,
@@ -99,11 +99,6 @@ impl<S> LogSinkBuilder<S> {
 
     pub const fn batch_timeout(mut self, duration: Option<Duration>) -> Self {
         self.timeout = duration;
-        self
-    }
-
-    pub fn default_api_key(mut self, api_key: Arc<str>) -> Self {
-        self.default_api_key = Some(api_key);
         self
     }
 
@@ -151,8 +146,8 @@ pub struct LogSink<S> {
 }
 
 impl<S> LogSink<S> {
-    pub fn new(service: S, context: SinkContext) -> LogSinkBuilder<S> {
-        LogSinkBuilder::new(service, context)
+    pub fn new(service: S, context: SinkContext, default_api_key: Arc<str>) -> LogSinkBuilder<S> {
+        LogSinkBuilder::new(service, context, default_api_key)
     }
 }
 

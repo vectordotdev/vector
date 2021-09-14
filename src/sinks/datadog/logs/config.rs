@@ -102,10 +102,9 @@ impl DatadogLogsConfig {
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(client, self.get_uri()));
-        let sink = LogSink::new(service, cx)
+        let sink = LogSink::new(service, cx, default_api_key)
             .batch_timeout(batch_timeout)
             .encoding(self.encoding.clone())
-            .default_api_key(default_api_key)
             .compression(self.compression.unwrap_or_default())
             .log_schema(vector_core::config::log_schema())
             .build();
