@@ -153,7 +153,7 @@ impl DatadogArchivesSinkConfig {
         // batch timeout - 15min
         let batch_size_bytes = NonZeroUsize::new(100_000_000);
         let batch_size_events =
-            NonZeroUsize::new(1000).expect("batch size, in events, must be greater than 0"); //TODO what would be a reasonable default?
+            NonZeroUsize::new(200_000).expect("batch size, in events, must be greater than 0"); // provided the average log size is around 500 bytes
         let batch_timeout = Duration::from_secs(900);
 
         let partitioner = DatadogArchivesSinkConfig::key_partitioner();
