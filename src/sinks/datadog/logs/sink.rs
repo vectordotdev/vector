@@ -64,17 +64,17 @@ pub struct LogSinkBuilder<S> {
     context: SinkContext,
     timeout: Option<Duration>,
     compression: Option<Compression>,
-    default_api_key: Option<Arc<str>>,
+    default_api_key: Arc<str>,
     log_schema: Option<&'static LogSchema>,
 }
 
 impl<S> LogSinkBuilder<S> {
-    pub fn new(service: S, context: SinkContext, api_key: Arc<str>) -> Self {
+    pub fn new(service: S, context: SinkContext, default_api_key: Arc<str>) -> Self {
         Self {
             encoding: Default::default(),
             service,
             context,
-            default_api_key: Some(api_key),
+            default_api_key,
             timeout: None,
             compression: None,
             log_schema: None,
@@ -104,7 +104,7 @@ impl<S> LogSinkBuilder<S> {
 
     pub fn build(self) -> LogSink<S> {
         LogSink {
-            default_api_key: self.default_api_key.unwrap(),
+            default_api_key: self.default_api_key,
             encoding: Some(self.encoding),
             acker: Some(self.context.acker()),
             service: Some(self.service),
