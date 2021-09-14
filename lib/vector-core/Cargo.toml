@@ -45,7 +45,7 @@ tokio-stream = { version = "0.1", default-features = false, optional = true }
 tokio-util = { version = "0.6.8", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
 tracing = { version = "0.1.26", default-features = false }
-tracing-core = { version = "0.1.19", default-features = false }
+tracing-core = { version = "0.1.20", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.20", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
