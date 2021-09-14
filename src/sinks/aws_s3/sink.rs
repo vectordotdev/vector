@@ -1,6 +1,6 @@
 use crate::sinks::aws_s3::config::S3RequestOptions;
 use crate::{
-    config::{log_schema, SinkContext},
+    config::log_schema,
     event::Event,
     sinks::{
         aws_s3::config::Encoding,
@@ -8,45 +8,12 @@ use crate::{
             service::S3Request,
             sink::{process_event_batch, S3EventEncoding, S3RequestBuilder},
         },
-        util::{
-            buffer::GZIP_FAST,
-            encoding::EncodingConfiguration,
-            sink::{Response, ServiceLogic, StdServiceLogic},
-            Compression,
-        },
+        util::encoding::EncodingConfiguration,
     },
 };
-use async_trait::async_trait;
-use bytes::Bytes;
 use chrono::Utc;
-use flate2::write::GzEncoder;
-use futures::{
-    stream::{BoxStream, FuturesUnordered, StreamExt},
-    FutureExt, TryFutureExt,
-};
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    io::{self, Write},
-    num::NonZeroUsize,
-    time::Duration,
-};
-use tokio::{
-    pin, select,
-    sync::{
-        mpsc::{channel, Receiver},
-        oneshot,
-    },
-};
-use tower::{Service, ServiceExt};
-use tracing_futures::Instrument;
+use std::io::{self, Write};
 use uuid::Uuid;
-use vector_core::{
-    buffers::Acker,
-    event::{EventFinalizers, Finalizable},
-    sink::StreamSink,
-    stream::batcher::Batcher,
-};
 
 impl S3EventEncoding for S3RequestOptions {
     fn encode_event(&mut self, mut event: Event, mut writer: &mut dyn Write) -> io::Result<()> {
@@ -165,6 +132,7 @@ mod tests {
     use vector_core::partition::Partitioner;
 
     use super::*;
+    use crate::sinks::util::Compression;
 
     #[derive(Clone, Default)]
     struct TestPartitioner;
@@ -218,7 +186,7 @@ mod tests {
 
     #[test]
     fn s3_encode_event_with_removed_key() {
-        let mut encoding_config = EncodingConfig {
+        let encoding_config = EncodingConfig {
             codec: Encoding::Ndjson,
             schema: None,
             only_fields: None,

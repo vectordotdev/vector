@@ -22,7 +22,6 @@ use crate::sinks::s3_common;
 use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
-    event::PathComponent,
     rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         s3_common::{
@@ -34,7 +33,6 @@ use crate::{
             service::{S3Request, S3Service},
             sink::{process_event_batch, S3EventEncoding, S3RequestBuilder, S3Sink},
         },
-        util::encoding::{EncodingConfiguration, TimestampFormat},
         util::Concurrency,
         util::{Compression, ServiceBuilderExt, TowerRequestConfig},
         VectorSink,
@@ -375,7 +373,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut encoding = default_encoding();
-        encoding.encode_event(event, &mut writer);
+        let _ = encoding.encode_event(event, &mut writer);
 
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
@@ -451,10 +449,9 @@ mod tests {
     #[test]
     fn generates_valid_id() {
         let log1 = Event::from("test event 1");
-        let mut encoding = default_encoding();
         let mut writer = Cursor::new(Vec::new());
         let mut encoding = default_encoding();
-        encoding.encode_event(log1, &mut writer);
+        let _ = encoding.encode_event(log1, &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();
@@ -468,7 +465,7 @@ mod tests {
         // check that id is different for the next event
         let log2 = Event::from("test event 2");
         let mut writer = Cursor::new(Vec::new());
-        encoding.encode_event(log2, &mut writer);
+        let _ = encoding.encode_event(log2, &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();
@@ -483,10 +480,10 @@ mod tests {
 
     #[test]
     fn generates_date_if_missing() {
-        let mut log = Event::from("test message");
+        let log = Event::from("test message");
         let mut writer = Cursor::new(Vec::new());
         let mut encoding = default_encoding();
-        encoding.encode_event(log, &mut writer);
+        let _ = encoding.encode_event(log, &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();

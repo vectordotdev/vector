@@ -1,31 +1,26 @@
+use crate::config::SinkContext;
 use crate::sinks::s3_common::sink::S3Sink;
 use crate::{
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext},
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
+    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
+    rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         s3_common::{
             self,
-            config::{
-                S3CannedAcl, S3Options, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
-            },
+            config::{S3Options, S3RetryLogic},
             partitioner::KeyPartitioner,
             service::S3Service,
         },
         util::{
-            encoding::EncodingConfig, retries::RetryLogic, BatchConfig, BatchSettings, Compression,
-            Concurrency, ServiceBuilderExt, TowerRequestConfig,
+            encoding::EncodingConfig, BatchConfig, BatchSettings, Compression, Concurrency,
+            ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck,
     },
 };
-use futures::FutureExt;
-use http::StatusCode;
-use rusoto_core::RusotoError;
-use rusoto_s3::{HeadBucketRequest, PutObjectError, PutObjectOutput, S3Client, S3};
+use rusoto_s3::S3Client;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use std::convert::TryInto;
 use std::num::NonZeroUsize;
-use std::{collections::BTreeMap, convert::TryInto};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
@@ -198,9 +193,7 @@ impl S3SinkConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::serde::to_string;
-
-    use super::{S3SinkConfig, S3StorageClass};
+    use super::S3SinkConfig;
 
     #[test]
     fn generate_config() {

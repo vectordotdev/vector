@@ -1,14 +1,11 @@
 use crate::sinks::util::sink::ServiceLogic;
 use crate::{
-    config::{log_schema, SinkContext},
+    config::SinkContext,
     event::Event,
-    sinks::util::{
-        buffer::GZIP_FAST, encoding::EncodingConfiguration, sink::StdServiceLogic, Compression,
-    },
+    sinks::util::{buffer::GZIP_FAST, sink::StdServiceLogic, Compression},
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use chrono::Utc;
 use flate2::write::GzEncoder;
 use futures::{
     stream::{BoxStream, FuturesUnordered, StreamExt},
@@ -16,7 +13,6 @@ use futures::{
 };
 use std::{
     collections::HashMap,
-    convert::TryInto,
     fmt::Debug,
     io::{self, Write},
     num::NonZeroUsize,
@@ -31,7 +27,6 @@ use tokio::{
 };
 use tower::{Service, ServiceExt};
 use tracing_futures::Instrument;
-use uuid::Uuid;
 use vector_core::{
     buffers::Acker,
     event::{EventFinalizers, Finalizable},
@@ -41,7 +36,6 @@ use vector_core::{
 
 use crate::sinks::s3_common::partitioner::KeyPartitioner;
 use crate::sinks::s3_common::service::S3Request;
-use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::util::sink::Response;
 
 pub struct S3Sink<S, R>
