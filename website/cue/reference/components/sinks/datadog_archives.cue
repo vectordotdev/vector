@@ -148,23 +148,8 @@ components: sinks: datadog_archives: {
 	}
 
 	how_it_works: {
-		a_general: {
-			title: "General overview"
-			body: """
-				The sink is implemented as a simple wrapper over corresponding storage service sinks,
-				with the following customizations for compatibility with DataDog Log Rehydration:
-				- custom object key format
-				- event pre-processing
-				- batch parameters, optimized for Log Rehydration
-				- events are always JSON-encoded
-				- batches are always gzip-compressed
 
-				Therefore some configuration parameters are not exposed to users - parameters that impact object names,
-				batch parameters, compression or encoding format.
-				"""
-		}
-
-		b_ojbect_key_format: {
+		a_object_key_format: {
 			title: "Custom object key format"
 			body: """
 				Objects written to the external archives have the following key format:
@@ -179,7 +164,7 @@ components: sinks: datadog_archives: {
 				"""
 		}
 
-		c_event_preprocessing: {
+		b_event_preprocessing: {
 			title: "Event format/pre-processing"
 			body:  """
 				Within the gzipped JSON file, each event’s content is formatted as follows:
@@ -213,7 +198,7 @@ components: sinks: datadog_archives: {
 				"""
 		}
 
-		d_aws: {
+		c_aws: {
 			title: "AWS S3 setup"
 			body:  """
 				For more details about AWS S3 configuration and how it works check out [AWS S3 sink](\(urls.vector_aws_s3_sink_how_it_works)).
