@@ -132,8 +132,9 @@ representing it](https://github.com/timberio/vector/blob/master/lib/vector-core/
 The implementation would then consist in:
 
 - Implement in the `datadog_agent` source the ability to proxy all known route (see above) as-is directly to Datadog
-  (this will require an new settings in the Vector source, something like `unused_payload_site: us3.datadoghq.com`). At
-  the beginning it will also proxify `/api/v1/series` & `/api/beta/sketches`.
+  (this will require an new settings for the Vector source, something like `unused_payload_site: us3.datadoghq.com` to
+  choose were to relay non-metric payloads). In early stages of work it would also proxify `/api/v1/series` &
+  `/api/beta/sketches`.
 - Handle the `/api/v1/series` route (based on both the offical [API](https://docs.datadoghq.com/api/latest/metrics/) and
   the [Datadog Agent itself](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/telemetry.go#L20-L31)) to
   cover every metric type handled by this endpoint (count, gauge and rate) and:
@@ -183,13 +184,15 @@ required to dispatch metric and non-metric payload that are sent by the agent to
 
 ## Prior Art
 
-- Existing Vector metrics source over HTTP(s) works well, those constructs will be reused
-- Datadog logs is already supported in the `datadog_agent` source
-- Vector has its own vector-to-vector protocol that serve a similar purpose but the idea is to enable Vector to receive
-  Datadog metrics from unmodified Datadog Agents so that is probably not an option
-- There are many [ways](https://edoliberty.github.io/papers/streamingQuantiles.pdf) of implementing quantile sketches
-- Opentelemetry is moving to official support sketches on a [general
-  basis](https://github.com/open-telemetry/opentelemetry-specification/issues/982).
+There are few existing metric aggregation solution. The Datadog Agent is able to
+[aggregate](https://github.com/DataDog/datadog-agent/tree/main/pkg/aggregator), in some extend, metrics coming over
+dogstatsd and from go/python code. It mostly aims at reducing the amount of metrics samples sent by the Agent.
+
+[Veneur](https://github.com/stripe/veneur#global-aggregation) offers an aggregation feature, but it does not support
+sketches/distribution per se. It requires what is called a central veneur, that would compute aggregated value for
+selected metrics and some percentile. Some aspects of this solution could be seen as an
+[alternative](#flattening-sketches) approach. However this approach has two major drawbacks: it relies on a central
+service for aggregation and it does not support sketches.
 
 ## Alternatives
 
@@ -199,9 +202,9 @@ protocol) could be envisionned. This would call for a significant, yet possible 
 addition, those changes would mostly be located in the
 [forwarder](https://github.com/DataDog/datadog-agent/tree/main/pkg/forwarder) and
 [serializer](https://github.com/DataDog/datadog-agent/tree/main/pkg/serializer) logic. This would imply a hugh chunk of
-work on the Agent side, require update to use the feature, probably also require some work on Vector side. The solution
-that would probably offer the most benefit would be to use OpenTelemetry as this is planned in Vector, it already has
-some support inside the Agent and but it does not support sketches as of today (this is probably coming anytime soon).
+work on the Agent side, require update to use the feature, probably also require some work on Vector side. This is not
+something that aligns well with the purpose of the Datadog Agent. This would also add a risk of losing information
+because of protocol conversion.
 
 ### Flattening sketches
 For sketches, we could flatten sketches and compute usual derived metrics (min/max/average/count/some percentiles) and
@@ -236,8 +239,9 @@ everything in Vector. Alternatives to that are:
   - In a middle layer (typically something like haproxy) that will have a configuration diverting metrics payload to
     Vector and everything else to Datadog
 - Is there any other metrics type that could required some degree of adaptation, there is the non monotonic counter that
-  exists in the agent but not in Vector that may require the introduction of a so-called `NonMonotonicCounter` in
-  Vector.
+  exists in the Agent, it does not explicitly exist in Vector, but the internal Vector data model should allow us to
+  represent non monotonic counter using
+  [absolute](https://github.com/vectordotdev/vector/blob/master/lib/vector-core/src/event/metric.rs#L105) counter.
 - Sketches shipped by the agent are generated with some [hardcoded
   settings](https://github.com/DataDog/datadog-agent/blob/main/pkg/quantile/config.go#L8-L12) that needs to be known
   (because they are not part of the [schema
@@ -245,6 +249,12 @@ everything in Vector. Alternatives to that are:
   sketches on wire) if some operations (most notably merging, maybe conversion to other sketches format if shipped to a
   non-Datadog endpoint) are to be performed by Vector on those skeches. Even if those value are unlikely to change it is
   worth discussing if the Agent should include those in sktech payloads.
+
+**Note about Agent upgrade**: as this may Datadog Agent is regularly updated, within the current 6/7 branches upgrades
+are usually easy, k8s deployments also make upgrades even easier. That being said:
+* requiring an Agent upgrade is not a blocker
+* but it also means that newer metric route may massively come up in upgraded Agent very quickly after being implemented
+  (the Agent follow a 6 weeks release cycle)
 
 ## Plan Of Attack
 
@@ -255,10 +265,10 @@ everything in Vector. Alternatives to that are:
 - [ ] Extend Vector to support sketches following the DDSketch paper, implement sketches forwarding in the
   `datadog_metrics` sinks.
 - [ ] Support `/api/beta/sketches` route, again in the `datadog_agent`, and validate the `Agent->Vector->Datadog`
-  scenario for sketches/distributions. This would also required sending sketches from the `datadog_metrics` sinks, this
-  is not directly addressed by this RFC but it is tracked in the following issues:
-  [#7283](https://github.com/timberio/vector/issues/7283), [#8493](https://github.com/timberio/vector/issues/8493) &
-  [#8626](https://github.com/timberio/vector/issues/8626).
+  scenario for sketches/distributions. This would also required internal sketches support in Vector along with sending
+  sketches from the `datadog_metrics` sinks, this is not directly addressed by this RFC but it is tracked in the
+  following issues: [#7283](https://github.com/timberio/vector/issues/7283),
+  [#8493](https://github.com/timberio/vector/issues/8493) & [#8626](https://github.com/timberio/vector/issues/8626).
 
 ## Future Improvements
 
