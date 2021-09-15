@@ -71,9 +71,10 @@ impl<'de> Visitor<'de> for BufferConfigVisitor {
                 }
             }
         }
+        let kind = kind.unwrap_or(BufferConfigKind::Memory);
         let when_full = when_full.unwrap_or_default();
         match kind {
-            Some(BufferConfigKind::Memory) => {
+            BufferConfigKind::Memory => {
                 #[cfg(feature = "disk-buffer")]
                 if max_size.is_some() {
                     return Err(Error::unknown_field(
@@ -87,7 +88,7 @@ impl<'de> Visitor<'de> for BufferConfigVisitor {
                 })
             }
             #[cfg(feature = "disk-buffer")]
-            Some(BufferConfigKind::Disk) => {
+            BufferConfigKind::Disk => {
                 if max_events.is_some() {
                     return Err(Error::unknown_field(
                         "max_events",
@@ -96,24 +97,6 @@ impl<'de> Visitor<'de> for BufferConfigVisitor {
                 }
                 Ok(BufferConfig::Disk {
                     max_size: max_size.ok_or_else(|| Error::missing_field("max_size"))?,
-                    when_full,
-                })
-            }
-            None => {
-                #[cfg(feature = "disk-buffer")]
-                if let Some(max_size) = max_size {
-                    if max_events.is_some() {
-                        return Err(Error::custom(
-                            "\"max_events\" and \"max_size\" cannot be both defined",
-                        ));
-                    }
-                    return Ok(BufferConfig::Disk {
-                        max_size,
-                        when_full,
-                    });
-                }
-                Ok(BufferConfig::Memory {
-                    max_events: max_events.unwrap_or_else(BufferConfig::memory_max_events),
                     when_full,
                 })
             }
@@ -285,7 +268,7 @@ mod test {
         let error = toml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "\"max_events\" and \"max_size\" cannot be both defined at line 1 column 1"
+            "unknown field `max_size`, expected one of `type`, `max_events`, `when_full` at line 1 column 1"
         );
     }
 }
