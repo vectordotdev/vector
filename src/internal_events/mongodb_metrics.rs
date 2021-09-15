@@ -12,6 +12,10 @@ pub struct MongoDbMetricsEventsReceived<'a> {
 impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
     fn emit_metrics(&self) {
         counter!(
+            "received_events_total", self.count as u64,
+            "uri" => self.uri.to_owned(),
+        );
+        counter!(
             "events_in_total", self.count as u64,
             "uri" => self.uri.to_owned(),
         );

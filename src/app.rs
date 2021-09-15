@@ -84,15 +84,12 @@ impl Application {
             LogFormat::Json => true,
         };
 
-        let enable_datadog_tracing = root_opts.enable_datadog_tracing;
-
         metrics::init().expect("metrics initialization failed");
+        trace::init(color, json, &level);
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
-                // Unforunately we can't `error!` here because we haven't yet called `trace::init`,
-                // and we can't call that without a runtime available.
-                println!("Config error: The `threads` argument must be greater or equal to 1.");
+                error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             }
         }
@@ -104,16 +101,6 @@ impl Application {
                 .build()
                 .expect("Unable to create async runtime")
         };
-
-        // We need a runtime to initiate the datadog tracing exporter
-        rt.block_on(async move {
-            trace::init(color, json, &level, enable_datadog_tracing);
-            info!(
-                message = "Log level is enabled.",
-                ?level,
-                ?enable_datadog_tracing
-            );
-        });
 
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
@@ -146,6 +133,8 @@ impl Application {
 
                     return Err(code);
                 };
+
+                info!(message = "Log level is enabled.", level = ?level);
 
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 
@@ -368,8 +357,6 @@ impl Application {
                 }
                 _ => unreachable!(),
             }
-
-            opentelemetry::global::shutdown_tracer_provider();
         });
     }
 }

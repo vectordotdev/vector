@@ -1,11 +1,11 @@
-use crate::{internal_events::EventOut, transforms::FunctionTransform};
+use crate::{internal_events::EventsSent, transforms::FunctionTransform};
 use futures::{channel::mpsc, task::Poll, Sink};
 #[cfg(test)]
 use futures::{Stream, StreamExt};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
-use vector_core::event::Event;
 #[cfg(test)]
 use vector_core::event::EventStatus;
+use vector_core::{event::Event, ByteSizeOf};
 
 #[derive(Debug)]
 pub struct ClosedError;
@@ -29,6 +29,7 @@ pub struct Pipeline {
     inlines: Vec<Box<dyn FunctionTransform>>,
     enqueued: VecDeque<Event>,
     events_outstanding: usize,
+    bytes_outstanding: usize,
 }
 
 impl Pipeline {
@@ -39,10 +40,12 @@ impl Pipeline {
         // We batch the updates to "events out" for efficiency, and do it here because
         // it gives us a chance to allow the natural batching of `Pipeline` to kick in.
         if self.events_outstanding > 0 {
-            emit!(EventOut {
-                count: self.events_outstanding
+            emit!(EventsSent {
+                count: self.events_outstanding,
+                byte_size: self.bytes_outstanding,
             });
             self.events_outstanding = 0;
+            self.bytes_outstanding = 0;
         }
 
         while let Some(event) = self.enqueued.pop_front() {
@@ -90,6 +93,7 @@ impl Sink<Event> for Pipeline {
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
         self.events_outstanding += 1;
+        self.bytes_outstanding += item.size_of();
 
         // Note how this gets **swapped** with `new_working_set` in the loop.
         // At the end of the loop, it will only contain finalized events.
@@ -154,6 +158,7 @@ impl Pipeline {
             // There is a possibility a component might blow this queue size.
             enqueued: VecDeque::with_capacity(10),
             events_outstanding: 0,
+            bytes_outstanding: 0,
         }
     }
 }
