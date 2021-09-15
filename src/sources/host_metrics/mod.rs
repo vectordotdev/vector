@@ -122,8 +122,11 @@ impl HostMetricsConfig {
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
+
+        let generator = HostMetrics::new(self);
+
         while interval.next().await.is_some() {
-            let metrics = self.capture_metrics().await;
+            let metrics = generator.capture_metrics().await;
             out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
         }
 
@@ -136,34 +139,44 @@ impl HostMetricsConfig {
             Some(collectors) => collectors.iter().any(|&c| c == collector),
         }
     }
+}
+
+pub struct HostMetrics {
+    config: HostMetricsConfig,
+}
+
+impl HostMetrics {
+    pub const fn new(config: HostMetricsConfig) -> Self {
+        Self { config }
+    }
 
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
-        if self.has_collector(Collector::Cgroups) {
+        if self.config.has_collector(Collector::Cgroups) {
             metrics.extend(add_collector("cgroups", self.cgroups_metrics().await));
         }
-        if self.has_collector(Collector::Cpu) {
+        if self.config.has_collector(Collector::Cpu) {
             metrics.extend(add_collector("cpu", self.cpu_metrics().await));
         }
-        if self.has_collector(Collector::Disk) {
+        if self.config.has_collector(Collector::Disk) {
             metrics.extend(add_collector("disk", self.disk_metrics().await));
         }
-        if self.has_collector(Collector::Filesystem) {
+        if self.config.has_collector(Collector::Filesystem) {
             metrics.extend(add_collector("filesystem", self.filesystem_metrics().await));
         }
-        if self.has_collector(Collector::Load) {
+        if self.config.has_collector(Collector::Load) {
             metrics.extend(add_collector("load", self.loadavg_metrics().await));
         }
-        if self.has_collector(Collector::Host) {
+        if self.config.has_collector(Collector::Host) {
             metrics.extend(add_collector("host", self.host_metrics().await));
         }
-        if self.has_collector(Collector::Memory) {
+        if self.config.has_collector(Collector::Memory) {
             metrics.extend(add_collector("memory", self.memory_metrics().await));
             metrics.extend(add_collector("memory", self.swap_metrics().await));
         }
-        if self.has_collector(Collector::Network) {
+        if self.config.has_collector(Collector::Network) {
             metrics.extend(add_collector("network", self.network_metrics().await));
         }
         if let Ok(hostname) = &hostname {
@@ -257,7 +270,7 @@ impl HostMetricsConfig {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
-            .with_namespace(self.namespace.0.clone())
+            .with_namespace(self.config.namespace.0.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(timestamp))
     }
@@ -270,7 +283,7 @@ impl HostMetricsConfig {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-            .with_namespace(self.namespace.0.clone())
+            .with_namespace(self.config.namespace.0.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(timestamp))
     }
@@ -493,7 +506,10 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn filters_on_collectors() {
-        let all_metrics_count = HostMetricsConfig::default().capture_metrics().await.count();
+        let all_metrics_count = HostMetrics::new(HostMetricsConfig::default())
+            .capture_metrics()
+            .await
+            .count();
 
         for collector in &[
             #[cfg(target_os = "linux")]
@@ -506,10 +522,10 @@ pub(self) mod tests {
             Collector::Memory,
             Collector::Network,
         ] {
-            let some_metrics = HostMetricsConfig {
+            let some_metrics = HostMetrics::new(HostMetricsConfig {
                 collectors: Some(vec![*collector]),
                 ..Default::default()
-            }
+            })
             .capture_metrics()
             .await;
 
@@ -523,7 +539,9 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn are_taged_with_hostname() {
-        let mut metrics = HostMetricsConfig::default().capture_metrics().await;
+        let mut metrics = HostMetrics::new(HostMetricsConfig::default())
+            .capture_metrics()
+            .await;
         let hostname = crate::get_hostname().expect("Broken hostname");
         assert!(!metrics.any(|event| event
             .into_metric()
@@ -536,10 +554,10 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn uses_custom_namespace() {
-        let mut metrics = HostMetricsConfig {
+        let mut metrics = HostMetrics::new(HostMetricsConfig {
             namespace: Namespace(Some("other".into())),
             ..Default::default()
-        }
+        })
         .capture_metrics()
         .await;
 
@@ -548,7 +566,9 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn uses_default_namespace() {
-        let mut metrics = HostMetricsConfig::default().capture_metrics().await;
+        let mut metrics = HostMetrics::new(HostMetricsConfig::default())
+            .capture_metrics()
+            .await;
 
         assert!(metrics.all(|event| event.into_metric().namespace() == Some("host")));
     }
@@ -557,7 +577,9 @@ pub(self) mod tests {
     #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn generates_loadavg_metrics() {
-        let metrics = HostMetricsConfig::default().loadavg_metrics().await;
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
+            .loadavg_metrics()
+            .await;
         assert_eq!(metrics.len(), 3);
         assert!(all_gauges(&metrics));
 
@@ -569,7 +591,9 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn generates_host_metrics() {
-        let metrics = HostMetricsConfig::default().host_metrics().await;
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
+            .host_metrics()
+            .await;
         assert_eq!(metrics.len(), 2);
         assert!(all_gauges(&metrics));
     }

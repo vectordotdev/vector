@@ -1,4 +1,4 @@
-use super::{filter_result_sync, FilterList, HostMetricsConfig};
+use super::{filter_result_sync, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
@@ -45,12 +45,12 @@ enum CgroupsError {
 
 type CgroupsResult<T> = Result<T, CgroupsError>;
 
-impl HostMetricsConfig {
+impl HostMetrics {
     pub async fn cgroups_metrics(&self) -> Vec<Metric> {
         let now = Utc::now();
         let mut buffer = String::new();
         let mut output = Vec::new();
-        if let Some(root) = CGroup::root(self.cgroups.base.as_deref()) {
+        if let Some(root) = CGroup::root(self.config.cgroups.base.as_deref()) {
             self.recurse_cgroup(&mut output, now, root, 1, &mut buffer)
                 .await;
         }
@@ -128,12 +128,12 @@ impl HostMetricsConfig {
                 }
             }
 
-            if level < self.cgroups.levels {
+            if level < self.config.cgroups.levels {
                 if let Some(children) =
                     filter_result_sync(cgroup.children().await, "Failed to load cgroups children.")
                 {
                     for child in children {
-                        if self.cgroups.groups.contains_path(Some(&child.name)) {
+                        if self.config.cgroups.groups.contains_path(Some(&child.name)) {
                             self.recurse_cgroup(result, now, child, level + 1, buffer)
                                 .await;
                         }
@@ -392,7 +392,7 @@ fn join_name(base_name: &Path, filename: impl AsRef<Path>) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::super::tests::{count_name, count_tag};
-    use super::super::HostMetricsConfig;
+    use super::super::{HostMetrics, HostMetricsConfig};
     use super::{join_name, join_path};
     use pretty_assertions::assert_eq;
     use std::path::{Path, PathBuf};
@@ -410,7 +410,7 @@ mod tests {
     #[tokio::test]
     async fn generates_cgroups_metrics() {
         let config: HostMetricsConfig = toml::from_str(r#"collectors = ["cgroups"]"#).unwrap();
-        let metrics = config.cgroups_metrics().await;
+        let metrics = HostMetrics::new(config).cgroups_metrics().await;
 
         assert!(!metrics.is_empty());
         assert_eq!(count_tag(&metrics, "cgroup"), metrics.len());
