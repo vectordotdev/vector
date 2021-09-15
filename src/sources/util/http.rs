@@ -24,10 +24,10 @@ use warp::{
 
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub fn add_query_parameters(
-    mut events: Vec<Event>,
+    events: &mut [Event],
     query_parameters_config: &[String],
     query_parameters: HashMap<String, String>,
-) -> Vec<Event> {
+) {
     for query_parameter_name in query_parameters_config {
         let value = query_parameters.get(query_parameter_name);
         for event in events.iter_mut() {
@@ -37,8 +37,6 @@ pub fn add_query_parameters(
             );
         }
     }
-
-    events
 }
 
 #[derive(Serialize, Debug)]

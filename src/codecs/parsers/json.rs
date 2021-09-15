@@ -23,6 +23,18 @@ impl ParserConfig for JsonParserConfig {
     }
 }
 
+impl JsonParserConfig {
+    /// Creates a new `JsonParserConfig`.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Creates a new `JsonParserConfig` with the provided options.
+    pub const fn new_with_options(skip_empty: bool) -> Self {
+        Self { skip_empty }
+    }
+}
+
 /// Parser that builds `Event`s from a byte frame containing JSON.
 #[derive(Debug, Clone, Default)]
 pub struct JsonParser {
@@ -35,7 +47,7 @@ impl JsonParser {
         Default::default()
     }
 
-    /// Creates a new `BytesParserConfig` with the provided options.
+    /// Creates a new `JsonParser` with the provided options.
     pub const fn new_with_options(skip_empty: bool) -> Self {
         Self { skip_empty }
     }
