@@ -42,6 +42,7 @@ impl InternalEvent for EventStoreDbMetricsReceived {
     }
 
     fn emit_metrics(&self) {
+        counter!("received_events_total", self.events as u64);
         counter!("events_in_total", self.events as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
