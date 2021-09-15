@@ -10,11 +10,12 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.17.0 release includes one **breaking change**:
+Vector's 0.17.0 release includes two **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
+2. [Vector now logs to stderr](#logging)
 
-We cover it below to help you upgrade quickly:
+We cover them below to help you upgrade quickly:
 
 ## Upgrade guide
 
@@ -27,3 +28,12 @@ of events coming into the sink, including when _no_ events are coming in.
 The configuration field `print_amount` has been removed, and replaced with `print_interval_secs`.
 Additionally, `print_interval_secs` defaults to `1 second`, which has the additional benefit of
 providing a very basic "events per second" indicator out-of-the-box.
+
+### Vector now logs to stderr {#logging}
+
+Previously, Vector used to log all output to stdout, but this made it difficult to use the output of the `console` sink,
+which also writes to stdout by default.  Following some discussion in
+[#1714](https://github.com/vectordotdev/vector/issues/1740) we decided to modify Vector to, instead, log to stderr so
+that stdout can be processed separately.
+
+If you were previously depending on Vector's logs appearing in stdout, you should now look for them in stderr.
