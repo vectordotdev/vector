@@ -257,6 +257,7 @@ pub enum Token<S> {
     SemiColon,
     Underscore,
     Escape,
+    Arrow,
 
     Equals,
     MergeEquals,
@@ -340,6 +341,7 @@ impl<S> Token<S> {
             SemiColon => SemiColon,
             Underscore => Underscore,
             Escape => Escape,
+            Arrow => Arrow,
 
             Equals => Equals,
             MergeEquals => MergeEquals,
@@ -393,6 +395,7 @@ where
             SemiColon => "SemiColon",
             Underscore => "Underscore",
             Escape => "Escape",
+            Arrow => "Arrow",
 
             Equals => "Equals",
             MergeEquals => "MergeEquals",
@@ -512,6 +515,11 @@ impl<'input> Iterator for Lexer<'input> {
 
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
                         Some(Ok(self.token(start, Bang)))
+                    }
+
+                    '-' if self.test_peek(|ch| ch == '>') => {
+                        let _ = self.bump();
+                        Some(Ok(self.token(start, Arrow)))
                     }
 
                     '#' => {
@@ -1915,6 +1923,62 @@ mod test {
                 ("                                   ~  ", IntegerLiteral(3)),
                 ("                                    ~ ", Newline),
                 ("                                     ~", RBrace),
+            ],
+        );
+    }
+
+    #[test]
+    fn function_closure_no_arg() {
+        test(
+            data("foo() -> || {}"),
+            vec![
+                ("~~~           ", FunctionCall("foo")),
+                ("   ~          ", LParen),
+                ("    ~         ", RParen),
+                ("      ~~      ", Arrow),
+                ("         ~~   ", Operator("||")),
+                ("            ~ ", LBrace),
+                ("             ~", RBrace),
+            ],
+        );
+    }
+
+    #[test]
+    fn function_closure_single_arg() {
+        test(
+            data("foo() -> |idx| { idx }"),
+            vec![
+                ("~~~                   ", FunctionCall("foo")),
+                ("   ~                  ", LParen),
+                ("    ~                 ", RParen),
+                ("      ~~              ", Arrow),
+                ("         ~            ", Operator("|")),
+                ("          ~~~         ", Identifier("idx")),
+                ("             ~        ", Operator("|")),
+                ("               ~      ", LBrace),
+                ("                 ~~~  ", Identifier("idx")),
+                ("                     ~", RBrace),
+            ],
+        );
+    }
+
+    #[test]
+    fn function_closure_args() {
+        test(
+            data("foo() -> |i, v| { v }"),
+            vec![
+                ("~~~                  ", FunctionCall("foo")),
+                ("   ~                 ", LParen),
+                ("    ~                ", RParen),
+                ("      ~~             ", Arrow),
+                ("         ~           ", Operator("|")),
+                ("          ~          ", Identifier("i")),
+                ("           ~         ", Comma),
+                ("             ~       ", Identifier("v")),
+                ("              ~      ", Operator("|")),
+                ("                ~    ", LBrace),
+                ("                  ~  ", Identifier("v")),
+                ("                    ~", RBrace),
             ],
         );
     }

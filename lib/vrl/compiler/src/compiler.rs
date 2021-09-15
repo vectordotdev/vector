@@ -14,7 +14,7 @@ use crate::{
 pub(crate) type Errors = Vec<Box<dyn DiagnosticError>>;
 
 pub(crate) struct Compiler<'a> {
-    fns: &'a [Box<dyn Function>],
+    pub(crate) fns: &'a [Box<dyn Function>],
     errors: Errors,
     fallible: bool,
     abortable: bool,
@@ -153,7 +153,12 @@ impl<'a> Compiler<'a> {
         Group::new(expr)
     }
 
-    fn compile_block(&mut self, node: Node<ast::Block>, external: &mut ExternalEnv) -> Block {
+    // FIXME: remove pub(crate)
+    pub(crate) fn compile_block(
+        &mut self,
+        node: Node<ast::Block>,
+        external: &mut ExternalEnv,
+    ) -> Block {
         // We track the original local state, as any mutations within the block
         // are removed after the block returns.
         let local = self.local.clone();
@@ -377,6 +382,7 @@ impl<'a> Compiler<'a> {
             ident,
             abort_on_error,
             arguments,
+            closure,
         } = node.into_inner();
 
         let arguments = arguments
@@ -393,9 +399,9 @@ impl<'a> Compiler<'a> {
             ident,
             abort_on_error,
             arguments,
-            self.fns,
-            &mut self.local,
             external,
+            closure,
+            self,
         )
         .unwrap_or_else(|err| {
             self.errors.push(Box::new(err));

@@ -123,6 +123,8 @@ mod log;
     feature = "parse_nginx_log"
 ))]
 mod log_util;
+#[cfg(feature = "map")]
+mod map;
 #[cfg(feature = "match")]
 mod r#match;
 #[cfg(feature = "match_any")]
@@ -274,6 +276,8 @@ mod uuid_v4;
 
 #[cfg(feature = "array")]
 pub use crate::array::Array;
+#[cfg(feature = "map")]
+pub use crate::map::Map;
 #[cfg(feature = "md5")]
 pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
@@ -531,6 +535,10 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
+        #[cfg(feature = "map")]
+        Box::new(Map),
+        #[cfg(feature = "array")]
+        Box::new(Array),
         #[cfg(feature = "append")]
         Box::new(Append),
         #[cfg(feature = "array")]

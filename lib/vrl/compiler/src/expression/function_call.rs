@@ -1,3 +1,14 @@
+use crate::compiler::Compiler;
+use crate::expression::assignment::Details;
+use crate::expression::{
+    levenstein, Block, ExpressionError, FunctionArgument, FunctionClosure, Noop,
+};
+use crate::function::{ArgumentList, Parameter};
+use crate::parser::{Ident, Node};
+use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
+
+use diagnostic::{DiagnosticError, Label, Note, Urls};
+use parser::ast;
 use std::{fmt, sync::Arc};
 
 use anymap::AnyMap;
@@ -34,26 +45,34 @@ pub struct FunctionCall {
 }
 
 impl FunctionCall {
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub fn new<'a>(
         call_span: Span,
         ident: Node<Ident>,
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
+<<<<<<< HEAD
         funcs: &[Box<dyn Function>],
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
+=======
+        closure: Option<Node<ast::FunctionClosure>>,
+        compiler: &'a mut Compiler,
+>>>>>>> c6f603a5a (feat: initial iteration support spike)
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let (function_id, function) = match funcs
+        let (function_id, function) = match compiler
+            .fns
             .iter()
             .enumerate()
             .find(|(_pos, f)| f.identifier() == ident.as_ref())
         {
             Some(function) => function,
             None => {
-                let idents = funcs
+                let idents = compiler
+                    .fns
                     .iter()
                     .map(|func| func.identifier())
                     .collect::<Vec<_>>();
@@ -121,7 +140,11 @@ impl FunctionCall {
             })?;
 
             // Check if the argument is of the expected type.
+<<<<<<< HEAD
             let argument_type_def = argument.type_def((local, external));
+=======
+            let argument_type_def = argument.type_def(compiler.state);
+>>>>>>> c6f603a5a (feat: initial iteration support spike)
             let expr_kind = argument_type_def.kind();
             let param_kind = parameter.kind();
 
@@ -167,6 +190,7 @@ impl FunctionCall {
                 })
             })?;
 
+<<<<<<< HEAD
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
@@ -177,6 +201,113 @@ impl FunctionCall {
 
         let mut expr = function
             .compile((local, external), &mut compile_ctx, list)
+=======
+        // Check function closure validity.
+        match (function.closure(), closure) {
+            // Ensure function accepts closure.
+            (None, Some(_)) => todo!("unexpected closure"),
+
+            // Ensure required closure is present.
+            (Some(_), None) => todo!("missing closure"),
+
+            // Check for invalid closure signature.
+            (Some(definition), Some(closure)) => {
+                // expand function closure, but don't expand the block yet.
+                let ast::FunctionClosure { variables, block } = closure.into_inner();
+
+                let mut matched = false;
+
+                for input in definition.inputs {
+                    // Check type definition for linked parameter.
+                    match list.arguments.get(input.parameter_keyword) {
+                        // No argument provided for the given parameter keyword.
+                        //
+                        // This means the closure can't act on the input definition, so we continue
+                        // on to the next. If no input definitions are valid, the closure is
+                        // invalid.
+                        None => continue,
+                        Some(expr) => {
+                            let type_def = expr.type_def(compiler.state);
+
+                            // The type definition of the value does not match the expected closure
+                            // type, continue to check if the closure eventually accepts this
+                            // definition.
+                            if type_def.kind() != input.kind {
+                                continue;
+                            }
+
+                            matched = true;
+                        }
+                    };
+
+                    // Now that we know we have a matching parameter argument with a valid type
+                    // definition, we can move on to checking/defining the closure arguments.
+                    //
+                    // In doing so we:
+                    //
+                    // - check the arity of the closure arguments
+                    // - set the expected type definition of each argument
+
+                    if input.variables.len() != variables.len() {
+                        todo!("invalid function-closure argument arity")
+                    }
+
+                    // Get the provided argument identifier in the same position as defined in the
+                    // input definition.
+                    //
+                    // That is, if the function closure definition expects:
+                    //
+                    //   [bytes, integer]
+                    //
+                    // Then, given for an actual implementation of:
+                    //
+                    //   foo() -> { |bar, baz| }
+                    //
+                    // We set "bar" (index 0) to return bytes, and "baz" (index 1) to return an
+                    // integer.
+                    //
+                    // An implementation with an arity mismatch will return in a compile-time
+                    // error.
+                    for (index, input_var) in input.variables.into_iter().enumerate() {
+                        let call_ident = &variables[index];
+
+                        // 1. get call_var type def from compiler state
+                        // 2. compare against input_var.kind type def
+                        // 3. if they don't match, error
+
+                        // TODO:
+                        // - need to register call_var type def as variable
+                        // - how??
+
+                        let details = Details {
+                            type_def: input_var.kind.into(),
+                            value: None,
+                        };
+
+                        compiler
+                            .state
+                            .insert_variable(call_ident.to_owned().into_inner(), details);
+                    }
+                }
+
+                // None of the inputs matched the value type, this is a user error.
+                if !matched {
+                    todo!("invalid closure signature")
+                }
+
+                let block = compiler.compile_block(block);
+                let closure = FunctionClosure::new(variables, block);
+                list.set_closure(closure);
+            }
+
+            (None, None) => {}
+        }
+
+        let compile_ctx = FunctionCompileContext { span: call_span };
+
+        let mut expr = function
+            .compile(compiler.state, &compile_ctx, list)
+>>>>>>> c6f603a5a (feat: initial iteration support spike)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
@@ -187,7 +318,11 @@ impl FunctionCall {
         // resulting program incorrectly convey this function call might fail.
         if abort_on_error
             && !maybe_fallible_arguments
+<<<<<<< HEAD
             && !expr.type_def((local, external)).is_fallible()
+=======
+            && !expr.type_def(compiler.state).is_fallible()
+>>>>>>> c6f603a5a (feat: initial iteration support spike)
         {
             return Err(Error::AbortInfallible {
                 ident_span,
@@ -196,7 +331,11 @@ impl FunctionCall {
         }
 
         // Update the state if necessary.
+<<<<<<< HEAD
         expr.update_state(local, external)
+=======
+        expr.update_state(compiler.state)
+>>>>>>> c6f603a5a (feat: initial iteration support spike)
             .map_err(|err| Error::UpdateState {
                 call_span,
                 error: err.to_string(),
