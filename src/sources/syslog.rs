@@ -30,7 +30,7 @@ use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 pub struct SyslogConfig {
     #[serde(flatten)]
     mode: Mode,
-    #[serde(default = "default_max_length")]
+    #[serde(default = "crate::serde::default_max_length")]
     max_length: usize,
     /// The host key of the log. (This differs from `hostname`)
     host_key: Option<String>,
@@ -53,16 +53,12 @@ pub enum Mode {
     Unix { path: PathBuf },
 }
 
-pub fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
-}
-
 impl SyslogConfig {
     pub fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
         }
     }
 }
@@ -81,7 +77,7 @@ impl GenerateConfig for SyslogConfig {
                 receive_buffer_bytes: None,
             },
             host_key: None,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
         })
         .unwrap()
     }

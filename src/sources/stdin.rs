@@ -13,7 +13,7 @@ use std::{io, thread};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
-    #[serde(default = "default_max_length")]
+    #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
 }
@@ -21,14 +21,10 @@ pub struct StdinConfig {
 impl Default for StdinConfig {
     fn default() -> Self {
         StdinConfig {
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
             host_key: None,
         }
     }
-}
-
-fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
 }
 
 inventory::submit! {

@@ -9,25 +9,25 @@ pub struct NewlineDelimitedDecoderConfig {
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
-    #[serde(default)]
-    max_length: Option<usize>,
+    #[serde(default = "crate::serde::default_max_length")]
+    max_length: usize,
 }
 
 impl NewlineDelimitedDecoderConfig {
     /// Creates a new `NewlineDelimitedDecoderConfig`.
-    pub const fn new() -> Self {
-        Self { max_length: None }
+    pub fn new() -> Self {
+        Self {
+            max_length: crate::serde::default_max_length(),
+        }
     }
 }
 
 #[typetag::serde(name = "newline_delimited")]
 impl FramingConfig for NewlineDelimitedDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(
-            self.max_length
-                .map(NewlineDelimitedCodec::new_with_max_length)
-                .unwrap_or_else(NewlineDelimitedCodec::new),
-        ))
+        Ok(Box::new(NewlineDelimitedCodec::new_with_max_length(
+            self.max_length,
+        )))
     }
 }
 
