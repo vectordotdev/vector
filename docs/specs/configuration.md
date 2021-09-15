@@ -74,7 +74,7 @@ under entities and also used to define global Vector behavior.
 
 ### Types
 
-Types MUST consist of [JSON types] only:
+Types MUST consist of [JSON types] only, minus the `null` type:
 
 * `string`
 * `number`
@@ -82,7 +82,6 @@ Types MUST consist of [JSON types] only:
 * `object`
 * `array`
 * `boolean`
-* `null`
 
 ### Polymorphism
 
