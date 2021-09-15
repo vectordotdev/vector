@@ -569,6 +569,7 @@ sinks-logs = [
   "sinks-clickhouse",
   "sinks-console",
   "sinks-datadog",
+  "sinks-datadog_archives",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -616,6 +617,7 @@ sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = ["bytesize"]
+sinks-datadog_archives = ["sinks-aws_s3"]
 sinks-elasticsearch = ["bytesize", "rusoto", "transforms-metric_to_log"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "gouth", "smpl_jwt", "uuid"]

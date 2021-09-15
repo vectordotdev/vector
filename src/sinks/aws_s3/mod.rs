@@ -1,8 +1,6 @@
 use crate::config::SinkDescription;
 
 mod config;
-mod partitioner;
-mod service;
 mod sink;
 
 #[cfg(test)]
