@@ -85,7 +85,7 @@ representing multiple endpoints.
 Vector components MUST be instrumented for optimal observability and monitoring.
 This is required to drive various interfaces that Vector users depend on to
 manage Vector installations in mission critical production environments. This
-section extends the [Instrumentation Sepcification].
+section extends the [Instrumentation Specification].
 
 ### Batching
 
@@ -224,7 +224,7 @@ implement since errors are specific to the component.
 
 [Configuration Specification]: configuration.md
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
-[Instrumentation Sepcification]: instrumentation.md
+[Instrumentation Specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/
 [RFC 2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
