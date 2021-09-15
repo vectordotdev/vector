@@ -1,0 +1,3 @@
+# result: { "FOO": "BAR" }
+
+map(value: { "foo": "bar" }) -> |k, v| { [upcase(k) + "_" + k, upcase(v)] }

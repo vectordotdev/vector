@@ -8,7 +8,12 @@ pub use compiler::{
     Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
 };
 
+pub use compiler::expression::ClosureOutput as Output;
+pub use compiler::expression::FunctionClosure as Closure;
+
 pub type Result<T> = std::result::Result<T, ExpressionError>;
+
+pub use compiler::function::closure;
 
 pub use std::collections::BTreeMap;
 pub use std::fmt;

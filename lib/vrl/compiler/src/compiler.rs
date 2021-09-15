@@ -10,8 +10,8 @@ use crate::{expression::*, Function, Program, State, Value};
 pub type Errors = Vec<Box<dyn DiagnosticError>>;
 
 pub struct Compiler<'a> {
-    fns: &'a [Box<dyn Function>],
-    state: &'a mut State,
+    pub(crate) fns: &'a [Box<dyn Function>],
+    pub(crate) state: &'a mut State,
     errors: Errors,
     fallible: bool,
     abortable: bool,
@@ -136,7 +136,8 @@ impl<'a> Compiler<'a> {
         Group::new(expr)
     }
 
-    fn compile_block(&mut self, node: Node<ast::Block>) -> Block {
+    // FIXME: remove pub(crate)
+    pub(crate) fn compile_block(&mut self, node: Node<ast::Block>) -> Block {
         let exprs = self.compile_exprs(node.into_inner().into_iter());
 
         Block::new(exprs)
@@ -330,6 +331,7 @@ impl<'a> Compiler<'a> {
             ident,
             abort_on_error,
             arguments,
+            closure,
         } = node.into_inner();
 
         let arguments = arguments
@@ -341,18 +343,13 @@ impl<'a> Compiler<'a> {
             self.fallible = true;
         }
 
-        FunctionCall::new(
-            call_span,
-            ident,
-            abort_on_error,
-            arguments,
-            self.fns,
-            self.state,
-        )
-        .unwrap_or_else(|err| {
-            self.errors.push(Box::new(err));
-            FunctionCall::noop()
-        })
+        // TODO: don't want to pass in `self` here, but need to refactor to allow for that to be
+        // removed.
+        FunctionCall::new(call_span, ident, abort_on_error, arguments, closure, self)
+            .unwrap_or_else(|err| {
+                self.errors.push(Box::new(err));
+                FunctionCall::noop()
+            })
     }
 
     fn compile_function_argument(&mut self, node: Node<ast::FunctionArgument>) -> FunctionArgument {

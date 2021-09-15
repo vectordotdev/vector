@@ -55,6 +55,7 @@ value = { path = "../../value", features = ["test"]}
 default = [
     "append",
     "array",
+    "map",
     "assert",
     "assert_eq",
     "boolean",
@@ -177,6 +178,7 @@ default = [
 
 append = []
 array = []
+map = []
 assert = []
 assert_eq = []
 boolean = []
