@@ -39,8 +39,8 @@ impl<'de> Visitor<'de> for BufferConfigVisitor {
         #[cfg(feature = "disk-buffer")]
         let mut max_size: Option<usize> = None;
         let mut when_full: Option<WhenFull> = None;
-        while let Some(key) = map.next_key()? {
-            match key {
+        while let Some(key) = map.next_key::<String>()? {
+            match key.as_str() {
                 "type" => {
                     if kind.is_some() {
                         return Err(Error::duplicate_field("type"));
