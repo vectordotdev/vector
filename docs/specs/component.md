@@ -12,9 +12,11 @@ interpreted as described in [RFC 2119].
 1. [Introduction](#introduction)
 1. [Scope](#scope)
 1. [How to read this document](#how-to-read-this-document)
+1. [Naming](#naming)
+   1. [Source and sink naming](#source-and-sink-naming)
+   1. [Transform naming](#transform-naming)
 1. [Configuration](#configuration)
    1. [Options](#options)
-      1. [`address`](#address)
       1. [`endpoint(s)`](#endpoints)
 1. [Instrumentation](#instrumentation)
    1. [Batching](#batching)
@@ -48,7 +50,26 @@ This document is written from the broad perspective of a Vector component.
 Unless otherwise stated, a section applies to all component types (sources,
 transforms, and sinks).
 
+## Naming
+
+To align with the [logical boundaries of components], component naming MUST
+follow the following guidelines.
+
+### Source and sink naming
+
+* MUST only contain ASCII alphanumeric, lowercase, and underscores
+* MUST be a noun named after the protocol or service that the component integrates with
+* MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`)
+
+### Transform naming
+
+* MUST only contain ASCII alphanumeric, lowercase, and underscores
+* MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`)
+
 ## Configuration
+
+This section extends the [Configuration Specification] for component specific
+configuration.
 
 ### Options
 
@@ -63,7 +84,8 @@ representing multiple endpoints.
 
 Vector components MUST be instrumented for optimal observability and monitoring.
 This is required to drive various interfaces that Vector users depend on to
-manage Vector installations in mission critical production environments.
+manage Vector installations in mission critical production environments. This
+section extends the [Instrumentation Specification].
 
 ### Batching
 
@@ -200,7 +222,10 @@ implement since errors are specific to the component.
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
 
+[Configuration Specification]: configuration.md
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[Instrumentation Specification]: instrumentation.md
+[logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/
 [RFC 2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
