@@ -5,7 +5,7 @@ use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use shared::btreemap;
 use snafu::{ResultExt, Snafu};
-use std::io::{self};
+use std::io::{self, Read};
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -70,31 +70,33 @@ impl HostMetricsConfig {
                 "cgroup" => cgroup.name.to_string_lossy(),
                 "collector" => "cgroups",
             };
-            if let Some(cpu) = filter_result_sync(
-                cgroup.load_cpu(buffer).await,
-                "Failed to load cgroups CPU statistics.",
-            ) {
-                result.push(self.counter(
-                    "cgroup_cpu_usage_seconds_total",
-                    now,
-                    cpu.usage_usec as f64 * MICROSECONDS,
-                    tags.clone(),
-                ));
-                result.push(self.counter(
-                    "cgroup_cpu_user_seconds_total",
-                    now,
-                    cpu.user_usec as f64 * MICROSECONDS,
-                    tags.clone(),
-                ));
-                result.push(self.counter(
-                    "cgroup_cpu_system_seconds_total",
-                    now,
-                    cpu.system_usec as f64 * MICROSECONDS,
-                    tags.clone(),
-                ));
+            if cgroup.has_cpu {
+                if let Some(cpu) = filter_result_sync(
+                    cgroup.load_cpu(buffer).await,
+                    "Failed to load cgroups CPU statistics.",
+                ) {
+                    result.push(self.counter(
+                        "cgroup_cpu_usage_seconds_total",
+                        now,
+                        cpu.usage_usec as f64 * MICROSECONDS,
+                        tags.clone(),
+                    ));
+                    result.push(self.counter(
+                        "cgroup_cpu_user_seconds_total",
+                        now,
+                        cpu.user_usec as f64 * MICROSECONDS,
+                        tags.clone(),
+                    ));
+                    result.push(self.counter(
+                        "cgroup_cpu_system_seconds_total",
+                        now,
+                        cpu.system_usec as f64 * MICROSECONDS,
+                        tags.clone(),
+                    ));
+                }
             }
 
-            if !cgroup.is_root() {
+            if cgroup.has_memory && !cgroup.is_root() {
                 if let Some(current) = filter_result_sync(
                     cgroup.load_memory_current(buffer).await,
                     "Failed to load cgroups current memory.",
@@ -146,7 +148,11 @@ impl HostMetricsConfig {
 struct CGroup {
     root: PathBuf,
     name: PathBuf,
+    has_cpu: bool,
+    has_memory: bool,
 }
+
+const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 
 impl CGroup {
     fn root<P: AsRef<Path>>(base_group: Option<P>) -> Option<CGroup> {
@@ -171,29 +177,59 @@ impl CGroup {
         // for that group.
 
         let base_dir = join_path(heim::os::linux::sysfs_root(), "fs/cgroup");
-        let hybrid_root = join_path(&base_dir, "unified");
 
-        let base_dir = is_dir(&hybrid_root)
-            .then(|| hybrid_root)
-            .or_else(|| is_file(join_path(&base_dir, "cgroup.procs")).then(|| base_dir));
-
-        base_dir.and_then(|root| {
-            debug!(message = "Detected cgroup base directory.", ?root);
-            match base_group {
-                Some(group) => {
-                    let group = group.as_ref();
-                    let root = join_path(root, group);
-                    is_dir(&root).then(|| CGroup {
-                        root,
-                        name: group.into(),
-                    })
+        let (base_dir, controllers_file) = {
+            let hybrid_root = join_path(&base_dir, "unified");
+            let test_file = join_path(&hybrid_root, CGROUP_CONTROLLERS);
+            if is_file(&test_file) {
+                (hybrid_root, test_file)
+            } else {
+                let test_file = join_path(&base_dir, CGROUP_CONTROLLERS);
+                if is_file(&test_file) {
+                    (base_dir, test_file)
+                } else {
+                    return None;
                 }
-                None => Some(CGroup {
-                    root,
-                    name: "/".into(),
-                }),
             }
-        })
+        };
+
+        debug!(message = "Detected cgroup base directory.", ?base_dir);
+
+        let controllers = load_controllers(&controllers_file)
+            .map_err(
+                |error| error!(message = "Could not load root cgroup controllers list", %error, ?controllers_file),
+            )
+            .ok()?;
+        let has_cpu = controllers.iter().any(|name| name == "cpu");
+        let has_memory = controllers.iter().any(|name| name == "memory");
+        if !has_cpu {
+            warn!(message = "Cgroups CPU controller is not active, there will be no CPU metrics.");
+        }
+        if !has_memory {
+            warn!(
+                message =
+                    "Cgroups memory controller is not active, there will be no memory metrics."
+            );
+        }
+
+        match base_group {
+            Some(group) => {
+                let group = group.as_ref();
+                let root = join_path(base_dir, group);
+                is_dir(&root).then(|| CGroup {
+                    root,
+                    name: group.into(),
+                    has_cpu,
+                    has_memory,
+                })
+            }
+            None => Some(CGroup {
+                root: base_dir,
+                name: "/".into(),
+                has_cpu,
+                has_memory,
+            }),
+        }
     }
 
     fn is_root(&self) -> bool {
@@ -251,12 +287,29 @@ impl CGroup {
         while let Some(entry) = dir.next_entry().await? {
             let root = entry.path();
             if is_dir(&root) {
-                let name = join_name(&self.name, entry.file_name());
-                result.push(CGroup { root, name });
+                result.push(CGroup {
+                    root,
+                    name: join_name(&self.name, entry.file_name()),
+                    has_cpu: self.has_cpu,
+                    has_memory: self.has_memory,
+                });
             }
         }
         Ok(result)
     }
+}
+
+fn load_controllers(filename: &Path) -> CgroupsResult<Vec<String>> {
+    let mut buffer = String::new();
+    std::fs::File::open(&filename)
+        .with_context(|| Opening {
+            filename: filename.to_path_buf(),
+        })?
+        .read_to_string(&mut buffer)
+        .with_context(|| Reading {
+            filename: filename.to_path_buf(),
+        })?;
+    Ok(buffer.trim().split(' ').map(Into::into).collect())
 }
 
 macro_rules! define_stat_struct {
