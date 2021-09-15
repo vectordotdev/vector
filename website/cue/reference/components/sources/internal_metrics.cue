@@ -454,7 +454,33 @@ components: sources: internal_metrics: {
 		events_in_total: {
 			description: """
 				The number of events accepted by this component either from tagged
-				origin like file and uri, or cumulatively from other origins.
+				origins like file and uri, or cumulatively from other origins.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              received_events_total.tags
+		}
+		events_out_total: {
+			description:       "The total number of events emitted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		processed_events_total: {
+			description:       """
+				The total number of events processed by this component.
+				This metric is deprecated in place of using
+				[`events_in_total`](\(urls.vector_sources)/internal_metrics/#events_in_total) and
+				[`events_out_total`](\(urls.vector_sources)/internal_metrics/#events_out_total) metrics.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		received_events_total: {
+			description: """
+				The number of events accepted by this component either from tagged
+				origins like file and uri, or cumulatively from other origins.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
@@ -486,19 +512,23 @@ components: sources: internal_metrics: {
 				mode: _mode
 			}
 		}
-		events_out_total: {
+		received_event_bytes_total: {
+			description: """
+				The number of event bytes accepted by this component either from
+				tagged origins like file and uri, or cumulatively from other origins.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              received_events_total.tags
+		}
+		sent_events_total: {
 			description:       "The total number of events emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		processed_events_total: {
-			description:       """
-				The total number of events processed by this component.
-				This metric is deprecated in place of using
-				[`events_in_total`](\(urls.vector_sources)/internal_metrics/#events_in_total) and
-				[`events_out_total`](\(urls.vector_sources)/internal_metrics/#events_out_total) metrics.
-				"""
+		sent_event_bytes_total: {
+			description:       "The total number of event bytes emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -1045,13 +1075,13 @@ components: sources: internal_metrics: {
 				"invalid_metric":              "The metric was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
-				"out_of_order":				   "The event was out of order."
+				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
 				"render_error":                "The rendering operation failed."
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."
-				"unlabeled_event":			   "The event was not labeled."
+				"unlabeled_event":             "The event was not labeled."
 				"value_invalid":               "The value was invalid."
 			}
 		}
@@ -1086,7 +1116,7 @@ components: sources: internal_metrics: {
 			required:    true
 			enum: {
 				"out_of_order": "The event was out of order."
-				"oversized":    "The event was too large."				
+				"oversized":    "The event was too large."
 			}
 		}
 	}

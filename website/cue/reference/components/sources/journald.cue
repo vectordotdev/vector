@@ -93,9 +93,9 @@ components: sources: journald: {
 				]
 				options: {
 					"*": {
-						common:		   false
+						common:      false
 						description: "The set of field values to match in journal entries that are to be excluded."
-						required:	   false
+						required:    false
 						type: array: {
 							default: []
 							items: type: string: {
@@ -134,9 +134,9 @@ components: sources: journald: {
 				]
 				options: {
 					"*": {
-						common:		 false
+						common:      false
 						description: "The set of field values to match in journal entries that are to be included."
-						required:	 false
+						required:    false
 						type: array: {
 							default: []
 							items: type: string: {
@@ -269,5 +269,6 @@ components: sources: journald: {
 		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
+		received_events_total:      components.sources.internal_metrics.output.metrics.received_events_total
 	}
 }
