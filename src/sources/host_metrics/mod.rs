@@ -38,7 +38,7 @@ mod network;
 #[serde(rename_all = "lowercase")]
 enum Collector {
     #[cfg(target_os = "linux")]
-    Cgroups,
+    CGroups,
     Cpu,
     Disk,
     Filesystem,
@@ -75,7 +75,7 @@ pub struct HostMetricsConfig {
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
-    cgroups: cgroups::CgroupsConfig,
+    cgroups: cgroups::CGroupsConfig,
     #[serde(default)]
     disk: disk::DiskConfig,
     #[serde(default)]
@@ -159,7 +159,7 @@ impl HostMetrics {
         let hostname = crate::get_hostname();
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
-        if self.config.has_collector(Collector::Cgroups) {
+        if self.config.has_collector(Collector::CGroups) {
             metrics.extend(add_collector("cgroups", self.cgroups_metrics().await));
         }
         if self.config.has_collector(Collector::Cpu) {
@@ -518,7 +518,7 @@ pub(self) mod tests {
 
         for collector in &[
             #[cfg(target_os = "linux")]
-            Collector::Cgroups,
+            Collector::CGroups,
             Collector::Cpu,
             Collector::Disk,
             Collector::Filesystem,

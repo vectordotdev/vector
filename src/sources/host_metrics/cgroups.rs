@@ -17,7 +17,7 @@ const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(default)]
-pub(super) struct CgroupsConfig {
+pub(super) struct CGroupsConfig {
     #[derivative(Default(value = "100"))]
     levels: usize,
     pub(super) base: Option<PathBuf>,
@@ -25,7 +25,7 @@ pub(super) struct CgroupsConfig {
 }
 
 #[derive(Debug, Snafu)]
-enum CgroupsError {
+enum CGroupsError {
     #[snafu(display("Could not open cgroup data file {:?}.", filename))]
     Opening {
         filename: PathBuf,
@@ -43,7 +43,7 @@ enum CgroupsError {
     },
 }
 
-type CgroupsResult<T> = Result<T, CgroupsError>;
+type CGroupsResult<T> = Result<T, CGroupsError>;
 
 impl HostMetrics {
     pub async fn cgroups_metrics(&self) -> Vec<Metric> {
@@ -203,12 +203,12 @@ impl CGroup {
         let has_cpu = controllers.iter().any(|name| name == "cpu");
         let has_memory = controllers.iter().any(|name| name == "memory");
         if !has_cpu {
-            warn!(message = "Cgroups CPU controller is not active, there will be no CPU metrics.");
+            warn!(message = "CGroups CPU controller is not active, there will be no CPU metrics.");
         }
         if !has_memory {
             warn!(
                 message =
-                    "Cgroups memory controller is not active, there will be no memory metrics."
+                    "CGroups memory controller is not active, there will be no memory metrics."
             );
         }
 
@@ -236,7 +236,7 @@ impl CGroup {
         self.name == Path::new("/")
     }
 
-    async fn load_cpu(&self, buffer: &mut String) -> CgroupsResult<CpuStat> {
+    async fn load_cpu(&self, buffer: &mut String) -> CGroupsResult<CpuStat> {
         self.open_read_parse("cpu.stat", buffer).await
     }
 
@@ -248,7 +248,7 @@ impl CGroup {
         &self,
         filename: impl AsRef<Path>,
         buffer: &mut String,
-    ) -> CgroupsResult<PathBuf> {
+    ) -> CGroupsResult<PathBuf> {
         buffer.clear();
         let filename = self.make_path(filename);
         File::open(&filename)
@@ -268,16 +268,16 @@ impl CGroup {
         &self,
         filename: impl AsRef<Path>,
         buffer: &mut String,
-    ) -> CgroupsResult<T> {
+    ) -> CGroupsResult<T> {
         let filename = self.open_read(filename, buffer).await?;
         buffer.trim().parse().with_context(|| Parsing { filename })
     }
 
-    async fn load_memory_current(&self, buffer: &mut String) -> CgroupsResult<u64> {
+    async fn load_memory_current(&self, buffer: &mut String) -> CGroupsResult<u64> {
         self.open_read_parse("memory.current", buffer).await
     }
 
-    async fn load_memory_stat(&self, buffer: &mut String) -> CgroupsResult<MemoryStat> {
+    async fn load_memory_stat(&self, buffer: &mut String) -> CGroupsResult<MemoryStat> {
         self.open_read_parse("memory.stat", buffer).await
     }
 
@@ -299,7 +299,7 @@ impl CGroup {
     }
 }
 
-fn load_controllers(filename: &Path) -> CgroupsResult<Vec<String>> {
+fn load_controllers(filename: &Path) -> CGroupsResult<Vec<String>> {
     let mut buffer = String::new();
     std::fs::File::open(&filename)
         .with_context(|| Opening {
