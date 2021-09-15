@@ -85,7 +85,7 @@ representing multiple endpoints.
 Vector components MUST be instrumented for optimal observability and monitoring.
 This is required to drive various interfaces that Vector users depend on to
 manage Vector installations in mission critical production environments. This
-section extends the [Instrumentation Sepcification].
+section extends the [Instrumentation Specification].
 
 ### Batching
 
