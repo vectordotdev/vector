@@ -114,12 +114,6 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         for input in inputs {
             let entry = frequencies.entry(input.clone()).or_insert(0usize);
             *entry += 1;
-            if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
-                errors.push(format!(
-                    "Input \"{}\" for {} \"{}\" doesn't match any components.",
-                    input, output_type, key
-                ));
-            }
         }
 
         for (dup, count) in frequencies.into_iter().filter(|(_name, count)| *count > 1) {
@@ -198,6 +192,10 @@ pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
 
 pub fn typecheck(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     Graph::from(config).typecheck()
+}
+
+pub fn check_inputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    Graph::from(config).check_inputs()
 }
 
 fn capitalize(s: &str) -> String {

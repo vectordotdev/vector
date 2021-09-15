@@ -1,14 +1,35 @@
 use super::{builder::ConfigBuilder, ComponentKey, DataType};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub enum Node {
-    Source { ty: DataType },
-    Transform { in_ty: DataType, out_ty: DataType },
-    Sink { ty: DataType },
+    Source {
+        ty: DataType,
+    },
+    Transform {
+        in_ty: DataType,
+        out_ty: DataType,
+        named_outputs: Vec<String>,
+    },
+    Sink {
+        ty: DataType,
+    },
 }
 
+#[derive(Debug, Clone)]
 struct Edge {
+    // TODO: these should be a new thing, e.g. `Output` or similar that's roughly:
+    //
+    // ```rust
+    // struct Output {
+    //     component: ComponentKey,
+    //     port: Option<String>,
+    // }
+    // ```
+    //
+    // And config should parse inputs as those instead of just component keys.
+    //
+    // Question: how to differentiate between pipeline dotted paths and branching dotted paths?
     from: ComponentKey,
     to: ComponentKey,
 }
@@ -33,13 +54,31 @@ impl Graph {
     ) {
         let id = id.into();
         let inputs = self.clean_inputs(inputs);
-        self.nodes
-            .insert(id.clone(), Node::Transform { in_ty, out_ty });
+        self.nodes.insert(
+            id.clone(),
+            Node::Transform {
+                in_ty,
+                out_ty,
+                named_outputs: Default::default(),
+            },
+        );
         for from in inputs {
             self.edges.push(Edge {
                 from,
                 to: id.clone(),
             });
+        }
+    }
+
+    fn add_transform_output<I, S>(&mut self, id: I, name: S)
+    where
+        I: Into<ComponentKey>,
+        S: Into<String>,
+    {
+        let id = id.into();
+        match self.nodes.get_mut(&id) {
+            Some(Node::Transform { named_outputs, .. }) => named_outputs.push(name.into()),
+            _ => panic!("invalid transform"),
         }
     }
 
@@ -125,13 +164,49 @@ impl Graph {
             Err(errors)
         }
     }
+
+    pub fn check_inputs(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        let valid_inputs = self
+            .nodes
+            .iter()
+            .flat_map(|(key, node)| match node {
+                Node::Sink { .. } => vec![],
+                Node::Source { .. } => vec![key.clone()],
+                Node::Transform { named_outputs, .. } => {
+                    let mut bleh = vec![key.clone()];
+                    bleh.extend(named_outputs.iter().map(|n| key.join(n)));
+                    bleh
+                }
+            })
+            .collect::<HashSet<ComponentKey>>();
+
+        for edge in &self.edges {
+            if !valid_inputs.contains(&edge.from) {
+                let output_type = match self.nodes.get(&edge.to) {
+                    Some(Node::Transform { .. }) => "transform",
+                    Some(Node::Sink { .. }) => "sink",
+                    _ => panic!("only transforms and sinks have inputs"),
+                };
+                errors.push(format!(
+                    "Input \"{}\" for {} \"{}\" doesn't match any components.",
+                    edge.from, output_type, edge.to
+                ));
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 impl From<&ConfigBuilder> for Graph {
     fn from(config: &ConfigBuilder) -> Self {
         let mut graph = Graph::default();
 
-        // TODO: validate that node names are unique across sources/transforms/sinks?
         for (id, config) in config.sources.iter() {
             graph.add_source(id.clone(), config.inner.output_type());
         }
@@ -143,6 +218,9 @@ impl From<&ConfigBuilder> for Graph {
                 config.inner.output_type(),
                 config.inputs.clone(),
             );
+            for name in config.inner.named_outputs() {
+                graph.add_transform_output(id, name.to_string());
+            }
         }
 
         for (id, config) in config.sinks.iter() {
@@ -368,5 +446,31 @@ mod test {
         graph.add_sink("metric_sink", DataType::Metric, vec!["any_to_metric"]);
 
         assert_eq!(Ok(()), graph.typecheck());
+    }
+
+    #[test]
+    fn allows_multiple_transform_outputs() {
+        let mut graph = Graph::default();
+        graph.add_source("log_source", DataType::Log);
+        graph.add_transform(
+            "log_to_log",
+            DataType::Log,
+            DataType::Log,
+            vec!["log_source"],
+        );
+        graph.add_transform_output("log_to_log", "errors");
+        graph.add_sink("good_log_sink", DataType::Log, vec!["log_to_log"]);
+        // TODO: can't parse dotted paths
+        let errors_key = ComponentKey::global("log_to_log.errors");
+        graph.add_sink("errored_log_sink", DataType::Log, vec![errors_key]);
+
+        // make sure we are cool with the dotted path
+        assert_eq!(Ok(()), graph.check_inputs());
+
+        // make sure that we're not cool with an unknown dotted path
+        let bad_key = ComponentKey::global("log_to_log.not_errors");
+        graph.add_sink("bad_log_sink", DataType::Log, vec![bad_key]);
+        let expected = "Input \"log_to_log.not_errors\" for sink \"bad_log_sink\" doesn't match any components.".to_string();
+        assert_eq!(Err(vec![expected]), graph.check_inputs());
     }
 }

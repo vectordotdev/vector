@@ -440,6 +440,9 @@ impl RunningTopology {
         // might try use it as an input
         for key in diff.transforms.changed_and_added() {
             self.setup_outputs(key, new_pieces).await;
+            if new_pieces.outputs.keys().any(|k| k == &key.join("errors")) {
+                self.setup_outputs(&key.join("errors"), new_pieces).await;
+            }
         }
 
         for key in &diff.transforms.to_change {
@@ -631,7 +634,7 @@ impl RunningTopology {
             let _ = self
                 .outputs
                 .get_mut(&input)
-                .unwrap()
+                .expect("unknown output")
                 .send(ControlMessage::Add(key.clone(), tx.get()))
                 .await;
         }

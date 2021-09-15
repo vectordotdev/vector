@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::FilterEventDiscarded,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FallibleFunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
 
@@ -31,7 +31,7 @@ impl GenerateConfig for FilterConfig {
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Filter::new(
+        Ok(Transform::fallible_function(Filter::new(
             self.condition.build(&context.enrichment_tables)?,
         )))
     }
@@ -42,6 +42,10 @@ impl TransformConfig for FilterConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Any
+    }
+
+    fn named_outputs(&self) -> Vec<String> {
+        vec!["errors".into()]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -62,12 +66,13 @@ impl Filter {
     }
 }
 
-impl FunctionTransform for Filter {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+impl FallibleFunctionTransform for Filter {
+    fn transform(&mut self, output: &mut Vec<Event>, errors: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
             output.push(event);
         } else {
             emit!(&FilterEventDiscarded);
+            errors.push(event);
         }
     }
 }

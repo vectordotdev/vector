@@ -31,6 +31,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 
     let warnings = validation::warnings(&builder);
 
+    if let Err(input_errors) = validation::check_inputs(&builder) {
+        errors.extend(input_errors);
+    }
+
     if let Err(type_errors) = validation::check_shape(&builder) {
         errors.extend(type_errors);
     }

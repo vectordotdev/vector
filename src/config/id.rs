@@ -66,7 +66,7 @@ impl ComponentKey {
         matches!(self.scope, ComponentScope::Global)
     }
 
-    pub fn join(&self, s: &'static str) -> Self {
+    pub fn join(&self, s: &str) -> Self {
         let mut other = self.clone();
         other.id.push('.');
         other.id.push_str(s);
