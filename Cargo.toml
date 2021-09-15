@@ -263,7 +263,7 @@ semver = { version = "1.0.4", default-features = false, features = ["serde", "st
 smallvec = { version = "1", optional = true }
 snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
-socket2 = { version = "0.4.1", default-features = false }
+socket2 = { version = "0.4.2", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.23", default-features = false }
