@@ -61,6 +61,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
             logs_config.use_http: true
             logs_config.logs_no_ssl: true
             logs_config.logs_dd_url: {}:8080
+            logs_config.use_v2_api: false
             listeners:
               - name: kubelet
             config_providers:
