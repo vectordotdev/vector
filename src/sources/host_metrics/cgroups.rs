@@ -20,7 +20,7 @@ const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 pub(super) struct CgroupsConfig {
     #[derivative(Default(value = "100"))]
     levels: usize,
-    base: Option<PathBuf>,
+    pub(super) base: Option<PathBuf>,
     groups: FilterList,
 }
 
@@ -50,7 +50,7 @@ impl HostMetrics {
         let now = Utc::now();
         let mut buffer = String::new();
         let mut output = Vec::new();
-        if let Some(root) = CGroup::root(self.config.cgroups.base.as_deref()) {
+        if let Some(root) = self.root_cgroup.clone() {
             self.recurse_cgroup(&mut output, now, root, 1, &mut buffer)
                 .await;
         }
@@ -144,8 +144,8 @@ impl HostMetrics {
     }
 }
 
-#[derive(Debug)]
-struct CGroup {
+#[derive(Clone, Debug)]
+pub(super) struct CGroup {
     root: PathBuf,
     name: PathBuf,
     has_cpu: bool,
@@ -155,7 +155,7 @@ struct CGroup {
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 
 impl CGroup {
-    fn root<P: AsRef<Path>>(base_group: Option<P>) -> Option<CGroup> {
+    pub(super) fn root<P: AsRef<Path>>(base_group: Option<P>) -> Option<CGroup> {
         // There are three standard possibilities for cgroups setups
         // (`BASE` below is normally `/sys/fs/cgroup`, but containers
         // sometimes have `/sys` mounted elsewhere):
@@ -197,7 +197,7 @@ impl CGroup {
 
         let controllers = load_controllers(&controllers_file)
             .map_err(
-                |error| error!(message = "Could not load root cgroup controllers list", %error, ?controllers_file),
+                |error| error!(message = "Could not load root cgroup controllers list.", %error, ?controllers_file),
             )
             .ok()?;
         let has_cpu = controllers.iter().any(|name| name == "cpu");

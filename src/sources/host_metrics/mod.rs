@@ -143,11 +143,16 @@ impl HostMetricsConfig {
 
 pub struct HostMetrics {
     config: HostMetricsConfig,
+    root_cgroup: Option<cgroups::CGroup>,
 }
 
 impl HostMetrics {
-    pub const fn new(config: HostMetricsConfig) -> Self {
-        Self { config }
+    pub fn new(config: HostMetricsConfig) -> Self {
+        let root_cgroup = cgroups::CGroup::root(config.cgroups.base.as_deref());
+        Self {
+            config,
+            root_cgroup,
+        }
     }
 
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
