@@ -32,6 +32,7 @@ impl InternalEvent for EventsSent {
 
     fn emit_metrics(&self) {
         if self.count > 0 {
+            counter!("events_out_total", self.count as u64);
             counter!("sent_events_total", self.count as u64);
             counter!("sent_event_bytes_total", self.byte_size as u64);
         }
