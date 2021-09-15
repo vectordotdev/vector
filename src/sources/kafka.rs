@@ -232,9 +232,7 @@ async fn kafka_source(
                             Some(Err(error)) => {
                                 // Error is logged by `crate::codecs::Decoder`, no further handling
                                 // is needed here.
-                                if error.can_continue() {
-                                    continue;
-                                } else {
+                                if !error.can_continue() {
                                     break;
                                 }
                             }
