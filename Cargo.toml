@@ -121,7 +121,7 @@ tracing = { version = "0.1.27", default-features = false }
 tracing-core = { version = "0.1.20", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.2.20", default-features = false }
+tracing-subscriber = { version = "0.2.22", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
