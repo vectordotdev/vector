@@ -118,6 +118,14 @@ mod route;
 mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
+#[cfg(any(
+    feature = "sources-socket",
+    feature = "sources-dnstap",
+    feature = "sinks-socket",
+    feature = "sinks-papertrail",
+    feature = "sinks-vector",
+    feature = "sinks-statsd"
+))]
 mod socket;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -127,13 +135,20 @@ mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
 mod statsd_source;
 mod stdin;
+#[cfg(feature = "sources-syslog")]
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
+#[cfg(any(
+    feature = "sources-utils-tls",
+    feature = "sinks-utils-tls",
+    feature = "sinks-utils-tcp"
+))]
 mod tcp;
 mod template;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
+#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
 mod udp;
 mod unix;
 mod vector;
@@ -258,6 +273,14 @@ pub use self::route::*;
 pub use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
+#[cfg(any(
+    feature = "sources-socket",
+    feature = "sources-dnstap",
+    feature = "sinks-socket",
+    feature = "sinks-papertrail",
+    feature = "sinks-vector",
+    feature = "sinks-statsd"
+))]
 pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -267,13 +290,20 @@ pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd_source::*;
 pub use self::stdin::*;
+#[cfg(feature = "sources-syslog")]
 pub use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
+#[cfg(any(
+    feature = "sources-utils-tls",
+    feature = "sinks-utils-tls",
+    feature = "sinks-utils-tcp"
+))]
 pub use self::tcp::*;
 pub use self::template::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
+#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;

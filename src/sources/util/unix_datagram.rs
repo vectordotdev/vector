@@ -1,8 +1,9 @@
 use crate::{
     codecs, emit,
     event::Event,
-    internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteFailed},
+    internal_events::{SocketReceiveError, UnixSocketFileDeleteFailed},
     shutdown::ShutdownSignal,
+    socket::SocketMode,
     sources::{util::tcp_error::TcpError, Source},
     Pipeline,
 };

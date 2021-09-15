@@ -5,6 +5,8 @@ use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
 impl MaybeTlsSettings {
+    // TODO: Fix interdependencies / component features that make this necessary.
+    #[allow(dead_code)]
     pub(crate) async fn connect(
         &self,
         host: &str,

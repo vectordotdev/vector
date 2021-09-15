@@ -1,7 +1,4 @@
-use crate::{
-    buffers::Acker,
-    internal_events::{SocketEventsSent, SocketMode},
-};
+use crate::{buffers::Acker, internal_events::SocketEventsSent, socket::SocketMode};
 use bytes::Bytes;
 use futures::{ready, Sink};
 use pin_project::{pin_project, pinned_drop};

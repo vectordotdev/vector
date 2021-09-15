@@ -61,6 +61,7 @@ pub mod shutdown;
 pub mod signal;
 pub mod sink;
 pub mod sinks;
+pub mod socket;
 pub mod sources;
 pub(crate) mod stats;
 pub mod stream;

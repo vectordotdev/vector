@@ -6,11 +6,14 @@ pub mod http;
 pub mod retries;
 pub mod service;
 pub mod sink;
+#[cfg(any(feature = "sinks-utils-tcp", feature = "sinks-utils-unix"))]
 pub mod socket_bytes_sink;
 pub mod statistic;
+#[cfg(feature = "sinks-utils-tcp")]
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
+#[cfg(feature = "sinks-utils-udp")]
 pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;

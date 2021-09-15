@@ -6,13 +6,14 @@ use crate::{
     dns,
     event::Event,
     internal_events::{
-        SocketEventsSent, SocketMode, UdpSendIncomplete, UdpSocketConnectionEstablished,
+        SocketEventsSent, UdpSendIncomplete, UdpSocketConnectionEstablished,
         UdpSocketConnectionFailed, UdpSocketError,
     },
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
         Healthcheck, VectorSink,
     },
+    socket::SocketMode,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
