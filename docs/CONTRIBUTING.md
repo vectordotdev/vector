@@ -147,7 +147,7 @@ All pull requests should be reviewed by:
 - Two Vector team members for major changes
 - Three Vector team members for RFCs
 
-If there are any CODEOWNERs automatically assigned, you should also wait for
+If there are any reviewers assigned, you should also wait for
 their review.
 
 #### Merge Style
