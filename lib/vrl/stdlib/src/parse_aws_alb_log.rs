@@ -145,8 +145,8 @@ fn parse_log(mut input: &str) -> Result<Value> {
     field_raw!("type", take_while1(|c| matches!(c, 'a'..='z' | '0'..='9')));
     field!("timestamp", '0'..='9' | '.' | '-' | ':' | 'T' | 'Z');
     field_raw!("elb", take_anything);
-    field!("client_host", '0'..='9' | '.' | ':' | '-');
-    field!("target_host", '0'..='9' | '.' | ':' | '-');
+    field!("client_host", '0'..='9' | 'a'..='f' | '.' | ':' | '-');
+    field!("target_host", '0'..='9' | 'a'..='f' | '.' | ':' | '-');
     field_parse!("request_processing_time", '0'..='9' | '.' | '-', f64);
     field_parse!("target_processing_time", '0'..='9' | '.' | '-', f64);
     field_parse!("response_processing_time", '0'..='9' | '.' | '-', f64);
@@ -197,7 +197,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
     field_raw!("error_reason", take_quoted1);
     field_raw!(
         "target_port_list",
-        take_maybe_quoted_list(|c| matches!(c, '0'..='9' | '.' | ':' | '-'))
+        take_maybe_quoted_list(|c| matches!(c, '0'..='9' | 'a'..='f' | '.' | ':' | '-'))
     );
     field_raw!(
         "target_status_code_list",
