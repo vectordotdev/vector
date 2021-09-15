@@ -380,8 +380,7 @@ mod tests {
             serde_json::from_slice(encoded.as_slice()).unwrap();
 
         validate_event_id(
-            &json
-                .get("_id")
+            json.get("_id")
                 .expect("_id not found")
                 .as_str()
                 .expect("_id is not a string"),
