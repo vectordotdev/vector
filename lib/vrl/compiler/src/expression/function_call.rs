@@ -1,9 +1,14 @@
-use crate::expression::{levenstein, ExpressionError, FunctionArgument, Noop};
+use crate::compiler::Compiler;
+use crate::expression::assignment::Details;
+use crate::expression::{
+    levenstein, Block, ExpressionError, FunctionArgument, FunctionClosure, Noop,
+};
 use crate::function::{ArgumentList, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
 
 use diagnostic::{DiagnosticError, Label, Note, Urls};
+use parser::ast;
 use std::fmt;
 
 #[derive(Clone)]
@@ -28,21 +33,27 @@ pub struct FunctionCall {
 }
 
 impl FunctionCall {
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub fn new<'a>(
         call_span: Span,
         ident: Node<Ident>,
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
-        funcs: &[Box<dyn Function>],
-        state: &mut State,
+        closure: Option<Node<ast::FunctionClosure>>,
+        compiler: &'a mut Compiler,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let function = match funcs.iter().find(|f| f.identifier() == ident.as_ref()) {
+        let function = match compiler
+            .fns
+            .iter()
+            .find(|f| f.identifier() == ident.as_ref())
+        {
             Some(function) => function,
             None => {
-                let idents = funcs
+                let idents = compiler
+                    .fns
                     .iter()
                     .map(|func| func.identifier())
                     .collect::<Vec<_>>();
@@ -120,7 +131,7 @@ impl FunctionCall {
             })?;
 
             // Check if the argument is of the expected type.
-            let expr_kind = argument.type_def(state).kind();
+            let expr_kind = argument.type_def(compiler.state).kind();
             let param_kind = parameter.kind();
 
             if !param_kind.intersects(expr_kind) {
@@ -138,7 +149,7 @@ impl FunctionCall {
             }
 
             // Check if the argument is infallible.
-            if argument.type_def(state).is_fallible() {
+            if argument.type_def(compiler.state).is_fallible() {
                 return Err(Error::FallibleArgument {
                     expr_span: argument.span(),
                 });
@@ -162,14 +173,118 @@ impl FunctionCall {
                 })
             })?;
 
+        // Check function closure validity.
+        match (function.closure(), closure) {
+            // Ensure function accepts closure.
+            (None, Some(_)) => todo!("unexpected closure"),
+
+            // Ensure required closure is present.
+            (Some(_), None) => todo!("missing closure"),
+
+            // Check for invalid closure signature.
+            (Some(definition), Some(closure)) => {
+                // expand function closure, but don't expand the block yet.
+                let ast::FunctionClosure { variables, block } = closure.into_inner();
+
+                let mut matched = false;
+
+                for input in definition.inputs {
+                    // Check type definition for linked parameter.
+                    match list.arguments.get(input.parameter_keyword) {
+                        // No argument provided for the given parameter keyword.
+                        //
+                        // This means the closure can't act on the input definition, so we continue
+                        // on to the next. If no input definitions are valid, the closure is
+                        // invalid.
+                        None => continue,
+                        Some(expr) => {
+                            let type_def = expr.type_def(compiler.state);
+
+                            // The type definition of the value does not match the expected closure
+                            // type, continue to check if the closure eventually accepts this
+                            // definition.
+                            if type_def.kind() != input.kind {
+                                continue;
+                            }
+
+                            matched = true;
+                        }
+                    };
+
+                    // Now that we know we have a matching parameter argument with a valid type
+                    // definition, we can move on to checking/defining the closure arguments.
+                    //
+                    // In doing so we:
+                    //
+                    // - check the arity of the closure arguments
+                    // - set the expected type definition of each argument
+
+                    if input.variables.len() != variables.len() {
+                        todo!("invalid function-closure argument arity")
+                    }
+
+                    // Get the provided argument identifier in the same position as defined in the
+                    // input definition.
+                    //
+                    // That is, if the function closure definition expects:
+                    //
+                    //   [bytes, integer]
+                    //
+                    // Then, given for an actual implementation of:
+                    //
+                    //   foo() -> { |bar, baz| }
+                    //
+                    // We set "bar" (index 0) to return bytes, and "baz" (index 1) to return an
+                    // integer.
+                    //
+                    // An implementation with an arity mismatch will return in a compile-time
+                    // error.
+                    for (index, input_var) in input.variables.into_iter().enumerate() {
+                        let call_ident = &variables[index];
+
+                        // 1. get call_var type def from compiler state
+                        // 2. compare against input_var.kind type def
+                        // 3. if they don't match, error
+
+                        // TODO:
+                        // - need to register call_var type def as variable
+                        // - how??
+
+                        let details = Details {
+                            type_def: input_var.kind.into(),
+                            value: None,
+                        };
+
+                        compiler
+                            .state
+                            .insert_variable(call_ident.to_owned().into_inner(), details);
+                    }
+                }
+
+                // None of the inputs matched the value type, this is a user error.
+                if !matched {
+                    todo!("invalid closure signature")
+                }
+
+                let block = compiler.compile_block(block);
+                let closure = FunctionClosure::new(variables, block);
+                list.set_closure(closure);
+            }
+
+            (None, None) => {}
+        }
+
         let mut expr = function
-            .compile(state, list)
+            .compile(compiler.state, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
-        if abort_on_error && !maybe_fallible_arguments && !expr.type_def(state).is_fallible() {
+        if abort_on_error
+            && !maybe_fallible_arguments
+            && !expr.type_def(compiler.state).is_fallible()
+        {
             return Err(Error::AbortInfallible {
                 ident_span,
                 abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
@@ -177,10 +292,11 @@ impl FunctionCall {
         }
 
         // Update the state if necessary.
-        expr.update_state(state).map_err(|err| Error::UpdateState {
-            call_span,
-            error: err.to_string(),
-        })?;
+        expr.update_state(compiler.state)
+            .map_err(|err| Error::UpdateState {
+                call_span,
+                error: err.to_string(),
+            })?;
 
         Ok(Self {
             abort_on_error,

@@ -142,7 +142,8 @@ prop_compose! {
             arguments: params.into_iter().map(|p| node(FunctionArgument {
                 ident: None,
                 expr: node(Expr::Variable(node(p)))
-            })).collect()
+            })).collect(),
+            closure: None,
         }
     }
 }
@@ -260,6 +261,7 @@ fn expr() -> impl Strategy<Value = Expr> {
                                 })
                             })
                             .collect(),
+                        closure: None,
                     }))
                 }
             ),

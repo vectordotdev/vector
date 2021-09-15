@@ -50,6 +50,7 @@ chrono-tz = "0.5"
 default = [
     "append",
     "array",
+    "map",
     "assert",
     "assert_eq",
     "boolean",
@@ -164,6 +165,7 @@ default = [
 
 append = []
 array = []
+map = []
 assert = []
 assert_eq = []
 boolean = []

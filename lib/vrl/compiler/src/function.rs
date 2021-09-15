@@ -1,5 +1,8 @@
+pub mod closure;
+
 use crate::expression::{
-    container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+    container::Variant, Container, Expr, Expression, FunctionArgument, FunctionClosure, Literal,
+    Query,
 };
 use crate::parser::Node;
 use crate::value::Kind;
@@ -48,6 +51,14 @@ pub trait Function: Sync + fmt::Debug {
     fn parameters(&self) -> &'static [Parameter] {
         &[]
     }
+
+    /// An optional closure definition for the function.
+    ///
+    /// This function returns `None` by default, indicating the function doesn't
+    /// accept a closure.
+    fn closure(&self) -> Option<closure::Definition> {
+        None
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -91,7 +102,10 @@ impl Parameter {
 // -----------------------------------------------------------------------------
 
 #[derive(Debug, Default)]
-pub struct ArgumentList(HashMap<&'static str, Expr>);
+pub struct ArgumentList {
+    pub(crate) arguments: HashMap<&'static str, Expr>,
+    closure: Option<FunctionClosure>,
+}
 
 impl ArgumentList {
     pub fn optional(&mut self, keyword: &'static str) -> Option<Box<dyn Expression>> {
@@ -236,16 +250,30 @@ impl ArgumentList {
         Ok(required(self.optional_array(keyword)?))
     }
 
+    pub fn optional_closure(&self) -> Option<&FunctionClosure> {
+        self.closure.as_ref()
+    }
+
+    pub fn required_closure(&self) -> Result<FunctionClosure, Error> {
+        self.optional_closure()
+            .cloned()
+            .ok_or(Error::ExpectedFunctionClosure)
+    }
+
     pub(crate) fn keywords(&self) -> Vec<&'static str> {
-        self.0.keys().copied().collect::<Vec<_>>()
+        self.arguments.keys().copied().collect::<Vec<_>>()
     }
 
     pub(crate) fn insert(&mut self, k: &'static str, v: Expr) {
-        self.0.insert(k, v);
+        self.arguments.insert(k, v);
+    }
+
+    pub(crate) fn set_closure(&mut self, closure: FunctionClosure) {
+        self.closure = Some(closure);
     }
 
     fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
-        self.0.remove(keyword)
+        self.arguments.remove(keyword)
     }
 
     fn required_expr(&mut self, keyword: &'static str) -> Expr {
@@ -259,11 +287,13 @@ fn required<T>(argument: Option<T>) -> T {
 
 impl From<HashMap<&'static str, Value>> for ArgumentList {
     fn from(map: HashMap<&'static str, Value>) -> Self {
-        Self(
-            map.into_iter()
+        Self {
+            arguments: map
+                .into_iter()
                 .map(|(k, v)| (k, v.into_expr()))
                 .collect::<HashMap<_, _>>(),
-        )
+            closure: None,
+        }
     }
 }
 
@@ -281,7 +311,10 @@ impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
             })
             .collect::<HashMap<_, _>>();
 
-        Self(arguments)
+        Self {
+            arguments,
+            ..Default::default()
+        }
     }
 }
 
@@ -312,6 +345,9 @@ pub enum Error {
         value: Value,
         error: &'static str,
     },
+
+    #[error(r#"missing function closure"#)]
+    ExpectedFunctionClosure,
 }
 
 impl diagnostic::DiagnosticError for Error {
@@ -323,6 +359,7 @@ impl diagnostic::DiagnosticError for Error {
             InvalidEnumVariant { .. } => 401,
             ExpectedStaticExpression { .. } => 402,
             InvalidArgument { .. } => 403,
+            ExpectedFunctionClosure => 420,
         }
     }
 
@@ -386,6 +423,8 @@ impl diagnostic::DiagnosticError for Error {
                 Label::context(format!("received: {}", value.to_string()), Span::default()),
                 Label::context(format!("error: {}", error), Span::default()),
             ],
+
+            ExpectedFunctionClosure => vec![],
         }
     }
 

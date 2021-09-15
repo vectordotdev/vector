@@ -8,8 +8,12 @@ pub use compiler::{
     value::Kind, Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
 };
 
+pub use compiler::expression::ClosureOutput as Output;
+pub use compiler::expression::FunctionClosure as Closure;
+
 pub type Result<T> = std::result::Result<T, ExpressionError>;
 
+pub use compiler::function::closure;
 pub use diagnostic::DiagnosticError;
 
 pub use bytes::Bytes;
