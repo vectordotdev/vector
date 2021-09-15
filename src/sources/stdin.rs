@@ -96,14 +96,12 @@ where
         loop {
             let (buffer, len) = match stdin.fill_buf() {
                 Ok(buffer) if buffer.is_empty() => break, // EOF.
-                Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), Some(buffer.len())),
+                Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
                 Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-                Err(error) => (Err(error), None),
+                Err(error) => (Err(error), 0),
             };
 
-            if let Some(len) = len {
-                stdin.consume(len);
-            }
+            stdin.consume(len);
 
             if executor::block_on(sender.send(buffer)).is_err() {
                 // Receiver has closed so we should shutdown.
