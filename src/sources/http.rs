@@ -166,7 +166,7 @@ mod tests {
         Pipeline,
     };
     use flate2::{
-        write::{ZlibEncoder, GzEncoder},
+        write::{GzEncoder, ZlibEncoder},
         Compression,
     };
     use futures::Stream;
