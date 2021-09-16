@@ -312,8 +312,10 @@ impl Sink<Event> for KafkaSink {
         }
         .map(|ts| ts.timestamp_millis());
 
-        let headers = self.headers_key.as_ref()
-        .and_then(|headers_key| get_headers(&item, headers_key));
+        let headers = self
+            .headers_key
+            .as_ref()
+            .and_then(|headers_key| get_headers(&item, headers_key));
 
         let (key, body, metadata) = encode_event(item, &self.key_field, &self.encoding);
 
