@@ -63,8 +63,7 @@ pub struct KafkaSinkConfig {
     message_timeout_ms: u64,
     #[serde(default)]
     librdkafka_options: HashMap<String, String>,
-    #[serde(default = "default_headers_key")]
-    headers_key: String,
+    headers_key: Option<String>,
 }
 
 const fn default_socket_timeout_ms() -> u64 {
@@ -109,7 +108,7 @@ pub struct KafkaSink {
     seq_head: usize,
     seq_tail: usize,
     pending_acks: HashSet<usize>,
-    headers_key: String,
+    headers_key: Option<String>,
 }
 
 inventory::submit! {
@@ -317,7 +316,8 @@ impl Sink<Event> for KafkaSink {
         }
         .map(|ts| ts.timestamp_millis());
 
-        let headers = get_headers(&item, &self.headers_key);
+        let headers = self.headers_key.as_ref()
+        .and_then(|headers_key| get_headers(&item, headers_key));
 
         let (key, body, metadata) = encode_event(item, &self.key_field, &self.encoding);
 
@@ -661,7 +661,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             librdkafka_options: HashMap::new(),
-            headers_key: "headers_key".to_string(),
+            headers_key: None,
         };
 
         super::healthcheck(config).await.unwrap();
@@ -716,7 +716,7 @@ mod integration_test {
             message_timeout_ms: 300000,
             batch,
             librdkafka_options,
-            headers_key: "headers_key".to_string(),
+            headers_key: None,
         };
         let (acker, _ack_counter) = Acker::new_for_testing();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
@@ -868,7 +868,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             librdkafka_options: HashMap::new(),
-            headers_key: headers_key.clone(),
+            headers_key: Some(headers_key.clone()),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         let (acker, ack_counter) = Acker::new_for_testing();
