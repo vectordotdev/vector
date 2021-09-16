@@ -11,6 +11,7 @@ use futures::{
     stream::{BoxStream, FuturesUnordered, StreamExt},
     FutureExt, TryFutureExt,
 };
+use std::sync::Arc;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -18,6 +19,7 @@ use std::{
     num::NonZeroUsize,
     time::Duration,
 };
+use tokio::sync::Barrier;
 use tokio::{
     pin, select,
     sync::{
@@ -93,6 +95,7 @@ where
         // exclusively with I/O, while we deal with everything else here:
         // batching, ordering, and so on.
         let (io_tx, io_rx) = channel(64);
+        let io_barrier = Arc::new(Barrier::new(2));
         let service = self
             .service
             .take()
@@ -106,7 +109,7 @@ where
             .take()
             .expect("same sink should not be run twice");
 
-        let io = run_io(io_rx, service, acker).in_current_span();
+        let io = run_io(io_rx, Arc::clone(&io_barrier), service, acker).in_current_span();
         let _ = tokio::spawn(io);
 
         let batcher = Batcher::new(
@@ -142,11 +145,19 @@ where
             }
         }
 
+        // Wait for the I/O task to complete.
+        //
+        // TODO: the need for this synchronization means we should probably look into something more
+        // ergonomic like `buffered`/`buffer_unordered` + `tokio::spawn`, otherwise every sink will
+        // be reimplementing this logic for the common case.
+        drop(io_tx);
+        io_barrier.wait().await;
+
         Ok(())
     }
 }
 
-async fn run_io<S>(mut rx: Receiver<S3Request>, mut service: S, acker: Acker)
+async fn run_io<S>(mut rx: Receiver<S3Request>, barrier: Arc<Barrier>, mut service: S, acker: Acker)
 where
     S: Service<S3Request>,
     S::Future: Send + 'static,
@@ -221,6 +232,8 @@ where
             else => break
         }
     }
+
+    barrier.wait().await;
 }
 
 pub trait S3RequestBuilder {
