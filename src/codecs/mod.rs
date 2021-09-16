@@ -122,6 +122,7 @@ impl tokio_util::codec::Decoder for Decoder {
 ///
 /// Usually used in source configs via `#[serde(flatten)]`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct DecodingConfig {
     /// The framing config.
     framing: Option<Box<dyn FramingConfig>>,

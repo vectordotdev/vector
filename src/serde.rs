@@ -12,6 +12,13 @@ pub const fn default_false() -> bool {
     false
 }
 
+/// The default max length of the input buffer.
+///
+/// Any input exceeding this limit will be discarded.
+pub fn default_max_length() -> usize {
+    bytesize::kib(100u64) as usize
+}
+
 pub fn to_string(value: impl serde::Serialize) -> String {
     let value = serde_json::to_value(value).unwrap();
     value.as_str().unwrap().into()
