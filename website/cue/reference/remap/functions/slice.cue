@@ -36,7 +36,7 @@ remap: functions: slice: {
 
 	examples: [
 		{
-			title: "Slice a string (positve index)"
+			title: "Slice a string (positive index)"
 			source: #"""
 				slice!("Supercalifragilisticexpialidocious", start: 5, end: 13)
 				"""#

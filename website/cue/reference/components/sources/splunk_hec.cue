@@ -114,6 +114,7 @@ components: sources: splunk_hec: {
 	telemetry: metrics: {
 		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
 		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		received_events_total:     components.sources.internal_metrics.output.metrics.received_events_total
 		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

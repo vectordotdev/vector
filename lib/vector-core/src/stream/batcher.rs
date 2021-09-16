@@ -6,11 +6,11 @@ use futures::stream::Stream;
 use pin_project::pin_project;
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hash};
-use std::mem;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use std::{cmp, mem};
 use tokio_util::time::delay_queue::Key;
 use tokio_util::time::DelayQueue;
 use twox_hash::XxHash64;
@@ -28,7 +28,7 @@ pub struct ExpirationQueue<K> {
 impl<K> ExpirationQueue<K> {
     /// Creates a new `ExpirationQueue`.
     ///
-    /// `timeout is used for all insertions and resets.
+    /// `timeout` is used for all insertions and resets.
     pub fn new(timeout: Duration) -> Self {
         Self {
             timeout,
@@ -137,20 +137,18 @@ where
     /// limits. The element limit is a maximum cap on the number of `I`
     /// instances. The allocation limit is a soft-max on the number of allocated
     /// bytes stored in this batch, not taking into account overhead from this
-    /// structure itself. Caller is responsible for ensuring that `I` will fit
-    /// inside the allocation limit.
+    /// structure itself.
     ///
-    /// # Panics
-    ///
-    /// This function will panic if the allocation limit will not store at least
-    /// 1 instance of `I`, as measured by `mem::size_of`.
+    /// If `allocation_limit` is smaller than the size of `I` as reported by
+    /// `std::mem::size_of`, then the allocation limit will be raised such that
+    /// the batch can hold a single instance of `I`.
     fn new(element_limit: usize, allocation_limit: usize) -> Self {
-        assert!(allocation_limit >= mem::size_of::<I>());
+        let allocation_limit = cmp::max(allocation_limit, mem::size_of::<I>());
         Self {
             allocated_bytes: 0,
             element_limit,
             allocation_limit,
-            elements: Vec::with_capacity(element_limit),
+            elements: Vec::with_capacity(128),
         }
     }
 
@@ -649,6 +647,7 @@ mod test {
     }
 
     #[tokio::test(start_paused = true)]
+    #[allow(clippy::semicolon_if_nothing_returned)] // https://github.com/rust-lang/rust-clippy/issues/7438
     async fn expiration_queue_impl_keyed_timer() {
         // Asserts that ExpirationQueue properly implements KeyedTimer. We are
         // primarily concerned with whether expiration is properly observed.

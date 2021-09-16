@@ -28,14 +28,14 @@ remap: functions: format_int: {
 
 	examples: [
 		{
-			title: "Format as a hexidecimal integer"
+			title: "Format as a hexadecimal integer"
 			source: #"""
 				format_int!(42, 16)
 				"""#
 			return: "2a"
 		},
 		{
-			title: "Format as a negative hexidecimal integer"
+			title: "Format as a negative hexadecimal integer"
 			source: #"""
 				format_int!(-42, 16)
 				"""#

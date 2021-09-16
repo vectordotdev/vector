@@ -22,7 +22,7 @@ use tower::{
 mod concurrency;
 mod map;
 
-pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
+pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL, SL> = BatchSink<Svc<S, RL>, B, SL>;
 pub type TowerPartitionSink<S, B, RL, K, SL> = PartitionBatchSink<Svc<S, RL>, B, K, SL>;
 
@@ -266,12 +266,12 @@ impl TowerRequestSettings {
         let policy = self.retry_policy(retry_logic.clone());
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
-            .retry(policy)
             .layer(AdaptiveConcurrencyLimitLayer::new(
                 self.concurrency,
                 self.adaptive_concurrency,
                 retry_logic,
             ))
+            .retry(policy)
             .timeout(self.timeout)
             .service(service)
     }

@@ -166,7 +166,7 @@ mod tests {
         Pipeline,
     };
     use flate2::{
-        write::{DeflateEncoder, GzEncoder},
+        write::{GzEncoder, ZlibEncoder},
         Compression,
     };
     use futures::Stream;
@@ -664,7 +664,7 @@ mod tests {
         encoder.write_all(body.as_bytes()).unwrap();
         let body = encoder.finish().unwrap();
 
-        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(body.as_slice()).unwrap();
         let body = encoder.finish().unwrap();
 

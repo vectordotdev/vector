@@ -1,25 +1,28 @@
-use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
-use crate::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::{BatchConfig, BatchSettings};
-use crate::sinks::{
-    aws_s3::service::S3Service,
-    util::{Compression, Concurrency, ServiceBuilderExt, TowerRequestConfig},
-    Healthcheck,
+use crate::config::SinkContext;
+use crate::sinks::s3_common::sink::S3Sink;
+use crate::{
+    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
+    rusoto::{AwsAuthentication, RegionOrEndpoint},
+    sinks::{
+        s3_common::{
+            self,
+            config::{S3Options, S3RetryLogic},
+            partitioner::KeyPartitioner,
+            service::S3Service,
+        },
+        util::{
+            encoding::EncodingConfig, BatchConfig, BatchSettings, Compression, Concurrency,
+            ServiceBuilderExt, TowerRequestConfig,
+        },
+        Healthcheck,
+    },
 };
-use futures::FutureExt;
-use http::StatusCode;
-use rusoto_core::RusotoError;
-use rusoto_s3::{HeadBucketRequest, PutObjectError, PutObjectOutput, S3Client, S3};
+use rusoto_s3::S3Client;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use std::convert::TryInto;
 use std::num::NonZeroUsize;
-use std::{collections::BTreeMap, convert::TryInto};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
-
-use super::{partitioner::KeyPartitioner, sink::S3Sink};
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
     TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
@@ -61,58 +64,6 @@ pub struct S3SinkConfig {
     pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct S3Options {
-    pub acl: Option<S3CannedAcl>,
-    pub grant_full_control: Option<String>,
-    pub grant_read: Option<String>,
-    pub grant_read_acp: Option<String>,
-    pub grant_write_acp: Option<String>,
-    pub server_side_encryption: Option<S3ServerSideEncryption>,
-    pub ssekms_key_id: Option<String>,
-    pub storage_class: Option<S3StorageClass>,
-    pub tags: Option<BTreeMap<String, String>>,
-    pub content_encoding: Option<String>, // inherit from compression value
-    pub content_type: Option<String>,     // default `text/x-log`
-}
-
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
-#[derivative(Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum S3CannedAcl {
-    #[derivative(Default)]
-    Private,
-    PublicRead,
-    PublicReadWrite,
-    AwsExecRead,
-    AuthenticatedRead,
-    BucketOwnerRead,
-    BucketOwnerFullControl,
-    LogDeliveryWrite,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub enum S3ServerSideEncryption {
-    #[serde(rename = "AES256")]
-    Aes256,
-    #[serde(rename = "aws:kms")]
-    AwsKms,
-}
-
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, PartialEq, Serialize)]
-#[derivative(Default)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum S3StorageClass {
-    #[derivative(Default)]
-    Standard,
-    ReducedRedundancy,
-    IntelligentTiering,
-    StandardIa,
-    OnezoneIa,
-    Glacier,
-    DeepArchive,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -173,16 +124,6 @@ impl SinkConfig for S3SinkConfig {
     }
 }
 
-#[derive(Debug, Snafu)]
-pub enum HealthcheckError {
-    #[snafu(display("Invalid credentials"))]
-    InvalidCredentials,
-    #[snafu(display("Unknown bucket: {:?}", bucket))]
-    UnknownBucket { bucket: String },
-    #[snafu(display("Unknown status code: {}", status))]
-    UnknownStatus { status: StatusCode },
-}
-
 impl S3SinkConfig {
     pub fn build_processor(&self, client: S3Client, cx: SinkContext) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
@@ -203,9 +144,9 @@ impl S3SinkConfig {
             .unwrap_or_else(|| DEFAULT_KEY_PREFIX.into())
             .try_into()?;
         let partitioner = KeyPartitioner::new(key_prefix);
-        let batch_size_bytes = NonZeroUsize::new(batch_settings.size.bytes)
-            .ok_or("batch, in bytes, max be greater than 0")?;
-        let batch_size_events = NonZeroUsize::new(batch_settings.size.events);
+        let batch_size_bytes = NonZeroUsize::new(batch_settings.size.bytes);
+        let batch_size_events = NonZeroUsize::new(batch_settings.size.events)
+            .ok_or("batch events must be greater than 0")?;
         let batch_timeout = batch_settings.timeout;
 
         // And now collect all of the S3-specific options and configuration knobs.
@@ -231,92 +172,31 @@ impl S3SinkConfig {
         let sink = S3Sink::new(
             cx,
             service,
+            request_options,
             partitioner,
             batch_size_bytes,
             batch_size_events,
             batch_timeout,
-            request_options,
         );
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }
 
     pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
-        let bucket = self.bucket.clone();
-        let healthcheck = async move {
-            let req = client
-                .head_bucket(HeadBucketRequest {
-                    bucket: bucket.clone(),
-                    expected_bucket_owner: None,
-                })
-                .await;
-
-            match req {
-                Ok(_) => Ok(()),
-                Err(error) => Err(match error {
-                    RusotoError::Unknown(resp) => match resp.status {
-                        StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                        StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
-                        status => HealthcheckError::UnknownStatus { status }.into(),
-                    },
-                    error => error.into(),
-                }),
-            }
-        };
-
-        Ok(healthcheck.boxed())
+        s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<S3Client> {
-        let region = (&self.region).try_into()?;
-        let client = rusoto::client(proxy)?;
-
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
-
-        Ok(S3Client::new_with(client, creds, region))
-    }
-}
-
-#[derive(Debug, Clone)]
-struct S3RetryLogic;
-
-impl RetryLogic for S3RetryLogic {
-    type Error = RusotoError<PutObjectError>;
-    type Response = PutObjectOutput;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        rusoto::is_retriable_error(error)
+        s3_common::config::create_client(&self.region, &self.auth, self.assume_role.clone(), proxy)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::serde::to_string;
-
-    use super::{S3SinkConfig, S3StorageClass};
+    use super::S3SinkConfig;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<S3SinkConfig>();
-    }
-
-    #[test]
-    fn storage_class_names() {
-        for &(name, storage_class) in &[
-            ("DEEP_ARCHIVE", S3StorageClass::DeepArchive),
-            ("GLACIER", S3StorageClass::Glacier),
-            ("INTELLIGENT_TIERING", S3StorageClass::IntelligentTiering),
-            ("ONEZONE_IA", S3StorageClass::OnezoneIa),
-            ("REDUCED_REDUNDANCY", S3StorageClass::ReducedRedundancy),
-            ("STANDARD", S3StorageClass::Standard),
-            ("STANDARD_IA", S3StorageClass::StandardIa),
-        ] {
-            assert_eq!(name, to_string(storage_class));
-            let result: S3StorageClass = serde_json::from_str(&format!("{:?}", name))
-                .unwrap_or_else(|error| {
-                    panic!("Unparsable storage class name {:?}: {}", name, error)
-                });
-            assert_eq!(result, storage_class);
-        }
     }
 }
