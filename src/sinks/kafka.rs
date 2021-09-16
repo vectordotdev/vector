@@ -14,7 +14,13 @@ use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
     Sink, Stream, TryFutureExt,
 };
-use rdkafka::{ClientConfig, consumer::{BaseConsumer, Consumer}, error::{KafkaError, RDKafkaErrorCode}, message::OwnedHeaders, producer::{DeliveryFuture, FutureProducer, FutureRecord}};
+use rdkafka::{
+    consumer::{BaseConsumer, Consumer},
+    error::{KafkaError, RDKafkaErrorCode},
+    message::OwnedHeaders,
+    producer::{DeliveryFuture, FutureProducer, FutureRecord},
+    ClientConfig,
+};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -103,7 +109,7 @@ pub struct KafkaSink {
     seq_head: usize,
     seq_tail: usize,
     pending_acks: HashSet<usize>,
-    headers_key: String
+    headers_key: String,
 }
 
 inventory::submit! {
@@ -252,7 +258,7 @@ impl KafkaSink {
             seq_head: 0,
             seq_tail: 0,
             pending_acks: HashSet::new(),
-            headers_key: config.headers_key
+            headers_key: config.headers_key,
         })
     }
 
@@ -415,8 +421,8 @@ fn get_headers(event: &Event, headers_key: &str) -> Option<OwnedHeaders> {
                         }
                     }
                     return Some(owned_headers);
-                },
-                _ => warn!("Value of headers_key field must be a map. Ignoring.")
+                }
+                _ => warn!("Value of headers_key field must be a map. Ignoring."),
             }
         }
     }
@@ -631,7 +637,11 @@ mod integration_test {
     };
     use bytes::Bytes;
     use futures::StreamExt;
-    use rdkafka::{Message, Offset, TopicPartitionList, consumer::{BaseConsumer, Consumer}, message::Headers};
+    use rdkafka::{
+        consumer::{BaseConsumer, Consumer},
+        message::Headers,
+        Message, Offset, TopicPartitionList,
+    };
     use std::{collections::BTreeMap, future::ready, thread, time::Duration};
     use vector_core::event::{BatchNotifier, BatchStatus};
 
@@ -651,7 +661,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             librdkafka_options: HashMap::new(),
-            headers_key: "headers_key".to_string()
+            headers_key: "headers_key".to_string(),
         };
 
         super::healthcheck(config).await.unwrap();
@@ -706,7 +716,7 @@ mod integration_test {
             message_timeout_ms: 300000,
             batch,
             librdkafka_options,
-            headers_key: "headers_key".to_string()
+            headers_key: "headers_key".to_string(),
         };
         let (acker, _ack_counter) = Acker::new_for_testing();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
@@ -858,7 +868,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             librdkafka_options: HashMap::new(),
-            headers_key: headers_key.clone()
+            headers_key: headers_key.clone(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         let (acker, ack_counter) = Acker::new_for_testing();
@@ -867,15 +877,24 @@ mod integration_test {
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_lines_with_stream(100, num_events, Some(batch));
-        
+
         let header_1_key = "header-1-key";
         let header_1_value = "header-1-value";
-        events.map(|mut event|{
-            let mut header_values = BTreeMap::new();
-            header_values.insert(header_1_key.to_string(), Value::Bytes(Bytes::from(header_1_value)));
-            event.as_mut_log().insert(headers_key.clone(), header_values);
-            Ok(event)
-        }).forward(sink).await.unwrap();
+        events
+            .map(|mut event| {
+                let mut header_values = BTreeMap::new();
+                header_values.insert(
+                    header_1_key.to_string(),
+                    Value::Bytes(Bytes::from(header_1_value)),
+                );
+                event
+                    .as_mut_log()
+                    .insert(headers_key.clone(), header_values);
+                Ok(event)
+            })
+            .forward(sink)
+            .await
+            .unwrap();
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning
