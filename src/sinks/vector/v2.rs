@@ -3,8 +3,8 @@ use crate::{
     event::{proto::EventWrapper, Event},
     proto::vector as proto,
     sinks::util::{
-        retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
-        EncodedLength, ServiceBuilderExt, TowerRequestConfig, VecBuffer,
+        retries::RetryLogic, BatchConfig, BatchSettings, BatchSink, EncodedEvent, EncodedLength,
+        ServiceBuilderExt, TowerRequestConfig, VecBuffer,
     },
     sinks::{Healthcheck, VectorSink},
     tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
@@ -21,7 +21,6 @@ use tonic::{body::BoxBody, IntoRequest};
 use tower::ServiceBuilder;
 
 type Client = proto::Client<HyperSvc>;
-type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -244,12 +243,6 @@ fn encode_event(mut event: Event) -> EncodedEvent<EventWrapper> {
 impl EncodedLength for EventWrapper {
     fn encoded_length(&self) -> usize {
         self.encoded_len()
-    }
-}
-
-impl sink::Response for Response {
-    fn is_successful(&self) -> bool {
-        self.is_ok()
     }
 }
 
