@@ -208,14 +208,17 @@ implement since errors are specific to the component.
 
 * Properties
   * `error` - The specifics of the error condition, such as system error code, etc.
-  * `stage` - The stage at which the error occurred. MUST be one of
-    `receiving`, `processing`, or `sending`. This MAY be omitted from
-    being represented explicitly in the event data when the error may
-    only happen at one stage, but MUST be included in the emitted logs
-    and metrics as if it were present.
+  * `error_type` - The type of error condition. This MUST be one of the types
+    listed in the `error_type` enum list in the cue docs. TODO: List them here?
+  * `stage` - The stage at which the error occurred. This MUST be one of
+    `receiving`, `processing`, or `sending`.
+  * If any of the above properties are implicit to the specific error
+    type, they MAY be omitted from being represented explicitly in the
+    event fields. However, they MUST still be included in the emitted
+    logs and metrics, as specified below, as if they were present.
 * Metrics
   * MUST increment the `errors_total` counter by 1 with the defined properties
-    as metric tags.
+    as metric tags (excluding `error`).
   * MUST increment the `discarded_events_total` counter by the number of Vector
     events discarded if the error resulted in discarding (dropping) events.
 * Logs
