@@ -287,7 +287,7 @@ pub struct TowerRequestLayer<L, Request> {
 impl<S, RL, Request> Layer<S> for TowerRequestLayer<RL, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
     RL: RetryLogic<Response = S::Response> + Send + 'static,

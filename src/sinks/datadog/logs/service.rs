@@ -1,6 +1,5 @@
 use crate::http::HttpClient;
 use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::sink;
 use futures::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -9,7 +8,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::Service;
 use tracing::Instrument;
-use vector_core::event::{EventFinalizers, Finalizable};
+use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
 #[derive(Debug, Default, Clone)]
 pub struct LogApiRetry;
@@ -20,7 +19,9 @@ impl RetryLogic for LogApiRetry {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match *error {
-            LogApiError::HttpError { .. } => false,
+            LogApiError::HttpError { .. }
+            | LogApiError::BadRequest
+            | LogApiError::PayloadTooLarge => false,
             LogApiError::ServerError => true,
         }
     }
@@ -48,6 +49,10 @@ pub enum LogApiError {
     ServerError,
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
     HttpError { error: crate::http::HttpError },
+    #[snafu(display("Client sent a payload that is too large."))]
+    PayloadTooLarge,
+    #[snafu(display("Client request was not valid for unknown reasons."))]
+    BadRequest,
 }
 
 #[derive(Debug)]
@@ -56,19 +61,14 @@ pub enum LogApiResponse {
     Ok,
     /// Client request has likely invalid API key.
     PermissionIssue,
-    /// Client sent a payload that is too large.
-    PayloadTooLarge,
-    /// Client request was not valid for unknown reasons.
-    BadRequest,
 }
 
-impl sink::Response for LogApiResponse {
-    fn is_successful(&self) -> bool {
-        matches!(self, LogApiResponse::Ok)
-    }
-
-    fn is_transient(&self) -> bool {
-        matches!(self, LogApiResponse::PermissionIssue)
+impl Into<EventStatus> for LogApiResponse {
+    fn into(self) -> EventStatus {
+        match self {
+            LogApiResponse::Ok => EventStatus::Delivered,
+            LogApiResponse::PermissionIssue => EventStatus::Errored,
+        }
     }
 }
 
@@ -128,10 +128,10 @@ impl Service<LogApiRequest> for LogApiService {
                     // 5xx: Internal error, request should be retried after some
                     //      time
                     match status {
-                        StatusCode::OK => Ok(LogApiResponse::Ok),
-                        StatusCode::BAD_REQUEST => Ok(LogApiResponse::BadRequest),
+                        StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
                         StatusCode::FORBIDDEN => Ok(LogApiResponse::PermissionIssue),
-                        StatusCode::PAYLOAD_TOO_LARGE => Ok(LogApiResponse::PayloadTooLarge),
+                        StatusCode::OK => Ok(LogApiResponse::Ok),
+                        StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
                         _ => Err(LogApiError::ServerError),
                     }
                 }
