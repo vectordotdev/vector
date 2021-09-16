@@ -1,0 +1,21 @@
+# result: [true, true, true]
+
+x = 2
+
+v1 = if (x = x + 1; x == 3) {
+  true
+}
+
+v2 = if (x = x + 1
+         x == 4) {
+  true
+}
+
+v3 = if (
+  x = x + 1
+  x == 5
+) {
+  true
+}
+
+[v1, v2, v3]
