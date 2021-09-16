@@ -70,33 +70,31 @@ impl HostMetrics {
                 "cgroup" => cgroup.name.to_string_lossy(),
                 "collector" => "cgroups",
             };
-            if cgroup.has_cpu {
-                if let Some(cpu) = filter_result_sync(
-                    cgroup.load_cpu(buffer).await,
-                    "Failed to load cgroups CPU statistics.",
-                ) {
-                    result.push(self.counter(
-                        "cgroup_cpu_usage_seconds_total",
-                        now,
-                        cpu.usage_usec as f64 * MICROSECONDS,
-                        tags.clone(),
-                    ));
-                    result.push(self.counter(
-                        "cgroup_cpu_user_seconds_total",
-                        now,
-                        cpu.user_usec as f64 * MICROSECONDS,
-                        tags.clone(),
-                    ));
-                    result.push(self.counter(
-                        "cgroup_cpu_system_seconds_total",
-                        now,
-                        cpu.system_usec as f64 * MICROSECONDS,
-                        tags.clone(),
-                    ));
-                }
+            if let Some(cpu) = filter_result_sync(
+                cgroup.load_cpu(buffer).await,
+                "Failed to load cgroups CPU statistics.",
+            ) {
+                result.push(self.counter(
+                    "cgroup_cpu_usage_seconds_total",
+                    now,
+                    cpu.usage_usec as f64 * MICROSECONDS,
+                    tags.clone(),
+                ));
+                result.push(self.counter(
+                    "cgroup_cpu_user_seconds_total",
+                    now,
+                    cpu.user_usec as f64 * MICROSECONDS,
+                    tags.clone(),
+                ));
+                result.push(self.counter(
+                    "cgroup_cpu_system_seconds_total",
+                    now,
+                    cpu.system_usec as f64 * MICROSECONDS,
+                    tags.clone(),
+                ));
             }
 
-            if cgroup.has_memory && !cgroup.is_root() {
+            if cgroup.has_memory_controller && !cgroup.is_root() {
                 if let Some(current) = filter_result_sync(
                     cgroup.load_memory_current(buffer).await,
                     "Failed to load cgroups current memory.",
@@ -148,8 +146,7 @@ impl HostMetrics {
 pub(super) struct CGroup {
     root: PathBuf,
     name: PathBuf,
-    has_cpu: bool,
-    has_memory: bool,
+    has_memory_controller: bool,
 }
 
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
@@ -200,12 +197,8 @@ impl CGroup {
                 |error| error!(message = "Could not load root cgroup controllers list.", %error, ?controllers_file),
             )
             .ok()?;
-        let has_cpu = controllers.iter().any(|name| name == "cpu");
-        let has_memory = controllers.iter().any(|name| name == "memory");
-        if !has_cpu {
-            warn!(message = "CGroups CPU controller is not active, there will be no CPU metrics.");
-        }
-        if !has_memory {
+        let has_memory_controller = controllers.iter().any(|name| name == "memory");
+        if !has_memory_controller {
             warn!(
                 message =
                     "CGroups memory controller is not active, there will be no memory metrics."
@@ -219,15 +212,13 @@ impl CGroup {
                 is_dir(&root).then(|| CGroup {
                     root,
                     name: group.into(),
-                    has_cpu,
-                    has_memory,
+                    has_memory_controller,
                 })
             }
             None => Some(CGroup {
                 root: base_dir,
                 name: "/".into(),
-                has_cpu,
-                has_memory,
+                has_memory_controller,
             }),
         }
     }
@@ -290,8 +281,7 @@ impl CGroup {
                 result.push(CGroup {
                     root,
                     name: join_name(&self.name, entry.file_name()),
-                    has_cpu: self.has_cpu,
-                    has_memory: self.has_memory,
+                    has_memory_controller: self.has_memory_controller,
                 });
             }
         }
