@@ -352,7 +352,7 @@ mod tests {
             vec![
                 (String::from("aggregated_summary.count"), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0].upper_limit"),
+                    String::from("aggregated_summary.quantiles[0].q"),
                     &Value::from(50.0)
                 ),
                 (
@@ -360,7 +360,7 @@ mod tests {
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1].upper_limit"),
+                    String::from("aggregated_summary.quantiles[1].q"),
                     &Value::from(90.0)
                 ),
                 (
