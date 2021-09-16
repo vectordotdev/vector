@@ -467,6 +467,74 @@ fn encode_events(
                     points: vec![DatadogPoint(ts, *value)],
                     tags,
                 }]),
+                MetricValue::AggregatedHistogram {
+                    buckets,
+                    count,
+                    sum,
+                } => {
+                    let mut result = vec![
+                        DatadogMetric {
+                            metric: format!("{}.count", &fullname),
+                            r#type: DatadogMetricType::Rate,
+                            interval: Some(interval),
+                            points: vec![DatadogPoint(ts, f64::from(*count))],
+                            tags: tags.clone(),
+                        },
+                        DatadogMetric {
+                            metric: format!("{}.sum", &fullname),
+                            r#type: DatadogMetricType::Gauge,
+                            interval: Some(interval),
+                            points: vec![DatadogPoint(ts, *sum)],
+                            tags: tags.clone(),
+                        },
+                    ];
+
+                    for bucket in buckets {
+                        let mut bucket_tags = tags.clone().unwrap_or_else(Vec::new);
+                        bucket_tags.push(format!("le:{}", bucket.upper_limit));
+                        result.push(DatadogMetric {
+                            metric: format!("{}.bucket", &fullname),
+                            r#type: DatadogMetricType::Gauge,
+                            interval: Some(interval),
+                            points: vec![DatadogPoint(ts, f64::from(bucket.count))],
+                            tags: Some(bucket_tags),
+                        })
+                    }
+                    Some(result)
+                }
+                MetricValue::AggregatedSummary {
+                    quantiles,
+                    count,
+                    sum,
+                } => {
+                    let mut result = vec![
+                        DatadogMetric {
+                            metric: format!("{}.count", &fullname),
+                            r#type: DatadogMetricType::Rate,
+                            interval: Some(interval),
+                            points: vec![DatadogPoint(ts, f64::from(*count))],
+                            tags: tags.clone(),
+                        },
+                        DatadogMetric {
+                            metric: format!("{}.sum", &fullname),
+                            r#type: DatadogMetricType::Gauge,
+                            interval: Some(interval),
+                            points: vec![DatadogPoint(ts, *sum)],
+                            tags: tags.clone(),
+                        },
+                    ];
+
+                    for quantile in quantiles {
+                        result.push(DatadogMetric {
+                            metric: format!("{}.{}percentile", &fullname, quantile.as_percentile()),
+                            r#type: DatadogMetricType::Gauge,
+                            interval: Some(interval),
+                            points: vec![DatadogPoint(ts, quantile.value)],
+                            tags: tags.clone(),
+                        })
+                    }
+                    Some(result)
+                }
                 _ => None,
             }
         })
@@ -531,6 +599,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use regex::Regex;
     use std::sync::atomic::AtomicI64;
+    use vector_core::{buckets, quantiles};
 
     #[test]
     fn generate_config() {
@@ -806,6 +875,48 @@ mod tests {
         assert_eq!(
             json,
             r#"{"series":[{"metric":"requests","interval":60,"points":[[1542182950,[1.0,1.0,1.0,2.0,2.0,2.0,3.0,3.0]]],"tags":null}]}"#
+        );
+    }
+
+    #[test]
+    fn encode_aggregated_histogram() {
+        let events = vec![Metric::new(
+            "requests",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: buckets!(1.0 => 10, 10.0 => 14, 100.0 => 15),
+                count: 15,
+                sum: 150.0,
+            },
+        )
+        .with_timestamp(Some(ts()))];
+        let input = encode_events(events, None, 60);
+        let json = serde_json::to_string(&input).unwrap();
+
+        assert_eq!(
+            json,
+            r#"{"series":[{"metric":"requests.count","type":"rate","interval":60,"points":[[1542182950,15.0]],"tags":null},{"metric":"requests.sum","type":"gauge","interval":60,"points":[[1542182950,150.0]],"tags":null},{"metric":"requests.bucket","type":"gauge","interval":60,"points":[[1542182950,10.0]],"tags":["le:1"]},{"metric":"requests.bucket","type":"gauge","interval":60,"points":[[1542182950,14.0]],"tags":["le:10"]},{"metric":"requests.bucket","type":"gauge","interval":60,"points":[[1542182950,15.0]],"tags":["le:100"]}]}"#
+        );
+    }
+
+    #[test]
+    fn encode_aggregated_summary() {
+        let events = vec![Metric::new(
+            "requests",
+            MetricKind::Incremental,
+            MetricValue::AggregatedSummary {
+                quantiles: quantiles!(0.25 => 1.0, 0.50 => 1.0, 0.999 => 1.0, 0.9999 => 1.0),
+                count: 10,
+                sum: 10.0,
+            },
+        )
+        .with_timestamp(Some(ts()))];
+        let input = encode_events(events, None, 60);
+        let json = serde_json::to_string(&input).unwrap();
+
+        assert_eq!(
+            json,
+            r#"{"series":[{"metric":"requests.count","type":"rate","interval":60,"points":[[1542182950,10.0]],"tags":null},{"metric":"requests.sum","type":"gauge","interval":60,"points":[[1542182950,10.0]],"tags":null},{"metric":"requests.25percentile","type":"gauge","interval":60,"points":[[1542182950,1.0]],"tags":null},{"metric":"requests.50percentile","type":"gauge","interval":60,"points":[[1542182950,1.0]],"tags":null},{"metric":"requests.999percentile","type":"gauge","interval":60,"points":[[1542182950,1.0]],"tags":null},{"metric":"requests.9999percentile","type":"gauge","interval":60,"points":[[1542182950,1.0]],"tags":null}]}"#
         );
     }
 }

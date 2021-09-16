@@ -172,7 +172,7 @@ pub(super) trait MetricCollector {
                             "",
                             quantile.value,
                             tags,
-                            Some(("quantile", quantile.upper_limit.to_string())),
+                            Some(("quantile", quantile.q.to_string())),
                         );
                     }
                     self.emit_value(timestamp, name, "_sum", *sum, tags, None);

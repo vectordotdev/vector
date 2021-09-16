@@ -213,8 +213,25 @@ impl ByteSizeOf for Bucket {
 /// A single value from a `MetricValue::AggregatedSummary`.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Quantile {
-    pub upper_limit: f64,
+    pub q: f64,
     pub value: f64,
+}
+
+impl Quantile {
+    /// Formats this quantile as a percentile.
+    ///
+    /// Up to two decimal places are maintained.  The rendered value will be without a decimal
+    /// point, however.  For example, a quantile of 0.25 will be rendered as "25" and a quantile of
+    /// 0.9999 will be rendered as "9999", but a quantile of 0.99999 would also be rendered as
+    /// "9999".
+    pub fn as_percentile(&self) -> String {
+        let clamped = self.q.clamp(0.0, 1.0);
+        let raw = format!("{}", (clamped * 100.0));
+        raw.chars()
+            .take(5)
+            .filter(|c| c.is_numeric())
+            .collect::<String>()
+    }
 }
 
 impl ByteSizeOf for Quantile {
@@ -241,8 +258,8 @@ macro_rules! buckets {
 
 #[macro_export]
 macro_rules! quantiles {
-    ( $( $limit:expr => $value:expr ),* ) => {
-        vec![ $( crate::event::metric::Quantile { upper_limit: $limit, value: $value }, )* ]
+    ( $( $q:expr => $value:expr ),* ) => {
+        vec![ $( crate::event::metric::Quantile { q: $q, value: $value }, )* ]
     }
 }
 
@@ -271,13 +288,13 @@ pub fn zip_buckets(
 }
 
 pub fn zip_quantiles(
-    limits: impl IntoIterator<Item = f64>,
+    quantiles: impl IntoIterator<Item = f64>,
     values: impl IntoIterator<Item = f64>,
 ) -> Vec<Quantile> {
-    limits
+    quantiles
         .into_iter()
         .zip(values.into_iter())
-        .map(|(upper_limit, value)| Quantile { upper_limit, value })
+        .map(|(q, value)| Quantile { q, value })
         .collect()
 }
 
@@ -862,7 +879,7 @@ impl Display for Metric {
             } => {
                 write!(fmt, "count={} sum={} ", count, sum)?;
                 write_list(fmt, " ", quantiles, |fmt, quantile| {
-                    write!(fmt, "{}@{}", quantile.upper_limit, quantile.value)
+                    write!(fmt, "{}@{}", quantile.q, quantile.value)
                 })
             }
         }
@@ -1173,5 +1190,26 @@ mod test {
             ),
             r#"six{} = count=2 sum=127 1@63 2@64"#
         );
+    }
+
+    #[test]
+    fn test_quantile_as_percentile() {
+        let quantiles = [
+            (-1.0, "0"),
+            (0.0, "0"),
+            (0.25, "25"),
+            (0.50, "50"),
+            (0.999, "999"),
+            (0.9999, "9999"),
+            (0.99999, "9999"),
+            (1.0, "100"),
+            (3.0, "100"),
+        ];
+
+        for (q, expected) in quantiles {
+            let quantile = Quantile { q, value: 1.0 };
+            let result = quantile.as_percentile();
+            assert_eq!(result, expected);
+        }
     }
 }

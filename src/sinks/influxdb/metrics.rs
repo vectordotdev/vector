@@ -304,7 +304,7 @@ fn get_type_and_fields(
                 .iter()
                 .map(|quantile| {
                     (
-                        format!("quantile_{}", quantile.upper_limit),
+                        format!("quantile_{}", quantile.q),
                         Field::Float(quantile.value),
                     )
                 })
