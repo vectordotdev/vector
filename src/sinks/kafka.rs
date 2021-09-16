@@ -74,10 +74,6 @@ const fn default_message_timeout_ms() -> u64 {
     300000 // default in librdkafka
 }
 
-fn default_headers_key() -> String {
-    "headers".into()
-}
-
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
