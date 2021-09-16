@@ -108,7 +108,7 @@ components: sinks: loki: {
 				options: {
 					"*": {
 						common:      false
-						description: "Any Loki label, templateable"
+						description: "Any Loki label, templatable"
 						required:    false
 						type: string: {
 							default: null

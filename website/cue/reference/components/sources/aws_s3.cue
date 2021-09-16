@@ -111,7 +111,7 @@ components: sources: aws_s3: components._aws & {
 						type: bool: default: true
 					}
 					queue_url: {
-						description: "The URL of the SQS queue to receieve bucket notifications from."
+						description: "The URL of the SQS queue to receive bucket notifications from."
 						required:    true
 						warnings: []
 						type: string: {

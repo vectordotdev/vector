@@ -54,7 +54,7 @@ components: sources: aws_kinesis_firehose: {
 		requirements: [
 			"""
 				AWS Kinesis Firehose can only deliver data over HTTP. You will need
-				to solve TLS termination by fronting Vector with a load balaner or
+				to solve TLS termination by fronting Vector with a load balancer or
 				configuring the `tls.*` options.
 				""",
 		]
