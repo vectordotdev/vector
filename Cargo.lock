@@ -3497,7 +3497,7 @@ dependencies = [
  "metrics",
  "metrics-util",
  "parking_lot",
- "quanta",
+ "quanta 0.7.2",
  "thiserror",
  "tokio",
 ]
@@ -3534,9 +3534,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a58e622a425b7308e73e4390c68b8cb3df4443f2a57495e391b978412531638c"
+checksum = "74c9b6aee519e1461b678952d3671652bb341d0664b1188f895a436a4e2e6ffa"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -3550,7 +3550,7 @@ dependencies = [
  "num_cpus",
  "ordered-float",
  "parking_lot",
- "quanta",
+ "quanta 0.9.3",
  "radix_trie",
  "sketches-ddsketch",
 ]
@@ -4784,7 +4784,23 @@ dependencies = [
  "libc",
  "mach",
  "once_cell",
- "raw-cpuid",
+ "raw-cpuid 9.1.1",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "quanta"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20afe714292d5e879d8b12740aa223c6a88f118af41870e8b6196e39a02238a8"
+dependencies = [
+ "crossbeam-utils 0.8.5",
+ "libc",
+ "mach",
+ "once_cell",
+ "raw-cpuid 10.2.0",
+ "wasi 0.10.0+wasi-snapshot-preview1",
+ "web-sys",
  "winapi 0.3.9",
 ]
 
@@ -4972,6 +4988,15 @@ name = "raw-cpuid"
 version = "9.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1733f6f80c9c24268736a501cd00d41a9849b4faa7a9f9334c096e5d10553206"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "10.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "929f54e29691d4e6a9cc558479de70db7aa3d98cd6fe7ab86d7507aa2886b9d2"
 dependencies = [
  "bitflags",
 ]
