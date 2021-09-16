@@ -365,7 +365,7 @@ where
                     .map(move |result| {
                         let status = match result {
                             Err(error) => {
-                                error!("Sink IO failed with error: {}", error);
+                                error!("Sink IO failed with error: {}.", error);
                                 EventStatus::Failed
                             },
                             Ok(response) => { *response.as_ref() }
