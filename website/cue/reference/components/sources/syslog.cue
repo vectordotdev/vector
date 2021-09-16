@@ -208,6 +208,7 @@ components: sources: syslog: {
 		connection_read_errors_total: components.sources.internal_metrics.output.metrics.connection_read_errors_total
 		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		received_events_total:        components.sources.internal_metrics.output.metrics.received_events_total
 		utf8_convert_errors_total:    components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}
 }
