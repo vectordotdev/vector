@@ -11,7 +11,6 @@ use futures::{
     stream::{BoxStream, FuturesUnordered, StreamExt},
     FutureExt, TryFutureExt,
 };
-use tokio::sync::Barrier;
 use std::sync::Arc;
 use std::{
     collections::HashMap,
@@ -20,6 +19,7 @@ use std::{
     num::NonZeroUsize,
     time::Duration,
 };
+use tokio::sync::Barrier;
 use tokio::{
     pin, select,
     sync::{
