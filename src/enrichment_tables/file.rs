@@ -246,8 +246,8 @@ impl File {
                     }
                 })
                 .collect::<Vec<_>>()
-                .join(",");
-            Err(format!("Field(s) {} missing from dataset", missing))
+                .join(", ");
+            Err(format!("field(s) '{}' missing from dataset", missing))
         } else {
             Ok(normalized)
         }
@@ -521,6 +521,24 @@ mod tests {
 
         assert_eq!(handle1, handle2);
         assert_eq!(1, file.indexes.len());
+    }
+
+    #[test]
+    fn errors_on_missing_columns() {
+        let mut file = File::new(
+            Vec::new(),
+            vec![
+                "field1".to_string(),
+                "field2".to_string(),
+                "field3".to_string(),
+            ],
+        );
+
+        let error = file.add_index(Case::Sensitive, &["apples", "field2", "bananas"]);
+        assert_eq!(
+            Err("field(s) 'apples, bananas' missing from dataset".to_string()),
+            error
+        )
     }
 
     #[test]
