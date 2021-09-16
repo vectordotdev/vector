@@ -1,3 +1,4 @@
+use crate::{internal_events::aws_s3::sink::S3EventsSent, serde::to_string};
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream};
 use md5::Digest;
@@ -6,11 +7,7 @@ use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3}
 use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
-use vector_core::event::{EventFinalizers, Finalizable};
-
-use crate::{
-    internal_events::aws_s3::sink::S3EventsSent, serde::to_string, sinks::util::sink::Response,
-};
+use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
 use super::config::S3Options;
 
@@ -31,7 +28,16 @@ impl Finalizable for S3Request {
     }
 }
 
-impl Response for PutObjectOutput {}
+#[derive(Debug)]
+pub struct S3Response {
+    inner: PutObjectOutput,
+}
+
+impl AsRef<EventStatus> for S3Response {
+    fn as_ref(&self) -> &EventStatus {
+        &EventStatus::Delivered
+    }
+}
 
 /// Wrapper for the Rusoto S3 client.
 ///
@@ -51,7 +57,7 @@ impl S3Service {
 }
 
 impl Service<S3Request> for S3Service {
-    type Response = PutObjectOutput;
+    type Response = S3Response;
     type Error = RusotoError<PutObjectError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -110,7 +116,7 @@ impl Service<S3Request> for S3Service {
                 byte_size: body_len,
             });
 
-            result
+            result.map(|inner| S3Response { inner })
         })
     }
 }
