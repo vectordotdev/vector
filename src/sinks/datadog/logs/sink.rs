@@ -251,7 +251,7 @@ impl<S> StreamSink for LogSink<S>
 where
     S: Service<LogApiRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: Into<EventStatus> + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -322,7 +322,7 @@ async fn run_io<S>(mut rx: Receiver<LogApiRequest>, mut service: S, acker: Acker
 where
     S: Service<LogApiRequest>,
     S::Future: Send + 'static,
-    S::Response: Into<EventStatus> + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     let in_flight = FuturesUnordered::new();
@@ -368,7 +368,7 @@ where
                                 error!("Sink IO failed with error: {}", error);
                                 EventStatus::Failed
                             },
-                            Ok(response) => { response.into() }
+                            Ok(response) => { *response.as_ref() }
                         };
                         finalizers.update_status(status);
                         // If the rx end is dropped we still completed

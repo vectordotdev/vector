@@ -63,11 +63,11 @@ pub enum LogApiResponse {
     PermissionIssue,
 }
 
-impl Into<EventStatus> for LogApiResponse {
-    fn into(self) -> EventStatus {
+impl AsRef<EventStatus> for LogApiResponse {
+    fn as_ref(&self) -> &EventStatus {
         match self {
-            LogApiResponse::Ok => EventStatus::Delivered,
-            LogApiResponse::PermissionIssue => EventStatus::Errored,
+            LogApiResponse::Ok => &EventStatus::Delivered,
+            LogApiResponse::PermissionIssue => &EventStatus::Errored,
         }
     }
 }
