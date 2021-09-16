@@ -44,7 +44,7 @@ const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 // of escaped double-quotes -- but we believe this should be very rare in
 // practice.
 const BATCH_GOAL_BYTES: usize = 4_250_000;
-const BATCH_DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+const BATCH_DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Default)]
 struct EventPartitioner {}
