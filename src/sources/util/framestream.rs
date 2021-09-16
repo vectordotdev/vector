@@ -1,8 +1,9 @@
 use crate::{
     event::Event,
-    internal_events::{SocketEventsReceived, UnixSocketError, UnixSocketFileDeleteFailed},
+    internal_events::{
+        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteFailed,
+    },
     shutdown::ShutdownSignal,
-    socket::SocketMode,
     sources::Source,
     Pipeline,
 };

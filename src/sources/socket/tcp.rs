@@ -1,8 +1,7 @@
 use crate::{
     codecs::{self, BytesParser, NewlineDelimitedCodec},
     event::Event,
-    internal_events::SocketEventsReceived,
-    socket::SocketMode,
+    internal_events::{SocketEventsReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,

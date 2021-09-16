@@ -3,8 +3,8 @@ use crate::{
     config::SinkContext,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, UnixSocketConnectionEstablished, UnixSocketConnectionFailed,
-        UnixSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
+        UnixSocketConnectionFailed, UnixSocketError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -15,7 +15,6 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    socket::SocketMode,
 };
 use async_trait::async_trait;
 use bytes::Bytes;

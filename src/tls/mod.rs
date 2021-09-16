@@ -170,8 +170,6 @@ pub(crate) fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslCo
     Ok(builder)
 }
 
-// TODO: Fix interdependencies / component features that make this necessary.
-#[allow(dead_code)]
 fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
     let verify_hostname = settings
         .tls()

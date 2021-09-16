@@ -1,5 +1,4 @@
 use super::InternalEvent;
-use crate::codecs;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -19,11 +18,13 @@ impl InternalEvent for SyslogEventReceived {
     }
 }
 
+#[cfg(feature = "codecs")]
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
-    pub error: codecs::Error,
+    pub error: crate::codecs::Error,
 }
 
+#[cfg(feature = "codecs")]
 impl InternalEvent for SyslogUdpReadError {
     fn emit_logs(&self) {
         error!(message = "Error reading datagram.", error = ?self.error, internal_log_rate_secs = 10);

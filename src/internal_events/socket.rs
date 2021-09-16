@@ -1,6 +1,23 @@
 use super::InternalEvent;
-use crate::socket::SocketMode;
 use metrics::counter;
+
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)] // some features only use some variants
+pub enum SocketMode {
+    Tcp,
+    Udp,
+    Unix,
+}
+
+impl SocketMode {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Tcp => "tcp",
+            Self::Udp => "udp",
+            Self::Unix => "unix",
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct SocketEventsReceived {

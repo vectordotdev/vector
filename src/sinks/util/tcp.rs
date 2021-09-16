@@ -4,8 +4,8 @@ use crate::{
     dns,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, TcpSocketConnectionEstablished, TcpSocketConnectionFailed,
-        TcpSocketConnectionShutdown, TcpSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
+        TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -16,7 +16,6 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    socket::SocketMode,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
