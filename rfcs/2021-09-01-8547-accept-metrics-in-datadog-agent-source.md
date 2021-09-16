@@ -56,7 +56,7 @@ better aggregation and accuracy.
 - Anything not related to metrics
   - Processing API validation requests
   - Processing other kind of payloads: traces, event, etc.
-- Shipping sketches to Datadog in the `datadog_metrics` sinks, it is required reach a fully functionnal situation but
+- Shipping sketches to Datadog in the `datadog_metrics` sinks, it is required reach a fully functional situation but
   this is not the goal of this RFC that focus on receiving metrics from Datadog Agents.
 
 ## Pain
@@ -198,7 +198,7 @@ service for aggregation and it does not support sketches.
 
 ### For transport between Agents and Vector
 The use an alternate protocol between Datadog Agents and Vector (Like Prometheus, Statds, OpenTelemetry or Vector own
-protocol) could be envisionned. This would call for a significant, yet possible with the current Agent architecture,
+protocol) could be envisioned. This would call for a significant, yet possible with the current Agent architecture,
 addition, those changes would mostly be located in the
 [forwarder](https://github.com/DataDog/datadog-agent/tree/main/pkg/forwarder) and
 [serializer](https://github.com/DataDog/datadog-agent/tree/main/pkg/serializer) logic. This would imply a hugh chunk of
