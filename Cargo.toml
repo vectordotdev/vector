@@ -30,6 +30,7 @@ debug = true
 
 [package.metadata.deb]
 name = "vector"
+section = "admin"
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml", "/etc/default/vector"]
 assets = [
