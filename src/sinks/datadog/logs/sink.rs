@@ -3,7 +3,6 @@ use crate::config::SinkContext;
 use crate::sinks::datadog::logs::config::Encoding;
 use crate::sinks::util::buffer::GZIP_FAST;
 use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfiguration};
-use crate::sinks::util::sink::{Response, ServiceLogic, StdServiceLogic};
 use crate::sinks::util::Compression;
 use async_trait::async_trait;
 use flate2::write::GzEncoder;
@@ -29,7 +28,7 @@ use tracing_futures::Instrument;
 use twox_hash::XxHash64;
 use vector_core::buffers::Acker;
 use vector_core::config::{log_schema, LogSchema};
-use vector_core::event::{Event, EventFinalizers, Finalizable, Value};
+use vector_core::event::{Event, EventFinalizers, EventStatus, Finalizable, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::batcher::Batcher;
@@ -252,7 +251,7 @@ impl<S> StreamSink for LogSink<S>
 where
     S: Service<LogApiRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -323,7 +322,7 @@ async fn run_io<S>(mut rx: Receiver<LogApiRequest>, mut service: S, acker: Acker
 where
     S: Service<LogApiRequest>,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     let in_flight = FuturesUnordered::new();
@@ -351,10 +350,6 @@ where
                     message = "Submitting service request.",
                     in_flight_requests = in_flight.len()
                 );
-                // TODO: This likely need be parameterized, which builds a
-                // stronger case for following through with the comment
-                // mentioned below.
-                let logic = StdServiceLogic::default();
                 // TODO: I'm not entirely happy with how we're smuggling
                 // batch_size/finalizers this far through, from the finished
                 // batch all the way through to the concrete request type...we
@@ -368,8 +363,14 @@ where
                 let fut = svc.call(req)
                     .err_into()
                     .map(move |result| {
-                        logic.update_finalizers(result, finalizers);
-
+                        let status = match result {
+                            Err(error) => {
+                                error!("Sink IO failed with error: {}.", error);
+                                EventStatus::Failed
+                            },
+                            Ok(response) => { *response.as_ref() }
+                        };
+                        finalizers.update_status(status);
                         // If the rx end is dropped we still completed
                         // the request so this is a weird case that we can
                         // ignore for now.
