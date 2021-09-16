@@ -12,7 +12,6 @@ components: sinks: datadog_logs: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    1049000
 				timeout_secs: 1
 			}
 			compression: {
