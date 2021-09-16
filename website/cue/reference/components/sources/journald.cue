@@ -87,7 +87,7 @@ components: sources: journald: {
 			type: object: {
 				examples: [
 					{
-						_SYSTEMD_UNIT: ["sshd.servcie", "ntpd.service"]
+						_SYSTEMD_UNIT: ["sshd.service", "ntpd.service"]
 						_TRANSPORT: ["kernel"]
 					},
 				]
@@ -99,7 +99,7 @@ components: sources: journald: {
 						type: array: {
 							default: []
 							items: type: string: {
-								examples: ["sshd.servcie", "ntpd.service"]
+								examples: ["sshd.service", "ntpd.service"]
 								syntax: "literal"
 							}
 						}
@@ -128,7 +128,7 @@ components: sources: journald: {
 			type: object: {
 				examples: [
 					{
-						_SYSTEMD_UNIT: ["sshd.servcie", "ntpd.service"]
+						_SYSTEMD_UNIT: ["sshd.service", "ntpd.service"]
 						_TRANSPORT: ["kernel"]
 					},
 				]
@@ -140,7 +140,7 @@ components: sources: journald: {
 						type: array: {
 							default: []
 							items: type: string: {
-								examples: ["sshd.servcie", "ntpd.service"]
+								examples: ["sshd.service", "ntpd.service"]
 								syntax: "literal"
 							}
 						}

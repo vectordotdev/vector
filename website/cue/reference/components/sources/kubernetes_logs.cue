@@ -586,7 +586,7 @@ components: sources: kubernetes_logs: {
 						```
 
 						As with all Kubernetes resource limit recommendations, **use these
-						as a reference point and adjust as ncessary**. If your configured
+						as a reference point and adjust as necessary**. If your configured
 						Vector pipeline is complex, you may need more resources; if you
 						have a more straightforward pipeline, you may need less.
 						"""
@@ -636,7 +636,7 @@ components: sources: kubernetes_logs: {
 
 				If your cluster doesn't use any access control scheme	and doesn't
 				restrict access to the Kubernetes API, you don't need to do any extra
-				configuration - Vector willjust work.
+				configuration - Vector will just work.
 
 				Clusters using legacy ABAC scheme are not officially supported
 				(although Vector might work if you configure access properly) -

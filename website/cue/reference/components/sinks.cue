@@ -168,7 +168,7 @@ components: sinks: [Name=string]: {
 										for codec in features.send.encoding.codec.enum {
 											if codec == "text" {
 												if batched {
-													text: "Newline delemited list of messages generated from the message key from each event."
+													text: "Newline delimited list of messages generated from the message key from each event."
 												}
 												if !batched {
 													text: "The message field from the event."
@@ -176,7 +176,7 @@ components: sinks: [Name=string]: {
 											}
 											if codec == "logfmt" {
 												if batched {
-													logfmt: "Newline delemited list of events encoded by [logfmt]\(urls.logfmt)."
+													logfmt: "Newline delimited list of events encoded by [logfmt]\(urls.logfmt)."
 												}
 												if !batched {
 													logfmt: "[logfmt]\(urls.logfmt) encoded event."
@@ -184,7 +184,7 @@ components: sinks: [Name=string]: {
 											}
 											if codec == "json" {
 												if batched {
-													json: "Array of JSON encoded events, each element reprenting one event."
+													json: "Array of JSON encoded events, each element representing one event."
 												}
 												if !batched {
 													json: "JSON encoded event."
@@ -558,7 +558,7 @@ components: sinks: [Name=string]: {
 						{
 							title: "Adaptive Request Concurrency (ARC)"
 							body:  """
-								Adaptive Requst Concurrency is a feature of Vector that does away with static
+								Adaptive Request Concurrency is a feature of Vector that does away with static
 								concurrency limits and automatically optimizes HTTP concurrency based on downstream
 								service responses. The underlying mechanism is a feedback loop inspired by TCP
 								congestion control algorithms. Checkout the [announcement blog

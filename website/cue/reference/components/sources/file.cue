@@ -385,7 +385,7 @@ components: sources: file: {
 				truncating the original. Vector will also handle this well out of
 				the box, but there are a couple configuration options that will help
 				reduce the very small chance of missed data in some edge cases. We
-				recommend a combination of delaycompress (if applicable) on the
+				recommend a combination of `delaycompress` (if applicable) on the
 				`logrotate` side and including the first rotated file in Vector's
 				`include` option. This allows Vector to find the file after rotation,
 				read it uncompressed to identify it, and then ensure it has all of

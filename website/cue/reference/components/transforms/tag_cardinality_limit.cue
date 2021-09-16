@@ -63,7 +63,7 @@ components: transforms: tag_cardinality_limit: {
 			}
 		}
 		mode: {
-			description: "Controls what approach is used internally to keep track of previously seen tags and deterime when a tag on an incoming metric exceeds the limit."
+			description: "Controls what approach is used internally to keep track of previously seen tags and determine when a tag on an incoming metric exceeds the limit."
 			required:    true
 			warnings: []
 			type: string: {
