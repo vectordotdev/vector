@@ -132,7 +132,7 @@ components: sources: kafka: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "headers"
 				examples: ["headers"]
 				syntax: "literal"
 			}
