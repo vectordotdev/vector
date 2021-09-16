@@ -71,6 +71,78 @@ components: sources: [Name=string]: {
 			}
 		}
 
+		if features.codecs != _|_ {
+			if features.codecs.enabled {
+				framing: {
+					common:      false
+					description: "Configures in which way incoming byte sequences are split up into byte frames."
+					required:    false
+					type: object: options: {
+						method: {
+							description: "The framing method."
+							required:    true
+							type: string: {
+								enum: {
+									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between packets for UDP or between segments for TCP)."
+									character_delimited: "Byte frames which are delimited by a chosen character."
+									length_delimited:    "Byte frames whose length is encoded in a header."
+									newline_delimited:   "Byte frames which are delimited by a newline character."
+									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
+								}
+								syntax: "literal"
+							}
+						}
+						max_length: {
+							common:      false
+							description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+							required:    false
+							type: uint: {
+								default: 102400
+								examples: [65535, 102400]
+								unit: "bytes"
+							}
+							relevant_when: "`method` = `character_delimited`, `newline_delimited` or `octet_counting`"
+						}
+						delimiter: {
+							description: "The character used to separate frames."
+							required:    true
+							type: string: {
+								examples: ["\n", "\t"]
+								syntax: "literal"
+							}
+							relevant_when: "`method` = `character_delimited`"
+						}
+					}
+				}
+				decoding: {
+					common:      false
+					description: "Configures in which way frames are decoded into events."
+					required:    false
+					type: object: options: {
+						codec: {
+							description: "The decoding method."
+							required:    true
+							type: string: {
+								enum: {
+									bytes:  "Events containing the byte frame as-is."
+									json:   "Events being parsed from a JSON string."
+									syslog: "Events being parsed from a Syslog message."
+								}
+								syntax: "literal"
+							}
+						}
+						skip_empty: {
+							common:      false
+							description: "Whether empty frames are skipped without warning."
+							required:    false
+							type: bool: default: false
+							relevant_when: "`codec` = `json`"
+						}
+					}
+				}
+			}
+		}
+
 		if features.encoding != _|_ {
 			if features.encoding.enabled {
 				encoding: {

@@ -397,6 +397,7 @@ urls: {
 	rfc_2822:                                                 "https://tools.ietf.org/html/rfc2822#section-3.3"
 	rfc_3339:                                                 "https://tools.ietf.org/html/rfc3339"
 	rfc_4180:                                                 "https://tools.ietf.org/html/rfc4180"
+	rfc_6587_3_4_1:                                           "https://tools.ietf.org/html/rfc6587#section-3.4.1"
 	rfc_6891:                                                 "https://tools.ietf.org/html/rfc6891"
 	rhel:                                                     "https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux"
 	rpm:                                                      "https://rpm.org/"
