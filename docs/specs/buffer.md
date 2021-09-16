@@ -16,20 +16,35 @@ interpreted as described in [RFC 2119].
 
 Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
 
-### When a Vector event is stored in the buffer
+### Events
+#### `EventsReceived`
+*All buffers* MUST emit an `EventsReceived` event immediately after receiving one or more Vector events.
+* Properties
+  * `entity` - buffer
+  * `count` - the number of received events
+  * `byte_size` - the byte size of received events
 * Metric
-  * MUST increment the `buffer_event_count` gauge by one
-  * MUST increment the `buffer_byte_size` gauge by size of the event
-  * MUST update the `buffer_usage_percentage` gauge which measures the current buffer space utilization (number of events/bytes) over total space available (max number of events/bytes).
+  * MUST increment the `received_events_total` counter by the defined `count` with other properties as tags
+  * MUST increment the `received_event_bytes_total` counter by the defined `byte_size` with other properties as tags
+  * MUST update the `buffer_usage_percentage` gauge which measures the current buffer space utilization (number of events/bytes) over total space available (max number of events/bytes)
 
-### When a Vector event is removed from the buffer
+#### `EventsFlushed`
+*All buffers* MUST emit an `EventsFlushed` event immediately after flushing one or more Vector events.
+* Properties
+  * `entity` - buffer
+  * `count` - the number of flushed events
+  * `byte_size` - the byte size of flushed events
 * Metric
-  * MUST decrement the `buffer_event_count` gauge by one
-  * MUST decrement the `buffer_byte_size` gauge by size of the event
+  * MUST increment the `flushed_events_total` counter by the defined `count` with other properties as tags 
+  * MUST increment the `flushed_event_bytes_total` counter by the defined `byte_size` with other properties as tags 
   * MUST update the `buffer_usage_percentage` gauge 
 
-### When a Vector event is dropped
+#### `EventsDropped`
+*All buffers* MUST emit an `EventsDropped` event immediately after dropping one or more Vector events.
+* Properties
+  * `entity` - buffer
+  * `count` - the number of dropped events
 * Metric
-  * MUST increment the `buffer_discarded_events_total` counter by one
+  * MUST increment the `discarded_events_total` counter by the defined `count` with other properties as tags
 
 [Instrumentation Specification]: instrumentation.md
