@@ -14,6 +14,8 @@ interpreted as described in [RFC 2119].
 
 ## Instrumentation
 
+Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
+
 ### When a Vector event is stored in the buffer
 * Metric
   * MUST increment the `buffer_event_count` gauge by one
@@ -29,3 +31,5 @@ interpreted as described in [RFC 2119].
 ### When a Vector event is dropped
 * Metric
   * MUST increment the `buffer_discarded_events_total` counter by one
+
+[Instrumentation Specification]: instrumentation.md
