@@ -119,7 +119,7 @@ components: sources: statsd: {
 			title: "Timestamps"
 			body:  """
 				The StatsD protocol doesn't provide support for sending metric timestamps. You may
-				notice that each parsed metric is assigned a `null` timestmap, which is a special
+				notice that each parsed metric is assigned a `null` timestamp, which is a special
 				value indicating a realtime metric (i.e. not a historical metric). Normally, such
 				`null` timestamps are substituted with the current time by downstream sinks or
 				third-party services during sending/ingestion. See the
@@ -135,5 +135,6 @@ components: sources: statsd: {
 		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
+		received_events_total:      components.sources.internal_metrics.output.metrics.received_events_total
 	}
 }

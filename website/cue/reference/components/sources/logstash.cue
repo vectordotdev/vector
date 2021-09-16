@@ -321,5 +321,6 @@ components: sources: logstash: {
 		open_connections:                 components.sources.internal_metrics.output.metrics.open_connections
 		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
+		received_events_total:            components.sources.internal_metrics.output.metrics.received_events_total
 	}
 }

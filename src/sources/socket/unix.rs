@@ -17,20 +17,16 @@ use std::path::PathBuf;
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
     pub path: PathBuf,
-    #[serde(default = "default_max_length")]
+    #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
-}
-
-fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
 }
 
 impl UnixConfig {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
             host_key: None,
         }
     }

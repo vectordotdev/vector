@@ -115,7 +115,7 @@ components: sources: docker_logs: {
 				The Docker host to connect to. Use an HTTPS URL to enable TLS encryption.
 				If absent, Vector will try to use `DOCKER_HOST` enviroment variable.
 				If `DOCKER_HOST` is also absent, Vector will use default Docker local socket
-				(`/var/run/docker.sock` on Unix flatforms, `//./pipe/docker_engine` on Windows).
+				(`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows).
 				"""
 			required: false
 			type: string: {
@@ -402,5 +402,6 @@ components: sources: docker_logs: {
 		logging_driver_errors_total:           components.sources.internal_metrics.output.metrics.logging_driver_errors_total
 		processed_bytes_total:                 components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:                components.sources.internal_metrics.output.metrics.processed_events_total
+		received_events_total:                 components.sources.internal_metrics.output.metrics.received_events_total
 	}
 }

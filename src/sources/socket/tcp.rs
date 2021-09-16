@@ -17,7 +17,7 @@ pub struct TcpConfig {
     address: SocketListenAddr,
     #[get_copy = "pub"]
     keepalive: Option<TcpKeepaliveConfig>,
-    #[serde(default = "default_max_length")]
+    #[serde(default = "crate::serde::default_max_length")]
     #[getset(get_copy = "pub", set = "pub")]
     max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -29,10 +29,6 @@ pub struct TcpConfig {
     tls: Option<TlsConfig>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
-}
-
-fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -64,7 +60,7 @@ impl TcpConfig {
         Self {
             address,
             keepalive: None,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: None,
             tls: None,
@@ -136,6 +132,6 @@ mod test {
         .unwrap();
 
         assert_eq!(with.max_length, 19);
-        assert_eq!(without.max_length, super::default_max_length());
+        assert_eq!(without.max_length, crate::serde::default_max_length());
     }
 }

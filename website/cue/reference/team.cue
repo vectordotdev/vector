@@ -29,7 +29,7 @@ team: [#Member, ...#Member] & [
 		_keybase: "binarylogic"
 		_twitter: "binarylogic"
 		bio: """
-			Ben is an engineering manager at Datadog mananging the Vector project (formerly the CTO/Co-Founder at Timber.io).
+			Ben is an engineering manager at Datadog managing the Vector project (formerly the CTO/Co-Founder at Timber.io).
 			"""
 	},
 	{
@@ -43,11 +43,11 @@ team: [#Member, ...#Member] & [
 		name:    "Bruce Guenter"
 		_github: "bruceg"
 		bio: """
-			Bruce is a software engineer at Datadog on the Vector project (formely part of Timber.io).
+			Bruce is a software engineer at Datadog on the Vector project (formerly part of Timber.io).
 			"""
 	},
 	{
-		name:     "James Turnball"
+		name:     "James Turnbull"
 		_github:  "jamtur01"
 		_keybase: "jamtur01"
 		_twitter: "kartar"

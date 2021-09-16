@@ -15,7 +15,7 @@ pin-project = { version = "1.0.8", default-features = false }
 serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.10", default-features = false, features = ["std"], optional = true }
 tokio = { version = "1.11.0", default-features = false, features = ["rt", "macros", "rt-multi-thread"] }
-tracing = { version = "0.1.26", default-features = false }
+tracing = { version = "0.1.27", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }

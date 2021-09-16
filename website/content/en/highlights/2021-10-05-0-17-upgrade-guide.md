@@ -10,9 +10,10 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.17.0 release includes one **breaking change**:
+Vector's 0.17.0 release includes two **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
+1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
 
 We cover it below to help you upgrade quickly:
 
@@ -27,3 +28,14 @@ of events coming into the sink, including when _no_ events are coming in.
 The configuration field `print_amount` has been removed, and replaced with `print_interval_secs`.
 Additionally, `print_interval_secs` defaults to `1 second`, which has the additional benefit of
 providing a very basic "events per second" indicator out-of-the-box.
+
+### Datadog Logs sink loses `batch.max_bytes` setting {#datadog_logs_max_bytes}
+
+We've updated the Datadog Logs sink to conform more tightly to the Datadog Logs
+API's constraints, one of which is a maximum payload size. The recommendation of
+that API is to send payloads as close to but not over 5MB in an uncompressed,
+serialized form. The sink will now always try to send 5MB payloads, consistent
+with your timeout settings.
+
+Users that have previously set `batch.max_bytes` may now safely remove the
+value. If it is left the setting will have no effect.
