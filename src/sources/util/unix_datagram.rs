@@ -92,9 +92,7 @@ async fn listen(
                                 mode: SocketMode::Unix,
                                 error: &error
                             });
-                            if error.can_continue() {
-                                continue;
-                            } else {
+                            if !error.can_continue() {
                                 break;
                             }
                         },

@@ -91,9 +91,7 @@ pub fn build_unix_stream_source(
                                     path: &listen_path
                                 });
 
-                                if error.can_continue() {
-                                    continue;
-                                } else {
+                                if !error.can_continue() {
                                     break;
                                 }
                             }
