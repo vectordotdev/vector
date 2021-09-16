@@ -6,7 +6,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::{Buf, Bytes};
-use flate2::read::{DeflateDecoder, MultiGzDecoder};
+use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
@@ -24,10 +24,10 @@ use warp::{
 
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub fn add_query_parameters(
-    mut events: Vec<Event>,
+    events: &mut [Event],
     query_parameters_config: &[String],
     query_parameters: HashMap<String, String>,
-) -> Vec<Event> {
+) {
     for query_parameter_name in query_parameters_config {
         let value = query_parameters.get(query_parameter_name);
         for event in events.iter_mut() {
@@ -37,8 +37,6 @@ pub fn add_query_parameters(
             );
         }
     }
-
-    events
 }
 
 #[derive(Serialize, Debug)]
@@ -141,7 +139,7 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
                 }
                 "deflate" => {
                     let mut decoded = Vec::new();
-                    DeflateDecoder::new(body.reader())
+                    ZlibDecoder::new(body.reader())
                         .read_to_end(&mut decoded)
                         .map_err(|error| handle_decode_error(encoding, error))?;
                     decoded.into()

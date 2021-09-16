@@ -4,7 +4,7 @@ components: transforms: compound: {
 	title: "Compound"
 
 	description: """
-		Defines an ordered chain of child tranforms that will be applied sequentially
+		Defines an ordered chain of child transforms that will be applied sequentially
 		on incoming events.
 		"""
 

@@ -30,6 +30,7 @@ debug = true
 
 [package.metadata.deb]
 name = "vector"
+section = "admin"
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml", "/etc/default/vector"]
 assets = [
@@ -114,7 +115,7 @@ futures = { version = "0.3.17", default-features = false, features = ["compat", 
 tokio = { version = "1.11.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
-tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time"] }
+tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time", "io"] }
 
 # Tracing
 tracing = { version = "0.1.27", default-features = false }
@@ -200,7 +201,7 @@ base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.11.0", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
-bytesize = { version = "1.1.0", default-features = false, optional = true }
+bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.4", default-features = false }
 csv = { version = "1.1", optional = true }
@@ -212,7 +213,8 @@ dyn-clone = { version = "1.0.4", default-features = false }
 encoding_rs = { version = "0.8.28", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.22", default-features = false }
+flate2 = { version = "1.0.21", default-features = false }
+futures-util = { version = "0.3.17", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 grok = { version = "1.2.0", default-features = false, optional = true }
@@ -237,7 +239,7 @@ lru = { version = "0.6.6", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.9", optional = true }
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.6.2", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.6.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
@@ -263,7 +265,7 @@ semver = { version = "1.0.4", default-features = false, features = ["serde", "st
 smallvec = { version = "1", optional = true }
 snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
-socket2 = { version = "0.4.1", default-features = false }
+socket2 = { version = "0.4.2", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.23", default-features = false }
@@ -302,7 +304,7 @@ approx = "0.5.0"
 assert_cmd = "2.0.1"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.101"
+libc = "0.2.102"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "0.7.2"
@@ -443,12 +445,12 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs"]
 sources-datadog = ["sources-utils-http"]
-sources-dnstap = ["bytesize", "base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
+sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
-sources-file = ["bytesize", "file-source"]
-sources-fluent = ["base64", "bytesize", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes"]
+sources-file = ["file-source"]
+sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes"]
 sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http"]
 sources-host_metrics = ["heim"]
@@ -456,19 +458,19 @@ sources-http = ["sources-utils-http", "codecs"]
 sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = ["codecs"]
-sources-kafka = ["rdkafka"]
+sources-kafka = ["rdkafka", "codecs"]
 sources-nats = ["async-nats"]
-sources-logstash = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
+sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
 sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = ["nom"]
 sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-utils-http", "warp"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "codecs"]
-sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
+sources-socket = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "codecs"]
+sources-splunk_hec = ["sources-utils-tls", "warp"]
 sources-statsd = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-udp", "sources-utils-unix", "tokio-util/net", "codecs"]
-sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "syslog_loose", "codecs"]
+sources-stdin = ["codecs"]
+sources-syslog = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "syslog_loose", "codecs"]
 sources-utils-http = ["snap", "sources-utils-tls", "warp"]
 sources-utils-tcp-keepalive = []
 sources-utils-tcp-socket = []
@@ -569,6 +571,7 @@ sinks-logs = [
   "sinks-clickhouse",
   "sinks-console",
   "sinks-datadog",
+  "sinks-datadog_archives",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -608,33 +611,34 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["base64", "bytesize", "md-5", "rusoto", "rusoto_s3", "uuid"]
+sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3", "uuid"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
-sinks-azure_blob = ["bytesize", "azure_core", "azure_storage", "reqwest", "uuid"]
-sinks-azure_monitor_logs = ["bytesize"]
+sinks-azure_blob = ["azure_core", "azure_storage", "reqwest", "uuid"]
+sinks-azure_monitor_logs = []
 sinks-blackhole = []
-sinks-clickhouse = ["bytesize"]
+sinks-clickhouse = []
 sinks-console = []
-sinks-datadog = ["bytesize"]
-sinks-elasticsearch = ["bytesize", "rusoto", "transforms-metric_to_log"]
+sinks-datadog = []
+sinks-datadog_archives = ["sinks-aws_s3"]
+sinks-elasticsearch = ["rusoto", "transforms-metric_to_log"]
 sinks-file = []
-sinks-gcp = ["base64", "bytesize", "goauth", "gouth", "smpl_jwt", "uuid"]
-sinks-honeycomb = ["bytesize"]
-sinks-http = ["bytesize"]
+sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt", "uuid"]
+sinks-honeycomb = []
+sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
-sinks-influxdb = ["bytesize"]
+sinks-influxdb = []
 sinks-kafka = ["rdkafka"]
-sinks-logdna = ["bytesize"]
-sinks-loki = ["bytesize", "uuid"]
+sinks-logdna = []
+sinks-loki = ["uuid"]
 sinks-nats = ["async-nats"]
-sinks-new_relic_logs = ["bytesize", "sinks-http"]
+sinks-new_relic_logs = ["sinks-http"]
 sinks-papertrail = ["syslog"]
 sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]
 sinks-pulsar = ["avro-rs", "pulsar"]
 sinks-redis = ["redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
-sinks-splunk_hec = ["bytesize"]
+sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
@@ -713,7 +717,7 @@ mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
-prometheus-integration-tests = ["bytesize", "sinks-prometheus", "sources-prometheus"]
+prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus"]
 pulsar-integration-tests = ["sinks-pulsar"]
 redis-integration-tests = ["sinks-redis"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]

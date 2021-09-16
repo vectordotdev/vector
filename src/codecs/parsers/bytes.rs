@@ -31,6 +31,13 @@ impl ParserConfig for BytesParserConfig {
 #[derive(Debug, Clone)]
 pub struct BytesParser;
 
+impl BytesParser {
+    /// Creates a new `BytesParser`.
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
 impl Parser for BytesParser {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         // Currently, the `From` implementation from `Bytes` to `Event` adds a

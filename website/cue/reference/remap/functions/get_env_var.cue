@@ -3,7 +3,7 @@ package metadata
 remap: functions: get_env_var: {
 	category: "System"
 	description: """
-		Returns the value of the environment variable specifed by `name`.
+		Returns the value of the environment variable specified by `name`.
 		"""
 
 	arguments: [

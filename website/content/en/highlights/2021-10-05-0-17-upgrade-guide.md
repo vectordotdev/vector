@@ -13,7 +13,8 @@ badges:
 Vector's 0.17.0 release includes two **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
-2. [Vector now logs to stderr](#logging)
+1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
+1. [Vector now logs to stderr](#logging)
 
 We cover them below to help you upgrade quickly:
 
@@ -29,6 +30,17 @@ The configuration field `print_amount` has been removed, and replaced with `prin
 Additionally, `print_interval_secs` defaults to `1 second`, which has the additional benefit of
 providing a very basic "events per second" indicator out-of-the-box.
 
+### Datadog Logs sink loses `batch.max_bytes` setting {#datadog_logs_max_bytes}
+
+We've updated the Datadog Logs sink to conform more tightly to the Datadog Logs
+API's constraints, one of which is a maximum payload size. The recommendation of
+that API is to send payloads as close to but not over 5MB in an uncompressed,
+serialized form. The sink will now always try to send 5MB payloads, consistent
+with your timeout settings.
+
+Users that have previously set `batch.max_bytes` may now safely remove the
+value. If it is left the setting will have no effect.
+
 ### Vector now logs to stderr {#logging}
 
 Previously, Vector used to log all output to stdout, but this made it difficult to use the output of the `console` sink,
@@ -37,3 +49,4 @@ which also writes to stdout by default.  Following some discussion in
 that stdout can be processed separately.
 
 If you were previously depending on Vector's logs appearing in stdout, you should now look for them in stderr.
+=======
