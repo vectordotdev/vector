@@ -18,12 +18,44 @@ use warp::http::HeaderMap;
 use warp::http::StatusCode;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum DatadogAgentMode {
+    V1,
+    V2,
+}
+
+impl Default for DatadogAgentMode {
+    fn default() -> Self {
+        Self::V2
+    }
+}
+
+impl DatadogAgentMode {
+    fn path(&self) -> &str {
+        match self {
+            Self::V1 => "/v1/input",
+            Self::V2 => "/api/v2/logs",
+        }
+    }
+
+    fn api_key_matcher(&self) -> Regex {
+        Regex::new(match self {
+            Self::V1 => r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??",
+            Self::V2 => r"^/api/v2/logs/(?P<api_key>[[:alnum:]]{32})/??",
+        })
+        .expect("static regex always compiles")
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DatadogAgentConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
+    #[serde(default)]
+    mode: DatadogAgentMode,
 }
 
 inventory::submit! {
@@ -37,6 +69,7 @@ impl GenerateConfig for DatadogAgentConfig {
             tls: None,
             auth: None,
             store_api_key: true,
+            mode: DatadogAgentMode::default(),
         })
         .unwrap()
     }
@@ -46,9 +79,15 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogAgentSource::new(self.store_api_key);
-        // We accept /v1/input & /v1/input/<API_KEY>
-        source.run(self.address, "/v1/input", false, &self.tls, &self.auth, cx)
+        let source = DatadogAgentSource::new(self.store_api_key, &self.mode);
+        source.run(
+            self.address,
+            self.mode.path(),
+            false,
+            &self.tls,
+            &self.auth,
+            cx,
+        )
     }
 
     fn output_type(&self) -> DataType {
@@ -73,11 +112,10 @@ struct DatadogAgentSource {
 }
 
 impl DatadogAgentSource {
-    fn new(store_api_key: bool) -> Self {
+    fn new(store_api_key: bool, mode: &DatadogAgentMode) -> Self {
         Self {
             store_api_key,
-            api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
-                .expect("static regex always compiles"),
+            api_key_matcher: mode.api_key_matcher(),
             log_schema_source_type_key: log_schema().source_type_key(),
             log_schema_timestamp_key: log_schema().timestamp_key(),
         }
@@ -176,7 +214,7 @@ impl HttpSource for DatadogAgentSource {
 
 #[cfg(test)]
 mod tests {
-    use super::{DatadogAgentConfig, LogMsg};
+    use super::{DatadogAgentConfig, DatadogAgentMode, LogMsg};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus},
@@ -216,7 +254,7 @@ mod tests {
             let api_key = None;
 
             let mut events = Vec::with_capacity(msgs.len());
-            let source = DatadogAgentSource::new(true);
+            let source = DatadogAgentSource::new(true, &DatadogAgentMode::V1);
             source.decode_body(body, api_key, &mut events).unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
@@ -245,6 +283,7 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
         store_api_key: bool,
+        mode: DatadogAgentMode,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
@@ -256,6 +295,7 @@ mod tests {
                 tls: None,
                 auth: None,
                 store_api_key,
+                mode,
             }
             .build(context)
             .await
@@ -285,9 +325,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn full_payload() {
+    async fn full_payload_v1() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V1).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -332,9 +372,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn full_payload_v2() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V2).await;
+
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("foo"),
+                            timestamp: 123,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
+                        HeaderMap::new(),
+                        "/api/v2/logs"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["message"], "foo".into());
+            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
+            assert!(event.metadata().datadog_api_key().is_none());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+        }
+    }
+
+    #[tokio::test]
     async fn no_api_key() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V1).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -381,7 +468,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_url() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V1).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -431,7 +518,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_header() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V1).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -487,7 +574,7 @@ mod tests {
     #[tokio::test]
     async fn delivery_failure() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed, true, true).await;
+        let (rx, addr) = source(EventStatus::Failed, true, true, DatadogAgentMode::V1).await;
 
         spawn_collect_n(
             async move {
@@ -520,7 +607,7 @@ mod tests {
     #[tokio::test]
     async fn ignores_disabled_acknowledgements() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed, false, true).await;
+        let (rx, addr) = source(EventStatus::Failed, false, true, DatadogAgentMode::V1).await;
 
         let events = spawn_collect_n(
             async move {
@@ -555,7 +642,7 @@ mod tests {
     #[tokio::test]
     async fn ignores_api_key() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, false).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, false, DatadogAgentMode::V1).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
