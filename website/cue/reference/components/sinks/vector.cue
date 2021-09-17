@@ -28,7 +28,7 @@ components: sinks: vector: {
 			request: {
 				enabled:       true
 				headers:       false
-				relevant_when: "version = \"v2\""
+				relevant_when: "version = \"2\""
 			}
 
 			tls: {
