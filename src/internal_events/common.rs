@@ -15,7 +15,10 @@ impl InternalEvent for EventsReceived {
     fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64);
         counter!("events_in_total", self.count as u64);
-        counter!("component_received_event_bytes_total", self.byte_size as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
     }
 }
 
