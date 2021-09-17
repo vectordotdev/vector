@@ -609,7 +609,10 @@ components: sources: file: {
 		checkpoint_write_errors_total: components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
 		checkpoints_total:             components.sources.internal_metrics.output.metrics.checkpoints_total
 		checksum_errors_total:         components.sources.internal_metrics.output.metrics.checksum_errors_total
-		errors_total:                  components.sources.internal_metrics.output.metrics.errors_total
+		component_errors_total:                  components.sources.internal_metrics.output.metrics.errors_total
+		component_received_bytes_total:          components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:         components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total:    components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		file_delete_errors_total:      components.sources.internal_metrics.output.metrics.file_delete_errors_total
 		file_watch_errors_total:       components.sources.internal_metrics.output.metrics.file_watch_errors_total
 		files_added_total:             components.sources.internal_metrics.output.metrics.files_added_total
@@ -618,8 +621,5 @@ components: sources: file: {
 		files_unwatched_total:         components.sources.internal_metrics.output.metrics.files_unwatched_total
 		fingerprint_read_errors_total: components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
 		glob_errors_total:             components.sources.internal_metrics.output.metrics.glob_errors_total
-		received_bytes_total:          components.sources.internal_metrics.output.metrics.received_bytes_total
-		received_event_bytes_total:    components.sources.internal_metrics.output.metrics.received_event_bytes_total
-		component_received_events_total:         components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

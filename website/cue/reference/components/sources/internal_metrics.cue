@@ -255,7 +255,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		checkpoint_write_errors_total: {
-			description:       "The total number of errors writing checkpoints. This metric is deprecated in favor of `errors_total`."
+			description:       "The total number of errors writing checkpoints. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -483,11 +483,11 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		received_bytes_total: {
+		component_received_bytes_total: {
 			description:       "The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              received_events_total.tags
+			tags:              component_received_events_total.tags
 		}
 		component_received_events_total: {
 			description: """
@@ -606,7 +606,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		file_delete_errors_total: {
-			description:       "The total number of failures to delete a file. This metric is deprecated in favor of `errors_total`."
+			description:       "The total number of failures to delete a file. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -614,7 +614,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		file_watch_errors_total: {
-			description:       "The total number of errors encountered when watching files. This metric is deprecated in favor of `errors_total`."
+			description:       "The total number of errors encountered when watching files. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -654,7 +654,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		fingerprint_read_errors_total: {
-			description:       "The total number of times Vector failed to read a file for fingerprinting. This metric is deprecated in favor of `errors_total`."
+			description:       "The total number of times Vector failed to read a file for fingerprinting. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -662,7 +662,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		glob_errors_total: {
-			description:       "The total number of errors encountered when globbing paths. This metric is deprecated in favor of `errors_total`."
+			description:       "The total number of errors encountered when globbing paths. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -798,7 +798,7 @@ components: sources: internal_metrics: {
 				mode: _mode
 			}
 		}
-		errors_total: {
+		component_errors_total: {
 			description:       "The total number of errors encountered by this component."
 			type:              "counter"
 			default_namespace: "vector"

@@ -40,7 +40,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "received_bytes_total", self.byte_size as u64,
+                "component_received_bytes_total", self.byte_size as u64,
                 "protocol" => "file",
                 "file" => self.path.to_string()
             );
@@ -64,10 +64,6 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "component_received_events_total", 1,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
                 "events_in_total", 1,
                 "file" => self.file.to_owned(),
             );
@@ -76,7 +72,11 @@ mod source {
                 "file" => self.file.to_owned(),
             );
             counter!(
-                "received_event_bytes_total", self.byte_size as u64,
+                "component_received_events_total", 1,
+                "file" => self.file.to_owned(),
+            );
+            counter!(
+                "component_received_event_bytes_total", self.byte_size as u64,
                 "file" => self.file.to_owned(),
             );
         }
@@ -126,7 +126,7 @@ mod source {
                 "file" => self.path.to_string_lossy().into_owned(),
             );
             counter!(
-                "errors_total", 1,
+                "component_errors_total", 1,
                 "error_type" => "read_failed",
                 "error" => self.error.to_string(),
                 "file" => self.path.to_string_lossy().into_owned(),
@@ -157,7 +157,7 @@ mod source {
                 "file" => self.path.to_string_lossy().into_owned(),
             );
             counter!(
-                "errors_total", 1,
+                "component_errors_total", 1,
                 "error_type" => "delete_failed",
                 "error" => self.error.to_string(),
                 "file" => self.path.to_string_lossy().into_owned(),
@@ -231,7 +231,7 @@ mod source {
                 "file" => self.path.to_string_lossy().into_owned(),
             );
             counter!(
-                "errors_total", 1,
+                "component_errors_total", 1,
                 "error_type" => "watch_failed",
                 "error" => self.error.to_string(),
                 "file" => self.path.to_string_lossy().into_owned(),
@@ -322,7 +322,7 @@ mod source {
         fn emit_metrics(&self) {
             counter!("checkpoint_write_errors_total", 1);
             counter!(
-                "errors_total", 1,
+                "component_errors_total", 1,
                 "error_type" => "write_error",
                 "error" => self.error.to_string(),
                 "stage" => "receiving"
@@ -353,7 +353,7 @@ mod source {
                 "path" => self.path.to_string_lossy().into_owned(),
             );
             counter!(
-                "errors_total", 1,
+                "component_errors_total", 1,
                 "error_type" => "glob_failed",
                 "error" => self.error.to_string(),
                 "file" => self.path.to_string_lossy().into_owned(),
