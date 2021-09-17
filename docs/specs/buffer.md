@@ -17,7 +17,9 @@ interpreted as described in [RFC 2119].
 Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
 
 ### Events
+
 #### `EventsReceived`
+
 *All buffers* MUST emit an `EventsReceived` event immediately after receiving one or more Vector events.
 * Properties
   * `entity` - buffer
