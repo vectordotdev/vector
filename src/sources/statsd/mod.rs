@@ -1,5 +1,7 @@
+use crate::sources::statsd::parser::ParseError;
+use crate::udp;
 use crate::{
-    codecs::{BoxedFramingError, NewlineDelimitedCodec},
+    codecs::{self, NewlineDelimitedCodec, Parser},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -7,11 +9,12 @@ use crate::{
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    udp, Pipeline,
+    Pipeline,
 };
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
@@ -20,7 +23,7 @@ pub mod parser;
 #[cfg(unix)]
 mod unix;
 
-use parser::{parse, ParseError};
+use parser::parse;
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
 
@@ -133,20 +136,28 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-pub(self) fn parse_event(bytes: Bytes) -> Option<Event> {
-    match std::str::from_utf8(&bytes)
-        .map_err(ParseError::InvalidUtf8)
-        .and_then(parse)
-    {
-        Ok(metric) => {
-            emit!(StatsdEventReceived {
-                byte_size: bytes.len()
-            });
-            Some(Event::Metric(metric))
-        }
-        Err(error) => {
-            emit!(StatsdInvalidRecord { error, bytes });
-            None
+#[derive(Debug, Clone)]
+pub struct StatsdParser;
+
+impl Parser for StatsdParser {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        match std::str::from_utf8(&bytes)
+            .map_err(ParseError::InvalidUtf8)
+            .and_then(parse)
+        {
+            Ok(metric) => {
+                emit!(StatsdEventReceived {
+                    byte_size: bytes.len()
+                });
+                Ok(smallvec![Event::Metric(metric)])
+            }
+            Err(error) => {
+                emit!(StatsdInvalidRecord {
+                    error: &error,
+                    bytes
+                });
+                Err(Box::new(error))
+            }
         }
     }
 }
@@ -172,18 +183,19 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let mut stream = UdpFramed::new(socket, NewlineDelimitedCodec::new()).take_until(shutdown);
+    let codec = codecs::Decoder::new(
+        Box::new(NewlineDelimitedCodec::new()),
+        Box::new(StatsdParser),
+    );
+    let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
-            Ok((bytes, _sock)) => {
-                let metric = match parse_event(bytes) {
-                    Some(metric) => metric,
-                    None => continue,
-                };
-
-                if let Err(error) = out.send(metric).await {
-                    error!(message = "Error sending metric.", %error);
-                    break;
+            Ok(((events, _byte_size), _sock)) => {
+                for metric in events {
+                    if let Err(error) = out.send(metric).await {
+                        error!(message = "Error sending metric.", %error);
+                        break;
+                    }
                 }
             }
             Err(error) => {
@@ -199,15 +211,15 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = BoxedFramingError;
-    type Decoder = NewlineDelimitedCodec;
+    type Error = codecs::Error;
+    type Item = SmallVec<[Event; 1]>;
+    type Decoder = codecs::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        NewlineDelimitedCodec::new()
-    }
-
-    fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
-        parse_event(line)
+        codecs::Decoder::new(
+            Box::new(NewlineDelimitedCodec::new()),
+            Box::new(StatsdParser),
+        )
     }
 }
 

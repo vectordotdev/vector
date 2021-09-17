@@ -6,10 +6,12 @@ use crate::sinks::Healthcheck;
 use futures::FutureExt;
 use http::StatusCode;
 use rusoto_core::RusotoError;
-use rusoto_s3::{HeadBucketRequest, PutObjectError, PutObjectOutput, S3Client, S3};
+use rusoto_s3::{HeadBucketRequest, PutObjectError, S3Client, S3};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{collections::BTreeMap, convert::TryInto};
+
+use super::service::S3Response;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct S3Options {
@@ -68,7 +70,7 @@ pub struct S3RetryLogic;
 
 impl RetryLogic for S3RetryLogic {
     type Error = RusotoError<PutObjectError>;
-    type Response = PutObjectOutput;
+    type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         rusoto::is_retriable_error(error)

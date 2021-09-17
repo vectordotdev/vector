@@ -1,28 +1,32 @@
-use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
-    codecs::{BoxedFramingError, OctetCountingCodec, Parser, SyslogParser},
+    codecs::{self, BytesCodec, OctetCountingCodec, SyslogParser},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
-    internal_events::{SyslogEventReceived, SyslogUdpReadError},
+    internal_events::SyslogEventReceived,
+    internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
+    sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     udp, Pipeline,
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{SinkExt, StreamExt};
+#[cfg(unix)]
+use codecs::Decoder;
+use futures::{FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 use tokio::net::UdpSocket;
-use tokio_util::{codec::BytesCodec, udp::UdpFramed};
+use tokio_util::udp::UdpFramed;
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -30,7 +34,7 @@ use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 pub struct SyslogConfig {
     #[serde(flatten)]
     mode: Mode,
-    #[serde(default = "default_max_length")]
+    #[serde(default = "crate::serde::default_max_length")]
     max_length: usize,
     /// The host key of the log. (This differs from `hostname`)
     host_key: Option<String>,
@@ -53,16 +57,12 @@ pub enum Mode {
     Unix { path: PathBuf },
 }
 
-pub fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
-}
-
 impl SyslogConfig {
     pub fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
         }
     }
 }
@@ -81,7 +81,7 @@ impl GenerateConfig for SyslogConfig {
                 receive_buffer_bytes: None,
             },
             host_key: None,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
         })
         .unwrap()
     }
@@ -131,14 +131,22 @@ impl SourceConfig for SyslogConfig {
                 cx.out,
             )),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(build_unix_stream_source(
-                path,
-                OctetCountingCodec::new_with_max_length(self.max_length),
-                host_key,
-                cx.shutdown,
-                cx.out,
-                event_from_bytes,
-            )),
+            Mode::Unix { path } => {
+                let decoder = Decoder::new(
+                    Box::new(OctetCountingCodec::new_with_max_length(self.max_length)),
+                    Box::new(SyslogParser),
+                );
+
+                Ok(build_unix_stream_source(
+                    path,
+                    decoder,
+                    move |events, host, byte_size| {
+                        handle_events(events, &host_key, host, byte_size)
+                    },
+                    cx.shutdown,
+                    cx.out,
+                ))
+            }
         }
     }
 
@@ -167,15 +175,19 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = BoxedFramingError;
-    type Decoder = OctetCountingCodec;
+    type Error = codecs::Error;
+    type Item = SmallVec<[Event; 1]>;
+    type Decoder = codecs::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        OctetCountingCodec::new_with_max_length(self.max_length)
+        codecs::Decoder::new(
+            Box::new(OctetCountingCodec::new_with_max_length(self.max_length)),
+            Box::new(SyslogParser),
+        )
     }
 
-    fn build_event(&self, bytes: Bytes, host: Bytes) -> Option<Event> {
-        event_from_bytes(&self.host_key, Some(host), bytes)
+    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
+        handle_events(events, &self.host_key, Some(host), byte_size);
     }
 }
 
@@ -206,43 +218,55 @@ pub fn udp(
             r#type = "udp"
         );
 
-        let _ = UdpFramed::new(socket, BytesCodec::new())
-            .take_until(shutdown)
-            .filter_map(|frame| {
-                let host_key = host_key.clone();
-                async move {
-                    match frame {
-                        Ok((bytes, received_from)) => {
-                            let received_from = received_from.ip().to_string().into();
-                            let bytes = bytes.freeze();
-
-                            event_from_bytes(&host_key, Some(received_from), bytes).map(Ok)
-                        }
-                        Err(error) => {
-                            emit!(SyslogUdpReadError { error });
-                            None
-                        }
+        UdpFramed::new(
+            socket,
+            codecs::Decoder::new(Box::new(BytesCodec::new()), Box::new(SyslogParser)),
+        )
+        .take_until(shutdown)
+        .filter_map(|frame| {
+            let host_key = host_key.clone();
+            async move {
+                match frame {
+                    Ok(((mut events, byte_size), received_from)) => {
+                        let received_from = received_from.ip().to_string().into();
+                        handle_events(&mut events, &host_key, Some(received_from), byte_size);
+                        Some(events.remove(0))
+                    }
+                    Err(error) => {
+                        emit!(SyslogUdpReadError { error });
+                        None
                     }
                 }
-            })
-            .forward(out)
-            .await;
-
-        info!("Finished sending.");
-        Ok(())
+            }
+        })
+        .map(Ok)
+        .forward(out)
+        .inspect(|_| info!("Finished sending."))
+        .await
     })
 }
 
-fn event_from_bytes(host_key: &str, default_host: Option<Bytes>, bytes: Bytes) -> Option<Event> {
-    let byte_size = bytes.len();
-    let parser = SyslogParser;
-    let mut events = parser.parse(bytes).ok()?;
+fn handle_events(
+    events: &mut [Event],
+    host_key: &str,
+    default_host: Option<Bytes>,
+    byte_size: usize,
+) {
     assert_eq!(
         events.len(),
         1,
-        "syslog parser parses exactly one message from a byte string",
+        "Syslog parser parses exactly one message from a byte string.",
     );
-    let mut event = events.remove(0);
+
+    enrich_syslog_event(&mut events[0], host_key, default_host, byte_size);
+}
+
+fn enrich_syslog_event(
+    event: &mut Event,
+    host_key: &str,
+    default_host: Option<Bytes>,
+    byte_size: usize,
+) {
     let log = event.as_mut_log();
 
     log.insert(log_schema().source_type_key(), Bytes::from("syslog"));
@@ -268,16 +292,26 @@ fn event_from_bytes(host_key: &str, default_host: Option<Bytes>, bytes: Bytes) -
         message = "Processing one event.",
         event = ?event
     );
-
-    Some(event)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::Event};
+    use crate::{codecs::Parser, config::log_schema, event::Event};
     use chrono::prelude::*;
     use shared::assert_event_data_eq;
+
+    fn event_from_bytes(
+        host_key: &str,
+        default_host: Option<Bytes>,
+        bytes: Bytes,
+    ) -> Option<Event> {
+        let byte_size = bytes.len();
+        let parser = SyslogParser;
+        let mut events = parser.parse(bytes).ok()?;
+        handle_events(&mut events, host_key, default_host, byte_size);
+        Some(events.remove(0))
+    }
 
     #[test]
     fn generate_config() {

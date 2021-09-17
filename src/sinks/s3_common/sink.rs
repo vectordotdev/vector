@@ -1,8 +1,7 @@
-use crate::sinks::util::sink::ServiceLogic;
 use crate::{
     config::SinkContext,
     event::Event,
-    sinks::util::{buffer::GZIP_FAST, sink::StdServiceLogic, Compression},
+    sinks::util::{buffer::GZIP_FAST, Compression},
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -11,6 +10,7 @@ use futures::{
     stream::{BoxStream, FuturesUnordered, StreamExt},
     FutureExt, TryFutureExt,
 };
+use std::sync::Arc;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -18,6 +18,7 @@ use std::{
     num::NonZeroUsize,
     time::Duration,
 };
+use tokio::sync::Barrier;
 use tokio::{
     pin, select,
     sync::{
@@ -29,14 +30,13 @@ use tower::{Service, ServiceExt};
 use tracing_futures::Instrument;
 use vector_core::{
     buffers::Acker,
-    event::{EventFinalizers, Finalizable},
+    event::{EventFinalizers, EventStatus, Finalizable},
     sink::StreamSink,
     stream::batcher::Batcher,
 };
 
 use crate::sinks::s3_common::partitioner::KeyPartitioner;
 use crate::sinks::s3_common::service::S3Request;
-use crate::sinks::util::sink::Response;
 
 pub struct S3Sink<S, R>
 where
@@ -81,7 +81,7 @@ impl<S, R> StreamSink for S3Sink<S, R>
 where
     S: Service<S3Request> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
     R: S3RequestBuilder + Send,
 {
@@ -93,6 +93,7 @@ where
         // exclusively with I/O, while we deal with everything else here:
         // batching, ordering, and so on.
         let (io_tx, io_rx) = channel(64);
+        let io_barrier = Arc::new(Barrier::new(2));
         let service = self
             .service
             .take()
@@ -106,7 +107,7 @@ where
             .take()
             .expect("same sink should not be run twice");
 
-        let io = run_io(io_rx, service, acker).in_current_span();
+        let io = run_io(io_rx, Arc::clone(&io_barrier), service, acker).in_current_span();
         let _ = tokio::spawn(io);
 
         let batcher = Batcher::new(
@@ -142,15 +143,23 @@ where
             }
         }
 
+        // Wait for the I/O task to complete.
+        //
+        // TODO: the need for this synchronization means we should probably look into something more
+        // ergonomic like `buffered`/`buffer_unordered` + `tokio::spawn`, otherwise every sink will
+        // be reimplementing this logic for the common case.
+        drop(io_tx);
+        io_barrier.wait().await;
+
         Ok(())
     }
 }
 
-async fn run_io<S>(mut rx: Receiver<S3Request>, mut service: S, acker: Acker)
+async fn run_io<S>(mut rx: Receiver<S3Request>, barrier: Arc<Barrier>, mut service: S, acker: Acker)
 where
     S: Service<S3Request>,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     let in_flight = FuturesUnordered::new();
@@ -177,10 +186,6 @@ where
                     message = "Submitting service request.",
                     in_flight_requests = in_flight.len()
                 );
-                // TODO: This likely need be parameterized, which builds a
-                // stronger case for following through with the comment
-                // mentioned below.
-                let logic = StdServiceLogic::default();
                 // TODO: I'm not entirely happy with how we're smuggling
                 // batch_size/finalizers this far through, from the finished
                 // batch all the way through to the concrete request type...we
@@ -194,8 +199,14 @@ where
                 let fut = svc.call(req)
                     .err_into()
                     .map(move |result| {
-                        logic.update_finalizers(result, finalizers);
-
+                        let status = match result {
+                            Err(error) => {
+                                error!("Sink IO failed with error: {}.", error);
+                                EventStatus::Failed
+                            },
+                            Ok(response) => { *response.as_ref() }
+                        };
+                        finalizers.update_status(status);
                         // If the rx end is dropped we still completed
                         // the request so this is a weird case that we can
                         // ignore for now.
@@ -221,6 +232,8 @@ where
             else => break
         }
     }
+
+    barrier.wait().await;
 }
 
 pub trait S3RequestBuilder {

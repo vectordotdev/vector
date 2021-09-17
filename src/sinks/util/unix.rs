@@ -158,7 +158,7 @@ impl StreamSink for UnixSink {
 
             if let Err(error) = result {
                 emit!(UnixSocketError {
-                    error,
+                    error: &error,
                     path: &self.connector.path
                 });
             }
