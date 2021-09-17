@@ -21,29 +21,31 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 #### `EventsReceived`
 
 *All buffers* MUST emit an `EventsReceived` event immediately after receiving one or more Vector events.
+
 * Properties
-  * `entity` - buffer
   * `count` - the number of received events
   * `byte_size` - the byte size of received events
 * Metric
-  * MUST increment the `received_events_total` counter by the defined `count` with other properties as tags
-  * MUST increment the `received_event_bytes_total` counter by the defined `byte_size` with other properties as tags
   * MUST increment the `buffer_event_count` gauge by the defined `count`
+  * MUST increment the `buffer_byte_size` gauge by the defined `byte_size`
   * MUST update the `buffer_usage_percentage` gauge which measures the current buffer space utilization (number of events/bytes) over total space available (max number of events/bytes)
 
 #### `EventsFlushed`
+
 *All buffers* MUST emit an `EventsFlushed` event immediately after flushing one or more Vector events.
+
 * Properties
   * `count` - the number of flushed events
   * `byte_size` - the byte size of flushed events
 * Metric
-  * MUST increment the `flushed_events_total` counter by the defined `count` with other properties as tags
-  * MUST increment the `flushed_event_bytes_total` counter by the defined `byte_size` with other properties as tags
   * MUST decrement the `buffer_event_count` gauge by the defined `count`
+  * MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
   * MUST update the `buffer_usage_percentage` gauge
 
 #### `EventsDropped`
+
 *All buffers* MUST emit an `EventsDropped` event immediately after dropping one or more Vector events.
+
 * Properties
   * `count` - the number of dropped events
 * Metric
