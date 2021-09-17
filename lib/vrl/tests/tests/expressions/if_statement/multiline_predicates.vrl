@@ -1,4 +1,4 @@
-# result: [true, true, true]
+# result: [true, true, true, true]
 
 x = 2
 
@@ -18,4 +18,16 @@ v3 = if (
   true
 }
 
-[v1, v2, v3]
+v4 = if (
+  # Lets test spaces
+  x = x + 1
+
+  # Does it work?
+
+  x = x + 1; x == 7;
+
+  ) {
+  true
+}
+
+[v1, v2, v3, v4]

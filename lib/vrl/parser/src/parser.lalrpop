@@ -451,7 +451,7 @@ StatementSeparator: () = {
 
 Predicate: Predicate = {
     Box<ArithmeticExpr> => Predicate::One(<>),
-    "(" StatementSeparator? <v:(<AssignmentExpr> StatementSeparator)+> <e:(<AssignmentExpr>)?> ")" => {
+    "(" NonterminalNewline* <v:(<AssignmentExpr> StatementSeparator+)+> <e:(<AssignmentExpr>)?> ")" => {
         let expressions = match e {
             None => v,
             Some(e) => {
