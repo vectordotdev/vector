@@ -28,7 +28,7 @@ remap: functions: ip_aton: {
 			source: #"""
 				ip_aton!("1.2.3.4")
 				"""#
-			return: 67305985
+			return: 16909060
 		},
 	]
 }
