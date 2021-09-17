@@ -32,16 +32,16 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
   * MUST increment the `buffer_byte_size` gauge by the defined `byte_size`
   * MUST update the `buffer_usage_percentage` gauge which measures the current buffer space utilization (number of events/bytes) over total space available (max number of events/bytes)
 
-#### `EventsFlushed`
+#### `EventsSent`
 
-*All buffers* MUST emit an `EventsFlushed` event immediately after flushing one or more Vector events.
+*All buffers* MUST emit an `EventsSent` event immediately after sending one or more Vector events.
 
 * Properties
-  * `count` - the number of flushed events
-  * `byte_size` - the byte size of flushed events
+  * `count` - the number of sent events
+  * `byte_size` - the byte size of sent events
 * Metric
-  * MUST increment the `buffer_flushed_events_total` counter by the defined `count`
-  * MUST increment the `buffer_flushed_bytes_total` counter by the defined `byte_size`
+  * MUST increment the `buffer_sent_events_total` counter by the defined `count`
+  * MUST increment the `buffer_sent_bytes_total` counter by the defined `byte_size`
   * MUST decrement the `buffer_events` gauge by the defined `count`
   * MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
   * MUST update the `buffer_usage_percentage` gauge
