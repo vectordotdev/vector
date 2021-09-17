@@ -109,7 +109,7 @@ components: sources: stdin: {
 		events_in_total:          components.sources.internal_metrics.output.metrics.events_in_total
 		processed_bytes_total:    components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:   components.sources.internal_metrics.output.metrics.processed_events_total
-		received_events_total:    components.sources.internal_metrics.output.metrics.received_events_total
+		component_received_events_total:    components.sources.internal_metrics.output.metrics.component_received_events_total
 		stdin_reads_failed_total: components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
 	}
 }

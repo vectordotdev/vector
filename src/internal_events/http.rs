@@ -18,7 +18,7 @@ impl InternalEvent for HttpEventsReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", self.events_count as u64);
+        counter!("component_received_events_total", self.events_count as u64);
         counter!("events_in_total", self.events_count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }

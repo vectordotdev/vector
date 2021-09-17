@@ -1270,6 +1270,6 @@ components: sources: dnstap: {
 		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 		parse_errors_total:     components.sources.internal_metrics.output.metrics.parse_errors_total
-		received_events_total:  components.sources.internal_metrics.output.metrics.received_events_total
+		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

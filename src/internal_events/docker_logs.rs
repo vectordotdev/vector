@@ -21,7 +21,7 @@ impl<'a> InternalEvent for DockerLogsEventReceived<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "received_events_total", 1,
+            "component_received_events_total", 1,
             "container_name" => self.container_name.to_owned()
         );
         counter!(
