@@ -68,7 +68,9 @@ pub fn init(color: bool, json: bool, levels: &str) {
         }
     } else {
         #[cfg(not(test))]
-        let formatter = tracing_subscriber::fmt::Layer::default().with_ansi(color);
+        let formatter = tracing_subscriber::fmt::Layer::default()
+            .with_ansi(color)
+            .with_writer(std::io::stderr);
 
         #[cfg(test)]
         let formatter = tracing_subscriber::fmt::Layer::default()

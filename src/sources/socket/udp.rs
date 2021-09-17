@@ -1,18 +1,19 @@
 use crate::{
-    codecs::CharacterDelimitedCodec,
+    codecs::Decoder,
     event::Event,
-    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
+    internal_events::{SocketEventsReceived, SocketMode},
     shutdown::ShutdownSignal,
-    sources::Source,
+    sources::{util::TcpError, Source},
     udp, Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use futures::SinkExt;
+use async_stream::stream;
+use bytes::Bytes;
+use futures::{SinkExt, StreamExt};
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
-use tokio_util::codec::Decoder;
+use tokio_util::udp::UdpFramed;
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters)]
@@ -42,10 +43,10 @@ impl UdpConfig {
 
 pub fn udp(
     address: SocketAddr,
-    max_length: usize,
     host_key: String,
     receive_buffer_bytes: Option<usize>,
-    mut shutdown: ShutdownSignal,
+    decoder: Decoder,
+    shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
@@ -61,54 +62,45 @@ pub fn udp(
             }
         }
 
-        let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            std::cmp::min(max_length, receive_buffer_bytes)
-        } else {
-            max_length
-        };
-
         info!(message = "Listening.", address = %address);
 
-        let mut buf = BytesMut::with_capacity(max_length);
-        loop {
-            buf.resize(max_length, 0);
-            tokio::select! {
-                recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, address) = recv.map_err(|error| {
-                        emit!(SocketReceiveError {
-                            error,
-                            mode: SocketMode::Udp
+        let mut stream = UdpFramed::new(socket, decoder).take_until(shutdown);
+        (stream! {
+            loop {
+                match stream.next().await {
+                    Some(Ok(((events, byte_size), received_from))) => {
+                        emit!(SocketEventsReceived {
+                            mode: SocketMode::Udp,
+                            byte_size,
+                            count: events.len()
                         });
-                    })?;
 
-                    let mut payload = buf.split_to(byte_size);
+                        for mut event in events {
+                            if let Event::Log(ref mut log) = event {
+                                log.insert(
+                                    crate::config::log_schema().source_type_key(),
+                                    Bytes::from("socket"),
+                                );
 
-                    // UDP processes messages per payload, where messages are separated by newline
-                    // and stretch to end of payload.
-                    let mut decoder = CharacterDelimitedCodec::new('\n');
-                    while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
-                        let mut event = Event::from(line);
+                                log.insert(host_key.clone(), received_from.to_string());
+                            }
 
-                        event
-                            .as_mut_log()
-                            .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
-                        event
-                            .as_mut_log()
-                            .insert(host_key.clone(), address.to_string());
-
-                        emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
-
-                        tokio::select!{
-                            result = out.send(event) => {match result {
-                                Ok(()) => { },
-                                Err(()) => return Ok(()),
-                            }}
-                            _ = &mut shutdown => return Ok(()),
+                            yield event;
                         }
                     }
+                    Some(Err(error)) => {
+                        // Error is logged by `crate::codecs::Decoder`, no
+                        // further handling is needed here.
+                        if !error.can_continue() {
+                            break;
+                        }
+                    }
+                    None => break,
                 }
-                _ = &mut shutdown => return Ok(()),
             }
-        }
+        })
+        .map(Ok)
+        .forward(&mut out)
+        .await
     })
 }

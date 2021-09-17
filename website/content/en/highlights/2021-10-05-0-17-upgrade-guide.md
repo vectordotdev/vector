@@ -14,8 +14,9 @@ Vector's 0.17.0 release includes two **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
 1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
+1. [Vector now logs to stderr](#logging)
 
-We cover it below to help you upgrade quickly:
+We cover them below to help you upgrade quickly:
 
 ## Upgrade guide
 
@@ -39,3 +40,13 @@ with your timeout settings.
 
 Users that have previously set `batch.max_bytes` may now safely remove the
 value. If it is left the setting will have no effect.
+
+### Vector now logs to stderr {#logging}
+
+Previously, Vector used to log all output to stdout, but this made it difficult to use the output of the `console` sink,
+which also writes to stdout by default.  Following some discussion in
+[#1714](https://github.com/vectordotdev/vector/issues/1740) we decided to modify Vector to, instead, log to stderr so
+that stdout can be processed separately.
+
+If you were previously depending on Vector's logs appearing in stdout, you should now look for them in stderr.
+=======

@@ -1,7 +1,7 @@
 use crate::{
-    codecs::{BoxedFramingError, CharacterDelimitedCodec},
+    codecs::{self, BytesParser, NewlineDelimitedCodec},
     event::Event,
-    internal_events::{SocketEventReceived, SocketMode},
+    internal_events::{SocketEventsReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
@@ -9,6 +9,7 @@ use crate::{
 use bytes::Bytes;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct TcpConfig {
@@ -74,33 +75,39 @@ pub struct RawTcpSource {
 }
 
 impl TcpSource for RawTcpSource {
-    type Error = BoxedFramingError;
-    type Decoder = CharacterDelimitedCodec;
+    type Error = codecs::Error;
+    type Item = SmallVec<[Event; 1]>;
+    type Decoder = codecs::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        CharacterDelimitedCodec::new_with_max_length('\n', self.config.max_length)
+        codecs::Decoder::new(
+            Box::new(NewlineDelimitedCodec::new_with_max_length(
+                self.config.max_length,
+            )),
+            Box::new(BytesParser),
+        )
     }
 
-    fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
-        let byte_size = frame.len();
-        let mut event = Event::from(frame);
-
-        event.as_mut_log().insert(
-            crate::config::log_schema().source_type_key(),
-            Bytes::from("socket"),
-        );
-
-        let host_key = (self.config.host_key.clone())
-            .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
-
-        event.as_mut_log().insert(host_key, host);
-
-        emit!(SocketEventReceived {
+    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
+        emit!(SocketEventsReceived {
+            mode: SocketMode::Tcp,
             byte_size,
-            mode: SocketMode::Tcp
+            count: events.len()
         });
 
-        Some(event)
+        for event in events {
+            if let Event::Log(ref mut log) = event {
+                log.insert(
+                    crate::config::log_schema().source_type_key(),
+                    Bytes::from("socket"),
+                );
+
+                let host_key = (self.config.host_key.clone())
+                    .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
+
+                log.insert(host_key, host.clone());
+            }
+        }
     }
 }
 

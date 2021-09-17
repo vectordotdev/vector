@@ -6,14 +6,12 @@ use crate::{
 use async_trait::async_trait;
 use bytes::Bytes;
 use flate2::write::GzEncoder;
-use futures::{
-    stream::{BoxStream, StreamExt},
-    FutureExt,
-};
+use futures::stream::{BoxStream, StreamExt};
 use std::{
     fmt,
     io::{self, Write},
     num::NonZeroUsize,
+    sync::Arc,
     time::Duration,
 };
 use tower::Service;
@@ -73,7 +71,7 @@ where
     S::Future: Send + 'static,
     S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
-    R: S3RequestBuilder + Send,
+    R: S3RequestBuilder + Send + Sync,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // All sinks do the same fundamental job: take in events, and ship them
@@ -97,6 +95,7 @@ where
         let request_builder = self
             .request_builder
             .take()
+            .map(Arc::new)
             .expect("same sink should not be run twice");
 
         let batcher = Batcher::new(
@@ -107,8 +106,9 @@ where
             self.batch_size_bytes,
         );
 
-        let processed_batches = batcher.filter_map(|(key, batch)| async move {
-            key.map(|key| request_builder.build_request(key, batch))
+        let processed_batches = batcher.filter_map(move |(key, batch)| {
+            let request_builder = request_builder.clone();
+            async move { key.map(|key| request_builder.build_request(key, batch)) }
         });
 
         let driver = Driver::new(processed_batches, service, acker);
@@ -117,16 +117,16 @@ where
 }
 
 pub trait S3RequestBuilder {
-    fn build_request(&mut self, key: String, batch: Vec<Event>) -> S3Request;
+    fn build_request(&self, key: String, batch: Vec<Event>) -> S3Request;
 }
 
 pub trait S3EventEncoding {
-    fn encode_event(&mut self, event: Event, writer: &mut dyn Write) -> io::Result<()>;
+    fn encode_event(&self, event: Event, writer: &mut dyn Write) -> io::Result<()>;
 }
 
 pub fn process_event_batch<E: S3EventEncoding>(
     batch: Vec<Event>,
-    encoding: &mut E,
+    encoding: &E,
     compression: Compression,
 ) -> (Bytes, EventFinalizers) {
     enum Writer {
