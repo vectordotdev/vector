@@ -220,9 +220,10 @@ impl File {
     }
 
     /// Order the fields in the index according to the position they are found in the header.
-    fn normalize_index_fields(&self, index: &[&str]) -> Vec<usize> {
+    fn normalize_index_fields(&self, index: &[&str]) -> Result<Vec<usize>, String> {
         // Get the positions of the fields we are indexing
-        self.headers
+        let normalized = self
+            .headers
             .iter()
             .enumerate()
             .filter_map(|(idx, col)| {
@@ -232,7 +233,24 @@ impl File {
                     None
                 }
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+
+        if normalized.len() != index.len() {
+            let missing = index
+                .iter()
+                .filter_map(|col| {
+                    if self.headers.iter().any(|header| header == *col) {
+                        None
+                    } else {
+                        Some(col.to_string())
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(format!("field(s) '{}' missing from dataset", missing))
+        } else {
+            Ok(normalized)
+        }
     }
 
     /// Creates an index with the given fields.
@@ -410,7 +428,7 @@ impl Table for File {
     }
 
     fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
-        let normalized = self.normalize_index_fields(fields);
+        let normalized = self.normalize_index_fields(fields)?;
         match self
             .indexes
             .iter()
@@ -503,6 +521,24 @@ mod tests {
 
         assert_eq!(handle1, handle2);
         assert_eq!(1, file.indexes.len());
+    }
+
+    #[test]
+    fn errors_on_missing_columns() {
+        let mut file = File::new(
+            Vec::new(),
+            vec![
+                "field1".to_string(),
+                "field2".to_string(),
+                "field3".to_string(),
+            ],
+        );
+
+        let error = file.add_index(Case::Sensitive, &["apples", "field2", "bananas"]);
+        assert_eq!(
+            Err("field(s) 'apples, bananas' missing from dataset".to_string()),
+            error
+        )
     }
 
     #[test]
