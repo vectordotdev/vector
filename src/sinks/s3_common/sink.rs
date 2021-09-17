@@ -202,7 +202,7 @@ where
                         let status = match result {
                             Err(error) => {
                                 error!("Sink IO failed with error: {}.", error);
-                                EventStatus::Failed
+                                EventStatus::Errored
                             },
                             Ok(response) => { *response.as_ref() }
                         };
