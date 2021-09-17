@@ -1,36 +1,25 @@
-use crate::sinks::util::sink::ServiceLogic;
 use crate::{
     config::SinkContext,
     event::Event,
-    sinks::util::{buffer::GZIP_FAST, sink::StdServiceLogic, Compression},
+    sinks::util::{buffer::GZIP_FAST, Compression},
 };
 use async_trait::async_trait;
 use bytes::Bytes;
 use flate2::write::GzEncoder;
 use futures::{
-    stream::{BoxStream, FuturesUnordered, StreamExt},
-    FutureExt, TryFutureExt,
+    stream::{BoxStream, StreamExt},
+    FutureExt,
 };
-use std::sync::Arc;
 use std::{
-    collections::HashMap,
-    fmt::Debug,
+    fmt,
     io::{self, Write},
     num::NonZeroUsize,
     time::Duration,
 };
-use tokio::sync::Barrier;
-use tokio::{
-    pin, select,
-    sync::{
-        mpsc::{channel, Receiver},
-        oneshot,
-    },
-};
-use tower::{Service, ServiceExt};
-use tracing_futures::Instrument;
+use tower::Service;
+use vector_core::stream::driver::Driver;
+use vector_core::{buffers::Acker, event::EventStatus};
 use vector_core::{
-    buffers::Acker,
     event::{EventFinalizers, Finalizable},
     sink::StreamSink,
     stream::batcher::Batcher,
@@ -38,7 +27,6 @@ use vector_core::{
 
 use crate::sinks::s3_common::partitioner::KeyPartitioner;
 use crate::sinks::s3_common::service::S3Request;
-use crate::sinks::util::sink::Response;
 
 pub struct S3Sink<S, R>
 where
@@ -46,7 +34,7 @@ where
 {
     acker: Option<Acker>,
     service: Option<S>,
-    request_builder: R,
+    request_builder: Option<R>,
     partitioner: Option<KeyPartitioner>,
     batch_size_bytes: Option<NonZeroUsize>,
     batch_size_events: NonZeroUsize,
@@ -69,7 +57,7 @@ where
         Self {
             acker: Some(cx.acker()),
             service: Some(service),
-            request_builder,
+            request_builder: Some(request_builder),
             partitioner: Some(partitioner),
             batch_size_bytes,
             batch_size_events,
@@ -83,8 +71,8 @@ impl<S, R> StreamSink for S3Sink<S, R>
 where
     S: Service<S3Request> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
-    S::Error: Debug + Into<crate::Error> + Send,
+    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
     R: S3RequestBuilder + Send,
 {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -94,8 +82,6 @@ where
         // order to do that, we'll spin up a separate task that deals
         // exclusively with I/O, while we deal with everything else here:
         // batching, ordering, and so on.
-        let (io_tx, io_rx) = channel(64);
-        let io_barrier = Arc::new(Barrier::new(2));
         let service = self
             .service
             .take()
@@ -108,9 +94,10 @@ where
             .partitioner
             .take()
             .expect("same sink should not be run twice");
-
-        let io = run_io(io_rx, Arc::clone(&io_barrier), service, acker).in_current_span();
-        let _ = tokio::spawn(io);
+        let request_builder = self
+            .request_builder
+            .take()
+            .expect("same sink should not be run twice");
 
         let batcher = Batcher::new(
             input,
@@ -119,121 +106,14 @@ where
             self.batch_size_events,
             self.batch_size_bytes,
         );
-        pin!(batcher);
 
-        while let Some((key, batch)) = batcher.next().await {
-            match key {
-                Some(key) => {
-                    // We could push this down to the I/O task if we wanted to.
-                    let request = self.request_builder.build_request(key, batch);
-                    if io_tx.send(request).await.is_err() {
-                        error!(
-                            "Sink I/O channel should not be closed before sink itself is closed."
-                        );
-                        return Err(());
-                    }
-                }
-                // Partitioning failed for one or more events.
-                //
-                // TODO: this might be where we would insert something like the
-                // proposed error handling/dead letter queue stuff; events that
-                // _we_ can't handle, but some other component may be able to
-                // salvage
-                None => {
-                    continue;
-                }
-            }
-        }
+        let processed_batches = batcher.filter_map(|(key, batch)| async move {
+            key.map(|key| request_builder.build_request(key, batch))
+        });
 
-        // Wait for the I/O task to complete.
-        //
-        // TODO: the need for this synchronization means we should probably look into something more
-        // ergonomic like `buffered`/`buffer_unordered` + `tokio::spawn`, otherwise every sink will
-        // be reimplementing this logic for the common case.
-        drop(io_tx);
-        io_barrier.wait().await;
-
-        Ok(())
+        let driver = Driver::new(processed_batches, service, acker);
+        driver.run().await
     }
-}
-
-async fn run_io<S>(mut rx: Receiver<S3Request>, barrier: Arc<Barrier>, mut service: S, acker: Acker)
-where
-    S: Service<S3Request>,
-    S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
-    S::Error: Debug + Into<crate::Error> + Send,
-{
-    let in_flight = FuturesUnordered::new();
-    let mut pending_acks = HashMap::new();
-    let mut seq_head: u64 = 0;
-    let mut seq_tail: u64 = 0;
-
-    pin!(in_flight);
-
-    loop {
-        select! {
-            Some(req) = rx.recv() => {
-                // Rebind the variable to avoid a bug with the pattern matching
-                // in `select!`: https://github.com/tokio-rs/tokio/issues/4076
-                let mut req = req;
-                let seqno = seq_head;
-                seq_head += 1;
-
-                let (tx, rx) = oneshot::channel();
-
-                in_flight.push(rx);
-
-                trace!(
-                    message = "Submitting service request.",
-                    in_flight_requests = in_flight.len()
-                );
-                // TODO: This likely need be parameterized, which builds a
-                // stronger case for following through with the comment
-                // mentioned below.
-                let logic = StdServiceLogic::default();
-                // TODO: I'm not entirely happy with how we're smuggling
-                // batch_size/finalizers this far through, from the finished
-                // batch all the way through to the concrete request type...we
-                // lifted this code from `ServiceSink` directly, but we should
-                // probably treat it like `PartitionBatcher` and shove it into a
-                // single, encapsulated type instead.
-                let batch_size = req.batch_size;
-                let finalizers = req.take_finalizers();
-
-                let svc = service.ready().await.expect("should not get error when waiting for svc readiness");
-                let fut = svc.call(req)
-                    .err_into()
-                    .map(move |result| {
-                        logic.update_finalizers(result, finalizers);
-
-                        // If the rx end is dropped we still completed
-                        // the request so this is a weird case that we can
-                        // ignore for now.
-                        let _ = tx.send((seqno, batch_size));
-                    })
-                    .instrument(info_span!("request", request_id = %seqno));
-                tokio::spawn(fut);
-            },
-
-            Some(Ok((seqno, batch_size))) = in_flight.next() => {
-                trace!("pending batch {} finished (n={})", seqno, batch_size);
-                pending_acks.insert(seqno, batch_size);
-
-                let mut num_to_ack = 0;
-                while let Some(ack_size) = pending_acks.remove(&seq_tail) {
-                    num_to_ack += ack_size;
-                    seq_tail += 1
-                }
-                trace!(message = "Acking events.", acking_num = num_to_ack);
-                acker.ack(num_to_ack);
-            },
-
-            else => break
-        }
-    }
-
-    barrier.wait().await;
 }
 
 pub trait S3RequestBuilder {

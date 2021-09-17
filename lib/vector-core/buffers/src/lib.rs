@@ -20,7 +20,7 @@ mod test;
 mod variant;
 
 use crate::bytes::{DecodeBytes, EncodeBytes};
-pub use acker::Acker;
+pub use acker::{Ackable, Acker};
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 #[cfg(test)]

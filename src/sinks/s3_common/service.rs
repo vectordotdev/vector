@@ -6,7 +6,10 @@ use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3}
 use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
-use vector_core::event::{EventFinalizers, Finalizable};
+use vector_core::{
+    buffers::Ackable,
+    event::{EventFinalizers, Finalizable},
+};
 
 use crate::{
     internal_events::aws_s3::sink::S3EventsSent, serde::to_string, sinks::util::sink::Response,
@@ -23,6 +26,12 @@ pub struct S3Request {
     pub options: S3Options,
     pub batch_size: usize,
     pub finalizers: EventFinalizers,
+}
+
+impl Ackable for S3Request {
+    fn ack_size(&self) -> usize {
+        self.batch_size
+    }
 }
 
 impl Finalizable for S3Request {

@@ -39,87 +39,85 @@ impl S3EventEncoding for S3RequestOptions {
 
 impl S3RequestBuilder for S3RequestOptions {
     fn build_request(&mut self, key: String, batch: Vec<Event>) -> S3Request {
-        {
-            // Generate the filename for this batch, which involves a surprising amount
-            // of code.
-            let filename = {
-                /*
-                Since this is generic over the partitioner, for purposes of unit tests,
-                we can't get the compiler to let us define a conversion trait such that
-                we can get &Event from &P::Item, or I at least don't know how to
-                trivially do that.  I'm leaving this snippet here because it embodies
-                the prior TODO comment of using the timestamp of the last event in the
-                batch rather than the current time.
+        // Generate the filename for this batch, which involves a surprising amount
+        // of code.
+        let filename = {
+            /*
+            Since this is generic over the partitioner, for purposes of unit tests,
+            we can't get the compiler to let us define a conversion trait such that
+            we can get &Event from &P::Item, or I at least don't know how to
+            trivially do that.  I'm leaving this snippet here because it embodies
+            the prior TODO comment of using the timestamp of the last event in the
+            batch rather than the current time.
 
-                Now that I think of it... is that even right?  Do customers want logs
-                with timestamps in them related to the last event contained within, or
-                do they want timestamps that include when the file was generated and
-                dropped into the bucket?  My gut says "time when the log dropped" but
-                maybe not...
+            Now that I think of it... is that even right?  Do customers want logs
+            with timestamps in them related to the last event contained within, or
+            do they want timestamps that include when the file was generated and
+            dropped into the bucket?  My gut says "time when the log dropped" but
+            maybe not...
 
-                let last_event_ts = batch
-                    .items()
-                    .iter()
-                    .last()
-                    .and_then(|e| match e.into() {
-                        // If the event has a field called timestamp, in RFC3339 format, use that.
-                        Event::Log(le) => le
-                            .get(log_schema().timestamp_key())
-                            .cloned()
-                            .and_then(|ts| match ts {
-                                Value::Timestamp(ts) => Some(ts),
-                                Value::Bytes(buf) => std::str::from_utf8(&buf)
-                                    .ok()
-                                    .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-                                    .map(|dt| dt.with_timezone(&Utc)),
-                                _ => None,
-                            }),
-                        // TODO: We don't ship metrics to the S3, but if we did, would this be right? or is
-                        // there an actual field we should be checking similar to above?
-                        Event::Metric(_) => Some(Utc::now()),
-                    })
-                    .unwrap_or_else(|| Utc::now());
-                let formatted_ts = last_event_ts.format(&time_format);
-                */
-                let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
+            let last_event_ts = batch
+                .items()
+                .iter()
+                .last()
+                .and_then(|e| match e.into() {
+                    // If the event has a field called timestamp, in RFC3339 format, use that.
+                    Event::Log(le) => le
+                        .get(log_schema().timestamp_key())
+                        .cloned()
+                        .and_then(|ts| match ts {
+                            Value::Timestamp(ts) => Some(ts),
+                            Value::Bytes(buf) => std::str::from_utf8(&buf)
+                                .ok()
+                                .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                                .map(|dt| dt.with_timezone(&Utc)),
+                            _ => None,
+                        }),
+                    // TODO: We don't ship metrics to the S3, but if we did, would this be right? or is
+                    // there an actual field we should be checking similar to above?
+                    Event::Metric(_) => Some(Utc::now()),
+                })
+                .unwrap_or_else(|| Utc::now());
+            let formatted_ts = last_event_ts.format(&time_format);
+            */
+            let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
 
-                if self.filename_append_uuid {
-                    let uuid = Uuid::new_v4();
-                    format!("{}-{}", formatted_ts, uuid.to_hyphenated())
-                } else {
-                    formatted_ts.to_string()
-                }
-            };
-
-            let extension = self
-                .filename_extension
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(|| self.compression.extension().into());
-            let key = format!("{}/{}.{}", key, filename, extension);
-
-            // Process our events. This does all of the necessary encoding rule
-            // application, as well as encoding and compressing the events.  We're
-            // handed back a tidy `Bytes` instance we can send directly to S3.
-            let batch_size = batch.len();
-            let (body, finalizers) = process_event_batch(batch, self, self.compression);
-
-            debug!(
-                message = "Sending events.",
-                bytes = ?body.len(),
-                bucket = ?self.bucket,
-                key = ?key
-            );
-
-            S3Request {
-                body,
-                bucket: self.bucket.clone(),
-                key,
-                content_encoding: self.compression.content_encoding(),
-                options: self.api_options.clone(),
-                batch_size,
-                finalizers,
+            if self.filename_append_uuid {
+                let uuid = Uuid::new_v4();
+                format!("{}-{}", formatted_ts, uuid.to_hyphenated())
+            } else {
+                formatted_ts.to_string()
             }
+        };
+
+        let extension = self
+            .filename_extension
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| self.compression.extension().into());
+        let key = format!("{}/{}.{}", key, filename, extension);
+
+        // Process our events. This does all of the necessary encoding rule
+        // application, as well as encoding and compressing the events.  We're
+        // handed back a tidy `Bytes` instance we can send directly to S3.
+        let batch_size = batch.len();
+        let (body, finalizers) = process_event_batch(batch, self, self.compression);
+
+        debug!(
+            message = "Sending events.",
+            bytes = ?body.len(),
+            bucket = ?self.bucket,
+            key = ?key
+        );
+
+        S3Request {
+            body,
+            bucket: self.bucket.clone(),
+            key,
+            content_encoding: self.compression.content_encoding(),
+            options: self.api_options.clone(),
+            batch_size,
+            finalizers,
         }
     }
 }
