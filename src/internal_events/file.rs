@@ -128,6 +128,7 @@ mod source {
             counter!(
                 "errors_total", 1,
                 "error_type" => "read_failed",
+                "error" => self.error.to_string(),
                 "file" => self.path.to_string_lossy().into_owned(),
                 "stage" => "receiving",
             );
@@ -158,6 +159,7 @@ mod source {
             counter!(
                 "errors_total", 1,
                 "error_type" => "delete_failed",
+                "error" => self.error.to_string(),
                 "file" => self.path.to_string_lossy().into_owned(),
                 "stage" => "receiving"
             );
@@ -231,6 +233,7 @@ mod source {
             counter!(
                 "errors_total", 1,
                 "error_type" => "watch_failed",
+                "error" => self.error.to_string(),
                 "file" => self.path.to_string_lossy().into_owned(),
                 "stage" => "receiving"
             );
@@ -321,6 +324,7 @@ mod source {
             counter!(
                 "errors_total", 1,
                 "error_type" => "write_error",
+                "error" => self.error.to_string(),
                 "stage" => "receiving"
             );
         }
@@ -351,6 +355,7 @@ mod source {
             counter!(
                 "errors_total", 1,
                 "error_type" => "glob_failed",
+                "error" => self.error.to_string(),
                 "file" => self.path.to_string_lossy().into_owned(),
                 "stage" => "receiving"
             );

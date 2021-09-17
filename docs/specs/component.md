@@ -218,7 +218,7 @@ implement since errors are specific to the component.
     logs and metrics, as specified below, as if they were present.
 * Metrics
   * MUST increment the `errors_total` counter by 1 with the defined properties
-    as metric tags (excluding `error`).
+    as metric tags.
   * MUST increment the `discarded_events_total` counter by the number of Vector
     events discarded if the error resulted in discarding (dropping) events.
 * Logs
