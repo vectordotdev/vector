@@ -1,5 +1,5 @@
 use crate::{
-    codecs::Decoder,
+    codecs::{Decoder, DecodingConfig},
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
     shutdown::ShutdownSignal,
@@ -20,6 +20,8 @@ pub struct UnixConfig {
     #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
+    #[serde(flatten, default)]
+    pub decoding: DecodingConfig,
 }
 
 impl UnixConfig {
@@ -28,6 +30,7 @@ impl UnixConfig {
             path,
             max_length: crate::serde::default_max_length(),
             host_key: None,
+            decoding: Default::default(),
         }
     }
 }

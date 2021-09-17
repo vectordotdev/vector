@@ -20,7 +20,7 @@ use smallvec::SmallVec;
 use std::fmt::Debug;
 
 /// Parse structured events from bytes.
-pub trait Parser: DynClone + Send + Sync {
+pub trait Parser: DynClone + Debug + Send + Sync {
     /// Parses structured events from bytes.
     ///
     /// It returns a `SmallVec` rather than an `Event` directly, since one byte
@@ -32,8 +32,8 @@ pub trait Parser: DynClone + Send + Sync {
 
 dyn_clone::clone_trait_object!(Parser);
 
-/// A `Box` containing a thread-safe `Parser`.
-pub type BoxedParser = Box<dyn Parser + Send + Sync>;
+/// A `Box` containing a `Parser`.
+pub type BoxedParser = Box<dyn Parser>;
 
 /// Define options for a parser and build it from the config object.
 ///

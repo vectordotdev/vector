@@ -54,7 +54,7 @@ impl TcpError for Error {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 /// A decoder that can decode structured events from a byte stream / byte
 /// messages.
 pub struct Decoder {
