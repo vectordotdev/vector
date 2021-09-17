@@ -92,25 +92,66 @@ components: sources: [Name=string]: {
 								syntax: "literal"
 							}
 						}
-						max_length: {
-							common:      false
-							description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
-							required:    false
-							type: uint: {
-								default: 102400
-								examples: [65535, 102400]
-								unit: "bytes"
+						character_delimited: {
+							description:   "Options for `character_delimited` framing."
+							required:      true
+							relevant_when: "method = `character_delimited`"
+							type: object: options: {
+								delimiter: {
+									description: "The character used to separate frames."
+									required:    true
+									type: string: {
+										examples: ["\n", "\t"]
+										syntax: "literal"
+									}
+								}
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: 102400
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
 							}
-							relevant_when: "`method` = `character_delimited`, `newline_delimited` or `octet_counting`"
 						}
-						delimiter: {
-							description: "The character used to separate frames."
-							required:    true
-							type: string: {
-								examples: ["\n", "\t"]
-								syntax: "literal"
+						newline_delimited: {
+							description:   "Options for `newline_delimited` framing."
+							required:      false
+							common:        false
+							relevant_when: "method = `newline_delimited`"
+							type: object: options: {
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: 102400
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
 							}
-							relevant_when: "`method` = `character_delimited`"
+						}
+						octet_counting: {
+							description:   "Options for `octet_counting` framing."
+							required:      false
+							common:        false
+							relevant_when: "method = `octet_counting`"
+							type: object: options: {
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: 102400
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
+							}
 						}
 					}
 				}
@@ -131,12 +172,20 @@ components: sources: [Name=string]: {
 								syntax: "literal"
 							}
 						}
-						skip_empty: {
-							common:      false
-							description: "Whether empty frames are skipped without warning."
-							required:    false
-							type: bool: default: false
-							relevant_when: "`codec` = `json`"
+						json: {
+							description:   "Options for `json` decoding."
+							required:      false
+							common:        false
+							relevant_when: "codec = `json`"
+							type: object: options: {
+								skip_empty: {
+									description: "Whether empty frames are skipped without warning."
+									required:    false
+									common:      false
+									type: bool: default: false
+									relevant_when: "`codec` = `json`"
+								}
+							}
 						}
 					}
 				}
