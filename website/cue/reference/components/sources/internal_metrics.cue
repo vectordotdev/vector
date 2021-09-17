@@ -456,17 +456,17 @@ components: sources: internal_metrics: {
 				The number of events accepted by this component either from tagged
 				origins like file and uri, or cumulatively from other origins.
 				This metric is deprecated and will be removed in a future version.
-				Use [`received_events_total`](\(urls.vector_sources)/internal_metrics/#received_events_total) instead.
+				Use [`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) instead.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              received_events_total.tags
+			tags:              component_received_events_total.tags
 		}
 		events_out_total: {
 			description:       """
 				The total number of events emitted by this component.
 				This metric is deprecated and will be removed in a future version.
-				Use [`sent_events_total`](\(urls.vector_sources)/internal_metrics/#sent_events_total) instead.
+				Use [`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) instead.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
@@ -476,8 +476,8 @@ components: sources: internal_metrics: {
 			description:       """
 				The total number of events processed by this component.
 				This metric is deprecated in place of using
-				[`received_events_total`](\(urls.vector_sources)/internal_metrics/#received_events_total) and
-				[`sent_events_total`](\(urls.vector_sources)/internal_metrics/#sent_events_total) metrics.
+				[`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) and
+				[`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) metrics.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
@@ -489,7 +489,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              received_events_total.tags
 		}
-		received_events_total: {
+		component_received_events_total: {
 			description: """
 				The number of events accepted by this component either from tagged
 				origins like file and uri, or cumulatively from other origins.
@@ -524,22 +524,22 @@ components: sources: internal_metrics: {
 				mode: _mode
 			}
 		}
-		received_event_bytes_total: {
+		component_received_event_bytes_total: {
 			description: """
 				The number of event bytes accepted by this component either from
 				tagged origins like file and uri, or cumulatively from other origins.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              received_events_total.tags
+			tags:              component_received_events_total.tags
 		}
-		sent_events_total: {
+		component_sent_events_total: {
 			description:       "The total number of events emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		sent_event_bytes_total: {
+		component_sent_event_bytes_total: {
 			description:       "The total number of event bytes emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"

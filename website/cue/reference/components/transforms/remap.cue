@@ -155,7 +155,7 @@ components: transforms: "remap": {
 				* read-only access to the event's`.type`
 				* read/write access to `kind`, but it can only be set to one of `incremental` or `absolute` and cannot be deleted
 				* read/write access to `name`, but it cannot be deleted
-				* read/write/delete access to `namespace, `timestamp`, and keys in `tags`
+				* read/write/delete access to `namespace`, `timestamp`, and keys in `tags`
 				"""
 		}
 		lazy_event_mutation: {

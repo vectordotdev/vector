@@ -619,7 +619,7 @@ components: sources: file: {
 		fingerprint_read_errors_total: components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
 		glob_errors_total:             components.sources.internal_metrics.output.metrics.glob_errors_total
 		received_bytes_total:          components.sources.internal_metrics.output.metrics.received_bytes_total
-		received_events_total:         components.sources.internal_metrics.output.metrics.received_events_total
 		received_event_bytes_total:    components.sources.internal_metrics.output.metrics.received_event_bytes_total
+		component_received_events_total:         components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

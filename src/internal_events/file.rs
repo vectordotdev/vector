@@ -64,7 +64,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "received_events_total", 1,
+                "component_received_events_total", 1,
                 "file" => self.file.to_owned(),
             );
             counter!(
