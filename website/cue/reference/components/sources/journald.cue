@@ -269,6 +269,6 @@ components: sources: journald: {
 		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
-		received_events_total:      components.sources.internal_metrics.output.metrics.received_events_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

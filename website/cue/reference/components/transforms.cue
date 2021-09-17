@@ -13,10 +13,10 @@ components: transforms: [Name=string]: {
 	telemetry: metrics: {
 		events_in_total:            components.sources.internal_metrics.output.metrics.events_in_total
 		events_out_total:           components.sources.internal_metrics.output.metrics.events_out_total
-		received_events_total:      components.sources.internal_metrics.output.metrics.received_events_total
-		received_event_bytes_total: components.sources.internal_metrics.output.metrics.received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		utilization:                components.sources.internal_metrics.output.metrics.utilization
-		sent_events_total:          components.sources.internal_metrics.output.metrics.sent_events_total
-		sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.sent_event_bytes_total
+		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 	}
 }

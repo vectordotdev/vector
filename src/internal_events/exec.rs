@@ -18,7 +18,7 @@ impl InternalEvent for ExecEventReceived<'_> {
 
     fn emit_metrics(&self) {
         counter!(
-            "received_events_total", 1,
+            "component_received_events_total", 1,
             "command" => self.command.to_owned(),
         );
         counter!(
