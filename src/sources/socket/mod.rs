@@ -5,6 +5,7 @@ mod unix;
 
 use super::util::TcpSource;
 use crate::{
+    codecs::{BytesParser, Decoder, NewlineDelimitedCodec},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -99,11 +100,17 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = Decoder::new(
+                    Box::new(NewlineDelimitedCodec::new_with_max_length(
+                        config.max_length(),
+                    )),
+                    Box::new(BytesParser),
+                );
                 Ok(udp::udp(
                     config.address(),
-                    config.max_length(),
                     host_key,
                     config.receive_buffer_bytes(),
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -113,10 +120,17 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = Decoder::new(
+                    Box::new(NewlineDelimitedCodec::new_with_max_length(
+                        config.max_length,
+                    )),
+                    Box::new(BytesParser),
+                );
                 Ok(unix::unix_datagram(
                     config.path,
                     config.max_length,
                     host_key,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -126,10 +140,16 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = Decoder::new(
+                    Box::new(NewlineDelimitedCodec::new_with_max_length(
+                        config.max_length,
+                    )),
+                    Box::new(BytesParser),
+                );
                 Ok(unix::unix_stream(
                     config.path,
-                    config.max_length,
                     host_key,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
