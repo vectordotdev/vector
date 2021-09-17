@@ -16,7 +16,7 @@ use std::io::{self, Write};
 use uuid::Uuid;
 
 impl S3EventEncoding for S3RequestOptions {
-    fn encode_event(&mut self, mut event: Event, mut writer: &mut dyn Write) -> io::Result<()> {
+    fn encode_event(&self, mut event: Event, mut writer: &mut dyn Write) -> io::Result<()> {
         self.encoding.apply_rules(&mut event);
 
         let log = event.into_log();
@@ -38,7 +38,7 @@ impl S3EventEncoding for S3RequestOptions {
 }
 
 impl S3RequestBuilder for S3RequestOptions {
-    fn build_request(&mut self, key: String, batch: Vec<Event>) -> S3Request {
+    fn build_request(&self, key: String, batch: Vec<Event>) -> S3Request {
         // Generate the filename for this batch, which involves a surprising amount
         // of code.
         let filename = {
@@ -148,7 +148,7 @@ mod tests {
     fn s3_encode_event_text() {
         let message = "hello world".to_string();
         let mut writer = Cursor::new(Vec::new());
-        let mut request_options = S3RequestOptions {
+        let request_options = S3RequestOptions {
             encoding: EncodingConfig::from(Encoding::Text),
             ..request_options()
         };
@@ -168,7 +168,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let mut writer = Cursor::new(Vec::new());
-        let mut request_options = S3RequestOptions {
+        let request_options = S3RequestOptions {
             encoding: EncodingConfig::from(Encoding::Ndjson),
             ..request_options()
         };
@@ -197,7 +197,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let mut writer = Cursor::new(Vec::new());
-        let mut request_options = S3RequestOptions {
+        let request_options = S3RequestOptions {
             encoding: encoding_config,
             ..request_options()
         };
@@ -219,25 +219,25 @@ mod tests {
         let partition_key = partitioner.partition(&event).to_string();
         let finished_batch = vec![event];
 
-        let mut settings = request_options();
+        let settings = request_options();
         let req = settings.build_request(partition_key.clone(), finished_batch.clone());
         assert_eq!(req.key, "key/date.ext");
 
-        let mut settings = S3RequestOptions {
+        let settings = S3RequestOptions {
             filename_extension: None,
             ..request_options()
         };
         let req = settings.build_request(partition_key.clone(), finished_batch.clone());
         assert_eq!(req.key, "key/date.log");
 
-        let mut settings = S3RequestOptions {
+        let settings = S3RequestOptions {
             compression: Compression::gzip_default(),
             ..settings
         };
         let req = settings.build_request(partition_key.clone(), finished_batch.clone());
         assert_eq!(req.key, "key/date.log.gz");
 
-        let mut settings = S3RequestOptions {
+        let settings = S3RequestOptions {
             filename_append_uuid: true,
             ..settings
         };

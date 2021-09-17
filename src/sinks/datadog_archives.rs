@@ -4,6 +4,7 @@ use std::{
     convert::TryFrom,
     io::{self, Write},
     num::NonZeroUsize,
+    sync::atomic::{AtomicU32, Ordering},
     time::Duration,
 };
 
@@ -188,11 +189,11 @@ const RESERVED_ATTRIBUTES: [&str; 10] = [
     "_id", "date", "message", "host", "source", "service", "status", "tags", "trace_id", "span_id",
 ];
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct DatadogArchivesSinkEncoding {
     reserved_attributes: HashSet<&'static str>,
     id_rnd_bytes: [u8; 8],
-    id_seq_number: u32,
+    id_seq_number: AtomicU32,
 }
 
 impl S3EventEncoding for DatadogArchivesSinkEncoding {
@@ -202,7 +203,7 @@ impl S3EventEncoding for DatadogArchivesSinkEncoding {
     /// - `message`,`host` are set from the corresponding Global Log Schema mappings;
     /// - `source`, `service`, `status`, `tags` and other reserved attributes are left as is;
     /// - the rest of the fields is moved to `attributes`.
-    fn encode_event(&mut self, event: Event, mut writer: &mut dyn Write) -> io::Result<()> {
+    fn encode_event(&self, event: Event, mut writer: &mut dyn Write) -> io::Result<()> {
         let mut log_event = event.into_log();
 
         log_event.insert("_id", self.generate_log_id());
@@ -246,7 +247,7 @@ impl DatadogArchivesSinkEncoding {
     ///
     /// To generate unique-ish trailing 12 bytes we use random 8 bytes, generated at startup,
     /// and a rolling-over 4-bytes sequence number.
-    fn generate_log_id(&mut self) -> String {
+    fn generate_log_id(&self) -> String {
         let mut id = BytesMut::with_capacity(18);
         // timestamp in millis - 6 bytes
         let now = Utc::now();
@@ -256,8 +257,8 @@ impl DatadogArchivesSinkEncoding {
         id.put_slice(&self.id_rnd_bytes);
 
         // 4 bytes for the counter should be more than enough - it should be unique for 1 millisecond only
-        self.id_seq_number = self.id_seq_number.wrapping_add(1);
-        id.put_u32(self.id_seq_number);
+        let id_seq_number = self.id_seq_number.fetch_add(1, Ordering::Relaxed);
+        id.put_u32(id_seq_number);
 
         base64::encode(id.freeze())
     }
@@ -267,11 +268,11 @@ fn default_encoding() -> DatadogArchivesSinkEncoding {
     DatadogArchivesSinkEncoding {
         reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
         id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
-        id_seq_number: u32::default(),
+        id_seq_number: AtomicU32::new(0),
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct DatadogS3RequestBuilder {
     pub bucket: String,
     pub key_prefix: Option<String>,
@@ -279,7 +280,7 @@ struct DatadogS3RequestBuilder {
 }
 
 impl S3RequestBuilder for DatadogS3RequestBuilder {
-    fn build_request(&mut self, key: String, batch: Vec<Event>) -> S3Request {
+    fn build_request(&self, key: String, batch: Vec<Event>) -> S3Request {
         let filename = Uuid::new_v4().to_string();
 
         let key = format!(
@@ -293,7 +294,7 @@ impl S3RequestBuilder for DatadogS3RequestBuilder {
 
         let batch_size = batch.len();
         let (body, finalizers) =
-            process_event_batch(batch, &mut default_encoding(), Compression::gzip_default());
+            process_event_batch(batch, &default_encoding(), Compression::gzip_default());
 
         debug!(
             message = "Sending events.",

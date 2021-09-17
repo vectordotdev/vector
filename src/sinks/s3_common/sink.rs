@@ -107,7 +107,7 @@ where
         );
 
         let processed_batches = batcher.filter_map(move |(key, batch)| {
-            let request_builder = request_builder.clone();
+            let request_builder = Arc::clone(&request_builder);
             async move { key.map(|key| request_builder.build_request(key, batch)) }
         });
 
