@@ -1,51 +1,37 @@
-use crate::sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
-    sources,
-    tls::TlsConfig,
+    sources::{
+        self,
+        util::{ErrorMessage, HttpSourceAuthConfig},
+    },
+    tls::{MaybeTlsSettings, TlsConfig},
+    Pipeline,
 };
 use bytes::Bytes;
 use chrono::Utc;
+use futures::{FutureExt, SinkExt, StreamExt};
+use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use snafu::Snafu;
+use std::{net::SocketAddr, sync::Arc};
 use vector_core::event::LogEvent;
-use warp::http::HeaderMap;
-use warp::http::StatusCode;
+use warp::{
+    filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
+};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum DatadogAgentMode {
-    V1,
-    V2,
+#[derive(Clone, Copy, Debug, Snafu)]
+pub(crate) enum ApiError {
+    BadRequest,
+    InvalidDataFormat,
+    ServerShutdown,
 }
 
-impl Default for DatadogAgentMode {
-    fn default() -> Self {
-        Self::V2
-    }
-}
-
-impl DatadogAgentMode {
-    fn path(&self) -> &str {
-        match self {
-            Self::V1 => "/v1/input",
-            Self::V2 => "/api/v2/logs",
-        }
-    }
-
-    fn api_key_matcher(&self) -> Regex {
-        Regex::new(match self {
-            Self::V1 => r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??",
-            Self::V2 => r"^/api/v2/logs/(?P<api_key>[[:alnum:]]{32})/??",
-        })
-        .expect("static regex always compiles")
-    }
-}
+impl warp::reject::Reject for ApiError {}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DatadogAgentConfig {
@@ -54,8 +40,6 @@ pub struct DatadogAgentConfig {
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
-    #[serde(default)]
-    mode: DatadogAgentMode,
 }
 
 inventory::submit! {
@@ -69,7 +53,6 @@ impl GenerateConfig for DatadogAgentConfig {
             tls: None,
             auth: None,
             store_api_key: true,
-            mode: DatadogAgentMode::default(),
         })
         .unwrap()
     }
@@ -79,15 +62,24 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogAgentSource::new(self.store_api_key, &self.mode);
-        source.run(
-            self.address,
-            self.mode.path(),
-            false,
-            &self.tls,
-            &self.auth,
-            cx,
-        )
+        let source = DatadogAgentSource::new(self.store_api_key);
+
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let listener = tls.bind(&self.address).await?;
+        let service = source.event_service(cx.out.clone());
+
+        let shutdown = cx.shutdown;
+        Ok(Box::pin(async move {
+            let span = crate::trace::current_span();
+            warp::serve(service.with(warp::trace(move |_info| span.clone())))
+                .serve_incoming_with_graceful_shutdown(
+                    listener.accept_stream(),
+                    shutdown.map(|_| ()),
+                )
+                .await;
+
+            Ok(())
+        }))
     }
 
     fn output_type(&self) -> DataType {
@@ -112,38 +104,79 @@ struct DatadogAgentSource {
 }
 
 impl DatadogAgentSource {
-    fn new(store_api_key: bool, mode: &DatadogAgentMode) -> Self {
+    fn new(store_api_key: bool) -> Self {
         Self {
             store_api_key,
-            api_key_matcher: mode.api_key_matcher(),
+            api_key_matcher: Regex::new(
+                r"^(/v1/input|/api/v2/logs)/(?P<api_key>[[:alnum:]]{32})/??",
+            )
+            .expect("static regex always compiles"),
             log_schema_source_type_key: log_schema().source_type_key(),
             log_schema_timestamp_key: log_schema().timestamp_key(),
         }
     }
 
-    fn extract_api_key<'a>(&self, headers: &'a HeaderMap, path: &'a str) -> Option<&'a str> {
+    fn extract_api_key<'a>(&self, path: &'a str, header: Option<String>) -> Option<Arc<str>> {
         // Grab from URL first
         self.api_key_matcher
             .captures(path)
-            .and_then(|cap| cap.name("api_key").map(|key| key.as_str()))
+            .and_then(|cap| cap.name("api_key").map(|key| key.as_str()).map(Arc::from))
             // Try from header next
-            .or_else(|| headers.get("dd-api-key").and_then(|key| key.to_str().ok()))
+            .or(header.map(Arc::from))
     }
 
-    fn decode_body(
+    fn event_service(self, out: Pipeline) -> BoxedFilter<(Response,)> {
+        warp::post()
+            .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
+            .and(warp::path::full())
+            .and(warp::header::optional::<String>("dd-api-key"))
+            .and(warp::body::bytes())
+            .and_then(
+                move |_, path: FullPath, api_token: Option<String>, body: Bytes| {
+                    let mut out = out
+                        .clone()
+                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+
+                    let token: Option<Arc<str>> = if self.store_api_key {
+                        self.extract_api_key(path.as_str(), api_token)
+                    } else {
+                        None
+                    };
+                    let events = self.decode_body(body, token);
+
+                    async move {
+                        let mut events = futures::stream::iter(events?).map(Ok);
+                        out.send_all(&mut events).await
+                    }
+                },
+            )
+            .map(|_| warp::reply().into_response())
+            .boxed()
+    }
+
+    fn decode_body<'a>(
         &self,
         body: Bytes,
         api_key: Option<Arc<str>>,
-        events: &mut Vec<Event>,
-    ) -> Result<(), ErrorMessage> {
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        if body.is_empty() {
+            // The datadog agent may send an empty payload as a keep alive
+            debug!(
+                message = "Empty payload ignored.",
+                internal_log_rate_secs = 30
+            );
+            return Ok(Vec::new());
+        }
+
         let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 format!("Error parsing JSON: {:?}", error),
             )
         })?;
+
         let now = Utc::now();
-        let iter = messages
+        Ok(messages
             .into_iter()
             .map(|msg| {
                 let mut log = LogEvent::default();
@@ -164,9 +197,8 @@ impl DatadogAgentSource {
                 }
                 log
             })
-            .map(|log| log.into());
-        events.extend(iter);
-        Ok(())
+            .map(|log| log.into())
+            .collect())
     }
 }
 
@@ -183,38 +215,9 @@ struct LogMsg {
     pub ddtags: Bytes,
 }
 
-impl HttpSource for DatadogAgentSource {
-    fn build_events(
-        &self,
-        body: Bytes,
-        header_map: HeaderMap,
-        _query_parameters: HashMap<String, String>,
-        request_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
-        if body.is_empty() {
-            // The datadog agent may send an empty payload as a keep alive
-            debug!(
-                message = "Empty payload ignored.",
-                internal_log_rate_secs = 30
-            );
-            return Ok(Vec::new());
-        }
-
-        let api_key = match self.store_api_key {
-            true => self.extract_api_key(&header_map, request_path),
-            false => None,
-        }
-        .map(Arc::from);
-
-        let mut events: Vec<Event> = Vec::with_capacity(1024);
-        self.decode_body(body, api_key, &mut events)?;
-        Ok(events)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{DatadogAgentConfig, DatadogAgentMode, LogMsg};
+    use super::{DatadogAgentConfig, LogMsg};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus},
@@ -253,9 +256,8 @@ mod tests {
             let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
             let api_key = None;
 
-            let mut events = Vec::with_capacity(msgs.len());
-            let source = DatadogAgentSource::new(true, &DatadogAgentMode::V1);
-            source.decode_body(body, api_key, &mut events).unwrap();
+            let source = DatadogAgentSource::new(true);
+            let events = source.decode_body(body, api_key).unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
                 let log = event.as_log();
@@ -283,7 +285,6 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
         store_api_key: bool,
-        mode: DatadogAgentMode,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
@@ -295,7 +296,6 @@ mod tests {
                 tls: None,
                 auth: None,
                 store_api_key,
-                mode,
             }
             .build(context)
             .await
@@ -327,7 +327,7 @@ mod tests {
     #[tokio::test]
     async fn full_payload_v1() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V1).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -374,7 +374,7 @@ mod tests {
     #[tokio::test]
     async fn full_payload_v2() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V2).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -421,7 +421,7 @@ mod tests {
     #[tokio::test]
     async fn no_api_key() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V1).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -468,7 +468,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_url() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V1).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -518,7 +518,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_header() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true, DatadogAgentMode::V1).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -574,7 +574,7 @@ mod tests {
     #[tokio::test]
     async fn delivery_failure() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed, true, true, DatadogAgentMode::V1).await;
+        let (rx, addr) = source(EventStatus::Failed, true, true).await;
 
         spawn_collect_n(
             async move {
@@ -607,7 +607,7 @@ mod tests {
     #[tokio::test]
     async fn ignores_disabled_acknowledgements() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed, false, true, DatadogAgentMode::V1).await;
+        let (rx, addr) = source(EventStatus::Failed, false, true).await;
 
         let events = spawn_collect_n(
             async move {
@@ -642,7 +642,7 @@ mod tests {
     #[tokio::test]
     async fn ignores_api_key() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, false, DatadogAgentMode::V1).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, false).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
