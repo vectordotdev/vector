@@ -54,10 +54,10 @@ Examples:
 
 As an extension of the previous principle, aligning on specific use cases
 allows us to make assumptions about the user and be opinionated with solutions.
-This approach reduces the number of decisions a user has to make, a hallmark of
-a good user experience. Therefore, as much as possible, we should offer
-opinionated models for use cases core to Vector's purpose and not leave them as
-creative exercises for the user.
+This approach reduces the number of decisions a user has to make and follows
+[Hicks Law], a hallmark of a good user experience. Therefore, as much as
+possible, we should offer opinionated models for use cases core to Vector's
+purpose and not leave them as creative exercises for the user.
 
 Examples:
 
@@ -181,3 +181,5 @@ As a user experience design committee member, you are responsible for:
 * Reviewing and approving proposed user experience changes in RFCs.
 * Reviewing and approving user-facing changes in pull requests.
 * Updating and evolving guides to reflect new Vector changes.
+
+[Hicks Law]: https://en.wikipedia.org/wiki/Hick%27s_law
