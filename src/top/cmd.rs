@@ -64,7 +64,11 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 
     // Initialize the dashboard
     match init_dashboard(url.as_str(), opts, sender).await {
-        Ok(_) => exitcode::OK,
+        // Even though we could return an `exitcode::OK` here, the upstream block_on won't
+        // return due to lingering subscriptions, which manifests as a hung cursor in the
+        // terminal. To work around this for now, exit immediately.
+        // TODO: https://github.com/vectordotdev/vector/issues/9206
+        Ok(_) => std::process::exit(0),
         _ => {
             eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
             exitcode::IOERR
