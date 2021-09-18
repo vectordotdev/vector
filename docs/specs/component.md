@@ -185,7 +185,7 @@ downstream target regardless if the transmission was successful or not.
     * For files, the total number of bytes written to the file excluding the
       delimiter.
   * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `http`, `file`, etc.)
+    `unix`, `http`, `file`, etc.)
   * `endpoint` - If relevant, the endpoint that the bytes were sent to. For
     HTTP, this MUST be the host and path only, excluding the query string.
   * `file` - If relevant, the absolute path of the file.
@@ -193,7 +193,7 @@ downstream target regardless if the transmission was successful or not.
   * MUST increment the `component_sent_bytes_total` counter by the defined value with the
     defined properties as metric tags.
 * Logs
-  * MUST log a `Bytes received.` message at the `trace` level with the
+  * MUST log a `Bytes sent.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
 #### Error

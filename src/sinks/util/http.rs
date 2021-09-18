@@ -8,7 +8,7 @@ use crate::{
     buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
-    internal_events::EventsSent,
+    internal_events::{BytesSent, EventsSent},
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
@@ -398,7 +398,13 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await?.map(Body::from);
+            let request = request_builder(body).await?;
+            let byte_size = request.body().len();
+            let request = request.map(Body::from);
+            emit!(BytesSent {
+                byte_size,
+                protocol: "http"
+            });
             let response = http_client.call(request).await?;
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
