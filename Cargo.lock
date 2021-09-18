@@ -804,7 +804,7 @@ dependencies = [
  "tempdir",
  "tokio",
  "tokio-test",
- "tracing 0.1.27",
+ "tracing 0.1.28",
 ]
 
 [[package]]
@@ -1552,7 +1552,7 @@ dependencies = [
  "snafu",
  "strum_macros 0.21.1",
  "thiserror",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "vrl-compiler",
 ]
 
@@ -2016,7 +2016,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "winapi 0.3.9",
 ]
 
@@ -2451,7 +2451,7 @@ dependencies = [
  "slab",
  "tokio",
  "tokio-util",
- "tracing 0.1.27",
+ "tracing 0.1.28",
 ]
 
 [[package]]
@@ -2772,7 +2772,7 @@ dependencies = [
  "socket2 0.4.2",
  "tokio",
  "tower-service",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "want",
 ]
 
@@ -3080,7 +3080,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "tokio",
- "tracing 0.1.27",
+ "tracing 0.1.28",
 ]
 
 [[package]]
@@ -3340,7 +3340,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "tracing 0.1.27",
+ "tracing 0.1.28",
 ]
 
 [[package]]
@@ -3528,7 +3528,7 @@ dependencies = [
  "metrics",
  "metrics-util",
  "once_cell",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "tracing-core 0.1.20",
  "tracing-subscriber",
 ]
@@ -5944,7 +5944,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "tracing 0.1.27",
+ "tracing 0.1.28",
 ]
 
 [[package]]
@@ -6804,7 +6804,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "tracing-futures 0.2.5",
 ]
 
@@ -6837,7 +6837,7 @@ dependencies = [
  "tokio-util",
  "tower-layer",
  "tower-service",
- "tracing 0.1.27",
+ "tracing 0.1.28",
 ]
 
 [[package]]
@@ -6878,9 +6878,9 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.27"
+version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2ba9ab62b7d6497a8638dfda5e5c4fb3b2d5a7fca4118f2b96151c8ef1a437e"
+checksum = "84f96e095c0c82419687c20ddf5cb3eadb61f4e1405923c9dc8e53a1adacbda8"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
@@ -6936,7 +6936,7 @@ dependencies = [
  "futures 0.3.17",
  "futures-task",
  "pin-project 1.0.8",
- "tracing 0.1.27",
+ "tracing 0.1.28",
 ]
 
 [[package]]
@@ -6956,7 +6956,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "mock_instant",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "tracing-core 0.1.20",
  "tracing-subscriber",
 ]
@@ -6998,7 +6998,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "tracing-core 0.1.20",
  "tracing-log",
  "tracing-serde",
@@ -7483,7 +7483,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-test",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "tracing-core 0.1.20",
  "tracing-futures 0.2.5",
  "tracing-limit",
@@ -7580,7 +7580,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "tracing-core 0.1.20",
  "tracing-log",
  "tracing-subscriber",
@@ -7654,7 +7654,7 @@ dependencies = [
  "serde",
  "shared",
  "thiserror",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "vrl-diagnostic",
  "vrl-parser",
 ]
@@ -7714,7 +7714,7 @@ dependencies = [
  "shared",
  "strip-ansi-escapes",
  "syslog_loose",
- "tracing 0.1.27",
+ "tracing 0.1.28",
  "uaparser",
  "url",
  "uuid",
@@ -7824,7 +7824,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "tower-service",
- "tracing 0.1.27",
+ "tracing 0.1.28",
 ]
 
 [[package]]
