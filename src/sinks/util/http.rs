@@ -8,6 +8,7 @@ use crate::{
     buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
+    internal_events::EventsSent,
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
@@ -26,6 +27,7 @@ use std::{
     time::Duration,
 };
 use tower::Service;
+use vector_core::ByteSizeOf;
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -175,7 +177,12 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
+        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
+            emit!(EventsSent {
+                count: 1,
+                byte_size
+            });
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
@@ -328,7 +335,12 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
+        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
+            emit!(EventsSent {
+                count: 1,
+                byte_size
+            });
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
