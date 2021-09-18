@@ -4,13 +4,17 @@ use mongodb::{bson, error::Error as MongoError};
 use std::time::Instant;
 
 #[derive(Debug)]
-pub(crate) struct MongoDbMetricsEventsReceived<'a> {
+pub struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
     pub uri: &'a str,
 }
 
 impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
     fn emit_metrics(&self) {
+        counter!(
+            "component_received_events_total", self.count as u64,
+            "uri" => self.uri.to_owned(),
+        );
         counter!(
             "events_in_total", self.count as u64,
             "uri" => self.uri.to_owned(),

@@ -2,8 +2,10 @@ use crate::expression::{levenstein, ExpressionError, FunctionArgument, Noop};
 use crate::function::{ArgumentList, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
+
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
+use tracing::{span, Level};
 
 #[derive(Clone)]
 pub struct FunctionCall {
@@ -209,29 +211,31 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|err| match err {
-            ExpressionError::Abort { .. } => {
-                panic!("abort errors must only be defined by `abort` statement")
-            }
-            ExpressionError::Error {
-                message,
-                mut labels,
-                notes,
-            } => {
-                labels.push(Label::primary(message.clone(), self.span));
-
-                ExpressionError::Error {
-                    message: format!(
-                        r#"function call error for "{}" at ({}:{}): {}"#,
-                        self.ident,
-                        self.span.start(),
-                        self.span.end(),
-                        message
-                    ),
-                    labels,
-                    notes,
+        span!(Level::ERROR, "remap", vrl_position = &self.span.start()).in_scope(|| {
+            self.expr.resolve(ctx).map_err(|err| match err {
+                ExpressionError::Abort { .. } => {
+                    panic!("abort errors must only be defined by `abort` statement")
                 }
-            }
+                ExpressionError::Error {
+                    message,
+                    mut labels,
+                    notes,
+                } => {
+                    labels.push(Label::primary(message.clone(), self.span));
+
+                    ExpressionError::Error {
+                        message: format!(
+                            r#"function call error for "{}" at ({}:{}): {}"#,
+                            self.ident,
+                            self.span.start(),
+                            self.span.end(),
+                            message
+                        ),
+                        labels,
+                        notes,
+                    }
+                }
+            })
         })
     }
 

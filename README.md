@@ -86,10 +86,10 @@ Vector**][docs.installation].
 
 ### Resources
 
-* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter]
+* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [calendar][urls.vector_calendar], [@vectordotdev][urls.vector_twitter]
 * [**Releases**][urls.vector_releases] - [latest][urls.vector_releases]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
-* **Policies** - [Code of Conduct][urls.vector_code_of_conduct], [Privacy][urls.vector_privacy_policy], [Releasing][urls.vector_release_policy], [RFCs][urls.vector_rfc_policy] [Reviewing][urls.vector_release_policy], [Security][urls.vector_security_policy]
+* **Policies** - [Code of Conduct][urls.vector_code_of_conduct], [Privacy][urls.vector_privacy_policy], [Releases][urls.vector_releases_policy], [Security][urls.vector_security_policy], [Versioning][urls.vector_versioning_policy]
 
 ## Comparisons
 
@@ -213,17 +213,18 @@ Vector is an end-to-end, unified, open data platform.
 [docs.under-the-hood.networking]: https://vector.dev/docs/about/under-the-hood/networking/
 [urls.production_users]: https://github.com/timberio/vector/issues/790
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector_calendar]: https://calendar.vector.dev
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community/
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_release_policy]: https://github.com/timberio/vector/blob/master/RELEASING.md
-[urls.vector_review_policy]: https://github.com/timberio/vector/blob/master/REVIEWING.md
 [urls.vector_releases]: https://vector.dev/releases/latest/
-[urls.vector_rfc_policy]: https://github.com/timberio/vector/blob/master/rfcs/README.md
+[urls.vector_releases_policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
 [urls.vector_roadmap]: https://roadmap.vector.dev
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
+[urls.vector_versioning_policy]: https://github.com/timberio/vector/blob/master/VERSIONING.md
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
 

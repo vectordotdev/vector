@@ -2,7 +2,7 @@ use super::InternalEvent;
 use metrics::gauge;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
-pub(crate) use self::source::*;
+pub use self::source::*;
 
 #[derive(Debug)]
 pub struct FileOpen {
@@ -38,6 +38,10 @@ mod source {
         }
 
         fn emit_metrics(&self) {
+            counter!(
+                "component_received_events_total", 1,
+                "file" => self.file.to_owned(),
+            );
             counter!(
                 "events_in_total", 1,
                 "file" => self.file.to_owned(),

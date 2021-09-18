@@ -3,8 +3,25 @@
 @tailwind utilities;
 
 :root {
-  --primary: #28d9f2;
-  --secondary: #f44af5;
+  --dark: #191927; /* Vector Dark */
+  --dark-rgb: 25, 25, 39;
+
+  --primary: #28d9f2; /* Vector Greenish Blue */
+  --primary-rgb: 40, 217, 242;
+
+  --primary-dark: #00a9bc; /* Vector Darker Greenish Blue */
+  --primary-dark-rgb: 0, 169, 188;
+
+  --secondary: #f44af5; /* Vector Magenta */
+  --secondary-rgb: 244, 74, 245;
+
+  --purple-v: #98f; /* Vector Purple */
+  --purple-v-rgb: 153, 136, 255;
+
+  --aa-primary-color: var(--dark-rgb);
+  --aa-primary-color-rgb: var(--dark-rgb);
+  --aa-input-border-color-rgb: var(--dark-rgb);
+  --aa-input-border-color-alpha: 0.25;
 }
 
 @layer components {
@@ -13,12 +30,24 @@
   }
 }
 
+.hover\:underline {
+  border-bottom: 1px solid transparent;
+}
+
+@variants hover {
+  .underline {
+    text-decoration: none;
+    border-bottom: 1px solid #f44af5;
+  }
+}
+
 [x-cloak] {
   display: none !important;
 }
 
 // Some rules that Tailwind can't really cover
-.jump + .jump, .admonition + .admonition {
+.jump + .jump,
+.admonition + .admonition {
   margin-top: 0.5rem;
 }
 
@@ -31,6 +60,60 @@
 :root {
   --docsearch-key-shadow: inset 0 -2px 0 0 rgb(205, 205, 230),
     inset 0 0 1px 1px #fff, 0 1px 2px 1px rgba(30, 35, 90, 0.4);
+}
+
+.aa-DetachedFormContainer,
+.aa-Form {
+  position: relative;
+}
+
+.aa-Form:focus-within {
+  box-shadow: none;
+}
+
+.aa-DetachedSearchButton:hover .aa-DetachedSearchButtonIcon {
+  color: var(--primary-dark);
+  cursor: pointer;
+}
+
+.dark .aa-DetachedSearchButton:hover .aa-DetachedSearchButtonIcon {
+  color: var(--secondary);
+}
+
+.aa-DetachedSearchButton:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.aa-Input:focus {
+  outline: none;
+  --tw-ring-color: var(--dark-rgb);
+}
+
+.aa-InputWrapperSuffix {
+  opacity: 0;
+}
+
+.aa-DetachedCancelButton {
+  opacity: 0.65;
+  position: absolute;
+  top: 0;
+  right: 3.5%;
+  padding: 8px;
+  margin: 0;
+  bottom: 0;
+}
+
+.aa-DetachedCancelButton:hover,
+.aa-DetachedCancelButton:focus {
+  color: var(--primary-dark);
+  box-shadow: none;
+  opacity: 1;
+}
+
+.dark .aa-DetachedCancelButton:hover,
+.dark .aa-DetachedCancelButton:focus {
+  color: var(--secondary);
 }
 
 .aa-Column {
@@ -105,17 +188,17 @@
   color: var(--aa-primary-color);
 }
 
-[data-autocomplete-source-id='hits'] {
+[data-autocomplete-source-id="hits"] {
   margin-bottom: var(--aa-spacing-half);
 }
 
-[data-autocomplete-source-id='suggestions'] .aa-List {
+[data-autocomplete-source-id="suggestions"] .aa-List {
   display: flex;
   flex-wrap: wrap;
   margin: 0 calc(calc(var(--aa-spacing-half) / 2) * -1px);
 }
 
-[data-autocomplete-source-id='suggestions'] .aa-Item[aria-selected='true'] {
+[data-autocomplete-source-id="suggestions"] .aa-Item[aria-selected="true"] {
   background: none;
 }
 
@@ -153,17 +236,27 @@
 
 .aa-Footer {
   padding: 15px;
-  box-shadow: 0 -1px 0 0 #e0e3e8,0 -3px 6px 0 rgba(69,98,155,0.12);
+  box-shadow: 0 -1px 0 0 #e0e3e8, 0 -3px 6px 0 rgba(69, 98, 155, 0.12);
 }
 
-[data-autocomplete-source-id='suggestions']
-  .aa-Item[aria-selected='true']
+@media screen and (max-width: 679px) {
+  .aa-Footer {
+    display: none;
+  }
+}
+
+[data-autocomplete-source-id="suggestions"]
+  .aa-Item[aria-selected="true"]
   .aa-QuerySuggestion {
   background: rgba(
     var(--aa-selected-color-rgb),
     var(--aa-selected-color-alpha)
   );
   border-color: transparent;
+}
+
+[data-autocomplete-source-id="queryResults"] .aa-Item[aria-selected=true] {
+  background-color: rgba(var(--purple-v-rgb), 0.25);
 }
 
 .DocSearch-Commands {
@@ -194,4 +287,8 @@
   margin-right: 0.4em;
   padding-bottom: 1px;
   width: 20px;
+}
+
+footer ion-icon[name="logo-github"]:hover {
+  @apply dark:text-gray-500
 }

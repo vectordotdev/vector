@@ -4,6 +4,7 @@ use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
+    Finalizable,
 };
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
@@ -52,6 +53,15 @@ impl ByteSizeOf for Event {
         match self {
             Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
+        }
+    }
+}
+
+impl Finalizable for Event {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        match self {
+            Event::Log(log) => log.metadata_mut().take_finalizers(),
+            Event::Metric(metric) => metric.metadata_mut().take_finalizers(),
         }
     }
 }

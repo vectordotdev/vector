@@ -1,34 +1,36 @@
 use crate::{
+    codecs::DecodingConfig,
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
-    internal_events::{StdinEventReceived, StdinReadFailed},
+    internal_events::StdinEventsReceived,
     shutdown::ShutdownSignal,
+    sources::util::TcpError,
     Pipeline,
 };
+use async_stream::stream;
 use bytes::Bytes;
-use futures::{channel::mpsc, executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
+use tokio_util::{codec::FramedRead, io::StreamReader};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
-    #[serde(default = "default_max_length")]
+    #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
+    #[serde(flatten)]
+    pub decoding: DecodingConfig,
 }
 
 impl Default for StdinConfig {
     fn default() -> Self {
         StdinConfig {
-            max_length: default_max_length(),
-            host_key: None,
+            max_length: crate::serde::default_max_length(),
+            host_key: Default::default(),
+            decoding: Default::default(),
         }
     }
-}
-
-fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
 }
 
 inventory::submit! {
@@ -63,7 +65,7 @@ impl SourceConfig for StdinConfig {
 }
 
 pub fn stdin_source<R>(
-    stdin: R,
+    mut stdin: R,
     config: StdinConfig,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -75,17 +77,31 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
+    let decoder = config.decoding.build()?;
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
-    // Start the background thread
+    // Spawn background thread with blocking I/O to process stdin.
+    //
+    // This is recommended by Tokio, as otherwise the process will not shut down
+    // until another newline is entered. See
+    // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
     thread::spawn(move || {
         info!("Capturing STDIN.");
 
-        for line in stdin.lines() {
-            if executor::block_on(sender.send(line)).is_err() {
-                // receiver has closed so we should shutdown
-                return;
+        loop {
+            let (buffer, len) = match stdin.fill_buf() {
+                Ok(buffer) if buffer.is_empty() => break, // EOF.
+                Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) => (Err(error), 0),
+            };
+
+            stdin.consume(len);
+
+            if executor::block_on(sender.send(buffer)).is_err() {
+                // Receiver has closed so we should shutdown.
+                break;
             }
         }
     });
@@ -94,38 +110,50 @@ where
         let mut out =
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error));
 
-        let res = receiver
-            .take_until(shutdown)
-            .map_err(|error| emit!(StdinReadFailed { error }))
-            .map_ok(move |line| {
-                emit!(StdinEventReceived {
-                    byte_size: line.len()
-                });
-                create_event(Bytes::from(line), &host_key, &hostname)
-            })
-            .forward(&mut out)
-            .inspect(|_| info!("Finished sending."))
-            .await;
+        let stream = StreamReader::new(receiver);
+        let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
+        let result = stream! {
+            loop {
+                match stream.next().await {
+                    Some(Ok((events, byte_size))) => {
+                        emit!(StdinEventsReceived {
+                            byte_size,
+                            count: events.len()
+                        });
 
-        let _ = out.flush().await; // error emitted by sink_map_err
+                        for mut event in events {
+                            let log = event.as_mut_log();
 
-        res
+                            log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
+
+                            if let Some(hostname) = &hostname {
+                                log.insert(&host_key, hostname.clone());
+                            }
+
+                            yield event;
+                        }
+                    }
+                    Some(Err(error)) => {
+                        // Error is logged by `crate::codecs::Decoder`, no
+                        // further handling is needed here.
+                        if !error.can_continue() {
+                            break;
+                        }
+                    }
+                    None => break,
+                }
+            }
+        }
+        .map(Ok)
+        .forward(&mut out)
+        .await;
+
+        info!("Finished sending.");
+
+        let _ = out.flush().await; // Error emitted by sink_map_err.
+
+        result
     }))
-}
-
-fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
-    let mut event = Event::from(line);
-
-    // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("stdin"));
-
-    if let Some(hostname) = &hostname {
-        event.as_mut_log().insert(host_key, hostname.clone());
-    }
-
-    event
 }
 
 #[cfg(test)]
@@ -137,20 +165,6 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StdinConfig>();
-    }
-
-    #[test]
-    fn stdin_create_event() {
-        let line = Bytes::from("hello world");
-        let host_key = "host".to_string();
-        let hostname = Some("Some.Machine".to_string());
-
-        let event = create_event(line, &host_key, &hostname);
-        let log = event.into_log();
-
-        assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "stdin".into());
     }
 
     #[tokio::test]

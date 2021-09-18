@@ -175,7 +175,7 @@ components: sinks: elasticsearch: {
 							Automatically routes events by deriving the data stream name using specific event fields with the `data_stream.type-data_stream.dataset-data_stream.namespace` format.
 
 							If enabled, the data_stream.* event fields will take precedence over the data_stream.type, data_stream.dataset, and data_stream.namespace settings, but will fall back to them if any of the fields are missing from the event.
-						"""
+							"""
 						required: false
 						warnings: []
 						type: bool: default: true
@@ -244,7 +244,7 @@ components: sinks: elasticsearch: {
 		}
 		id_key: {
 			common:      false
-			description: "The name of the event key that should map to Elasticsearch's [`_id` field](\(urls.elasticsearch_id_field)). By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder perofrmance](\(urls.elasticsearch_id_performance))."
+			description: "The name of the event key that should map to Elasticsearch's [`_id` field](\(urls.elasticsearch_id_field)). By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder performance](\(urls.elasticsearch_id_performance))."
 			required:    false
 			warnings: []
 			type: string: {

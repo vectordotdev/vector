@@ -5,6 +5,7 @@ mod unix;
 
 use super::util::TcpSource;
 use crate::{
+    codecs::{BytesParser, Decoder, NewlineDelimitedCodec},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -99,11 +100,17 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = Decoder::new(
+                    Box::new(NewlineDelimitedCodec::new_with_max_length(
+                        config.max_length(),
+                    )),
+                    Box::new(BytesParser),
+                );
                 Ok(udp::udp(
                     config.address(),
-                    config.max_length(),
                     host_key,
                     config.receive_buffer_bytes(),
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -113,10 +120,17 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = Decoder::new(
+                    Box::new(NewlineDelimitedCodec::new_with_max_length(
+                        config.max_length,
+                    )),
+                    Box::new(BytesParser),
+                );
                 Ok(unix::unix_datagram(
                     config.path,
                     config.max_length,
                     host_key,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -126,10 +140,16 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = Decoder::new(
+                    Box::new(NewlineDelimitedCodec::new_with_max_length(
+                        config.max_length,
+                    )),
+                    Box::new(BytesParser),
+                );
                 Ok(unix::unix_stream(
                     config.path,
-                    config.max_length,
                     host_key,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -162,7 +182,7 @@ mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{
-            log_schema, ComponentId, GlobalOptions, SinkContext, SourceConfig, SourceContext,
+            log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
         event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
@@ -372,7 +392,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
-        let source_id = ComponentId::from("tcp_shutdown_simple");
+        let source_id = ComponentKey::from("tcp_shutdown_simple");
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
         let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
@@ -409,7 +429,7 @@ mod test {
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
         let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
-        let source_id = ComponentId::from("tcp_shutdown_infinite_stream");
+        let source_id = ComponentKey::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
         let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
@@ -492,7 +512,7 @@ mod test {
 
     async fn init_udp_with_shutdown(
         sender: Pipeline,
-        source_id: &ComponentId,
+        source_id: &ComponentKey,
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (shutdown_signal, _) = shutdown.register_source(source_id);
@@ -502,7 +522,7 @@ mod test {
     async fn init_udp(sender: Pipeline) -> SocketAddr {
         let (addr, _handle) = init_udp_inner(
             sender,
-            &ComponentId::from("default"),
+            &ComponentKey::from("default"),
             ShutdownSignal::noop(),
         )
         .await;
@@ -511,14 +531,14 @@ mod test {
 
     async fn init_udp_inner(
         sender: Pipeline,
-        source_id: &ComponentId,
+        source_key: &ComponentKey,
         shutdown_signal: ShutdownSignal,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let address = next_addr();
 
         let server = SocketConfig::from(UdpConfig::from_address(address))
             .build(SourceContext {
-                id: source_id.clone(),
+                key: source_key.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,
@@ -616,7 +636,7 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_simple() {
         let (tx, rx) = Pipeline::new_test();
-        let source_id = ComponentId::from("udp_shutdown_simple");
+        let source_id = ComponentKey::from("udp_shutdown_simple");
 
         let mut shutdown = SourceShutdownCoordinator::default();
         let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
@@ -642,7 +662,7 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_infinite_stream() {
         let (tx, rx) = Pipeline::new_test();
-        let source_id = ComponentId::from("udp_shutdown_infinite_stream");
+        let source_id = ComponentKey::from("udp_shutdown_infinite_stream");
 
         let mut shutdown = SourceShutdownCoordinator::default();
         let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;

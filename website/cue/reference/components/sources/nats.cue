@@ -54,8 +54,10 @@ components: sources: nats: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:        components.sources.internal_metrics.output.metrics.events_in_total
 		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 
 	how_it_works: components._nats.how_it_works

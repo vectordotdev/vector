@@ -69,21 +69,6 @@ components: sources: http: {
 				syntax: "literal"
 			}
 		}
-		encoding: {
-			common:      true
-			description: "The expected encoding of received data. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields."
-			required:    false
-			type: string: {
-				default: "text"
-				enum: {
-					text:   "Newline-delimited text, with each line forming a message."
-					ndjson: "Newline-delimited JSON objects, where each line must contain a JSON object."
-					json:   "Array of JSON objects, which must be a JSON array containing JSON objects."
-					binary: "Binary or text, whole http request body is considered as one message."
-				}
-				syntax: "literal"
-			}
-		}
 		headers: {
 			common:      false
 			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names."
@@ -259,6 +244,7 @@ components: sources: http: {
 		events_in_total:         components.sources.internal_metrics.output.metrics.events_in_total
 		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
 		parse_errors_total:      components.sources.internal_metrics.output.metrics.parse_errors_total
+		component_received_events_total:   components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 
 	how_it_works: {

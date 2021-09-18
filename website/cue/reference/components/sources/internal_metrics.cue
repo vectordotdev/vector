@@ -441,7 +441,9 @@ components: sources: internal_metrics: {
 			description:       "The total number of events discarded by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _internal_metrics_tags & {
+				reason: _reason
+			}
 		}
 		events_failed_total: {
 			description:       "The total number of failures to read a Kafka message."
@@ -452,7 +454,39 @@ components: sources: internal_metrics: {
 		events_in_total: {
 			description: """
 				The number of events accepted by this component either from tagged
-				origin like file and uri, or cumulatively from other origins.
+				origins like file and uri, or cumulatively from other origins.
+				This metric is deprecated and will be removed in a future version.
+				Use [`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) instead.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              component_received_events_total.tags
+		}
+		events_out_total: {
+			description: """
+				The total number of events emitted by this component.
+				This metric is deprecated and will be removed in a future version.
+				Use [`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) instead.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		processed_events_total: {
+			description:       """
+				The total number of events processed by this component.
+				This metric is deprecated in place of using
+				[`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) and
+				[`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) metrics.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_received_events_total: {
+			description: """
+				The number of events accepted by this component either from tagged
+				origins like file and uri, or cumulatively from other origins.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
@@ -484,19 +518,23 @@ components: sources: internal_metrics: {
 				mode: _mode
 			}
 		}
-		events_out_total: {
+		component_received_event_bytes_total: {
+			description: """
+				The number of event bytes accepted by this component either from
+				tagged origins like file and uri, or cumulatively from other origins.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              component_received_events_total.tags
+		}
+		component_sent_events_total: {
 			description:       "The total number of events emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		processed_events_total: {
-			description:       """
-				The total number of events processed by this component.
-				This metric is deprecated in place of using
-				[`events_in_total`](\(urls.vector_sources)/internal_metrics/#events_in_total) and
-				[`events_out_total`](\(urls.vector_sources)/internal_metrics/#events_out_total) metrics.
-				"""
+		component_sent_event_bytes_total: {
+			description:       "The total number of event bytes emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -810,6 +848,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		streams_total: {
+			description:       "The total number of streams."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		sqs_message_delete_failed_total: {
 			description:       "The total number of failures to delete SQS messages."
 			type:              "counter"
@@ -983,10 +1027,11 @@ components: sources: internal_metrics: {
 
 		// Helpful tag groupings
 		_component_tags: _internal_metrics_tags & {
-			component_kind: _component_kind
-			component_id:   _component_id
-			component_name: _component_name
-			component_type: _component_type
+			component_kind:  _component_kind
+			component_id:    _component_id
+			component_scope: _component_scope
+			component_name:  _component_name
+			component_type:  _component_type
 		}
 
 		// All available tags
@@ -1007,6 +1052,11 @@ components: sources: internal_metrics: {
 			description: "The Vector component ID."
 			required:    true
 			examples: ["my_source", "my_sink"]
+		}
+		_component_scope: {
+			description: "The Vector component scope."
+			required:    true
+			examples: ["global", "pipeline:appname"]
 		}
 		_component_name: {
 			description: "Deprecated, use `component_id` instead. The value is the same as `component_id`."
@@ -1031,11 +1081,13 @@ components: sources: internal_metrics: {
 				"invalid_metric":              "The metric was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
+				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
 				"render_error":                "The rendering operation failed."
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."
+				"unlabeled_event":             "The event was not labeled."
 				"value_invalid":               "The value was invalid."
 			}
 		}
@@ -1064,6 +1116,14 @@ components: sources: internal_metrics: {
 		_path: {
 			description: "The path that produced the error."
 			required:    true
+		}
+		_reason: {
+			description: "The type of the error"
+			required:    true
+			enum: {
+				"out_of_order": "The event was out of order."
+				"oversized":    "The event was too large."
+			}
 		}
 	}
 }

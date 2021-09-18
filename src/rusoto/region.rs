@@ -13,14 +13,14 @@ pub struct RegionOrEndpoint {
 }
 
 impl RegionOrEndpoint {
-    pub fn with_region(region: String) -> Self {
+    pub const fn with_region(region: String) -> Self {
         Self {
             region: Some(region),
             endpoint: None,
         }
     }
 
-    pub fn with_endpoint(endpoint: String) -> Self {
+    pub const fn with_endpoint(endpoint: String) -> Self {
         Self {
             region: None,
             endpoint: Some(endpoint),

@@ -21,6 +21,10 @@ impl InternalEvent for PrometheusEventReceived {
 
     fn emit_metrics(&self) {
         counter!(
+            "component_received_events_total", self.count as u64,
+            "uri" => format!("{}",self.uri),
+        );
+        counter!(
             "events_in_total", self.count as u64,
             "uri" => format!("{}",self.uri),
         );

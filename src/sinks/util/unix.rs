@@ -37,7 +37,7 @@ pub struct UnixSinkConfig {
 }
 
 impl UnixSinkConfig {
-    pub fn new(path: PathBuf) -> Self {
+    pub const fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
@@ -61,11 +61,11 @@ struct UnixConnector {
 }
 
 impl UnixConnector {
-    fn new(path: PathBuf) -> Self {
+    const fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
-    fn fresh_backoff() -> ExponentialBackoff {
+    const fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
         ExponentialBackoff::from_millis(2)
             .factor(250)
@@ -158,7 +158,7 @@ impl StreamSink for UnixSink {
 
             if let Err(error) = result {
                 emit!(UnixSocketError {
-                    error,
+                    error: &error,
                     path: &self.connector.path
                 });
             }

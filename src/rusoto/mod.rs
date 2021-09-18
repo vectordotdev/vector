@@ -8,6 +8,8 @@ use http::{
     Method, Request, Response, StatusCode,
 };
 use hyper::body::{Body, HttpBody};
+use once_cell::sync::OnceCell;
+use regex::bytes::RegexSet;
 use rusoto_core::{
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
@@ -183,7 +185,7 @@ pub struct RusotoBody {
 }
 
 impl<T> HttpClient<T> {
-    pub fn new(client: T) -> Self {
+    pub const fn new(client: T) -> Self {
         HttpClient { client }
     }
 }
@@ -339,14 +341,43 @@ impl From<Option<SignedRequestPayload>> for RusotoBody {
     }
 }
 
+static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
+
 pub fn is_retriable_error<T>(error: &RusotoError<T>) -> bool {
     match error {
         RusotoError::HttpDispatch(_) => true,
-        RusotoError::Unknown(res)
-            if res.status.is_server_error()
-                || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-        {
-            true
+        RusotoError::Unknown(response) => {
+            // This header is a direct indication that we should retry the request. Eventually it'd
+            // be nice to actually schedule the retry after the given delay, but for now we just
+            // check that it contains a positive value.
+            let retry_header = response
+                .headers
+                .get("x-amz-retry-after")
+                .and_then(|value| value.parse::<isize>().ok())
+                .filter(|duration| *duration > 0);
+
+            // Certain 400-level responses will contain an error code indicating that the request
+            // should be retried. Since we don't retry 400-level responses by default, we'll look
+            // for these specifically before falling back to more general heuristics. Because AWS
+            // services use a mix of XML and JSON response bodies and Rusoto doesn't give us
+            // a parsed representation, we resort to a simple string match.
+            //
+            // S3: RequestTimeout
+            // SQS: RequestExpired, ThrottlingException
+            // ECS: RequestExpired, ThrottlingException
+            // Kinesis: RequestExpired, ThrottlingException
+            // Cloudwatch: RequestExpired, ThrottlingException
+            //
+            // Now just look for those when it's a client_error
+            let re = RETRIABLE_CODES.get_or_init(|| {
+                RegexSet::new(&["RequestTimeout", "RequestExpired", "ThrottlingException"])
+                    .expect("invalid regex")
+            });
+
+            retry_header.is_some()
+                || response.status.is_server_error()
+                || response.status == http::StatusCode::TOO_MANY_REQUESTS
+                || (response.status.is_client_error() && re.is_match(&response.body))
         }
         _ => false,
     }

@@ -60,7 +60,7 @@ pub struct TcpSinkConfig {
 }
 
 impl TcpSinkConfig {
-    pub fn new(
+    pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
@@ -74,7 +74,7 @@ impl TcpSinkConfig {
         }
     }
 
-    pub fn from_address(address: String) -> Self {
+    pub const fn from_address(address: String) -> Self {
         Self {
             address,
             keepalive: None,
@@ -112,7 +112,7 @@ struct TcpConnector {
 }
 
 impl TcpConnector {
-    fn new(
+    const fn new(
         host: String,
         port: u16,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -133,7 +133,7 @@ impl TcpConnector {
         Self::new(host, port, None, None.into(), None)
     }
 
-    fn fresh_backoff() -> ExponentialBackoff {
+    const fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
         ExponentialBackoff::from_millis(2)
             .factor(250)

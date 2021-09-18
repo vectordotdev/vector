@@ -354,6 +354,8 @@ jobs:
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds
         run: make slim-builds
+      - name: Check style
+        run: make check-style
       - name: Check code format || needs.changes.outputs.source == 'true'
         if: needs.changes.outputs.source == 'true'
         run: make check-fmt

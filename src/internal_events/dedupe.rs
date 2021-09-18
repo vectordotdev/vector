@@ -2,7 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct DedupeEventDiscarded {
+pub struct DedupeEventDiscarded {
     pub event: crate::event::Event,
 }
 

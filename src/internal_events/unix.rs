@@ -42,7 +42,7 @@ where
 
 #[derive(Debug)]
 pub struct UnixSocketError<'a, E> {
-    pub error: E,
+    pub error: &'a E,
     pub path: &'a std::path::Path,
 }
 

@@ -3,6 +3,7 @@ use crate::{
     event::Event,
     internal_events::{ConnectionOpen, OpenGauge, TcpSendAckError, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
+    sources::util::TcpError,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Pipeline,
@@ -11,6 +12,7 @@ use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
+use smallvec::SmallVec;
 use socket2::SockRef;
 use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
@@ -18,7 +20,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::sleep,
 };
-use tokio_util::codec::{Decoder, FramedRead, LinesCodecError};
+use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
 
 async fn make_listener(
@@ -53,21 +55,6 @@ async fn make_listener(
         },
     }
 }
-pub trait IsErrorFatal {
-    fn is_error_fatal(&self) -> bool;
-}
-
-impl IsErrorFatal for LinesCodecError {
-    fn is_error_fatal(&self) -> bool {
-        false
-    }
-}
-
-impl IsErrorFatal for std::io::Error {
-    fn is_error_fatal(&self) -> bool {
-        true
-    }
-}
 
 pub trait TcpSource: Clone + Send + Sync + 'static
 where
@@ -75,14 +62,15 @@ where
 {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
-    type Error: From<io::Error> + IsErrorFatal + std::fmt::Debug + std::fmt::Display + Send;
-    type Decoder: Decoder<Error = Self::Error> + Send + 'static + Send;
+    type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
+    type Item: Into<SmallVec<[Event; 1]>> + Send;
+    type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
+    fn handle_events(&self, _events: &mut [Event], _host: Bytes, _byte_size: usize) {}
 
-    fn build_ack(&self, _frame: &<Self::Decoder as Decoder>::Item) -> Bytes {
+    fn build_ack(&self, _item: &Self::Item) -> Bytes {
         Bytes::new()
     }
 
@@ -249,11 +237,11 @@ async fn handle_stream<T>(
             },
             res = reader.next() => {
                 match res {
-                    Some(Ok(frame)) => {
-                        let host = host.clone();
-                        let ack = source.build_ack(&frame);
-
-                        if let Some(event) = source.build_event(frame, host) {
+                    Some(Ok((item, byte_size))) => {
+                        let ack = source.build_ack(&item);
+                        let mut events = item.into();
+                        source.handle_events(&mut events, host.clone(), byte_size);
+                        for event in events {
                             match out.send(event).await {
                                 Ok(_) => {
                                     let stream = reader.get_mut();
@@ -270,7 +258,7 @@ async fn handle_stream<T>(
                         }
                     }
                     Some(Err(error)) => {
-                        if <<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(&error) {
+                        if !<<T as TcpSource>::Error as TcpError>::can_continue(&error) {
                             warn!(message = "Failed to read data from TCP source.", %error);
                             break;
                         }

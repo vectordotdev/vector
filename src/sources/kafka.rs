@@ -1,14 +1,18 @@
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
+    codecs::{self, DecodingConfig},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    event::{BatchNotifier, Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
+    sources::util::TcpError,
     Pipeline,
 };
+use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -19,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use vector_core::event::{BatchNotifier, LogEvent, Value};
+use tokio_util::codec::FramedRead;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -58,21 +62,23 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+    #[serde(flatten)]
+    decoding: DecodingConfig,
 }
 
-fn default_session_timeout_ms() -> u64 {
+const fn default_session_timeout_ms() -> u64 {
     10000 // default in librdkafka
 }
 
-fn default_socket_timeout_ms() -> u64 {
+const fn default_socket_timeout_ms() -> u64 {
     60000 // default in librdkafka
 }
 
-fn default_fetch_wait_max_ms() -> u64 {
+const fn default_fetch_wait_max_ms() -> u64 {
     100 // default in librdkafka
 }
 
-fn default_commit_interval_ms() -> u64 {
+const fn default_commit_interval_ms() -> u64 {
     5000 // default in librdkafka
 }
 
@@ -119,6 +125,7 @@ impl SourceConfig for KafkaSourceConfig {
             self.partition_key.clone(),
             self.offset_key.clone(),
             self.headers_key.clone(),
+            self.decoding.build()?,
             cx.shutdown,
             cx.out,
             cx.acknowledgements,
@@ -141,6 +148,7 @@ async fn kafka_source(
     partition_key: String,
     offset_key: String,
     headers_key: String,
+    decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
     acknowledgements: bool,
@@ -165,12 +173,6 @@ async fn kafka_source(
                     None => continue, // skip messages with empty payload
                     Some(payload) => payload,
                 };
-                let mut log = LogEvent::default();
-
-                log.insert(
-                    log_schema().message_key(),
-                    Value::from(Bytes::from(payload.to_owned())),
-                );
 
                 // Extract timestamp from kafka message
                 let timestamp = msg
@@ -178,22 +180,11 @@ async fn kafka_source(
                     .to_millis()
                     .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                     .unwrap_or_else(Utc::now);
-                log.insert(log_schema().timestamp_key(), timestamp);
-
-                // Add source type
-                log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
 
                 let msg_key = msg
                     .key()
                     .map(|key| Value::from(String::from_utf8_lossy(key).to_string()))
                     .unwrap_or(Value::Null);
-                log.insert(&key_field, msg_key);
-
-                log.insert(&topic_key, Value::from(msg.topic().to_string()));
-
-                log.insert(&partition_key, Value::from(msg.partition()));
-
-                log.insert(&offset_key, Value::from(msg.offset()));
 
                 let mut headers_map = BTreeMap::new();
                 if let Some(headers) = msg.headers() {
@@ -208,18 +199,65 @@ async fn kafka_source(
                         }
                     }
                 }
-                log.insert(&headers_key, Value::from(headers_map));
+
+                let msg_topic = msg.topic().to_string();
+                let msg_partition = msg.partition();
+                let msg_offset = msg.offset();
+
+                let key_field = &key_field;
+                let topic_key = &topic_key;
+                let partition_key = &partition_key;
+                let offset_key = &offset_key;
+                let headers_key = &headers_key;
+
+                let mut stream = FramedRead::new(payload, decoder.clone());
+                let mut stream = stream! {
+                    loop {
+                        match stream.next().await {
+                            Some(Ok((events, _))) => {
+                                for mut event in events {
+                                    if let Event::Log(ref mut log) = event {
+                                        log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
+                                        log.insert(log_schema().timestamp_key(), timestamp);
+                                        log.insert(key_field, msg_key.clone());
+                                        log.insert(topic_key, Value::from(msg_topic.clone()));
+                                        log.insert(partition_key, Value::from(msg_partition));
+                                        log.insert(offset_key, Value::from(msg_offset));
+                                        log.insert(headers_key, Value::from(headers_map.clone()));
+                                    }
+
+                                    yield event;
+                                }
+                            },
+                            Some(Err(error)) => {
+                                // Error is logged by `crate::codecs::Decoder`, no further handling
+                                // is needed here.
+                                if !error.can_continue() {
+                                    break;
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                }
+                .map(Ok)
+                .boxed();
 
                 match &mut finalizer {
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let log = log.with_batch_notifier(&batch);
-                        match out.send(log.into()).await {
+                        let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
+                        match out.send_all(&mut stream).await {
                             Err(error) => error!(message = "Error sending to sink.", %error),
-                            Ok(_) => finalizer.add(msg.into(), receiver),
+                            Ok(_) => {
+                                // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
+                                // here, when `stream` is dropped and runs the destructor [...]".
+                                drop(stream);
+                                finalizer.add(msg.into(), receiver);
+                            }
                         }
                     }
-                    None => match out.send(log.into()).await {
+                    None => match out.send_all(&mut stream).await {
                         Err(error) => error!(message = "Error sending to sink.", %error),
                         Ok(_) => {
                             if let Err(error) = consumer.store_offset(&msg) {
@@ -444,6 +482,7 @@ mod integration_test {
             config.partition_key,
             config.offset_key,
             config.headers_key,
+            codecs::Decoder::default(),
             shutdown,
             tx,
             acknowledgements,

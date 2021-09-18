@@ -6,16 +6,16 @@ edition = "2018"
 publish = false
 
 [dependencies]
-bytes = { version = "1.0.1", default-features = false }
+bytes = { version = "1.1.0", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
-futures = { version = "0.3.16", default-features = false, features = ["std"] }
+futures = { version = "0.3.17", default-features = false, features = ["std"] }
 leveldb = { version = "0.8.6", default-features = false, optional = true }
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
 pin-project = { version = "1.0.8", default-features = false }
-serde = { version = "1.0.127", default-features = false, features = ["derive"] }
+serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.10", default-features = false, features = ["std"], optional = true }
-tokio = { version = "1.10.0", default-features = false, features = ["rt", "macros", "rt-multi-thread"] }
-tracing = { version = "0.1.26", default-features = false }
+tokio = { version = "1.11.0", default-features = false, features = ["rt", "macros", "rt-multi-thread"] }
+tracing = { version = "0.1.27", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
@@ -23,6 +23,7 @@ pretty_assertions = "0.7.2"
 quickcheck = "1.0"
 tempdir = "0.3"
 tokio-test = "0.4.2"
+metrics-exporter-prometheus = "0.6"
 
 [features]
 disk-buffer = ["db-key", "snafu", "leveldb"]

@@ -6,7 +6,7 @@ tags: ["pipeline", "dag", "graph", "configuration"]
 
 {{< svg "img/pipeline-model.svg" >}}
 
-Vector's pipeline model is based on a [directed acyclic graph][dag] of [components] that contains indepdendent subgraphs. [Events] must flow in a single direction from sources to sinks and can't create cycles. Each component in the graph can produce zero or more events.
+Vector's pipeline model is based on a [directed acyclic graph][dag] of [components] that contains independent subgraphs. [Events] must flow in a single direction from sources to sinks and can't create cycles. Each component in the graph can produce zero or more events.
 
 ## Defining pipelines
 

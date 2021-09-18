@@ -6,5 +6,5 @@ services: datadog_agent: {
 	url:      urls.datadog_agent
 	versions: null
 
-	description: "The [Datadog agent](\(urls.datadog_agent)) is a daemon that collects eventst and metrics from hosts to forward to Datadog, but can also be sent to Vector."
+	description: "The [Datadog agent](\(urls.datadog_agent)) is a daemon that collects events and metrics from hosts to forward to Datadog, but can also be sent to Vector."
 }

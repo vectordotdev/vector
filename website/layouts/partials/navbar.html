@@ -53,15 +53,7 @@
 
 
         {{/* Search bar */}}
-        <div class="max-w-xxs flex-grow">
-          <label for="search" class="sr-only">
-            Search
-          </label>
-
-          {{/* Targeted by the global site search in assets/js/search.tsx */}}
-          <div id="site-search"></div>
-        </div>
-      </div>
+        {{ partial "navbar/search-bar.html" }}
 
       {{/* Social icons */}}
       <div class="hidden lg:flex space-x-3.5 md:order-2 text-lg pt-1.5 ml-2 lg:ml-4 md:ml-3">

@@ -30,13 +30,13 @@ use std::str::FromStr;
 //
 // This is not necessarily a bad thing, but it does mean the relevant code has
 // to be updated to accommodate the updated parser syntax tree.
-macro_rules! unexpected_parser_sytax {
+macro_rules! unexpected_parser_syntax {
     ($pair:expr) => {
         unimplemented!(
             "unexpected parser rule: {:#?}\n\n {:#?}",
             $pair.as_rule(),
             $pair
-        );
+        )
     };
 }
 
@@ -55,7 +55,7 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
                 segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."));
             }
             Rule::target_path => return target_path_from_pair(segment),
-            _ => unexpected_parser_sytax!(segment),
+            _ => unexpected_parser_syntax!(segment),
         }
     }
     Ok(segments.join("."))
@@ -82,12 +82,12 @@ fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
                     match option.as_rule() {
                         Rule::path_segment => options.push(option.as_str().to_string()),
                         Rule::quoted_path_segment => options.push(quoted_path_from_pair(option)?),
-                        _ => unexpected_parser_sytax!(option),
+                        _ => unexpected_parser_syntax!(option),
                     }
                 }
                 segments.push(options);
             }
-            _ => unexpected_parser_sytax!(segment),
+            _ => unexpected_parser_syntax!(segment),
         }
     }
     Ok(segments)
@@ -241,7 +241,7 @@ fn function_arguments_from_pairs(
                         positional_item_from_pair(pair, &mut arguments, index - 1, signature)
                     }
                     Rule::keyword_item => keyword_item_from_pair(pair, &mut arguments, signature),
-                    _ => unexpected_parser_sytax!(pair),
+                    _ => unexpected_parser_syntax!(pair),
                 }
             })?;
     }
@@ -313,7 +313,7 @@ fn argument_item_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>>
     match inner.as_rule() {
         Rule::query_arithmetic_boolean => query_arithmetic_from_pair(inner),
         Rule::regex => regex_from_pair(inner),
-        _ => unexpected_parser_sytax!(inner),
+        _ => unexpected_parser_syntax!(inner),
     }
 }
 
@@ -338,7 +338,7 @@ fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
 
             Ok(Box::new(Literal::from(QueryValue::from(regex))))
         }
-        _ => unexpected_parser_sytax!(pair),
+        _ => unexpected_parser_syntax!(pair),
     }
 }
 
@@ -425,7 +425,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
         Rule::group => query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
         Rule::query_function => query_function_from_pairs(pair.into_inner())?,
-        _ => unexpected_parser_sytax!(pair),
+        _ => unexpected_parser_syntax!(pair),
     })
 }
 
@@ -471,7 +471,7 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
         Rule::merge => merge_function_from_pair(pair),
         Rule::log => log_function_from_pair(pair),
-        _ => unexpected_parser_sytax!(pair),
+        _ => unexpected_parser_syntax!(pair),
     }
 }
 
@@ -491,7 +491,7 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
         }
         Rule::function => function_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?),
         Rule::if_statement => if_statement_from_pairs(pair.into_inner()),
-        _ => unexpected_parser_sytax!(pair),
+        _ => unexpected_parser_syntax!(pair),
     }
 }
 
@@ -511,7 +511,7 @@ fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
                 assignments.push(statement_from_pair(pair)?);
             }
             Rule::EOI => (),
-            _ => unexpected_parser_sytax!(pair),
+            _ => unexpected_parser_syntax!(pair),
         }
     }
     Ok(Mapping::new(assignments))

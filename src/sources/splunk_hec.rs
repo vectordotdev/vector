@@ -13,8 +13,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use http::StatusCode;
-use serde::{de, Deserialize, Serialize};
-use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
+use serde::{Deserialize, Serialize};
+use serde_json::{de::Read as JsonRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::{
     collections::HashMap,
@@ -192,7 +192,12 @@ impl SplunkSource {
                             Box::new(body.reader())
                         };
 
-                        let events = stream::iter(EventIterator::new(reader, channel, remote, xff));
+                        let events = stream::iter(EventIterator::new(
+                            Deserializer::from_reader(reader).into_iter::<JsonValue>(),
+                            channel,
+                            remote,
+                            xff,
+                        ));
 
                         // `fn send_all` can be used once https://github.com/rust-lang/futures-rs/issues/2402
                         // is resolved.
@@ -326,9 +331,9 @@ impl SplunkSource {
 }
 /// Constructs one or more events from json-s coming from reader.
 /// If errors, it's done with input.
-struct EventIterator<R: Read> {
+struct EventIterator<'de, R: JsonRead<'de>> {
     /// Remaining request with JSON events
-    data: R,
+    deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
     /// Count of sent events
     events: usize,
     /// Optional channel from headers
@@ -339,15 +344,15 @@ struct EventIterator<R: Read> {
     extractors: [DefaultExtractor; 4],
 }
 
-impl<R: Read> EventIterator<R> {
+impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
     fn new(
-        data: R,
+        deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
         channel: Option<String>,
         remote: Option<SocketAddr>,
         remote_addr: Option<String>,
     ) -> Self {
         EventIterator {
-            data,
+            deserializer,
             events: 0,
             channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
@@ -367,20 +372,6 @@ impl<R: Read> EventIterator<R> {
                 DefaultExtractor::new("source", SOURCE),
                 DefaultExtractor::new("sourcetype", SOURCETYPE),
             ],
-        }
-    }
-
-    /// As serde_json::from_reader, but doesn't require that all data has to be consumed,
-    /// nor that it has to exist.
-    fn from_reader_take<T>(&mut self) -> Result<Option<T>, serde_json::Error>
-    where
-        T: de::DeserializeOwned,
-    {
-        use serde_json::de::Read;
-        let mut reader = IoRead::new(&mut self.data);
-        match reader.peek()? {
-            None => Ok(None),
-            Some(_) => Deserialize::deserialize(&mut Deserializer::new(reader)).map(Some),
         }
     }
 
@@ -486,20 +477,20 @@ impl<R: Read> EventIterator<R> {
     }
 }
 
-impl<R: Read> Iterator for EventIterator<R> {
+impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
     type Item = Result<Event, Rejection>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.from_reader_take::<JsonValue>() {
-            Ok(Some(json)) => Some(self.build_event(json)),
-            Ok(None) => {
+        match self.deserializer.next() {
+            Some(Ok(json)) => Some(self.build_event(json)),
+            None => {
                 if self.events == 0 {
                     Some(Err(ApiError::NoData.into()))
                 } else {
                     None
                 }
             }
-            Err(error) => {
+            Some(Err(error)) => {
                 emit!(SplunkHecRequestBodyInvalid {
                     error: error.into()
                 });
@@ -551,7 +542,7 @@ struct DefaultExtractor {
 }
 
 impl DefaultExtractor {
-    fn new(field: &'static str, to_field: &'static str) -> Self {
+    const fn new(field: &'static str, to_field: &'static str) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -777,7 +768,7 @@ mod tests {
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
         sinks::{
-            splunk_hec::{Encoding, HecSinkConfig},
+            splunk_hec::logs::{Encoding, HecSinkLogsConfig},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
@@ -831,7 +822,7 @@ mod tests {
         encoding: impl Into<EncodingConfig<Encoding>>,
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
-        HecSinkConfig {
+        HecSinkLogsConfig {
             token: TOKEN.to_owned(),
             endpoint: format!("http://{}", address),
             host_key: "host".to_owned(),
@@ -1260,6 +1251,50 @@ mod tests {
 
         assert_eq!(
             400,
+            post(address, "services/collector/event", message).await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn handles_newlines() {
+        trace_init();
+
+        let message = r#"
+{"event":"first"}
+        "#;
+        let (source, address) = source().await;
+
+        assert_eq!(
+            200,
+            post(address, "services/collector/event", message).await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn handles_spaces() {
+        trace_init();
+
+        let message = r#" {"event":"first"} "#;
+        let (source, address) = source().await;
+
+        assert_eq!(
+            200,
             post(address, "services/collector/event", message).await
         );
 

@@ -126,7 +126,7 @@ enum Encoding {
 }
 
 impl Encoding {
-    fn content_type(self) -> &'static str {
+    const fn content_type(self) -> &'static str {
         match self {
             Self::Text => "text/plain",
             Self::Ndjson => "application/x-ndjson",

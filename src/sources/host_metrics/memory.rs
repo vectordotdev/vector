@@ -1,4 +1,4 @@
-use super::HostMetricsConfig;
+use super::HostMetrics;
 use crate::event::metric::Metric;
 use chrono::Utc;
 #[cfg(target_os = "linux")]
@@ -10,7 +10,7 @@ use heim::memory::os::SwapExt;
 use heim::units::information::byte;
 use shared::btreemap;
 
-impl HostMetricsConfig {
+impl HostMetrics {
     pub async fn memory_metrics(&self) -> Vec<Metric> {
         match heim::memory::memory().await {
             Ok(memory) => {

@@ -27,6 +27,7 @@ criterion_group!(
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
+              find,
               flatten,
               floor,
               format_int,
@@ -109,6 +110,7 @@ criterion_group!(
               to_timestamp,
               to_unix_timestamp,
               truncate,
+              unique,
               // TODO: Cannot pass a Path to bench_function
               //unnest
               // TODO: value is dynamic so we cannot assert equality
@@ -333,6 +335,25 @@ bench_function! {
     case_insensitive {
         args: func_args![value: "abcdefg", substring: "EFG", case_sensitive: false],
         want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
+    find => vrl_stdlib::Find;
+
+    str_matching {
+        args: func_args![value: "foobarfoo", pattern: "bar"],
+        want: Ok(value!(3)),
+    }
+
+    str_too_long {
+        args: func_args![value: "foo", pattern: "foobar"],
+        want: Ok(value!(-1)),
+    }
+
+    regex_matching_start {
+        args: func_args![value: "foobar", pattern: Value::Regex(Regex::new("fo+z?").unwrap().into())],
+        want: Ok(value!(0)),
     }
 }
 
@@ -2063,6 +2084,24 @@ bench_function! {
             ellipsis: false,
         ],
         want: Ok("Super"),
+    }
+}
+
+bench_function! {
+    unique => vrl_stdlib::Unique;
+
+    default {
+        args: func_args![
+            value: value!(["bar", "foo", "baz", "foo"]),
+        ],
+        want: Ok(value!(["bar", "foo", "baz"])),
+    }
+
+    mixed_values {
+        args: func_args![
+            value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
+        ],
+        want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
     }
 }
 

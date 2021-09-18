@@ -2,32 +2,19 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct StdinEventReceived {
+pub struct StdinEventsReceived {
     pub byte_size: usize,
+    pub count: usize,
 }
 
-impl InternalEvent for StdinEventReceived {
+impl InternalEvent for StdinEventsReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.");
+        trace!(message = "Received events.", self.count);
     }
 
     fn emit_metrics(&self) {
-        counter!("events_in_total", 1);
+        counter!("component_received_events_total", self.count as u64);
+        counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
-pub struct StdinReadFailed {
-    pub error: std::io::Error,
-}
-
-impl InternalEvent for StdinReadFailed {
-    fn emit_logs(&self) {
-        error!(message = "Unable to read from source.", error = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("stdin_reads_failed_total", 1);
     }
 }
