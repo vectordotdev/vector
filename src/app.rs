@@ -85,7 +85,6 @@ impl Application {
         };
 
         metrics::init().expect("metrics initialization failed");
-        trace::init(color, json, &level);
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
@@ -109,6 +108,7 @@ impl Application {
             let require_healthy = root_opts.require_healthy;
 
             rt.block_on(async move {
+                trace::init(color, json, &level);
                 // Signal handler for OS and provider messages.
                 let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
                 signal_handler.forever(signal::os_signals());
