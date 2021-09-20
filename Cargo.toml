@@ -203,7 +203,7 @@ bollard = { version = "0.11.0", default-features = false, features = ["ssl"], op
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.4", default-features = false }
+cidr-utils = { version = "0.5.5", default-features = false }
 csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
