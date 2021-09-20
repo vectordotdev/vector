@@ -1563,12 +1563,6 @@
 {{ $hash := $scenario | jsonify | base64Encode }}
 {{ $hashUrl := printf "https://vrl-web.netlify.app/h/%s" $hash }}
 <div>
-  <a href="{{ $hashUrl }}" target="_blank">
-    Open in VRL Web
-  </a>
-
-  {{ .ctx }}
-
   <span>
     {{ partial "heading.html" (dict "text" .ctx.title "level" 5 "id" $id "toc_hide" true) }}
   </span>
@@ -1595,6 +1589,21 @@
       </div>
     </div>
     {{ end }}
+  </div>
+
+  <div class="mt-4 text-sm flex justify-end">
+    <a class="flex space-x-2 items-center" href="{{ $hashUrl }}" target="_blank">
+      {{/* Heroicon: solid/play */}}
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd"
+          d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+          clip-rule="evenodd" />
+      </svg>
+
+      <span>
+        Open in the VRL Playground
+      </span>
+    </a>
   </div>
 </div>
 {{ end }}
