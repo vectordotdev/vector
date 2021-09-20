@@ -4,21 +4,20 @@ use crate::{
         SourceDescription,
     },
     event::Event,
-    sources::{
-        self,
-        util::{ErrorMessage, HttpSourceAuthConfig},
-    },
+    internal_events::HttpDecompressError,
+    sources,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use chrono::Utc;
+use flate2::read::{DeflateDecoder, MultiGzDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{net::SocketAddr, sync::Arc};
+use std::{error::Error, fmt, io::Read, net::SocketAddr, sync::Arc};
 use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 use warp::{
     filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
@@ -37,7 +36,6 @@ impl warp::reject::Reject for ApiError {}
 pub struct DatadogAgentConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
-    auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 }
@@ -51,7 +49,6 @@ impl GenerateConfig for DatadogAgentConfig {
         toml::Value::try_from(Self {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
-            auth: None,
             store_api_key: true,
         })
         .unwrap()
@@ -184,17 +181,22 @@ impl DatadogAgentSource {
         warp::post()
             .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
             .and(warp::path::full())
+            .and(warp::header::optional::<String>("content-encoding"))
             .and(warp::header::optional::<String>("dd-api-key"))
             .and(warp::body::bytes())
             .and_then(
-                move |_, path: FullPath, api_token: Option<String>, body: Bytes| {
+                move |_,
+                      path: FullPath,
+                      encoding_header: Option<String>,
+                      api_token: Option<String>,
+                      body: Bytes| {
                     let token: Option<Arc<str>> = if self.store_api_key {
                         self.extract_api_key(path.as_str(), api_token)
                     } else {
                         None
                     };
-                    let events = self.decode_body(body, token);
-
+                    let events = decode(&encoding_header, body)
+                        .and_then(|body| self.decode_body(body, token));
                     Self::handle_request(events, acknowledgements, out.clone())
                 },
             )
@@ -248,6 +250,78 @@ impl DatadogAgentSource {
             .collect())
     }
 }
+
+fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
+    if let Some(encodings) = header {
+        for encoding in encodings.rsplit(',').map(str::trim) {
+            body = match encoding {
+                "identity" => body,
+                "gzip" | "x-gzip" => {
+                    let mut decoded = Vec::new();
+                    MultiGzDecoder::new(body.reader())
+                        .read_to_end(&mut decoded)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    decoded.into()
+                }
+                "deflate" | "x-deflate" => {
+                    let mut decoded = Vec::new();
+                    DeflateDecoder::new(body.reader())
+                        .read_to_end(&mut decoded)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    decoded.into()
+                }
+                encoding => {
+                    return Err(ErrorMessage::new(
+                        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                        format!("Unsupported encoding {}", encoding),
+                    ))
+                }
+            }
+        }
+    }
+
+    Ok(body)
+}
+
+fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
+    emit!(HttpDecompressError {
+        encoding,
+        error: &error
+    });
+    ErrorMessage::new(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        format!("Failed decompressing payload with {} decoder.", encoding),
+    )
+}
+
+#[derive(Serialize, Debug)]
+pub struct ErrorMessage {
+    code: u16,
+    message: String,
+}
+
+impl ErrorMessage {
+    pub fn new(code: StatusCode, message: String) -> Self {
+        ErrorMessage {
+            code: code.as_u16(),
+            message,
+        }
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+
+impl Error for ErrorMessage {}
+
+impl fmt::Display for ErrorMessage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}: {}", self.code, self.message)
+    }
+}
+
+impl warp::reject::Reject for ErrorMessage {}
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
 #[derive(Deserialize, Clone, Serialize, Debug)]
@@ -341,7 +415,6 @@ mod tests {
             DatadogAgentConfig {
                 address,
                 tls: None,
-                auth: None,
                 store_api_key,
             }
             .build(context)
