@@ -148,12 +148,16 @@ pub struct HostMetrics {
 }
 
 impl HostMetrics {
+    #[cfg(not(target_os = "linux"))]
     pub const fn new(config: HostMetricsConfig) -> Self {
-        #[cfg(target_os = "linux")]
+        Self { config }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn new(config: HostMetricsConfig) -> Self {
         let root_cgroup = cgroups::CGroup::root(config.cgroups.base.as_deref());
         Self {
             config,
-            #[cfg(target_os = "linux")]
             root_cgroup,
         }
     }
