@@ -527,6 +527,25 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              component_received_events_total.tags
 		}
+		component_sent_bytes_total: {
+			description:       "The number of raw bytes sent by this component to destination sinks."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				protocol: {
+					description: "The protocol used to send the bytes."
+					required:    true
+				}
+				endpoint: {
+					description: "The endpoint that the bytes were sent to. For HTTP, this will be the host and path only, excluding the query string."
+					required:    false
+				}
+				file: {
+					description: "The absolute path of the destination file."
+					required:    false
+				}
+			}
+		}
 		component_sent_events_total: {
 			description:       "The total number of events emitted by this component."
 			type:              "counter"
