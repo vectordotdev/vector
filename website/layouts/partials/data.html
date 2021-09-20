@@ -597,7 +597,7 @@
       {{/* Function title */}}
       <span class="flex justify-between items-center">
         <span class="font-mono">
-          {{ $href := printf "%s" $name }}
+          {{ $href := printf "#%s" $name }}
           {{ partial "heading.html" (dict "text" $name "level" 3 "href" $href "icon" false) }}
         </span>
 
@@ -1712,7 +1712,35 @@
 </div>
 {{ end }}
 
+{{ define "vrl-function-arg-row" }}
+{{ $color := cond .required "text-secondary dark:text-primary" "text-indigo-500 dark:text-indigo-300" }}
+<tr>
+  <td>
+    <span class="font-mono {{ $color }}{{ if .required }} font-bold{{ end }}">
+      {{ .name }}
+    </span>
+  </td>
+  <td>
+    <span class="font-mono">
+      {{ range .type }}
+      {{ . }}<br />
+      {{ end }}
+    </span>
+  </td>
+  <td class="leading-snug">
+    {{ .description | markdownify }}
+  </td>
+  <td class="overflow-auto">
+    {{ with .default }}
+    <code>{{ . }}</code>
+    {{ end }}
+  </td>
+</tr>
+{{ end }}
+
 {{ define "vrl-function-args" }}
+{{ $required := where . "required" true }}
+{{ $optional := where . "required" false }}
 <table class="table-fixed">
   <thead>
     <tr>
@@ -1731,30 +1759,12 @@
     </tr>
   </thead>
   <tbody>
-    {{ range . }}
-    {{ $color := cond .required "text-secondary dark:text-primary" "text-indigo-500 dark:text-indigo-300" }}
-    <tr>
-      <td>
-        <span class="font-mono {{ $color }}{{ if .required }} font-bold{{ end }}">
-          {{ .name }}
-        </span>
-      </td>
-      <td>
-        <span class="font-mono">
-          {{ range .type }}
-          {{ . }}<br />
-          {{ end }}
-        </span>
-      </td>
-      <td class="leading-snug">
-        {{ .description | markdownify }}
-      </td>
-      <td class="overflow-auto">
-        {{ with .default }}
-        <code>{{ . }}</code>
-        {{ end }}
-      </td>
-    </tr>
+    {{ range $required }}
+    {{ template "vrl-function-arg-row" . }}
+    {{ end }}
+
+    {{ range $optional }}
+    {{ template "vrl-function-arg-row" . }}
     {{ end }}
   </tbody>
 </table>
