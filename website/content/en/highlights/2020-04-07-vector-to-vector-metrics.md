@@ -22,4 +22,4 @@ the [centralized topology][docs.topologies#centralized].
 [docs.data-model.log]: /docs/about/under-the-hood/architecture/data-model/log
 [docs.sources.vector]: /docs/reference/configuration/sources/vector/
 [docs.topologies#centralized]: /docs/setup/deployment/topologies/#centralized
-[urls.pr_2245]: https://github.com/timberio/vector/pull/2245
+[urls.pr_2245]: https://github.com/vectordotdev/vector/pull/2245

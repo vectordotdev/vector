@@ -57,11 +57,11 @@ Vector has adopted the Rust community model and practices for engaging with peop
 
 [chat]: https://chat.vector.dev
 [cncf]: https://bestpractices.coreinfrastructure.org/en
-[contribution]: https://github.com/timberio/vector/blob/master/CONTRIBUTING.md
-[first_issues]: https://github.com/timberio/vector/contribute
+[contribution]: https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md
+[first_issues]: https://github.com/vectordotdev/vector/contribute
 [kernel]: https://bestpractices.coreinfrastructure.org/en/projects/34
 [lf]: https://www.linuxfoundation.org
 [linux]: https://www.kernel.org
-[oss]: https://github.com/timberio/vector
+[oss]: https://github.com/vectordotdev/vector
 [rust_community]: https://www.rust-lang.org/community
 [rust_lang]: https://www.rust-lang.org

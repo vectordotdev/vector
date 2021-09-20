@@ -9,7 +9,7 @@ weight: 4
 ## Installation
 
 ```shell
-brew tap timberio/brew && brew install vector
+brew tap vectordotdev/brew && brew install vector
 ```
 
 ## Other actions

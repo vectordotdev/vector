@@ -112,7 +112,7 @@ option = "{{ parent.child[0] }}"
 ```
 
 
-[1692]: https://github.com/timberio/vector/issues/1692
+[1692]: https://github.com/vectordotdev/vector/issues/1692
 [aws_s3]: /docs/reference/configuration/sinks/aws_s3
 [fields]: /docs/reference/configuration/field-path-notation
 [log]: /docs/about/under-the-hood/architecture/data-model/log

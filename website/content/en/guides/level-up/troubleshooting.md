@@ -109,7 +109,7 @@ At this point, we recommend reaching out to the community for help.
 
 3. If you need help, [join our chat community][urls.vector_chat]. You can post a question and search previous questions.
 
-[urls.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug
-[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.new_bug_report]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+bug
+[urls.new_feature_request]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+new+feature
 [urls.vector_chat]: https://chat.vector.dev
-[urls.vector_issues]: https://github.com/timberio/vector/issues
+[urls.vector_issues]: https://github.com/vectordotdev/vector/issues
