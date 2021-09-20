@@ -118,11 +118,11 @@ tokio-stream = { version = "0.1.7", default-features = false, features = ["net",
 tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time", "io"] }
 
 # Tracing
-tracing = { version = "0.1.27", default-features = false }
+tracing = { version = "0.1.28", default-features = false }
 tracing-core = { version = "0.1.20", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.2.23", default-features = false }
+tracing-subscriber = { version = "0.2.24", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -203,7 +203,7 @@ bollard = { version = "0.11.0", default-features = false, features = ["ssl"], op
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.4", default-features = false }
+cidr-utils = { version = "0.5.5", default-features = false }
 csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
@@ -256,7 +256,7 @@ pin-project = { version = "1.0.8", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
-rand_distr = { version = "0.4.1", default-features = false }
+rand_distr = { version = "0.4.2", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }

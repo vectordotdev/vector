@@ -1,6 +1,6 @@
 ---
 title: Under the hood
-weight: 1
+weight: 3
 tags: ["concepts"]
 ---
 
