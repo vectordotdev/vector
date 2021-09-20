@@ -452,7 +452,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		events_in_total: {
-			description: """
+			description:       """
 				The number of events accepted by this component either from tagged
 				origins like file and uri, or cumulatively from other origins.
 				This metric is deprecated and will be removed in a future version.
@@ -463,7 +463,7 @@ components: sources: internal_metrics: {
 			tags:              component_received_events_total.tags
 		}
 		events_out_total: {
-			description: """
+			description:       """
 				The total number of events emitted by this component.
 				This metric is deprecated and will be removed in a future version.
 				Use [`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) instead.
