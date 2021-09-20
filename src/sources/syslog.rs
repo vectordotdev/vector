@@ -233,7 +233,7 @@ pub fn udp(
                         Some(events.remove(0))
                     }
                     Err(error) => {
-                        emit!(SyslogUdpReadError { error });
+                        emit!(&SyslogUdpReadError { error });
                         None
                     }
                 }
@@ -286,7 +286,7 @@ fn enrich_syslog_event(
         .unwrap_or_else(Utc::now);
     log.insert(log_schema().timestamp_key(), timestamp);
 
-    emit!(SyslogEventReceived { byte_size });
+    emit!(&SyslogEventReceived { byte_size });
 
     trace!(
         message = "Processing one event.",

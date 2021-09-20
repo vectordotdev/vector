@@ -192,7 +192,7 @@ impl HostMetrics {
                 metric.insert_tag("host".into(), hostname.into());
             }
         }
-        emit!(HostMetricsEventReceived {
+        emit!(&HostMetricsEventReceived {
             count: metrics.len()
         });
         metrics.into_iter().map(Into::into)

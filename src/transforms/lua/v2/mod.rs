@@ -225,7 +225,7 @@ impl Lua {
     fn attempt_gc(&mut self) {
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
-            emit!(LuaGcTriggered {
+            emit!(&LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
             let _ = self
@@ -264,7 +264,7 @@ impl RuntimeTransform for Lua {
                     .call((event, wrap_emit_fn(scope, emit_fn)?))
             })
             .context(RuntimeErrorHooksProcess)
-            .map_err(|e| emit!(LuaBuildError { error: e }));
+            .map_err(|e| emit!(&LuaBuildError { error: e }));
 
         self.attempt_gc();
     }

@@ -74,7 +74,7 @@ pub fn build_unix_stream_source(
             let mut out = out.clone();
             tokio::spawn(
                 async move {
-                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
+                    let _open_token = connection_open.open(|count| emit!(&ConnectionOpen { count }));
 
                     loop {
                         match stream.next().await {
@@ -86,7 +86,7 @@ pub fn build_unix_stream_source(
                                 }
                             }
                             Some(Err(error)) => {
-                                emit!(UnixSocketError {
+                                emit!(&UnixSocketError {
                                     error: &error,
                                     path: &listen_path
                                 });
@@ -120,7 +120,7 @@ pub fn build_unix_stream_source(
 
         // Delete socket file
         if let Err(error) = remove_file(&listen_path) {
-            emit!(UnixSocketFileDeleteFailed {
+            emit!(&UnixSocketFileDeleteFailed {
                 path: &listen_path,
                 error
             });

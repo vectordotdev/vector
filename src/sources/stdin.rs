@@ -116,7 +116,7 @@ where
             loop {
                 match stream.next().await {
                     Some(Ok((events, byte_size))) => {
-                        emit!(StdinEventsReceived {
+                        emit!(&StdinEventsReceived {
                             byte_size,
                             count: events.len()
                         });

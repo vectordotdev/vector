@@ -179,7 +179,7 @@ pub async fn build_pieces(
             Transform::Function(mut t) => input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
                 .inspect(|event| {
-                    emit!(EventsReceived {
+                    emit!(&EventsReceived {
                         count: 1,
                         byte_size: event.size_of(),
                     })
@@ -187,7 +187,7 @@ pub async fn build_pieces(
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
-                    emit!(EventsSent {
+                    emit!(&EventsSent {
                         count: buf.len(),
                         byte_size: buf.iter().map(|event| event.size_of()).sum(),
                     });
@@ -199,7 +199,7 @@ pub async fn build_pieces(
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
                     .inspect(|event| {
-                        emit!(EventsReceived {
+                        emit!(&EventsReceived {
                             count: 1,
                             byte_size: event.size_of(),
                         })
@@ -207,7 +207,7 @@ pub async fn build_pieces(
                 t.transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output.with(|event: Event| async {
-                        emit!(EventsSent {
+                        emit!(&EventsSent {
                             count: 1,
                             byte_size: event.size_of(),
                         });
@@ -289,7 +289,7 @@ pub async fn build_pieces(
                 rx.by_ref()
                     .filter(|event| ready(filter_event_type(event, input_type)))
                     .inspect(|event| {
-                        emit!(EventsReceived {
+                        emit!(&EventsReceived {
                             count: 1,
                             byte_size: event.size_of(),
                         })

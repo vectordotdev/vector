@@ -141,7 +141,7 @@ impl<'a> DnstapParser<'a> {
             if dnstap_data_type == "Message" {
                 if let Some(message) = proto_msg.message {
                     if let Err(err) = self.parse_dnstap_message(message) {
-                        emit!(DnstapParseDataError {
+                        emit!(&DnstapParseDataError {
                             error: err.to_string().as_str()
                         });
                         need_raw_data = true;
@@ -153,7 +153,7 @@ impl<'a> DnstapParser<'a> {
                 }
             }
         } else {
-            emit!(DnstapParseDataError {
+            emit!(&DnstapParseDataError {
                 error: format!("Unknown dnstap data type: {}", dnstap_data_type_id).as_str()
             });
             need_raw_data = true;

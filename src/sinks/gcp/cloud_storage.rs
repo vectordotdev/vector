@@ -404,7 +404,7 @@ fn encode_event(
     let key = key_prefix
         .render_string(&event)
         .map_err(|error| {
-            emit!(TemplateRenderingFailed {
+            emit!(&TemplateRenderingFailed {
                 error,
                 field: Some("key_prefix"),
                 drop_event: true,

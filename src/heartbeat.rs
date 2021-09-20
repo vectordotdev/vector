@@ -8,6 +8,6 @@ pub async fn heartbeat() {
     let mut interval = interval(Duration::from_secs(1));
     loop {
         interval.tick().await;
-        emit!(Heartbeat { since });
+        emit!(&Heartbeat { since });
     }
 }

@@ -162,7 +162,7 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(HttpDecompressError {
+    emit!(&HttpDecompressError {
         encoding,
         error: &error
     });
@@ -282,7 +282,7 @@ async fn handle_request(
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok((mut events, body_size)) => {
-            emit!(HttpEventsReceived {
+            emit!(&HttpEventsReceived {
                 events_count: events.len(),
                 byte_size: body_size,
             });
@@ -307,7 +307,7 @@ async fn handle_request(
                 .await
         }
         Err(error) => {
-            emit!(HttpBadRequest {
+            emit!(&HttpBadRequest {
                 error_code: error.code,
                 error_message: error.message.as_str(),
             });

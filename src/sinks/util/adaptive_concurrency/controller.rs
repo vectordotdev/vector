@@ -99,7 +99,7 @@ impl<L> Controller<L> {
             inner.reached_limit = true;
         }
 
-        emit!(AdaptiveConcurrencyInFlight {
+        emit!(&AdaptiveConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
     }
@@ -113,7 +113,7 @@ impl<L> Controller<L> {
 
         let rtt = now.saturating_duration_since(start);
         if use_rtt {
-            emit!(AdaptiveConcurrencyObservedRtt { rtt });
+            emit!(&AdaptiveConcurrencyObservedRtt { rtt });
         }
         let rtt = rtt.as_secs_f64();
 
@@ -133,7 +133,7 @@ impl<L> Controller<L> {
         }
 
         inner.in_flight -= 1;
-        emit!(AdaptiveConcurrencyInFlight {
+        emit!(&AdaptiveConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
 
@@ -172,7 +172,7 @@ impl<L> Controller<L> {
                     }
 
                     if let Some(current_rtt) = current_rtt {
-                        emit!(AdaptiveConcurrencyAveragedRtt {
+                        emit!(&AdaptiveConcurrencyAveragedRtt {
                             rtt: Duration::from_secs_f64(current_rtt)
                         });
                     }
@@ -230,7 +230,7 @@ impl<L> Controller<L> {
             self.semaphore.forget_permits(to_forget);
             inner.current_limit -= to_forget;
         }
-        emit!(AdaptiveConcurrencyLimit {
+        emit!(&AdaptiveConcurrencyLimit {
             concurrency: inner.current_limit as u64,
             reached_limit: inner.reached_limit,
             had_back_pressure: inner.had_back_pressure,

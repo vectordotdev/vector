@@ -112,7 +112,7 @@ impl Service<S3Request> for S3Service {
 
             // TODO: This is fine for testing, but we should have a better
             // pattern for this.
-            emit!(S3EventsSent {
+            emit!(&S3EventsSent {
                 byte_size: body_len,
             });
 

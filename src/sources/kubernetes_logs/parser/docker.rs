@@ -25,11 +25,11 @@ impl FunctionTransform for Docker {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         if let Err(err) = parse_json(log) {
-            emit!(KubernetesLogsDockerFormatParseFailed { error: &err });
+            emit!(&KubernetesLogsDockerFormatParseFailed { error: &err });
             return;
         }
         if let Err(err) = normalize_event(log) {
-            emit!(KubernetesLogsDockerFormatParseFailed { error: &err });
+            emit!(&KubernetesLogsDockerFormatParseFailed { error: &err });
             return;
         }
         output.push(event);
