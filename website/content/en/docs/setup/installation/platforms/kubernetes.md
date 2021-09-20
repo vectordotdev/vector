@@ -54,8 +54,8 @@ bases:
 
 images:
   # Override the Vector image to avoid use of the sliding tag.
-  - name: vectordotdev/vector
-    newName: vectordotdev/vector
+  - name: timberio/vector
+    newName: timberio/vector
     newTag: {{< version >}}-debian
 
 resources:
