@@ -589,6 +589,8 @@
     {{ $func := index site.Data.docs.remap.functions .name }}
     {{ $infallible := not $func.internal_failure_reasons }}
     {{ $args := $func.arguments }}
+    {{ $requiredArgs := where $args "required" true }}
+    {{ $optionalArgs := where $args "required" false }}
     {{ $lastArg := sub (len $args) 1 }}
     {{ $return := $func.return }}
     <div class="py-4 px-6">
@@ -609,6 +611,10 @@
         </span>
       </span>
 
+      <div>
+        {{ $requiredArgs }}
+      </div>
+
       {{/* Function description */}}
       <div class="mt-6 text-sm prose prose-md dark:prose-dark max-w-none">
         {{ $func.description | markdownify }}
@@ -622,15 +628,24 @@
         </span>
 
         <div class="my-2 font-mono text-sm bg-dark dark:bg-black px-3.5 py-2.5 rounded text-gray-100">
-          <span class="text-primary dark:text-primary font-semibold">{{ $name }}</span>(
-            {{- range $idx, $arg := $args -}}
+          <span class="text-primary-dark dark:text-primary font-semibold">{{ $name }}</span>(
+            {{- $lastArg := sub (len $requiredArgs) 1 -}}
+            {{- range $idx, $arg := $requiredArgs -}}
             {{ $isLast := eq $idx $lastArg -}}
-            <span class="{{ if .required }} font-bold text-secondary dark:text-primary{{ else }} text-indigo-500 dark:text-indigo-300{{ end }}">
+            <span class="font-bold text-secondary dark:text-primary">
               {{- .name -}}
             </span>:
             <span class="text-gray-200"><{{ delimit .type `<span class="text-grey-500"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
             {{ end -}}
-          )
+            {{- if gt (len $optionalArgs) 0 -}},
+            [{{- $lastArg := sub (len $optionalArgs) 1 -}}
+            {{- range $idx, $arg := $optionalArgs -}}
+            {{ $isLast := eq $idx $lastArg -}}
+            <span class="text-indigo-500 dark:text-indigo-300">
+              {{- .name -}}
+            </span>:
+            <span class="text-gray-200"><{{ delimit .type `<span class="text-grey-500"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+            {{ end -}}]{{ end }})
           {{- with $return -}}
           <div class="ml-3">
             <span class="font-extrabold">::</span> <span class="text-gray-200"><{{ delimit .types " | " }}></span>{{ if not $infallible }}, &lt;error>{{ end }}
