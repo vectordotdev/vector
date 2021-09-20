@@ -37,4 +37,4 @@ likely we will revisit this decision.
 [gnu_allocator]: https://www.gnu.org/software/libc/manual/html_node/The-GNU-Allocator.html
 [jemalloc]: https://github.com/jemalloc/jemalloc
 [musl_allocator]: https://musl.libc.org/releases.html
-[performance]: https://github.com/timberio/vector/issues/1985#issuecomment-670667972
+[performance]: https://github.com/vectordotdev/vector/issues/1985#issuecomment-670667972

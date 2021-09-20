@@ -15,7 +15,7 @@ In this quickstart guide, we walk you through using Vector for the first time. W
 We can install Vector using this installation script:
 
 ```shell
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 ```
 
 Or you can [choose your preferred installation method][install].

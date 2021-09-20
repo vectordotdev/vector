@@ -38,4 +38,4 @@ banana@tree:/$ vector eval stdin//console(encoding=json)
 
 Want to contribute? [Discussion here!][urls.vector_generate_arguments_issue]
 
-[urls.vector_generate_arguments_issue]: https://github.com/timberio/vector/issues/1966
+[urls.vector_generate_arguments_issue]: https://github.com/vectordotdev/vector/issues/1966

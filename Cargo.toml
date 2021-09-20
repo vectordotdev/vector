@@ -116,6 +116,7 @@ tokio = { version = "1.11.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time", "io"] }
+console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30d52c9f22de69bac38009a9183135808806c",  optional = true }
 
 # Tracing
 tracing = { version = "0.1.28", default-features = false }
@@ -337,6 +338,7 @@ default-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafk
 default-no-api-client = ["api", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
 disk-buffer = ["vector_core/disk-buffer"]
+tokio-console = ["console-subscriber", "tokio/tracing"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
 all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datadog-pipelines"]

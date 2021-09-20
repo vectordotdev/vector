@@ -663,6 +663,6 @@ components: sources: kubernetes_logs: {
 		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
 		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total:                  components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }
