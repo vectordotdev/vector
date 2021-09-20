@@ -633,7 +633,7 @@
           )
           {{- with $return -}}
           <div class="ml-3">
-            <span class="font-extrabold">::</span> <span class="text-gray-200"><{{ delimit .types " | " }}></span>
+            <span class="font-extrabold">::</span> <span class="text-gray-200"><{{ delimit .types " | " }}></span>{{ if not $infallible }}, &lt;error>{{ end }}
           </div>
           {{- end -}}
         </div>
