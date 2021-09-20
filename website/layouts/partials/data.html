@@ -610,13 +610,13 @@
       </span>
 
       {{/* Function description */}}
-      <div class="mt-4 prose prose-md dark:prose-dark max-w-none leading-snug">
+      <div class="mt-6 text-sm prose prose-md dark:prose-dark max-w-none">
         {{ $func.description | markdownify }}
       </div>
 
       {{/* Function spec, etc. */}}
       {{ $id := printf "%s-function-spec" $name }}
-      <div class="mt-3 border rounded-md py-3 px-4 dark:border-gray-700">
+      <div class="mt-6">
         <span>
           {{ partial "heading.html" (dict "text" "Function spec" "level" 4 "id" $id "toc_hide" true) }}
         </span>
@@ -638,50 +638,67 @@
           {{- end -}}
         </div>
 
-        {{/* Function arguments */}}
-        {{ with $args }}
-        <div class="mt-2 prose dark:prose-dark max-w-none">
-          {{ template "vrl-function-args" . }}
-        </div>
-        {{ end }}
-
         <div class="mt-3 flex flex-row-reverse">
           {{ template "vrl-function-legend" }}
         </div>
 
-        {{ with $func.examples }}
-        {{ $id := printf "%s-examples" $name }}
-        <div x-data="{ open: location.hash.startsWith('#{{ $id }}') }" class="mt-4 border rounded py-2 px-3 dark:border-gray-700">
-          <span class="flex justify-between items-center">
-            {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id "toc_hide" true) }}
-
-            {{ template "config-toggler" (dict "size" 4) }}
-          </span>
-
-          <div x-show="open" class="pt-4 flex flex-col space-y-5 overflow-x-scroll">
-            {{ range . }}
-            {{ template "vrl-function-example" (dict "name" $name "ctx" .) }}
-            {{ end }}
-          </div>
+        {{/* Function arguments */}}
+        {{ with $args }}
+        <div class="mt-6 prose dark:prose-dark max-w-none">
+          {{ template "vrl-function-args" . }}
         </div>
         {{ end }}
 
+        {{/* Function notices */}}
         {{ with $func.notices }}
-        <div class="mt-3 border rounded border-yellow-400 py-3 px-4">
-          <span class="block font-semibold">
-            Notices
+        {{ $id := printf "%s-notices" $name }}
+        <div class="mt-6">
+          <span>
+            {{ partial "heading.html" (dict "text" "Notices" "level" 4 "id" $id "toc_hide" true) }}
           </span>
 
-          <span class="my-2 block font-sm">
+          <span class="mt-2 text-sm prose prose-md dark:prose-dark max-w-none">
             This function has special behavior that you should be aware of.
           </span>
 
           <div class="mt-1.5 flex flex-col space-y-2">
             {{ range . }}
-            <div class="flex space-x-5">
+            <div class="flex space-x-5 items-center">
+              <div class="flex-shrink-0 py-1">
+                {{/* Heroicon: outline/exclamation-circle */}}
+                <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+
+              <div class="prose prose-sm dark:prose-dark max-w-none leading-snug">
+                {{ . | markdownify }}
+              </div>
+            </div>
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+
+        {{/* Function errors */}}
+        {{ with $func.internal_failure_reasons }}
+        {{ $id := printf "%s-errors" $name }}
+        <div class="mt-6">
+          <span>
+            {{ partial "heading.html" (dict "text" "Errors" "level" 4 "id" $id "toc_hide" true) }}
+          </span>
+
+          <span class="mt-2 text-sm prose prose-md dark:prose-dark max-w-none">
+            The <code>{{ $name }}</code> is <strong>fallible</strong>, which means that <a href="/docs/reference/vrl/errors">error handling</a>
+            is required for these errors:
+          </span>
+
+          <div class="mt-1.5">
+            {{ range . }}
+            <div class="flex space-x-5 items-center">
               <div class="flex-shrink-0 py-1">
                 {{/* Heroicon: outline/exclamation */}}
-                <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="text-red-400 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
@@ -690,6 +707,22 @@
                 {{ . | markdownify }}
               </div>
             </div>
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+
+        {{/* Function examples */}}
+        {{ with $func.examples }}
+        {{ $id := printf "%s-examples" $name }}
+        <div class="mt-6">
+          <span>
+            {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id "toc_hide" true) }}
+          </span>
+
+          <div class="mt-2 flex flex-col space-y-4">
+            {{ range . }}
+            {{ template "vrl-function-example" (dict "name" $name "ctx" .) }}
             {{ end }}
           </div>
         </div>
@@ -1481,7 +1514,9 @@
 {{ define "vrl-function-example" }}
 {{ $id := printf "%s-examples-%s" .name (.ctx.title | urlize) }}
 <div>
-  {{ partial "heading.html" (dict "text" .ctx.title "level" 5 "id" $id "toc_hide" true) }}
+  <span>
+    {{ partial "heading.html" (dict "text" .ctx.title "level" 5 "id" $id "toc_hide" true) }}
+  </span>
 
   <div class="flex flex-col space-y-2">
     <div>
