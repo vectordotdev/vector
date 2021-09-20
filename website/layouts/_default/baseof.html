@@ -1,5 +1,6 @@
 {{/* Root template for all pages */}}
 {{ $hasBottomNav := eq .Section "docs" }}
+{{ $displayBanner := site.Params.display_banner }}
 <!DOCTYPE html>
 <html
   lang="{{ site.LanguageCode }}"
@@ -38,7 +39,10 @@
   </head>
   <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
     <div class="flex-1 z-1">
-      {{/* {{ partial "banner.html" . }} */}}
+      {{ if $displayBanner }}
+      {{ partial "banner.html" . }}
+      {{ end }}
+
       {{ partial "navbar.html" . }}
 
       {{ block "main" . }}
