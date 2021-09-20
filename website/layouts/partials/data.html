@@ -1811,8 +1811,11 @@
 {{ end }}
 
 {{ define "code" }}
-{{ if or (reflect.IsMap .) (reflect.IsSlice .) }} {{/* If a map or array, highlight as JSON */}}
+{{ if reflect.IsMap . }} {{/* If a map or array, highlight as JSON */}}
 {{ $json := . | jsonify (dict "indent" "  ") }}
+{{ highlight $json "json" "" }}
+{{ else if reflect.IsSlice . }}
+{{ $json := . | jsonify }}
 {{ highlight $json "json" "" }}
 {{ else if hasPrefix . "```" }} {{/* If a code sample, translate into Markdown */}}
 {{ . | markdownify }}
