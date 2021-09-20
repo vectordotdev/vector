@@ -466,7 +466,7 @@ bench_function! {
 
     valid {
         args: func_args![value: "1.2.3.4"],
-        want: Ok(value!(67305985)),
+        want: Ok(value!(16909060)),
     }
 }
 
@@ -488,7 +488,7 @@ bench_function! {
     ip_ntoa => vrl_stdlib::IpNtoa;
 
     valid {
-        args: func_args![value: 67305985],
+        args: func_args![value: 16909060],
         want: Ok(value!("1.2.3.4")),
     }
 }
