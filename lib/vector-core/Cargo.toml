@@ -73,3 +73,7 @@ vrl = ["vrl-core", "enrichment"]
 [[bench]]
 name = "lookup"
 harness = false
+
+[[bench]]
+name = "event"
+harness = false
