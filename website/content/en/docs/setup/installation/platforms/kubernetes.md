@@ -50,12 +50,12 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/timberio/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
 
 images:
   # Override the Vector image to avoid use of the sliding tag.
-  - name: timberio/vector
-    newName: timberio/vector
+  - name: vectordotdev/vector
+    newName: vectordotdev/vector
     newTag: {{< version >}}-debian
 
 resources:
@@ -131,7 +131,7 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/timberio/vector/distribution/kubernetes/vector-aggregator?ref=v{{< version >}}
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-aggregator?ref=v{{< version >}}
 
 images:
   # Override the Vector image to avoid use of the sliding tag.

@@ -28,7 +28,7 @@ enough.
 {{< info >}}
 Did you know we're also [working on a WASM integration][urls.pr_2006] 👀
 
-[urls.pr_2006]: https://github.com/timberio/vector/pull/2006
+[urls.pr_2006]: https://github.com/vectordotdev/vector/pull/2006
 {{< /info >}}
 
 ## Get Started
@@ -44,4 +44,4 @@ And for the curious, check out [Vector's Lua RFC][urls.rfc].
 [docs.transforms.lua#event-data-model]: /docs/reference/configuration/transforms/lua/#event-data-model
 [docs.transforms.lua#timers]: /docs/reference/configuration/transforms/lua/#timers
 [docs.transforms.lua]: /docs/reference/configuration/transforms/lua/
-[urls.rfc]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-06-1999-api-extensions-for-lua-transform.md
+[urls.rfc]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-06-1999-api-extensions-for-lua-transform.md

@@ -11,7 +11,7 @@ tags: ["webassembly", "wasm", "transform", "advanced", "guides", "guide"]
 
 {{< warning >}}
 [Vector `wasm` support was removed in
-v0.17.0](https://github.com/timberio/vector/issues/8036). This guide remains for
+v0.17.0](https://github.com/vectordotdev/vector/issues/8036). This guide remains for
 posterity.
 
 It can be used with Vector versions prior to its removal.
@@ -110,7 +110,7 @@ In order to develop and test a WASM plugin for Vector, you'll need to do two thi
 
 Let's do that now:
 
-First, [consult the CONTRIBUTING.md guide on how to set up your development environment](https://github.com/timberio/vector/blob/master/CONTRIBUTING.md#development), or bootstrap an Ubuntu 20.04 host/VM/Container with:
+First, [consult the CONTRIBUTING.md guide on how to set up your development environment](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md#development), or bootstrap an Ubuntu 20.04 host/VM/Container with:
 
 ```bash
 apt install build-essentials git cmake llvm lld clang libssl-dev protobuf-compiler
@@ -177,7 +177,7 @@ Then, `mkdir -p cache` to create a local directory for vector to store its optim
 Now it's time for the best part! Run Vector and have a try, using `CTRL+C` to stop as needed:
 
 ```bash
-ana@autonoma:~/git/timberio/vector$ ./target/release/vector --config test.toml
+ana@autonoma:~/git/vectordotdev/vector$ ./target/release/vector --config test.toml
 # ...
 Aug 17 15:28:05.954  INFO vector::topology::builder: Healthcheck: Passed.
 This is some input!

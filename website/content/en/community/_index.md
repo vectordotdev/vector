@@ -13,11 +13,11 @@ buttons:
   ionicon: logo-twitter
   icon_classes: text-twitter-blue
   url: https://twitter.com/vectordotdev
-- title: timberio/vector
+- title: vectordotdev/vector
   description: Issues, code, and development
   ionicon: logo-github
   icon_classes: text-dark dark:text-gray-200
-  url: https://github.com/timberio/vector
+  url: https://github.com/vectordotdev/vector
 aliases: ["/mailing_list"]
 ---
 
