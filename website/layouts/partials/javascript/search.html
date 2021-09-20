@@ -9,5 +9,5 @@
   "process.env.ALGOLIA_PUBLIC_API_KEY" $apiKey
   "process.env.ALGOLIA_INDEX_NAME" $index) }}
 {{ $babelOpts := dict "noComments" true }}
-{{ $compiled := resources.Get $searchJs | js.Build $jsOpts | babel $babelOpts }}
+{{ $compiled := resources.Get $searchJs | js.Build $jsOpts | babel $babelOpts | fingerprint "sha256" }}
 <script src="{{ $compiled.RelPermalink }}"></script>
