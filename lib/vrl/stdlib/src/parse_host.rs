@@ -107,9 +107,9 @@ impl Expression for ParseHostFn {
 fn tld_to_value(tld: TldResult) -> Value {
     let mut map = BTreeMap::<&str, Value>::new();
 
-    map.insert("domain", tld.domain.to_owned().into());
-    map.insert("subdomain", tld.subdomain.to_owned().into());
-    map.insert("suffix", tld.suffix.to_owned().into());
+    map.insert("domain", tld.domain.into());
+    map.insert("subdomain", tld.subdomain.into());
+    map.insert("suffix", tld.suffix.into());
 
     map.into_iter()
         .map(|(k, v)| (k.to_owned(), v))
