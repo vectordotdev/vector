@@ -3,8 +3,8 @@
 {{ $appJsOptions := dict "targetPath" $appJsPath "minify" true }}
 {{ $ddLogsRumJsOptions := dict "targetPath" $ddLogsRumPath "minify" true }}
 
-{{ $app := resources.Get $appJsPath | resources.ExecuteAsTemplate $appJsPath . | js.Build $appJsOptions }}
-{{ $ddLogsRum := resources.Get $ddLogsRumPath | resources.ExecuteAsTemplate $ddLogsRumPath . | js.Build $ddLogsRumJsOptions }}
+{{ $app := resources.Get $appJsPath | resources.ExecuteAsTemplate $appJsPath . | js.Build $appJsOptions | fingerprint "sha256" }}
+{{ $ddLogsRum := resources.Get $ddLogsRumPath | resources.ExecuteAsTemplate $ddLogsRumPath . | js.Build $ddLogsRumJsOptions | fingerprint "sha256" }}
 
 <script type="text/javascript" src="{{ $ddLogsRum.RelPermalink }}" integrity="{{ $ddLogsRum.Data.Integrity }}"></script>
 <script type="text/javascript" src="{{ $app.RelPermalink }}" integrity="{{ $app.Data.Integrity }}"></script>
