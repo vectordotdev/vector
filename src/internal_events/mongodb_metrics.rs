@@ -1,7 +1,7 @@
-use super::InternalEvent;
 use metrics::{counter, histogram};
 use mongodb::{bson, error::Error as MongoError};
 use std::time::Instant;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {

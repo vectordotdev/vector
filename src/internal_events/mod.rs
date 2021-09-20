@@ -282,20 +282,10 @@ pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
-pub trait InternalEvent {
-    fn emit_logs(&self) {}
-    fn emit_metrics(&self) {}
-}
-
-pub fn emit(event: impl InternalEvent) {
-    event.emit_logs();
-    event.emit_metrics();
-}
-
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        $crate::internal_events::emit($event)
+        vector_core::internal_event::emit($event)
     };
 }
 

@@ -1,7 +1,7 @@
-use super::InternalEvent;
 use crate::sources::nginx_metrics::parser::ParseError;
 use metrics::{counter, histogram};
 use std::time::Instant;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct NginxMetricsEventsReceived<'a> {

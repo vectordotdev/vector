@@ -2965,6 +2965,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "internal_event"
+version = "0.1.0"
+
+[[package]]
 name = "inventory"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7553,6 +7557,7 @@ dependencies = [
  "http",
  "hyper-proxy",
  "indexmap",
+ "internal_event",
  "lazy_static",
  "lookup",
  "metrics",

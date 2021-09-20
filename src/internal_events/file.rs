@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::gauge;
+use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
