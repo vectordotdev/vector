@@ -39,4 +39,4 @@ More to come! This feature is part of our [best-in-class operator
 UX][urls.milestone_39] initiative.
 
 [docs.transforms.tag_cardinality_limit]: /docs/reference/configuration/transforms/tag_cardinality_limit/
-[urls.milestone_39]: https://github.com/timberio/vector/milestone/39
+[urls.milestone_39]: https://github.com/vectordotdev/vector/milestone/39

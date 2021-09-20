@@ -204,6 +204,6 @@ using it only when truly necessary, for several reasons:
 [docs.vrl]: /docs/reference/vrl
 [paths]: /docs/reference/vrl/expressions/#path
 [urls.lua]: https://www.lua.org
-[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.new_feature_request]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+new+feature
 [urls.rust]: https://www.rust-lang.org/
 [urls.syslog]: https://en.wikipedia.org/wiki/Syslog

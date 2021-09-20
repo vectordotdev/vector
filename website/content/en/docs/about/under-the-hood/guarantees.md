@@ -88,6 +88,6 @@ No, Vector does not support exactly once delivery. There are future plans to par
 Head over to the [components page][components] and use the guarantee
 filters.
 
-[bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22
+[bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22
 [components]: /components
 [event]: /docs/about/under-the-hood/architecture/data-model

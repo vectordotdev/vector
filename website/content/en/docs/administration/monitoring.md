@@ -122,7 +122,7 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [journald_source]: /docs/reference/configuration/sources/journald
 [output]: /docs/reference/configuration/sources/internal_metrics/#output
 [remap]: /docs/reference/configuration/transforms/remap
-[rfc_2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+[rfc_2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [sinks]: /sinks
 [sources]: /sources
 [starting]: /docs/administration/management

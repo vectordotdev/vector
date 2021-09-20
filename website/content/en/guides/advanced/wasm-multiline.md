@@ -11,7 +11,7 @@ tags: ["webassembly", "wasm", "multiline", "multi-line", "advanced", "guides", "
 
 {{< warning >}}
 [Vector `wasm` support was removed in
-v0.17.0](https://github.com/timberio/vector/issues/8036). This guide remains for
+v0.17.0](https://github.com/vectordotdev/vector/issues/8036). This guide remains for
 posterity.
 
 It can be used with Vector versions prior to its removal.
@@ -85,7 +85,7 @@ Next, add the following content, setting the crate up as a `cdylib` and adding s
 crate-type = ["cdylib"]
 
 [dependencies]
-vector-wasm = { version = "0.1", git = "https://github.com/timberio/vector/"}
+vector-wasm = { version = "0.1", git = "https://github.com/vectordotdev/vector/"}
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0"
@@ -389,7 +389,7 @@ data_dir = "/var/lib/vector/"
 Then, using your Wasm-capable Vector build take it for a test drive:
 
 ```bash
-ana@autonoma:~/git/timberio/banana$ ../vector/target/release/vector --config banana.toml
+ana@autonoma:~/git/vectordotdev/banana$ ../vector/target/release/vector --config banana.toml
 Aug 25 10:29:19.705  INFO vector: Log level "info" is enabled.
 Aug 25 10:29:19.706  INFO vector: Loading configs. path=["banana.toml"]
 Aug 25 10:29:19.708  INFO vector: Vector is starting. version="0.11.0" git_version="v0.9.0-530-g1b9eadd" released="Mon, 17 Aug 2020 20:48:21 +0000" arch="x86_64"
@@ -444,7 +444,7 @@ When you have some ideas of what to test, you can add a new behavior test to Vec
 Running the test:
 
 ```bash
-ana@autonoma:~/git/timberio/banana$ ../vector/target/release/vector test banana.toml
+ana@autonoma:~/git/vectordotdev/banana$ ../vector/target/release/vector test banana.toml
 Aug 25 10:49:42.370  INFO vector: Log level "info" is enabled.
 Running banana.toml tests
 Aug 25 10:49:42.374  INFO vector::internal_events::wasm::compilation: WASM Compilation via `lucet` state="beginning" role="transform"
