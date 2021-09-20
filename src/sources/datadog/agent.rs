@@ -13,13 +13,13 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{net::SocketAddr, sync::Arc};
-use vector_core::event::LogEvent;
+use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 use warp::{
     filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
 };
@@ -66,12 +66,23 @@ impl SourceConfig for DatadogAgentConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
-        let service = source.event_service(cx.out.clone());
+        let service = source.event_service(cx.acknowledgements, cx.out.clone());
 
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
-            warp::serve(service.with(warp::trace(move |_info| span.clone())))
+            let routes = service
+                .with(warp::trace(move |_info| span.clone()))
+                .recover(|r: Rejection| async move {
+                    if let Some(e_msg) = r.find::<ErrorMessage>() {
+                        let json = warp::reply::json(e_msg);
+                        Ok(warp::reply::with_status(json, e_msg.status_code()))
+                    } else {
+                        // other internal error - will return 500 internal server error
+                        Err(r)
+                    }
+                });
+            warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
                     shutdown.map(|_| ()),
@@ -116,16 +127,60 @@ impl DatadogAgentSource {
         }
     }
 
-    fn extract_api_key<'a>(&self, path: &'a str, header: Option<String>) -> Option<Arc<str>> {
+    fn extract_api_key(&self, path: &str, header: Option<String>) -> Option<Arc<str>> {
         // Grab from URL first
         self.api_key_matcher
             .captures(path)
             .and_then(|cap| cap.name("api_key").map(|key| key.as_str()).map(Arc::from))
             // Try from header next
-            .or(header.map(Arc::from))
+            .or_else(|| header.map(Arc::from))
     }
 
-    fn event_service(self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    async fn handle_request(
+        events: Result<Vec<Event>, ErrorMessage>,
+        acknowledgements: bool,
+        mut out: Pipeline,
+    ) -> Result<Response, Rejection> {
+        match events {
+            Ok(mut events) => {
+                let receiver = acknowledgements.then(|| {
+                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                    for event in &mut events {
+                        event.add_batch_notifier(Arc::clone(&batch));
+                    }
+                    receiver
+                });
+
+                let mut events = futures::stream::iter(events).map(Ok);
+                out.send_all(&mut events)
+                    .map_err(move |error: crate::pipeline::ClosedError| {
+                        // can only fail if receiving end disconnected, so we are shutting down,
+                        // probably not gracefully.
+                        error!(message = "Failed to forward events, downstream is closed.");
+                        error!(message = "Tried to send the following event.", %error);
+                        warp::reject::custom(ApiError::ServerShutdown)
+                    })
+                    .await?;
+                match receiver {
+                    None => Ok(warp::reply().into_response()),
+                    Some(receiver) => match receiver.await {
+                        BatchStatus::Delivered => Ok(warp::reply().into_response()),
+                        BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Error delivering contents to sink".into(),
+                        ))),
+                        BatchStatus::Failed => Err(warp::reject::custom(ErrorMessage::new(
+                            StatusCode::BAD_REQUEST,
+                            "Contents failed to deliver to sink".into(),
+                        ))),
+                    },
+                }
+            }
+            Err(err) => Err(warp::reject::custom(err)),
+        }
+    }
+
+    fn event_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
             .and(warp::path::full())
@@ -133,10 +188,6 @@ impl DatadogAgentSource {
             .and(warp::body::bytes())
             .and_then(
                 move |_, path: FullPath, api_token: Option<String>, body: Bytes| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
-
                     let token: Option<Arc<str>> = if self.store_api_key {
                         self.extract_api_key(path.as_str(), api_token)
                     } else {
@@ -144,17 +195,13 @@ impl DatadogAgentSource {
                     };
                     let events = self.decode_body(body, token);
 
-                    async move {
-                        let mut events = futures::stream::iter(events?).map(Ok);
-                        out.send_all(&mut events).await
-                    }
+                    Self::handle_request(events, acknowledgements, out.clone())
                 },
             )
-            .map(|_| warp::reply().into_response())
             .boxed()
     }
 
-    fn decode_body<'a>(
+    fn decode_body(
         &self,
         body: Bytes,
         api_key: Option<Arc<str>>,

@@ -51,6 +51,10 @@ impl ErrorMessage {
             message,
         }
     }
+
+    pub fn status_code(&self) -> StatusCode {
+        StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+    }
 }
 impl Error for ErrorMessage {}
 impl fmt::Display for ErrorMessage {
@@ -250,11 +254,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let routes = svc.or(ping).recover(|r: Rejection| async move {
                 if let Some(e_msg) = r.find::<ErrorMessage>() {
                     let json = warp::reply::json(e_msg);
-                    Ok(warp::reply::with_status(
-                        json,
-                        StatusCode::from_u16(e_msg.code)
-                            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
-                    ))
+                    Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
                     Err(r)
