@@ -73,34 +73,23 @@ better aggregation and accuracy.
 - No foreseen backward compatibily issue (tags management may be a bit bothersome)
 - New configuration settings should be consistent with existing ones
 
-Regarding the Datadog Agent configuration, ideally it should be only a matter of configuring `dd_url:
+Regarding the Datadog Agent configuration, ideally it should be only a matter of configuring `metrics_dd_url:
 https://vector.mycompany.tld` to forward metrics to a Vector deployement.
 
-The `dd_url` endpoint configuration has a [conditional
+The current `dd_url` endpoint configuration has a [conditional
 behavior](https://github.com/DataDog/datadog-agent/blob/main/pkg/config/config.go#L1199-L1201) (also
 [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/forwarder_health.go#L131-L143)). I.e. if
 `dd_url` contains a known pattern (i.e. it has a suffix that matches a Datadog site) some extra hostname manipulation
-happens. But overal, this conditional behavior can be ignored here and if we want unmodified Datadog Agent to use a
-`dd_url` pointing to a Vector deployement, the following route will have to be supported:
+happens. But overal, the following paths are expected to be supported on the host behind `dd_url`:
 - `/api/v1/validate` for API key validation
 - `/api/v1/check_run` for check submission
 - `/intake/` for events and metadata (possibly others)
 - `/support/flare/` for support flare
 - `/api/v1/series` & `/api/beta/sketches` for metrics submission
 
-Regarding the relative amount of requests:
-- `/api/v1/validate` is requested at a periodic interval (10 seconds).
-- `/intake/` is requested at various (rather long)
-  [intervals](https://github.com/DataDog/datadog-agent/blob/main/pkg/metadata/helper.go#L12-L22).
-- `/support/flare/` is only used by users upon customer support request, but payloads can be rather large (>10MBytes).
-- `/api/v1/series` & `/api/beta/sketches` it accounts for the vast majority of requests, it relays everything received
-  on the Dogstatsd socket by the Agent.
-- `/api/v1/check_run` depends on the number of checks, but it usually accounts for much less data than metrics.
-
-The aforementionned details highlight that current Datadog Agents cannot be configured to only send metrics to a certain
-endpoint and other kind of data have to be sent to another endoint. We could envision work in the Agent that would
-introduce another configurable endpoint. This is exposed in the [Alternatives](#alternatives)/[Outstanding
-Questions](#outstanding-questions) chapters.
+Then to only ship metrics, and let other payload follow the standard path, the newly introduced Datadog Agent setting
+`metrics_dd_url` would have to be set to point to a Vector host, with a `datadog_agent` source enabled. And then request
+targeted to `/api/v1/series` & `/api/beta/sketches` would be diverted there allowing Vector to further processed them.
 
 ### Implementation
 
