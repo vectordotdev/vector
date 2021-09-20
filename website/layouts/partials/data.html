@@ -595,7 +595,7 @@
       {{/* Function title */}}
       <span class="flex justify-between items-center">
         <span class="font-mono">
-          {{ $href := printf "#%s" $name }}
+          {{ $href := printf "%s" $name }}
           {{ partial "heading.html" (dict "text" $name "level" 3 "href" $href "icon" false) }}
         </span>
 
@@ -1670,14 +1670,17 @@
 <table class="table-fixed">
   <thead>
     <tr>
-      <th class="w-1/5">
+      <th class="w-1/6">
         Argument
       </th>
-      <th class="w-1/5">
+      <th class="w-1/6">
         Type
       </th>
-      <th class="w-3/5">
+      <th class="w-1/2">
         Description
+      </th>
+      <th class="w-1/6">
+        Default
       </th>
     </tr>
   </thead>
@@ -1699,6 +1702,11 @@
       </td>
       <td class="leading-snug">
         {{ .description | markdownify }}
+      </td>
+      <td class="overflow-auto">
+        {{ with .default }}
+        <code>{{ . }}</code>
+        {{ end }}
       </td>
     </tr>
     {{ end }}
