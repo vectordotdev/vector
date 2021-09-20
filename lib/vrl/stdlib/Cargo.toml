@@ -34,6 +34,7 @@ sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
 syslog_loose = { version = "0.15", optional = true }
+# support for non-full URL's isn't released yet
 tldextract = { git = "https://github.com/dovahcrow/tldextract-rs.git", rev = "3be7b0edb3bd73779882764a7e6564489798f164", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
