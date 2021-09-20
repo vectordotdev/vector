@@ -1559,7 +1559,16 @@
 
 {{ define "vrl-function-example" }}
 {{ $id := printf "%s-examples-%s" .name (.ctx.title | urlize) }}
+{{ $scenario := (dict "title" .ctx.title "program" .ctx.source "event" (.ctx.input | default dict) "output" (.ctx.return | default dict)) }}
+{{ $hash := $scenario | jsonify | base64Encode }}
+{{ $hashUrl := printf "https://vrl-web.netlify.app/h/%s" $hash }}
 <div>
+  <a href="{{ $hashUrl }}" target="_blank">
+    Open in VRL Web
+  </a>
+
+  {{ .ctx }}
+
   <span>
     {{ partial "heading.html" (dict "text" .ctx.title "level" 5 "id" $id "toc_hide" true) }}
   </span>
