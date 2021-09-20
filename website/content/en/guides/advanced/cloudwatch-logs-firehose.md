@@ -389,7 +389,7 @@ manner. You can now use Vector to transform and forward these logs to your
 destinations of choice.
 
 Any troubles getting this to work? Let us know via [Github
-issues](https://github.com/timberio/vector/issues/new/choose) or [drop into the
+issues](https://github.com/vectordotdev/vector/issues/new/choose) or [drop into the
 `#aws` channel on our discord server.](https://chat.vector.dev)
 
 Still want more? Read on for a deep dive into this pipeline.
