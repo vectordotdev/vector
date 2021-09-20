@@ -140,6 +140,8 @@ mod parse_duration;
 mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
+#[cfg(feature = "parse_host")]
+mod parse_host;
 #[cfg(feature = "parse_int")]
 mod parse_int;
 #[cfg(feature = "parse_json")]
@@ -371,6 +373,8 @@ pub use parse_duration::ParseDuration;
 pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::ParseGrok;
+#[cfg(feature = "parse_host")]
+pub use parse_host::ParseHost;
 #[cfg(feature = "parse_int")]
 pub use parse_int::ParseInt;
 #[cfg(feature = "parse_json")]

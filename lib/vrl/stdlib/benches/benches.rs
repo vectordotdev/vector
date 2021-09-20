@@ -72,6 +72,7 @@ criterion_group!(
               parse_duration,
               parse_glog,
               parse_grok,
+              parse_host,
               parse_key_value,
               parse_klog,
               parse_int,
@@ -1184,6 +1185,37 @@ bench_function! {
             "timestamp": "2020-10-02T23:22:12.223222Z",
             "level": "info",
             "message": "Hello world",
+        })),
+    }
+}
+
+bench_function! {
+    parse_host => vrl_stdlib::ParseHost;
+
+    simple {
+        args: func_args![value: "www.example.com"],
+        want: Ok(value!({
+            "domain": "example",
+            "subdomain": "www",
+            "suffix": "com",
+        })),
+    }
+
+    private {
+        args: func_args![value: "internal.us-east-1.elb.amazonaws.com"],
+        want: Ok(value!({
+            "domain": "internal",
+            "subdomain": null,
+            "suffix": "us-east-1.elb.amazonaws.com",
+        })),
+    }
+
+    no_private {
+        args: func_args![value: "internal.us-east-1.elb.amazonaws.com", private_domains: false],
+        want: Ok(value!({
+            "domain": "amazonaws",
+            "subdomain": "internal.us-east-1.elb",
+            "suffix": "com",
         })),
     }
 }

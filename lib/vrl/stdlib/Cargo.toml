@@ -34,6 +34,7 @@ sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
 syslog_loose = { version = "0.15", optional = true }
+tldextract = { git = "https://github.com/dovahcrow/tldextract-rs.git", rev = "3be7b0edb3bd73779882764a7e6564489798f164", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
@@ -115,6 +116,7 @@ default = [
     "parse_duration",
     "parse_glog",
     "parse_grok",
+    "parse_host",
     "parse_int",
     "parse_json",
     "parse_key_value",
@@ -231,6 +233,7 @@ parse_csv = ["csv"]
 parse_duration = ["rust_decimal", "lazy_static", "regex"]
 parse_glog = ["chrono", "lazy_static", "regex"]
 parse_grok = ["grok"]
+parse_host = ["tldextract"]
 parse_int = []
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
