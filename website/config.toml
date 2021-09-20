@@ -82,7 +82,7 @@ home_page_only = true
 
 [params.social]
 twitter_handle = "vectordotdev"
-github_repo = "timberio/vector"
+github_repo = "vectordotdev/vector"
 discord = "https://chat.vector.dev"
 
 # Datadog configuration
@@ -219,7 +219,7 @@ weight = 4
 
 [[languages.en.menus.footer]]
 name = "GitHub"
-url = "https://github.com/timberio/vector"
+url = "https://github.com/vectordotdev/vector"
 parent = "community"
 weight = 1
 
@@ -238,29 +238,29 @@ weight = 3
 # Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]
 name = "Privacy"
-url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 1
 
 [[languages.en.menus.meta]]
 name = "Security"
-url = "https://github.com/timberio/vector/security/policy"
+url = "https://github.com/vectordotdev/vector/security/policy"
 weight = 2
 
 [[languages.en.menus.meta]]
 name = "Releases"
-url = "https://github.com/timberio/vector/blob/master/RELEASES.md"
+url = "https://github.com/vectordotdev/vector/blob/master/RELEASES.md"
 weight = 3
 
 [[languages.en.menus.meta]]
 name = "Versioning"
-url = "https://github.com/timberio/vector/blob/master/VERSIONING.md"
+url = "https://github.com/vectordotdev/vector/blob/master/VERSIONING.md"
 weight = 4
 
 # Buttons in "community" section on main page
 [[languages.en.menus.community]]
 name = "View GitHub repo"
 params = { color = "black", dark = "white", icon = "github" }
-url = "https://github.com/timberio/vector"
+url = "https://github.com/vectordotdev/vector"
 weight = 1
 
 [[languages.en.menus.community]]
@@ -280,7 +280,7 @@ weight = 1
 [[languages.en.menus.comms]]
 name = "GitHub"
 params = { color = "black", dark = "white", icon = "github" }
-url = "https://github.com/timberio/vector"
+url = "https://github.com/vectordotdev/vector"
 weight = 2
 
 [[languages.en.menus.comms]]
@@ -298,12 +298,12 @@ weight = 4
 # Links in subfooter
 [[languages.en.menus.subfooter]]
 name = "Security policy"
-url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 1
 
 [[languages.en.menus.subfooter]]
 name = "Privacy policy"
-url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 2
 
 [[languages.en.menus.flyout]]
