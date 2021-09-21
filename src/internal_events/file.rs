@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::gauge;
+use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
@@ -362,54 +362,54 @@ mod source {
 
     impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
         fn emit_file_added(&self, path: &Path) {
-            emit!(FileAdded { path });
+            emit!(&FileAdded { path });
         }
 
         fn emit_file_resumed(&self, path: &Path, file_position: u64) {
-            emit!(FileResumed {
+            emit!(&FileResumed {
                 path,
                 file_position
             });
         }
 
         fn emit_file_watch_error(&self, path: &Path, error: Error) {
-            emit!(FileWatchError { path, error });
+            emit!(&FileWatchError { path, error });
         }
 
         fn emit_file_unwatched(&self, path: &Path) {
-            emit!(FileUnwatched { path });
+            emit!(&FileUnwatched { path });
         }
 
         fn emit_file_deleted(&self, path: &Path) {
-            emit!(FileDeleted { path });
+            emit!(&FileDeleted { path });
         }
 
         fn emit_file_delete_error(&self, path: &Path, error: Error) {
-            emit!(FileDeleteError { path, error });
+            emit!(&FileDeleteError { path, error });
         }
 
         fn emit_file_fingerprint_read_error(&self, path: &Path, error: Error) {
-            emit!(FileFingerprintReadError { path, error });
+            emit!(&FileFingerprintReadError { path, error });
         }
 
         fn emit_file_checksum_failed(&self, path: &Path) {
-            emit!(FileChecksumFailed { path });
+            emit!(&FileChecksumFailed { path });
         }
 
         fn emit_file_checkpointed(&self, count: usize, duration: Duration) {
-            emit!(FileCheckpointed { count, duration });
+            emit!(&FileCheckpointed { count, duration });
         }
 
         fn emit_file_checkpoint_write_error(&self, error: Error) {
-            emit!(FileCheckpointWriteError { error });
+            emit!(&FileCheckpointWriteError { error });
         }
 
         fn emit_files_open(&self, count: usize) {
-            emit!(FileOpen { count });
+            emit!(&FileOpen { count });
         }
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
-            emit!(PathGlobbingError { path, error });
+            emit!(&PathGlobbingError { path, error });
         }
     }
 }

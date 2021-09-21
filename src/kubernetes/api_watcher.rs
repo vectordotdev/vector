@@ -61,7 +61,7 @@ where
             .request_builder
             .build(watch_optional)
             .context(invocation::RequestPreparation)?;
-        emit!(internal_events::RequestPrepared { request: &request });
+        emit!(&internal_events::RequestPrepared { request: &request });
 
         // Send request, get response.
         let response = match self.client.send(request).await {
@@ -78,7 +78,7 @@ where
             }
         };
 
-        emit!(internal_events::ResponseReceived {
+        emit!(&internal_events::ResponseReceived {
             response: &response
         });
 

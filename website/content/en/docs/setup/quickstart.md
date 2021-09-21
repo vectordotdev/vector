@@ -15,7 +15,7 @@ In this quickstart guide, we walk you through using Vector for the first time. W
 We can install Vector using this installation script:
 
 ```shell
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 ```
 
 Or you can [choose your preferred installation method][install].
@@ -120,6 +120,7 @@ Lastly, we've updated the ID of our sink component to `emit_syslog`, updated the
 
 Let's re-run Vector. This time we don't need to echo any data to it; just run in on the command line. It'll process
 100 lines of generated Syslog data, emit the processed data as JSON, and exit:
+
 ```shell
 vector --config ./vector.toml
 ```

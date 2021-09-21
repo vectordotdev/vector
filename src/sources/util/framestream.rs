@@ -155,7 +155,7 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
-                emit!(SocketEventsReceived {
+                emit!(&SocketEventsReceived {
                     mode: SocketMode::Unix,
                     byte_size: frame.len(),
                     count: 1
@@ -486,7 +486,7 @@ pub fn build_framestream_unix_source(
             let frames = sock_stream
                 .take_until(shutdown.clone())
                 .map_err(move |error| {
-                    emit!(UnixSocketError {
+                    emit!(&UnixSocketError {
                         error: &error,
                         path: &listen_path,
                     });
@@ -545,7 +545,7 @@ pub fn build_framestream_unix_source(
 
         // Delete socket file
         if let Err(error) = fs::remove_file(&path) {
-            emit!(UnixSocketFileDeleteError { path: &path, error });
+            emit!(&UnixSocketFileDeleteError { path: &path, error });
         }
 
         Ok(())

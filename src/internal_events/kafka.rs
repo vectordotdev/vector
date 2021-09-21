@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::{counter, gauge};
+use vector_core::internal_event::InternalEvent;
 use vector_core::update_counter;
 
 #[derive(Debug)]

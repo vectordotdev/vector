@@ -112,17 +112,18 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 async-stream = "0.3.2"
 async-trait = "0.1.51"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.11.0", default-features = false, features = ["full"] }
+tokio = { version = "1.12.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time", "io"] }
+console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30d52c9f22de69bac38009a9183135808806c",  optional = true }
 
 # Tracing
-tracing = { version = "0.1.27", default-features = false }
+tracing = { version = "0.1.28", default-features = false }
 tracing-core = { version = "0.1.20", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.2.23", default-features = false }
+tracing-subscriber = { version = "0.2.24", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -173,12 +174,12 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "=2.6.4", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "=2.6.4", default-features = false, optional = true }
+async-graphql = { version = "2.10.0", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "2.10.0", default-features = false, optional = true }
 itertools = { version = "0.10.1", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.21.0", default-features = false, optional = true }
+crossterm = { version = "0.21.0", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.16.0", optional = true, default-features = false, features = ["crossterm"] }
@@ -203,7 +204,7 @@ bollard = { version = "0.11.0", default-features = false, features = ["ssl"], op
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.4", default-features = false }
+cidr-utils = { version = "0.5.5", default-features = false }
 csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
@@ -256,7 +257,7 @@ pin-project = { version = "1.0.8", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
-rand_distr = { version = "0.4.1", default-features = false }
+rand_distr = { version = "0.4.2", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
@@ -310,7 +311,7 @@ matches = "0.1.9"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.4", features = ["json"] }
 tempfile = "3.2.0"
-tokio = { version = "1.11.0", features = ["test-util"] }
+tokio = { version = "1.12.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
@@ -337,6 +338,7 @@ default-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafk
 default-no-api-client = ["api", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
 disk-buffer = ["vector_core/disk-buffer"]
+tokio-console = ["console-subscriber", "tokio/tracing"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
 all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datadog-pipelines"]

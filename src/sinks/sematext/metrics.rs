@@ -193,7 +193,7 @@ impl MetricNormalize for SematextMetricNormalize {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
-                emit!(SematextMetricsInvalidMetricReceived { metric: &metric });
+                emit!(&SematextMetricsInvalidMetricReceived { metric: &metric });
                 None
             }
         }
@@ -247,7 +247,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(SematextMetricsEncodeEventFailed { error });
+            emit!(&SematextMetricsEncodeEventFailed { error });
         };
     }
 

@@ -1,7 +1,7 @@
-use super::InternalEvent;
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DockerLogsEventReceived<'a> {

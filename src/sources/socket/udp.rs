@@ -69,7 +69,7 @@ pub fn udp(
             loop {
                 match stream.next().await {
                     Some(Ok(((events, byte_size), received_from))) => {
-                        emit!(SocketEventsReceived {
+                        emit!(&SocketEventsReceived {
                             mode: SocketMode::Udp,
                             byte_size,
                             count: events.len()

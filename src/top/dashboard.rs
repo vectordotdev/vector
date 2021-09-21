@@ -1,5 +1,6 @@
 use super::{events::capture_key_press, state};
 use crossterm::{
+    cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -317,6 +318,7 @@ pub async fn init_dashboard<'a>(
     // Clean-up terminal
     terminal.backend_mut().execute(DisableMouseCapture)?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
+    terminal.backend_mut().execute(Show)?;
 
     disable_raw_mode()?;
 

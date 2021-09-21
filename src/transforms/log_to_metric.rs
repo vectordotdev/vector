@@ -178,7 +178,7 @@ fn render_tags(
                         map.insert(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(TemplateRenderingFailed {
+                        emit!(&TemplateRenderingFailed {
                             error,
                             drop_event: false,
                             field: Some(name.as_str()),
@@ -375,27 +375,27 @@ impl FunctionTransform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNull { field }) => emit!(LogToMetricFieldNull {
+                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNull {
                     field: field.as_ref()
                 }),
-                Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
+                Err(TransformError::FieldNotFound { field }) => emit!(&LogToMetricFieldNotFound {
                     field: field.as_ref()
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError {
+                    emit!(&LogToMetricParseFloatError {
                         field: field.as_ref(),
                         error
                     })
                 }
                 Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         drop_event: false,
                         field: None,
                     })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
-                    emit!(LogToMetricTemplateParseError { error })
+                    emit!(&LogToMetricTemplateParseError { error })
                 }
             }
         }

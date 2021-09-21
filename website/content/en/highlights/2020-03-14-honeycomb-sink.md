@@ -21,4 +21,4 @@ is built upon. Vector + Honeycomb = 👯.
 
 [docs.sinks.honeycomb]: /docs/reference/configuration/sinks/honeycomb/
 [urls.honeycomb]: https://honeycomb.io
-[urls.pr_1991]: https://github.com/timberio/vector/pull/1991
+[urls.pr_1991]: https://github.com/vectordotdev/vector/pull/1991

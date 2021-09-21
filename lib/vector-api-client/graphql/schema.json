@@ -2882,31 +2882,15 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
+              "description": "Returns `true` to denote the GraphQL server is reachable",
               "isDeprecated": false,
-              "name": "meta",
+              "name": "health",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Meta",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Vector host metrics",
-              "isDeprecated": false,
-              "name": "hostMetrics",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "HostMetrics",
+                  "kind": "SCALAR",
+                  "name": "Boolean",
                   "ofType": null
                 }
               }
@@ -3291,15 +3275,31 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Returns `true` to denote the GraphQL server is reachable",
+              "description": "Vector host metrics",
               "isDeprecated": false,
-              "name": "health",
+              "name": "hostMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
+                  "kind": "OBJECT",
+                  "name": "HostMetrics",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "meta",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Meta",
                   "ofType": null
                 }
               }
@@ -4342,45 +4342,9 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
-                  "description": null,
-                  "name": "componentIds",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "LIST",
-                      "name": null,
-                      "ofType": {
-                        "kind": "NON_NULL",
-                        "name": null,
-                        "ofType": {
-                          "kind": "SCALAR",
-                          "name": "String",
-                          "ofType": null
-                        }
-                      }
-                    }
-                  }
-                },
-                {
-                  "defaultValue": "500",
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  }
-                },
-                {
-                  "defaultValue": "100",
-                  "description": null,
-                  "name": "limit",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -4393,55 +4357,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "A stream of events emitted from matched component(s)",
+              "description": "Heartbeat, containing the UTC timestamp of the last server-sent payload",
               "isDeprecated": false,
-              "name": "outputEvents",
+              "name": "heartbeat",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "UNION",
-                      "name": "OutputEventsPayload",
-                      "ofType": null
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Subscribes to all newly added components",
-              "isDeprecated": false,
-              "name": "componentAdded",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INTERFACE",
-                  "name": "Component",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Subscribes to all removed components",
-              "isDeprecated": false,
-              "name": "componentRemoved",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INTERFACE",
-                  "name": "Component",
+                  "kind": "OBJECT",
+                  "name": "Heartbeat",
                   "ofType": null
                 }
               }
@@ -5139,11 +5063,79 @@
               }
             },
             {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all newly added components",
+              "isDeprecated": false,
+              "name": "componentAdded",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Component",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all removed components",
+              "isDeprecated": false,
+              "name": "componentRemoved",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Component",
+                  "ofType": null
+                }
+              }
+            },
+            {
               "args": [
                 {
-                  "defaultValue": "1000",
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "componentIds",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "defaultValue": "500",
                   "description": null,
                   "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                },
+                {
+                  "defaultValue": "100",
+                  "description": null,
+                  "name": "limit",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -5156,16 +5148,24 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Heartbeat, containing the UTC timestamp of the last server-sent payload",
+              "description": "A stream of events emitted from matched component(s)",
               "isDeprecated": false,
-              "name": "heartbeat",
+              "name": "outputEvents",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Heartbeat",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "UNION",
+                      "name": "OutputEventsPayload",
+                      "ofType": null
+                    }
+                  }
                 }
               }
             }

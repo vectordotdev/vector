@@ -187,6 +187,7 @@ Side note: We would have also caught this particular issue with:
 ```shell
 vector validate --topology ./example.toml
 ```
+
 {{< /info >}}
 
 The fix is easy, we simply change the input of `baz` from `foo` to `bar`:

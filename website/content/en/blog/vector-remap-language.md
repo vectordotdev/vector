@@ -109,6 +109,7 @@ Parsing this log, without VRL, looks like this:
 
 {{< tabs default="Vector" >}}
 {{< tab title="Vector" >}}
+
 ```toml title="vector.toml"
 # ... sources ...
 
@@ -135,8 +136,10 @@ types.bytes_out = "int"
 
 # ... sinks ...
 ```
+
 {{< /tab >}}
 {{< tab title="Logstash" >}}
+
 ```text title="logstash.conf"
 # ... inputs ...
 
@@ -163,8 +166,10 @@ filter {
 
 # ... outputs ...
 ```
+
 {{< /tab >}}
 {{< tab title="Fluentd" >}}
+
 ```text title="fluentd.conf"
 <source>
   # ... source options ...
@@ -186,6 +191,7 @@ filter {
 
 # ... outputs ...
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

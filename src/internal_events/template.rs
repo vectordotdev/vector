@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use crate::template::TemplateRenderingError;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 pub struct TemplateRenderingFailed<'a> {
     pub field: Option<&'a str>,

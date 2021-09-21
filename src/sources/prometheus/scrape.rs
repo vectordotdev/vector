@@ -169,7 +169,7 @@ fn prometheus(
                 .filter_map(move |response| {
                     ready(match response {
                         Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            emit!(PrometheusRequestCompleted {
+                            emit!(&PrometheusRequestCompleted {
                                 start,
                                 end: Instant::now()
                             });
@@ -179,7 +179,7 @@ fn prometheus(
 
                             match parser::parse_text(&body) {
                                 Ok(metrics) => {
-                                    emit!(PrometheusEventReceived {
+                                    emit!(&PrometheusEventReceived {
                                         byte_size,
                                         count: metrics.len(),
                                         uri: url.clone()
@@ -194,7 +194,7 @@ fn prometheus(
                                             endpoint = %url
                                         );
                             }
-                                    emit!(PrometheusParseError {
+                                    emit!(&PrometheusParseError {
                                         error,
                                         url: url.clone(),
                                         body,
@@ -211,14 +211,14 @@ fn prometheus(
                                     endpoint = %url
                                 );
                             }
-                            emit!(PrometheusErrorResponse {
+                            emit!(&PrometheusErrorResponse {
                                 code: header.status,
                                 url: url.clone(),
                             });
                             None
                         }
                         Err(error) => {
-                            emit!(PrometheusHttpError {
+                            emit!(&PrometheusHttpError {
                                 error,
                                 url: url.clone(),
                             });
