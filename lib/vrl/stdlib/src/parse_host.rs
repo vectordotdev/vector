@@ -16,9 +16,9 @@ impl Function for ParseHost {
 
     fn usage(&self) -> &'static str {
         indoc! {r#"
-            Parses the provided `value` into TLD, regiestered domain, and subdomains.
+            Parses the provided `value` into TLD, registered domain, and subdomains.
 
-            By default included private domains.
+            By default includes private domains.
         "#}
     }
 

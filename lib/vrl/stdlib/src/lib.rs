@@ -608,6 +608,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseGlog),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
+        #[cfg(feature = "parse_host")]
+        Box::new(ParseHost),
         #[cfg(feature = "parse_int")]
         Box::new(ParseInt),
         #[cfg(feature = "parse_json")]
