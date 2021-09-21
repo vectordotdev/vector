@@ -12,7 +12,7 @@ use crate::{
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
-use http::{uri::PathAndQuery, StatusCode, Uri};
+use http::{uri::PathAndQuery, uri::Scheme, StatusCode, Uri};
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
@@ -409,13 +409,14 @@ where
                     .parse::<PathAndQuery>()
                     .unwrap_or_else(|_| unreachable!())
             });
+            let scheme = parts.scheme.clone();
             let endpoint = Uri::from_parts(parts)
                 .unwrap_or_else(|_| unreachable!())
                 .to_string();
 
             emit!(EndpointBytesSent {
                 byte_size,
-                protocol: "http",
+                protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
                 endpoint: &endpoint
             });
 
