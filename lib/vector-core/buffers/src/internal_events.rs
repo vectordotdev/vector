@@ -1,5 +1,5 @@
 use internal_event::InternalEvent;
-use metrics::{counter, decrement_gauge, increment_gauge};
+use metrics::counter;
 
 pub struct EventsReceived {
     pub count: usize,

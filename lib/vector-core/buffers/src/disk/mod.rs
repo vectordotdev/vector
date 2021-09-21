@@ -1,9 +1,13 @@
 use crate::bytes::{DecodeBytes, EncodeBytes};
+use crate::internal_events::EventsSent;
+use futures::StreamExt;
 use futures::{Sink, Stream};
+use internal_event::emit;
 use pin_project::pin_project;
 use snafu::Snafu;
 use std::fmt::Debug;
 use std::fmt::Display;
+use std::mem::size_of_val;
 use std::{
     io,
     path::{Path, PathBuf},
@@ -117,5 +121,11 @@ where
         })?;
 
     let (writer, reader, acker) = leveldb_buffer::Buffer::build(&path, max_size)?;
+    let reader = reader.inspect(|item| {
+        emit(&EventsSent {
+            count: 1,
+            byte_size: size_of_val(item),
+        })
+    });
     Ok((Writer { inner: writer }, Box::new(reader), acker))
 }
