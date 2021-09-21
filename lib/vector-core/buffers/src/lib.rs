@@ -15,6 +15,7 @@ mod acker;
 pub mod bytes;
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
+mod internal_events;
 #[cfg(test)]
 mod test;
 mod variant;
