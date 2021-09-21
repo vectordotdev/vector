@@ -181,6 +181,7 @@ impl BufferConfig {
 
     /// Resources that the sink is using.
     #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
+    #[allow(clippy::missing_const_for_fn)] // False positive, allocations are not allowed in const fns
     pub fn resources(&self, sink_id: &str) -> Vec<Resource> {
         match self {
             BufferConfig::Memory { .. } => Vec::new(),
