@@ -255,7 +255,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		checkpoint_write_errors_total: {
-			description:       "The total number of errors writing checkpoints."
+			description:       "The total number of errors writing checkpoints. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -483,6 +483,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_received_bytes_total: {
+			description:       "The number of raw bytes accepted by this component from source origins."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              component_received_events_total.tags
+		}
 		component_received_events_total: {
 			description: """
 				The number of events accepted by this component either from tagged
@@ -600,7 +606,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		file_delete_errors_total: {
-			description:       "The total number of failures to delete a file."
+			description:       "The total number of failures to delete a file. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -608,7 +614,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		file_watch_errors_total: {
-			description:       "The total number of errors encountered when watching files."
+			description:       "The total number of errors encountered when watching files. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -648,7 +654,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		fingerprint_read_errors_total: {
-			description:       "The total number of times Vector failed to read a file for fingerprinting."
+			description:       "The total number of times Vector failed to read a file for fingerprinting. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -656,7 +662,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		glob_errors_total: {
-			description:       "The total number of errors encountered when globbing paths."
+			description:       "The total number of errors encountered when globbing paths. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -790,6 +796,15 @@ components: sources: internal_metrics: {
 					required:    false
 				}
 				mode: _mode
+			}
+		}
+		component_errors_total: {
+			description:       "The total number of errors encountered by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				error_type: _error_type
+				stage:      _stage
 			}
 		}
 		processing_errors_total: {
@@ -1077,18 +1092,23 @@ components: sources: internal_metrics: {
 			description: "The type of the error"
 			required:    true
 			enum: {
+				"delete_failed":               "The file deletion failed."
 				"field_missing":               "The event field was missing."
+				"glob_failed":                 "The glob pattern match operation failed."
 				"invalid_metric":              "The metric was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
 				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
+				"read_failed":                 "The file read operation failed."
 				"render_error":                "The rendering operation failed."
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."
 				"unlabeled_event":             "The event was not labeled."
 				"value_invalid":               "The value was invalid."
+				"watch_failed":                "The file watch operation failed."
+				"write_failed":                "The file write operation failed."
 			}
 		}
 		_file: {
@@ -1107,6 +1127,15 @@ components: sources: internal_metrics: {
 				udp:  "User Datagram Protocol"
 				tcp:  "Transmission Control Protocol"
 				unix: "Unix domain socket"
+			}
+		}
+		_stage: {
+			description: "The stage within the component at which the error occurred."
+			required:    true
+			enum: {
+				receiving:  "While receiving data."
+				processing: "While processing data within the component."
+				sending:    "While sending data."
 			}
 		}
 		_status: {

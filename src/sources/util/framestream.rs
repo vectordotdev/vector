@@ -1,7 +1,7 @@
 use crate::{
     event::Event,
     internal_events::{
-        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteFailed,
+        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::Source,
@@ -545,7 +545,7 @@ pub fn build_framestream_unix_source(
 
         // Delete socket file
         if let Err(error) = fs::remove_file(&path) {
-            emit!(&UnixSocketFileDeleteFailed { path: &path, error });
+            emit!(&UnixSocketFileDeleteError { path: &path, error });
         }
 
         Ok(())

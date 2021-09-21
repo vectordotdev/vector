@@ -4,7 +4,9 @@ use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, Event, LogEvent},
-    internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
+    internal_events::{
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+    },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
@@ -332,6 +334,10 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
+                emit!(&FileBytesReceived {
+                    byte_size: line.text.len(),
+                    path: &line.filename,
+                });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
                     Some(d) => d.decode_to_utf8(line.text),
@@ -447,7 +453,7 @@ fn create_event(
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> Event {
-    emit!(&FileEventReceived {
+    emit!(&FileEventsReceived {
         file: &file,
         byte_size: line.len(),
     });

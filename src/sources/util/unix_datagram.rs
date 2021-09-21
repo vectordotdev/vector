@@ -1,7 +1,7 @@
 use crate::{
     codecs, emit,
     event::Event,
-    internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteFailed},
+    internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
     sources::{util::tcp_error::TcpError, Source},
     Pipeline,
@@ -33,7 +33,7 @@ pub fn build_unix_datagram_source(
 
         // Delete socket file.
         if let Err(error) = remove_file(&listen_path) {
-            emit!(&UnixSocketFileDeleteFailed {
+            emit!(&UnixSocketFileDeleteError {
                 path: &listen_path,
                 error
             });
