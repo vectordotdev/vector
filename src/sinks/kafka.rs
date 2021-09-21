@@ -416,7 +416,7 @@ fn get_headers(event: &Event, headers_key: &str) -> Option<OwnedHeaders> {
                             owned_headers = owned_headers.add(key, value_bytes.as_ref());
                         } else {
                             emit!(&KafkaHeaderExtractionFailed {
-                                header_field: &headers_key
+                                header_field: headers_key
                             });
                         }
                     }
@@ -424,7 +424,7 @@ fn get_headers(event: &Event, headers_key: &str) -> Option<OwnedHeaders> {
                 }
                 _ => {
                     emit!(&KafkaHeaderExtractionFailed {
-                        header_field: &headers_key
+                        header_field: headers_key
                     });
                 }
             }
