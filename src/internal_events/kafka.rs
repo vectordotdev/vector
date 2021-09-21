@@ -102,13 +102,15 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
 }
 
 pub struct KafkaHeaderExtractionFailed<'a> {
-    pub header_field: &'a str
+    pub header_field: &'a str,
 }
 
 impl InternalEvent for KafkaHeaderExtractionFailed<'_> {
     fn emit_logs(&self) {
-        error!(message = "Failed to extract header. Value should be a map of String -> Bytes",
-        header_field = self.header_field);
+        error!(
+            message = "Failed to extract header. Value should be a map of String -> Bytes",
+            header_field = self.header_field
+        );
     }
 
     fn emit_metrics(&self) {

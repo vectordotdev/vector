@@ -1,7 +1,15 @@
-use crate::{buffers::Acker, config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription}, internal_events::{KafkaHeaderExtractionFailed, TemplateRenderingFailed}, kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsContext}, serde::to_string, sinks::util::{
+use crate::{
+    buffers::Acker,
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    internal_events::{KafkaHeaderExtractionFailed, TemplateRenderingFailed},
+    kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsContext},
+    serde::to_string,
+    sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         BatchConfig,
-    }, template::{Template, TemplateParseError}};
+    },
+    template::{Template, TemplateParseError},
+};
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
     Sink, Stream, TryFutureExt,
@@ -407,13 +415,17 @@ fn get_headers(event: &Event, headers_key: &str) -> Option<OwnedHeaders> {
                         if let Value::Bytes(value_bytes) = value {
                             owned_headers = owned_headers.add(key, value_bytes.as_ref());
                         } else {
-                            emit!(KafkaHeaderExtractionFailed{header_field: &headers_key});
+                            emit!(&KafkaHeaderExtractionFailed {
+                                header_field: &headers_key
+                            });
                         }
                     }
                     return Some(owned_headers);
                 }
                 _ => {
-                    emit!(KafkaHeaderExtractionFailed{header_field: &headers_key});
+                    emit!(&KafkaHeaderExtractionFailed {
+                        header_field: &headers_key
+                    });
                 }
             }
         }
