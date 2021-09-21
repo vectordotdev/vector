@@ -21,6 +21,7 @@ use std::sync::{
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
+use tracing::{debug, error};
 
 /// How much time needs to pass between compaction to trigger new one.
 const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);

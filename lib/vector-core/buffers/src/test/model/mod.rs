@@ -1,16 +1,18 @@
-mod in_memory;
-#[cfg(feature = "disk-buffer")]
-mod on_disk;
-
 use crate::test::common::{Action, Message};
 use crate::test::model::in_memory::InMemory;
 #[cfg(feature = "disk-buffer")]
 use crate::test::model::on_disk::OnDisk;
 use crate::Variant;
+use crate::WhenFull;
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
-use quickcheck::{QuickCheck, TestResult};
+use proptest::prelude::*;
 use std::pin::Pin;
+use tokio::runtime;
+
+mod in_memory;
+#[cfg(feature = "disk-buffer")]
+mod on_disk;
 
 #[derive(Debug)]
 /// For operations that might block whether the operation would or would not
@@ -31,24 +33,6 @@ trait Model {
     fn is_empty(&self) -> bool;
 }
 
-fn check(variant: &Variant) -> bool {
-    match variant {
-        Variant::Memory { .. } => {
-            // nothing to check
-            true
-        }
-        #[cfg(feature = "disk-buffer")]
-        Variant::Disk { id, data_dir, .. } => {
-            // determine if data_dir is in temp_dir/id
-            let mut prefix = std::path::PathBuf::new();
-            prefix.push(std::env::temp_dir());
-            prefix.push(id);
-
-            data_dir.starts_with(prefix)
-        }
-    }
-}
-
 /// `VariantGuard` wraps a `Variant`, allowing a convenient Drop implementation
 struct VariantGuard {
     inner: Variant,
@@ -56,31 +40,7 @@ struct VariantGuard {
 
 impl VariantGuard {
     fn new(variant: Variant) -> Self {
-        match variant {
-            Variant::Memory { .. } => VariantGuard { inner: variant },
-            #[cfg(feature = "disk-buffer")]
-            Variant::Disk {
-                max_size,
-                when_full,
-                id,
-                ..
-            } => {
-                // SAFETY: We allow tempdir to create the directory but by
-                // calling `into_path` we obligate ourselves to delete it. This
-                // is done in the drop implementation for `VariantGuard`.
-                let data_dir = tempdir::TempDir::new_in(std::env::temp_dir(), &id)
-                    .unwrap()
-                    .into_path();
-                VariantGuard {
-                    inner: Variant::Disk {
-                        max_size,
-                        when_full,
-                        data_dir,
-                        id,
-                    },
-                }
-            }
-        }
+        VariantGuard { inner: variant }
     }
 }
 
@@ -104,21 +64,57 @@ impl Drop for VariantGuard {
     }
 }
 
-/// This test models a single sender and a single receiver pushing and pulling
-/// from a common buffer. The buffer itself may be either memory or disk. We use
-/// the raw `futures::sink::Sink` and `futures::stream::Stream` interface,
-/// avoiding the need to model the runtime in any way. This is, then, the buffer
-/// as a runtime will see it.
-///
-/// Acks are not modeled yet. I believe doing so would be a straightforward
-/// process.
-#[test]
-fn model_check() {
-    fn inner(variant: Variant, actions: Vec<Action>) -> TestResult {
-        if !check(&variant) {
-            return TestResult::discard();
-        }
+#[cfg(feature = "disk-buffer")]
+fn arb_variant() -> impl Strategy<Value = Variant> {
+    prop_oneof![
+        <(u16, WhenFull)>::arbitrary().prop_map(|(max_events, when_full)| {
+            Variant::Memory {
+                max_events: max_events as usize,
+                when_full,
+            }
+        }),
+        <(u16, WhenFull, u64)>::arbitrary().prop_map(|(max_size, when_full, id)| {
+            let id = id.to_string();
+            // SAFETY: We allow tempdir to create the directory but by
+            // calling `into_path` we obligate ourselves to delete it. This
+            // is done in the drop implementation for `VariantGuard`.
+            let data_dir = tempdir::TempDir::new_in(std::env::temp_dir(), &id)
+                .unwrap()
+                .into_path();
+            Variant::Disk {
+                max_size: max_size as usize,
+                when_full,
+                data_dir,
+                id,
+            }
+        })
+    ]
+}
 
+#[cfg(not(feature = "disk-buffer"))]
+fn arb_variant() -> impl Strategy<Value = Variant> {
+    prop_oneof![
+        <(u16, WhenFull)>::arbitrary().prop_map(|(max_events, when_full)| {
+            Variant::Memory {
+                max_events: max_events as usize,
+                when_full,
+            }
+        }),
+    ]
+}
+
+proptest! {
+    /// This test models a single sender and a single receiver pushing and
+    /// pulling from a common buffer. The buffer itself may be either memory or
+    /// disk. We use the raw `futures::sink::Sink` and `futures::stream::Stream`
+    /// interface, avoiding the need to model the runtime in any way. This is,
+    /// then, the buffer as a runtime will see it.
+    ///
+    /// Acks are not modeled yet. I believe doing so would be a straightforward
+    /// process.
+    #[test]
+    fn model_check(variant in arb_variant(),
+                   actions in Vec::<Action>::arbitrary()) {
         let guard = VariantGuard::new(variant);
         let mut model: Box<dyn Model> = match guard.as_ref() {
             Variant::Memory { .. } => Box::new(InMemory::new(guard.as_ref(), 1)),
@@ -132,11 +128,17 @@ fn model_check() {
         let snd_waker = noop_waker();
         let mut snd_context = Context::from_waker(&snd_waker);
 
-        let (tx, mut rx, _) = crate::build::<Message>(guard.as_ref().clone()).unwrap();
+        let (tx, rx, _) = crate::build::<Message>(guard.as_ref().clone()).unwrap();
 
         let mut tx = tx.get();
-        let sink = tx.as_mut();
+        let mut recv = Pin::new(rx);
+        let mut sink = Pin::new(tx.as_mut());
 
+        let runtime = runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .build()?;
+
+        runtime.block_on(async {
         for action in actions {
             match action {
                 // For each send action we attempt to send into the buffer and
@@ -144,15 +146,15 @@ fn model_check() {
                 // flush. We might profitably model a distinct flush action but
                 // at the time this model was created there was no clear reason
                 // to do so.
-                Action::Send(msg) => match Sink::poll_ready(Pin::new(sink), &mut snd_context) {
+                Action::Send(msg) => match Sink::poll_ready(sink.as_mut(), &mut snd_context) {
                     Poll::Ready(Ok(())) => {
                         // Once the buffer signals its ready we are allowed to
                         // call `start_send`. The buffer may or may not make the
                         // value immediately available to a receiver, something
                         // we elide by immediately flushing.
-                        assert_eq!(Ok(()), Sink::start_send(Pin::new(sink), msg.clone()));
+                        assert_eq!(Ok(()), Sink::start_send(sink.as_mut(), msg.clone()));
                         assert!(matches!(model.send(msg.clone()), Progress::Advanced));
-                        match Sink::poll_flush(Pin::new(sink), &mut snd_context) {
+                        match Sink::poll_flush(sink.as_mut(), &mut snd_context) {
                             Poll::Ready(Ok(())) => {}
                             // If the buffer signals Ready/Ok then we're good to
                             // go. Both the model and the SUT will have received
@@ -160,17 +162,17 @@ fn model_check() {
                             // then this is only valid so long as the model is
                             // full.
                             Poll::Pending => {
-                                debug_assert!(model.is_full(), "{:?}", msg);
+                                assert!(model.is_full(), "{:?}", msg);
                             }
                             // The SUT must never signal an error when we
                             // flush. There is no way to recover from an error.
-                            Poll::Ready(Err(_)) => return TestResult::failed(),
+                            Poll::Ready(Err(_)) => unreachable!(),
                         }
                     }
                     Poll::Pending => assert!(model.is_full()),
-                    Poll::Ready(Err(_)) => return TestResult::failed(),
+                    Poll::Ready(Err(_)) => unreachable!(),
                 },
-                Action::Recv => match Stream::poll_next(Pin::new(&mut rx), &mut rcv_context) {
+                Action::Recv => match Stream::poll_next(recv.as_mut(), &mut rcv_context) {
                     Poll::Pending => {
                         assert!(model.is_empty());
                     }
@@ -180,12 +182,8 @@ fn model_check() {
                 },
             }
         }
+        });
 
         drop(guard);
-        TestResult::passed()
     }
-    QuickCheck::new()
-        .tests(10_000)
-        .max_tests(100_000)
-        .quickcheck(inner as fn(Variant, Vec<Action>) -> TestResult);
 }

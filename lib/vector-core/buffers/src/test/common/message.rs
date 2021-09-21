@@ -1,9 +1,9 @@
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut};
-use quickcheck::{Arbitrary, Gen};
+use proptest_derive::Arbitrary;
 use std::{fmt, mem};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Arbitrary)]
 pub struct Message {
     id: u64,
 }
@@ -11,22 +11,6 @@ pub struct Message {
 impl Message {
     pub(crate) fn new(id: u64) -> Self {
         Message { id }
-    }
-}
-
-//
-// QuickCheck support
-//
-
-impl Arbitrary for Message {
-    fn arbitrary(g: &mut Gen) -> Self {
-        Message {
-            id: u64::arbitrary(g),
-        }
-    }
-
-    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        Box::new(self.id.shrink().map(|id| Message { id }))
     }
 }
 

@@ -812,7 +812,8 @@ dependencies = [
  "metrics-exporter-prometheus",
  "pin-project 1.0.8",
  "pretty_assertions",
- "quickcheck",
+ "proptest",
+ "proptest-derive",
  "serde",
  "snafu",
  "tempdir",
@@ -4833,6 +4834,17 @@ dependencies = [
  "regex-syntax",
  "rusty-fork",
  "tempfile",
+]
+
+[[package]]
+name = "proptest-derive"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90b46295382dc76166cb7cf2bb4a97952464e4b7ed5a43e6cd34e1fec3349ddc"
+dependencies = [
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "syn 0.15.44",
 ]
 
 [[package]]

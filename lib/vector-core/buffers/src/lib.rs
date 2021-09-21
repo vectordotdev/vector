@@ -8,9 +8,6 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
-#[macro_use]
-extern crate tracing;
-
 mod acker;
 pub mod bytes;
 #[cfg(feature = "disk-buffer")]
@@ -24,11 +21,14 @@ pub use acker::Acker;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 #[cfg(test)]
+use proptest_derive::Arbitrary;
+#[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use tracing::{debug, error};
 pub use variant::*;
 
 /// Build a new buffer based on the passed `Variant`
@@ -81,6 +81,7 @@ where
     }
 }
 
+#[cfg_attr(test, derive(Arbitrary))]
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum WhenFull {
