@@ -255,6 +255,8 @@ mod tests {
                     pod_namespace: "ns".to_owned(),
                     pod_uid: "uid".to_owned(),
                     pod_labels: "labels".to_owned(),
+                    // ensure we can disable fields
+                    pod_annotations: "".to_owned(),
                     ..Default::default()
                 },
                 ObjectMeta {
@@ -265,6 +267,14 @@ mod tests {
                         vec![
                             ("sandbox0-label0".to_owned(), "val0".to_owned()),
                             ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                    annotations: Some(
+                        vec![
+                            ("sandbox0-annotation0".to_owned(), "val0".to_owned()),
+                            ("sandbox0-annotation1".to_owned(), "val1".to_owned()),
                         ]
                         .into_iter()
                         .collect(),
