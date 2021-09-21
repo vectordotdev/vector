@@ -807,6 +807,7 @@ dependencies = [
  "criterion",
  "db-key",
  "futures 0.3.17",
+ "internal_event",
  "leveldb",
  "metrics",
  "metrics-exporter-prometheus",
