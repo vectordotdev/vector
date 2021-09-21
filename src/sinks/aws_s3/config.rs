@@ -24,6 +24,8 @@ use std::num::NonZeroUsize;
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
+use super::sink::S3RequestOptions;
+
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
     TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
         .rate_limit_num(250)
@@ -71,17 +73,6 @@ pub struct S3SinkConfig {
 pub enum Encoding {
     Text,
     Ndjson,
-}
-
-#[derive(Clone)]
-pub struct S3RequestOptions {
-    pub bucket: String,
-    pub filename_time_format: String,
-    pub filename_append_uuid: bool,
-    pub filename_extension: Option<String>,
-    pub api_options: S3Options,
-    pub encoding: EncodingConfig<Encoding>,
-    pub compression: Compression,
 }
 
 impl GenerateConfig for S3SinkConfig {

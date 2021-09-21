@@ -4,7 +4,6 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HttpEventEncoded, HttpEventMissingMessage},
     sinks::util::{
-        buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
@@ -249,8 +248,7 @@ impl HttpSink for HttpSinkConfig {
             Compression::Gzip(level) => {
                 builder = builder.header("Content-Encoding", "gzip");
 
-                let level = level.unwrap_or(GZIP_DEFAULT) as u32;
-                let mut w = GzEncoder::new(Vec::new(), flate2::Compression::new(level));
+                let mut w = GzEncoder::new(Vec::new(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail");
             }

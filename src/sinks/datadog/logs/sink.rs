@@ -1,7 +1,6 @@
 use super::service::LogApiRequest;
 use crate::config::SinkContext;
 use crate::sinks::datadog::logs::config::Encoding;
-use crate::sinks::util::buffer::GZIP_FAST;
 use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfiguration};
 use crate::sinks::util::Compression;
 use async_trait::async_trait;
@@ -223,10 +222,9 @@ impl RequestBuilder {
         let (encoded_body, is_compressed) = match self.compression {
             Compression::None => (body, false),
             Compression::Gzip(level) => {
-                let level = level.unwrap_or(GZIP_FAST);
                 let mut encoder = GzEncoder::new(
                     Vec::with_capacity(serialized_payload_bytes_len),
-                    flate2::Compression::new(level as u32),
+                    level,
                 );
 
                 encoder

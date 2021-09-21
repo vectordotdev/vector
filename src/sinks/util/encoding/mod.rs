@@ -39,7 +39,7 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, io};
 
 /// The behavior of a encoding configuration.
 pub trait EncodingConfiguration<E> {
@@ -150,6 +150,13 @@ pub trait EncodingConfiguration<E> {
         self.apply_only_fields(event);
         self.apply_timestamp_format(event);
     }
+}
+
+pub trait Encoder<E> {
+    type Configuration: EncodingConfiguration<E>;
+
+    /// Encodes an individual event to the provided writer.
+    fn encode_event(&self, event: Event, writer: &mut dyn io::Write) -> io::Result<()>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]

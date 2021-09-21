@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, marker::PhantomData};
+use std::{collections::HashMap, fmt};
 
 use buffers::{Ackable, Acker};
 use futures::{stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
@@ -20,38 +20,30 @@ use crate::event::{EventStatus, Finalizable};
 /// This capability is parameterized so any implementation which can define how to interpret the
 /// response for each request, as well as define how many events a request is compromised of, can be
 /// used with `Driver`.
-pub struct Driver<St, Svc, Req>
-where
-    Svc: Service<Req>,
-{
+pub struct Driver<St, Svc> {
     input: St,
     service: Svc,
     acker: Acker,
-    _req: PhantomData<Req>,
 }
 
-impl<St, Svc, Req> Driver<St, Svc, Req>
-where
-    Svc: Service<Req>,
-{
+impl<St, Svc> Driver<St, Svc> {
     pub fn new(input: St, service: Svc, acker: Acker) -> Self {
         Self {
             input,
             service,
             acker,
-            _req: PhantomData,
         }
     }
 }
 
-impl<St, Svc, Req> Driver<St, Svc, Req>
+impl<St, Svc> Driver<St, Svc>
 where
-    St: Stream<Item = Req>,
-    Svc: Service<Req>,
+    St: Stream,
+    St::Item: Ackable + Finalizable,
+    Svc: Service<St::Item>,
     Svc::Error: fmt::Debug + 'static,
     Svc::Future: Send + 'static,
     Svc::Response: AsRef<EventStatus>,
-    Req: Ackable + Finalizable,
 {
     /// Runs the driver until the input stream is exhausted.
     ///

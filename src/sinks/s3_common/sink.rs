@@ -1,12 +1,8 @@
-use crate::{
-    config::SinkContext,
-    event::Event,
-    sinks::util::{buffer::GZIP_FAST, Compression},
-};
+use crate::{config::SinkContext, event::Event, sinks::util::{Compression, SinkBuilder}};
 use async_trait::async_trait;
 use bytes::Bytes;
 use flate2::write::GzEncoder;
-use futures::stream::{BoxStream, StreamExt};
+use futures::stream::BoxStream;
 use std::{
     fmt,
     io::{self, Write},
@@ -15,12 +11,10 @@ use std::{
     time::Duration,
 };
 use tower::Service;
-use vector_core::stream::driver::Driver;
 use vector_core::{buffers::Acker, event::EventStatus};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     sink::StreamSink,
-    stream::batcher::Batcher,
 };
 
 use crate::sinks::s3_common::partitioner::KeyPartitioner;
@@ -71,9 +65,9 @@ where
     S::Future: Send + 'static,
     S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
-    R: S3RequestBuilder + Send + Sync,
+    R: S3RequestBuilder + Send + Sync + 'static,
 {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(&mut self, input: BoxStream<'static, Event>) -> Result<(), ()> {
         // All sinks do the same fundamental job: take in events, and ship them
         // out. Empirical testing shows that our number one priority for high
         // throughput needs to be servicing I/O as soon as we possibly can.  In
@@ -98,95 +92,99 @@ where
             .map(Arc::new)
             .expect("same sink should not be run twice");
 
-        let batcher = Batcher::new(
-            input,
-            partitioner,
-            self.batch_timeout,
-            self.batch_size_events,
-            self.batch_size_bytes,
-        );
+        let request_builder_rate_limit = NonZeroUsize::new(50);
 
-        let processed_batches = batcher.filter_map(move |(key, batch)| {
-            let request_builder = Arc::clone(&request_builder);
-            async move { key.map(|key| request_builder.build_request(key, batch)) }
-        });
+        let sink = SinkBuilder::new(input)
+            .batched(partitioner, self.batch_timeout, self.batch_size_events, self.batch_size_bytes)
+            .filter_map(|(key, batch)| async move { key.map(|k| (k, batch)) })
+            .concurrent_map(request_builder_rate_limit, move |(key, batch)| {
+                let request_builder = Arc::clone(&request_builder);
+                async move { request_builder.build_request(key, batch) }
+            })
+            .driver(service, acker);
 
-        let driver = Driver::new(processed_batches, service, acker);
-        driver.run().await
+        let _ = sink.run().await;
+        Ok(())
     }
 }
 
+/// Generalized interface for defining how a batch of events will be turned into an S3 request.
 pub trait S3RequestBuilder {
+    fn compression(&self) -> Compression;
+
+    /// Builds an `S3Request` for the given batch of events, and their partition key.
     fn build_request(&self, key: String, batch: Vec<Event>) -> S3Request;
-}
 
-pub trait S3EventEncoding {
+    /// Encodes an individual event to the provided writer.
     fn encode_event(&self, event: Event, writer: &mut dyn Write) -> io::Result<()>;
-}
 
-pub fn process_event_batch<E: S3EventEncoding>(
-    batch: Vec<Event>,
-    encoding: &E,
-    compression: Compression,
-) -> (Bytes, EventFinalizers) {
-    enum Writer {
-        Plain(Vec<u8>),
-        GzipCompressed(GzEncoder<Vec<u8>>),
-    }
+    /// Transforms a batch of events into a byte-oriented payload.
+    ///
+    /// Each event in the batch is run through `encode_event`, and optionally, the entire batch is
+    /// compressed based on the value returned by `compression`. The finalizers for all processed
+    /// events are merged together and handed back, as well.
+    ///
+    /// This is a helper method that is expected to be used by `build_request` in most cases.
+    ///
+    /// TODO: This should likely just be a separate type that can be constructed via builder and
+    /// baked into whatever sink needs it, since encoding and compressing events, as well as
+    /// collecting their finalizers, is pretty common.  We could additionally make
+    /// `S3RequestBuilder` generic over the request output type, and then create a new type for
+    /// request building that is essentially this function, but parameterized based on the request
+    /// builder that is passed in.  That might be a better way to wrap it all up...
+    fn process_event_batch(&self, batch: Vec<Event>) -> (Bytes, EventFinalizers) {
+        enum Writer {
+            Plain(Vec<u8>),
+            GzipCompressed(GzEncoder<Vec<u8>>),
+        }
 
-    impl Write for Writer {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            match self {
-                Writer::Plain(inner_buf) => inner_buf.write(buf),
-                Writer::GzipCompressed(writer) => writer.write(buf),
+        impl Write for Writer {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                match self {
+                    Writer::Plain(inner_buf) => inner_buf.write(buf),
+                    Writer::GzipCompressed(writer) => writer.write(buf),
+                }
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                match self {
+                    Writer::Plain(_) => Ok(()),
+                    Writer::GzipCompressed(writer) => writer.flush(),
+                }
             }
         }
 
-        fn flush(&mut self) -> std::io::Result<()> {
-            match self {
-                Writer::Plain(_) => Ok(()),
-                Writer::GzipCompressed(writer) => writer.flush(),
+        // Build our compressor first, so that we can encode directly into it.
+        let mut writer = {
+            // This is a best guess, because encoding could add a good chunk of
+            // overhead to the raw, in-memory representation of an event, but if
+            // we're compressing, then we should end up net below the capacity.
+            let buffer = Vec::with_capacity(1_024);
+            match self.compression() {
+                Compression::None => Writer::Plain(buffer),
+                Compression::Gzip(level) => Writer::GzipCompressed(GzEncoder::new(buffer, level)),
             }
+        };
+
+        let mut finalizers = EventFinalizers::default();
+
+        // Now encode each item into the writer.
+        for mut event in batch {
+            finalizers.merge(event.take_finalizers());
+
+            let _ = self.encode_event(event, &mut writer)
+                .expect("failed to encode event into writer; this is a bug!");
         }
+
+        // Extract the buffer and push it back in a frozen state.
+        let buf = match writer {
+            Writer::Plain(buf) => buf.into(),
+            Writer::GzipCompressed(writer) => writer
+                .finish()
+                .expect("gzip writer should not fail to finish")
+                .into(),
+        };
+
+        (buf, finalizers)
     }
-
-    // Build our compressor first, so that we can encode directly into it.
-    let mut writer = {
-        // This is a best guess, because encoding could add a good chunk of
-        // overhead to the raw, in-memory representation of an event, but if
-        // we're compressing, then we should end up net below the capacity.
-        let buffer = Vec::with_capacity(1_024);
-        match compression {
-            Compression::None => Writer::Plain(buffer),
-            Compression::Gzip(level) => {
-                let level = level.unwrap_or(GZIP_FAST);
-                Writer::GzipCompressed(GzEncoder::new(
-                    buffer,
-                    flate2::Compression::new(level as u32),
-                ))
-            }
-        }
-    };
-
-    let mut finalizers = EventFinalizers::default();
-
-    // Now encode each item into the writer.
-    for mut event in batch {
-        finalizers.merge(event.take_finalizers());
-
-        let _ = encoding
-            .encode_event(event, &mut writer)
-            .expect("failed to encode event into writer; this is a bug!");
-    }
-
-    // Extract the buffer and push it back in a frozen state.
-    let buf = match writer {
-        Writer::Plain(buf) => buf.into(),
-        Writer::GzipCompressed(writer) => writer
-            .finish()
-            .expect("gzip writer should not fail to finish")
-            .into(),
-    };
-
-    (buf, finalizers)
 }
