@@ -5,7 +5,7 @@ use crate::{
     },
     event::Event,
     internal_events::HttpDecompressError,
-    sources,
+    sources::{self, util::ErrorMessage},
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -17,7 +17,7 @@ use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{error::Error, fmt, io::Read, net::SocketAddr, sync::Arc};
+use std::{io::Read, net::SocketAddr, sync::Arc};
 use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 use warp::{
     filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
@@ -284,7 +284,7 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(HttpDecompressError {
+    emit!(&HttpDecompressError {
         encoding,
         error: &error
     });
@@ -293,35 +293,6 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
         format!("Failed decompressing payload with {} decoder.", encoding),
     )
 }
-
-#[derive(Serialize, Debug)]
-pub struct ErrorMessage {
-    code: u16,
-    message: String,
-}
-
-impl ErrorMessage {
-    pub fn new(code: StatusCode, message: String) -> Self {
-        ErrorMessage {
-            code: code.as_u16(),
-            message,
-        }
-    }
-
-    pub fn status_code(&self) -> StatusCode {
-        StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-
-impl Error for ErrorMessage {}
-
-impl fmt::Display for ErrorMessage {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: {}", self.code, self.message)
-    }
-}
-
-impl warp::reject::Reject for ErrorMessage {}
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
 #[derive(Deserialize, Clone, Serialize, Debug)]
