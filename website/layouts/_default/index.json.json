@@ -1,0 +1,5 @@
+{{- $data := newScratch -}}
+{{- range site.Data.docs.remap.functions -}}
+{{- $data.SetInMap "vrl" .name (dict "description" .description "arguments" .arguments "category" .category "return" .return) -}}
+{{- end -}}
+{{- $data.Get "vrl" | jsonify -}}
