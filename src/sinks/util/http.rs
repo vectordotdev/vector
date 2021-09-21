@@ -8,11 +8,11 @@ use crate::{
     buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
-    internal_events::{BytesSent, EventsSent},
+    internal_events::{EndpointBytesSent, EventsSent},
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
-use http::StatusCode;
+use http::{uri::PathAndQuery, StatusCode, Uri};
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
@@ -401,10 +401,24 @@ where
             let request = request_builder(body).await?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
-            emit!(BytesSent {
-                byte_size,
-                protocol: "http"
+
+            // Simplify the URI in the request to remove the "query" portion.
+            let mut parts = request.uri().clone().into_parts();
+            parts.path_and_query = parts.path_and_query.map(|pq| {
+                pq.path()
+                    .parse::<PathAndQuery>()
+                    .unwrap_or_else(|_| unreachable!())
             });
+            let endpoint = Uri::from_parts(parts)
+                .unwrap_or_else(|_| unreachable!())
+                .to_string();
+
+            emit!(EndpointBytesSent {
+                byte_size,
+                protocol: "http",
+                endpoint: &endpoint
+            });
+
             let response = http_client.call(request).await?;
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
