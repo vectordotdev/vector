@@ -367,12 +367,12 @@ impl<'de> Visitor<'de> for LookupBufVisitor {
         FromStr::from_str(value).map_err(de::Error::custom)
     }
 
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        FromStr::from_str(&value).map_err(de::Error::custom)
-    }
+    // fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    // where
+    //     E: de::Error,
+    // {
+    //     FromStr::from_str(&value).map_err(de::Error::custom)
+    // }
 }
 
 impl<'a> From<Lookup<'a>> for LookupBuf {
