@@ -69,3 +69,11 @@ from = "https://rustdoc.vector.dev/*"
 to = "https://vector-rustdoc.netlify.app/vector/:splat"
 status = 301
 force = true
+
+# CORS headers for /index.json
+[[headers]]
+for = "/index.json"
+
+[headers.values]
+Access-Control-Allow-Origin = "*"
+
