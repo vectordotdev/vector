@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::counter;
 use std::fmt::Debug;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct WatchRequestInvoked;

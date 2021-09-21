@@ -155,7 +155,7 @@ impl Dedupe {
     fn transform_one(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
-            emit!(DedupeEventDiscarded { event });
+            emit!(&DedupeEventDiscarded { event });
             None
         } else {
             Some(event)

@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct EventsReceived {
@@ -13,9 +13,12 @@ impl InternalEvent for EventsReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", self.count as u64);
+        counter!("component_received_events_total", self.count as u64);
         counter!("events_in_total", self.count as u64);
-        counter!("received_event_bytes_total", self.byte_size as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
     }
 }
 
@@ -32,8 +35,9 @@ impl InternalEvent for EventsSent {
 
     fn emit_metrics(&self) {
         if self.count > 0 {
-            counter!("sent_events_total", self.count as u64);
-            counter!("sent_event_bytes_total", self.byte_size as u64);
+            counter!("events_out_total", self.count as u64);
+            counter!("component_sent_events_total", self.count as u64);
+            counter!("component_sent_event_bytes_total", self.byte_size as u64);
         }
     }
 }

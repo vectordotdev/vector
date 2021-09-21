@@ -1,7 +1,7 @@
-use super::InternalEvent;
 use metrics::{counter, histogram};
 use std::borrow::Cow;
 use std::time::Instant;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AwsEcsMetricsReceived {
@@ -15,7 +15,7 @@ impl InternalEvent for AwsEcsMetricsReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", self.count as u64);
+        counter!("component_received_events_total", self.count as u64);
         counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }

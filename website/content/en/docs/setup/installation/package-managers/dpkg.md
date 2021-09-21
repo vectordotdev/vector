@@ -21,14 +21,18 @@ sudo dpkg -i vector-{{< version >}}-amd64.deb
 
 {{< tabs default="Upgrade Vector" >}}
 {{< tab title="Upgrade Vector" >}}
+
 ```shell
 dpkg -i vector-{{< version >}}-amd64
 ```
+
 {{< /tab >}}
 {{< tab title="Uninstall Vector" >}}
+
 ```shell
 dpkg -r vector-{{< version >}}-amd64
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

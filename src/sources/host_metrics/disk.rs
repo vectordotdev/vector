@@ -1,4 +1,4 @@
-use super::{filter_result, FilterList, HostMetricsConfig};
+use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 use chrono::Utc;
 use futures::{stream, StreamExt};
@@ -12,7 +12,7 @@ pub(super) struct DiskConfig {
     devices: FilterList,
 }
 
-impl HostMetricsConfig {
+impl HostMetrics {
     pub async fn disk_metrics(&self) -> Vec<Metric> {
         match heim::disk::io_counters().await {
             Ok(counters) => {
@@ -21,7 +21,8 @@ impl HostMetricsConfig {
                         filter_result(result, "Failed to load/parse disk I/O data.")
                     })
                     .map(|counter| {
-                        self.disk
+                        self.config
+                            .disk
                             .devices
                             .contains_path(Some(counter.device_name().as_ref()))
                             .then(|| counter)
@@ -77,12 +78,14 @@ impl HostMetricsConfig {
 #[cfg(test)]
 mod tests {
     use super::super::tests::{all_counters, assert_filtered_metrics, count_name, count_tag};
-    use super::super::HostMetricsConfig;
+    use super::super::{HostMetrics, HostMetricsConfig};
     use super::DiskConfig;
 
     #[tokio::test]
     async fn generates_disk_metrics() {
-        let metrics = HostMetricsConfig::default().disk_metrics().await;
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
+            .disk_metrics()
+            .await;
         // The Windows test runner doesn't generate any disk metrics on the VM.
         #[cfg(not(target_os = "windows"))]
         assert!(!metrics.is_empty());
@@ -111,10 +114,10 @@ mod tests {
     #[tokio::test]
     async fn filters_disk_metrics_on_device() {
         assert_filtered_metrics("device", |devices| async {
-            HostMetricsConfig {
+            HostMetrics::new(HostMetricsConfig {
                 disk: DiskConfig { devices },
                 ..Default::default()
-            }
+            })
             .disk_metrics()
             .await
         })

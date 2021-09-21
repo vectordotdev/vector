@@ -119,7 +119,7 @@ components: sources: statsd: {
 			title: "Timestamps"
 			body:  """
 				The StatsD protocol doesn't provide support for sending metric timestamps. You may
-				notice that each parsed metric is assigned a `null` timestmap, which is a special
+				notice that each parsed metric is assigned a `null` timestamp, which is a special
 				value indicating a realtime metric (i.e. not a historical metric). Normally, such
 				`null` timestamps are substituted with the current time by downstream sinks or
 				third-party services during sending/ingestion. See the
@@ -129,11 +129,12 @@ components: sources: statsd: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:            components.sources.internal_metrics.output.metrics.events_in_total
-		connection_errors_total:    components.sources.internal_metrics.output.metrics.connection_errors_total
-		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		connection_errors_total:         components.sources.internal_metrics.output.metrics.connection_errors_total
+		invalid_record_total:            components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total:      components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

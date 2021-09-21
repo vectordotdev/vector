@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::counter;
 use std::{io::Error, path::Path};
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
@@ -42,7 +42,7 @@ where
 
 #[derive(Debug)]
 pub struct UnixSocketError<'a, E> {
-    pub error: E,
+    pub error: &'a E,
     pub path: &'a std::path::Path,
 }
 

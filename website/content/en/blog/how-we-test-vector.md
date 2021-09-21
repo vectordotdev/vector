@@ -381,11 +381,11 @@ challenge as the project grows and matures.
 [6]: https://github.com/blt
 [7]: http://lcamtuf.coredump.cx/afl/
 [8]: https://github.com/loiclec/fuzzcheck-rs
-[9]: https://github.com/timberio/vector-test-harness/
+[9]: https://github.com/vectordotdev/vector-test-harness/
 [10]: https://github.com/Shopify/toxiproxy
 [11]: https://github.com/osrg/namazu
 [12]: https://github.com/google/fuzzing/blob/master/docs/structure-aware-fuzzing.md
 [13]: https://github.com/rust-fuzz/cargo-fuzz
-[14]: https://github.com/timberio/vector/blob/9fe1eeb4786b27843673c05ff012f6b5cf5c3e45/src/transforms/tokenizer.rs#L240-L249
+[14]: https://github.com/vectordotdev/vector/blob/9fe1eeb4786b27843673c05ff012f6b5cf5c3e45/src/transforms/tokenizer.rs#L240-L249
 [15]: https://www.youtube.com/watch?v=4fFDFbi3toc
 [16]: https://www.hillelwayne.com/post/metamorphic-testing/

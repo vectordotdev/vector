@@ -62,6 +62,15 @@ pub struct Decoder {
     parser: BoxedParser,
 }
 
+impl Default for Decoder {
+    fn default() -> Self {
+        Self {
+            framer: Box::new(NewlineDelimitedCodec::new()),
+            parser: Box::new(BytesParser::new()),
+        }
+    }
+}
+
 impl Decoder {
     /// Creates a new `Decoder` with the specified `Framer` to produce byte
     /// frames from the byte stream / byte messages and `Parser` to parse
@@ -69,9 +78,7 @@ impl Decoder {
     pub fn new(framer: BoxedFramer, parser: BoxedParser) -> Self {
         Self { framer, parser }
     }
-}
 
-impl Decoder {
     /// Handles the framing result and parses it into a structured event, if
     /// possible.
     ///
@@ -81,7 +88,7 @@ impl Decoder {
         frame: Result<Option<Bytes>, BoxedFramingError>,
     ) -> Result<Option<(SmallVec<[Event; 1]>, usize)>, Error> {
         let frame = frame.map_err(|error| {
-            emit!(DecoderFramingFailed { error: &error });
+            emit!(&DecoderFramingFailed { error: &error });
             Error::FramingError(error)
         })?;
 
@@ -97,7 +104,7 @@ impl Decoder {
             .parse(frame)
             .map(|event| Some((event, byte_size)))
             .map_err(|error| {
-                emit!(DecoderParseFailed { error: &error });
+                emit!(&DecoderParseFailed { error: &error });
                 Error::ParsingError(error)
             })
     }
@@ -122,6 +129,7 @@ impl tokio_util::codec::Decoder for Decoder {
 ///
 /// Usually used in source configs via `#[serde(flatten)]`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct DecodingConfig {
     /// The framing config.
     framing: Option<Box<dyn FramingConfig>>,

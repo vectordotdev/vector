@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::{counter, gauge};
+use vector_core::internal_event::InternalEvent;
 use vector_core::update_counter;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ impl InternalEvent for KafkaEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", 1);
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }

@@ -193,7 +193,7 @@ impl HttpSink for LokiSink {
         let tenant_id = self.tenant_id.as_ref().and_then(|t| {
             t.render_string(&event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         field: Some("tenant_id"),
                         drop_event: false,
@@ -252,7 +252,7 @@ impl HttpSink for LokiSink {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(LokiEventUnlabeled);
+            emit!(&LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -275,7 +275,7 @@ impl HttpSink for LokiSink {
 
         let body = serde_json::to_vec(&json).unwrap();
 
-        emit!(LokiEventsProcessed {
+        emit!(&LokiEventsProcessed {
             byte_size: body.len(),
         });
 

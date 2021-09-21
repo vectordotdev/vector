@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use bytes::Bytes;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct StatsdEventReceived {
@@ -13,19 +13,19 @@ impl InternalEvent for StatsdEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", 1);
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64,);
     }
 }
 
 #[derive(Debug)]
-pub struct StatsdInvalidRecord {
-    pub error: crate::sources::statsd::parser::ParseError,
+pub struct StatsdInvalidRecord<'a> {
+    pub error: &'a crate::sources::statsd::parser::ParseError,
     pub bytes: Bytes,
 }
 
-impl InternalEvent for StatsdInvalidRecord {
+impl<'a> InternalEvent for StatsdInvalidRecord<'a> {
     fn emit_logs(&self) {
         error!(message = "Invalid packet from statsd, discarding.", error = ?self.error, bytes = %String::from_utf8_lossy(&self.bytes));
     }

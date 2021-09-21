@@ -153,7 +153,7 @@ components: sources: syslog: {
 			_msgid:        "ID931"
 			_procid:       "2426"
 			_timestamp:    "2020-03-13T20:45:38.119Z"
-			title:         "Syslog Eve"
+			title:         "Syslog Event"
 			configuration: {}
 			input: """
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)
@@ -204,10 +204,11 @@ components: sources: syslog: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
-		connection_read_errors_total: components.sources.internal_metrics.output.metrics.connection_read_errors_total
-		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
-		utf8_convert_errors_total:    components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		connection_read_errors_total:    components.sources.internal_metrics.output.metrics.connection_read_errors_total
+		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		utf8_convert_errors_total:       components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}
 }

@@ -21,7 +21,7 @@ impl Function for IpNtoa {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "Example",
-            source: r#"ip_ntoa!(67305985)"#,
+            source: r#"ip_ntoa!(16909060)"#,
             result: Ok("1.2.3.4"),
         }]
     }
@@ -47,9 +47,7 @@ impl Expression for IpNtoaFn {
             .try_into()
             .map_err(|_| String::from("cannot convert to bytes: integer does not fit in u32"))?;
 
-        let ip = Ipv4Addr::from(u32::from_be(i));
-
-        Ok(ip.to_string().into())
+        Ok(Ipv4Addr::from(i).to_string().into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -71,7 +69,7 @@ mod tests {
         }
 
         valid {
-            args: func_args![value: 67305985],
+            args: func_args![value: 16909060],
             want: Ok(value!("1.2.3.4")),
             tdef: TypeDef::new().fallible().bytes(),
         }

@@ -385,7 +385,7 @@ components: sources: file: {
 				truncating the original. Vector will also handle this well out of
 				the box, but there are a couple configuration options that will help
 				reduce the very small chance of missed data in some edge cases. We
-				recommend a combination of delaycompress (if applicable) on the
+				recommend a combination of `delaycompress` (if applicable) on the
 				`logrotate` side and including the first rotated file in Vector's
 				`include` option. This allows Vector to find the file after rotation,
 				read it uncompressed to identify it, and then ensure it has all of
@@ -605,17 +605,18 @@ components: sources: file: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:               components.sources.internal_metrics.output.metrics.events_in_total
-		checkpoint_write_errors_total: components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
-		checkpoints_total:             components.sources.internal_metrics.output.metrics.checkpoints_total
-		checksum_errors_total:         components.sources.internal_metrics.output.metrics.checksum_errors_total
-		file_delete_errors_total:      components.sources.internal_metrics.output.metrics.file_delete_errors_total
-		file_watch_errors_total:       components.sources.internal_metrics.output.metrics.file_watch_errors_total
-		files_added_total:             components.sources.internal_metrics.output.metrics.files_added_total
-		files_deleted_total:           components.sources.internal_metrics.output.metrics.files_deleted_total
-		files_resumed_total:           components.sources.internal_metrics.output.metrics.files_resumed_total
-		files_unwatched_total:         components.sources.internal_metrics.output.metrics.files_unwatched_total
-		fingerprint_read_errors_total: components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
-		glob_errors_total:             components.sources.internal_metrics.output.metrics.glob_errors_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		checkpoint_write_errors_total:   components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
+		checkpoints_total:               components.sources.internal_metrics.output.metrics.checkpoints_total
+		checksum_errors_total:           components.sources.internal_metrics.output.metrics.checksum_errors_total
+		file_delete_errors_total:        components.sources.internal_metrics.output.metrics.file_delete_errors_total
+		file_watch_errors_total:         components.sources.internal_metrics.output.metrics.file_watch_errors_total
+		files_added_total:               components.sources.internal_metrics.output.metrics.files_added_total
+		files_deleted_total:             components.sources.internal_metrics.output.metrics.files_deleted_total
+		files_resumed_total:             components.sources.internal_metrics.output.metrics.files_resumed_total
+		files_unwatched_total:           components.sources.internal_metrics.output.metrics.files_unwatched_total
+		fingerprint_read_errors_total:   components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
+		glob_errors_total:               components.sources.internal_metrics.output.metrics.glob_errors_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

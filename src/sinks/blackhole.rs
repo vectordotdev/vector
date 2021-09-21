@@ -137,7 +137,7 @@ impl StreamSink for BlackholeSink {
                 .total_raw_bytes
                 .fetch_add(message_len, Ordering::AcqRel);
 
-            emit!(BlackholeEventReceived {
+            emit!(&BlackholeEventReceived {
                 byte_size: message_len
             });
 

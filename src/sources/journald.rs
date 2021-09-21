@@ -313,7 +313,7 @@ impl JournaldSource {
                 let mut record = match decode_record(&bytes, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
-                        emit!(JournaldInvalidRecord {
+                        emit!(&JournaldInvalidRecord {
                             error,
                             text: String::from_utf8_lossy(&bytes).into_owned()
                         });
@@ -330,7 +330,7 @@ impl JournaldSource {
                     continue;
                 }
 
-                emit!(JournaldEventReceived {
+                emit!(&JournaldEventReceived {
                     byte_size: bytes.len()
                 });
 

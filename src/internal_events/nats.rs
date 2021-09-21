@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::counter;
 use std::io::Error;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct NatsEventReceived {
@@ -13,7 +13,7 @@ impl InternalEvent for NatsEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", 1);
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }

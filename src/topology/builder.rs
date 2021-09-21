@@ -178,20 +178,26 @@ pub async fn build_pieces(
         let transform = match transform {
             Transform::Function(mut t) => input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
-                .inspect(|event| {
-                    emit!(EventsReceived {
-                        count: 1,
-                        byte_size: event.size_of(),
-                    })
-                })
-                .flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
-                    t.transform(&mut buf, v);
-                    emit!(EventsSent {
-                        count: buf.len(),
-                        byte_size: buf.iter().map(|event| event.size_of()).sum(),
+                .ready_chunks(128) // 128 is an arbitrary, smallish constant
+                .inspect(|events| {
+                    emit!(&EventsReceived {
+                        count: events.len(),
+                        byte_size: events.iter().map(|e| e.size_of()).sum(),
                     });
-                    stream::iter(buf.into_iter()).map(Ok)
+                })
+                .flat_map(move |events| {
+                    let mut output = Vec::with_capacity(events.len());
+                    let mut buf = Vec::with_capacity(4); // also an arbitrary,
+                                                         // smallish constant
+                    for v in events {
+                        t.transform(&mut buf, v);
+                        output.append(&mut buf);
+                    }
+                    emit!(&EventsSent {
+                        count: output.len(),
+                        byte_size: output.iter().map(|event| event.size_of()).sum(),
+                    });
+                    stream::iter(output.into_iter()).map(Ok)
                 })
                 .forward(output)
                 .boxed(),
@@ -199,7 +205,7 @@ pub async fn build_pieces(
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
                     .inspect(|event| {
-                        emit!(EventsReceived {
+                        emit!(&EventsReceived {
                             count: 1,
                             byte_size: event.size_of(),
                         })
@@ -207,7 +213,7 @@ pub async fn build_pieces(
                 t.transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output.with(|event: Event| async {
-                        emit!(EventsSent {
+                        emit!(&EventsSent {
                             count: 1,
                             byte_size: event.size_of(),
                         });
@@ -289,7 +295,7 @@ pub async fn build_pieces(
                 rx.by_ref()
                     .filter(|event| ready(filter_event_type(event, input_type)))
                     .inspect(|event| {
-                        emit!(EventsReceived {
+                        emit!(&EventsReceived {
                             count: 1,
                             byte_size: event.size_of(),
                         })

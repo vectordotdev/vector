@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct SyslogEventReceived {
@@ -12,17 +12,19 @@ impl InternalEvent for SyslogEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", 1);
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
+#[cfg(feature = "codecs")]
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
-    pub error: std::io::Error,
+    pub error: crate::codecs::Error,
 }
 
+#[cfg(feature = "codecs")]
 impl InternalEvent for SyslogUdpReadError {
     fn emit_logs(&self) {
         error!(message = "Error reading datagram.", error = ?self.error, internal_log_rate_secs = 10);

@@ -26,7 +26,7 @@ remap: functions: ip_ntoa: {
 		{
 			title: "Integer to IPv4"
 			source: #"""
-				ip_ntoa!(67305985)
+				ip_ntoa!(16909060)
 				"""#
 			return: "1.2.3.4"
 		},

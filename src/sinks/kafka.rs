@@ -288,7 +288,7 @@ impl Sink<Event> for KafkaSink {
         );
 
         let topic = self.topic.render_string(&item).map_err(|error| {
-            emit!(TemplateRenderingFailed {
+            emit!(&TemplateRenderingFailed {
                 error,
                 field: Some("topic"),
                 drop_event: true,
