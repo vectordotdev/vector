@@ -58,6 +58,8 @@ mod get_env_var;
 mod get_hostname;
 #[cfg(feature = "includes")]
 mod includes;
+#[cfg(feature = "insert")]
+mod insert;
 #[cfg(feature = "integer")]
 mod integer;
 #[cfg(feature = "ip_aton")]
@@ -104,6 +106,8 @@ mod log;
     feature = "parse_nginx_log"
 ))]
 mod log_util;
+#[cfg(feature = "lookup")]
+mod lookup;
 #[cfg(feature = "match")]
 mod r#match;
 #[cfg(feature = "match_any")]
@@ -178,6 +182,8 @@ mod parse_xml;
 mod push;
 #[cfg(feature = "redact")]
 mod redact;
+#[cfg(feature = "remove")]
+mod remove;
 #[cfg(feature = "replace")]
 mod replace;
 #[cfg(feature = "reverse_dns")]
@@ -303,6 +309,8 @@ pub use get_env_var::GetEnvVar;
 pub use get_hostname::GetHostname;
 #[cfg(feature = "includes")]
 pub use includes::Includes;
+#[cfg(feature = "insert")]
+pub use insert::Insert;
 #[cfg(feature = "integer")]
 pub use integer::Integer;
 #[cfg(feature = "ip_aton")]
@@ -343,6 +351,8 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
+#[cfg(feature = "lookup")]
+pub use lookup::Lookup;
 #[cfg(feature = "match_any")]
 pub use match_any::MatchAny;
 #[cfg(feature = "match_array")]
@@ -415,6 +425,8 @@ pub use push::Push;
 pub use r#match::Match;
 #[cfg(feature = "redact")]
 pub use redact::Redact;
+#[cfg(feature = "remove")]
+pub use remove::Remove;
 #[cfg(feature = "replace")]
 pub use replace::Replace;
 #[cfg(feature = "reverse_dns")]
@@ -534,6 +546,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(GetHostname),
         #[cfg(feature = "includes")]
         Box::new(Includes),
+        #[cfg(feature = "insert")]
+        Box::new(Insert),
         #[cfg(feature = "integer")]
         Box::new(Integer),
         #[cfg(feature = "ip_aton")]
@@ -574,6 +588,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "lookup")]
+        Box::new(Lookup),
         #[cfg(feature = "match")]
         Box::new(Match),
         #[cfg(feature = "match_any")]
@@ -650,6 +666,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Push),
         #[cfg(feature = "redact")]
         Box::new(Redact),
+        #[cfg(feature = "remove")]
+        Box::new(Remove),
         #[cfg(feature = "replace")]
         Box::new(Replace),
         #[cfg(feature = "reverse_dns")]

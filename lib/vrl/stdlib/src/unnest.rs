@@ -1,4 +1,4 @@
-use lookup::LookupBuf;
+use lookup_lib::LookupBuf;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
