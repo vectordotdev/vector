@@ -179,7 +179,7 @@ where
         let finalizers = event.metadata_mut().take_finalizers();
         let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(EventsSent {
+            emit!(&EventsSent {
                 count: 1,
                 byte_size
             });
@@ -337,7 +337,7 @@ where
         let finalizers = event.metadata_mut().take_finalizers();
         let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(EventsSent {
+            emit!(&EventsSent {
                 count: 1,
                 byte_size
             });
@@ -414,7 +414,7 @@ where
                 .unwrap_or_else(|_| unreachable!())
                 .to_string();
 
-            emit!(EndpointBytesSent {
+            emit!(&EndpointBytesSent {
                 byte_size,
                 protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
                 endpoint: &endpoint
