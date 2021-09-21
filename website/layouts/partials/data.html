@@ -1561,7 +1561,7 @@
 {{ $id := printf "%s-examples-%s" .name (.ctx.title | urlize) }}
 {{ $scenario := (dict "title" .ctx.title "program" .ctx.source "output" (.ctx.return | default dict)) }}
 {{ $hash := $scenario | jsonify | base64Encode }}
-{{ $hashUrl := printf "http://localhost:8080/h/%s" $hash }}
+{{ $hashUrl := printf "https://vrl-server.fly.dev/h/%s" $hash }}
 <div>
   <span>
     {{ partial "heading.html" (dict "text" .ctx.title "level" 5 "id" $id "toc_hide" true) }}
