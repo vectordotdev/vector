@@ -9,6 +9,7 @@ tags: ["lua", "csv", "logs", "transform", "advanced", "guides", "guide"]
 ---
 
 {{< requirement title="Pre-requisites" >}}
+
 * You understand the [basic Lua concepts][docs.transforms.lua].
 * You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][docs.setup.quickstart].
 {{< /requirement >}}
