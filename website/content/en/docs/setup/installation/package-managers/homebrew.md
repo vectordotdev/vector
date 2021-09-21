@@ -16,14 +16,18 @@ brew tap vectordotdev/brew && brew install vector
 
 {{< tabs default="Upgrade Vector" >}}
 {{< tab title="Upgrade Vector" >}}
+
 ```shell
 brew update && brew upgrade vector
 ```
+
 {{< /tab >}}
 {{< tab title="Uninstall Vector" >}}
+
 ```shell
 brew remove vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

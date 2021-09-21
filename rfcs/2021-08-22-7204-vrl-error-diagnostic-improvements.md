@@ -40,15 +40,15 @@ solve the problem.
 
 ## Context
 
-- [RFC 4862 - 2020-11-02 - Remap Language Compile-Time Type Checking v1][#4862]
+* [RFC 4862 - 2020-11-02 - Remap Language Compile-Time Type Checking v1][#4862]
 
 [#4862]: https://github.com/timberio/vector/blob/ab9ff57ddccaa561b84eb3d0139bd764ad655fa6/rfcs/2020-11-02-remap-language-compile-time-type-checking-v1.md
 
 ## Cross cutting concerns
 
-- [Log schemas][#3910]
-- [Improve VRL type checking][#8380]
-- [VRL compiler improvements][#8221]
+* [Log schemas][#3910]
+* [Improve VRL type checking][#8380]
+* [VRL compiler improvements][#8221]
 
 [#3910]: https://github.com/timberio/vector/issues/3910
 [#8380]: https://github.com/timberio/vector/issues/8380
@@ -58,14 +58,14 @@ solve the problem.
 
 ### In scope
 
-- Improve VRL error diagnostics
-- Simplify VRL error codes
-- Update VRL website documentation
+* Improve VRL error diagnostics
+* Simplify VRL error codes
+* Update VRL website documentation
 
 ### Out of scope
 
-- Changes to error handling in VRL itself
-- Non-diagnostics changes to the VRL compiler
+* Changes to error handling in VRL itself
+* Non-diagnostics changes to the VRL compiler
 
 ## Proposed Solutions
 
@@ -98,7 +98,7 @@ upcase(foo)
 There's a typo (`to_strng` instead of `to_string`), which causes the following
 diagnostic message:
 
-```
+```text
 error[E105]: call to undefined function
   ┌─ :1:7
   │
@@ -119,7 +119,7 @@ injected.
 
 This results in the following invalid diagnostic message:
 
-```
+```coffee
 error[E110]: invalid argument type
   ┌─ :1:8
   │
@@ -153,7 +153,7 @@ foo = string!(foo)
 upcase(foo)
 ```
 
-```
+```text
 error[E620]: can't abort infallible function
   ┌─ :1:7
   │
@@ -292,7 +292,7 @@ upcase(bar)
 This program fails, because `to_string` takes one argument `value`, not
 `invalid`:
 
-```
+```text
 error[E108]: unknown function argument keyword
   ┌─ :1:17
   │
@@ -411,7 +411,7 @@ occurs when a root level expression is considered fallible:
 to_string(.foo)
 ```
 
-```
+```text
 error[E100]: unhandled error
   ┌─ :1:1
   │
@@ -482,7 +482,7 @@ Take this example:
 "foo" + .bar + baz[1]
 ```
 
-```
+```text
 error[E100]: unhandled error
   ┌─ :1:1
   │
@@ -509,19 +509,19 @@ instead of highlighting the entire chain of expressions.
 
 Given the following nested expressions:
 
-```
+```text
 A ( B ( C ( D ) ) )
 ```
 
 Where:
 
-- `A` is the root expression
-- `C` is fallible
-- `D` is infallible
+* `A` is the root expression
+* `C` is fallible
+* `D` is infallible
 
 The compiler must return a diagnostic similar to this:
 
-```
+```text
 error[E100]: unhandled error
   ┌─ :1:1
   │
@@ -534,16 +534,16 @@ error[E100]: unhandled error
 
 Here's what the compiler will do:
 
-- Compile the nested expressions, from `D` to `A`
-- `D` is infallible, and thus valid
-- `C` is fallible
-  - But it might become infallible by a parent expression
-  - Set `C` as the source of fallibility for this expression chain
-- `B` is fallible
-- `A` is fallible
-  - This is the root expression, and thus the fallibility of `C` remains
+* Compile the nested expressions, from `D` to `A`
+* `D` is infallible, and thus valid
+* `C` is fallible
+  * But it might become infallible by a parent expression
+  * Set `C` as the source of fallibility for this expression chain
+* `B` is fallible
+* `A` is fallible
+  * This is the root expression, and thus the fallibility of `C` remains
     unhandled
-- Show the error diagnostic specific to the unhandled fallibility of `C`
+* Show the error diagnostic specific to the unhandled fallibility of `C`
 
 The compiler has a `compile_root_exprs` function:
 
@@ -706,7 +706,7 @@ expects, and which types the argument can expand to at runtime.
 
 Something similar to this:
 
-```
+```text
 error[E100]: argument type might be invalid at runtime
   ┌─ :1:8
   │
@@ -742,8 +742,8 @@ error codes is still accurate, and remove any error codes that aren't useful.
 
 ### Update VRL Website Documentation
 
-- Make sure all diagnostic errors are covered on the website
-- Update function documentation, to make it clear that an infallible function
+* Make sure all diagnostic errors are covered on the website
+* Update function documentation, to make it clear that an infallible function
   can become fallible if its arguments are potentially invalid.
 
 ## Rationale
@@ -774,18 +774,18 @@ None.
 
 ## Plan Of Attack
 
-- [ ] Prevent Incorrect Error Diagnostics
-- [ ] Recover From Non-Fatal Expression Errors
-- [ ] Remove Generic "Expression Can Result in Runtime Error" Diagnostic
-- [ ] Correctly Diagnose Invalid Function Argument Types
-- [ ] Update VRL Error Codes
-- [ ] Update VRL Website Documentation
+* [ ] Prevent Incorrect Error Diagnostics
+* [ ] Recover From Non-Fatal Expression Errors
+* [ ] Remove Generic "Expression Can Result in Runtime Error" Diagnostic
+* [ ] Correctly Diagnose Invalid Function Argument Types
+* [ ] Update VRL Error Codes
+* [ ] Update VRL Website Documentation
 
 ## Future Improvements
 
-- `vrl check` subcommand
-- `vrl fix` subcommand to auto-fix errors
-- improve error diagnostic visuals
-- undefined variable checking
-- non-error diagnostics (for example when using functions that can be slow)
-- more/better "try" solutions in error diagnostics
+* `vrl check` subcommand
+* `vrl fix` subcommand to auto-fix errors
+* improve error diagnostic visuals
+* undefined variable checking
+* non-error diagnostics (for example when using functions that can be slow)
+* more/better "try" solutions in error diagnostics

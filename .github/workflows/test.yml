@@ -71,6 +71,8 @@ jobs:
               - 'scripts/cross/**'
             cue:
               - 'website/cue/**'
+            markdown:
+              - '**/**.md'
             internal_events:
               - 'src/internal_events/**'
             helm:
@@ -391,7 +393,12 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check licenses
-
+      - name: Check Cue docs
+        if: needs.changes.outputs.cue == 'true'
+        run: make check-docs
+      - name: Check Markdown
+        if: needs.changes.outputs.markdown == 'true'
+        run: make check-markdown
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'

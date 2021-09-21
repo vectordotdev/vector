@@ -120,6 +120,7 @@ Lastly, we've updated the ID of our sink component to `emit_syslog`, updated the
 
 Let's re-run Vector. This time we don't need to echo any data to it; just run in on the command line. It'll process
 100 lines of generated Syslog data, emit the processed data as JSON, and exit:
+
 ```shell
 vector --config ./vector.toml
 ```

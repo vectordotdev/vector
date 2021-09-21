@@ -30,6 +30,7 @@ Getting started is easy. Simply add this component to your pipeline:
 ```
 
 {{< success >}}
+
 - The `limit_exceeded_action` described the behavior when the `value_limit` is reached.
 - The `mode` enables you to switch between `exact` and `probabilistic` algorithms to trade performance for memory efficiency.
 - The `value` limit allows you to select exactly how many unique tag values you're willing to accept.
