@@ -20,6 +20,8 @@ remap: expressions: if: {
 				description: """
 					The `predicate` _must_ be an expression that resolves to a Boolean. If a Boolean isn't returned, a
 					compile-time error is raised.
+					The predicate can contain multiple expressions. Multiple expression predicates must be wrapped in
+					parentheses. The expressions need to be seperated by either a semicolon (`;`) or a new line.
 					"""
 			}
 		}
@@ -72,5 +74,22 @@ remap: expressions: if: {
 				"""#
 			return: "Hello, World!"
 		},
+		{
+			title: "Multiline expression"
+			source: #"""
+				x = 3
+				if (x = x + 1; x == 5) {
+					# not evaluated
+					null
+				} else if (
+					x = x + 1
+					x == 5
+				) {
+					"Hello, World!"
+				}
+				"""#
+			return: "Hello, World!"
+		},
+
 	]
 }
