@@ -1,7 +1,6 @@
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    metrics::Controller,
-    metrics::{capture_metrics, get_controller},
+    metrics::{capture_metrics, get_controller, Controller},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -96,7 +95,7 @@ async fn run(
     namespace: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
-    controller: &Controller,
+    controller: Controller,
     interval: time::Duration,
     out: Pipeline,
     shutdown: ShutdownSignal,
@@ -109,7 +108,7 @@ async fn run(
         let hostname = crate::get_hostname();
         let pid = std::process::id().to_string();
 
-        let metrics = capture_metrics(controller);
+        let metrics = capture_metrics(&controller);
 
         out.send_all(&mut stream::iter(metrics).map(|mut metric| {
             // A metric starts out with a default "vector" namespace, but will be overridden

@@ -13,7 +13,16 @@ use metrics_tracing_context::TracingContextLayer;
 use metrics_util::{layers::Layer, Generational, NotTracked, Registry};
 use once_cell::sync::OnceCell;
 
-static CONTROLLER: OnceCell<Controller> = OnceCell::new();
+thread_local!(static LOCAL_CONTROLLER: OnceCell<Controller> = OnceCell::new());
+static GLOBAL_CONTROLLER: OnceCell<Controller> = OnceCell::new();
+
+enum Switch {
+    Global,
+    Local,
+}
+
+static CONTROLLER_SWITCH: OnceCell<Switch> = OnceCell::new();
+
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
 // of their environment and how vectors acts in it.
@@ -21,6 +30,7 @@ const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
 static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
+#[derive(Clone)]
 pub struct Controller {
     registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>,
 }
@@ -33,12 +43,11 @@ fn tracing_context_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-/// Initialize the metrics sub-system
-///
-/// # Errors
-///
-/// This function will error if it is called multiple times.
-pub fn init() -> crate::Result<()> {
+const ALREADY_INITIALIZED: &str = "Metrics controller is already initialized.";
+
+fn init_generic(
+    set_controller: impl FnOnce(Controller) -> Result<Switch, ()>,
+) -> crate::Result<()> {
     // An escape hatch to allow disabing internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
     if !metrics_enabled() {
@@ -64,9 +73,10 @@ pub fn init() -> crate::Result<()> {
     let controller = Controller {
         registry: registry.clone(),
     };
-    CONTROLLER
-        .set(controller)
-        .map_err(|_| "controller already initialized")?;
+    let switch = set_controller(controller).map_err(|_| ALREADY_INITIALIZED)?;
+    CONTROLLER_SWITCH
+        .set(switch)
+        .map_err(|_| ALREADY_INITIALIZED)?;
 
     ////
     //// Initialize the recorder.
@@ -90,6 +100,31 @@ pub fn init() -> crate::Result<()> {
     Ok(())
 }
 
+/// Initialize the default metrics sub-system
+///
+/// # Errors
+///
+/// This function will error if it is called multiple times.
+pub fn init() -> crate::Result<()> {
+    init_generic(|controller| {
+        GLOBAL_CONTROLLER
+            .set(controller)
+            .map_err(|_| ())
+            .map(|()| Switch::Global)
+    })
+}
+
+/// Initialize the thread-local metrics sub-system
+///
+/// # Errors
+///
+/// This function will error if it is called multiple times.
+pub fn init_test() -> crate::Result<()> {
+    init_generic(|controller| {
+        LOCAL_CONTROLLER.with(|rc| rc.set(controller).map_err(|_| ()).map(|_| Switch::Local))
+    })
+}
+
 /// Clear all metrics from the registry.
 pub fn reset(controller: &Controller) {
     controller.registry.clear();
@@ -101,9 +136,13 @@ pub fn reset(controller: &Controller) {
 ///
 /// This function will fail if the metrics subsystem has not been correctly
 /// initialized.
-pub fn get_controller() -> crate::Result<&'static Controller> {
-    CONTROLLER
+pub fn get_controller() -> crate::Result<Controller> {
+    CONTROLLER_SWITCH
         .get()
+        .and_then(|switch| match switch {
+            Switch::Global => GLOBAL_CONTROLLER.get().map(Clone::clone),
+            Switch::Local => LOCAL_CONTROLLER.with(|oc| oc.get().map(Clone::clone)),
+        })
         .ok_or_else(|| "metrics system not initialized".into())
 }
 

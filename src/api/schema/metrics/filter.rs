@@ -11,7 +11,7 @@ use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 lazy_static! {
-    static ref GLOBAL_CONTROLLER: &'static Controller =
+    static ref GLOBAL_CONTROLLER: Controller =
         get_controller().expect("Metrics system not initialized. Please report.");
 }
 
@@ -119,13 +119,13 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
 
 /// Returns a stream of `Metric`s, collected at the provided millisecond interval.
 pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
-    let controller = get_controller().unwrap();
+    let controller = &GLOBAL_CONTROLLER;
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
     stream! {
         loop {
             interval.tick().await;
-            for m in capture_metrics(controller) {
+            for m in capture_metrics(controller){
                 yield m;
             }
         }
@@ -133,7 +133,7 @@ pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
 }
 
 pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
-    let controller = get_controller().unwrap();
+    let controller = &GLOBAL_CONTROLLER;
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
     stream! {
