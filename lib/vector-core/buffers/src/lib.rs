@@ -22,12 +22,16 @@ mod variant;
 
 use crate::bytes::{DecodeBytes, EncodeBytes};
 pub use acker::Acker;
+use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
+use internal_event::emit;
+use internal_events::EventsSent;
 use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
+use std::mem::size_of_val;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 pub use variant::*;
@@ -66,7 +70,6 @@ where
 
             let (tx, rx, acker) =
                 disk::open(&data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
-
             let tx = BufferInputCloner::Disk(tx, when_full);
             Ok((tx, rx, acker))
         }
@@ -76,6 +79,12 @@ where
         } => {
             let (tx, rx) = mpsc::channel(max_events);
             let tx = BufferInputCloner::Memory(tx, when_full);
+            let rx = rx.inspect(|item| {
+                emit(&EventsSent {
+                    count: 1,
+                    byte_size: size_of_val(item),
+                })
+            });
             let rx = Box::new(rx);
             Ok((tx, rx, Acker::Null))
         }
