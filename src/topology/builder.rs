@@ -180,7 +180,7 @@ pub async fn build_pieces(
                 .filter(move |event| ready(filter_event_type(event, input_type)))
                 .ready_chunks(128) // 128 is an arbitrary, smallish constant
                 .inspect(|events| {
-                    emit!(EventsReceived {
+                    emit!(&EventsReceived {
                         count: events.len(),
                         byte_size: events.iter().map(|e| e.size_of()).sum(),
                     });
@@ -193,7 +193,7 @@ pub async fn build_pieces(
                         t.transform(&mut buf, v);
                         output.append(&mut buf);
                     }
-                    emit!(EventsSent {
+                    emit!(&EventsSent {
                         count: output.len(),
                         byte_size: output.iter().map(|event| event.size_of()).sum(),
                     });
@@ -205,7 +205,7 @@ pub async fn build_pieces(
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
                     .inspect(|event| {
-                        emit!(EventsReceived {
+                        emit!(&EventsReceived {
                             count: 1,
                             byte_size: event.size_of(),
                         })
@@ -213,7 +213,7 @@ pub async fn build_pieces(
                 t.transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output.with(|event: Event| async {
-                        emit!(EventsSent {
+                        emit!(&EventsSent {
                             count: 1,
                             byte_size: event.size_of(),
                         });
@@ -295,7 +295,7 @@ pub async fn build_pieces(
                 rx.by_ref()
                     .filter(|event| ready(filter_event_type(event, input_type)))
                     .inspect(|event| {
-                        emit!(EventsReceived {
+                        emit!(&EventsReceived {
                             count: 1,
                             byte_size: event.size_of(),
                         })

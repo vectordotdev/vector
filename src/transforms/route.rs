@@ -59,7 +59,7 @@ impl FunctionTransform for Lane {
         if self.condition.check(&event) {
             output.push(event);
         } else {
-            emit!(RouteEventDiscarded);
+            emit!(&RouteEventDiscarded);
         }
     }
 }

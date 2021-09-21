@@ -173,7 +173,7 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(ApacheMetricsRequestCompleted {
+                                emit!(&ApacheMetricsRequestCompleted {
                                     start,
                                     end: Instant::now()
                                 });
@@ -200,7 +200,7 @@ fn apache_metrics(
                                     .filter_map(|res| match res {
                                         Ok(metric) => Some(metric),
                                         Err(e) => {
-                                            emit!(ApacheMetricsParseError {
+                                            emit!(&ApacheMetricsParseError {
                                                 error: e,
                                                 url: &sanitized_url,
                                             });
@@ -209,7 +209,7 @@ fn apache_metrics(
                                     })
                                     .collect::<Vec<_>>();
 
-                                emit!(ApacheMetricsEventReceived {
+                                emit!(&ApacheMetricsEventReceived {
                                     byte_size,
                                     count: metrics.len(),
                                     uri: &sanitized_url,
@@ -217,7 +217,7 @@ fn apache_metrics(
                                 Some(stream::iter(metrics).map(Event::Metric).map(Ok))
                             }
                             Ok((header, _)) => {
-                                emit!(ApacheMetricsErrorResponse {
+                                emit!(&ApacheMetricsErrorResponse {
                                     code: header.status,
                                     url: &sanitized_url,
                                 });
@@ -235,7 +235,7 @@ fn apache_metrics(
                                 )
                             }
                             Err(error) => {
-                                emit!(ApacheMetricsHttpError {
+                                emit!(&ApacheMetricsHttpError {
                                     error,
                                     url: &sanitized_url
                                 });

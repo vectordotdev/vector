@@ -34,7 +34,7 @@ provided by a CSV file.
 
 To represent the CSV file we have a new top level configuration option.
 
-```
+```toml
 [enrichment_tables.csv_file]
   type = "file"
   encoding = "csv"
@@ -44,22 +44,22 @@ To represent the CSV file we have a new top level configuration option.
 
 The fields available for this section are:
 
-*type*
+#### type
 
 The type of data that the resource represents. Currently only a csv file is
 supported, but this may expand in future to handle other file formats and
 database connections.
 
-*path*
+#### path
 
 The path to the csv file, either an absolute path or one relative to the current
 working directory.
 
-*delimiter*
+#### delimiter
 
 The delimiter used in the csv file to separate fields. Defaults to `","`.
 
-*header_row*
+#### header_row
 
 If true, it assumes the first row in the csv file contains column names. If
 false, columns are named according to their numerical index.
@@ -110,18 +110,18 @@ A metric will be emitted to indicate the lookup time.
 
 #### Parameters
 
-*table*
+##### table
 
 The name of the enrichment table to lookup. This must point to a table specified
 in the config file eg `enrichment_tables.csv_file`. Both functions are generic
 over all table types.
 
-*condition*
+##### condition
 
 `condition` is a single level, key/value object that specifies the fields and
 values to lookup. The fields must all match (AND) for the row to be returned.
 
-*case_sensitive*
+##### case_sensitive
 
 By default the search will be case insensitive, but this can be changed by
 passing `true` to this parameter.
@@ -261,7 +261,7 @@ benefits of the Join transform.
 Instead of using an object to specify the search criteria we could allow the
 user to specify a predicate to determine the row to use for enrichment.
 
-```
+```coffee
 find_table_row(table.csv, |row| row.some_key == .some_field)
 ```
 
@@ -278,7 +278,7 @@ There is nothing that would prevent us from providing both options.
 Instead of using a separate section to specify the enrichment table, we could
 require the filename te be specified within VRL.
 
-```
+```coffee
 find_table_row("/path/to/file.csv", criteria)
 ```
 

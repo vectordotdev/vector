@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::counter;
 use std::error::Error;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct HttpEventsReceived {

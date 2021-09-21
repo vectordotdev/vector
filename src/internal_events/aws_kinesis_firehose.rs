@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use crate::sources::aws_kinesis_firehose::Compression;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseEventReceived {

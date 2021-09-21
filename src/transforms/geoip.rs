@@ -181,10 +181,10 @@ impl FunctionTransform for Geoip {
                     }
                 }
             } else {
-                emit!(GeoipIpAddressParseError { address: ipaddress });
+                emit!(&GeoipIpAddressParseError { address: ipaddress });
             }
         } else {
-            emit!(GeoipFieldDoesNotExist {
+            emit!(&GeoipFieldDoesNotExist {
                 field: &self.source
             });
         };

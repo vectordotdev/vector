@@ -152,7 +152,7 @@ where
                             debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
-                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+                                connection_gauge.open(|count| emit!(&ConnectionOpen { count }));
 
                             let fut = handle_stream(
                                 shutdown_signal,
@@ -193,7 +193,7 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketConnectionError { error });
+                emit!(&TcpSocketConnectionError { error });
                 return;
             }
         },
@@ -246,7 +246,7 @@ async fn handle_stream<T>(
                                 Ok(_) => {
                                     let stream = reader.get_mut();
                                     if let Err(error) = stream.write_all(&ack).await {
-                                        emit!(TcpSendAckError{ error });
+                                        emit!(&TcpSendAckError{ error });
                                         break;
                                     }
                                 }

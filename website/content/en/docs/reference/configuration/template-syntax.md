@@ -29,7 +29,7 @@ Notice that Vector allows direct field references as well as strftime specifiers
 
 The value of the key_prefix option would equal:
 
-```
+```text
 application_id=1/date=2020-02-14
 ```
 

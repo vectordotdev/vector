@@ -1,5 +1,5 @@
-use crate::internal_events::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct EventStoreDbMetricsHttpError {

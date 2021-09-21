@@ -67,7 +67,7 @@ where
         if self.events_total > 0 {
             self.acker.ack(self.events_total);
 
-            emit!(SocketEventsSent {
+            emit!(&SocketEventsSent {
                 mode: self.socket_mode,
                 count: self.events_total as u64,
                 byte_size: self.bytes_total,

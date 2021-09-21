@@ -153,7 +153,7 @@ components: sources: syslog: {
 			_msgid:        "ID931"
 			_procid:       "2426"
 			_timestamp:    "2020-03-13T20:45:38.119Z"
-			title:         "Syslog Eve"
+			title:         "Syslog Event"
 			configuration: {}
 			input: """
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)

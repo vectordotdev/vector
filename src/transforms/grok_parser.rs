@@ -124,7 +124,7 @@ impl FunctionTransform for GrokParser {
                                 event.insert_path(path, value);
                             }
                         }
-                        Err(error) => emit!(GrokParserConversionFailed { name, error }),
+                        Err(error) => emit!(&GrokParserConversionFailed { name, error }),
                     }
                 }
 
@@ -132,12 +132,12 @@ impl FunctionTransform for GrokParser {
                     event.remove(&self.field);
                 }
             } else {
-                emit!(GrokParserFailedMatch {
+                emit!(&GrokParserFailedMatch {
                     value: value.as_ref()
                 });
             }
         } else {
-            emit!(GrokParserMissingField {
+            emit!(&GrokParserMissingField {
                 field: self.field.as_ref()
             });
         }

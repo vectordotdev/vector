@@ -157,11 +157,11 @@ impl Batch for LokiBuffer {
         if item.event.timestamp < latest_timestamp {
             match self.out_of_order_action {
                 OutOfOrderAction::Drop => {
-                    emit!(LokiOutOfOrderEventDropped);
+                    emit!(&LokiOutOfOrderEventDropped);
                     return PushResult::Ok(self.is_full());
                 }
                 OutOfOrderAction::RewriteTimestamp => {
-                    emit!(LokiOutOfOrderEventRewritten);
+                    emit!(&LokiOutOfOrderEventRewritten);
                     item.event.timestamp = latest_timestamp;
                 }
             }
@@ -239,7 +239,7 @@ impl Batch for LokiBuffer {
 
         self.global_timestamps.insert(partition, latest_timestamp);
         if self.latest_timestamp == Some(None) {
-            emit!(LokiUniqueStream);
+            emit!(&LokiUniqueStream);
         }
 
         json!({
