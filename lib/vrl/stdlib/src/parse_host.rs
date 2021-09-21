@@ -11,7 +11,7 @@ impl Function for ParseHost {
     }
 
     fn summary(&self) -> &'static str {
-        "parse a host string"
+        "parse a URL or domain name string"
     }
 
     fn usage(&self) -> &'static str {
@@ -40,8 +40,19 @@ impl Function for ParseHost {
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
-                title: "parse host",
+                title: "parse domain name",
                 source: r#"parse_host!("www.example.com")"#,
+                result: Ok(indoc! {r#"
+                    {
+                        "domain": "example",
+                        "subdomain": "www",
+                        "suffix": "com"
+                    }
+                "#}),
+            },
+            Example {
+                title: "parse URL",
+                source: r#"parse_host!("https://www.example.com/s?q=foobar")"#,
                 result: Ok(indoc! {r#"
                     {
                         "domain": "example",
@@ -71,9 +82,21 @@ impl Function for ParseHost {
             .optional("private_domains")
             .unwrap_or_else(|| expr!(true));
 
+        let options = TldOption {
+            cache_path: Some("/tmp/.tld_cache".to_string()),
+            ..Default::default()
+        };
+        let private_options = TldOption {
+            cache_path: Some("/tmp/.private_tld_cache".to_string()),
+            private_domains: true,
+            ..Default::default()
+        };
+
         Ok(Box::new(ParseHostFn {
             value,
+            options,
             private_domains,
+            private_options,
         }))
     }
 }
@@ -81,7 +104,9 @@ impl Function for ParseHost {
 #[derive(Debug, Clone)]
 struct ParseHostFn {
     value: Box<dyn Expression>,
+    options: TldOption,
     private_domains: Box<dyn Expression>,
+    private_options: TldOption,
 }
 
 impl Expression for ParseHostFn {
@@ -90,11 +115,14 @@ impl Expression for ParseHostFn {
         let string = value.try_bytes_utf8_lossy()?;
 
         let private_domains = self.private_domains.resolve(ctx)?.try_boolean()?;
+        let options = self.options.clone();
+        let private_options = self.private_options.clone();
 
-        let ext = TldExtractor::new(TldOption {
-            private_domains,
-            ..Default::default()
-        });
+        let ext = if private_domains {
+            TldExtractor::new(private_options)
+        } else {
+            TldExtractor::new(options)
+        };
         let tld = ext.extract(&string).unwrap();
         Ok(tld_to_value(tld))
     }
