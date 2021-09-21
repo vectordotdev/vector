@@ -21,6 +21,7 @@ mod test;
 mod variant;
 
 use crate::bytes::{DecodeBytes, EncodeBytes};
+use crate::internal_events::EventsDropped;
 pub use acker::Acker;
 use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
@@ -201,6 +202,7 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
                 message = "Shedding load; dropping event.",
                 internal_log_rate_secs = 10
             );
+            emit(&EventsDropped { count: 1 });
             Ok(())
         } else {
             self.project().inner.start_send(item)
