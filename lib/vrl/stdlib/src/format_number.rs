@@ -34,7 +34,12 @@ impl Function for FormatNumber {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileInfo,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let scale = arguments.optional("scale");
         let decimal_separator = arguments.optional("decimal_separator");

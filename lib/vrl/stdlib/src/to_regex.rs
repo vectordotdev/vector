@@ -25,7 +25,12 @@ impl Function for ToRegex {
         }]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileInfo,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         warn!("`to_regex` is an expensive function that could impact throughput.");
         let value = arguments.required("value");
         Ok(Box::new(ToRegexFn { value }))

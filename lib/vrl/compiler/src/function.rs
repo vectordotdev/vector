@@ -39,7 +39,12 @@ pub trait Function: Sync + fmt::Debug {
     ///
     /// At runtime, the `Expression` returned by this function is executed and
     /// resolved to its final [`Value`].
-    fn compile(&self, state: &super::State, arguments: ArgumentList) -> Compiled;
+    fn compile(
+        &self,
+        state: &super::State,
+        info: &CompileInfo,
+        arguments: ArgumentList,
+    ) -> Compiled;
 
     /// An optional list of parameters the function accepts.
     ///
@@ -57,6 +62,11 @@ pub struct Example {
     pub title: &'static str,
     pub source: &'static str,
     pub result: Result<&'static str, &'static str>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct CompileInfo {
+    pub span: Span,
 }
 
 // -----------------------------------------------------------------------------

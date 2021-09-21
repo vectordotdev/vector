@@ -17,7 +17,12 @@ impl Function for Now {
         }]
     }
 
-    fn compile(&self, _state: &state::Compiler, _: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileInfo,
+        _: ArgumentList,
+    ) -> Compiled {
         Ok(Box::new(NowFn))
     }
 }

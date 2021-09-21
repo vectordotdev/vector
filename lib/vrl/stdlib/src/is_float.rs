@@ -36,7 +36,12 @@ impl Function for IsFloat {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileInfo,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(IsFloatFn { value }))

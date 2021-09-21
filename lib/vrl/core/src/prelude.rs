@@ -24,7 +24,9 @@ pub use std::fmt;
 
 // commonly used function types
 
-pub use compiler::function::{ArgumentList, Compiled, Example, Parameter};
+pub use compiler::function::{
+    ArgumentList, CompileInfo as FunctionCompileInfo, Compiled, Example, Parameter,
+};
 
 // commonly used macros
 pub use compiler::{

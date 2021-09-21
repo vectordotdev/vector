@@ -24,7 +24,12 @@ impl Function for Floor {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileInfo,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let precision = arguments.optional("precision");
 

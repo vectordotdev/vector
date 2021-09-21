@@ -49,7 +49,12 @@ impl Function for Slice {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileInfo,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let start = arguments.required("start");
         let end = arguments.optional("end");
