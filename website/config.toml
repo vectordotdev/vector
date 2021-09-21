@@ -36,6 +36,7 @@ ionicons_version = "5.4.0"
 site_logo = "img/vector-open-graph.png"
 favicon = "favicon.ico"
 display_banner = false # Whether to display the top banner in layouts/partials/banner.html
+vrl_web_url = "https://vrl-web.netlify.app"
 
 # Update this every time there's a new "generation" of the site. Incrementing this forces the browser to refresh any
 # state persisted in localStorage. You should do that whenever there's some change in the front-end logic that requires

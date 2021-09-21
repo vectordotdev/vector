@@ -1,6 +1,7 @@
 {{/* This partial is for pretty much all structured data (VRL stuff, CLI, API, component configs/output/telemetry, etc.)
 */}}
 {{ $ctx := . }}
+{{ $vrlWebUrl := site.Params.vrl_web_url }}
 <div class="relative no-prose border dark:border-gray-700 rounded-md shadow">
   {{/* Source/transform/sink config */}}
   {{ with .component_config }}
@@ -754,7 +755,7 @@
 
           <div class="mt-2 flex flex-col space-y-4">
             {{ range . }}
-            {{ template "vrl-function-example" (dict "name" $name "ctx" .) }}
+            {{ template "vrl-function-example" (dict "name" $name "ctx" . "vrl_web_url" $vrlWebUrl) }}
             {{ end }}
           </div>
         </div>
@@ -1561,7 +1562,7 @@
 {{ $id := printf "%s-examples-%s" .name (.ctx.title | urlize) }}
 {{ $scenario := (dict "title" .ctx.title "program" .ctx.source "output" (.ctx.return | default dict)) }}
 {{ $hash := $scenario | jsonify | base64Encode }}
-{{ $hashUrl := printf "https://vrl-server.fly.dev/h/%s" $hash }}
+{{ $hashUrl := printf "%s/h/%s" .vrl_web_url $hash }}
 <div>
   <span>
     {{ partial "heading.html" (dict "text" .ctx.title "level" 5 "id" $id "toc_hide" true) }}
