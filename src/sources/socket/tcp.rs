@@ -89,7 +89,7 @@ impl TcpSource for RawTcpSource {
     }
 
     fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
-        emit!(SocketEventsReceived {
+        emit!(&SocketEventsReceived {
             mode: SocketMode::Tcp,
             byte_size,
             count: events.len()

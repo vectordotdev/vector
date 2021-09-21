@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use bytes::Bytes;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct StatsdEventReceived {

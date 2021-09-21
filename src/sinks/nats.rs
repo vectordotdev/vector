@@ -161,7 +161,7 @@ impl StreamSink for NatsSink {
             let subject = match self.subject.render_string(&event) {
                 Ok(subject) => subject,
                 Err(error) => {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         field: Some("subject"),
                         drop_event: true,
@@ -176,12 +176,12 @@ impl StreamSink for NatsSink {
 
             match nc.publish(&subject, log).await {
                 Ok(_) => {
-                    emit!(NatsEventSendSuccess {
+                    emit!(&NatsEventSendSuccess {
                         byte_size: message_len,
                     });
                 }
                 Err(error) => {
-                    emit!(NatsEventSendFail { error });
+                    emit!(&NatsEventSendFail { error });
                 }
             }
 

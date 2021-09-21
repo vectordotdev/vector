@@ -38,6 +38,7 @@ pub mod partition;
 pub mod serde;
 pub mod stream;
 pub mod time;
+pub use internal_event;
 
 pub use byte_size_of::ByteSizeOf;
 use std::path::PathBuf;

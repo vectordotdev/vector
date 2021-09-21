@@ -162,7 +162,7 @@ impl HttpSink for StackdriverSink {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         field: Some("resource.labels"),
                         drop_event: true,
@@ -175,7 +175,7 @@ impl HttpSink for StackdriverSink {
             .config
             .log_name(&event)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("log_id"),
                     drop_event: true,

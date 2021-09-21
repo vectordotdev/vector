@@ -198,7 +198,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
                 .put_records(request)
                 .inspect_ok(|_| {
                     for byte_size in sizes {
-                        emit!(AwsKinesisStreamsEventSent { byte_size });
+                        emit!(&AwsKinesisStreamsEventSent { byte_size });
                     }
                 })
                 .instrument(info_span!("request"))

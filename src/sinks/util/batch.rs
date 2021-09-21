@@ -181,7 +181,7 @@ impl<B> Default for BatchSettings<B> {
 }
 
 pub(super) fn err_event_too_large<T>(length: usize, max_length: usize) -> PushResult<T> {
-    emit!(LargeEventDropped { length, max_length });
+    emit!(&LargeEventDropped { length, max_length });
     PushResult::Ok(false)
 }
 

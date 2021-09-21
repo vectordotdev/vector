@@ -107,7 +107,7 @@ impl FunctionTransform for Tokenizer {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
                     Err(error) => {
-                        emit!(TokenizerConvertFailed { field: name, error });
+                        emit!(&TokenizerConvertFailed { field: name, error });
                     }
                 }
             }
@@ -115,7 +115,7 @@ impl FunctionTransform for Tokenizer {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(TokenizerFieldMissing { field: &self.field });
+            emit!(&TokenizerFieldMissing { field: &self.field });
         };
 
         output.push(event)

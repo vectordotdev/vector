@@ -40,7 +40,7 @@ fn handle_events(
     received_from: Option<Bytes>,
     byte_size: usize,
 ) {
-    emit!(SocketEventsReceived {
+    emit!(&SocketEventsReceived {
         mode: SocketMode::Unix,
         byte_size,
         count: events.len()
