@@ -804,7 +804,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags & {
 				error_type: _error_type
-				error:      _error
 				stage:      _stage
 			}
 		}
@@ -1088,11 +1087,6 @@ components: sources: internal_metrics: {
 			description: "The absolute path of originating file."
 			required:    true
 			examples: ["http://localhost:8080/server-status?auto"]
-		}
-		_error: {
-			description: "The specifics of the error condition, such as system error code, etc."
-			required:    true
-			examples: ["File not found", "Connection dropped by remote"]
 		}
 		_error_type: {
 			description: "The type of the error"

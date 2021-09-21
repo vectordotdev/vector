@@ -209,7 +209,7 @@ implement since errors are specific to the component.
 * Properties
   * `error` - The specifics of the error condition, such as system error code, etc.
   * `error_type` - The type of error condition. This MUST be one of the types
-    listed in the `error_type` enum list in the cue docs. TODO: List them here?
+    listed in the `error_type` enum list in the cue docs.
   * `stage` - The stage at which the error occurred. This MUST be one of
     `receiving`, `processing`, or `sending`.
   * If any of the above properties are implicit to the specific error
