@@ -1,4 +1,7 @@
-use vrl::prelude::*;
+use vrl::prelude::{Function};
+
+#[cfg(not(feature = "wasm_compatible"))]
+use hostname;
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetHostname;
@@ -25,6 +28,12 @@ impl Function for GetHostname {
 struct GetHostnameFn;
 
 impl Expression for GetHostnameFn {
+    #[cfg(feature = "wasm_compatible")]
+    fn resolve(&self, _: &mut Context) -> Resolved {
+        Ok("vrl_web_host".into())
+    }
+
+    #[cfg(not(feature = "wasm_compatible"))]
     fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(hostname::get()
             .map_err(|error| format!("failed to get hostname: {}", error))?

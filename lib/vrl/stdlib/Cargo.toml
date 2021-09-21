@@ -79,6 +79,7 @@ format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
 get_env_var = []
+get_hostname_wasm = []
 get_hostname = ["hostname"]
 includes = []
 integer = []
@@ -199,6 +200,7 @@ wasm_compatible = [
   "format_number",
   "format_timestamp",
   "get_env_var",
+  "get_hostname_wasm",
   "includes",
   "integer",
   "ip_aton",
