@@ -22,8 +22,6 @@ use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
-#[cfg(test)]
-use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
@@ -92,17 +90,6 @@ pub enum WhenFull {
 impl Default for WhenFull {
     fn default() -> Self {
         WhenFull::Block
-    }
-}
-
-#[cfg(test)]
-impl Arbitrary for WhenFull {
-    fn arbitrary(g: &mut Gen) -> Self {
-        if bool::arbitrary(g) {
-            WhenFull::Block
-        } else {
-            WhenFull::DropNewest
-        }
     }
 }
 
