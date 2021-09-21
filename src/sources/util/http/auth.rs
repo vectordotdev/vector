@@ -1,8 +1,9 @@
+#[cfg(feature = "sources-utils-http-prelude")]
 use super::error::ErrorMessage;
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
-use warp::http::{HeaderMap, StatusCode};
+use warp::http::HeaderMap;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct HttpSourceAuthConfig {
@@ -39,8 +40,11 @@ pub struct HttpSourceAuth {
     pub token: Option<String>,
 }
 
+#[cfg(feature = "sources-utils-http-prelude")]
 impl HttpSourceAuth {
     pub fn is_valid(&self, header: &Option<String>) -> Result<(), ErrorMessage> {
+        use warp::http::StatusCode;
+
         match (&self.token, header) {
             (Some(token1), Some(token2)) => {
                 if token1 == token2 {

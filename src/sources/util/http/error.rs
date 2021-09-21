@@ -1,4 +1,3 @@
-use http::StatusCode;
 use serde::Serialize;
 use std::error::Error;
 use std::fmt;
@@ -9,16 +8,21 @@ pub struct ErrorMessage {
     message: String,
 }
 
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-utils-http-encoding",
+    feature = "sources-datadog"
+))]
 impl ErrorMessage {
-    pub fn new(code: StatusCode, message: String) -> Self {
+    pub fn new(code: http::StatusCode, message: String) -> Self {
         ErrorMessage {
             code: code.as_u16(),
             message,
         }
     }
 
-    pub fn status_code(&self) -> StatusCode {
-        StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+    pub fn status_code(&self) -> http::StatusCode {
+        http::StatusCode::from_u16(self.code).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 

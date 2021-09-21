@@ -210,6 +210,7 @@ pub use self::heartbeat::*;
 pub(crate) use self::host_metrics::*;
 #[cfg(any(
     feature = "sources-utils-http",
+    feature = "sources-utils-http-encoding",
     feature = "sinks-http",
     feature = "sources-datadog"
 ))]

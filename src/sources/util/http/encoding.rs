@@ -1,7 +1,7 @@
 use super::error::ErrorMessage;
 use crate::internal_events::HttpDecompressError;
 use bytes::{Buf, Bytes};
-use flate2::read::{ZlibDecoder, MultiGzDecoder};
+use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snap::raw::Decoder as SnappyDecoder;
 use std::io::Read;
 use warp::http::StatusCode;
