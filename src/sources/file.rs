@@ -334,7 +334,7 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                emit!(FileBytesReceived {
+                emit!(&FileBytesReceived {
                     byte_size: line.text.len(),
                     path: &line.filename,
                 });
