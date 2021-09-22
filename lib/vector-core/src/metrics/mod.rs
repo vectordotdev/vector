@@ -45,9 +45,7 @@ fn tracing_context_layer_enabled() -> bool {
 
 const ALREADY_INITIALIZED: &str = "Metrics controller is already initialized.";
 
-fn init_generic(
-    set_controller: impl FnOnce(Controller) -> Result<Switch, ()>,
-) -> crate::Result<()> {
+fn init(set_controller: impl FnOnce(Controller) -> Result<Switch, ()>) -> crate::Result<()> {
     // An escape hatch to allow disabing internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
     if !metrics_enabled() {
@@ -105,8 +103,8 @@ fn init_generic(
 /// # Errors
 ///
 /// This function will error if it is called multiple times.
-pub fn init() -> crate::Result<()> {
-    init_generic(|controller| {
+pub fn init_global() -> crate::Result<()> {
+    init(|controller| {
         GLOBAL_CONTROLLER
             .set(controller)
             .map_err(|_| ())
@@ -120,7 +118,7 @@ pub fn init() -> crate::Result<()> {
 ///
 /// This function will error if it is called multiple times.
 pub fn init_test() -> crate::Result<()> {
-    init_generic(|controller| {
+    init(|controller| {
         LOCAL_CONTROLLER.with(|rc| rc.set(controller).map_err(|_| ()).map(|_| Switch::Local))
     })
 }

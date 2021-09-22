@@ -145,7 +145,7 @@ mod tests {
     #[tokio::test]
     async fn add() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -176,7 +176,7 @@ mod tests {
     #[tokio::test]
     async fn update() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -207,7 +207,7 @@ mod tests {
     #[tokio::test]
     async fn delete() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -238,7 +238,7 @@ mod tests {
     #[tokio::test]
     async fn resync() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -265,7 +265,7 @@ mod tests {
     #[tokio::test]
     async fn request_maintenance_without_maintenance() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
         let _guard = tests_lock().await;
 
         let (mut writer, _events_rx, _actions_tx) = prepare_test();
@@ -278,7 +278,7 @@ mod tests {
     #[tokio::test]
     async fn request_maintenance_with_maintenance() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
         let _guard = tests_lock().await;
 
         let (events_tx, _events_rx) = mpsc::channel(0);
@@ -301,7 +301,7 @@ mod tests {
     #[tokio::test]
     async fn perform_maintenance() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();

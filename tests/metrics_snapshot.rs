@@ -1,7 +1,7 @@
 use vector::metrics::Controller;
 
 fn prepare_metrics(cardinality: usize) -> Controller {
-    let _ = vector::metrics::init();
+    let _ = vector::metrics::init_global();
     let controller = Controller::get().unwrap();
     controller.reset();
 

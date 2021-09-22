@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn captures_internal_metrics() {
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
@@ -222,7 +222,7 @@ mod tests {
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_global();
 
         let (sender, mut recv) = Pipeline::new_test();
 
