@@ -83,8 +83,8 @@ pub(crate) fn add_index(
                 .iter()
                 .filter_map(|(field, value)| match value {
                     expression::Expr::Container(expression::Container {
-                        variant: expression::Variant::Object(_),
-                    }) => None,
+                        variant: expression::Variant::Object(map),
+                    }) if map.contains_key("from") && map.contains_key("to") => None,
                     _ => Some(field.as_ref()),
                 })
                 .collect::<Vec<_>>();
