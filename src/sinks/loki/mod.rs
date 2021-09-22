@@ -3,372 +3,39 @@
 //! This sink provides downstream support for `Loki` via
 //! the v1 http json endpoint.
 //!
-//! <https://github.com/grafana/loki/blob/master/docs/api.md>
+//! <https://github.com/grafana/loki/tree/v1.6.1/docs>
 //!
 //! This sink uses `PartitionBatching` to partition events
 //! by streams. There must be at least one valid set of labels.
 //!
 //! If an event produces no labels, this can happen if the template
 //! does not match, we will add a default label `{agent="vector"}`.
+mod config;
+mod healthcheck;
+mod sink;
 
-use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event, Value},
-    http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{LokiEventUnlabeled, LokiEventsProcessed, TemplateRenderingFailed},
-    sinks::util::{
-        buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
-        encoding::{EncodingConfig, EncodingConfiguration},
-        http::{HttpSink, PartitionHttpSink},
-        BatchConfig, BatchSettings, Concurrency, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig, UriSerde,
-    },
-    template::Template,
-    tls::{TlsOptions, TlsSettings},
-};
-use futures::{FutureExt, SinkExt};
-use serde::{Deserialize, Serialize};
-use shared::encode_logfmt;
-use std::collections::HashMap;
+use crate::config::SinkDescription;
+use config::LokiConfig;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct LokiConfig {
-    endpoint: UriSerde,
-    encoding: EncodingConfig<Encoding>,
-
-    tenant_id: Option<Template>,
-    labels: HashMap<Template, Template>,
-
-    #[serde(default = "crate::serde::default_false")]
-    remove_label_fields: bool,
-    #[serde(default = "crate::serde::default_true")]
-    remove_timestamp: bool,
-    #[serde(default)]
-    out_of_order_action: OutOfOrderAction,
-
-    auth: Option<Auth>,
-
-    #[serde(default)]
-    request: TowerRequestConfig,
-
-    #[serde(default)]
-    batch: BatchConfig,
-
-    tls: Option<TlsOptions>,
-}
-
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
-#[derivative(Default)]
-#[serde(rename_all = "snake_case")]
-pub enum OutOfOrderAction {
-    #[derivative(Default)]
-    Drop,
-    RewriteTimestamp,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-enum Encoding {
-    Json,
-    Text,
-    Logfmt,
-}
+pub use config::OutOfOrderAction;
 
 inventory::submit! {
     SinkDescription::new::<LokiConfig>("loki")
 }
 
-impl GenerateConfig for LokiConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"endpoint = "http://localhost:3100"
-            encoding = "json"
-            labels = {}"#,
-        )
-        .unwrap()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "loki")]
-impl SinkConfig for LokiConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        if self.labels.is_empty() {
-            return Err("`labels` must include at least one label.".into());
-        }
-
-        for label in self.labels.keys() {
-            if !valid_label_name(label) {
-                return Err(format!("Invalid label name {:?}", label.get_ref()).into());
-            }
-        }
-
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(5),
-            ..Default::default()
-        });
-
-        let batch_settings = BatchSettings::default()
-            .bytes(102_400)
-            .events(100_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
-        let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls, cx.proxy())?;
-
-        let config = LokiConfig {
-            auth: self.auth.choose_one(&self.endpoint.auth)?,
-            ..self.clone()
-        };
-
-        let sink = LokiSink::new(config.clone());
-
-        let sink = PartitionHttpSink::new(
-            sink,
-            PartitionBuffer::new(LokiBuffer::new(
-                batch_settings.size,
-                GlobalTimestamps::default(),
-                config.out_of_order_action.clone(),
-            )),
-            request_settings,
-            batch_settings.timeout,
-            client.clone(),
-            cx.acker(),
-        )
-        .ordered()
-        .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
-
-        let healthcheck = healthcheck(config, client).boxed();
-
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "loki"
-    }
-}
-
-struct LokiSink {
-    endpoint: UriSerde,
-    encoding: EncodingConfig<Encoding>,
-
-    tenant_id: Option<Template>,
-    labels: HashMap<Template, Template>,
-
-    remove_label_fields: bool,
-    remove_timestamp: bool,
-
-    auth: Option<Auth>,
-}
-
-impl LokiSink {
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    fn new(config: LokiConfig) -> Self {
-        Self {
-            endpoint: config.endpoint,
-            encoding: config.encoding,
-            tenant_id: config.tenant_id,
-            labels: config.labels,
-            remove_label_fields: config.remove_label_fields,
-            remove_timestamp: config.remove_timestamp,
-            auth: config.auth,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl HttpSink for LokiSink {
-    type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
-    type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
-
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        let tenant_id = self.tenant_id.as_ref().and_then(|t| {
-            t.render_string(&event)
-                .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
-                        error,
-                        field: Some("tenant_id"),
-                        drop_event: false,
-                    })
-                })
-                .ok()
-        });
-
-        let mut labels = Vec::new();
-
-        for (key_template, value_template) in &self.labels {
-            if let (Ok(key), Ok(value)) = (
-                key_template.render_string(&event),
-                value_template.render_string(&event),
-            ) {
-                labels.push((key, value));
-            }
-        }
-
-        if self.remove_label_fields {
-            for template in self.labels.values() {
-                if let Some(fields) = template.get_fields() {
-                    for field in fields {
-                        event.as_mut_log().remove(&field);
-                    }
-                }
-            }
-        }
-
-        let timestamp = match event.as_log().get(log_schema().timestamp_key()) {
-            Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
-            _ => chrono::Utc::now().timestamp_nanos(),
-        };
-
-        if self.remove_timestamp {
-            event.as_mut_log().remove(log_schema().timestamp_key());
-        }
-
-        self.encoding.apply_rules(&mut event);
-        let log = event.into_log();
-        let event = match &self.encoding.codec() {
-            Encoding::Json => {
-                serde_json::to_string(&log).expect("json encoding should never fail.")
-            }
-
-            Encoding::Text => log
-                .get(log_schema().message_key())
-                .map(Value::to_string_lossy)
-                .unwrap_or_default(),
-
-            Encoding::Logfmt => encode_logfmt::to_string(log.into_parts().0)
-                .expect("Logfmt encoding should never fail."),
-        };
-
-        // If no labels are provided we set our own default
-        // `{agent="vector"}` label. This can happen if the only
-        // label is a templatable one but the event doesn't match.
-        if labels.is_empty() {
-            emit!(&LokiEventUnlabeled);
-            labels = vec![("agent".to_string(), "vector".to_string())]
-        }
-
-        let key = PartitionKey::new(tenant_id, &mut labels);
-
-        let event = LokiEvent { timestamp, event };
-        Some(PartitionInnerBuffer::new(
-            LokiRecord {
-                labels,
-                event,
-                partition: key.clone(),
-            },
-            key,
-        ))
-    }
-
-    async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-        let (json, key) = output.into_parts();
-        let tenant_id = key.tenant_id;
-
-        let body = serde_json::to_vec(&json).unwrap();
-
-        emit!(&LokiEventsProcessed {
-            byte_size: body.len(),
-        });
-
-        let uri = format!("{}loki/api/v1/push", self.endpoint.uri);
-
-        let mut req = http::Request::post(uri).header("Content-Type", "application/json");
-
-        if let Some(tenant_id) = tenant_id {
-            req = req.header("X-Scope-OrgID", tenant_id);
-        }
-
-        let mut req = req.body(body).unwrap();
-
-        if let Some(auth) = &self.auth {
-            auth.apply(&mut req);
-        }
-
-        Ok(req)
-    }
-}
-
-async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}ready", config.endpoint.uri);
-
-    let mut req = http::Request::get(uri)
-        .body(hyper::Body::empty())
-        .expect("Building request never fails.");
-
-    if let Some(auth) = &config.auth {
-        auth.apply(&mut req);
-    }
-
-    let res = client.send(req).await?;
-
-    let status = match fetch_status("ready", &config, &client).await? {
-        // Issue https://github.com/timberio/vector/issues/6463
-        http::StatusCode::NOT_FOUND => {
-            debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
-            fetch_status("", &config, &client).await?
-        }
-        status => status,
-    };
-
-    match status {
-        http::StatusCode::OK => Ok(()),
-        _ => Err(format!("A non-successful status returned: {}", res.status()).into()),
-    }
-}
-
-async fn fetch_status(
-    endpoint: &str,
-    config: &LokiConfig,
-    client: &HttpClient,
-) -> crate::Result<http::StatusCode> {
-    let uri = format!("{}{}", config.endpoint.uri, endpoint);
-
-    let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
-
-    if let Some(auth) = &config.auth {
-        auth.apply(&mut req);
-    }
-
-    Ok(client.send(req).await?.status())
-}
-
-fn valid_label_name(label: &Template) -> bool {
-    label.is_dynamic() || {
-        // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
-        // Although that isn't explicitly said anywhere besides what's in the code.
-        // The closest mention is in section about Parser Expression https://grafana.com/docs/loki/latest/logql/
-        //
-        // [a-zA-Z_][a-zA-Z0-9_]*
-        let label_trim = label.get_ref().trim();
-        let mut label_chars = label_trim.chars();
-        if let Some(ch) = label_chars.next() {
-            (ch.is_ascii_alphabetic() || ch == '_')
-                && label_chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
-        } else {
-            false
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::config::LokiConfig;
+    use super::healthcheck::healthcheck;
+    use super::sink::LokiSink;
     use crate::config::ProxyConfig;
     use crate::event::Event;
+    use crate::http::HttpClient;
     use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
+    use crate::tls::TlsSettings;
     use futures::StreamExt;
-    use std::convert::TryInto;
 
     #[test]
     fn generate_config() {
@@ -506,27 +173,12 @@ mod tests {
             .await
             .expect("healthcheck failed");
     }
-
-    #[test]
-    fn valid_label_names() {
-        assert!(valid_label_name(&"name".try_into().unwrap()));
-        assert!(valid_label_name(&" name ".try_into().unwrap()));
-        assert!(valid_label_name(&"bee_bop".try_into().unwrap()));
-        assert!(valid_label_name(&"a09b".try_into().unwrap()));
-
-        assert!(!valid_label_name(&"0ab".try_into().unwrap()));
-        assert!(!valid_label_name(&"*".try_into().unwrap()));
-        assert!(!valid_label_name(&"".try_into().unwrap()));
-        assert!(!valid_label_name(&" ".try_into().unwrap()));
-
-        assert!(valid_label_name(&"{{field}}".try_into().unwrap()));
-    }
 }
 
 #[cfg(feature = "loki-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
+    use super::config::valid_label_name;
     use crate::{
         config::SinkConfig,
         sinks::util::test::load_sink,
