@@ -64,7 +64,7 @@ components: transforms: sample: {
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
 				]
-				syntax: "remap_boolean_expression"
+				syntax: "vrl_boolean_expression"
 			}
 		}
 		rate: {

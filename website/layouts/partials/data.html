@@ -39,7 +39,7 @@
           {{ end }}
 
           {{ with $v.syntax }}
-          {{ if eq . "remap_boolean_expression" }}
+          {{ if eq . "vrl_boolean_expression" }}
           {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
           {{ else if eq . "remap_program" }}
           {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
