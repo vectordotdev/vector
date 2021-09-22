@@ -13,7 +13,7 @@ impl Function for Tally {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "tally",
-            source: r#"tally(["foo", "bar", "foo", "baz"])"#,
+            source: r#"tally!(["foo", "bar", "foo", "baz"])"#,
             result: Ok(r#"{"foo": 2, "bar": 1, "baz": 1]"#),
         }]
     }
@@ -47,6 +47,7 @@ impl Expression for TallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?.try_array()?;
 
+        #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
         let mut map: HashMap<Bytes, usize> = HashMap::new();
         for value in value.into_iter() {
             if let Value::Bytes(value) = value {
