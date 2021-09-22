@@ -88,7 +88,7 @@ struct MongoDbMetrics {
     tags: BTreeMap<String, String>,
 }
 
-pub fn default_scrape_interval_secs() -> u64 {
+pub const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -126,7 +126,7 @@ impl SourceConfig for MongoDbMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
-                emit!(MongoDbMetricsCollectCompleted {
+                emit!(&MongoDbMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -237,11 +237,11 @@ impl MongoDbMetrics {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
                 match error {
-                    CollectError::Mongo(error) => emit!(MongoDbMetricsRequestError {
+                    CollectError::Mongo(error) => emit!(&MongoDbMetricsRequestError {
                         error,
                         endpoint: &self.endpoint,
                     }),
-                    CollectError::Bson(error) => emit!(MongoDbMetricsBsonParseError {
+                    CollectError::Bson(error) => emit!(&MongoDbMetricsBsonParseError {
                         error,
                         endpoint: &self.endpoint,
                     }),
@@ -253,7 +253,7 @@ impl MongoDbMetrics {
 
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
-        emit!(MongoDbMetricsEventsReceived {
+        emit!(&MongoDbMetricsEventsReceived {
             count: metrics.len(),
             uri: &self.endpoint,
         });

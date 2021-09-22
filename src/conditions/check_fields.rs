@@ -516,6 +516,7 @@ impl_generate_config_from_default!(CheckFieldsConfig);
 
 impl CheckFieldsConfig {
     #[cfg(test)]
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(predicates: IndexMap<String, CheckFieldsPredicateArg>) -> Self {
         Self { predicates }
     }

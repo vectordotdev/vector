@@ -90,13 +90,13 @@ glossary: #Glossary & [
 		term: "Log"
 		description: """
 			An individual log event. Logs are one of the core Vector [event types](#event),
-			alongside [mterics](#metric).
+			alongside [metrics](#metric).
 			"""
 	},
 	{
 		term: "Metric"
 		description: """
-			An individual data unit representing a point-in-itme measurement. Metrics are one of the
+			An individual data unit representing a point-in-time measurement. Metrics are one of the
 			core Vector [event types](#event), alongside [logs](#log).
 			"""
 	},

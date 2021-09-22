@@ -12,7 +12,7 @@ pub struct Writer<T> {
 
 impl<T> Writer<T> {
     /// Take a [`super::Write`] and return it wrapped with [`Writer`].
-    pub fn new(inner: T) -> Self {
+    pub const fn new(inner: T) -> Self {
         Self { inner }
     }
 }
@@ -25,22 +25,22 @@ where
     type Item = <T as super::Write>::Item;
 
     async fn add(&mut self, item: Self::Item) {
-        emit!(internal_events::StateItemAdded);
+        emit!(&internal_events::StateItemAdded);
         self.inner.add(item).await
     }
 
     async fn update(&mut self, item: Self::Item) {
-        emit!(internal_events::StateItemUpdated);
+        emit!(&internal_events::StateItemUpdated);
         self.inner.update(item).await
     }
 
     async fn delete(&mut self, item: Self::Item) {
-        emit!(internal_events::StateItemDeleted);
+        emit!(&internal_events::StateItemDeleted);
         self.inner.delete(item).await
     }
 
     async fn resync(&mut self) {
-        emit!(internal_events::StateResynced);
+        emit!(&internal_events::StateResynced);
         self.inner.resync().await
     }
 }
@@ -52,13 +52,13 @@ where
 {
     fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
         self.inner.maintenance_request().map(|future| {
-            emit!(internal_events::StateMaintenanceRequested);
+            emit!(&internal_events::StateMaintenanceRequested);
             future
         })
     }
 
     async fn perform_maintenance(&mut self) {
-        emit!(internal_events::StateMaintenancePerformed);
+        emit!(&internal_events::StateMaintenancePerformed);
         self.inner.perform_maintenance().await
     }
 }

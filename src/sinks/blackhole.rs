@@ -41,7 +41,7 @@ pub struct BlackholeConfig {
     pub rate: Option<usize>,
 }
 
-fn default_print_interval_secs() -> u64 {
+const fn default_print_interval_secs() -> u64 {
     1
 }
 
@@ -137,7 +137,7 @@ impl StreamSink for BlackholeSink {
                 .total_raw_bytes
                 .fetch_add(message_len, Ordering::AcqRel);
 
-            emit!(BlackholeEventReceived {
+            emit!(&BlackholeEventReceived {
                 byte_size: message_len
             });
 

@@ -1,7 +1,7 @@
-use super::InternalEvent;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct HostMetricsEventReceived {
+pub struct HostMetricsEventReceived {
     pub count: usize,
 }
 

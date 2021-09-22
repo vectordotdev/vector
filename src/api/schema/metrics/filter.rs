@@ -1,18 +1,18 @@
 use super::{EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal};
 use crate::{
-    config::ComponentId,
+    config::ComponentKey,
     event::{Metric, MetricValue},
     metrics::{capture_metrics, get_controller, Controller},
 };
 use async_stream::stream;
 use lazy_static::lazy_static;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 lazy_static! {
-    static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =
-        Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
+    static ref GLOBAL_CONTROLLER: &'static Controller =
+        get_controller().expect("Metrics system not initialized. Please report.");
 }
 
 /// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically
@@ -145,11 +145,16 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 }
 
 /// Return Vec<Metric> based on a component id tag.
-pub fn by_component_id(component_id: &ComponentId) -> Vec<Metric> {
+pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
     capture_metrics(&GLOBAL_CONTROLLER)
         .filter_map(|m| {
-            m.tag_matches("component_id", component_id.as_str())
-                .then(|| m)
+            if let Some(pipeline) = component_key.pipeline_str() {
+                m.tag_matches("component_id", component_key.id())
+                    && m.tag_matches("pipeline_id", pipeline)
+            } else {
+                m.tag_matches("component_id", component_key.id())
+            }
+            .then(|| m)
         })
         .collect()
 }

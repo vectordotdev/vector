@@ -4,7 +4,9 @@ use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, Event, LogEvent},
-    internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
+    internal_events::{
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+    },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
@@ -152,7 +154,7 @@ fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-fn default_lines() -> usize {
+const fn default_lines() -> usize {
     1
 }
 
@@ -211,7 +213,7 @@ impl SourceConfig for FileConfig {
         let data_dir = cx
             .globals
             // source are only global, name can be used for subdir
-            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.id.as_str())?;
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
         // Clippy rule, because async_trait?
         #[allow(clippy::suspicious_else_formatting)]
@@ -332,6 +334,10 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
+                emit!(&FileBytesReceived {
+                    byte_size: line.text.len(),
+                    path: &line.filename,
+                });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
                     Some(d) => d.decode_to_utf8(line.text),
@@ -387,7 +393,7 @@ pub fn file_source(
         spawn_blocking(move || {
             let _enter = span.enter();
             let result = file_server.run(tx, shutdown, checkpointer);
-            emit!(FileOpen { count: 0 });
+            emit!(&FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -447,7 +453,7 @@ fn create_event(
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> Event {
-    emit!(FileEventReceived {
+    emit!(&FileEventsReceived {
         file: &file,
         byte_size: line.len(),
     });

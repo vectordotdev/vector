@@ -1,7 +1,8 @@
+use crate::config::ComponentKey;
 use std::collections::btree_map::BTreeMap;
 use tokio::sync::mpsc;
 
-type IdentifiedMetric = (String, i64);
+type IdentifiedMetric = (ComponentKey, i64);
 
 #[derive(Debug)]
 pub enum EventType {
@@ -15,17 +16,17 @@ pub enum EventType {
     /// Interval + identified metric
     ProcessedBytesThroughputs(i64, Vec<IdentifiedMetric>),
     ComponentAdded(ComponentRow),
-    ComponentRemoved(String),
+    ComponentRemoved(ComponentKey),
 }
 
-pub type State = BTreeMap<String, ComponentRow>;
+pub type State = BTreeMap<ComponentKey, ComponentRow>;
 pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
 pub type StateRx = mpsc::Receiver<State>;
 
 #[derive(Debug, Clone)]
 pub struct ComponentRow {
-    pub id: String,
+    pub key: ComponentKey,
     pub kind: String,
     pub component_type: String,
     pub processed_bytes_total: i64,
@@ -47,65 +48,63 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
     let _ = tx.send(state.clone()).await;
 
     tokio::spawn(async move {
-        loop {
-            if let Some(event_type) = event_rx.recv().await {
-                match event_type {
-                    EventType::EventsInTotals(rows) => {
-                        for (id, v) in rows {
-                            if let Some(r) = state.get_mut(&id) {
-                                r.events_in_total = v;
-                            }
+        while let Some(event_type) = event_rx.recv().await {
+            match event_type {
+                EventType::EventsInTotals(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.get_mut(&key) {
+                            r.events_in_total = v;
                         }
-                    }
-                    EventType::EventsInThroughputs(interval, rows) => {
-                        for (id, v) in rows {
-                            if let Some(r) = state.get_mut(&id) {
-                                r.events_in_throughput_sec =
-                                    (v as f64 * (1000.0 / interval as f64)) as i64;
-                            }
-                        }
-                    }
-                    EventType::EventsOutTotals(rows) => {
-                        for (id, v) in rows {
-                            if let Some(r) = state.get_mut(&id) {
-                                r.events_out_total = v;
-                            }
-                        }
-                    }
-                    EventType::EventsOutThroughputs(interval, rows) => {
-                        for (id, v) in rows {
-                            if let Some(r) = state.get_mut(&id) {
-                                r.events_out_throughput_sec =
-                                    (v as f64 * (1000.0 / interval as f64)) as i64;
-                            }
-                        }
-                    }
-                    EventType::ProcessedBytesTotals(rows) => {
-                        for (id, v) in rows {
-                            if let Some(r) = state.get_mut(&id) {
-                                r.processed_bytes_total = v;
-                            }
-                        }
-                    }
-                    EventType::ProcessedBytesThroughputs(interval, rows) => {
-                        for (id, v) in rows {
-                            if let Some(r) = state.get_mut(&id) {
-                                r.processed_bytes_throughput_sec =
-                                    (v as f64 * (1000.0 / interval as f64)) as i64;
-                            }
-                        }
-                    }
-                    EventType::ComponentAdded(c) => {
-                        let _ = state.insert(c.id.clone(), c);
-                    }
-                    EventType::ComponentRemoved(id) => {
-                        let _ = state.remove(&id);
                     }
                 }
-
-                // Send updated map to listeners
-                let _ = tx.send(state.clone()).await;
+                EventType::EventsInThroughputs(interval, rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.get_mut(&key) {
+                            r.events_in_throughput_sec =
+                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                        }
+                    }
+                }
+                EventType::EventsOutTotals(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.get_mut(&key) {
+                            r.events_out_total = v;
+                        }
+                    }
+                }
+                EventType::EventsOutThroughputs(interval, rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.get_mut(&key) {
+                            r.events_out_throughput_sec =
+                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                        }
+                    }
+                }
+                EventType::ProcessedBytesTotals(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.get_mut(&key) {
+                            r.processed_bytes_total = v;
+                        }
+                    }
+                }
+                EventType::ProcessedBytesThroughputs(interval, rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.get_mut(&key) {
+                            r.processed_bytes_throughput_sec =
+                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                        }
+                    }
+                }
+                EventType::ComponentAdded(c) => {
+                    let _ = state.insert(c.key.clone(), c);
+                }
+                EventType::ComponentRemoved(key) => {
+                    let _ = state.remove(&key);
+                }
             }
+
+            // Send updated map to listeners
+            let _ = tx.send(state.clone()).await;
         }
     });
 

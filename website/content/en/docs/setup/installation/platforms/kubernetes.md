@@ -5,7 +5,7 @@ weight: 2
 ---
 
 {{< requirement title="Minimum Kubernetes version" >}}
-Vector must be installed on Kubernetes version **1.14** or higher.
+Vector must be installed on Kubernetes version **1.15** or higher.
 {{< /requirement >}}
 
 [Kubernetes], also known as **k8s**, is an open source container orchestration system for automating application deployment, scaling, and management. This page covers installing and managing Vector on the Kubernetes platform.
@@ -22,15 +22,18 @@ You can install Vector on Kubernetes using either [Helm](#helm) or [kubectl](#ku
 
 [kubectl] is the Kubernetes command-line tool. You can use it as an alternative to [Helm](#helm) to install Vector on Kubernetes The instructions below are for installing Vector in the [agent] role.
 
-{{< warning title="Aggregator role not yet supported" >}}
-Deploying Vector in the [aggregator] role using kubectl isn't yet supported.
+{{< warning title="Aggregator role in public beta" >}}
+Support for the [aggregator] role is currently in public beta. We're seeking beta testers! If deploying the aggregator, please [join our chat][chat] and let us know how it went.
 
-[aggregator]: /docs/setup/deployment/roles#aggregator
+[aggregator]: /docs/setup/deployment/roles/#aggregator
+[chat]: https://chat.vector.dev
 {{< /warning >}}
+
+#### Agent
 
 The [agent] role is designed to collect all log data on each Kubernetes [Node]. Vector runs as a [DaemonSet] and tails logs for the entire Pod, automatically enriching those logs with Kubernetes metadata via the [Kubernetes API][k8s_api]. Collection is handled automatically and it intended for you to adjust your pipeline as necessary using Vector's [sources], [transforms], and [sinks].
 
-#### Define Vector's namespace
+##### Define Vector's namespace
 
 We recommend running Vector in its own Kubernetes namespace. In the instructions here we'll use `vector` as a namespace but you're free to choose your own.
 
@@ -38,9 +41,7 @@ We recommend running Vector in its own Kubernetes namespace. In the instructions
 kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
 ```
 
-#### Prepare kustomization
-
-
+##### Prepare kustomization
 
 ```shell
 cat <<-'KUSTOMIZATION' > kustomization.yaml
@@ -49,7 +50,7 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/timberio/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
 
 images:
   # Override the Vector image to avoid use of the sliding tag.
@@ -73,32 +74,136 @@ generatorOptions:
 KUSTOMIZATION
 ```
 
-#### Configure Vector
+##### Configure Vector
 
 ```shell
 cat <<-'VECTORCFG' > vector.toml
 # The Vector Kubernetes integration automatically defines a
-# `kubernetes_logs` source that is made available to you.
+# kubernetes_logs source that is made available to you.
 # You do not need to define a log source.
+[sinks.stdout]
+# Adjust as necessary. By default we use the console sink
+# to print all data. This allows you to see Vector working.
+# /docs/reference/sinks/
+type = "console"
+inputs = ["kubernetes_logs"]
+target = "stdout"
+encoding = "json"
 VECTORCFG
 ```
 
-#### Verify the configuration
+##### Verify the configuration
 
 ```shell
 kubectl kustomize
 ```
 
-#### Install Vector
+##### Install Vector
 
 ```shell
 kubectl install -k .
 ```
 
-#### Tail Vector logs
+##### Tail Vector logs
 
 ```shell
-"kubectl logs -n vector daemonset/\(_controller_resource_name)"
+"kubectl logs -n vector daemonset/vector-agent"
+```
+
+#### Aggregator
+
+The Vector [Aggregator] lets you [transform] and ship data collected by other agents. For example, it can insure that the data you are collecting is scrubbed of sensitive information, properly formatted for downstream consumers, sampled to reduce volume, and more.
+
+##### Define Vector's namespace
+
+We recommend running Vector in its own Kubernetes namespace. In the instructions here we'll use `vector` as a namespace but you're free to choose your own.
+
+```shell
+kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
+```
+
+##### Prepare kustomization
+
+```shell
+cat <<-'KUSTOMIZATION' > kustomization.yaml
+# Override the namespace of all of the resources we manage.
+namespace: vector
+
+bases:
+  # Include Vector recommended base (from git).
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-aggregator?ref=v{{< version >}}
+
+images:
+  # Override the Vector image to avoid use of the sliding tag.
+  - name: timberio/vector
+    newName: timberio/vector
+    newTag: {{< version >}}-debian
+
+resources:
+  # A namespace to keep the resources at.
+  - namespace.yaml
+
+configMapGenerator:
+  # Provide a custom `ConfigMap` for Vector.
+  - name: vector-aggregator-config
+    files:
+      - vector.toml
+
+generatorOptions:
+  # We don't want a suffix for the `ConfigMap` name.
+  disableNameSuffixHash: true
+KUSTOMIZATION
+```
+
+##### Configure Vector
+
+```shell
+cat <<-'VECTORCFG' > vector.toml
+# The Vector Aggregator chart defines a
+# vector source that is made available to you.
+# You do not need to define a log source.
+[transforms.remap]
+# Adjust as necessary. This remap transform parses a JSON
+# formatted log message, emitting a log if the contents are
+# not valid JSON
+# /docs/reference/transforms/
+type = "remap"
+inputs = ["vector"]
+source = '''
+  structured, err = parse_json(.message)
+  if err != null {
+    log("Unable to parse JSON: " + err, level: "error")
+  } else {
+    . = merge(., object!(structured))
+  }
+'''
+[sinks.stdout]
+# Adjust as necessary. By default we use the console sink
+# to print all data. This allows you to see Vector working.
+# /docs/reference/sinks/
+type = "console"
+inputs = ["kubernetes_logs"]
+target = "stdout"
+encoding = "json"
+VECTORCFG
+```
+
+##### Verify the configuration
+
+```shell
+kubectl kustomize
+```
+
+##### Install Vector
+
+```shell
+kubectl install -k .
+```
+
+##### Tail Vector logs
+
+```shell
+"kubectl logs -n vector statefulset/vector-aggregator"
 ```
 
 ## Deployment
@@ -228,3 +333,5 @@ Vector is tested extensively against Kubernetes. In addition to Kubernetes being
 [sinks]: /docs/reference/configuration/sinks
 [sources]: /docs/reference/configuration/sources
 [transforms]: /docs/reference/configuration/transforms
+[Aggregator]: /docs/setup/deployment/roles/#aggregator
+[transform]: /docs/reference/configuration/transforms/

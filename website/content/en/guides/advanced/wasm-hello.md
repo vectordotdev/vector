@@ -11,13 +11,14 @@ tags: ["webassembly", "wasm", "transform", "advanced", "guides", "guide"]
 
 {{< warning >}}
 [Vector `wasm` support was removed in
-v0.17.0](https://github.com/timberio/vector/issues/8036). This guide remains for
+v0.17.0](https://github.com/vectordotdev/vector/issues/8036). This guide remains for
 posterity.
 
 It can be used with Vector versions prior to its removal.
 {{< /warning >}}
 
 {{< requirement title="Pre-requisites" >}}
+
 * You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][docs.setup.quickstart].
 * You must be using a Linux system (or WSL2 for Windows users) for WASM related work right now.
 
@@ -110,7 +111,7 @@ In order to develop and test a WASM plugin for Vector, you'll need to do two thi
 
 Let's do that now:
 
-First, [consult the CONTRIBUTING.md guide on how to set up your development environment](https://github.com/timberio/vector/blob/master/CONTRIBUTING.md#development), or bootstrap an Ubuntu 20.04 host/VM/Container with:
+First, [consult the CONTRIBUTING.md guide on how to set up your development environment](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md#development), or bootstrap an Ubuntu 20.04 host/VM/Container with:
 
 ```bash
 apt install build-essentials git cmake llvm lld clang libssl-dev protobuf-compiler
@@ -124,16 +125,19 @@ With your machine provisioned, it's time to hack!
   ```bash
   rustup target add wasm32-wasi
   ```
+
 1. Build Vector:  **(This will take a bit!)**
 
   ```bash
    cargo build --features wasm --release
    ```
+
 1. Verify your handiwork, make sure the `wasm` component is loaded:
 
   ```bash
   ./target/release/vector list | grep wasm
   ```
+
 1. Build the test WASM module Vector uses:
 
   ```bash
@@ -177,7 +181,7 @@ Then, `mkdir -p cache` to create a local directory for vector to store its optim
 Now it's time for the best part! Run Vector and have a try, using `CTRL+C` to stop as needed:
 
 ```bash
-ana@autonoma:~/git/timberio/vector$ ./target/release/vector --config test.toml
+ana@autonoma:~/git/vectordotdev/vector$ ./target/release/vector --config test.toml
 # ...
 Aug 17 15:28:05.954  INFO vector::topology::builder: Healthcheck: Passed.
 This is some input!
@@ -222,6 +226,7 @@ examples in the `tests/data/wasm/` folder of Vector.
 Some things to note:
 
 * Accessing a chunk of guest memory as mutable slice can be done via:
+
   ```rust
   let data = unsafe {
     std::ptr::slice_from_raw_parts_mut(data as *mut u8, length.try_into().unwrap())
@@ -229,7 +234,9 @@ Some things to note:
         .unwrap()
   };
   ```
+
 * `OnceCell` is useful for one-time initializers. Eg.
+
   ```rust
   static FIELDS: OnceCell<HashMap<String, Value>> = OnceCell::new();
 
@@ -239,6 +246,7 @@ Some things to note:
       // ...
   }
   ```
+
 * Vector will reinitialize panicked modules, so panicing is safe so long as you're fine losing your working data.
 * By default, the heap size is 10MB.
 

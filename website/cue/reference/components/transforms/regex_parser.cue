@@ -151,7 +151,7 @@ components: transforms: regex_parser: {
 			body: #"""
 				Regex flags can be toggled with the `(?flags)` syntax. The available flags are:
 
-				| Flag | Descriuption |
+				| Flag | Description |
 				| :--- | :----------- |
 				| `i`  | case-insensitive: letters match both upper and lower case |
 				| `m`  | multi-line mode: ^ and $ match begin/end of line |

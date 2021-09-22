@@ -20,7 +20,9 @@ method.
 The new `customConfig` key will take precedence over the existing configuration options, if `customConfig` is
 set then no default configurations will be rendered.
 
-**You do not need to upgrade immediately. The deprecated keys will not be removed before Vector hits 1.0**
+{{< warning >}}
+You do not need to upgrade immediately. The deprecated keys will not be removed before Vector hits 1.0
+{{< /warning >}}
 
 ## Upgrade Guide
 

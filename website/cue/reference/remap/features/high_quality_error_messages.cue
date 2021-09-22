@@ -1,7 +1,7 @@
 remap: features: high_quality_error_messages: {
 	title: "High-quality error messages"
 	description: """
-		VRL strives to provide high-quality, helpful error messages, streamling the development and iteration workflow
+		VRL strives to provide high-quality, helpful error messages, streamlining the development and iteration workflow
 		around VRL programs.
 
 		This VRL program, for example...

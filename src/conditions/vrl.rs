@@ -102,7 +102,7 @@ impl Condition for Vrl {
                 _ => false,
             })
             .unwrap_or_else(|_| {
-                emit!(VrlConditionExecutionError);
+                emit!(&VrlConditionExecutionError);
                 false
             })
     }

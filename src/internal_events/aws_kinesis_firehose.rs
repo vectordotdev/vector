@@ -1,14 +1,15 @@
-use super::InternalEvent;
 use crate::sources::aws_kinesis_firehose::Compression;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct AwsKinesisFirehoseEventReceived {
+pub struct AwsKinesisFirehoseEventReceived {
     pub byte_size: usize,
 }
 
 impl InternalEvent for AwsKinesisFirehoseEventReceived {
     fn emit_metrics(&self) {
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }

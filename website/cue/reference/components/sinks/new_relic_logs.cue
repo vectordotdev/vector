@@ -117,4 +117,6 @@ components: sinks: new_relic_logs: {
 		logs:    true
 		metrics: null
 	}
+
+	telemetry: components.sinks.http.telemetry
 }

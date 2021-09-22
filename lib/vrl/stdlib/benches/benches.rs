@@ -27,6 +27,7 @@ criterion_group!(
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
+              find,
               flatten,
               floor,
               format_int,
@@ -338,6 +339,25 @@ bench_function! {
 }
 
 bench_function! {
+    find => vrl_stdlib::Find;
+
+    str_matching {
+        args: func_args![value: "foobarfoo", pattern: "bar"],
+        want: Ok(value!(3)),
+    }
+
+    str_too_long {
+        args: func_args![value: "foo", pattern: "foobar"],
+        want: Ok(value!(-1)),
+    }
+
+    regex_matching_start {
+        args: func_args![value: "foobar", pattern: Value::Regex(Regex::new("fo+z?").unwrap().into())],
+        want: Ok(value!(0)),
+    }
+}
+
+bench_function! {
     flatten => vrl_stdlib::Flatten;
 
     nested_map {
@@ -446,7 +466,7 @@ bench_function! {
 
     valid {
         args: func_args![value: "1.2.3.4"],
-        want: Ok(value!(67305985)),
+        want: Ok(value!(16909060)),
     }
 }
 
@@ -468,7 +488,7 @@ bench_function! {
     ip_ntoa => vrl_stdlib::IpNtoa;
 
     valid {
-        args: func_args![value: 67305985],
+        args: func_args![value: 16909060],
         want: Ok(value!("1.2.3.4")),
     }
 }

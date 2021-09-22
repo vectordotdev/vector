@@ -1,7 +1,7 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
-pub(crate) struct TagCardinalityLimitRejectingEvent<'a> {
+pub struct TagCardinalityLimitRejectingEvent<'a> {
     pub tag_key: &'a str,
     pub tag_value: &'a str,
 }
@@ -21,7 +21,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
     }
 }
 
-pub(crate) struct TagCardinalityLimitRejectingTag<'a> {
+pub struct TagCardinalityLimitRejectingTag<'a> {
     pub tag_key: &'a str,
     pub tag_value: &'a str,
 }
@@ -41,7 +41,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
     }
 }
 
-pub(crate) struct TagCardinalityValueLimitReached<'a> {
+pub struct TagCardinalityValueLimitReached<'a> {
     pub key: &'a str,
 }
 

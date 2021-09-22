@@ -56,6 +56,19 @@ struct InstallOpts {
         use_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
+
+    /// Read pipeline configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "pipeline-dir",
+        short = "P",
+        long,
+        env = "VECTOR_PIPELINE_DIR",
+        use_delimiter(true)
+    )]
+    pub pipeline_dirs: Vec<PathBuf>,
 }
 
 impl InstallOpts {
@@ -66,7 +79,7 @@ impl InstallOpts {
 
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
-        let arguments = create_service_arguments(&config_paths).unwrap();
+        let arguments = create_service_arguments(&config_paths, &self.pipeline_dirs).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
@@ -251,9 +264,12 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
     }
 }
 
-fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
+fn create_service_arguments(
+    config_paths: &[config::ConfigPath],
+    pipeline_paths: &[PathBuf],
+) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(config_paths)?;
-    match config::load_from_paths(&config_paths) {
+    match config::load_from_paths(&config_paths, pipeline_paths) {
         Ok(_) => Some(
             config_paths
                 .iter()

@@ -166,11 +166,11 @@ impl DataStreamConfig {
         Template::try_from("default").expect("couldn't build default namespace template")
     }
 
-    fn default_auto_routing() -> bool {
+    const fn default_auto_routing() -> bool {
         true
     }
 
-    fn default_sync_fields() -> bool {
+    const fn default_sync_fields() -> bool {
         true
     }
 
@@ -191,7 +191,7 @@ impl DataStreamConfig {
         self.dtype
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("data_stream.type"),
                     drop_event: true,
@@ -204,7 +204,7 @@ impl DataStreamConfig {
         self.dataset
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("data_stream.dataset"),
                     drop_event: true,
@@ -217,7 +217,7 @@ impl DataStreamConfig {
         self.namespace
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("data_stream.namespace"),
                     drop_event: true,
@@ -322,14 +322,14 @@ pub enum BulkAction {
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
 impl BulkAction {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
         }
     }
 
-    pub fn as_json_pointer(&self) -> &'static str {
+    pub const fn as_json_pointer(&self) -> &'static str {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
@@ -417,7 +417,7 @@ impl ElasticSearchCommonMode {
             Self::Normal { index, .. } => index
                 .render_string(event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         field: Some("index"),
                         drop_event: true,
@@ -434,7 +434,7 @@ impl ElasticSearchCommonMode {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
-                        emit!(TemplateRenderingFailed {
+                        emit!(&TemplateRenderingFailed {
                             error,
                             field: Some("bulk_action"),
                             drop_event: true,
@@ -449,7 +449,7 @@ impl ElasticSearchCommonMode {
         }
     }
 
-    fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
+    const fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
         match self {
             Self::DataStream(value) => Some(value),
             _ => None,
@@ -522,7 +522,7 @@ impl ElasticSearchCommon {
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
 
-        emit!(ElasticSearchEventEncoded {
+        emit!(&ElasticSearchEventEncoded {
             byte_size: body.len(),
             index,
         });
@@ -1491,6 +1491,8 @@ mod integration_tests {
             let hits = response["hits"]["hits"]
                 .as_array_mut()
                 .expect("Elasticsearch response does not include hits->hits");
+            #[allow(clippy::needless_collect)]
+            // https://github.com/rust-lang/rust-clippy/issues/6909
             let input = input
                 .into_iter()
                 .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())

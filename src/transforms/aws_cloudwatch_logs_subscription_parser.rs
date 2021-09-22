@@ -80,7 +80,7 @@ impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
             .and_then(|to_parse| {
                 serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&to_parse)
                     .map_err(|error| {
-                        emit!(AwsCloudwatchLogsSubscriptionParserFailedParse { error })
+                        emit!(&AwsCloudwatchLogsSubscriptionParserFailedParse { error })
                     })
                     .ok()
             });

@@ -35,7 +35,7 @@ pub struct DatadogEventsConfig {
     tls: Option<TlsConfig>,
 
     #[serde(default)]
-    request: TowerRequestConfig<Concurrency>,
+    request: TowerRequestConfig,
 }
 
 fn default_site() -> String {
@@ -197,7 +197,7 @@ impl HttpSink for DatadogEventsService {
         let log = event.as_mut_log();
 
         if !log.contains("title") {
-            emit!(DatadogEventsFieldInvalid { field: "title" });
+            emit!(&DatadogEventsFieldInvalid { field: "title" });
             return None;
         }
 
@@ -205,7 +205,7 @@ impl HttpSink for DatadogEventsService {
             if let Some(message) = log.remove(log_schema().message_key()) {
                 log.insert("text", message);
             } else {
-                emit!(DatadogEventsFieldInvalid {
+                emit!(&DatadogEventsFieldInvalid {
                     field: log_schema().message_key()
                 });
                 return None;
@@ -248,7 +248,7 @@ impl HttpSink for DatadogEventsService {
         assert_eq!(events.len(), 1);
         let body = serde_json::to_vec(&events.pop().expect("One event"))?;
 
-        emit!(DatadogEventsProcessed {
+        emit!(&DatadogEventsProcessed {
             byte_size: body.len(),
         });
 

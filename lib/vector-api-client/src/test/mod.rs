@@ -42,10 +42,10 @@ pub struct FileSourceMetricsQuery;
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "tests/queries/component_by_component_id.graphql",
+    query_path = "tests/queries/component_by_component_key.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentByComponentIdQuery;
+pub struct ComponentByComponentKeyQuery;
 
 /// Component by id query
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
@@ -72,10 +72,11 @@ pub trait TestQueryExt {
         first: Option<i64>,
         last: Option<i64>,
     ) -> crate::QueryResult<FileSourceMetricsQuery>;
-    async fn component_by_component_id_query(
+    async fn component_by_component_key_query(
         &self,
-        id: &str,
-    ) -> crate::QueryResult<ComponentByComponentIdQuery>;
+        pipeline_id: Option<String>,
+        component_id: &str,
+    ) -> crate::QueryResult<ComponentByComponentKeyQuery>;
     async fn components_connection_query(
         &self,
         after: Option<String>,
@@ -120,15 +121,18 @@ impl TestQueryExt for crate::Client {
         self.query::<FileSourceMetricsQuery>(&request_body).await
     }
 
-    async fn component_by_component_id_query(
+    async fn component_by_component_key_query(
         &self,
+        pipeline_id: Option<String>,
         component_id: &str,
-    ) -> QueryResult<ComponentByComponentIdQuery> {
-        let request_body =
-            ComponentByComponentIdQuery::build_query(component_by_component_id_query::Variables {
+    ) -> QueryResult<ComponentByComponentKeyQuery> {
+        let request_body = ComponentByComponentKeyQuery::build_query(
+            component_by_component_key_query::Variables {
+                pipeline_id,
                 component_id: component_id.to_string(),
-            });
-        self.query::<ComponentByComponentIdQuery>(&request_body)
+            },
+        );
+        self.query::<ComponentByComponentKeyQuery>(&request_body)
             .await
     }
 

@@ -10,9 +10,13 @@ components: sources: datadog_agent: {
 		be expanded in the future to cover metrics and traces.
 
 		To send logs from a Datadog Agent to this source, the [Datadog Agent](\(urls.datadog_agent_doc)) configuration
-		must be updated to use `logs_config.dd_url: "<VECTOR_HOST>:<SOURCE_PORT>"`, `logs_config.use_http` should be set
-		to `true` as this source only supports HTTP/HTTPS and `logs_config.logs_no_ssl` must be set to `true` or `false`
-		in accordance to the source SSL configuration.
+		must be updated to use:
+
+		```
+		logs_config.dd_url = "<VECTOR_HOST>:<SOURCE_PORT>"
+		logs_config.use_v2_api = false # source does not yet support new v2 API
+		logs_config.use_http = true # this source only supports HTTP/HTTPS
+		logs_config.logs_no_ssl = true|false # should match source SSL configuration.
 		"""
 
 	classes: {

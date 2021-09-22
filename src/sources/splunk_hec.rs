@@ -91,7 +91,7 @@ impl SourceConfig for SplunkConfig {
             .and(
                 warp::path::full()
                     .map(|path: warp::filters::path::FullPath| {
-                        emit!(SplunkHecRequestReceived {
+                        emit!(&SplunkHecRequestReceived {
                             path: path.as_str()
                         });
                     })
@@ -470,7 +470,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             de.extract(log, &mut json);
         }
 
-        emit!(SplunkHecEventReceived);
+        emit!(&SplunkHecEventReceived);
         self.events += 1;
 
         Ok(event)
@@ -491,7 +491,7 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                emit!(SplunkHecRequestBodyInvalid {
+                emit!(&SplunkHecRequestBodyInvalid {
                     error: error.into()
                 });
                 Some(Err(
@@ -542,7 +542,7 @@ struct DefaultExtractor {
 }
 
 impl DefaultExtractor {
-    fn new(field: &'static str, to_field: &'static str) -> Self {
+    const fn new(field: &'static str, to_field: &'static str) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -599,7 +599,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
-                emit!(SplunkHecRequestBodyInvalid { error });
+                emit!(&SplunkHecRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -634,7 +634,7 @@ fn raw_event(
         .as_mut_log()
         .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
-    emit!(SplunkHecEventReceived);
+    emit!(&SplunkHecEventReceived);
 
     Ok(event)
 }
@@ -689,7 +689,7 @@ fn finish_ok(_: ()) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(SplunkHecRequestError { error });
+        emit!(&SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
@@ -768,7 +768,7 @@ mod tests {
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
         sinks::{
-            splunk_hec::{Encoding, HecSinkConfig},
+            splunk_hec::logs::{Encoding, HecSinkLogsConfig},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
@@ -822,7 +822,7 @@ mod tests {
         encoding: impl Into<EncodingConfig<Encoding>>,
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
-        HecSinkConfig {
+        HecSinkLogsConfig {
             token: TOKEN.to_owned(),
             endpoint: format!("http://{}", address),
             host_key: "host".to_owned(),

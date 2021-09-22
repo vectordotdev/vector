@@ -1,13 +1,14 @@
-use crate::{Condition, IndexHandle, Table, TableRegistry};
+use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 use shared::btreemap;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::{Arc, Mutex},
 };
+use vrl_core::Value;
 
 #[derive(Debug, Clone)]
 pub(crate) struct DummyEnrichmentTable {
-    data: BTreeMap<String, String>,
+    data: BTreeMap<String, Value>,
     indexes: Arc<Mutex<Vec<Vec<String>>>>,
 }
 
@@ -19,7 +20,7 @@ impl DummyEnrichmentTable {
     pub(crate) fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
         Self {
             data: btreemap! {
-                "field".to_string() => "result".to_string()
+                "field".to_string() => Value::from("result"),
             },
             indexes,
         }
@@ -29,13 +30,25 @@ impl DummyEnrichmentTable {
 impl Table for DummyEnrichmentTable {
     fn find_table_row(
         &self,
+        _case: Case,
         _condition: &[Condition],
+        _select: Option<&[String]>,
         _index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, String>, String> {
+    ) -> Result<BTreeMap<String, Value>, String> {
         Ok(self.data.clone())
     }
 
-    fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn find_table_rows(
+        &self,
+        _case: Case,
+        _condition: &[Condition],
+        _select: Option<&[String]>,
+        _index: Option<IndexHandle>,
+    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+        Ok(vec![self.data.clone()])
+    }
+
+    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
         let mut indexes = self.indexes.lock().unwrap();
         indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
         Ok(IndexHandle(indexes.len() - 1))

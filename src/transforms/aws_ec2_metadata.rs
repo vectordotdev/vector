@@ -262,10 +262,10 @@ impl MetadataClient {
         loop {
             match self.refresh_metadata().await {
                 Ok(_) => {
-                    emit!(AwsEc2MetadataRefreshSuccessful);
+                    emit!(&AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
-                    emit!(AwsEc2MetadataRefreshFailed { error });
+                    emit!(&AwsEc2MetadataRefreshFailed { error });
                 }
             }
 

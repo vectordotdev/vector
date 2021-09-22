@@ -15,5 +15,5 @@ a new [privacy policy][urls.vector_privacy_policy]. It's our pledge that Vector
 will _never_ implement any tactics, gray-area or not, to unknowingly collect
 data.
 
-[urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
-[urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
+[urls.vector_privacy_policy]: https://github.com/vectordotdev/vector/blob/master/PRIVACY.md
+[urls.vector_security_policy]: https://github.com/vectordotdev/vector/security/policy

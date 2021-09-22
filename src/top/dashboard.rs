@@ -1,5 +1,6 @@
 use super::{events::capture_key_press, state};
 use crossterm::{
+    cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -82,8 +83,9 @@ impl HumanFormatter for i64 {
     }
 }
 
-static HEADER: [&str; 7] = [
+static HEADER: [&str; 8] = [
     "ID",
+    "Pipeline",
     "Kind",
     "Type",
     "Events In",
@@ -146,7 +148,12 @@ impl<'a> Widgets<'a> {
 
         // Data columns
         let items = state.iter().map(|(_, r)| {
-            let mut data = vec![r.id.clone(), r.kind.clone(), r.component_type.clone()];
+            let mut data = vec![
+                r.key.id().to_string(),
+                r.key.pipeline_str().unwrap_or_default().into(),
+                r.kind.clone(),
+                r.component_type.clone(),
+            ];
 
             let formatted_metrics = [
                 match r.events_in_total {
@@ -202,11 +209,12 @@ impl<'a> Widgets<'a> {
             .column_spacing(2)
             .widths(&[
                 Constraint::Percentage(19),
+                Constraint::Percentage(14),
                 Constraint::Percentage(8),
                 Constraint::Percentage(8),
-                Constraint::Percentage(19),
-                Constraint::Percentage(19),
-                Constraint::Percentage(19),
+                Constraint::Percentage(18),
+                Constraint::Percentage(18),
+                Constraint::Percentage(18),
                 Constraint::Percentage(8),
             ]);
 
@@ -310,6 +318,7 @@ pub async fn init_dashboard<'a>(
     // Clean-up terminal
     terminal.backend_mut().execute(DisableMouseCapture)?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
+    terminal.backend_mut().execute(Show)?;
 
     disable_raw_mode()?;
 

@@ -105,7 +105,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
                 match log.get(field) {
                     Some(v) => Some(v.to_string_lossy()),
                     None => {
-                        emit!(ConsoleFieldNotFound {
+                        emit!(&ConsoleFieldNotFound {
                             missing_field: field,
                         });
                         None
@@ -144,7 +144,7 @@ impl StreamSink for WriterSink {
                     return Err(());
                 }
 
-                emit!(ConsoleEventProcessed {
+                emit!(&ConsoleEventProcessed {
                     byte_size: buf.len(),
                 });
             }

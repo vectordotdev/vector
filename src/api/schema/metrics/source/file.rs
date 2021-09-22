@@ -18,6 +18,7 @@ pub struct FileSourceMetricFile<'a> {
 
 impl<'a> FileSourceMetricFile<'a> {
     /// Returns a new FileSourceMetricFile from a (name, Vec<&Metric>) tuple
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     fn from_tuple((name, metrics): (String, Vec<&'a Metric>)) -> Self {
         Self { name, metrics }
     }
@@ -170,7 +171,7 @@ impl FileSourceMetrics {
         filter: Option<FileSourceMetricsFilesFilter>,
         sort: Option<Vec<sort::SortField<FileSourceMetricFilesSortFieldName>>>,
     ) -> relay::ConnectionResult<FileSourceMetricFile<'_>> {
-        let filter = filter.unwrap_or_else(FileSourceMetricsFilesFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut files = filter_items(self.get_files().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {

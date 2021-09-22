@@ -92,28 +92,28 @@ impl Default for ExecConfig {
     }
 }
 
-fn default_maximum_buffer_size() -> usize {
+const fn default_maximum_buffer_size() -> usize {
     // 1MB
     1000000
 }
 
-fn default_exec_interval_secs() -> u64 {
+const fn default_exec_interval_secs() -> u64 {
     60
 }
 
-fn default_respawn_interval_secs() -> u64 {
+const fn default_respawn_interval_secs() -> u64 {
     5
 }
 
-fn default_respawn_on_exit() -> bool {
+const fn default_respawn_on_exit() -> bool {
     true
 }
 
-fn default_include_stderr() -> bool {
+const fn default_include_stderr() -> bool {
     true
 }
 
-fn default_events_per_line() -> bool {
+const fn default_events_per_line() -> bool {
     true
 }
 
@@ -149,21 +149,21 @@ impl ExecConfig {
         self.command.join(" ")
     }
 
-    fn exec_interval_secs_or_default(&self) -> u64 {
+    const fn exec_interval_secs_or_default(&self) -> u64 {
         match &self.scheduled {
             None => default_exec_interval_secs(),
             Some(config) => config.exec_interval_secs,
         }
     }
 
-    fn respawn_on_exit_or_default(&self) -> bool {
+    const fn respawn_on_exit_or_default(&self) -> bool {
         match &self.streaming {
             None => default_respawn_on_exit(),
             Some(config) => config.respawn_on_exit,
         }
     }
 
-    fn respawn_interval_secs_or_default(&self) -> u64 {
+    const fn respawn_interval_secs_or_default(&self) -> u64 {
         match &self.streaming {
             None => default_respawn_interval_secs(),
             Some(config) => config.respawn_interval_secs,
@@ -241,14 +241,14 @@ async fn run_scheduled(
         match timeout_result {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(ExecFailed {
+                    emit!(&ExecFailed {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
             Err(_) => {
-                emit!(ExecTimeout {
+                emit!(&ExecTimeout {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
                 });
@@ -278,7 +278,7 @@ async fn run_streaming(
                 output = run_command(config.clone(), hostname.clone(), shutdown.clone(), out.clone()) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(ExecFailed {
+                        emit!(&ExecFailed {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -300,7 +300,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(ExecFailed {
+            emit!(&ExecFailed {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -403,7 +403,7 @@ async fn run_command(
 }
 
 fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
-    emit!(ExecCommandExecuted {
+    emit!(&ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
         exec_duration,
@@ -449,7 +449,7 @@ fn create_event(
     data_stream: &Option<String>,
     pid: Option<u32>,
 ) -> Event {
-    emit!(ExecEventReceived {
+    emit!(&ExecEventReceived {
         command: config.command_line().as_str(),
         byte_size: line.len(),
     });
