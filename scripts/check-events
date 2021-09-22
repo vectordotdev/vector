@@ -136,40 +136,7 @@ class Event
     end
 end
 
-class Component
-  attr_reader :missing, :name
-
-  def initialize(name)
-    @name = name
-    @emits = []
-    @missing = []
-  end
-
-  def emits(array)
-    @emits += array
-  end
-
-  def valid?
-    @missing.clear
-    require_events(SOURCE_EVENTS) if @name.start_with? 'sources/'
-    require_events(TRANSFORM_EVENTS) if @name.start_with? 'transforms/'
-    require_events(SINK_EVENTS) if @name.start_with? 'sinks/'
-    @missing.empty?
-  end
-
-  private
-
-    def require_events(names)
-      names.each do |name|
-        if @emits.none? { |event| event.end_with? name }
-          @missing.append(name)
-        end
-      end
-    end
-end
-
 $all_events = Hash::new { |hash, key| hash[key] = Event::new(key) }
-$all_components = Hash::new { |hash, key| hash[key] = Component::new(key) }
 
 error_count = 0
 
@@ -222,16 +189,6 @@ Find.find('src') do |path|
           $all_events[event_name].add_log(type, message, parameters)
         end
       end
-
-    # Scan all the source, transform, and sink components for all
-    # internal events they emit, to be handled below.
-    elsif path.start_with? 'src/sinks/' or path.start_with? 'src/sources/' or path.start_with? 'src/transforms/'
-      component_name = path_component(path)
-
-      if component_name
-        emits = text.scan(/emit!\(([A-Za-z0-9]+)/).map { |name,| name }
-        $all_components[component_name].emits(emits)
-      end
     end
   end
 end
@@ -240,14 +197,6 @@ $all_events.each_value do |event|
   unless event.valid?
     puts "#{event.path}: Errors in event #{event.name}:"
     event.reports.each { |report| puts "    #{report}" }
-    error_count += 1
-  end
-end
-
-$all_components.each_value do |component|
-  unless component.valid?
-    puts "#{component.name}: Missing required event(s):"
-    component.missing.each { |event| puts "    #{event}" }
     error_count += 1
   end
 end
