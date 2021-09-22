@@ -154,9 +154,12 @@ impl Expression for GetEnrichmentTableRecordFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::get_table_registry;
+    use crate::test_util::{
+        get_table_registry, get_table_registry_with_tables, DummyEnrichmentTable,
+    };
     use chrono::{TimeZone as _, Utc};
     use shared::{btreemap, TimeZone};
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn find_table_row() {
@@ -208,7 +211,10 @@ mod tests {
 
     #[test]
     fn add_indexes_with_dates() {
-        let registry = get_table_registry();
+        let indexes = Arc::new(Mutex::new(Vec::new()));
+        let dummy = DummyEnrichmentTable::new_with_index(indexes.clone());
+
+        let registry = get_table_registry_with_tables(vec![("dummy1".to_string(), dummy)]);
 
         let mut func = GetEnrichmentTableRecordFn {
             table: "dummy1".to_string(),
@@ -230,5 +236,9 @@ mod tests {
 
         assert_eq!(Ok(()), func.update_state(&mut compiler));
         assert_eq!(Some(IndexHandle(0)), func.index);
+
+        // Ensure only the exact match has been added as an index.
+        let indexes = indexes.lock().unwrap();
+        assert_eq!(vec![vec!["field1".to_string()]], *indexes);
     }
 }
