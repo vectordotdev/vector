@@ -123,7 +123,7 @@ pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     stream! {
         loop {
             interval.tick().await;
-            for m in controller.capture_metrics(){
+            for m in controller.capture_metrics() {
                 yield m;
             }
         }
