@@ -53,7 +53,7 @@ impl Function for AssertEq {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _info: &FunctionCompileInfo,
+        _info: &FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let left = arguments.required("left");

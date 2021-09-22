@@ -47,7 +47,7 @@ impl Function for Log {
     fn compile(
         &self,
         _state: &state::Compiler,
-        info: &FunctionCompileInfo,
+        info: &FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let levels = vec![

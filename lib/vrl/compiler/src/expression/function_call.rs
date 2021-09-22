@@ -1,5 +1,5 @@
 use crate::expression::{levenstein, ExpressionError, FunctionArgument, Noop};
-use crate::function::{ArgumentList, CompileInfo, Parameter};
+use crate::function::{ArgumentList, FunctionCompileContext, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
 
@@ -162,7 +162,7 @@ impl FunctionCall {
                 })
             })?;
 
-        let compile_info = CompileInfo { span: call_span };
+        let compile_info = FunctionCompileContext { span: call_span };
 
         let mut expr = function
             .compile(state, &compile_info, list)

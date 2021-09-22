@@ -20,7 +20,7 @@ impl Function for Now {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _info: &FunctionCompileInfo,
+        _info: &FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
         Ok(Box::new(NowFn))

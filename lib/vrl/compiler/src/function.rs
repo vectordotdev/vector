@@ -42,7 +42,7 @@ pub trait Function: Sync + fmt::Debug {
     fn compile(
         &self,
         state: &super::State,
-        info: &CompileInfo,
+        info: &FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;
 
@@ -65,7 +65,7 @@ pub struct Example {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct CompileInfo {
+pub struct FunctionCompileContext {
     pub span: Span,
 }
 
