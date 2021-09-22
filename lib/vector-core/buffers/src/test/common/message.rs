@@ -1,20 +1,22 @@
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut};
 use proptest_derive::Arbitrary;
-use std::{fmt, mem};
+use std::{cmp, fmt, mem};
 
 #[derive(Clone, Debug, PartialEq, Eq, Arbitrary)]
 pub struct Message {
     id: u64,
 }
 
+impl PartialOrd for Message {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
+}
+
 impl Message {
     pub(crate) fn new(id: u64) -> Self {
         Message { id }
-    }
-
-    pub(crate) fn id(&self) -> u64 {
-        self.id
     }
 }
 
