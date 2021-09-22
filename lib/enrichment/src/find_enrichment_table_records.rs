@@ -41,7 +41,12 @@ impl Function for FindEnrichmentTableRecords {
         &[]
     }
 
-    fn compile(&self, state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let registry = state
             .get_external_context::<TableRegistry>()
             .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
