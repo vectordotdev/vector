@@ -2,6 +2,7 @@ mod generic;
 
 use super::{
     EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal, ReceivedEventsTotal,
+    SentEventsTotal,
 };
 use crate::event::Metric;
 use async_graphql::Interface;
@@ -16,7 +17,12 @@ use async_graphql::Interface;
         type = "Option<EventsInTotal>",
         deprecation = "Use received_events_total instead"
     ),
-    field(name = "events_out_total", type = "Option<EventsOutTotal>")
+    field(name = "sent_events_total", type = "Option<SentEventsTotal>"),
+    field(
+        name = "events_out_total",
+        type = "Option<EventsOutTotal>",
+        deprecation = "Use sent_events_total instead"
+    )
 )]
 pub enum SinkMetrics {
     GenericSinkMetrics(generic::GenericSinkMetrics),
