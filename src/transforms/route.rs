@@ -104,7 +104,9 @@ impl TransformConfig for RouteConfig {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
         while let Some((k, v)) = self.route.pop() {
-            map.insert(k.clone(), Box::new(LaneConfig { condition: v }));
+            if let Some(_) = map.insert(k.clone(), Box::new(LaneConfig { condition: v })) {
+                return Err("duplicate route id".into());
+            }
         }
 
         if !map.is_empty() {
