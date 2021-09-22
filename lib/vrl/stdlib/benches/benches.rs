@@ -99,6 +99,7 @@ criterion_group!(
               starts_with,
               strip_ansi_escape_codes,
               strip_whitespace,
+              tally,
               to_bool,
               to_float,
               to_int,
@@ -1903,6 +1904,18 @@ bench_function! {
         args: func_args![value: Value::Null],
         want: Ok(Value::Null),
     }
+}
+
+bench_function! {
+    tally => vrl_stdlib::Tally;
+
+    default {
+        args: func_args![
+            value: value!(["bar", "foo", "baz", "foo"]),
+        ],
+        want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
+    }
+
 }
 
 bench_function! {

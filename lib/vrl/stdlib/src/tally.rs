@@ -42,21 +42,27 @@ impl Expression for TallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?.try_array()?;
 
-        let map: BTreeMap<_, _> = value
+        let mut map: HashMap<Bytes, usize> = HashMap::new();
+        for value in value.into_iter() {
+            if let Value::Bytes(value) = value {
+                *map.entry(value).or_insert(0) += 1;
+            } else {
+                return Err(format!("all values must be strings, found: {:?}", value).into());
+            }
+        }
+
+        let map: BTreeMap<_, _> = map
             .into_iter()
-            .fold(HashMap::<_, _>::new(), |mut m, x| {
-                *m.entry(x.to_string()).or_insert(0) += 1;
-                m
-            })
-            .into_iter()
-            .map(|(k, v)| (k, Value::from(v)))
+            .map(|(k, v)| (String::from_utf8_lossy(&k).into_owned(), Value::from(v)))
             .collect();
 
         Ok(map.into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().object::<(), Kind>(map! { (): Kind::all() })
+        TypeDef::new()
+            .object::<(), Kind>(map! { (): Kind::Integer })
+            .fallible()
     }
 }
 
@@ -72,15 +78,15 @@ mod tests {
                 value: value!(["bar", "foo", "baz", "foo"]),
             ],
             want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::Integer }).fallible(),
         }
 
-        mixed_values {
+        non_string_values {
             args: func_args![
                 value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
             ],
-            want: Ok(value!({"foo": 2, "[1,2,3]": 2, "123abc": 1, "1": 2, "true": 2})),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            want: Err("all keys must be strings, found: Array([Integer(1), Integer(2), Integer(3)])"),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::Integer }).fallible(),
         }
     ];
 }
