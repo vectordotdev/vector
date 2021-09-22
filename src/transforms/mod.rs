@@ -62,6 +62,8 @@ pub mod sample;
 pub mod split;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub mod tag_cardinality_limit;
+#[cfg(feature = "transforms-throttle")]
+pub mod throttle;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
 

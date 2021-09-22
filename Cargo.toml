@@ -218,6 +218,7 @@ flate2 = { version = "1.0.21", default-features = false }
 futures-util = { version = "0.3.17", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
+governor = { version = "0.3.2", optional = true }
 grok = { version = "1.2.0", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.4", default-features = false }
@@ -511,6 +512,7 @@ transforms-logs = [
   "transforms-route",
   "transforms-sample",
   "transforms-split",
+  "transforms-throttle",
   "transforms-tokenizer",
 ]
 transforms-metrics = [
@@ -524,6 +526,7 @@ transforms-metrics = [
   "transforms-remap",
   "transforms-remove_tags",
   "transforms-tag_cardinality_limit",
+  "transforms-throttle",
 ]
 
 transforms-add_fields = []
@@ -557,6 +560,7 @@ transforms-route = []
 transforms-sample = ["seahash"]
 transforms-split = []
 transforms-tag_cardinality_limit = ["bloom"]
+transforms-throttle = ["governor"]
 transforms-tokenizer = []
 
 # Sinks

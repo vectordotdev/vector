@@ -41,6 +41,12 @@ checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
 name = "ahash"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8fd72866655d1904d6b0997d0b07ba561047d070fbe29de039031c641b61217"
+
+[[package]]
+name = "ahash"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43bb833f0bf979d8475d38fbf09ed3b8a55e1885fe93ad3f93239fc6a4f17b98"
@@ -774,7 +780,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dcc15cd0b9aff8e8326561dcf0bb6e56d0e559f3a4897f615b4a5075ab54c46"
 dependencies = [
- "ahash",
+ "ahash 0.7.4",
  "base64 0.13.0",
  "chrono",
  "hex",
@@ -2461,6 +2467,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "governor"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06c5d2f987ee8f6dff3fa1a352058dc59b990e447e4c7846aa7d804971314f7b"
+dependencies = [
+ "dashmap",
+ "futures 0.3.17",
+ "futures-timer",
+ "no-std-compat",
+ "nonzero_ext",
+ "parking_lot",
+ "quanta 0.4.1",
+ "rand 0.8.4",
+ "smallvec",
+]
+
+[[package]]
 name = "graphql-introspection-query"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2567,6 +2590,16 @@ checksum = "a9be661681f30f8ef0f5bd6a2bff28b16cbcffc0e1b79d18558b74d5e1817fbb"
 
 [[package]]
 name = "hashbrown"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e91b62f79061a0bc2e046024cb7ba44b08419ed238ecbd9adbd787434b9e8c25"
+dependencies = [
+ "ahash 0.3.8",
+ "autocfg",
+]
+
+[[package]]
+name = "hashbrown"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
@@ -2577,7 +2610,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 dependencies = [
- "ahash",
+ "ahash 0.7.4",
 ]
 
 [[package]]
@@ -3592,7 +3625,7 @@ version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a00f42f354a2ed4894db863b3a4db47aef2d2e4435b937221749bd37a8a7aaa8"
 dependencies = [
- "ahash",
+ "ahash 0.7.4",
  "metrics-macros",
  "proc-macro-hack",
 ]
@@ -3608,7 +3641,7 @@ dependencies = [
  "metrics",
  "metrics-util",
  "parking_lot",
- "quanta",
+ "quanta 0.9.3",
  "thiserror",
  "tokio",
 ]
@@ -3649,7 +3682,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74c9b6aee519e1461b678952d3671652bb341d0664b1188f895a436a4e2e6ffa"
 dependencies = [
- "ahash",
+ "ahash 0.7.4",
  "aho-corasick",
  "atomic-shim",
  "crossbeam-epoch 0.9.5",
@@ -3661,7 +3694,7 @@ dependencies = [
  "num_cpus",
  "ordered-float",
  "parking_lot",
- "quanta",
+ "quanta 0.9.3",
  "radix_trie",
  "sketches-ddsketch",
 ]
@@ -3976,6 +4009,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "no-std-compat"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b93853da6d84c2e3c7d730d6473e8817692dd89be387eb01b94d7f108ecb5b8c"
+dependencies = [
+ "hashbrown 0.8.2",
+]
+
+[[package]]
 name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4015,6 +4057,12 @@ dependencies = [
  "minimal-lexical",
  "version_check",
 ]
+
+[[package]]
+name = "nonzero_ext"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44a1290799eababa63ea60af0cbc3f03363e328e58f32fb0294798ed3e85f444"
 
 [[package]]
 name = "notify"
@@ -4924,6 +4972,16 @@ dependencies = [
  "tokio-native-tls",
  "tokio-util",
  "url",
+]
+
+[[package]]
+name = "quanta"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d98dc777a7a39b76b1a26ae9d3f691f4c1bc0455090aa0b64dfa8cb7fc34c135"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -7554,6 +7612,7 @@ dependencies = [
  "glob",
  "goauth",
  "gouth",
+ "governor",
  "grok",
  "hash_hasher",
  "headers",
