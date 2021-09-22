@@ -26,7 +26,7 @@ pub use acker::Acker;
 use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use internal_event::emit;
-use internal_events::EventsSent;
+use internal_events::{EventsReceived, EventsSent};
 use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
@@ -148,7 +148,7 @@ where
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
                 } else {
-                    Box::new(inner)
+                    Box::new(BlockWhenFull::new(inner))
                 }
             }
 
@@ -158,7 +158,7 @@ where
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
                 } else {
-                    Box::new(inner)
+                    Box::new(BlockWhenFull::new(inner))
                 }
             }
         }
@@ -205,8 +205,55 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
             emit(&EventsDropped { count: 1 });
             Ok(())
         } else {
-            self.project().inner.start_send(item)
+            let byte_size = size_of_val(&item);
+            self.project().inner.start_send(item).map(|()| {
+                emit(&EventsReceived {
+                    count: 1,
+                    byte_size,
+                });
+                ()
+            })
         }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
+    }
+}
+
+// The BlockWhenFull wrapper is used for instrumentation purposes
+#[pin_project]
+pub struct BlockWhenFull<S> {
+    #[pin]
+    inner: S,
+}
+
+impl<S> BlockWhenFull<S> {
+    pub fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T, S: Sink<T> + Unpin> Sink<T> for BlockWhenFull<S> {
+    type Error = S::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        let byte_size = size_of_val(&item);
+        self.project().inner.start_send(item).map(|()| {
+            emit(&EventsReceived {
+                count: 1,
+                byte_size,
+            });
+            ()
+        })
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
