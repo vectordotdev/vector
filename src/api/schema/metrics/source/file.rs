@@ -50,6 +50,11 @@ impl<'a> FileSourceMetricFile<'a> {
         self.metrics.events_in_total()
     }
 
+    /// Metric indicating received events for the current file
+    async fn received_events_total(&self) -> Option<metrics::ReceivedEventsTotal> {
+        self.metrics.received_events_total()
+    }
+
     /// Metric indicating outgoing events for the current file
     async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
         self.metrics.events_out_total()
@@ -83,6 +88,7 @@ pub enum FileSourceMetricFilesSortFieldName {
     Name,
     ProcessedBytesTotal,
     ProcessedEventsTotal,
+    ReceivedEventsTotal,
     EventsInTotal,
     EventsOutTotal,
 }
@@ -111,6 +117,17 @@ impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMet
                 &rhs.metrics
                     .processed_events_total()
                     .map(|m| m.get_processed_events_total() as i64)
+                    .unwrap_or(0),
+            ),
+            FileSourceMetricFilesSortFieldName::ReceivedEventsTotal => Ord::cmp(
+                &self
+                    .metrics
+                    .received_events_total()
+                    .map(|m| m.get_received_events_total() as i64)
+                    .unwrap_or(0),
+                &rhs.metrics
+                    .received_events_total()
+                    .map(|m| m.get_received_events_total() as i64)
                     .unwrap_or(0),
             ),
             FileSourceMetricFilesSortFieldName::EventsInTotal => Ord::cmp(
@@ -199,6 +216,11 @@ impl FileSourceMetrics {
     /// Total incoming events for the current file source
     pub async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
         self.0.events_in_total()
+    }
+
+    /// Total received events for the current file source
+    pub async fn received_events_total(&self) -> Option<metrics::ReceivedEventsTotal> {
+        self.0.received_events_total()
     }
 
     /// Total outgoing events for the current file source

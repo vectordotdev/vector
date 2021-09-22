@@ -1,0 +1,3 @@
+subscription ReceivedEventsThroughputSubscription($interval: Int!) {
+    receivedEventsThroughput(interval: $interval)
+}

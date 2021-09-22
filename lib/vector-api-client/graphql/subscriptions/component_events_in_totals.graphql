@@ -1,9 +1,0 @@
-subscription ComponentEventsInTotalsSubscription($interval: Int!) {
-    componentEventsInTotals(interval: $interval) {
-        pipelineId
-        componentId
-        metric {
-            eventsInTotal
-        }
-    }
-}
