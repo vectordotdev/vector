@@ -14,6 +14,10 @@
 //! other major constraints we have to follow in this implementation. The sink
 //! is careful to always send the maximum payload size excepting where we
 //! violate the size constraint.
+//!
+//! The endpoint used to send the payload is currently being migrated from
+//! `/v1/input` to `/api/v2/logs`, but the content of the above documentation
+//! still applies for `/api/v2/logs`.
 
 #[cfg(test)]
 mod tests;
