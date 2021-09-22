@@ -5,10 +5,13 @@ use crate::test::model::on_disk::OnDisk;
 use crate::Variant;
 use crate::WhenFull;
 use futures::task::{noop_waker, Context, Poll};
-use futures::{Sink, Stream};
+use futures::{stream, SinkExt};
+use futures::{Sink, Stream, StreamExt};
 use proptest::prelude::*;
 use std::pin::Pin;
+use std::sync::Arc;
 use tokio::runtime;
+use tokio::sync::Barrier;
 
 mod in_memory;
 #[cfg(feature = "disk-buffer")]
@@ -101,6 +104,51 @@ fn arb_variant() -> impl Strategy<Value = Variant> {
             }
         }),
     ]
+}
+
+// NOTE this test will hang on the call to `rx.next()` for unknown reasons. The
+// behavior here is of a sending side that does not properly hang up, leaving
+// the receiving side waiting for more messages that won't come.
+#[test]
+fn crazy_pills_or_sender_never_hangs_up() {
+    let messages = vec![Message::new(0)];
+    let variant = Variant::Memory {
+        max_events: 10,
+        when_full: WhenFull::Block,
+    };
+    let guard = VariantGuard::new(variant);
+
+    let (tx, mut rx, _) = crate::build::<Message>(guard.as_ref().clone()).unwrap();
+    let runtime = runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .build()
+        .unwrap();
+
+    let mut tx = tx.get();
+
+    runtime.block_on(async move {
+        let barrier = Arc::new(Barrier::new(2));
+
+        let snd_barrier = Arc::clone(&barrier);
+        let _ = tokio::spawn(async move {
+            let _ = snd_barrier.wait().await;
+            let mut stream = stream::iter(messages.clone()).map(|m| Ok(m));
+            tx.send_all(&mut stream).await.unwrap();
+            tx.close().await.unwrap();
+            println!("I AM DONE");
+        });
+
+        barrier.wait().await;
+
+        let mut base_id = 0;
+        while let Some(msg) = rx.next().await {
+            println!("LOOP HERE");
+            assert!(base_id <= msg.id());
+            base_id = msg.id();
+        }
+
+        println!("GOT HERE");
+    })
 }
 
 proptest! {

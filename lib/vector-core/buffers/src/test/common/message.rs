@@ -12,6 +12,10 @@ impl Message {
     pub(crate) fn new(id: u64) -> Self {
         Message { id }
     }
+
+    pub(crate) fn id(&self) -> u64 {
+        self.id
+    }
 }
 
 //
