@@ -125,48 +125,50 @@ pub fn init_test() -> crate::Result<()> {
     })
 }
 
-/// Clear all metrics from the registry.
-pub fn reset(controller: &Controller) {
-    controller.registry.clear();
-}
-
-/// Get a handle to the globally registered controller, if it's initialized.
-///
-/// # Errors
-///
-/// This function will fail if the metrics subsystem has not been correctly
-/// initialized.
-pub fn get_controller() -> crate::Result<Controller> {
-    CONTROLLER_SWITCH
-        .get()
-        .and_then(|switch| match switch {
-            Switch::Global => GLOBAL_CONTROLLER.get().map(Clone::clone),
-            Switch::Local => LOCAL_CONTROLLER.with(|oc| oc.get().map(Clone::clone)),
-        })
-        .ok_or_else(|| "metrics system not initialized".into())
-}
-
-/// Take a snapshot of all gathered metrics and expose them as metric
-/// [`Event`](crate::event::Event)s.
-pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Metric> {
-    let mut metrics: Vec<Metric> = Vec::new();
-    controller.registry.visit(|_kind, (key, handle)| {
-        metrics.push(Metric::from_metric_kv(key, handle.get_inner()));
-    });
-
-    // Add alias `events_processed_total` for `events_out_total`.
-    for i in 0..metrics.len() {
-        let metric = &metrics[i];
-        if metric.name() == "events_out_total" {
-            let alias = metric.clone().with_name("processed_events_total");
-            metrics.push(alias);
-        }
+impl Controller {
+    /// Clear all metrics from the registry.
+    pub fn reset(&self) {
+        self.registry.clear();
     }
 
-    let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
-    metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
+    /// Get a handle to the globally registered controller, if it's initialized.
+    ///
+    /// # Errors
+    ///
+    /// This function will fail if the metrics subsystem has not been correctly
+    /// initialized.
+    pub fn get() -> crate::Result<Self> {
+        CONTROLLER_SWITCH
+            .get()
+            .and_then(|switch| match switch {
+                Switch::Global => GLOBAL_CONTROLLER.get().map(Clone::clone),
+                Switch::Local => LOCAL_CONTROLLER.with(|oc| oc.get().map(Clone::clone)),
+            })
+            .ok_or_else(|| "metrics system not initialized".into())
+    }
 
-    metrics.into_iter()
+    /// Take a snapshot of all gathered metrics and expose them as metric
+    /// [`Event`](crate::event::Event)s.
+    pub fn capture_metrics(&self) -> impl Iterator<Item = Metric> {
+        let mut metrics: Vec<Metric> = Vec::new();
+        self.registry.visit(|_kind, (key, handle)| {
+            metrics.push(Metric::from_metric_kv(key, handle.get_inner()));
+        });
+
+        // Add alias `events_processed_total` for `events_out_total`.
+        for i in 0..metrics.len() {
+            let metric = &metrics[i];
+            if metric.name() == "events_out_total" {
+                let alias = metric.clone().with_name("processed_events_total");
+                metrics.push(alias);
+            }
+        }
+
+        let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
+        metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
+
+        metrics.into_iter()
+    }
 }
 
 #[macro_export]

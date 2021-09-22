@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    metrics::{capture_metrics, get_controller, Controller},
+    metrics::Controller,
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -75,7 +75,7 @@ impl SourceConfig for InternalMetricsConfig {
             namespace,
             host_key,
             pid_key,
-            get_controller()?,
+            Controller::get()?,
             interval,
             cx.out,
             cx.shutdown,
@@ -108,7 +108,7 @@ async fn run(
         let hostname = crate::get_hostname();
         let pid = std::process::id().to_string();
 
-        let metrics = capture_metrics(&controller);
+        let metrics = controller.capture_metrics();
 
         out.send_all(&mut stream::iter(metrics).map(|mut metric| {
             // A metric starts out with a default "vector" namespace, but will be overridden
@@ -141,7 +141,7 @@ mod tests {
             metric::{Metric, MetricValue},
             Event,
         },
-        metrics::{capture_metrics, get_controller},
+        metrics::Controller,
         Pipeline,
     };
     use metrics::{counter, gauge, histogram};
@@ -168,12 +168,13 @@ mod tests {
         histogram!("quux", 8.0, "host" => "foo");
         histogram!("quux", 8.1, "host" => "foo");
 
-        let controller = get_controller().expect("no controller");
+        let controller = Controller::get().expect("no controller");
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        let output = capture_metrics(controller)
+        let output = controller
+            .capture_metrics()
             .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 

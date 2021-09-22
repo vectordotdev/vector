@@ -2,7 +2,7 @@ use super::{EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsT
 use crate::{
     config::ComponentKey,
     event::{Metric, MetricValue},
-    metrics::{capture_metrics, get_controller, Controller},
+    metrics::Controller,
 };
 use async_stream::stream;
 use lazy_static::lazy_static;
@@ -12,7 +12,7 @@ use tokio_stream::{Stream, StreamExt};
 
 lazy_static! {
     static ref GLOBAL_CONTROLLER: Controller =
-        get_controller().expect("Metrics system not initialized. Please report.");
+        Controller::get().expect("Metrics system not initialized. Please report.");
 }
 
 /// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically
@@ -125,7 +125,7 @@ pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     stream! {
         loop {
             interval.tick().await;
-            for m in capture_metrics(controller){
+            for m in controller.capture_metrics(){
                 yield m;
             }
         }
@@ -139,14 +139,15 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     stream! {
         loop {
             interval.tick().await;
-            yield capture_metrics(controller).collect()
+            yield controller.capture_metrics().collect()
         }
     }
 }
 
 /// Return Vec<Metric> based on a component id tag.
 pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
-    capture_metrics(&GLOBAL_CONTROLLER)
+    GLOBAL_CONTROLLER
+        .capture_metrics()
         .filter_map(|m| {
             if let Some(pipeline) = component_key.pipeline_str() {
                 m.tag_matches("component_id", component_key.id())

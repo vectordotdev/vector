@@ -74,7 +74,7 @@ pub fn benchmark(c: &mut Criterion, mode: Mode) {
     boot();
     let metrics_core_enabled = mode != Mode::MetricsOff;
     assert_eq!(
-        vector::metrics::get_controller().is_ok(),
+        vector::metrics::Controller::get().is_ok(),
         metrics_core_enabled,
         "the presence of a controller must correspond to whether metrics core is on or off"
     );

@@ -10,17 +10,17 @@ fn benchmark(c: &mut Criterion) {
             &cardinality,
             |b, &cardinality| {
                 let controller = prepare_metrics(cardinality);
-                b.iter(|| vector::metrics::capture_metrics(controller));
+                b.iter(|| controller.capture_metrics());
             },
         );
     }
     group.finish();
 }
 
-fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
+fn prepare_metrics(cardinality: usize) -> vector::metrics::Controller {
     let _ = vector::metrics::init();
-    let controller = vector::metrics::get_controller().unwrap();
-    vector::metrics::reset(controller);
+    let controller = vector::metrics::Controller::get().unwrap();
+    controller.reset();
 
     for idx in 0..cardinality {
         metrics::counter!("test", 1, "idx" => format!("{}", idx));

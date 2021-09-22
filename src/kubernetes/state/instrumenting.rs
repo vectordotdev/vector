@@ -97,7 +97,8 @@ mod tests {
     }
 
     fn get_metric_value(op_kind: &'static str) -> Option<MetricValue> {
-        let controller = crate::metrics::get_controller().expect("failed to init metric container");
+        let controller =
+            crate::metrics::Controller::get().expect("failed to init metric container");
 
         let tags_to_lookup = Some(
             vec![("op_kind".to_owned(), op_kind.to_owned())]
@@ -105,7 +106,8 @@ mod tests {
                 .collect(),
         );
 
-        crate::metrics::capture_metrics(controller)
+        controller
+            .capture_metrics()
             .find(|metric| {
                 metric.name() == "k8s_state_ops_total" && metric.tags() == tags_to_lookup.as_ref()
             })
