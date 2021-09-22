@@ -24,7 +24,12 @@ impl Function for GetEnvVar {
         }]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let name = arguments.required("name");
 
         Ok(Box::new(GetEnvVarFn { name }))

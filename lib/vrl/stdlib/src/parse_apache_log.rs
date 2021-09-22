@@ -30,7 +30,12 @@ impl Function for ParseApacheLog {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let variants = vec![value!("common"), value!("combined"), value!("error")];
 
         let value = arguments.required("value");

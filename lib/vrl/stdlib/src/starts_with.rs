@@ -48,7 +48,12 @@ impl Function for StartsWith {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
         let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
