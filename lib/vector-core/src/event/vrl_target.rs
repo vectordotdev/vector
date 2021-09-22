@@ -1,13 +1,15 @@
-use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
+use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, Value};
 use crate::config::log_schema;
 use lookup::LookupBuf;
 use snafu::Snafu;
 use std::{collections::BTreeMap, convert::TryFrom};
 
-const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
+const VALID_METRIC_PATHS_SET: &str =
+    ".name, .namespace, .timestamp, .kind, .tags, .counter.value, .gauge.value";
 
 /// We can get the `type` of the metric in Remap, but can't set it.
-const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
+const VALID_METRIC_PATHS_GET: &str =
+    ".name, .namespace, .timestamp, .kind, .tags, .type, .counter.value, .gauge.value";
 
 /// Metrics aren't interested in paths that have a length longer than 3.
 ///
@@ -106,12 +108,41 @@ impl vrl_core::Target for VrlTarget {
                             metric.data.kind = MetricKind::try_from(value)?;
                             return Ok(());
                         }
+                        ["counter", "value"] => {
+                            let new_value = match value {
+                                vrl_core::Value::Integer(i) => Ok(i as f64),
+                                vrl_core::Value::Float(f) => Ok(*f),
+                                _ => Err(format!(
+                                    "expected integer or float, found: {}",
+                                    value.kind()
+                                )),
+                            }?;
+
+                            if let MetricValue::Counter { ref mut value } = metric.data.value {
+                                *value = new_value
+                            }
+                            return Ok(());
+                        }
+                        ["gauge", "value"] => {
+                            let new_value = match value {
+                                vrl_core::Value::Integer(i) => Ok(i as f64),
+                                vrl_core::Value::Float(f) => Ok(*f),
+                                _ => Err(format!(
+                                    "expected integer or float, found: {}",
+                                    value.kind()
+                                )),
+                            }?;
+                            if let MetricValue::Gauge { ref mut value } = metric.data.value {
+                                *value = new_value
+                            }
+                            return Ok(());
+                        }
                         _ => {
                             return Err(MetricPathError::InvalidPath {
                                 path: &path.to_string(),
                                 expected: VALID_METRIC_PATHS_SET,
                             }
-                            .to_string())
+                            .to_string());
                         }
                     }
                 }
@@ -180,6 +211,14 @@ impl vrl_core::Target for VrlTarget {
                             None => continue,
                         },
                         ["type"] => return Ok(Some(metric.data.value.clone().into())),
+                        ["counter", "value"] => match metric.data.value {
+                            MetricValue::Counter { value } => return Ok(Some(value.into())),
+                            _ => continue,
+                        },
+                        ["gauge", "value"] => match metric.data.value {
+                            MetricValue::Gauge { value } => return Ok(Some(value.into())),
+                            _ => continue,
+                        },
                         _ => {
                             return Err(MetricPathError::InvalidPath {
                                 path: &path.to_string(),
