@@ -42,7 +42,12 @@ impl Function for Unnest {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let path = arguments.required_query("path")?;
 
         Ok(Box::new(UnnestFn { path }))
