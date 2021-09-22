@@ -159,13 +159,13 @@ impl HttpSink for HecSinkMetricsConfig {
 
         match serde_json::to_vec(&body) {
             Ok(value) => {
-                emit!(SplunkEventSent {
+                emit!(&SplunkEventSent {
                     byte_size: value.len()
                 });
                 Some(value)
             }
             Err(error) => {
-                emit!(SplunkEventEncodeError { error });
+                emit!(&SplunkEventEncodeError { error });
                 None
             }
         }
@@ -249,7 +249,7 @@ impl HecSinkMetricsConfig {
             MetricValue::Counter { value } => Some(value),
             MetricValue::Gauge { value } => Some(value),
             _ => {
-                emit!(SplunkInvalidMetricReceived {
+                emit!(&SplunkInvalidMetricReceived {
                     value: metric.value(),
                     kind: &metric.kind(),
                 });

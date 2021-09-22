@@ -294,7 +294,7 @@ impl Decoder for FluentDecoder {
         })
         .map_err(|error| {
             let base64_encoded_message = base64::encode(&src);
-            emit!(FluentMessageDecodeError {
+            emit!(&FluentMessageDecodeError {
                 error: &error,
                 base64_encoded_message
             });
@@ -329,7 +329,7 @@ impl Decoder for FluentEntryStreamDecoder {
 
             let byte_size = des.position();
 
-            emit!(FluentMessageReceived { byte_size });
+            emit!(&FluentMessageReceived { byte_size });
 
             (byte_size as usize, res)
         };

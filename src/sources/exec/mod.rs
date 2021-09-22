@@ -241,14 +241,14 @@ async fn run_scheduled(
         match timeout_result {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(ExecFailed {
+                    emit!(&ExecFailed {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
             Err(_) => {
-                emit!(ExecTimeout {
+                emit!(&ExecTimeout {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
                 });
@@ -278,7 +278,7 @@ async fn run_streaming(
                 output = run_command(config.clone(), hostname.clone(), shutdown.clone(), out.clone()) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(ExecFailed {
+                        emit!(&ExecFailed {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -300,7 +300,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(ExecFailed {
+            emit!(&ExecFailed {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -403,7 +403,7 @@ async fn run_command(
 }
 
 fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
-    emit!(ExecCommandExecuted {
+    emit!(&ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
         exec_duration,
@@ -449,7 +449,7 @@ fn create_event(
     data_stream: &Option<String>,
     pid: Option<u32>,
 ) -> Event {
-    emit!(ExecEventReceived {
+    emit!(&ExecEventReceived {
         command: config.command_line().as_str(),
         byte_size: line.len(),
     });

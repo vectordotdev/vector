@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::counter;
 use prost::DecodeError;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct VectorEventReceived {

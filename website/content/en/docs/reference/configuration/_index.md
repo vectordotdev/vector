@@ -14,7 +14,8 @@ The following is an example of a popular Vector configuration that ingests logs
 from a file and routes them to both Elasticsearch and AWS S3. Your configuration
 will differ based on your needs.
 
-{{< tabs default="vector.toml" >}} {{< tab title="vector.toml" >}}
+{{< tabs default="vector.toml" >}}
+{{< tab title="vector.toml" >}}
 
 ```toml
 # Set global options
@@ -65,7 +66,8 @@ encoding     = "ndjson"                      # new line delimited JSON
 batch.max_size   = 10000000                  # 10mb uncompressed
 ```
 
-{{< /tab >}} {{< tab title="vector.yaml" >}}
+{{< /tab >}}
+{{< tab title="vector.yaml" >}}
 
 ```yaml
 data_dir: /var/lib/vector
@@ -107,7 +109,8 @@ sinks:
       max_size: 10000000
 ```
 
-{{< /tab >}} {{< tab title="vector.json" >}}
+{{< /tab >}}
+{{< tab title="vector.json" >}}
 
 ```json
 {
@@ -164,30 +167,37 @@ sinks:
 }
 ```
 
-{{< /tab >}} {{< /tabs >}}
+{{< /tab >}}
+{{< /tabs >}}
 
 To use this configuration file, specify it with the `--config` flag when
 starting Vector:
 
 {{< tabs default="TOML" >}} {{< tab title="TOML" >}}
 
+{{< tabs default="TOML" >}}
+{{< tab title="TOML" >}}
+
 ```shell
 vector --config /etc/vector/vector.toml
 ```
 
-{{< /tab >}} {{< tab title="YAML" >}}
+{{< /tab >}}
+{{< tab title="YAML" >}}
 
 ```shell
 vector --config /etc/vector/vector.yaml
 ```
 
-{{< /tab >}} {{< tab title="JSON" >}}
+{{< /tab >}}
+{{< tab title="JSON" >}}
 
 ```shell
 vector --config /etc/vector/vector.json
 ```
 
-{{< /tab >}} {{< /tabs >}}
+{{< /tab >}}
+{{< /tabs >}}
 
 ## Reference
 

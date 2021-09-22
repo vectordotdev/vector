@@ -34,14 +34,18 @@ sudo apt-get install vector
 
 {{< tabs default="Upgrade Vector" >}}
 {{< tab title="Upgrade Vector" >}}
+
 ```bash
 sudo apt-get upgrade vector
 ```
+
 {{< /tab >}}
 {{< tab title="Uninstall Vector" >}}
+
 ```bash
 sudo apt remove vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

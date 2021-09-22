@@ -67,7 +67,7 @@ impl FunctionTransform for Filter {
         if self.condition.check(&event) {
             output.push(event);
         } else {
-            emit!(FilterEventDiscarded);
+            emit!(&FilterEventDiscarded);
         }
     }
 }

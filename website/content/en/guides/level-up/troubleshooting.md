@@ -33,6 +33,7 @@ a utility like `tail` to access your logs:
 ```shell
 tail /var/log/vector.log
 ```
+
 {{< /tab >}}
 
 {{< tab title="Systemd" >}}
@@ -41,6 +42,7 @@ Tail logs:
 ```shell
 sudo journalctl -fu vector
 ```
+
 {{< /tab >}}
 
 {{< tab title="Initd" >}}
@@ -49,6 +51,7 @@ Tail logs:
 ```shell
 tail -f /var/log/vector.log
 ```
+
 {{< /tab >}}
 {{< tab title="Homebrew" >}}
 Tail logs:
@@ -56,6 +59,7 @@ Tail logs:
 ```shell
 tail -f /usr/local/var/log/vector.log
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -88,14 +92,18 @@ Vector rate limits logs in the hot path. As a result, dropping to the
 
 {{< tabs default="Env Var" >}}
 {{< tab title="Env Var" >}}
+
 ```shell
 LOG=debug vector --config=/etc/vector/vector.toml
 ```
+
 {{< /tab >}}
 {{< tab title="Flag" >}}
+
 ```bash
 vector --verbose --config=/etc/vector/vector.toml
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

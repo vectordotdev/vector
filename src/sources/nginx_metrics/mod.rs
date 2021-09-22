@@ -106,7 +106,7 @@ impl SourceConfig for NginxMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
-                emit!(NginxMetricsCollectCompleted {
+                emit!(&NginxMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -177,7 +177,7 @@ impl NginxMetrics {
 
         metrics.push(self.create_metric("up", gauge!(up_value)));
 
-        emit!(NginxMetricsEventsReceived {
+        emit!(&NginxMetricsEventsReceived {
             count: metrics.len(),
             uri: &self.endpoint
         });
@@ -187,7 +187,7 @@ impl NginxMetrics {
 
     async fn collect_metrics(&self) -> Result<Vec<Metric>, ()> {
         let response = self.get_nginx_response().await.map_err(|error| {
-            emit!(NginxMetricsRequestError {
+            emit!(&NginxMetricsRequestError {
                 error,
                 endpoint: &self.endpoint,
             })
@@ -195,7 +195,7 @@ impl NginxMetrics {
 
         let status = NginxStubStatus::try_from(String::from_utf8_lossy(&response).as_ref())
             .map_err(|error| {
-                emit!(NginxMetricsStubStatusParseError {
+                emit!(&NginxMetricsStubStatusParseError {
                     error,
                     endpoint: &self.endpoint,
                 })

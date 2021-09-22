@@ -224,7 +224,7 @@ In addition, it is possible to pick only a subset of Vector's components for the
 {{< details title="Click to see all component features" >}}
 <!-- TODO: create a dedicated shortcode for this -->
 
-**Vector component features**
+#### Vector component features
 
 Name | Description
 :----|:-----------

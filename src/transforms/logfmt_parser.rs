@@ -85,7 +85,7 @@ impl FunctionTransform for Logfmt {
                             event.as_mut_log().insert(key, value);
                         }
                         Err(error) => {
-                            emit!(LogfmtParserConversionFailed {
+                            emit!(&LogfmtParserConversionFailed {
                                 name: key.as_ref(),
                                 error
                             });
@@ -100,7 +100,7 @@ impl FunctionTransform for Logfmt {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(LogfmtParserMissingField { field: &self.field });
+            emit!(&LogfmtParserMissingField { field: &self.field });
         };
 
         output.push(event);

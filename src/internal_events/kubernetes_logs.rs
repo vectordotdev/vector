@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use crate::event::Event;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventReceived<'a> {

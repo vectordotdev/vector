@@ -167,9 +167,5 @@ components: sinks: splunk_hec_metrics: {
 		}
 	}
 
-	telemetry: metrics: {
-		encode_errors_total:     components.sources.internal_metrics.output.metrics.encode_errors_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-	}
+	telemetry: components.sinks.splunk_hec_logs.telemetry
 }

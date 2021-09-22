@@ -264,11 +264,11 @@ components: sources: journald: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:            components.sources.internal_metrics.output.metrics.events_in_total
-		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		invalid_record_total:            components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total:      components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

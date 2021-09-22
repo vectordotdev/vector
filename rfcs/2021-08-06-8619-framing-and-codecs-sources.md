@@ -199,7 +199,7 @@ src = """
 """
 ```
 
-# Alternatives Considered
+## Alternatives Considered
 
 In a previous iteration of this RFC, codecs were implemented on the topology
 level and it was possible to chain multiple codecs to cover a wide range of
@@ -232,13 +232,13 @@ considered in the future, for now this is can be accomplished by the `wasm` or
 - Implement common configuration object
 - Implement common `Decoder` and build methods from configs
 - Integrate `DecodingConfig` into sources that expose framing/decoding to users:
-    - `file` source
-    - `kafka` source
-    - `socket` (TCP, UDP, Unix) source
-    - `stdin` source
+  - `file` source
+  - `kafka` source
+  - `socket` (TCP, UDP, Unix) source
+  - `stdin` source
 - Reuse `Decoder` for sources that internally build an `Event` from bytes
-    - `fluent` source
-    - `logstash` source
-    - `statsd` source
-    - `syslog` source
-    - `vector` source
+  - `fluent` source
+  - `logstash` source
+  - `statsd` source
+  - `syslog` source
+  - `vector` source

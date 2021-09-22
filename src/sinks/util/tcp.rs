@@ -175,13 +175,13 @@ impl TcpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(TcpSocketConnectionEstablished {
+                    emit!(&TcpSocketConnectionEstablished {
                         peer_addr: socket.peer_addr().ok(),
                     });
                     return socket;
                 }
                 Err(error) => {
-                    emit!(TcpSocketConnectionFailed { error });
+                    emit!(&TcpSocketConnectionFailed { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -264,7 +264,7 @@ impl StreamSink for TcpSink {
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
 
             let result = match sink
                 .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
@@ -276,9 +276,9 @@ impl StreamSink for TcpSink {
 
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown {});
+                    emit!(&TcpSocketConnectionShutdown {});
                 } else {
-                    emit!(TcpSocketError { error });
+                    emit!(&TcpSocketError { error });
                 }
             }
         }

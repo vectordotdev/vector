@@ -185,7 +185,7 @@ downstream target regardless if the transmission was successful or not.
     * For files, the total number of bytes written to the file excluding the
       delimiter.
   * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `http`, `file`, etc.)
+    `unix`, `http`, `https`, `file`, etc.)
   * `endpoint` - If relevant, the endpoint that the bytes were sent to. For
     HTTP, this MUST be the host and path only, excluding the query string.
   * `file` - If relevant, the absolute path of the file.
@@ -193,7 +193,7 @@ downstream target regardless if the transmission was successful or not.
   * MUST increment the `component_sent_bytes_total` counter by the defined value with the
     defined properties as metric tags.
 * Logs
-  * MUST log a `Bytes received.` message at the `trace` level with the
+  * MUST log a `Bytes sent.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
 #### Error
@@ -208,11 +208,14 @@ implement since errors are specific to the component.
 
 * Properties
   * `error` - The specifics of the error condition, such as system error code, etc.
-  * `stage` - The stage at which the error occurred. MUST be one of
-    `receiving`, `processing`, or `sending`. This MAY be omitted from
-    being represented explicitly in the event data when the error may
-    only happen at one stage, but MUST be included in the emitted logs
-    and metrics as if it were present.
+  * `error_type` - The type of error condition. This MUST be one of the types
+    listed in the `error_type` enum list in the cue docs.
+  * `stage` - The stage at which the error occurred. This MUST be one of
+    `receiving`, `processing`, or `sending`.
+  * If any of the above properties are implicit to the specific error
+    type, they MAY be omitted from being represented explicitly in the
+    event fields. However, they MUST still be included in the emitted
+    logs and metrics, as specified below, as if they were present.
 * Metrics
   * MUST increment the `component_errors_total` counter by 1 with the defined properties
     as metric tags.

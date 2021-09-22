@@ -251,7 +251,7 @@ impl PrometheusExporter {
                         )
                     });
 
-                    emit!(PrometheusServerRequestComplete {
+                    emit!(&PrometheusServerRequestComplete {
                         status_code: response.status(),
                     });
 

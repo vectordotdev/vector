@@ -112,7 +112,7 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 async-stream = "0.3.2"
 async-trait = "0.1.51"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.11.0", default-features = false, features = ["full"] }
+tokio = { version = "1.12.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.2", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time", "io"] }
@@ -174,8 +174,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "=2.6.4", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "=2.6.4", default-features = false, optional = true }
+async-graphql = { version = "2.10.0", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "2.10.0", default-features = false, optional = true }
 itertools = { version = "0.10.1", default-features = false, optional = true }
 
 # API client
@@ -223,7 +223,7 @@ hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.4", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
-http = { version = "0.2.4", default-features = false }
+http = { version = "0.2.5", default-features = false }
 hyper = { version = "0.14.13", default-features = false, features = ["stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
@@ -311,7 +311,7 @@ matches = "0.1.9"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.4", features = ["json"] }
 tempfile = "3.2.0"
-tokio = { version = "1.11.0", features = ["test-util"] }
+tokio = { version = "1.12.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 walkdir = "2.3.2"

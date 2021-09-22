@@ -77,12 +77,12 @@ impl DatadogLogsConfig {
             .or_else(|| {
                 self.site
                     .as_ref()
-                    .map(|s| format!("https://http-intake.logs.{}/v1/input", s))
+                    .map(|s| format!("https://http-intake.logs.{}/api/v2/logs", s))
             })
             .unwrap_or_else(|| match self.region {
-                Some(Region::Eu) => "https://http-intake.logs.datadoghq.eu/v1/input".to_string(),
+                Some(Region::Eu) => "https://http-intake.logs.datadoghq.eu/api/v2/logs".to_string(),
                 None | Some(Region::Us) => {
-                    "https://http-intake.logs.datadoghq.com/v1/input".to_string()
+                    "https://http-intake.logs.datadoghq.com/api/v2/logs".to_string()
                 }
             });
         http::Uri::try_from(endpoint).expect("URI not valid")

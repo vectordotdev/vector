@@ -113,7 +113,7 @@ async fn nats_source(
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
-        emit!(NatsEventReceived {
+        emit!(&NatsEventReceived {
             byte_size: msg.data.len(),
         });
 
