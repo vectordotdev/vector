@@ -44,7 +44,7 @@ impl Function for GetEnrichmentTableRecord {
     fn compile(
         &self,
         state: &state::Compiler,
-        _info: &FunctionCompileInfo,
+        _info: &FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let registry = state
