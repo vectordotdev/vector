@@ -71,4 +71,6 @@ components: sinks: sematext_logs: {
 				"""
 		}
 	}
+
+	telemetry: components.sinks.elasticsearch.telemetry
 }

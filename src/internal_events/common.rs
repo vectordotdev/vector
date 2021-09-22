@@ -41,3 +41,46 @@ impl InternalEvent for EventsSent {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct BytesSent<'a> {
+    pub byte_size: usize,
+    pub protocol: &'a str,
+}
+
+impl<'a> InternalEvent for BytesSent<'a> {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = %self.protocol);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_sent_bytes_total", self.byte_size as u64,
+                 "protocol" => self.protocol.to_string());
+    }
+}
+
+#[derive(Debug)]
+pub struct EndpointBytesSent<'a> {
+    pub byte_size: usize,
+    pub protocol: &'a str,
+    pub endpoint: &'a str,
+}
+
+impl<'a> InternalEvent for EndpointBytesSent<'a> {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes sent.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            endpoint = %self.endpoint
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_sent_bytes_total", self.byte_size as u64,
+            "protocol" => self.protocol.to_string(),
+            "endpoint" => self.endpoint.to_string()
+        );
+    }
+}
