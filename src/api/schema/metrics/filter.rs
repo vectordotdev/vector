@@ -72,7 +72,10 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
     }
 
     fn received_events_total(&self) -> Option<ReceivedEventsTotal> {
-        let sum = sum_metrics(self.iter().filter(|m| m.name() == "received_events_total"))?;
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_received_events_total"),
+        )?;
 
         Some(ReceivedEventsTotal::new(sum))
     }
@@ -108,7 +111,7 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
     fn received_events_total(&self) -> Option<ReceivedEventsTotal> {
         let sum = sum_metrics(
             self.iter()
-                .filter(|m| m.name() == "received_events_total")
+                .filter(|m| m.name() == "component_received_events_total")
                 .copied(),
         )?;
 

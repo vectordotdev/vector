@@ -145,7 +145,7 @@ impl MetricsSubscription {
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ReceivedEventsTotal> {
         get_metrics(interval).filter_map(|m| match m.name() {
-            "received_events_total" => Some(ReceivedEventsTotal::new(m)),
+            "component_received_events_total" => Some(ReceivedEventsTotal::new(m)),
             _ => None,
         })
     }
@@ -165,7 +165,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = i64> {
-        counter_throughput(interval, &|m| m.name() == "received_events_total")
+        counter_throughput(interval, &|m| m.name() == "component_received_events_total")
             .map(|(_, throughput)| throughput as i64)
     }
 
@@ -195,19 +195,20 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentReceivedEventsThroughput>> {
-        component_counter_throughputs(interval, &|m| m.name() == "received_events_total").map(|m| {
-            m.into_iter()
-                .map(|(m, throughput)| {
-                    ComponentReceivedEventsThroughput::new(
-                        ComponentKey::from((
-                            m.tag_value("pipeline_id"),
-                            m.tag_value("component_id").unwrap(),
-                        )),
-                        throughput as i64,
-                    )
-                })
-                .collect()
-        })
+        component_counter_throughputs(interval, &|m| m.name() == "component_received_events_total")
+            .map(|m| {
+                m.into_iter()
+                    .map(|(m, throughput)| {
+                        ComponentReceivedEventsThroughput::new(
+                            ComponentKey::from((
+                                m.tag_value("pipeline_id"),
+                                m.tag_value("component_id").unwrap(),
+                            )),
+                            throughput as i64,
+                        )
+                    })
+                    .collect()
+            })
     }
 
     /// Total incoming component event metrics over `interval`
@@ -225,11 +226,13 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentReceivedEventsTotal>> {
-        component_counter_metrics(interval, &|m| m.name() == "received_events_total").map(|m| {
-            m.into_iter()
-                .map(ComponentReceivedEventsTotal::new)
-                .collect()
-        })
+        component_counter_metrics(interval, &|m| m.name() == "component_received_events_total").map(
+            |m| {
+                m.into_iter()
+                    .map(ComponentReceivedEventsTotal::new)
+                    .collect()
+            },
+        )
     }
 
     /// Total outgoing events metrics
