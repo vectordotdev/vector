@@ -1,5 +1,52 @@
 package metadata
 
+#BytesReceivedEvent: {
+	emits_event:               bool
+	has_bytes_size_property:   bool
+	has_protocol_property:     bool | null
+	has_http_path_property:    bool | null
+	has_socket_property:       bool | null
+	increments_received_bytes: bool
+	logs_bytes_received:       bool
+}
+
+#BytesSentEvent: {
+	emits_event:                 bool
+	has_byte_size_property:      bool
+	has_protocol_property:       bool | null
+	has_endpoint_property:       bool | null
+	has_file_property:           bool | null
+	increments_sent_bytes_total: bool
+	logs_bytes_sent:             bool
+}
+
+#EventsReceivedEvent: {
+	emits_event:                     bool
+	has_count_property:              bool
+	has_byte_size_property:          bool
+	increments_received_events:      bool
+	increments_received_event_bytes: bool
+	logs_events_received:            bool
+}
+
+#EventsSentEvent: {
+	emits_event:                 bool
+	has_count_property:          bool
+	has_byte_size_property:      bool
+	increments_sent_events:      bool
+	increments_sent_event_bytes: bool
+	logs_events_sent:            bool
+}
+
+#ErrorEvents: {
+	have_error_property:              bool
+	have_error_type_property:         bool
+	have_stage_property:              bool
+	increment_errors_total:           bool
+	increment_discarded_events_total: bool | null
+	log_error:                        bool
+}
+
 components: {
 	// `#Classes` represent various `#Components` classifications.
 	#Classes: {
@@ -46,6 +93,8 @@ components: {
 		installation?: {
 			platform_name: string | null
 		}
+
+		spec_compliance: object | *null
 
 		configuration: #Schema
 

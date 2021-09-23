@@ -4,6 +4,14 @@ components: sources: [Name=string]: {
 	kind:     "source"
 	features: _
 
+	spec_compliance: {
+		audit_date:            string
+		bytes_received_event:  #BytesReceivedEvent
+		events_received_event: #EventsReceivedEvent
+		// events_sent_event handled in topology
+		error_events: #ErrorEvents
+	}
+
 	configuration: {
 		if features.collect != _|_ {
 			if features.collect.checkpoint.enabled {

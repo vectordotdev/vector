@@ -56,6 +56,35 @@ components: sources: file: {
 		platform_name: null
 	}
 
+	spec_compliance: {
+		audit_date: "2012-09-14"
+		bytes_received_event: {
+			emits_event:               true
+			has_byte_size_property:    true
+			has_protocol_property:     null
+			has_http_path_property:    null
+			has_socket_property:       null
+			increments_received_bytes: true
+			logs_bytes_received:       true
+		}
+		events_received_event: {
+			emits_event:                     true
+			has_count_property:              true
+			has_byte_size_property:          true
+			increments_received_events:      true
+			increments_received_event_bytes: true
+			logs_events_received:            true
+		}
+		error_events: {
+			have_error_property:              true
+			have_error_type_property:         true
+			have_stage_property:              true
+			increment_errors_total:           true
+			increment_discarded_events_total: null
+			log_error:                        true
+		}
+	}
+
 	configuration: {
 		acknowledgements: configuration._acknowledgements
 		exclude: {
