@@ -18,7 +18,7 @@ fn benchmark(c: &mut Criterion) {
 }
 
 fn prepare_metrics(cardinality: usize) -> vector::metrics::Controller {
-    let _ = vector::metrics::init_global();
+    let _ = vector::metrics::init_test();
     let controller = vector::metrics::Controller::get().unwrap();
     controller.reset();
 
