@@ -286,7 +286,7 @@ pub use mongodb_metrics::*;
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {{
-        crate::test_util::metrics::record_internal_event(stringify!($event));
+        crate::test_util::components::record_internal_event(stringify!($event));
         vector_core::internal_event::emit($event)
     }};
 }

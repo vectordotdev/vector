@@ -45,7 +45,7 @@ const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
 const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retrying
 
-pub mod metrics;
+pub mod components;
 pub mod stats;
 
 #[macro_export]

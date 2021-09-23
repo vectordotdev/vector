@@ -482,6 +482,7 @@ mod tests {
         event::{EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
+        test_util::components::{self, SOURCE_TESTS},
     };
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
@@ -637,7 +638,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_happy_path() {
-        crate::test_util::metrics::init();
+        components::init();
 
         let n = 5;
 
@@ -689,7 +690,7 @@ mod tests {
         assert_eq!(hello_i, n);
         assert_eq!(goodbye_i, n);
 
-        crate::test_util::metrics::SOURCE_TEST.assert(&["file"]);
+        SOURCE_TESTS.assert(&["file"]);
     }
 
     // https://github.com/timberio/vector/issues/8363
