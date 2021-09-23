@@ -84,7 +84,7 @@ where
                 emit(&EventsSent {
                     count: 1,
                     byte_size: size_of_val(item),
-                })
+                });
             });
             let rx = Box::new(rx);
             Ok((tx, rx, Acker::Null))
@@ -211,7 +211,6 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
                     count: 1,
                     byte_size,
                 });
-                ()
             })
         }
     }
@@ -252,7 +251,6 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for BlockWhenFull<S> {
                 count: 1,
                 byte_size,
             });
-            ()
         })
     }
 

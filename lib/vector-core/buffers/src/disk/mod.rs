@@ -125,7 +125,7 @@ where
         emit(&EventsSent {
             count: 1,
             byte_size: size_of_val(item),
-        })
+        });
     });
     Ok((Writer { inner: writer }, Box::new(reader), acker))
 }
