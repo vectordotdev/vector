@@ -35,6 +35,7 @@ struct PrometheusScrapeConfig {
     endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+    instance_key: Option<String>,
     tls: Option<TlsOptions>,
     auth: Option<Auth>,
 }
@@ -56,6 +57,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             scrape_interval_secs: default_scrape_interval_secs(),
+            instance_key: Some("instance".to_string()),
             tls: None,
             auth: None,
         })
@@ -75,6 +77,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         Ok(prometheus(
             urls,
+            self.instance_key.clone(),
             tls,
             self.auth.clone(),
             cx.proxy.clone(),
@@ -101,6 +104,7 @@ struct PrometheusCompatConfig {
     // https://github.com/serde-rs/serde/issues/1504
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
+    instance_key: Option<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     tls: Option<TlsOptions>,
@@ -115,6 +119,7 @@ impl SourceConfig for PrometheusCompatConfig {
         // https://github.com/serde-rs/serde/issues/1504
         let config = PrometheusScrapeConfig {
             endpoints: self.endpoints.clone(),
+            instance_key: self.instance_key.clone(),
             scrape_interval_secs: self.scrape_interval_secs,
             tls: self.tls.clone(),
             auth: self.auth.clone(),
@@ -131,8 +136,18 @@ impl SourceConfig for PrometheusCompatConfig {
     }
 }
 
+// InstanceInfo stores the scraped instance info and the key to insert into the log event with. It
+// is used to join these two pieces of info to avoid storing the instance if instance_key is not
+// configured
+#[derive(Clone)]
+struct InstanceInfo {
+    key: String,
+    instance: String,
+}
+
 fn prometheus(
     urls: Vec<http::Uri>,
+    instance_key: Option<String>,
     tls: TlsSettings,
     auth: Option<Auth>,
     proxy: ProxyConfig,
@@ -156,6 +171,20 @@ fn prometheus(
                 auth.apply(&mut request);
             }
 
+            let instance_info = instance_key.as_ref().map(|key| {
+                let instance = format!("{}:{}", url.host().unwrap_or_default(), url.port_u16().unwrap_or_else(|| {
+                    let scheme = url.scheme();
+                    if url.scheme() == Some(&http::uri::Scheme::HTTP) {
+                        80
+                    } else if scheme == Some(&http::uri::Scheme::HTTPS) {
+                        443
+                    } else {
+                        0
+                    }
+                }));
+                InstanceInfo{ key: key.to_string(), instance }
+            });
+
             let start = Instant::now();
             client
                 .send(request)
@@ -167,6 +196,7 @@ fn prometheus(
                 })
                 .into_stream()
                 .filter_map(move |response| {
+                    let instance_info = instance_info.clone();
                     ready(match response {
                         Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                             emit!(&PrometheusRequestCompleted {
@@ -178,13 +208,19 @@ fn prometheus(
                             let body = String::from_utf8_lossy(&body);
 
                             match parser::parse_text(&body) {
-                                Ok(metrics) => {
+                                Ok(events) => {
                                     emit!(&PrometheusEventReceived {
                                         byte_size,
-                                        count: metrics.len(),
+                                        count: events.len(),
                                         uri: url.clone()
                                     });
-                                    Some(stream::iter(metrics).map(Ok))
+                                    Some(stream::iter(events).map(move |mut event| {
+                                        if let Some(InstanceInfo {key, instance}) = &instance_info{
+                                        let metric = event.as_mut_metric();
+                                        metric.insert_tag(key.clone(), instance.clone());
+                                        }
+                                        Ok(event)
+                                    }))
                                 }
                                 Err(error) => {
                                     if url.path() == "/" {
@@ -305,6 +341,7 @@ mod test {
             "in",
             PrometheusScrapeConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
+                instance: None,
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
@@ -387,6 +424,7 @@ mod integration_tests {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://localhost:9090/metrics".into()],
             scrape_interval_secs: 1,
+            instance: Some("instance".to_string()),
             auth: None,
             tls: None,
         };
@@ -418,14 +456,26 @@ mod integration_tests {
         assert!(matches!(build.value(), &MetricValue::Gauge { .. }));
         assert!(build.tags().unwrap().contains_key("branch"));
         assert!(build.tags().unwrap().contains_key("version"));
+        assert_eq!(
+            build.tag_value("instance").unwrap(),
+            Some("localhost:9090".to_string())
+        );
 
         let queries = find_metric("prometheus_engine_queries");
         assert!(matches!(queries.kind(), MetricKind::Absolute));
         assert!(matches!(queries.value(), &MetricValue::Gauge { .. }));
+        assert_eq!(
+            queries.tag_value("instance").unwrap(),
+            Some("localhost:9090".to_string())
+        );
 
         let go_info = find_metric("go_info");
         assert!(matches!(go_info.kind(), MetricKind::Absolute));
         assert!(matches!(go_info.value(), &MetricValue::Gauge { .. }));
         assert!(go_info.tags().unwrap().contains_key("version"));
+        assert_eq!(
+            go_info.tag_value("instance").unwrap(),
+            Some("localhost:9090".to_string())
+        );
     }
 }

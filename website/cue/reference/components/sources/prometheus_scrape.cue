@@ -83,6 +83,20 @@ components: sources: prometheus_scrape: {
 				unit:    "seconds"
 			}
 		}
+		instance_key: {
+			category: "Context"
+			common:   true
+			description: """
+				The key name added to each event representing the scraped instance's host:port.
+				"""
+			required: false
+			warnings: []
+			type: string: {
+				default: null
+				syntax:  "literal"
+				examples: ["instance"]
+			}
+		}
 		auth: configuration._http_auth & {_args: {
 			password_example: "${PROMETHEUS_PASSWORD}"
 			username_example: "${PROMETHEUS_USERNAME}"
@@ -90,10 +104,26 @@ components: sources: prometheus_scrape: {
 	}
 
 	output: metrics: {
-		counter:   output._passthrough_counter
-		gauge:     output._passthrough_gauge
-		histogram: output._passthrough_histogram
-		summary:   output._passthrough_summary
+		_extra_tags: {
+			"instance": {
+				description: "Any host:port of the scraped instance. Only present if `instance_key` is set.."
+				examples: [_values.instance]
+				required: false
+			}
+		}
+
+		counter: output._passthrough_counter & {
+			tags: _extra_tags
+		}
+		gauge: output._passthrough_gauge & {
+			tags: _extra_tags
+		}
+		histogram: output._passthrough_histogram & {
+			tags: _extra_tags
+		}
+		summary: output._passthrough_summary & {
+			tags: _extra_tags
+		}
 	}
 
 	telemetry: metrics: {
