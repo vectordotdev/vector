@@ -29,8 +29,8 @@ impl SentEventsTotal {
         self.get_timestamp()
     }
 
-    /// Total outgoing events
-    pub async fn events_out_total(&self) -> f64 {
+    /// Total sent events
+    pub async fn sent_events_total(&self) -> f64 {
         self.get_sent_events_total()
     }
 }

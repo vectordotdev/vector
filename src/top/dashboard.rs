@@ -168,7 +168,7 @@ impl<'a> Widgets<'a> {
                         r.received_events_throughput_sec.human_format()
                     ),
                 },
-                match r.events_out_total {
+                match r.sent_events_total {
                     0 => "N/A".to_string(),
                     v => format!(
                         "{} ({}/s)",
@@ -177,7 +177,7 @@ impl<'a> Widgets<'a> {
                         } else {
                             v.thousands_format()
                         },
-                        r.events_out_throughput_sec.human_format()
+                        r.sent_events_throughput_sec.human_format()
                     ),
                 },
                 match r.processed_bytes_total {

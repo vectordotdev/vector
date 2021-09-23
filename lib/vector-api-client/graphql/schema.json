@@ -3721,9 +3721,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Total outgoing events",
+              "description": "Total sent events",
               "isDeprecated": false,
-              "name": "eventsOutTotal",
+              "name": "sentEventsTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
