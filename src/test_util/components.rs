@@ -11,8 +11,10 @@ use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::env;
 
-/// A buffer for recording internal events emitted by a single test.
-thread_local!(static EVENTS_RECORDED: RefCell<Vec<String>> = RefCell::new(Vec::new()));
+thread_local!(
+    /// A buffer for recording internal events emitted by a single test.
+    static EVENTS_RECORDED: RefCell<Vec<String>> = RefCell::new(Vec::new())
+);
 
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {

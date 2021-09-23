@@ -383,7 +383,7 @@ struct TestResults {
 }
 
 async fn run_test(params: TestParams) -> TestResults {
-    let _ = metrics::init();
+    let _ = metrics::init_test();
     let (send_done, is_done) = oneshot::channel();
 
     let test_config = TestConfig {
