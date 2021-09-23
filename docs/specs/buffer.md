@@ -18,6 +18,16 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 
 ### Events
 
+#### `BufferCreated`
+
+*All buffers* MUST emit a `BufferCreated` event immediately upon creation.
+
+* Properties
+  * `max_size` - the maximum number of events or byte size of the buffer
+  * `id` - the ID of the component associated with the buffer
+* Metric
+  * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) or `buffer_max_byte_size` gauge (disk buffers) with the defined `max_size` value and `id` as tag.
+
 #### `EventsReceived`
 
 *All buffers* MUST emit an `EventsReceived` event immediately after receiving one or more Vector events.
@@ -30,7 +40,6 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
   * MUST increment the `buffer_received_bytes_total` counter by the defined `byte_size`
   * MUST increment the `buffer_events` gauge by the defined `count`
   * MUST increment the `buffer_byte_size` gauge by the defined `byte_size`
-  * MUST update the `buffer_usage_percentage` gauge which measures the current buffer space utilization (number of events/bytes) over total space available (max number of events/bytes)
 
 #### `EventsSent`
 
@@ -44,7 +53,6 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
   * MUST increment the `buffer_sent_bytes_total` counter by the defined `byte_size`
   * MUST decrement the `buffer_events` gauge by the defined `count`
   * MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
-  * MUST update the `buffer_usage_percentage` gauge
 
 #### `EventsDropped`
 
