@@ -24,9 +24,13 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 
 * Properties
   * `max_size` - the maximum number of events or byte size of the buffer
-  * `id` - the ID of the component associated with the buffer
+  * `initial_events_size` - the number of events in the buffer at creation
+  * `initial_bytes_size` - the byte size of the buffer at creation
+  * `component_id` - the ID of the component associated with the buffer
 * Metric
-  * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) or `buffer_max_byte_size` gauge (disk buffers) with the defined `max_size` value and `id` as tag.
+  * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) or `buffer_max_byte_size` gauge (disk buffers) with the defined `max_size` value and `component_id` as tag.
+  * MUST emit the `buffer_received_events_total` counter with the defined `initial_events_size` value with `component_id` as tag.
+  * MUST emit the `buffer_received_bytes_total` counter with the defined `initial_bytes_size` value with `component_id` as tag.
 
 #### `EventsReceived`
 
