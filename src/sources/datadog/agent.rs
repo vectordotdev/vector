@@ -1,27 +1,41 @@
-use crate::sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
-    sources,
-    tls::TlsConfig,
+    internal_events::HttpDecompressError,
+    sources::{self, util::ErrorMessage},
+    tls::{MaybeTlsSettings, TlsConfig},
+    Pipeline,
 };
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use chrono::Utc;
+use flate2::read::{DeflateDecoder, MultiGzDecoder};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use vector_core::event::LogEvent;
-use warp::http::HeaderMap;
-use warp::http::StatusCode;
+use snafu::Snafu;
+use std::{io::Read, net::SocketAddr, sync::Arc};
+use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
+use warp::{
+    filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
+};
+
+#[derive(Clone, Copy, Debug, Snafu)]
+pub(crate) enum ApiError {
+    BadRequest,
+    InvalidDataFormat,
+    ServerShutdown,
+}
+
+impl warp::reject::Reject for ApiError {}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DatadogAgentConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
-    auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 }
@@ -30,12 +44,17 @@ inventory::submit! {
     SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
 }
 
+#[derive(Deserialize)]
+pub struct ApiKeyQueryParams {
+    #[serde(rename = "dd-api-key")]
+    dd_api_key: Option<String>,
+}
+
 impl GenerateConfig for DatadogAgentConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
-            auth: None,
             store_api_key: true,
         })
         .unwrap()
@@ -47,8 +66,34 @@ impl GenerateConfig for DatadogAgentConfig {
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = DatadogAgentSource::new(self.store_api_key);
-        // We accept /v1/input & /v1/input/<API_KEY>
-        source.run(self.address, "/v1/input", false, &self.tls, &self.auth, cx)
+
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let listener = tls.bind(&self.address).await?;
+        let service = source.event_service(cx.acknowledgements, cx.out.clone());
+
+        let shutdown = cx.shutdown;
+        Ok(Box::pin(async move {
+            let span = crate::trace::current_span();
+            let routes = service
+                .with(warp::trace(move |_info| span.clone()))
+                .recover(|r: Rejection| async move {
+                    if let Some(e_msg) = r.find::<ErrorMessage>() {
+                        let json = warp::reply::json(e_msg);
+                        Ok(warp::reply::with_status(json, e_msg.status_code()))
+                    } else {
+                        // other internal error - will return 500 internal server error
+                        Err(r)
+                    }
+                });
+            warp::serve(routes)
+                .serve_incoming_with_graceful_shutdown(
+                    listener.accept_stream(),
+                    shutdown.map(|_| ()),
+                )
+                .await;
+
+            Ok(())
+        }))
     }
 
     fn output_type(&self) -> DataType {
@@ -83,29 +128,117 @@ impl DatadogAgentSource {
         }
     }
 
-    fn extract_api_key<'a>(&self, headers: &'a HeaderMap, path: &'a str) -> Option<&'a str> {
+    fn extract_api_key(
+        &self,
+        path: &str,
+        header: Option<String>,
+        query_params: Option<String>,
+    ) -> Option<Arc<str>> {
         // Grab from URL first
         self.api_key_matcher
             .captures(path)
-            .and_then(|cap| cap.name("api_key").map(|key| key.as_str()))
+            .and_then(|cap| cap.name("api_key").map(|key| key.as_str()).map(Arc::from))
+            // Try from query params
+            .or_else(|| query_params.map(Arc::from))
             // Try from header next
-            .or_else(|| headers.get("dd-api-key").and_then(|key| key.to_str().ok()))
+            .or_else(|| header.map(Arc::from))
+    }
+
+    async fn handle_request(
+        events: Result<Vec<Event>, ErrorMessage>,
+        acknowledgements: bool,
+        mut out: Pipeline,
+    ) -> Result<Response, Rejection> {
+        match events {
+            Ok(mut events) => {
+                let receiver = acknowledgements.then(|| {
+                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                    for event in &mut events {
+                        event.add_batch_notifier(Arc::clone(&batch));
+                    }
+                    receiver
+                });
+
+                let mut events = futures::stream::iter(events).map(Ok);
+                out.send_all(&mut events)
+                    .map_err(move |error: crate::pipeline::ClosedError| {
+                        // can only fail if receiving end disconnected, so we are shutting down,
+                        // probably not gracefully.
+                        error!(message = "Failed to forward events, downstream is closed.");
+                        error!(message = "Tried to send the following event.", %error);
+                        warp::reject::custom(ApiError::ServerShutdown)
+                    })
+                    .await?;
+                match receiver {
+                    None => Ok(warp::reply().into_response()),
+                    Some(receiver) => match receiver.await {
+                        BatchStatus::Delivered => Ok(warp::reply().into_response()),
+                        BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Error delivering contents to sink".into(),
+                        ))),
+                        BatchStatus::Failed => Err(warp::reject::custom(ErrorMessage::new(
+                            StatusCode::BAD_REQUEST,
+                            "Contents failed to deliver to sink".into(),
+                        ))),
+                    },
+                }
+            }
+            Err(err) => Err(warp::reject::custom(err)),
+        }
+    }
+
+    fn event_service(self, acknowledgements: bool, out: Pipeline) -> BoxedFilter<(Response,)> {
+        warp::post()
+            .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
+            .and(warp::path::full())
+            .and(warp::header::optional::<String>("content-encoding"))
+            .and(warp::header::optional::<String>("dd-api-key"))
+            .and(warp::query::<ApiKeyQueryParams>())
+            .and(warp::body::bytes())
+            .and_then(
+                move |_,
+                      path: FullPath,
+                      encoding_header: Option<String>,
+                      api_token: Option<String>,
+                      query_params: ApiKeyQueryParams,
+                      body: Bytes| {
+                    let token: Option<Arc<str>> = if self.store_api_key {
+                        self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key)
+                    } else {
+                        None
+                    };
+                    let events = decode(&encoding_header, body)
+                        .and_then(|body| self.decode_body(body, token));
+                    Self::handle_request(events, acknowledgements, out.clone())
+                },
+            )
+            .boxed()
     }
 
     fn decode_body(
         &self,
         body: Bytes,
         api_key: Option<Arc<str>>,
-        events: &mut Vec<Event>,
-    ) -> Result<(), ErrorMessage> {
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        if body.is_empty() {
+            // The datadog agent may send an empty payload as a keep alive
+            debug!(
+                message = "Empty payload ignored.",
+                internal_log_rate_secs = 30
+            );
+            return Ok(Vec::new());
+        }
+
         let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 format!("Error parsing JSON: {:?}", error),
             )
         })?;
+
         let now = Utc::now();
-        let iter = messages
+        Ok(messages
             .into_iter()
             .map(|msg| {
                 let mut log = LogEvent::default();
@@ -126,10 +259,52 @@ impl DatadogAgentSource {
                 }
                 log
             })
-            .map(|log| log.into());
-        events.extend(iter);
-        Ok(())
+            .map(|log| log.into())
+            .collect())
     }
+}
+
+fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
+    if let Some(encodings) = header {
+        for encoding in encodings.rsplit(',').map(str::trim) {
+            body = match encoding {
+                "identity" => body,
+                "gzip" | "x-gzip" => {
+                    let mut decoded = Vec::new();
+                    MultiGzDecoder::new(body.reader())
+                        .read_to_end(&mut decoded)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    decoded.into()
+                }
+                "deflate" | "x-deflate" => {
+                    let mut decoded = Vec::new();
+                    DeflateDecoder::new(body.reader())
+                        .read_to_end(&mut decoded)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    decoded.into()
+                }
+                encoding => {
+                    return Err(ErrorMessage::new(
+                        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                        format!("Unsupported encoding {}", encoding),
+                    ))
+                }
+            }
+        }
+    }
+
+    Ok(body)
+}
+
+fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
+    emit!(&HttpDecompressError {
+        encoding,
+        error: &error
+    });
+    ErrorMessage::new(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        format!("Failed decompressing payload with {} decoder.", encoding),
+    )
 }
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
@@ -143,35 +318,6 @@ struct LogMsg {
     pub service: Bytes,
     pub ddsource: Bytes,
     pub ddtags: Bytes,
-}
-
-impl HttpSource for DatadogAgentSource {
-    fn build_events(
-        &self,
-        body: Bytes,
-        header_map: HeaderMap,
-        _query_parameters: HashMap<String, String>,
-        request_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
-        if body.is_empty() {
-            // The datadog agent may send an empty payload as a keep alive
-            debug!(
-                message = "Empty payload ignored.",
-                internal_log_rate_secs = 30
-            );
-            return Ok(Vec::new());
-        }
-
-        let api_key = match self.store_api_key {
-            true => self.extract_api_key(&header_map, request_path),
-            false => None,
-        }
-        .map(Arc::from);
-
-        let mut events: Vec<Event> = Vec::with_capacity(1024);
-        self.decode_body(body, api_key, &mut events)?;
-        Ok(events)
-    }
 }
 
 #[cfg(test)]
@@ -215,9 +361,8 @@ mod tests {
             let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
             let api_key = None;
 
-            let mut events = Vec::with_capacity(msgs.len());
             let source = DatadogAgentSource::new(true);
-            source.decode_body(body, api_key, &mut events).unwrap();
+            let events = source.decode_body(body, api_key).unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
                 let log = event.as_log();
@@ -254,7 +399,6 @@ mod tests {
             DatadogAgentConfig {
                 address,
                 tls: None,
-                auth: None,
                 store_api_key,
             }
             .build(context)
@@ -285,7 +429,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn full_payload() {
+    async fn full_payload_v1() {
         trace_init();
         let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
@@ -307,6 +451,53 @@ mod tests {
                         .unwrap(),
                         HeaderMap::new(),
                         "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["message"], "foo".into());
+            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
+            assert!(event.metadata().datadog_api_key().is_none());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn full_payload_v2() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("foo"),
+                            timestamp: 123,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
+                        HeaderMap::new(),
+                        "/api/v2/logs"
                     )
                     .await
                 );
@@ -401,6 +592,56 @@ mod tests {
                         .unwrap(),
                         HeaderMap::new(),
                         "/v1/input/12345678abcdefgh12345678abcdefgh"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["message"], "bar".into());
+            assert_eq!(log["timestamp"], 456.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(
+                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn api_key_in_query_params() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("bar"),
+                            timestamp: 456,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
+                        HeaderMap::new(),
+                        "/api/v2/logs?dd-api-key=12345678abcdefgh12345678abcdefgh"
                     )
                     .await
                 );
