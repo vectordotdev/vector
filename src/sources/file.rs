@@ -637,7 +637,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_happy_path() {
-        crate::metrics::init_test().unwrap();
+        crate::test_util::metrics::init();
 
         let n = 5;
 
