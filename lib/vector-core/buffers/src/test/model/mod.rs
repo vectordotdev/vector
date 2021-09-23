@@ -1,18 +1,26 @@
 use crate::test::common::Message;
 use crate::Variant;
 use crate::WhenFull;
+use futures::SinkExt;
 use futures::{stream, StreamExt};
 use proptest::prelude::*;
+use std::mem;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use tokio::runtime;
+use tokio::sync::Barrier;
 
 /// `VariantGuard` wraps a `Variant`, allowing a convenient Drop implementation
 struct VariantGuard {
     inner: Variant,
 }
 
+static TEST_COUNT: AtomicU64 = AtomicU64::new(0);
+
 impl VariantGuard {
     fn new(variant: Variant) -> Self {
-        VariantGuard { inner: variant }
+        Self { inner: variant }
     }
 }
 
@@ -41,12 +49,13 @@ fn arb_variant() -> impl Strategy<Value = Variant> {
     prop_oneof![
         <(u16, WhenFull)>::arbitrary().prop_map(|(max_events, when_full)| {
             Variant::Memory {
-                max_events: max_events as usize,
+                max_events: max_events.max(1) as usize,
                 when_full,
             }
         }),
         <(u16, WhenFull, u64)>::arbitrary().prop_map(|(max_size, when_full, id)| {
-            let id = id.to_string();
+            let test_count = TEST_COUNT.fetch_add(1, Ordering::Relaxed);
+            let id = ["buffer".to_string(), id.to_string(), test_count.to_string()].join(".");
             // SAFETY: We allow tempdir to create the directory but by
             // calling `into_path` we obligate ourselves to delete it. This
             // is done in the drop implementation for `VariantGuard`.
@@ -54,7 +63,7 @@ fn arb_variant() -> impl Strategy<Value = Variant> {
                 .unwrap()
                 .into_path();
             Variant::Disk {
-                max_size: max_size as usize,
+                max_size: (max_size as usize).max(mem::size_of::<Message>()),
                 when_full,
                 data_dir,
                 id,
@@ -68,7 +77,7 @@ fn arb_variant() -> impl Strategy<Value = Variant> {
     prop_oneof![
         <(u16, WhenFull)>::arbitrary().prop_map(|(max_events, when_full)| {
             Variant::Memory {
-                max_events: max_events as usize,
+                max_events: max_events.max(1) as usize,
                 when_full,
             }
         }),
@@ -80,12 +89,18 @@ fn arb_variant_blocking() -> impl Strategy<Value = Variant> {
     prop_oneof![
         <u16>::arbitrary().prop_map(|max_events| {
             Variant::Memory {
-                max_events: max_events as usize,
+                max_events: max_events.max(1) as usize,
                 when_full: WhenFull::Block,
             }
         }),
         <(u16, u64)>::arbitrary().prop_map(|(max_size, id)| {
-            let id = id.to_string();
+            let test_count = TEST_COUNT.fetch_add(1, Ordering::Relaxed);
+            let id = [
+                "buffer-blocking".to_string(),
+                id.to_string(),
+                test_count.to_string(),
+            ]
+            .join(".");
             // SAFETY: We allow tempdir to create the directory but by
             // calling `into_path` we obligate ourselves to delete it. This
             // is done in the drop implementation for `VariantGuard`.
@@ -93,7 +108,7 @@ fn arb_variant_blocking() -> impl Strategy<Value = Variant> {
                 .unwrap()
                 .into_path();
             Variant::Disk {
-                max_size: max_size as usize,
+                max_size: (max_size as usize).max(mem::size_of::<Message>()),
                 when_full: WhenFull::Block,
                 data_dir,
                 id,
@@ -178,21 +193,28 @@ proptest! {
             .unwrap();
 
         let guard = VariantGuard::new(variant);
-        let (bic, mut rx, _) = crate::build::<Message>(guard.as_ref().clone()).unwrap();
-        let tx = bic.get();
+        let (bic, mut rx, acker) = crate::build::<Message>(guard.as_ref().clone()).unwrap();
+        let mut tx = bic.get();
         drop(bic);
 
         runtime.block_on(async move {
+            let barrier = Arc::new(Barrier::new(2));
+            let snd_barrier = barrier.clone();
             let _ = tokio::spawn(async move {
-                let  stream = stream::iter(messages.clone()).map(|m| Ok(m));
-                stream.forward(tx).await.unwrap();
+                snd_barrier.wait().await;
+                for message in messages.into_iter() {
+                    tx.send(message).await.unwrap();
+                }
             });
 
+            barrier.wait().await;
             let mut actual_total = 0;
             while let Some(_) = rx.next().await {
+                acker.ack(1);
                 actual_total += 1;
             }
             assert_eq!(expected_total, actual_total);
-        })
+        });
+        drop(guard);
     }
 }
