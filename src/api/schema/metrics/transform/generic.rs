@@ -30,6 +30,11 @@ impl GenericTransformMetrics {
         self.0.events_in_total()
     }
 
+    /// Total received events for the current transform
+    pub async fn received_events_total(&self) -> Option<metrics::ReceivedEventsTotal> {
+        self.0.received_events_total()
+    }
+
     /// Total outgoing events for the current transform
     pub async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
         self.0.events_out_total()

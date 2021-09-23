@@ -1,0 +1,5 @@
+subscription ReceivedEventsTotalSubscription($interval: Int!) {
+  receivedEventsTotal(interval: $interval) {
+    receivedEventsTotal
+  }
+}
