@@ -44,6 +44,12 @@ inventory::submit! {
     SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
 }
 
+#[derive(Deserialize)]
+pub struct ApiKeyQueryParams {
+    #[serde(rename = "dd-api-key")]
+    dd_api_key: Option<String>,
+}
+
 impl GenerateConfig for DatadogAgentConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -115,20 +121,25 @@ impl DatadogAgentSource {
     fn new(store_api_key: bool) -> Self {
         Self {
             store_api_key,
-            api_key_matcher: Regex::new(
-                r"^(/v1/input|/api/v2/logs)/(?P<api_key>[[:alnum:]]{32})/??",
-            )
-            .expect("static regex always compiles"),
+            api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
+                .expect("static regex always compiles"),
             log_schema_source_type_key: log_schema().source_type_key(),
             log_schema_timestamp_key: log_schema().timestamp_key(),
         }
     }
 
-    fn extract_api_key(&self, path: &str, header: Option<String>) -> Option<Arc<str>> {
+    fn extract_api_key(
+        &self,
+        path: &str,
+        header: Option<String>,
+        query_params: Option<String>,
+    ) -> Option<Arc<str>> {
         // Grab from URL first
         self.api_key_matcher
             .captures(path)
             .and_then(|cap| cap.name("api_key").map(|key| key.as_str()).map(Arc::from))
+            // Try from query params
+            .or_else(|| query_params.map(Arc::from))
             // Try from header next
             .or_else(|| header.map(Arc::from))
     }
@@ -183,15 +194,17 @@ impl DatadogAgentSource {
             .and(warp::path::full())
             .and(warp::header::optional::<String>("content-encoding"))
             .and(warp::header::optional::<String>("dd-api-key"))
+            .and(warp::query::<ApiKeyQueryParams>())
             .and(warp::body::bytes())
             .and_then(
                 move |_,
                       path: FullPath,
                       encoding_header: Option<String>,
                       api_token: Option<String>,
+                      query_params: ApiKeyQueryParams,
                       body: Bytes| {
                     let token: Option<Arc<str>> = if self.store_api_key {
-                        self.extract_api_key(path.as_str(), api_token)
+                        self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key)
                     } else {
                         None
                     };
@@ -579,6 +592,56 @@ mod tests {
                         .unwrap(),
                         HeaderMap::new(),
                         "/v1/input/12345678abcdefgh12345678abcdefgh"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["message"], "bar".into());
+            assert_eq!(log["timestamp"], 456.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(
+                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn api_key_in_query_params() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("bar"),
+                            timestamp: 456,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
+                        }])
+                        .unwrap(),
+                        HeaderMap::new(),
+                        "/api/v2/logs?dd-api-key=12345678abcdefgh12345678abcdefgh"
                     )
                     .await
                 );
