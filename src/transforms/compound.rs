@@ -43,10 +43,13 @@ impl TransformConfig for CompoundConfig {
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
         for (i, step) in self.steps.iter().enumerate() {
-            if let Some(_) = map.insert(
-                step.id.as_ref().cloned().unwrap_or_else(|| i.to_string()),
-                step.transform.to_owned(),
-            ) {
+            if map
+                .insert(
+                    step.id.as_ref().cloned().unwrap_or_else(|| i.to_string()),
+                    step.transform.to_owned(),
+                )
+                .is_some()
+            {
                 return Err("conflicting id found while expanding transform".into());
             }
         }
