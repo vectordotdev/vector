@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
-fn get_controller() -> Controller {
+fn get_controller() -> &'static Controller {
     Controller::get().expect("Metrics system not initialized. Please report.")
 }
 

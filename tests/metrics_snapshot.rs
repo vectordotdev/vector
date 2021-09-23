@@ -1,6 +1,6 @@
 use vector::metrics::Controller;
 
-fn prepare_metrics(cardinality: usize) -> Controller {
+fn prepare_metrics(cardinality: usize) -> &'static Controller {
     let _ = vector::metrics::init_test();
     let controller = Controller::get().unwrap();
     controller.reset();

@@ -95,7 +95,7 @@ async fn run(
     namespace: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
-    controller: Controller,
+    controller: &Controller,
     interval: time::Duration,
     out: Pipeline,
     shutdown: ShutdownSignal,
