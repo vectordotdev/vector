@@ -689,7 +689,7 @@ mod tests {
         assert_eq!(hello_i, n);
         assert_eq!(goodbye_i, n);
 
-        crate::test_util::metrics::emits_source_events(&["file"]).unwrap();
+        crate::test_util::metrics::SOURCE_TEST.assert(&["file"]);
     }
 
     // https://github.com/timberio/vector/issues/8363
