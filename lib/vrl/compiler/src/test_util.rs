@@ -122,7 +122,16 @@ macro_rules! test_function {
 #[macro_export]
 macro_rules! __prep_bench_or_test {
     ($func:path, $state:expr, $args:expr, $want:expr) => {{
-        ($func.compile(&$state, $args.into()), $want)
+        (
+            $func.compile(
+                &$state,
+                &$crate::function::FunctionCompileContext {
+                    span: vrl::diagnostic::Span::new(0, 0),
+                },
+                $args.into(),
+            ),
+            $want,
+        )
     }};
 }
 

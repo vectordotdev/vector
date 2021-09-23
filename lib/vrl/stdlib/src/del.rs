@@ -49,7 +49,12 @@ impl Function for Del {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let query = arguments.required_query("target")?;
 
         Ok(Box::new(DelFn { query }))
