@@ -4,8 +4,8 @@ use super::api;
 use super::datadog;
 use super::{
     compiler, pipeline::Pipelines, provider, ComponentKey, Config, EnrichmentTableConfig,
-    EnrichmentTableOuter, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformOuter,
+    EnrichmentTableOuter, HealthcheckOptions, OutputId, SinkConfig, SinkOuter, SourceConfig,
+    SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -30,9 +30,9 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<ComponentKey, SinkOuter>,
+    pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
-    pub transforms: IndexMap<ComponentKey, TransformOuter>,
+    pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
@@ -53,7 +53,17 @@ impl Clone for ConfigBuilder {
 }
 
 impl From<Config> for ConfigBuilder {
-    fn from(c: Config) -> Self {
+    fn from(mut c: Config) -> Self {
+        let transforms = std::mem::take(&mut c.transforms)
+            .into_iter()
+            .map(|(key, transform)| (key, transform.map_inputs(stringify_input)))
+            .collect();
+
+        let sinks = std::mem::take(&mut c.sinks)
+            .into_iter()
+            .map(|(key, sink)| (key, sink.map_inputs(stringify_input)))
+            .collect();
+
         ConfigBuilder {
             global: c.global,
             #[cfg(feature = "api")]
@@ -63,12 +73,19 @@ impl From<Config> for ConfigBuilder {
             healthchecks: c.healthchecks,
             enrichment_tables: c.enrichment_tables,
             sources: c.sources,
-            sinks: c.sinks,
-            transforms: c.transforms,
+            sinks,
+            transforms,
             provider: None,
             tests: c.tests,
             pipelines: Default::default(),
         }
+    }
+}
+
+fn stringify_input(output_id: OutputId) -> String {
+    match output_id.port {
+        Some(port) => format!("{}.{}", output_id.component, port),
+        None => output_id.component.to_string(),
     }
 }
 
@@ -100,9 +117,10 @@ impl ConfigBuilder {
             }
             for input in pipeline_transform.outputs.iter() {
                 if let Some(transform) = self.transforms.get_mut(input) {
-                    transform.inputs.push(component_id.clone());
+                    // TODO: it's a bit sad to `to_string` these only to re-resolve them later
+                    transform.inputs.push(component_id.to_string());
                 } else if let Some(sink) = self.sinks.get_mut(input) {
-                    sink.inputs.push(component_id.clone());
+                    sink.inputs.push(component_id.to_string());
                 } else {
                     errors.push(format!("Couldn't find transform or sink '{}'", input));
                 }
@@ -154,7 +172,10 @@ impl ConfigBuilder {
         inputs: &[&str],
         sink: S,
     ) {
-        let inputs = inputs.iter().map(ComponentKey::from).collect::<Vec<_>>();
+        let inputs = inputs
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
 
         self.sinks.insert(ComponentKey::from(id.into()), sink);
@@ -168,7 +189,7 @@ impl ConfigBuilder {
     ) {
         let inputs = inputs
             .iter()
-            .map(|value| ComponentKey::from(value.to_string()))
+            .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let transform = TransformOuter {
             inner: Box::new(transform),

@@ -5,7 +5,9 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{ComponentKey, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
+    config::{
+        ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
+    },
     event::Event,
     internal_events::{EventsReceived, EventsSent},
     shutdown::SourceShutdownCoordinator,
@@ -58,8 +60,8 @@ pub async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<ComponentKey>)>,
-    pub outputs: HashMap<ComponentKey, fanout::ControlChannel>,
+    pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<OutputId>)>,
+    pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
     pub healthchecks: HashMap<ComponentKey, Task>,
@@ -136,7 +138,7 @@ pub async fn build_pieces(
         };
         let server = Task::new(key.clone(), typetag, server);
 
-        outputs.insert(key.clone(), control);
+        outputs.insert(OutputId::from(key), control);
         tasks.insert(key.clone(), pump);
         source_tasks.insert(key.clone(), server);
     }
@@ -155,6 +157,8 @@ pub async fn build_pieces(
         let trans_inputs = &transform.inputs;
 
         let typetag = transform.inner.transform_type();
+
+        let mut named_outputs = transform.inner.named_outputs();
 
         let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(&context).await {
@@ -207,7 +211,7 @@ pub async fn build_pieces(
                         TaskOutput::Transform
                     });
 
-                outputs.insert(key.clone(), control);
+                outputs.insert(OutputId::from(key), control);
 
                 Task::new(key.clone(), typetag, transform)
             }
@@ -251,8 +255,14 @@ pub async fn build_pieces(
                 }
                 .boxed();
 
-                outputs.insert(key.clone(), control);
-                outputs.insert(key.join("errors"), errors_control);
+                outputs.insert(OutputId::from(key), control);
+                // TODO: actually drive fanout creation from transform output declaration instead
+                // of relying on the one fallible function pattern we currently have
+                assert_eq!(1, named_outputs.len());
+                outputs.insert(
+                    OutputId::from((key, named_outputs.remove(0))),
+                    errors_control,
+                );
 
                 Task::new(key.clone(), typetag, transform)
             }
@@ -283,7 +293,7 @@ pub async fn build_pieces(
                         TaskOutput::Transform
                     });
 
-                outputs.insert(key.clone(), control);
+                outputs.insert(OutputId::from(key), control);
 
                 Task::new(key.clone(), typetag, transform)
             }
@@ -426,10 +436,18 @@ pub async fn build_pieces(
     // readonly.
     ENRICHMENT_TABLES.finish_load();
 
+    let mut finalized_outputs = HashMap::new();
+    for (id, output) in outputs {
+        let entry = finalized_outputs
+            .entry(id.component)
+            .or_insert(HashMap::new());
+        entry.insert(id.port, output);
+    }
+
     if errors.is_empty() {
         let pieces = Pieces {
             inputs,
-            outputs,
+            outputs: finalized_outputs,
             tasks,
             source_tasks,
             healthchecks,

@@ -22,6 +22,42 @@ impl fmt::Display for ComponentScope {
     }
 }
 
+// Unlike `ComponentKey`, we never deserialize these directly out of user configs, so it's fine to
+// use the derive. They should really only be triggered by our hacky roundtrip-through-serde clone.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct OutputId {
+    pub component: ComponentKey,
+    pub port: Option<String>,
+}
+
+impl fmt::Display for OutputId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.port {
+            None => self.component.fmt(f),
+            Some(port) => write!(f, "{}.{}", self.component, port),
+        }
+    }
+}
+
+// TODO: this is too broad to be generally safe. Try to get rid of it.
+impl<T: Into<ComponentKey>> From<T> for OutputId {
+    fn from(key: T) -> Self {
+        Self {
+            component: key.into(),
+            port: None,
+        }
+    }
+}
+
+impl From<(&ComponentKey, String)> for OutputId {
+    fn from((key, name): (&ComponentKey, String)) -> Self {
+        Self {
+            component: key.clone(),
+            port: Some(name),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentKey {
     id: String,

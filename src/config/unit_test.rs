@@ -29,6 +29,8 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
 
     let expansions = super::compiler::expand_macros(&mut builder)?;
 
+    let (transforms, sinks) = super::compiler::take_and_resolve_everything(&mut builder)?;
+
     // Don't let this escape since it's not validated
     let config = Config {
         global: builder.global,
@@ -39,8 +41,8 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         healthchecks: builder.healthchecks,
         enrichment_tables: builder.enrichment_tables,
         sources: builder.sources,
-        sinks: builder.sinks,
-        transforms: builder.transforms,
+        sinks,
+        transforms,
         tests: builder.tests,
         expansions,
     };
@@ -423,7 +425,8 @@ async fn build_unit_test(
 
     config.transforms.iter().for_each(|(k, t)| {
         t.inputs.iter().for_each(|i| {
-            if let Some(outputs) = transform_outputs.get_mut(i) {
+            // TODO: this is intentionally ignoring named outputs for now
+            if let Some(outputs) = transform_outputs.get_mut(&i.component) {
                 outputs.insert(k.clone(), ());
             }
         })

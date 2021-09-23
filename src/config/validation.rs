@@ -1,4 +1,7 @@
-use super::{builder::ConfigBuilder, graph::Graph, pipeline::Pipelines, ComponentKey, Resource};
+use super::{
+    builder::ConfigBuilder, graph::Graph, pipeline::Pipelines, ComponentKey, Config, OutputId,
+    Resource,
+};
 use std::collections::HashMap;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -161,7 +164,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
+pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
     let source_names = config.sources.keys().map(|name| ("source", name.clone()));
@@ -169,15 +172,18 @@ pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
         .transforms
         .keys()
         .map(|name| ("transform", name.clone()));
+
+    // TODO: maybe warn about no consumers for named outputs as well?
     for (input_type, name) in transform_names.chain(source_names) {
+        let id = OutputId::from(&name);
         if !config
             .transforms
             .iter()
-            .any(|(_, transform)| transform.inputs.contains(&name))
+            .any(|(_, transform)| transform.inputs.contains(&id))
             && !config
                 .sinks
                 .iter()
-                .any(|(_, sink)| sink.inputs.contains(&name))
+                .any(|(_, sink)| sink.inputs.contains(&id))
         {
             warnings.push(format!(
                 "{} \"{}\" has no consumers",
