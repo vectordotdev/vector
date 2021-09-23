@@ -637,6 +637,8 @@ mod tests {
 
     #[tokio::test]
     async fn file_happy_path() {
+        crate::metrics::init_test().unwrap();
+
         let n = 5;
 
         let dir = tempdir().unwrap();
@@ -686,6 +688,8 @@ mod tests {
         }
         assert_eq!(hello_i, n);
         assert_eq!(goodbye_i, n);
+
+        crate::test_util::metrics::emits_source_events(&["file"]).unwrap();
     }
 
     // https://github.com/timberio/vector/issues/8363
