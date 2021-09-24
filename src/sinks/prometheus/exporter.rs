@@ -616,7 +616,7 @@ mod tests {
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
         ];
 
-        let internal_metrics = sink.metrics.clone();
+        let internal_metrics = Arc::clone(&sink.metrics);
 
         sink.run(Box::pin(futures::stream::iter(metrics)))
             .await
