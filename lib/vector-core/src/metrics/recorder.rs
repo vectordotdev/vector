@@ -22,17 +22,19 @@ impl VectorRecorder {
     }
 
     pub(super) fn new_test() -> Self {
-        LOCAL_REGISTRY.with(|oc| oc.get_or_init(Registry::untracked).clear());
+        Self::with_thread_local(Registry::clear);
         Self::ThreadLocal
     }
-}
 
-impl VectorRecorder {
     pub(super) fn with_registry<T>(&self, doit: impl FnOnce(&Registry) -> T) -> T {
         match &self {
             Self::Global(registry) => doit(registry),
-            Self::ThreadLocal => LOCAL_REGISTRY.with(|oc| doit(oc.get().unwrap())),
+            Self::ThreadLocal => Self::with_thread_local(doit),
         }
+    }
+
+    fn with_thread_local<T>(doit: impl FnOnce(&Registry) -> T) -> T {
+        LOCAL_REGISTRY.with(|oc| doit(oc.get_or_init(Registry::untracked)))
     }
 }
 
