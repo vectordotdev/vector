@@ -1,11 +1,10 @@
-
-use std::{collections::BinaryHeap, fmt};
+use crate::event::{EventStatus, Finalizable};
 use buffers::{Ackable, Acker};
 use futures::{stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
+use std::{collections::BinaryHeap, fmt};
 use tokio::{pin, select, task::JoinError};
 use tower::{Service, ServiceExt};
 use tracing::Instrument;
-use crate::event::{EventStatus, Finalizable};
 
 #[derive(Eq)]
 struct PendingAcknowledgement {

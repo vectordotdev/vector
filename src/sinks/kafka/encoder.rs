@@ -47,7 +47,9 @@ mod tests {
         crate::test_util::trace_init();
         let message = "hello world".to_string();
         let mut bytes = vec![];
-        Encoding::Text.encode_event(message.clone().into(), &mut bytes).unwrap();
+        Encoding::Text
+            .encode_event(message.clone().into(), &mut bytes)
+            .unwrap();
         assert_eq!(&bytes[..], message.as_bytes());
     }
 
@@ -77,7 +79,9 @@ mod tests {
             MetricValue::Counter { value: 0.0 },
         );
         let mut bytes = vec![];
-        Encoding::Text.encode_event(metric.clone().into(), &mut bytes).unwrap();
+        Encoding::Text
+            .encode_event(metric.clone().into(), &mut bytes)
+            .unwrap();
         assert_eq!(metric.to_string(), String::from_utf8_lossy(&bytes));
     }
 
@@ -90,7 +94,9 @@ mod tests {
         );
 
         let mut bytes = vec![];
-        Encoding::Json.encode_event(metric.clone().into(), &mut bytes).unwrap();
+        Encoding::Json
+            .encode_event(metric.clone().into(), &mut bytes)
+            .unwrap();
 
         assert_eq!(
             serde_json::to_string(&metric).unwrap(),
