@@ -61,6 +61,7 @@ impl ComponentTests {
 
 /// Initialize the necessary bits needed to run a component test specification.
 pub fn init() {
+    EVENTS_RECORDED.with(|er| er.borrow_mut().clear());
     // Handle multiple initializations.
     if let Err(error) = metrics::init_test() {
         if error != metrics::Error::AlreadyInitialized {
@@ -102,7 +103,7 @@ impl ComponentTester {
     fn new() -> Self {
         let mut metrics: Vec<_> = Controller::get().unwrap().capture_metrics().collect();
 
-        if env::var("DEBUG_COMPLIANCE").is_ok() {
+        if env::var("DEBUG_COMPONENT_COMPLIANCE").is_ok() {
             EVENTS_RECORDED.with(|events| {
                 for event in events.borrow().iter() {
                     println!("{}", event);
