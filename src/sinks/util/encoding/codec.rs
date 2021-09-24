@@ -138,7 +138,7 @@ mod tests {
         let result = encode_event(log_event, encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
-        // We havce to hard-code the transformation of the timestamp here, as `chrono::DateTime`
+        // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`
         // uses a more timezone-explicit format in its `Display` implementation, while its
         // `Serialize` implementation uses RFC3339.
         let expected = format!(

@@ -3,28 +3,16 @@ use futures::{future::BoxFuture, stream};
 use md5::Digest;
 use rusoto_core::{ByteStream, RusotoError};
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
-use std::{
-    io::{self, Write},
-    task::{Context, Poll},
-};
+use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::{
     buffers::Ackable,
-    event::{Event, EventFinalizers, EventStatus, Finalizable},
+    event::{EventFinalizers, EventStatus, Finalizable},
 };
 
 use super::config::S3Options;
 use crate::{internal_events::aws_s3::sink::S3EventsSent, serde::to_string};
-
-/// Generalized interface for defining how a batch of events will be turned into an S3 request.
-pub trait S3RequestBuilder {
-    /// Builds an `S3Request` for the given batch of events, and their partition key.
-    fn build_request(&self, key: String, batch: Vec<Event>) -> S3Request;
-
-    /// Encodes an individual event to the provided writer.
-    fn encode_event(&self, event: Event, writer: &mut dyn Write) -> io::Result<()>;
-}
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
