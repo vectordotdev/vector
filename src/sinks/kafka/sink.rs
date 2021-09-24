@@ -1,7 +1,8 @@
-use crate::sinks::kafka::config::KafkaSinkConfig;
 use crate::sinks::util::StreamSink;
-use async_graphql::futures_util::stream::BoxStream;
 use crate::event::Event;
+use futures::stream::BoxStream;
+use async_trait::async_trait;
+use super::config::KafkaSinkConfig;
 
 pub struct KafkaSink {
     headers_key: Option<String>,
@@ -18,6 +19,6 @@ impl KafkaSink {
 #[async_trait]
 impl StreamSink for KafkaSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-
+        todo!();
     }
 }

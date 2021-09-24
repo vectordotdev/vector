@@ -1,7 +1,7 @@
 use crate::config::SinkDescription;
 
-mod config;
-mod sink;
+pub(crate) mod config;
+pub(crate) mod sink;
 
 // #[cfg(test)]
 // mod tests;
