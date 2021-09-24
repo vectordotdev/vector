@@ -41,7 +41,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
 
     // Issue the 'tap' request, printing to stdout.
     let res = subscription_client.output_events_subscription(
-        opts.components.clone(),
+        opts.component_patterns.clone(),
         opts.format,
         opts.limit as i64,
         opts.interval as i64,

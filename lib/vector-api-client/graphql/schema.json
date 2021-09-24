@@ -1248,9 +1248,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Id of the component associated with the notification",
+              "description": "Component pattern that raised the event",
               "isDeprecated": false,
-              "name": "componentId",
+              "name": "componentPattern",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1259,18 +1259,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Id of the pipeline associated to the component",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -5478,7 +5466,7 @@
                 {
                   "defaultValue": null,
                   "description": null,
-                  "name": "componentIds",
+                  "name": "componentPatterns",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,

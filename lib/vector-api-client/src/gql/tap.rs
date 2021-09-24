@@ -62,7 +62,7 @@ pub trait TapSubscriptionExt {
     /// Executes an output events subscription.
     fn output_events_subscription(
         &self,
-        component_ids: Vec<String>,
+        component_patterns: Vec<String>,
         encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
@@ -73,14 +73,14 @@ impl TapSubscriptionExt for crate::SubscriptionClient {
     /// Executes an output events subscription.
     fn output_events_subscription(
         &self,
-        component_ids: Vec<String>,
+        component_patterns: Vec<String>,
         encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
     ) -> BoxedSubscription<OutputEventsSubscription> {
         let request_body =
             OutputEventsSubscription::build_query(output_events_subscription::Variables {
-                component_ids,
+                component_patterns,
                 limit,
                 interval,
                 encoding: encoding.into(),

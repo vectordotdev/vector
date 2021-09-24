@@ -27,5 +27,5 @@ pub struct Opts {
 
     /// Components to observe (comma-separated; accepts glob patterns)
     #[structopt(default_value = "*", use_delimiter(true))]
-    components: Vec<String>,
+    component_patterns: Vec<String>,
 }
