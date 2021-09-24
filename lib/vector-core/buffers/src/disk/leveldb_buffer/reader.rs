@@ -157,8 +157,6 @@ where
             this.read_offset = key.0 + 1;
 
             let buffer: Bytes = Bytes::from(value);
-            // use this encoded byte size for emitting the Disk Buffer
-            // EventsSent
             let byte_size = buffer.len();
             match T::decode(buffer) {
                 Ok(event) => {
