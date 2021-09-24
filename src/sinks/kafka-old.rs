@@ -44,42 +44,6 @@ enum BuildError {
     TopicTemplate { source: TemplateParseError },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct KafkaSinkConfig {
-    bootstrap_servers: String,
-    topic: String,
-    key_field: Option<String>,
-    encoding: EncodingConfig<Encoding>,
-    /// These batching options will **not** override librdkafka_options values.
-    #[serde(default)]
-    batch: BatchConfig,
-    #[serde(default)]
-    compression: KafkaCompression,
-    #[serde(flatten)]
-    auth: KafkaAuthConfig,
-    #[serde(default = "default_socket_timeout_ms")]
-    socket_timeout_ms: u64,
-    #[serde(default = "default_message_timeout_ms")]
-    message_timeout_ms: u64,
-    #[serde(default)]
-    librdkafka_options: HashMap<String, String>,
-    headers_key: Option<String>,
-}
-
-const fn default_socket_timeout_ms() -> u64 {
-    60000 // default in librdkafka
-}
-
-const fn default_message_timeout_ms() -> u64 {
-    300000 // default in librdkafka
-}
-
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
 
 pub struct KafkaSink {
     producer: Arc<FutureProducer<KafkaStatisticsContext>>,
@@ -107,21 +71,7 @@ pub struct KafkaSink {
     headers_key: Option<String>,
 }
 
-inventory::submit! {
-    SinkDescription::new::<KafkaSinkConfig>("kafka")
-}
 
-impl GenerateConfig for KafkaSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-            key_field = "user_id"
-            topic = "topic-1234"
-            encoding.codec = "json""#,
-        )
-        .unwrap()
-    }
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
@@ -507,11 +457,6 @@ mod tests {
     use super::*;
     use crate::event::{Metric, MetricKind, MetricValue};
     use std::collections::BTreeMap;
-
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<KafkaSinkConfig>();
-    }
 
     #[test]
     fn kafka_encode_event_log_text() {
