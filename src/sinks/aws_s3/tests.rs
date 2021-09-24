@@ -220,7 +220,7 @@ mod integration_tests {
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
-        assert_eq!(receiver.await, BatchStatus::Errored);
+        assert_eq!(receiver.await, BatchStatus::Failed);
 
         let objects = list_objects(&bucket, prefix.unwrap()).await;
         assert_eq!(objects, None);

@@ -1,8 +1,12 @@
 pub mod adaptive_concurrency;
 pub mod batch;
 pub mod buffer;
+pub mod builder;
+pub mod compressor;
+pub mod concurrent_map;
 pub mod encoding;
 pub mod http;
+pub mod request_builder;
 pub mod retries;
 pub mod service;
 pub mod sink;
@@ -28,6 +32,10 @@ pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
+pub use builder::SinkBuilderExt;
+pub use compressor::Compressor;
+pub use concurrent_map::ConcurrentMap;
+pub use request_builder::RequestBuilder;
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
