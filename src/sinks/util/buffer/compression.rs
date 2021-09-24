@@ -147,7 +147,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                         None => Ok(Compression::None),
                     },
                     "gzip" => Ok(Compression::Gzip(
-                        level.unwrap_or_else(|| flate2::Compression::default()),
+                        level.unwrap_or_else(flate2::Compression::default),
                     )),
                     algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
@@ -175,7 +175,7 @@ impl ser::Serialize for Compression {
                     GZIP_FAST => map.serialize_entry("level", "fast")?,
                     // Don't serialize if at default level, we already utilize that when
                     // deserializing and it just clutters the resulting JSON.
-                    GZIP_DEFAULT => {},
+                    GZIP_DEFAULT => {}
                     GZIP_BEST => map.serialize_entry("level", "best")?,
                     level => map.serialize_entry("level", &level)?,
                 };
@@ -194,7 +194,10 @@ mod test {
         let fixtures_valid = [
             (r#""none""#, Compression::None),
             (r#"{"algorithm": "none"}"#, Compression::None),
-            (r#"{"algorithm": "gzip"}"#, Compression::Gzip(flate2::Compression::default())),
+            (
+                r#"{"algorithm": "gzip"}"#,
+                Compression::Gzip(flate2::Compression::default()),
+            ),
             (
                 r#"{"algorithm": "gzip", "level": "best"}"#,
                 Compression::Gzip(flate2::Compression::best()),

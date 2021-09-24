@@ -51,10 +51,10 @@ where
     ///
     /// # Errors
     ///
-    /// No errors are currently returned.  Te return type is purely to simplify caller code, but may
+    /// No errors are currently returned.  The return type is purely to simplify caller code, but may
     /// return an error for a legitimate reason in the future.
     pub async fn run(self) -> Result<(), ()> {
-        let in_flight = FuturesUnordered::new();
+        let mut in_flight = FuturesUnordered::new();
         let mut pending_acks = HashMap::new();
         let mut seq_head: u64 = 0;
         let mut seq_tail: u64 = 0;
@@ -63,11 +63,9 @@ where
             input,
             mut service,
             acker,
-            ..
         } = self;
 
         pin!(input);
-        pin!(in_flight);
 
         loop {
             select! {

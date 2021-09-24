@@ -222,10 +222,8 @@ impl RequestBuilder {
         let (encoded_body, is_compressed) = match self.compression {
             Compression::None => (body, false),
             Compression::Gzip(level) => {
-                let mut encoder = GzEncoder::new(
-                    Vec::with_capacity(serialized_payload_bytes_len),
-                    level,
-                );
+                let mut encoder =
+                    GzEncoder::new(Vec::with_capacity(serialized_payload_bytes_len), level);
 
                 encoder
                     .write_all(&body)
