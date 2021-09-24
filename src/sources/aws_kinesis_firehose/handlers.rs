@@ -1,11 +1,13 @@
 use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
 use super::Compression;
+use crate::codecs;
+use crate::sources::util::TcpError;
 use crate::{
     config::log_schema,
     event::Event,
     internal_events::{
-        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventReceived,
+        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
     },
     Pipeline,
 };
@@ -15,6 +17,7 @@ use flate2::read::MultiGzDecoder;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use std::io::Read;
+use tokio_util::codec::FramedRead;
 use warp::reject;
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
@@ -22,72 +25,65 @@ pub async fn firehose(
     request_id: String,
     source_arn: String,
     request: FirehoseRequest,
-    record_compression: Compression,
+    compression: Compression,
+    decoder: codecs::Decoder,
     mut out: Pipeline,
 ) -> Result<impl warp::Reply, reject::Rejection> {
-    let events = parse_records(
-        record_compression,
-        request,
-        request_id.as_str(),
-        source_arn.as_str(),
-    )
-    .with_context(|| ParseRecords {
+    for record in request.records {
+        let bytes = decode_record(&record, compression)
+            .with_context(|| ParseRecords {
+                request_id: request_id.clone(),
+            })
+            .map_err(reject::custom)?;
+
+        let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
+        loop {
+            match stream.next().await {
+                Some(Ok((events, byte_size))) => {
+                    emit!(&AwsKinesisFirehoseEventsReceived {
+                        count: events.len(),
+                        byte_size
+                    });
+
+                    for mut event in events {
+                        if let Event::Log(ref mut log) = event {
+                            log.insert(log_schema().timestamp_key(), request.timestamp);
+                            log.insert("request_id", request_id.to_string());
+                            log.insert("source_arn", source_arn.to_string());
+                        }
+
+                        out.send(event)
+                            .map_err(|error| {
+                                let error = RequestError::ShuttingDown {
+                                    request_id: request_id.clone(),
+                                    source: error,
+                                };
+                                // can only fail if receiving end disconnected, so we are shutting
+                                // down, probably not gracefully.
+                                error!(message = "Failed to forward events, downstream is closed.");
+                                error!(message = "Tried to send the following event.", %error);
+                                warp::reject::custom(error)
+                            })
+                            .await?;
+                    }
+                }
+                Some(Err(error)) => {
+                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // handling is needed here.
+                    if !error.can_continue() {
+                        break;
+                    }
+                }
+                None => break,
+            }
+        }
+    }
+
+    Ok(warp::reply::json(&FirehoseResponse {
         request_id: request_id.clone(),
-    })
-    .map_err(reject::custom)?;
-    let mut stream = futures::stream::iter(events).map(Ok);
-
-    let request_id = request_id.clone();
-    out.send_all(&mut stream)
-        .map_err(|error| {
-            let error = RequestError::ShuttingDown {
-                request_id: request_id.clone(),
-                source: error,
-            };
-            // can only fail if receiving end disconnected, so we are shutting down,
-            // probably not gracefully.
-            error!(message = "Failed to forward events, downstream is closed.");
-            error!(message = "Tried to send the following event.", %error);
-            warp::reject::custom(error)
-        })
-        .map_ok(|_| {
-            warp::reply::json(&FirehoseResponse {
-                request_id: request_id.clone(),
-                timestamp: Utc::now(),
-                error_message: None,
-            })
-        })
-        .await
-}
-
-/// Parses out events from the FirehoseRequest
-fn parse_records(
-    compression: Compression,
-    request: FirehoseRequest,
-    request_id: &str,
-    source_arn: &str,
-) -> Result<Vec<Event>, RecordDecodeError> {
-    request
-        .records
-        .iter()
-        .map(|record| {
-            decode_record(record, compression).map(|record| {
-                emit!(&AwsKinesisFirehoseEventReceived {
-                    byte_size: record.len()
-                });
-
-                let mut event = Event::new_empty_log();
-                let log = event.as_mut_log();
-
-                log.insert(log_schema().message_key(), record);
-                log.insert(log_schema().timestamp_key(), request.timestamp);
-                log.insert("request_id", request_id.to_string());
-                log.insert("source_arn", source_arn.to_string());
-
-                event
-            })
-        })
-        .collect()
+        timestamp: Utc::now(),
+        error_message: None,
+    }))
 }
 
 #[derive(Debug, Snafu)]
