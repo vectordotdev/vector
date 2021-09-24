@@ -354,7 +354,7 @@ where
     S: Sink<Event> + Send + std::marker::Unpin,
     <S as Sink<Event>>::Error: std::fmt::Display,
 {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             if let Err(error) = self.sink.send(event).await {
                 error!(message = "Ingesting an event failed at mock sink.", %error);
