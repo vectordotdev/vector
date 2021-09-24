@@ -1,6 +1,7 @@
 use super::Key;
-use crate::bytes::{DecodeBytes, EncodeBytes};
+use crate::{bytes::{DecodeBytes, EncodeBytes}, internal_events::EventsReceived};
 use bytes::BytesMut;
+use core_common::internal_event::emit;
 use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
     batch::{Batch, Writebatch},
@@ -168,6 +169,11 @@ where
         if self.batch_size >= 100 {
             self.flush();
         }
+
+        emit(&EventsReceived {
+            count: 1,
+            byte_size: event_size,
+        });
 
         None
     }
