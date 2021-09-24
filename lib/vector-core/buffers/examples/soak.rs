@@ -5,6 +5,7 @@ use buffers::{
     Variant, WhenFull,
 };
 use bytes::{Buf, BufMut};
+use core_common::byte_size_of::ByteSizeOf;
 use futures::{SinkExt, StreamExt};
 use metrics::{counter, increment_counter};
 use metrics_exporter_prometheus::PrometheusBuilder;
@@ -29,6 +30,12 @@ impl<const N: usize> Message<N> {
 
     pub fn id(&self) -> u64 {
         self.id
+    }
+}
+
+impl<const N: usize> ByteSizeOf for Message<N> {
+    fn allocated_bytes(&self) -> usize {
+        self.id.size_of() + self._padding.iter().fold(0, |acc, v| acc + v.size_of())
     }
 }
 

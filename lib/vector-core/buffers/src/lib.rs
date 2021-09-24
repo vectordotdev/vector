@@ -123,7 +123,7 @@ impl Arbitrary for WhenFull {
 #[derive(Clone)]
 pub enum BufferInputCloner<T>
 where
-    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    T: ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug,
 {
@@ -218,9 +218,10 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
     }
 }
 
-/// Instrumenting events received by the memory buffer can be accomplished by hooking
-/// into the lifecycle of writing events to the buffer, hence the InstrumentMemoryBuffer wrapper. This is not necessary for
-/// disk buffers which are instrumented for this at a lower level in their implementation.
+// Instrumenting events received by the memory buffer can be accomplished by 
+// hooking into the lifecycle of writing events to the buffer, hence the 
+// InstrumentMemoryBuffer wrapper. This is not necessary for disk buffers 
+// which are instrumented for this at a lower level in their implementation.
 #[pin_project]
 pub struct InstrumentMemoryBuffer<S> {
     #[pin]
