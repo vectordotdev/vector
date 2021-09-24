@@ -83,11 +83,11 @@ components: sources: prometheus_scrape: {
 				unit:    "seconds"
 			}
 		}
-		instance_key: {
+		instance_tag: {
 			category: "Context"
 			common:   true
 			description: """
-				The key name added to each event representing the scraped instance's host:port.
+				The tag name added to each event representing the scraped instance's host:port.
 				"""
 			required: false
 			warnings: []
@@ -95,6 +95,20 @@ components: sources: prometheus_scrape: {
 				default: null
 				syntax:  "literal"
 				examples: ["instance"]
+			}
+		}
+		endpoint_tag: {
+			category: "Context"
+			common:   true
+			description: """
+				The tag name added to each event representing the scraped instance's endpoint.
+				"""
+			required: false
+			warnings: []
+			type: string: {
+				default: null
+				syntax:  "literal"
+				examples: ["endpoint"]
 			}
 		}
 		auth: configuration._http_auth & {_args: {
@@ -106,8 +120,13 @@ components: sources: prometheus_scrape: {
 	output: metrics: {
 		_extra_tags: {
 			"instance": {
-				description: "Any host:port of the scraped instance. Only present if `instance_key` is set.."
-				examples: [_values.instance]
+				description: "The host:port of the scraped instance. Only present if `instance_tag` is set."
+				examples: ["localhost:9090"]
+				required: false
+			}
+			"endpoint": {
+				description: "Any endpoint of the scraped instance. Only present if `endpoint_tag` is set."
+				examples: ["http://localhost:9090/metrics"]
 				required: false
 			}
 		}

@@ -35,7 +35,8 @@ struct PrometheusScrapeConfig {
     endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
-    instance_key: Option<String>,
+    instance_tag: Option<String>,
+    endpoint_tag: Option<String>,
     tls: Option<TlsOptions>,
     auth: Option<Auth>,
 }
@@ -57,7 +58,8 @@ impl GenerateConfig for PrometheusScrapeConfig {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             scrape_interval_secs: default_scrape_interval_secs(),
-            instance_key: Some("instance".to_string()),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
             tls: None,
             auth: None,
         })
@@ -77,7 +79,8 @@ impl SourceConfig for PrometheusScrapeConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         Ok(prometheus(
             urls,
-            self.instance_key.clone(),
+            self.instance_tag.clone(),
+            self.endpoint_tag.clone(),
             tls,
             self.auth.clone(),
             cx.proxy.clone(),
@@ -104,7 +107,8 @@ struct PrometheusCompatConfig {
     // https://github.com/serde-rs/serde/issues/1504
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
-    instance_key: Option<String>,
+    instance_tag: Option<String>,
+    endpoint_tag: Option<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     tls: Option<TlsOptions>,
@@ -119,7 +123,8 @@ impl SourceConfig for PrometheusCompatConfig {
         // https://github.com/serde-rs/serde/issues/1504
         let config = PrometheusScrapeConfig {
             endpoints: self.endpoints.clone(),
-            instance_key: self.instance_key.clone(),
+            instance_tag: self.instance_tag.clone(),
+            endpoint_tag: self.endpoint_tag.clone(),
             scrape_interval_secs: self.scrape_interval_secs,
             tls: self.tls.clone(),
             auth: self.auth.clone(),
@@ -136,18 +141,28 @@ impl SourceConfig for PrometheusCompatConfig {
     }
 }
 
-// InstanceInfo stores the scraped instance info and the key to insert into the log event with. It
-// is used to join these two pieces of info to avoid storing the instance if instance_key is not
+// InstanceInfo stores the scraped instance info and the tag to insert into the log event with. It
+// is used to join these two pieces of info to avoid storing the instance if instance_tag is not
 // configured
 #[derive(Clone)]
 struct InstanceInfo {
-    key: String,
+    tag: String,
     instance: String,
+}
+
+// EndpointInfo stores the scraped endpoint info and the tag to insert into the log event with. It
+// is used to join these two pieces of info to avoid storing the endpoint if endpoint_tag is not
+// configured
+#[derive(Clone)]
+struct EndpointInfo {
+    tag: String,
+    endpoint: String,
 }
 
 fn prometheus(
     urls: Vec<http::Uri>,
-    instance_key: Option<String>,
+    instance_tag: Option<String>,
+    endpoint_tag: Option<String>,
     tls: TlsSettings,
     auth: Option<Auth>,
     proxy: ProxyConfig,
@@ -171,9 +186,10 @@ fn prometheus(
                 auth.apply(&mut request);
             }
 
-            let instance_info = instance_key.as_ref().map(|key| {
+            let instance_info = instance_tag.as_ref().map(|tag| {
                 let instance = format!("{}:{}", url.host().unwrap_or_default(), url.port_u16().unwrap_or_else(|| {
                     let scheme = url.scheme();
+                    // cannot use match because `Scheme` does not derive the needed traits
                     if url.scheme() == Some(&http::uri::Scheme::HTTP) {
                         80
                     } else if scheme == Some(&http::uri::Scheme::HTTPS) {
@@ -182,7 +198,10 @@ fn prometheus(
                         0
                     }
                 }));
-                InstanceInfo{ key: key.to_string(), instance }
+                InstanceInfo { tag: tag.to_string(), instance }
+            });
+            let endpoint_info = endpoint_tag.as_ref().map(|tag| {
+                EndpointInfo { tag: tag.to_string(), endpoint: url.to_string()}
             });
 
             let start = Instant::now();
@@ -197,6 +216,8 @@ fn prometheus(
                 .into_stream()
                 .filter_map(move |response| {
                     let instance_info = instance_info.clone();
+                    let endpoint_info = endpoint_info.clone();
+
                     ready(match response {
                         Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                             emit!(&PrometheusRequestCompleted {
@@ -215,9 +236,12 @@ fn prometheus(
                                         uri: url.clone()
                                     });
                                     Some(stream::iter(events).map(move |mut event| {
-                                        if let Some(InstanceInfo {key, instance}) = &instance_info{
                                         let metric = event.as_mut_metric();
-                                        metric.insert_tag(key.clone(), instance.clone());
+                                        if let Some(InstanceInfo {tag, instance}) = &instance_info{
+                                        metric.insert_tag(tag.clone(), instance.clone());
+                                        }
+                                        if let Some(EndpointInfo{ tag, endpoint} ) = &endpoint_info {
+                                        metric.insert_tag(tag.clone(), endpoint.clone());
                                         }
                                         Ok(event)
                                     }))
@@ -341,7 +365,8 @@ mod test {
             "in",
             PrometheusScrapeConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
-                instance: None,
+                instance_tag: None,
+                endpoint_tag: None,
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
@@ -460,6 +485,10 @@ mod integration_tests {
             build.tag_value("instance").unwrap(),
             Some("localhost:9090".to_string())
         );
+        assert_eq!(
+            bould.tag_value("endpoint").unwrap(),
+            Some("http://localhost:9090/metrics".to_string())
+        );
 
         let queries = find_metric("prometheus_engine_queries");
         assert!(matches!(queries.kind(), MetricKind::Absolute));
@@ -467,6 +496,10 @@ mod integration_tests {
         assert_eq!(
             queries.tag_value("instance").unwrap(),
             Some("localhost:9090".to_string())
+        );
+        assert_eq!(
+            queries.tag_value("endpoint").unwrap(),
+            Some("http://localhost:9090/metrics".to_string())
         );
 
         let go_info = find_metric("go_info");
@@ -476,6 +509,10 @@ mod integration_tests {
         assert_eq!(
             go_info.tag_value("instance").unwrap(),
             Some("localhost:9090".to_string())
+        );
+        assert_eq!(
+            go_info.tag_value("endpoint").unwrap(),
+            Some("http://localhost:9090/metrics".to_string())
         );
     }
 }
