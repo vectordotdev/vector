@@ -1,4 +1,7 @@
-use std::{collections::{BTreeMap, BTreeSet}, mem};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type
