@@ -146,13 +146,13 @@ impl Parser for StatsdParser {
             .and_then(parse)
         {
             Ok(metric) => {
-                emit!(StatsdEventReceived {
+                emit!(&StatsdEventReceived {
                     byte_size: bytes.len()
                 });
                 Ok(smallvec![Event::Metric(metric)])
             }
             Err(error) => {
-                emit!(StatsdInvalidRecord {
+                emit!(&StatsdInvalidRecord {
                     error: &error,
                     bytes
                 });
@@ -168,7 +168,7 @@ async fn statsd_udp(
     mut out: Pipeline,
 ) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
-        .map_err(|error| emit!(StatsdSocketError::bind(error)))
+        .map_err(|error| emit!(&StatsdSocketError::bind(error)))
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
@@ -199,7 +199,7 @@ async fn statsd_udp(
                 }
             }
             Err(error) => {
-                emit!(StatsdSocketError::read(error));
+                emit!(&StatsdSocketError::read(error));
             }
         }
     }

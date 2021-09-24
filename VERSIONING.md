@@ -34,11 +34,11 @@ Vector adheres to the [Semantic Versioning 2.0] convention. In summary:
 
 ## Public API
 
-Semantic Versioning hinges on Vector's defintion of "public API". By nature of
-Vector - a tool that collects, processes, and routes data from disparate systems
-- it has a very large public surface area. It's not immediately obvious which
-parts are covered under our versioning contract and how they're covered. This
-section aims to remove all ambiguity in this area.
+Semantic Versioning hinges on Vector's defintion of "public API". By the nature
+of Vector -- a tool that collects, processes, and routes data from disparate
+systems -- it has a very large public surface area. It's not immediately obvious
+which parts are covered under our versioning contract and how they're covered.
+This section aims to remove all ambiguity in this area.
 
 ### Areas that *are* covered
 

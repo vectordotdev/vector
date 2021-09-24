@@ -28,7 +28,7 @@ pub struct SyslogParser;
 impl Parser for SyslogParser {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes).map_err(|error| {
-            emit!(SyslogConvertUtf8Error { error });
+            emit!(&SyslogConvertUtf8Error { error });
             error
         })?;
         let line = line.trim();

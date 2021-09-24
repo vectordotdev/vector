@@ -1,19 +1,18 @@
+use super::{
+    auth::{HttpSourceAuth, HttpSourceAuthConfig},
+    encoding::decode,
+    error::ErrorMessage,
+};
 use crate::{
     config::SourceContext,
-    internal_events::{HttpBadRequest, HttpDecompressError, HttpEventsReceived},
+    internal_events::{HttpBadRequest, HttpEventsReceived},
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes::{Buf, Bytes};
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use headers::{Authorization, HeaderMapExt};
-use serde::{Deserialize, Serialize};
-use snap::raw::Decoder as SnappyDecoder;
-use std::{
-    collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr, sync::Arc,
-};
+use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr, sync::Arc};
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
 use warp::{
     filters::{path::FullPath, path::Tail, BoxedFilter},
@@ -21,156 +20,6 @@ use warp::{
     reject::Rejection,
     Filter,
 };
-
-#[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
-pub fn add_query_parameters(
-    events: &mut [Event],
-    query_parameters_config: &[String],
-    query_parameters: HashMap<String, String>,
-) {
-    for query_parameter_name in query_parameters_config {
-        let value = query_parameters.get(query_parameter_name);
-        for event in events.iter_mut() {
-            event.as_mut_log().insert(
-                query_parameter_name as &str,
-                crate::event::Value::from(value.map(String::to_owned)),
-            );
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-pub struct ErrorMessage {
-    code: u16,
-    message: String,
-}
-impl ErrorMessage {
-    pub fn new(code: StatusCode, message: String) -> Self {
-        ErrorMessage {
-            code: code.as_u16(),
-            message,
-        }
-    }
-}
-impl Error for ErrorMessage {}
-impl fmt::Display for ErrorMessage {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: {}", self.code, self.message)
-    }
-}
-impl warp::reject::Reject for ErrorMessage {}
-
-struct RejectShuttingDown;
-impl fmt::Debug for RejectShuttingDown {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("shutting down")
-    }
-}
-impl warp::reject::Reject for RejectShuttingDown {}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct HttpSourceAuthConfig {
-    pub username: String,
-    pub password: String,
-}
-
-impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
-    type Error = String;
-
-    fn try_from(auth: Option<&HttpSourceAuthConfig>) -> Result<Self, Self::Error> {
-        match auth {
-            Some(auth) => {
-                let mut headers = HeaderMap::new();
-                headers.typed_insert(Authorization::basic(&auth.username, &auth.password));
-                match headers.get("authorization") {
-                    Some(value) => {
-                        let token = value
-                            .to_str()
-                            .map_err(|error| format!("Failed stringify HeaderValue: {:?}", error))?
-                            .to_owned();
-                        Ok(HttpSourceAuth { token: Some(token) })
-                    }
-                    None => Err("Authorization headers wasn't generated".to_owned()),
-                }
-            }
-            None => Ok(HttpSourceAuth { token: None }),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct HttpSourceAuth {
-    pub token: Option<String>,
-}
-
-impl HttpSourceAuth {
-    pub fn is_valid(&self, header: &Option<String>) -> Result<(), ErrorMessage> {
-        match (&self.token, header) {
-            (Some(token1), Some(token2)) => {
-                if token1 == token2 {
-                    Ok(())
-                } else {
-                    Err(ErrorMessage::new(
-                        StatusCode::UNAUTHORIZED,
-                        "Invalid username/password".to_owned(),
-                    ))
-                }
-            }
-            (Some(_), None) => Err(ErrorMessage::new(
-                StatusCode::UNAUTHORIZED,
-                "No authorization header".to_owned(),
-            )),
-            (None, _) => Ok(()),
-        }
-    }
-}
-
-pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
-    if let Some(encodings) = header {
-        for encoding in encodings.rsplit(',').map(str::trim) {
-            body = match encoding {
-                "identity" => body,
-                "gzip" => {
-                    let mut decoded = Vec::new();
-                    MultiGzDecoder::new(body.reader())
-                        .read_to_end(&mut decoded)
-                        .map_err(|error| handle_decode_error(encoding, error))?;
-                    decoded.into()
-                }
-                "deflate" => {
-                    let mut decoded = Vec::new();
-                    ZlibDecoder::new(body.reader())
-                        .read_to_end(&mut decoded)
-                        .map_err(|error| handle_decode_error(encoding, error))?;
-                    decoded.into()
-                }
-                "snappy" => SnappyDecoder::new()
-                    .decompress_vec(&body)
-                    .map_err(|error| handle_decode_error(encoding, error))?
-                    .into(),
-                encoding => {
-                    return Err(ErrorMessage::new(
-                        StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                        format!("Unsupported encoding {}", encoding),
-                    ))
-                }
-            }
-        }
-    }
-
-    Ok(body)
-}
-
-fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(HttpDecompressError {
-        encoding,
-        error: &error
-    });
-    ErrorMessage::new(
-        StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {} decoder.", encoding),
-    )
-}
 
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -250,11 +99,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let routes = svc.or(ping).recover(|r: Rejection| async move {
                 if let Some(e_msg) = r.find::<ErrorMessage>() {
                     let json = warp::reply::json(e_msg);
-                    Ok(warp::reply::with_status(
-                        json,
-                        StatusCode::from_u16(e_msg.code)
-                            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
-                    ))
+                    Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
                     Err(r)
@@ -275,6 +120,16 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     }
 }
 
+struct RejectShuttingDown;
+
+impl fmt::Debug for RejectShuttingDown {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("shutting down")
+    }
+}
+
+impl warp::reject::Reject for RejectShuttingDown {}
+
 async fn handle_request(
     events: Result<(Vec<Event>, usize), ErrorMessage>,
     acknowledgements: bool,
@@ -282,7 +137,7 @@ async fn handle_request(
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok((mut events, body_size)) => {
-            emit!(HttpEventsReceived {
+            emit!(&HttpEventsReceived {
                 events_count: events.len(),
                 byte_size: body_size,
             });
@@ -307,9 +162,9 @@ async fn handle_request(
                 .await
         }
         Err(error) => {
-            emit!(HttpBadRequest {
-                error_code: error.code,
-                error_message: error.message.as_str(),
+            emit!(&HttpBadRequest {
+                error_code: error.code(),
+                error_message: error.message(),
             });
             Err(warp::reject::custom(error))
         }

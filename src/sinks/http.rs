@@ -186,7 +186,7 @@ impl HttpSink for HttpSinkConfig {
                     b.push(b'\n');
                     b
                 } else {
-                    emit!(HttpEventMissingMessage);
+                    emit!(&HttpEventMissingMessage);
                     return None;
                 }
             }
@@ -208,7 +208,7 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
-        emit!(HttpEventEncoded {
+        emit!(&HttpEventEncoded {
             byte_size: body.len(),
         });
 

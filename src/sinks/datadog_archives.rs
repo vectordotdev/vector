@@ -263,8 +263,10 @@ impl Encoder for DatadogArchiveEncoding {
 
         let mut attributes = BTreeMap::new();
         let custom_attributes: Vec<String> = log_event
+            .as_map()
             .keys()
-            .filter(|path| !self.reserved_attributes.contains(path.as_str()))
+            .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
+            .map(|v| v.to_owned())
             .collect();
         for path in custom_attributes {
             if let Some(value) = log_event.remove(&path) {
@@ -392,6 +394,7 @@ mod tests {
         let log_mut = event.as_mut_log();
         log_mut.insert("service", "test-service");
         log_mut.insert("not_a_reserved_attribute", "value");
+        log_mut.insert("tags", vec!["tag1:value1", "tag2:value2"]);
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
             .expect("invalid test case")
             .with_timezone(&Utc);
@@ -412,7 +415,7 @@ mod tests {
                 .expect("_id is not a string"),
         );
 
-        assert_eq!(json.len(), 5); // _id, message, date, service, attributes
+        assert_eq!(json.len(), 6); // _id, message, date, service, attributes
         assert_eq!(
             json.get("message")
                 .expect("message not found")
@@ -433,6 +436,15 @@ mod tests {
                 .as_str()
                 .expect("service is not a string"),
             "test-service"
+        );
+
+        assert_eq!(
+            json.get("tags")
+                .expect("tags not found")
+                .as_array()
+                .expect("service is not an array")
+                .to_owned(),
+            vec!["tag1:value1", "tag2:value2"]
         );
 
         let attributes = json

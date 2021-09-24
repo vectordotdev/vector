@@ -49,4 +49,3 @@ which also writes to stdout by default.  Following some discussion in
 that stdout can be processed separately.
 
 If you were previously depending on Vector's logs appearing in stdout, you should now look for them in stderr.
-=======

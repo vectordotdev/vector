@@ -50,7 +50,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     fn generate_event(&self, n: usize) -> Event {
-        emit!(GeneratorEventProcessed);
+        emit!(&GeneratorEventProcessed);
 
         let line = match self {
             Self::Shuffle {

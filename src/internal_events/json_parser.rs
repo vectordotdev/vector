@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct JsonParserFailedParse<'a> {

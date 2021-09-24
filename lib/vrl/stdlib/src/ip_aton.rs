@@ -22,11 +22,16 @@ impl Function for IpAton {
         &[Example {
             title: "Example",
             source: r#"ip_aton!("1.2.3.4")"#,
-            result: Ok("67305985"),
+            result: Ok("16909060"),
         }]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(IpAtonFn { value }))
@@ -47,9 +52,7 @@ impl Expression for IpAtonFn {
             .parse()
             .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;
 
-        let i = u32::from(ip); // host-order
-
-        Ok(i.to_be().into())
+        Ok(u32::from(ip).into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -72,7 +75,7 @@ mod tests {
 
         valid {
             args: func_args![value: "1.2.3.4"],
-            want: Ok(value!(67305985)),
+            want: Ok(value!(16909060)),
             tdef: TypeDef::new().fallible().integer(),
         }
     ];

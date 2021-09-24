@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 /// Emitted when reflector gets a desync from the watch command.
 #[derive(Debug)]

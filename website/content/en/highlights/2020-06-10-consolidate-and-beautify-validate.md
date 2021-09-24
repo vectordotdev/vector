@@ -16,7 +16,7 @@ We gave `vector validate` some touching up to make it look better, and feel nice
 Take a gander at the new output on a good valid configuration:
 
 ```bash
-vic@sticky-keyboard-macbook:/git/timberio/vector$ vector validate test.toml
+vic@sticky-keyboard-macbook:/git/vectordotdev/vector$ vector validate test.toml
 √ Loaded "test.toml"
 √ Configuration topology
 √ Component configuration
@@ -28,7 +28,7 @@ vic@sticky-keyboard-macbook:/git/timberio/vector$ vector validate test.toml
 Now an invalid configuration:
 
 ```bash
-vic@sticky-keyboard-macbook:/git/timberio/vector$ vector validate test.toml
+vic@sticky-keyboard-macbook:/git/vectordotdev/vector$ vector validate test.toml
 Failed to parse "test.toml"
 ---------------------------
 x missing field `type` for key `sinks.sink1`

@@ -32,7 +32,13 @@
         </p>
         {{ end }}
 
-        {{ partial "docs/component-under-hero.html" . }}
+        <div class="mt-8">
+          {{ partial "docs/component-under-hero.html" . }}
+        </div>
+
+        <div class="mt-8">
+          {{ partial "page-actions.html" . }}
+        </div>
 
         <div class="mt-12 prose dark:prose-dark max-w-none tracking-tight pb-32">
           {{ with $config.description }}

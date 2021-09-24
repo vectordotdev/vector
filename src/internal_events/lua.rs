@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::{counter, gauge};
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct LuaGcTriggered {

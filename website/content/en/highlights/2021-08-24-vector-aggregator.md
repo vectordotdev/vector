@@ -47,7 +47,7 @@ a better experience integrating load balancing across multiple aggregators with 
 on the bundled HAProxy deployment.
 
 [aggregator]: /docs/setup/deployment/roles/#aggregator
-[chart]: https://github.com/timberio/helm-charts/blob/master/charts/vector-aggregator
+[chart]: https://github.com/vectordotdev/helm-charts/blob/master/charts/vector-aggregator
 [discord]: https://discord.gg/Ywcq9cWEPE
 [setup]: /docs/setup/installation/package-managers/helm/#aggregator
 [statefulset]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/

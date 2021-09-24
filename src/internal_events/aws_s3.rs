@@ -1,6 +1,5 @@
 #[cfg(feature = "sources-aws_s3")]
 pub mod source {
-    use crate::internal_events::InternalEvent;
     use crate::sources::aws_s3::sqs::ProcessingError;
     use metrics::counter;
     use rusoto_core::RusotoError;
@@ -8,6 +7,7 @@ pub mod source {
         BatchResultErrorEntry, DeleteMessageBatchError, DeleteMessageBatchRequestEntry,
         DeleteMessageBatchResultEntry, ReceiveMessageError,
     };
+    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
     pub struct SqsS3EventReceived {
@@ -16,7 +16,7 @@ pub mod source {
 
     impl InternalEvent for SqsS3EventReceived {
         fn emit_metrics(&self) {
-            counter!("received_events_total", 1);
+            counter!("component_received_events_total", 1);
             counter!("events_in_total", 1);
             counter!("processed_bytes_total", self.byte_size as u64);
         }
@@ -171,7 +171,7 @@ pub mod source {
 pub mod sink {
     use metrics::counter;
 
-    use crate::internal_events::InternalEvent;
+    use vector_core::internal_event::InternalEvent;
 
     pub struct S3EventsSent {
         pub byte_size: usize,

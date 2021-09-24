@@ -208,7 +208,12 @@ pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-#[cfg(any(feature = "sources-utils-http", feature = "sinks-http"))]
+#[cfg(any(
+    feature = "sources-utils-http",
+    feature = "sources-utils-http-encoding",
+    feature = "sinks-http",
+    feature = "sources-datadog"
+))]
 pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
@@ -282,20 +287,10 @@ pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
-pub trait InternalEvent {
-    fn emit_logs(&self) {}
-    fn emit_metrics(&self) {}
-}
-
-pub fn emit(event: impl InternalEvent) {
-    event.emit_logs();
-    event.emit_metrics();
-}
-
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        $crate::internal_events::emit($event)
+        vector_core::internal_event::emit($event)
     };
 }
 

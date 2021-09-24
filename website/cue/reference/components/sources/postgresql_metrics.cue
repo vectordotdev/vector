@@ -160,11 +160,11 @@ components: sources: postgresql_metrics: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:          components.sources.internal_metrics.output.metrics.events_in_total
-		collect_completed_total:  components.sources.internal_metrics.output.metrics.collect_completed_total
-		collect_duration_seconds: components.sources.internal_metrics.output.metrics.collect_duration_seconds
-		received_events_total:    components.sources.internal_metrics.output.metrics.received_events_total
-		request_errors_total:     components.sources.internal_metrics.output.metrics.request_errors_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		collect_completed_total:         components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_seconds:        components.sources.internal_metrics.output.metrics.collect_duration_seconds
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		request_errors_total:            components.sources.internal_metrics.output.metrics.request_errors_total
 	}
 
 	output: metrics: {

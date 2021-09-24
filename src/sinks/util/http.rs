@@ -8,10 +8,11 @@ use crate::{
     buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
+    internal_events::{EndpointBytesSent, EventsSent},
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
-use http::StatusCode;
+use http::{uri::PathAndQuery, uri::Scheme, StatusCode, Uri};
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
@@ -26,6 +27,7 @@ use std::{
     time::Duration,
 };
 use tower::Service;
+use vector_core::ByteSizeOf;
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -175,7 +177,12 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
+        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
+            emit!(&EventsSent {
+                count: 1,
+                byte_size
+            });
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
@@ -328,7 +335,12 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
+        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
+            emit!(&EventsSent {
+                count: 1,
+                byte_size
+            });
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
@@ -386,7 +398,28 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await?.map(Body::from);
+            let request = request_builder(body).await?;
+            let byte_size = request.body().len();
+            let request = request.map(Body::from);
+
+            // Simplify the URI in the request to remove the "query" portion.
+            let mut parts = request.uri().clone().into_parts();
+            parts.path_and_query = parts.path_and_query.map(|pq| {
+                pq.path()
+                    .parse::<PathAndQuery>()
+                    .unwrap_or_else(|_| unreachable!())
+            });
+            let scheme = parts.scheme.clone();
+            let endpoint = Uri::from_parts(parts)
+                .unwrap_or_else(|_| unreachable!())
+                .to_string();
+
+            emit!(&EndpointBytesSent {
+                byte_size,
+                protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
+                endpoint: &endpoint
+            });
+
             let response = http_client.call(request).await?;
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;

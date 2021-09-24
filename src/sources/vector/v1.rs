@@ -89,11 +89,11 @@ impl Parser for VectorParser {
         let byte_size = bytes.len();
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
-                emit!(VectorEventReceived { byte_size });
+                emit!(&VectorEventReceived { byte_size });
                 Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(VectorProtoDecodeError { error: &error });
+                emit!(&VectorProtoDecodeError { error: &error });
                 Err(Box::new(error))
             }
         }

@@ -1,4 +1,4 @@
-use super::{filter_result, FilterList, HostMetricsConfig};
+use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 use chrono::Utc;
 use futures::{stream, StreamExt};
@@ -16,7 +16,7 @@ pub(super) struct NetworkConfig {
     devices: FilterList,
 }
 
-impl HostMetricsConfig {
+impl HostMetrics {
     pub async fn network_metrics(&self) -> Vec<Metric> {
         match heim::net::io_counters().await {
             Ok(counters) => {
@@ -28,7 +28,8 @@ impl HostMetricsConfig {
                     // .filter_map, but it results in a strange "one type is
                     // more general than the other" error.
                     .map(|counter| {
-                        self.network
+                        self.config
+                            .network
                             .devices
                             .contains_str(Some(counter.interface()))
                             .then(|| counter)
@@ -104,12 +105,14 @@ impl HostMetricsConfig {
 #[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::super::tests::{all_counters, assert_filtered_metrics, count_tag};
-    use super::super::HostMetricsConfig;
+    use super::super::{HostMetrics, HostMetricsConfig};
     use super::NetworkConfig;
 
     #[tokio::test]
     async fn generates_network_metrics() {
-        let metrics = HostMetricsConfig::default().network_metrics().await;
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
+            .network_metrics()
+            .await;
         assert!(!metrics.is_empty());
         assert!(all_counters(&metrics));
 
@@ -125,10 +128,10 @@ mod tests {
     #[tokio::test]
     async fn network_metrics_filters_on_device() {
         assert_filtered_metrics("device", |devices| async {
-            HostMetricsConfig {
+            HostMetrics::new(HostMetricsConfig {
                 network: NetworkConfig { devices },
                 ..Default::default()
-            }
+            })
             .network_metrics()
             .await
         })

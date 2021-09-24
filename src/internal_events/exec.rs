@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::{counter, histogram};
 use std::time::Duration;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ExecEventReceived<'a> {
@@ -18,7 +18,7 @@ impl InternalEvent for ExecEventReceived<'_> {
 
     fn emit_metrics(&self) {
         counter!(
-            "received_events_total", 1,
+            "component_received_events_total", 1,
             "command" => self.command.to_owned(),
         );
         counter!(

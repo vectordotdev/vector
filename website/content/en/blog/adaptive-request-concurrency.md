@@ -134,26 +134,26 @@ Going forward, we'll continue listening to Vector users and incorporating their 
 For now, we're quite confident that ARC in Vector 0.11, even in its initial state, should immediately improve the experience of users that rely on downstream HTTP services.
 
 [aimd]: https://en.wikipedia.org/wiki/Additive_increase/multiplicative_decrease
-[adaptive_concurrency]: https://github.com/timberio/vector/tree/master/src/sinks/util/adaptive_concurrency
+[adaptive_concurrency]: https://github.com/vectordotdev/vector/tree/master/src/sinks/util/adaptive_concurrency
 [bruce guenter]: https://github.com/bruceg
 [buffer]: /docs/reference/configuration/sinks/http/#buffer
 [clickhouse]: /docs/reference/configuration/sinks/clickhouse
 [congestion control]: https://en.wikipedia.org/wiki/TCP_congestion_control
-[controller]: https://github.com/timberio/vector/blob/master/src/sinks/util/adaptive_concurrency/controller.rs#L23-L31
-[dead ends]: https://github.com/timberio/vector/pull/3671
+[controller]: https://github.com/vectordotdev/vector/blob/master/src/sinks/util/adaptive_concurrency/controller.rs#L23-L31
+[dead ends]: https://github.com/vectordotdev/vector/pull/3671
 [elasticsearch]: /docs/reference/configuration/sinks/elasticsearch
-[http_test_server]: https://github.com/timberio/http_test_server
-[issue_325]: https://github.com/timberio/vector/issues/3255
+[http_test_server]: https://github.com/vectordotdev/http_test_server
+[issue_325]: https://github.com/vectordotdev/vector/issues/3255
 [kubernetes]: https://kubernetes.io
 [max_size]: /docs/reference/configuration/sinks/http/#buffer.max_size
-[open issue]: https://github.com/timberio/vector/issues/3887
+[open issue]: https://github.com/vectordotdev/vector/issues/3887
 [performance under load]: https://medium.com/@NetflixTechBlog/performance-under-load-3e6fa9a60581
-[prior_art]: https://github.com/timberio/vector/blob/master/rfcs/2020-04-06-1858-automatically-adjust-request-limits.md#prior-art
+[prior_art]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-04-06-1858-automatically-adjust-request-limits.md#prior-art
 [rate limit]: /docs/reference/configuration/sinks/http/#rate-limits-adapative-concurrency
 [rate_limit_duration_secs]: /docs/reference/configuration/sinks/http/#request.rate_limit_duration_secs
 [rate_limit_num]: /docs/reference/configuration/sinks/http/#request.rate_limit_num
 [request_concurrency]: /docs/reference/configuration/sinks/http/#request.concurrency
-[rfc 1858]: https://github.com/timberio/vector/blob/master/rfcs/2020-04-06-1858-automatically-adjust-request-limits.md
+[rfc 1858]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-04-06-1858-automatically-adjust-request-limits.md
 [rust]: https://rust-lang.org
 [sinks]: /docs/reference/configuration/sinks
 [sources]: /docs/reference/configuration/sources

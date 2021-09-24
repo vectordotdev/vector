@@ -30,6 +30,7 @@ Getting started is easy. Simply add this component to your pipeline:
 ```
 
 {{< success >}}
+
 - The `limit_exceeded_action` described the behavior when the `value_limit` is reached.
 - The `mode` enables you to switch between `exact` and `probabilistic` algorithms to trade performance for memory efficiency.
 - The `value` limit allows you to select exactly how many unique tag values you're willing to accept.
@@ -39,4 +40,4 @@ More to come! This feature is part of our [best-in-class operator
 UX][urls.milestone_39] initiative.
 
 [docs.transforms.tag_cardinality_limit]: /docs/reference/configuration/transforms/tag_cardinality_limit/
-[urls.milestone_39]: https://github.com/timberio/vector/milestone/39
+[urls.milestone_39]: https://github.com/vectordotdev/vector/milestone/39

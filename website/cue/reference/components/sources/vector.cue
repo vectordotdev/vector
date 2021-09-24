@@ -122,8 +122,8 @@ components: sources: vector: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
-		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
-		received_events_total:        components.sources.internal_metrics.output.metrics.received_events_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		protobuf_decode_errors_total:    components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

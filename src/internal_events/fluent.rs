@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use crate::sources::fluent::DecodeError;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct FluentMessageReceived {
@@ -13,7 +13,7 @@ impl InternalEvent for FluentMessageReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", 1);
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }

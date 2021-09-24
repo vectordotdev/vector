@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)] // some features only use some variants
@@ -37,7 +37,7 @@ impl InternalEvent for SocketEventsReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", 1, "mode" => self.mode.as_str());
+        counter!("component_received_events_total", 1, "mode" => self.mode.as_str());
         counter!("events_in_total", 1, "mode" => self.mode.as_str());
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }

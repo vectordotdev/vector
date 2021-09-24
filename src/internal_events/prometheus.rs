@@ -1,4 +1,3 @@
-use super::InternalEvent;
 use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
@@ -6,6 +5,7 @@ use prometheus_parser::ParserError;
 #[cfg(feature = "sources-prometheus")]
 use std::borrow::Cow;
 use std::time::Instant;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct PrometheusEventReceived {
@@ -21,7 +21,7 @@ impl InternalEvent for PrometheusEventReceived {
 
     fn emit_metrics(&self) {
         counter!(
-            "received_events_total", self.count as u64,
+            "component_received_events_total", self.count as u64,
             "uri" => format!("{}",self.uri),
         );
         counter!(
