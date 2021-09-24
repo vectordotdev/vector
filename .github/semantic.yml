@@ -122,6 +122,7 @@ scopes:
   - datadog_agent source # Anything `datadog_agent` source related
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
+  - exec source # Anything `exec` source related
   - file source # Anything `file` source related
   - fluent source # Anything `fluent` source related
   - generator source # Anything `generator` source related

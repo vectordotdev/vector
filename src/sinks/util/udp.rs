@@ -247,7 +247,7 @@ impl UdpSink {
 
 #[async_trait]
 impl StreamSink for UdpSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
