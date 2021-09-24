@@ -288,7 +288,7 @@ impl PrometheusExporter {
 
 #[async_trait]
 impl StreamSink for PrometheusExporter {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed().await;
         while let Some(event) = input.next().await {
             let item = event.into_metric();
@@ -591,7 +591,7 @@ mod tests {
         };
         let cx = SinkContext::new_test();
 
-        let mut sink = PrometheusExporter::new(config, cx.acker());
+        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
 
         let m1 = Metric::new(
             "absolute",
@@ -616,11 +616,13 @@ mod tests {
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
         ];
 
+        let internal_metrics = sink.metrics.clone();
+
         sink.run(Box::pin(futures::stream::iter(metrics)))
             .await
             .unwrap();
 
-        let map = &sink.metrics.read().unwrap().map;
+        let map = &internal_metrics.read().unwrap().map;
 
         assert_eq!(
             map.get_full(&MetricEntry(m1)).unwrap().1.value(),

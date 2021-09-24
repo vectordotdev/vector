@@ -42,10 +42,10 @@ pub struct S3Sink<S, R>
 where
     R: S3RequestBuilder,
 {
-    acker: Option<Acker>,
-    service: Option<S>,
+    acker: Acker,
+    service: S,
     request_builder: R,
-    partitioner: Option<KeyPartitioner>,
+    partitioner: KeyPartitioner,
     batch_size_bytes: Option<NonZeroUsize>,
     batch_size_events: NonZeroUsize,
     batch_timeout: Duration,
@@ -65,10 +65,10 @@ where
         batch_timeout: Duration,
     ) -> Self {
         Self {
-            acker: Some(cx.acker()),
-            service: Some(service),
+            acker: cx.acker(),
+            service,
             request_builder,
-            partitioner: Some(partitioner),
+            partitioner,
             batch_size_bytes,
             batch_size_events,
             batch_timeout,
@@ -85,7 +85,7 @@ where
     S::Error: Debug + Into<crate::Error> + Send,
     R: S3RequestBuilder + Send,
 {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // All sinks do the same fundamental job: take in events, and ship them
         // out. Empirical testing shows that our number one priority for high
         // throughput needs to be servicing I/O as soon as we possibly can.  In
@@ -94,25 +94,17 @@ where
         // batching, ordering, and so on.
         let (io_tx, io_rx) = channel(64);
         let io_barrier = Arc::new(Barrier::new(2));
-        let service = self
-            .service
-            .take()
-            .expect("same sink should not be run twice");
-        let acker = self
-            .acker
-            .take()
-            .expect("same sink should not be run twice");
-        let partitioner = self
-            .partitioner
-            .take()
-            .expect("same sink should not be run twice");
 
-        let io = run_io(io_rx, Arc::clone(&io_barrier), service, acker).in_current_span();
+        let io = run_io(io_rx,
+                   Arc::clone(&io_barrier),
+                   self.service,
+                   self.acker
+            ).in_current_span();
         let _ = tokio::spawn(io);
 
         let batcher = Batcher::new(
             input,
-            partitioner,
+            self.partitioner,
             self.batch_timeout,
             self.batch_size_events,
             self.batch_size_bytes,

@@ -152,8 +152,8 @@ impl From<&NatsSinkConfig> for NatsOptions {
 
 #[async_trait]
 impl StreamSink for NatsSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let nats_options: async_nats::Options = self.options.clone().into();
+    async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let nats_options: async_nats::Options = self.options.into();
 
         let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
 
