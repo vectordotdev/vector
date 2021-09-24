@@ -195,17 +195,12 @@ fn prometheus(
             }
 
             let instance_info = instance_tag.as_ref().map(|tag| {
-                let instance = format!("{}:{}", url.host().unwrap_or_default(), url.port_u16().unwrap_or_else(|| {
-                    let scheme = url.scheme();
-                    // cannot use match because `Scheme` does not derive the needed traits
-                    if url.scheme() == Some(&http::uri::Scheme::HTTP) {
-                        80
-                    } else if scheme == Some(&http::uri::Scheme::HTTPS) {
-                        443
-                    } else {
-                        0
+                let instance = format!("{}:{}", url.host().unwrap_or_default(), url.port_u16().unwrap_or_else(|| match url.scheme() {
+                        Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
+                        Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
+                        _ => 0,
                     }
-                }));
+                ));
                 InstanceInfo { tag: tag.to_string(), instance, honor_label: honor_labels }
             });
             let endpoint_info = endpoint_tag.as_ref().map(|tag| {
