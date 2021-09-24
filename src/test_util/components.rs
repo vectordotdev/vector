@@ -6,7 +6,7 @@
 //! patterns.
 
 use crate::event::{Metric, MetricValue};
-use crate::metrics::Controller;
+use crate::metrics::{self, Controller};
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::env;
@@ -60,7 +60,12 @@ impl ComponentTests {
 
 /// Initialize the necessary bits needed to run a component test specification.
 pub fn init() {
-    crate::metrics::init_test().expect("Failed to initialize metrics recorder");
+    // Handle multiple initializations.
+    if let Err(error) = metrics::init_test() {
+        if error != metrics::Error::AlreadyInitialized {
+            panic!("Failed to initialize metrics recorder: {:?}", error);
+        }
+    }
 }
 
 /// Record an emitted internal event. This is somewhat dumb at this

@@ -12,8 +12,19 @@ use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::{layers::Layer, Generational, NotTracked};
 use once_cell::sync::OnceCell;
+use snafu::Snafu;
 
 pub(self) type Registry = metrics_util::Registry<Key, Handle, NotTracked<Handle>>;
+
+type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+pub enum Error {
+    #[snafu(display("Recorder already initialized."))]
+    AlreadyInitialized,
+    #[snafu(display("Metrics system was not initialized."))]
+    NotInitialized,
+}
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 
@@ -36,12 +47,12 @@ fn tracing_context_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-fn init(recorder: VectorRecorder) -> crate::Result<()> {
+fn init(recorder: VectorRecorder) -> Result<()> {
     // An escape hatch to allow disabing internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
     if !metrics_enabled() {
         metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
-            .map_err(|_| "recorder already initialized")?;
+            .map_err(|_| Error::AlreadyInitialized)?;
         info!(message = "Internal metrics core is disabled.");
         return Ok(());
     }
@@ -59,7 +70,7 @@ fn init(recorder: VectorRecorder) -> crate::Result<()> {
     };
     CONTROLLER
         .set(controller)
-        .map_err(|_| "controller already initialized")?;
+        .map_err(|_| Error::AlreadyInitialized)?;
 
     ////
     //// Initialize the recorder.
@@ -77,9 +88,7 @@ fn init(recorder: VectorRecorder) -> crate::Result<()> {
 
     // This where we combine metrics-rs and our registry. We box it to avoid
     // having to fiddle with statics ourselves.
-    metrics::set_boxed_recorder(recorder).map_err(|_| "recorder already initialized")?;
-
-    Ok(())
+    metrics::set_boxed_recorder(recorder).map_err(|_| Error::AlreadyInitialized)
 }
 
 /// Initialize the default metrics sub-system
@@ -87,7 +96,7 @@ fn init(recorder: VectorRecorder) -> crate::Result<()> {
 /// # Errors
 ///
 /// This function will error if it is called multiple times.
-pub fn init_global() -> crate::Result<()> {
+pub fn init_global() -> Result<()> {
     init(VectorRecorder::new_global())
 }
 
@@ -96,7 +105,7 @@ pub fn init_global() -> crate::Result<()> {
 /// # Errors
 ///
 /// This function will error if it is called multiple times.
-pub fn init_test() -> crate::Result<()> {
+pub fn init_test() -> Result<()> {
     init(VectorRecorder::new_test())
 }
 
@@ -112,10 +121,8 @@ impl Controller {
     ///
     /// This function will fail if the metrics subsystem has not been correctly
     /// initialized.
-    pub fn get() -> crate::Result<&'static Self> {
-        CONTROLLER
-            .get()
-            .ok_or_else(|| "metrics system not initialized".into())
+    pub fn get() -> Result<&'static Self> {
+        CONTROLLER.get().ok_or_else(|| Error::NotInitialized)
     }
 
     /// Take a snapshot of all gathered metrics and expose them as metric

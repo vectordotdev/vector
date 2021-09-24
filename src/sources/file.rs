@@ -638,8 +638,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_happy_path() {
-        components::init();
-
         let n = 5;
 
         let dir = tempdir().unwrap();
@@ -689,8 +687,6 @@ mod tests {
         }
         assert_eq!(hello_i, n);
         assert_eq!(goodbye_i, n);
-
-        SOURCE_TESTS.assert(&["file"]);
     }
 
     // https://github.com/timberio/vector/issues/8363
@@ -1224,7 +1220,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received=run_file_source(&config, false, NoAcks, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1651,6 +1647,8 @@ mod tests {
         acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
+        components::init();
+
         let (tx, rx) = if acking_mode == Acks {
             let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
             (tx, rx.boxed())
@@ -1673,6 +1671,7 @@ mod tests {
         if wait_shutdown {
             shutdown_done.await;
         }
+        SOURCE_TESTS.assert(&["file"]);
         result
     }
 
