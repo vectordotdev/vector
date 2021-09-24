@@ -4,7 +4,7 @@ components: sources: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	features: {
-		multiline: enabled: true
+		multiline: enabled: false
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false
@@ -169,9 +169,8 @@ components: sources: aws_s3: components._aws & {
 		events: {
 			title: "Handling events from the `aws_s3` source"
 			body:  """
-				This source behaves very similarly to the `file` source in that
-				it will output one event per line (unless the `multiline`
-				configuration option is used).
+				This source parses events from the S3 body depending on which framing
+				and decoding methods have been configured.
 
 				You will commonly want to use [transforms](\(urls.vector_transforms)) to
 				parse the data. For example, to parse VPC flow logs sent to S3 you can

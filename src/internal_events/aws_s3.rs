@@ -10,14 +10,15 @@ pub mod source {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct SqsS3EventReceived {
+    pub struct SqsS3EventsReceived {
+        pub count: usize,
         pub byte_size: usize,
     }
 
-    impl InternalEvent for SqsS3EventReceived {
+    impl InternalEvent for SqsS3EventsReceived {
         fn emit_metrics(&self) {
-            counter!("component_received_events_total", 1);
-            counter!("events_in_total", 1);
+            counter!("component_received_events_total", self.count as u64);
+            counter!("events_in_total", self.count as u64);
             counter!("processed_bytes_total", self.byte_size as u64);
         }
     }

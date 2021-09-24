@@ -1,7 +1,6 @@
-use super::util::MultilineConfig;
 use crate::{
+    codecs::{self, DecodingConfig},
     config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
-    line_agg,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
 };
 use async_compression::tokio::bufread;
@@ -39,19 +38,15 @@ enum Strategy {
 struct AwsS3Config {
     #[serde(flatten)]
     region: RegionOrEndpoint,
-
     compression: Compression,
-
     strategy: Strategy,
-
     sqs: Option<sqs::Config>,
-
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
     auth: AwsAuthentication,
-
-    multiline: Option<MultilineConfig>,
+    #[serde(default)]
+    decoding: DecodingConfig,
 }
 
 inventory::submit! {
@@ -64,15 +59,11 @@ impl_generate_config_from_default!(AwsS3Config);
 #[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let multiline_config: Option<line_agg::Config> = self
-            .multiline
-            .as_ref()
-            .map(|config| config.try_into())
-            .transpose()?;
+        let decoder = self.decoding.build()?;
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
-                self.create_sqs_ingestor(multiline_config, &cx.proxy)
+                self.create_sqs_ingestor(decoder, &cx.proxy)
                     .await?
                     .run(cx.out, cx.shutdown),
             )),
@@ -91,7 +82,7 @@ impl SourceConfig for AwsS3Config {
 impl AwsS3Config {
     async fn create_sqs_ingestor(
         &self,
-        multiline: Option<line_agg::Config>,
+        decoder: codecs::Decoder,
         proxy: &ProxyConfig,
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         use std::sync::Arc;
@@ -124,7 +115,7 @@ impl AwsS3Config {
                     s3_client,
                     sqs.clone(),
                     self.compression,
-                    multiline,
+                    decoder,
                 )
                 .await
                 .context(Initialize {})
@@ -296,9 +287,7 @@ mod integration_tests {
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
         config::{SourceConfig, SourceContext},
-        line_agg,
         rusoto::RegionOrEndpoint,
-        sources::util::MultilineConfig,
         test_util::{
             collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
         },
@@ -316,7 +305,7 @@ mod integration_tests {
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(key, None, None, None, logs.join("\n").into_bytes(), logs).await;
+        test_event(key, None, None, logs.join("\n").into_bytes(), logs).await;
     }
 
     #[tokio::test]
@@ -326,7 +315,7 @@ mod integration_tests {
         let key = format!("special:{}", uuid::Uuid::new_v4().to_string());
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(key, None, None, None, logs.join("\n").into_bytes(), logs).await;
+        test_event(key, None, None, logs.join("\n").into_bytes(), logs).await;
     }
 
     #[tokio::test]
@@ -345,7 +334,7 @@ mod integration_tests {
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer).unwrap();
 
-        test_event(key, Some("gzip"), None, None, buffer, logs).await;
+        test_event(key, Some("gzip"), None, buffer, logs).await;
     }
 
     #[tokio::test]
@@ -365,7 +354,7 @@ mod integration_tests {
             data
         };
 
-        test_event(key, Some("gzip"), None, None, buffer, logs).await;
+        test_event(key, Some("gzip"), None, buffer, logs).await;
     }
 
     #[tokio::test]
@@ -385,41 +374,14 @@ mod integration_tests {
             data
         };
 
-        test_event(key, Some("zstd"), None, None, buffer, logs).await;
+        test_event(key, Some("zstd"), None, buffer, logs).await;
     }
 
-    #[tokio::test]
-    async fn s3_process_message_multiline() {
-        trace_init();
-
-        let key = uuid::Uuid::new_v4().to_string();
-        let logs: Vec<String> = vec!["abc", "def", "geh"]
-            .into_iter()
-            .map(ToOwned::to_owned)
-            .collect();
-
-        test_event(
-            key,
-            None,
-            None,
-            Some(MultilineConfig {
-                start_pattern: "abc".to_owned(),
-                mode: line_agg::Mode::HaltWith,
-                condition_pattern: "geh".to_owned(),
-                timeout_ms: 1000,
-            }),
-            logs.join("\n").into_bytes(),
-            vec!["abc\ndef\ngeh".to_owned()],
-        )
-        .await;
-    }
-
-    fn config(queue_url: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
+    fn config(queue_url: &str) -> AwsS3Config {
         AwsS3Config {
             region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
-            multiline,
             sqs: Some(sqs::Config {
                 queue_url: queue_url.to_string(),
                 poll_secs: 1,
@@ -434,7 +396,6 @@ mod integration_tests {
         key: String,
         content_encoding: Option<&str>,
         content_type: Option<&str>,
-        multiline: Option<MultilineConfig>,
         payload: Vec<u8>,
         expected_lines: Vec<String>,
     ) {
@@ -444,7 +405,7 @@ mod integration_tests {
         let queue = create_queue(&sqs).await;
         let bucket = create_bucket(&s3, &queue).await;
 
-        let config = config(&queue, multiline);
+        let config = config(&queue);
 
         s3.put_object(PutObjectRequest {
             bucket: bucket.to_owned(),

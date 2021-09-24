@@ -1,19 +1,18 @@
 use crate::{
-    codecs::{CharacterDelimitedCodec, FramingError},
+    codecs::{self},
     config::log_schema,
     event::Event,
     internal_events::aws_s3::source::{
         SqsMessageDeleteBatchFailed, SqsMessageDeletePartialFailure, SqsMessageDeleteSucceeded,
         SqsMessageProcessingFailed, SqsMessageProcessingSucceeded, SqsMessageReceiveFailed,
-        SqsMessageReceiveSucceeded, SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
+        SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored, SqsS3EventsReceived,
     },
-    line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     Pipeline,
 };
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
@@ -103,7 +102,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to read all of s3://{}/{}: {}", bucket, key, source))]
     ReadObject {
-        source: Box<dyn FramingError>,
+        source: codecs::Error,
         bucket: String,
         key: String,
     },
@@ -130,13 +129,9 @@ pub enum ProcessingError {
 
 pub struct State {
     region: Region,
-
     s3_client: S3Client,
     sqs_client: SqsClient,
-
-    multiline: Option<line_agg::Config>,
     compression: super::Compression,
-
     queue_url: String,
     poll_secs: u32,
     client_concurrency: u32,
@@ -146,6 +141,7 @@ pub struct State {
 
 pub(super) struct Ingestor {
     state: Arc<State>,
+    decoder: codecs::Decoder,
 }
 
 impl Ingestor {
@@ -155,19 +151,15 @@ impl Ingestor {
         s3_client: S3Client,
         config: Config,
         compression: super::Compression,
-        multiline: Option<line_agg::Config>,
+        decoder: codecs::Decoder,
     ) -> Result<Ingestor, IngestorNewError> {
         let visibility_timeout_secs: i64 = config.visibility_timeout_secs.into();
 
         let state = Arc::new(State {
             region,
-
             s3_client,
             sqs_client,
-
             compression,
-            multiline,
-
             queue_url: config.queue_url,
             poll_secs: config.poll_secs,
             client_concurrency: config.client_concurrency,
@@ -175,14 +167,18 @@ impl Ingestor {
             delete_message: config.delete_message,
         });
 
-        Ok(Ingestor { state })
+        Ok(Ingestor { state, decoder })
     }
 
     pub(super) async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
-            let process =
-                IngestorProcess::new(Arc::clone(&self.state), out.clone(), shutdown.clone());
+            let process = IngestorProcess::new(
+                Arc::clone(&self.state),
+                self.decoder.clone(),
+                out.clone(),
+                shutdown.clone(),
+            );
             let fut = async move { process.run().await };
             let handle = tokio::spawn(fut.in_current_span());
             handles.push(handle);
@@ -204,14 +200,21 @@ impl Ingestor {
 
 pub struct IngestorProcess {
     state: Arc<State>,
+    decoder: codecs::Decoder,
     out: Pipeline,
     shutdown: ShutdownSignal,
 }
 
 impl IngestorProcess {
-    pub fn new(state: Arc<State>, out: Pipeline, shutdown: ShutdownSignal) -> Self {
+    pub fn new(
+        state: Arc<State>,
+        decoder: codecs::Decoder,
+        out: Pipeline,
+        shutdown: ShutdownSignal,
+    ) -> Self {
         Self {
             state,
+            decoder,
             out,
             shutdown,
         }
@@ -394,6 +397,10 @@ impl IngestorProcess {
                 )
                 .await;
 
+                let bucket_name = Bytes::from(s3_event.s3.bucket.name.clone());
+                let object_key = Bytes::from(s3_event.s3.object.key.clone());
+                let aws_region = Bytes::from(s3_event.aws_region.clone());
+
                 // Record the read error seen to propagate up later so we avoid ack'ing the SQS
                 // message
                 //
@@ -406,9 +413,9 @@ impl IngestorProcess {
                 // prefer duplicate lines over message loss. Future work could include recording
                 // the offset of the object that has been read, but this would only be relevant in
                 // the case that the same vector instance processes the same message.
-                let mut read_error: Option<Box<dyn FramingError>> = None;
-                let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-                    FramedRead::new(object_reader, CharacterDelimitedCodec::new('\n'))
+                let mut read_error = None;
+                let mut stream = Box::new(
+                    FramedRead::new(object_reader, self.decoder.clone())
                         .map(|res| {
                             res.map_err(|err| {
                                 read_error = Some(err);
@@ -419,47 +426,35 @@ impl IngestorProcess {
                         .map(|r| r.expect("validated by take_while")),
                 );
 
-                let lines = match &self.state.multiline {
-                    Some(config) => Box::new(
-                        LineAgg::new(
-                            lines.map(|line| ((), line, ())),
-                            line_agg::Logic::new(config.clone()),
-                        )
-                        .map(|(_src, line, _context)| line),
-                    ),
-                    None => lines,
-                };
-
-                let bucket_name = Bytes::from(s3_event.s3.bucket.name.as_str().as_bytes().to_vec());
-                let object_key = Bytes::from(s3_event.s3.object.key.as_str().as_bytes().to_vec());
-                let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
-
-                let mut stream = lines.filter_map(|line| {
-                    emit!(&SqsS3EventReceived {
-                        byte_size: line.len()
+                let mut send_error = None;
+                while let (Some((events, byte_size)), true) =
+                    (stream.next().await, send_error.is_none())
+                {
+                    emit!(&SqsS3EventsReceived {
+                        count: events.len(),
+                        byte_size
                     });
 
-                    let mut event = Event::from(line);
+                    for mut event in events {
+                        if let Event::Log(ref mut log) = event {
+                            log.insert_flat("bucket", bucket_name.clone());
+                            log.insert_flat("object", object_key.clone());
+                            log.insert_flat("region", aws_region.clone());
+                            log.insert_flat(log_schema().timestamp_key(), timestamp);
 
-                    let log = event.as_mut_log();
-                    log.insert_flat("bucket", bucket_name.clone());
-                    log.insert_flat("object", object_key.clone());
-                    log.insert_flat("region", aws_region.clone());
-                    log.insert_flat(log_schema().timestamp_key(), timestamp);
+                            if let Some(metadata) = &metadata {
+                                for (key, value) in metadata {
+                                    log.insert(key, value.clone());
+                                }
+                            }
+                        }
 
-                    if let Some(metadata) = &metadata {
-                        for (key, value) in metadata {
-                            log.insert(key, value.clone());
+                        if self.out.send(event).await.is_err() {
+                            send_error = Some(crate::pipeline::ClosedError);
+                            break;
                         }
                     }
-
-                    ready(Some(Ok(event)))
-                });
-
-                let send_error = match self.out.send_all(&mut stream).await {
-                    Ok(_) => None,
-                    Err(_) => Some(crate::pipeline::ClosedError),
-                };
+                }
 
                 // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
                 // so we explicitly drop it so that we can again utilize `read_error` below.
