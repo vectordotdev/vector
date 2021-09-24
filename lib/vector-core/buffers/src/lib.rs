@@ -146,9 +146,9 @@ where
                     .clone()
                     .sink_map_err(|error| error!(message = "Sender error.", %error));
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner, false))
+                    Box::new(DropWhenFull::new(InstrumentMemoryBuffer::new(inner)))
                 } else {
-                    Box::new(BlockWhenFull::new(inner, false))
+                    Box::new(InstrumentMemoryBuffer::new(inner))
                 }
             }
 
@@ -156,9 +156,9 @@ where
             BufferInputCloner::Disk(writer, when_full) => {
                 let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner, true))
+                    Box::new(DropWhenFull::new(inner))
                 } else {
-                    Box::new(BlockWhenFull::new(inner, true))
+                    Box::new(inner)
                 }
             }
         }
@@ -169,17 +169,12 @@ where
 pub struct DropWhenFull<S> {
     #[pin]
     inner: S,
-    is_disk_buffer: bool,
     drop: bool,
 }
 
 impl<S> DropWhenFull<S> {
-    pub fn new(inner: S, is_disk_buffer: bool) -> Self {
-        Self {
-            inner,
-            is_disk_buffer,
-            drop: false,
-        }
+    pub fn new(inner: S) -> Self {
+        Self { inner, drop: false }
     }
 }
 
@@ -210,19 +205,7 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
             emit(&EventsDropped { count: 1 });
             Ok(())
         } else {
-            if self.is_disk_buffer {
-                // The disk_buffer is instrumented in `writer.rs` to avoid
-                // recalculating the size of the item
-                self.project().inner.start_send(item)
-            } else {
-                let byte_size = item.allocated_bytes();
-                self.project().inner.start_send(item).map(|()| {
-                    emit(&EventsReceived {
-                        count: 1,
-                        byte_size,
-                    });
-                })
-            }
+            self.project().inner.start_send(item)
         }
     }
 
@@ -235,29 +218,22 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
     }
 }
 
-/// Instrumenting events received by the buffer can be accomplished by hooking
-/// into the lifecycle of writing events to the buffer. This general strategy is
-/// already available to non-blocking buffers because they implement dropping
-/// behavior in a similar way.
-///
-/// The BlockWhenFull wrapper allows us to instrument blocking buffers
+/// Instrumenting events received by the memory buffer can be accomplished by hooking
+/// into the lifecycle of writing events to the buffer, hence the InstrumentMemoryBuffer wrapper. This is not necessary for
+/// disk buffers which are instrumented for this at a lower level in their implementation.
 #[pin_project]
-pub struct BlockWhenFull<S> {
+pub struct InstrumentMemoryBuffer<S> {
     #[pin]
     inner: S,
-    is_disk_buffer: bool,
 }
 
-impl<S> BlockWhenFull<S> {
-    pub fn new(inner: S, is_disk_buffer: bool) -> Self {
-        Self {
-            inner,
-            is_disk_buffer,
-        }
+impl<S> InstrumentMemoryBuffer<S> {
+    pub fn new(inner: S) -> Self {
+        Self { inner }
     }
 }
 
-impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for BlockWhenFull<S> {
+impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for InstrumentMemoryBuffer<S> {
     type Error = S::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -265,17 +241,13 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for BlockWhenFull<S> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        if self.is_disk_buffer {
-            self.project().inner.start_send(item)
-        } else {
-            let byte_size = item.allocated_bytes();
-            self.project().inner.start_send(item).map(|()| {
-                emit(&EventsReceived {
-                    count: 1,
-                    byte_size,
-                });
-            })
-        }
+        let byte_size = item.allocated_bytes();
+        self.project().inner.start_send(item).map(|()| {
+            emit(&EventsReceived {
+                count: 1,
+                byte_size,
+            });
+        })
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
