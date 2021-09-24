@@ -180,138 +180,180 @@ fn prometheus(
 ) -> sources::Source {
     let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
-    Box::pin(IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
-        .take_until(shutdown)
-        .map(move |_| stream::iter(urls.clone()))
-        .flatten()
-        .map(move |url| {
-            let client = HttpClient::new(tls.clone(), &proxy).expect("Building HTTP client failed");
+    Box::pin(
+        IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
+            .take_until(shutdown)
+            .map(move |_| stream::iter(urls.clone()))
+            .flatten()
+            .map(move |url| {
+                let client =
+                    HttpClient::new(tls.clone(), &proxy).expect("Building HTTP client failed");
 
-            let mut request = Request::get(&url)
-                .body(Body::empty())
-                .expect("error creating request");
-            if let Some(auth) = &auth {
-                auth.apply(&mut request);
-            }
+                let mut request = Request::get(&url)
+                    .body(Body::empty())
+                    .expect("error creating request");
+                if let Some(auth) = &auth {
+                    auth.apply(&mut request);
+                }
 
-            let instance_info = instance_tag.as_ref().map(|tag| {
-                let instance = format!("{}:{}", url.host().unwrap_or_default(), url.port_u16().unwrap_or_else(|| match url.scheme() {
+                let instance_info = instance_tag.as_ref().map(|tag| {
+                    let instance = format!(
+                        "{}:{}",
+                        url.host().unwrap_or_default(),
+                        url.port_u16().unwrap_or_else(|| match url.scheme() {
                             Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
-                        Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
-                        _ => 0,
+                            Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
+                            _ => 0,
+                        })
+                    );
+                    InstanceInfo {
+                        tag: tag.to_string(),
+                        instance,
+                        honor_label: honor_labels,
                     }
-                ));
-                InstanceInfo { tag: tag.to_string(), instance, honor_label: honor_labels }
-            });
-            let endpoint_info = endpoint_tag.as_ref().map(|tag| {
-                EndpointInfo { tag: tag.to_string(), endpoint: url.to_string(), honor_label: honor_labels}
-            });
+                });
+                let endpoint_info = endpoint_tag.as_ref().map(|tag| EndpointInfo {
+                    tag: tag.to_string(),
+                    endpoint: url.to_string(),
+                    honor_label: honor_labels,
+                });
 
-            let start = Instant::now();
-            client
-                .send(request)
-                .map_err(crate::Error::from)
-                .and_then(|response| async move {
-                    let (header, body) = response.into_parts();
-                    let body = hyper::body::to_bytes(body).await?;
-                    Ok((header, body))
-                })
-                .into_stream()
-                .filter_map(move |response| {
-                    let instance_info = instance_info.clone();
-                    let endpoint_info = endpoint_info.clone();
-
-                    ready(match response {
-                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            emit!(&PrometheusRequestCompleted {
-                                start,
-                                end: Instant::now()
-                            });
-
-                            let byte_size = body.len();
-                            let body = String::from_utf8_lossy(&body);
-
-                            match parser::parse_text(&body) {
-                                Ok(events) => {
-                                    emit!(&PrometheusEventReceived {
-                                        byte_size,
-                                        count: events.len(),
-                                        uri: url.clone()
-                                    });
-                                    Some(stream::iter(events).map(move |mut event| {
-                                        let metric = event.as_mut_metric();
-                                        if let Some(InstanceInfo {tag, instance, honor_label}) = &instance_info{
-                                            match (honor_label, metric.tag_value(tag)) {
-                                                (false, Some(old_instance)) => {
-                                                    metric.insert_tag(format!("exported_{}", tag), old_instance);
-                                                    metric.insert_tag(tag.clone(), instance.clone());
-                                                },
-                                                (true, Some(_)) => {},
-                                                (_, None) => {
-                                                    metric.insert_tag(tag.clone(), instance.clone());
-                                                },
-                                            }
-                                        }
-                                        if let Some(EndpointInfo {tag, endpoint, honor_label}) = &endpoint_info{
-                                            match (honor_label, metric.tag_value(tag)) {
-                                                (false, Some(old_endpoint)) => {
-                                                    metric.insert_tag(format!("exported_{}", tag), old_endpoint);
-                                                    metric.insert_tag(tag.clone(), endpoint.clone());
-                                                },
-                                                (true, Some(_)) => {},
-                                                (_, None) => {
-                                                    metric.insert_tag(tag.clone(), endpoint.clone());
-                                                },
-                                            }
-                                        }
-                                        Ok(event)
-                                    }))
-                                }
-                                Err(error) => {
-                                    if url.path() == "/" {
-                                        // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
-                                        warn!(
-                                            message = "No path is set on the endpoint and we got a parse error, did you mean to use /metrics? This behavior changed in version 0.11.",
-                                            endpoint = %url
-                                        );
-                            }
-                                    emit!(&PrometheusParseError {
-                                        error,
-                                        url: url.clone(),
-                                        body,
-                                    });
-                                    None
-                                }
-                            }
-                        }
-                        Ok((header, _)) => {
-                            if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
-                                // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
-                                warn!(
-                                    message = "No path is set on the endpoint and we got a 404, did you mean to use /metrics? This behavior changed in version 0.11.",
-                                    endpoint = %url
-                                );
-                            }
-                            emit!(&PrometheusErrorResponse {
-                                code: header.status,
-                                url: url.clone(),
-                            });
-                            None
-                        }
-                        Err(error) => {
-                            emit!(&PrometheusHttpError {
-                                error,
-                                url: url.clone(),
-                            });
-                            None
-                        }
+                let start = Instant::now();
+                client
+                    .send(request)
+                    .map_err(crate::Error::from)
+                    .and_then(|response| async move {
+                        let (header, body) = response.into_parts();
+                        let body = hyper::body::to_bytes(body).await?;
+                        Ok((header, body))
                     })
-                })
-                .flatten()
-        })
-        .flatten()
-        .forward(out)
-        .inspect(|_| info!("Finished sending.")))
+                    .into_stream()
+                    .filter_map(move |response| {
+                        let instance_info = instance_info.clone();
+                        let endpoint_info = endpoint_info.clone();
+
+                        ready(match response {
+                            Ok((header, body)) if header.status == hyper::StatusCode::OK => {
+                                emit!(&PrometheusRequestCompleted {
+                                    start,
+                                    end: Instant::now()
+                                });
+
+                                let byte_size = body.len();
+                                let body = String::from_utf8_lossy(&body);
+
+                                match parser::parse_text(&body) {
+                                    Ok(events) => {
+                                        emit!(&PrometheusEventReceived {
+                                            byte_size,
+                                            count: events.len(),
+                                            uri: url.clone()
+                                        });
+                                        Some(stream::iter(events).map(move |mut event| {
+                                            let metric = event.as_mut_metric();
+                                            if let Some(InstanceInfo {
+                                                tag,
+                                                instance,
+                                                honor_label,
+                                            }) = &instance_info
+                                            {
+                                                match (honor_label, metric.tag_value(tag)) {
+                                                    (false, Some(old_instance)) => {
+                                                        metric.insert_tag(
+                                                            format!("exported_{}", tag),
+                                                            old_instance,
+                                                        );
+                                                        metric.insert_tag(
+                                                            tag.clone(),
+                                                            instance.clone(),
+                                                        );
+                                                    }
+                                                    (true, Some(_)) => {}
+                                                    (_, None) => {
+                                                        metric.insert_tag(
+                                                            tag.clone(),
+                                                            instance.clone(),
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            if let Some(EndpointInfo {
+                                                tag,
+                                                endpoint,
+                                                honor_label,
+                                            }) = &endpoint_info
+                                            {
+                                                match (honor_label, metric.tag_value(tag)) {
+                                                    (false, Some(old_endpoint)) => {
+                                                        metric.insert_tag(
+                                                            format!("exported_{}", tag),
+                                                            old_endpoint,
+                                                        );
+                                                        metric.insert_tag(
+                                                            tag.clone(),
+                                                            endpoint.clone(),
+                                                        );
+                                                    }
+                                                    (true, Some(_)) => {}
+                                                    (_, None) => {
+                                                        metric.insert_tag(
+                                                            tag.clone(),
+                                                            endpoint.clone(),
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            Ok(event)
+                                        }))
+                                    }
+                                    Err(error) => {
+                                        if url.path() == "/" {
+                                            // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                            warn!(
+                                                message = "No path is set on the endpoint and we got a parse error, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                                endpoint = %url,
+                                            );
+                                        }
+                                        emit!(&PrometheusParseError {
+                                            error,
+                                            url: url.clone(),
+                                            body,
+                                        });
+                                        None
+                                    }
+                                }
+                            }
+                            Ok((header, _)) => {
+                                if header.status == hyper::StatusCode::NOT_FOUND
+                                    && url.path() == "/"
+                                {
+                                    // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                    warn!(
+                                        message = "No path is set on the endpoint and we got a 404, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                        endpoint = %url,
+                                    );
+                                }
+                                emit!(&PrometheusErrorResponse {
+                                    code: header.status,
+                                    url: url.clone(),
+                                });
+                                None
+                            }
+                            Err(error) => {
+                                emit!(&PrometheusHttpError {
+                                    error,
+                                    url: url.clone(),
+                                });
+                                None
+                            }
+                        })
+                    })
+                    .flatten()
+            })
+            .flatten()
+            .forward(out)
+            .inspect(|_| info!("Finished sending.")),
+    )
 }
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
