@@ -22,6 +22,14 @@ use std::{
 };
 use tokio_stream::wrappers::IntervalStream;
 
+// pulled up, and split over multiple lines, because the long lines trip up rustfmt such that it
+// gave up trying to format, but reported no error
+static PARSE_ERROR_NO_PATH: &str = "No path is set on the endpoint and we got a parse error,\
+                                    did you mean to use /metrics? This behavior changed in version 0.11.";
+static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 404,\
+                                  did you mean to use /metrics?\
+                                  This behavior changed in version 0.11.";
+
 #[derive(Debug, Snafu)]
 enum ConfigError {
     #[snafu(display("Cannot set both `endpoints` and `hosts`"))]
@@ -310,7 +318,7 @@ fn prometheus(
                                         if url.path() == "/" {
                                             // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
                                             warn!(
-                                                message = "No path is set on the endpoint and we got a parse error, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                                message = PARSE_ERROR_NO_PATH,
                                                 endpoint = %url,
                                             );
                                         }
@@ -329,7 +337,7 @@ fn prometheus(
                                 {
                                     // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
                                     warn!(
-                                        message = "No path is set on the endpoint and we got a 404, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                        message = PARSE_ERROR_NO_PATH,
                                         endpoint = %url,
                                     );
                                 }
@@ -624,7 +632,8 @@ mod integration_tests {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://localhost:9090/metrics".into()],
             scrape_interval_secs: 1,
-            instance: Some("instance".to_string()),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
             auth: None,
             tls: None,
         };
@@ -657,11 +666,11 @@ mod integration_tests {
         assert!(build.tags().unwrap().contains_key("branch"));
         assert!(build.tags().unwrap().contains_key("version"));
         assert_eq!(
-            build.tag_value("instance").unwrap(),
+            build.tag_value("instance"),
             Some("localhost:9090".to_string())
         );
         assert_eq!(
-            bould.tag_value("endpoint").unwrap(),
+            build.tag_value("endpoint"),
             Some("http://localhost:9090/metrics".to_string())
         );
 
@@ -669,11 +678,11 @@ mod integration_tests {
         assert!(matches!(queries.kind(), MetricKind::Absolute));
         assert!(matches!(queries.value(), &MetricValue::Gauge { .. }));
         assert_eq!(
-            queries.tag_value("instance").unwrap(),
+            queries.tag_value("instance"),
             Some("localhost:9090".to_string())
         );
         assert_eq!(
-            queries.tag_value("endpoint").unwrap(),
+            queries.tag_value("endpoint"),
             Some("http://localhost:9090/metrics".to_string())
         );
 
@@ -682,11 +691,11 @@ mod integration_tests {
         assert!(matches!(go_info.value(), &MetricValue::Gauge { .. }));
         assert!(go_info.tags().unwrap().contains_key("version"));
         assert_eq!(
-            go_info.tag_value("instance").unwrap(),
+            go_info.tag_value("instance"),
             Some("localhost:9090".to_string())
         );
         assert_eq!(
-            go_info.tag_value("endpoint").unwrap(),
+            go_info.tag_value("endpoint"),
             Some("http://localhost:9090/metrics".to_string())
         );
     }
