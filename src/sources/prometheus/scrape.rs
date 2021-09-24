@@ -337,7 +337,7 @@ fn prometheus(
                                 {
                                     // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
                                     warn!(
-                                        message = PARSE_ERROR_NO_PATH,
+                                        message = NOT_FOUND_NO_PATH,
                                         endpoint = %url,
                                     );
                                 }
@@ -634,6 +634,7 @@ mod integration_tests {
             scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: false,
             auth: None,
             tls: None,
         };
