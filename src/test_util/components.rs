@@ -9,11 +9,12 @@ use crate::event::{Metric, MetricValue};
 use crate::metrics::{self, Controller};
 use lazy_static::lazy_static;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::env;
 
 thread_local!(
     /// A buffer for recording internal events emitted by a single test.
-    static EVENTS_RECORDED: RefCell<Vec<String>> = RefCell::new(Vec::new())
+    static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(Default::default());
 );
 
 /// This struct is used to describe a set of component tests.
@@ -75,16 +76,12 @@ pub fn init() {
 /// this is good enough for these tests. This should only be used by the
 /// test `emit!` macro. The `check-events` script will test that emitted
 /// events contain the right fields, etc.
-pub fn record_internal_event(s: &str) {
-    let s = s.strip_prefix('&').unwrap_or(s);
-    EVENTS_RECORDED.with(|er| er.borrow_mut().push(s.into()));
-}
-
-fn event_base_name(mut event: &str) -> &str {
-    if let Some(par) = event.find('{') {
-        event = &event[..par];
-    }
-    event
+pub fn record_internal_event(event: &str) {
+    // Remove leading '&'
+    // Remove trailing '{fields…}'
+    let event = event.strip_prefix('&').unwrap_or(event);
+    let event = event.find('{').map(|par| &event[..par]).unwrap_or(event);
+    EVENTS_RECORDED.with(|er| er.borrow_mut().insert(event.into()));
 }
 
 /// Tests if the given metric contains all the given tag names
@@ -139,12 +136,9 @@ impl ComponentTester {
 
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
-            if !EVENTS_RECORDED.with(|events| {
-                events
-                    .borrow()
-                    .iter()
-                    .any(|event| event_base_name(event).ends_with(name))
-            }) {
+            if !EVENTS_RECORDED
+                .with(|events| events.borrow().iter().any(|event| event.ends_with(name)))
+            {
                 self.errors.push(format!("Missing emitted event {}", name));
             }
         }
