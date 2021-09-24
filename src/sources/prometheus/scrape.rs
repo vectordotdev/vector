@@ -196,7 +196,7 @@ fn prometheus(
 
             let instance_info = instance_tag.as_ref().map(|tag| {
                 let instance = format!("{}:{}", url.host().unwrap_or_default(), url.port_u16().unwrap_or_else(|| match url.scheme() {
-                        Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
+                            Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
                         Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
                         _ => 0,
                     }
@@ -393,7 +393,7 @@ mod test {
         let dummy_endpoint = warp::path!("metrics").map(|| {
                 r#"
                     promhttp_metric_handler_requests_total{endpoint="http://example.com", instance="localhost:9999", code="200"} 100 1612411516789
-                    "#
+                "#
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
