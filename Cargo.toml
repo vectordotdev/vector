@@ -794,24 +794,6 @@ test = true
 required-features = ["language-benches"]
 
 [[bench]]
-name = "metrics_on"
-harness = false
-test = true
-required-features = ["metrics-benches"]
-
-[[bench]]
-name = "metrics_no_tracing_integration"
-harness = false
-test = true
-required-features = ["metrics-benches"]
-
-[[bench]]
-name = "metrics_off"
-harness = false
-test = true
-required-features = ["metrics-benches"]
-
-[[bench]]
 name = "distribution_statistic"
 harness = false
 test = true
