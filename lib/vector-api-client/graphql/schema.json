@@ -1248,9 +1248,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component pattern that raised the event",
+              "description": "Pattern that raised the event",
               "isDeprecated": false,
-              "name": "componentPattern",
+              "name": "pattern",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -5466,7 +5466,7 @@
                 {
                   "defaultValue": null,
                   "description": null,
-                  "name": "componentPatterns",
+                  "name": "patterns",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -5515,9 +5515,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "A stream of events emitted from matched component(s)",
+              "description": "A stream of events emitted from matched component ID patterns",
               "isDeprecated": false,
-              "name": "outputEvents",
+              "name": "outputEventsByComponentIdPatterns",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
