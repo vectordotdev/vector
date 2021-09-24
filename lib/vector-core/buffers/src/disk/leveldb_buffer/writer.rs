@@ -1,5 +1,8 @@
 use super::Key;
-use crate::{bytes::{DecodeBytes, EncodeBytes}, internal_events::EventsReceived};
+use crate::{
+    bytes::{DecodeBytes, EncodeBytes},
+    internal_events::EventsReceived,
+};
 use bytes::BytesMut;
 use core_common::internal_event::emit;
 use futures::{task::AtomicWaker, Sink};
