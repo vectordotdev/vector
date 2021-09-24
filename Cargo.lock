@@ -1179,6 +1179,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea221b5284a47e40033bf9b66f35f984ec0ea2931eb03505246cd27a963f981b"
 
 [[package]]
+name = "core_common"
+version = "0.1.0"
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3069,10 +3073,6 @@ checksum = "bee0328b1209d157ef001c94dd85b4f8f64139adb0eac2659f4b08382b2f474d"
 dependencies = [
  "cfg-if 1.0.0",
 ]
-
-[[package]]
-name = "internal_event"
-version = "0.1.0"
 
 [[package]]
 name = "inventory"
@@ -7717,6 +7717,7 @@ dependencies = [
  "buffers",
  "bytes 1.1.0",
  "chrono",
+ "core_common",
  "criterion",
  "db-key",
  "derivative",
@@ -7728,7 +7729,6 @@ dependencies = [
  "http",
  "hyper-proxy",
  "indexmap",
- "internal_event",
  "lazy_static",
  "lookup",
  "metrics",

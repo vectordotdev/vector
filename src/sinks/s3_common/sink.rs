@@ -14,11 +14,11 @@ use vector_core::{buffers::Acker, event::EventStatus};
 use crate::sinks::s3_common::partitioner::KeyPartitioner;
 
 pub struct S3Sink<Svc, RB, E> {
-    acker: Option<Acker>,
-    service: Option<Svc>,
-    request_builder: Option<RB>,
-    partitioner: Option<KeyPartitioner>,
-    encoding: Option<E>,
+    acker: Acker,
+    service: Svc,
+    request_builder: RB,
+    partitioner: KeyPartitioner,
+    encoding: E,
     compression: Compression,
     batch_size_bytes: Option<NonZeroUsize>,
     batch_size_events: NonZeroUsize,
@@ -38,12 +38,12 @@ impl<Svc, RB, E> S3Sink<Svc, RB, E> {
         batch_timeout: Duration,
     ) -> Self {
         Self {
-            acker: Some(cx.acker()),
-            service: Some(service),
-            request_builder: Some(request_builder),
-            partitioner: Some(partitioner),
-            encoding: Some(encoding),
+            partitioner,
+            encoding,
             compression,
+            acker: cx.acker(),
+            service,
+            request_builder,
             batch_size_bytes,
             batch_size_events,
             batch_timeout,
@@ -63,39 +63,19 @@ where
     RB::Request: Ackable + Finalizable + Send,
     E: Encoder + Send + Sync + 'static,
 {
-    async fn run_inner(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // All sinks do the same fundamental job: take in events, and ship them
         // out. Empirical testing shows that our number one priority for high
         // throughput needs to be servicing I/O as soon as we possibly can.  In
         // order to do that, we'll spin up a separate task that deals
         // exclusively with I/O, while we deal with everything else here:
         // batching, ordering, and so on.
-        let service = self
-            .service
-            .take()
-            .expect("same sink should not be run twice");
-        let acker = self
-            .acker
-            .take()
-            .expect("same sink should not be run twice");
-        let partitioner = self
-            .partitioner
-            .take()
-            .expect("same sink should not be run twice");
-        let request_builder = self
-            .request_builder
-            .take()
-            .expect("same sink should not be run twice");
-        let encoding = self
-            .encoding
-            .take()
-            .expect("same sink should not be run twice");
 
         let request_builder_rate_limit = NonZeroUsize::new(50);
 
         let sink = input
             .batched(
-                partitioner,
+                self.partitioner,
                 self.batch_timeout,
                 self.batch_size_events,
                 self.batch_size_bytes,
@@ -103,8 +83,8 @@ where
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
                 request_builder_rate_limit,
-                request_builder,
-                encoding,
+                self.request_builder,
+                self.encoding,
                 self.compression,
             )
             .filter_map(|request| async move {
@@ -116,7 +96,7 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(service, acker);
+            .into_driver(self.service, self.acker);
 
         sink.run().await
     }
@@ -135,7 +115,7 @@ where
     RB::Request: Ackable + Finalizable + Send,
     E: Encoder + Send + Sync + 'static,
 {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
 }
