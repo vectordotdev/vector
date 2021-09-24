@@ -37,6 +37,7 @@ struct PrometheusScrapeConfig {
     scrape_interval_secs: u64,
     instance_tag: Option<String>,
     endpoint_tag: Option<String>,
+    honor_labels: bool,
     tls: Option<TlsOptions>,
     auth: Option<Auth>,
 }
@@ -60,6 +61,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
             scrape_interval_secs: default_scrape_interval_secs(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: false,
             tls: None,
             auth: None,
         })
@@ -81,6 +83,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             urls,
             self.instance_tag.clone(),
             self.endpoint_tag.clone(),
+            self.honor_labels,
             tls,
             self.auth.clone(),
             cx.proxy.clone(),
@@ -109,6 +112,7 @@ struct PrometheusCompatConfig {
     endpoints: Vec<String>,
     instance_tag: Option<String>,
     endpoint_tag: Option<String>,
+    honor_labels: bool,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     tls: Option<TlsOptions>,
@@ -125,6 +129,7 @@ impl SourceConfig for PrometheusCompatConfig {
             endpoints: self.endpoints.clone(),
             instance_tag: self.instance_tag.clone(),
             endpoint_tag: self.endpoint_tag.clone(),
+            honor_labels: self.honor_labels,
             scrape_interval_secs: self.scrape_interval_secs,
             tls: self.tls.clone(),
             auth: self.auth.clone(),
@@ -148,6 +153,7 @@ impl SourceConfig for PrometheusCompatConfig {
 struct InstanceInfo {
     tag: String,
     instance: String,
+    honor_label: bool,
 }
 
 // EndpointInfo stores the scraped endpoint info and the tag to insert into the log event with. It
@@ -157,12 +163,14 @@ struct InstanceInfo {
 struct EndpointInfo {
     tag: String,
     endpoint: String,
+    honor_label: bool,
 }
 
 fn prometheus(
     urls: Vec<http::Uri>,
     instance_tag: Option<String>,
     endpoint_tag: Option<String>,
+    honor_labels: bool,
     tls: TlsSettings,
     auth: Option<Auth>,
     proxy: ProxyConfig,
@@ -198,10 +206,10 @@ fn prometheus(
                         0
                     }
                 }));
-                InstanceInfo { tag: tag.to_string(), instance }
+                InstanceInfo { tag: tag.to_string(), instance, honor_label: honor_labels }
             });
             let endpoint_info = endpoint_tag.as_ref().map(|tag| {
-                EndpointInfo { tag: tag.to_string(), endpoint: url.to_string()}
+                EndpointInfo { tag: tag.to_string(), endpoint: url.to_string(), honor_label: honor_labels}
             });
 
             let start = Instant::now();
@@ -237,11 +245,29 @@ fn prometheus(
                                     });
                                     Some(stream::iter(events).map(move |mut event| {
                                         let metric = event.as_mut_metric();
-                                        if let Some(InstanceInfo {tag, instance}) = &instance_info{
-                                        metric.insert_tag(tag.clone(), instance.clone());
+                                        if let Some(InstanceInfo {tag, instance, honor_label}) = &instance_info{
+                                            match (honor_label, metric.tag_value(tag)) {
+                                                (false, Some(old_instance)) => {
+                                                    metric.insert_tag(format!("exported_{}", tag), old_instance);
+                                                    metric.insert_tag(tag.clone(), instance.clone());
+                                                },
+                                                (true, Some(_)) => {},
+                                                (_, None) => {
+                                                    metric.insert_tag(tag.clone(), instance.clone());
+                                                },
+                                            }
                                         }
-                                        if let Some(EndpointInfo{ tag, endpoint} ) = &endpoint_info {
-                                        metric.insert_tag(tag.clone(), endpoint.clone());
+                                        if let Some(EndpointInfo {tag, endpoint, honor_label}) = &endpoint_info{
+                                            match (honor_label, metric.tag_value(tag)) {
+                                                (false, Some(old_endpoint)) => {
+                                                    metric.insert_tag(format!("exported_{}", tag), old_endpoint);
+                                                    metric.insert_tag(tag.clone(), endpoint.clone());
+                                                },
+                                                (true, Some(_)) => {},
+                                                (_, None) => {
+                                                    metric.insert_tag(tag.clone(), endpoint.clone());
+                                                },
+                                            }
                                         }
                                         Ok(event)
                                     }))
@@ -299,7 +325,7 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
-        test_util::{next_addr, start_topology},
+        test_util::{self, next_addr, start_topology},
         Error,
     };
     use hyper::{
@@ -308,10 +334,121 @@ mod test {
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{sleep, Duration};
+    use warp::Filter;
 
     #[test]
     fn genreate_config() {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_honor_labels() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").map(|| {
+                r#"
+                    promhttp_metric_handler_requests_total{endpoint="http://example.com", instance="localhost:9999", code="200"} 100 1612411516789
+                    "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr).into()],
+            scrape_interval_secs: 1,
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            auth: None,
+            tls: None,
+        };
+
+        let (tx, rx) = Pipeline::new_test();
+        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+
+        tokio::spawn(source);
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let events = test_util::collect_ready(rx).await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<_> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+
+        for metric in metrics {
+            assert_eq!(
+                metric.tag_value("instance"),
+                Some(String::from("localhost:9999"))
+            );
+            assert_eq!(
+                metric.tag_value("endpoint"),
+                Some(String::from("http://example.com"))
+            );
+            assert_eq!(metric.tag_value("exported_instance"), None,);
+            assert_eq!(metric.tag_value("exported_endpoint"), None,);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_do_not_honor_labels() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").map(|| {
+                r#"
+                    promhttp_metric_handler_requests_total{endpoint="http://example.com", instance="localhost:9999", code="200"} 100 1612411516789
+                    "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr).into()],
+            scrape_interval_secs: 1,
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: false,
+            auth: None,
+            tls: None,
+        };
+
+        let (tx, rx) = Pipeline::new_test();
+        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+
+        tokio::spawn(source);
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let events = test_util::collect_ready(rx).await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<_> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+
+        for metric in metrics {
+            assert_eq!(
+                metric.tag_value("instance"),
+                Some(format!("{}:{}", in_addr.ip(), in_addr.port()))
+            );
+            assert_eq!(
+                metric.tag_value("endpoint"),
+                Some(format!(
+                    "http://{}:{}/metrics",
+                    in_addr.ip(),
+                    in_addr.port()
+                ))
+            );
+            assert_eq!(
+                metric.tag_value("exported_instance"),
+                Some(String::from("localhost:9999"))
+            );
+            assert_eq!(
+                metric.tag_value("exported_endpoint"),
+                Some(String::from("http://example.com"))
+            );
+        }
     }
 
     #[tokio::test]
@@ -367,6 +504,7 @@ mod test {
                 endpoints: vec![format!("http://{}", in_addr)],
                 instance_tag: None,
                 endpoint_tag: None,
+                honor_labels: false,
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,

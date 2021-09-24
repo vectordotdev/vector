@@ -111,6 +111,21 @@ components: sources: prometheus_scrape: {
 				examples: ["endpoint"]
 			}
 		}
+		honor_labels: {
+			category: "Context"
+			common:   true
+			description: """
+				Controls how tag conflicts are handled if the scraped source has tags that Vector would add. If true,
+				Vector will not add the new tag if the scraped metric has the tag already. If false, Vector will rename
+				the conflicting tag by adding `exported_` to it.  This matches Prometheus's `honor_labels`
+				configuration.
+				"""
+			required: false
+			warnings: []
+			type: bool: {
+				default: false
+			}
+		}
 		auth: configuration._http_auth & {_args: {
 			password_example: "${PROMETHEUS_PASSWORD}"
 			username_example: "${PROMETHEUS_USERNAME}"
