@@ -323,9 +323,10 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         )
         .replace("//", "/");
 
-        debug!(
+        trace!(
             message = "Sending events.",
             bytes = ?payload.len(),
+            events_len = ?batch_size,
             bucket = ?self.bucket,
             key = ?key
         );

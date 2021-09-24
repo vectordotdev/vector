@@ -46,7 +46,6 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
             self.filename_append_uuid
                 .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().to_hyphenated()))
                 .unwrap_or_else(|| formatted_ts.to_string())
-            }
         };
 
         let extension = self
@@ -56,9 +55,10 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
             .unwrap_or_else(|| self.compression.extension().into());
         let key = format!("{}/{}.{}", key, filename, extension);
 
-        debug!(
+        trace!(
             message = "Sending events.",
             bytes = ?payload.len(),
+            events_len = ?batch_size,
             bucket = ?self.bucket,
             key = ?key
         );
