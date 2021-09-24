@@ -95,11 +95,7 @@ where
         let (io_tx, io_rx) = channel(64);
         let io_barrier = Arc::new(Barrier::new(2));
 
-        let io = run_io(io_rx,
-                   Arc::clone(&io_barrier),
-                   self.service,
-                   self.acker
-            ).in_current_span();
+        let io = run_io(io_rx, Arc::clone(&io_barrier), self.service, self.acker).in_current_span();
         let _ = tokio::spawn(io);
 
         let batcher = Batcher::new(

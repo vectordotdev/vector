@@ -337,7 +337,9 @@ async fn write_event_to_file(
 #[async_trait]
 impl StreamSink for FileSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        FileSink::run(&mut self, input).await.expect("file sink error");
+        FileSink::run(&mut self, input)
+            .await
+            .expect("file sink error");
         Ok(())
     }
 }
