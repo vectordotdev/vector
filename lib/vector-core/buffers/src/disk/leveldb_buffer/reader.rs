@@ -1,6 +1,7 @@
 use super::Key;
-use crate::bytes::DecodeBytes;
+use crate::{bytes::DecodeBytes, internal_events::EventsSent};
 use bytes::Bytes;
+use core_common::internal_event::emit;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
@@ -156,8 +157,17 @@ where
             this.read_offset = key.0 + 1;
 
             let buffer: Bytes = Bytes::from(value);
+            // use this encoded byte size for emitting the Disk Buffer
+            // EventsSent
+            let byte_size = buffer.len();
             match T::decode(buffer) {
-                Ok(event) => Poll::Ready(Some(event)),
+                Ok(event) => {
+                    emit(&EventsSent {
+                        count: 1,
+                        byte_size,
+                    });
+                    Poll::Ready(Some(event))
+                }
                 Err(error) => {
                     error!(message = "Error deserializing event.", %error);
                     debug_assert!(false);
