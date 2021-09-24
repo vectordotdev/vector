@@ -23,6 +23,7 @@ mod variant;
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use crate::internal_events::EventsDropped;
 pub use acker::Acker;
+use core_common::byte_size_of::ByteSizeOf;
 use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use core_common::internal_event::emit;
@@ -54,7 +55,7 @@ pub fn build<'a, T>(
     String,
 >
 where
-    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    T: 'a + ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug + Display,
 {
@@ -80,10 +81,10 @@ where
         } => {
             let (tx, rx) = mpsc::channel(max_events);
             let tx = BufferInputCloner::Memory(tx, when_full);
-            let rx = rx.inspect(|item| {
+            let rx = rx.inspect(|item: &T| {
                 emit(&EventsSent {
                     count: 1,
-                    byte_size: size_of_val(item),
+                    byte_size: item.allocated_bytes(),
                 });
             });
             let rx = Box::new(rx);
@@ -134,7 +135,7 @@ where
 
 impl<'a, T> BufferInputCloner<T>
 where
-    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    T: 'a + ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug + Display,
 {
@@ -146,7 +147,7 @@ where
                     .clone()
                     .sink_map_err(|error| error!(message = "Sender error.", %error));
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner))
+                    Box::new(DropWhenFull::new(inner, false))
                 } else {
                     Box::new(BlockWhenFull::new(inner))
                 }
@@ -156,7 +157,7 @@ where
             BufferInputCloner::Disk(writer, when_full) => {
                 let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner))
+                    Box::new(DropWhenFull::new(inner, false))
                 } else {
                     Box::new(BlockWhenFull::new(inner))
                 }
@@ -169,16 +170,17 @@ where
 pub struct DropWhenFull<S> {
     #[pin]
     inner: S,
+    is_disk_buffer: bool,
     drop: bool,
 }
 
 impl<S> DropWhenFull<S> {
-    pub fn new(inner: S) -> Self {
-        Self { inner, drop: false }
+    pub fn new(inner: S, is_disk_buffer: bool) -> Self {
+        Self { inner, is_disk_buffer, drop: false }
     }
 }
 
-impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
+impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
     type Error = S::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -205,13 +207,19 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
             emit(&EventsDropped { count: 1 });
             Ok(())
         } else {
-            let byte_size = size_of_val(&item);
-            self.project().inner.start_send(item).map(|()| {
-                emit(&EventsReceived {
-                    count: 1,
-                    byte_size,
-                });
-            })
+            let byte_size = item.allocated_bytes();
+            if self.is_disk_buffer {
+                // The disk_buffer is instrumented in `writer.rs` to avoid
+                // recalculating the size of the item
+                self.project().inner.start_send(item)
+            } else {
+                self.project().inner.start_send(item).map(|()| {
+                    emit(&EventsReceived {
+                        count: 1,
+                        byte_size,
+                    });
+                })
+            }
         }
     }
 
@@ -224,11 +232,16 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
     }
 }
 
-// The BlockWhenFull wrapper is used for instrumentation purposes
+/// Instrumenting events received by the buffer can be accomplished by hooking 
+/// into the lifecycle of writing events to the buffer. This general strategy is 
+/// already available to non-blocking buffers because they implement dropping 
+/// behavior in a similar way.
+/// 
+/// The BlockWhenFull wrapper thus allows us to instrument blocking buffers
 #[pin_project]
 pub struct BlockWhenFull<S> {
     #[pin]
-    inner: S,
+    inner: S
 }
 
 impl<S> BlockWhenFull<S> {
@@ -237,7 +250,7 @@ impl<S> BlockWhenFull<S> {
     }
 }
 
-impl<T, S: Sink<T> + Unpin> Sink<T> for BlockWhenFull<S> {
+impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for BlockWhenFull<S> {
     type Error = S::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
