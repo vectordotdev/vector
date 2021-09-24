@@ -36,13 +36,8 @@ use vector_core::event::{Event, EventMetadata, EventStatus, Value};
 // Maximum number of futures blocked by [send_result](https://docs.rs/rdkafka/0.24.0/rdkafka/producer/future_producer/struct.FutureProducer.html#method.send_result)
 const SEND_RESULT_LIMIT: usize = 5;
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("creating kafka producer failed: {}", source))]
-    KafkaCreateFailed { source: KafkaError },
-    #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateParseError },
-}
+
+
 
 
 pub struct KafkaSink {
@@ -94,97 +89,7 @@ impl SinkConfig for KafkaSinkConfig {
     }
 }
 
-/// Used to determine the options to set in configs, since both Kafka consumers and producers have
-/// unique options, they use the same struct, and the error if given the wrong options.
-#[derive(Debug, PartialOrd, PartialEq)]
-enum KafkaRole {
-    Consumer,
-    Producer,
-}
 
-impl KafkaSinkConfig {
-    fn to_rdkafka(&self, kafka_role: KafkaRole) -> crate::Result<ClientConfig> {
-        let mut client_config = ClientConfig::new();
-        client_config
-            .set("bootstrap.servers", &self.bootstrap_servers)
-            .set("compression.codec", &to_string(self.compression))
-            .set("socket.timeout.ms", &self.socket_timeout_ms.to_string())
-            .set("message.timeout.ms", &self.message_timeout_ms.to_string())
-            .set("statistics.interval.ms", "1000");
-
-        self.auth.apply(&mut client_config)?;
-
-        // All batch options are producer only.
-        if kafka_role == KafkaRole::Producer {
-            if let Some(value) = self.batch.timeout_secs {
-                // Delay in milliseconds to wait for messages in the producer queue to accumulate before
-                // constructing message batches (MessageSets) to transmit to brokers. A higher value
-                // allows larger and more effective (less overhead, improved compression) batches of
-                // messages to accumulate at the expense of increased message delivery latency.
-                // Type: float
-                let key = "queue.buffering.max.ms";
-                if let Some(val) = self.librdkafka_options.get(key) {
-                    return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{}={}`.\
-                                    The config already sets this as `librdkafka_options.queue.buffering.max.ms={}`.\
-                                    Please delete one.", key, value, val).into());
-                }
-                debug!(
-                    librdkafka_option = key,
-                    batch_option = "timeout_secs",
-                    value,
-                    "Applying batch option as librdkafka option."
-                );
-                client_config.set(key, &(value * 1000).to_string());
-            }
-            if let Some(value) = self.batch.max_events {
-                // Maximum number of messages batched in one MessageSet. The total MessageSet size is
-                // also limited by batch.size and message.max.bytes.
-                // Type: integer
-                let key = "batch.num.messages";
-                if let Some(val) = self.librdkafka_options.get(key) {
-                    return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{}={}`.\
-                                    The config already sets this as `librdkafka_options.batch.num.messages={}`.\
-                                    Please delete one.", key, value, val).into());
-                }
-                debug!(
-                    librdkafka_option = key,
-                    batch_option = "max_events",
-                    value,
-                    "Applying batch option as librdkafka option."
-                );
-                client_config.set(key, &value.to_string());
-            }
-            if let Some(value) = self.batch.max_bytes {
-                // Maximum size (in bytes) of all messages batched in one MessageSet, including protocol
-                // framing overhead. This limit is applied after the first message has been added to the
-                // batch, regardless of the first message's size, this is to ensure that messages that
-                // exceed batch.size are produced. The total MessageSet size is also limited by
-                // batch.num.messages and message.max.bytes.
-                // Type: integer
-                let key = "batch.size";
-                if let Some(val) = self.librdkafka_options.get(key) {
-                    return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{}={}`.\
-                                    The config already sets this as `librdkafka_options.batch.size={}`.\
-                                    Please delete one.", key, value, val).into());
-                }
-                debug!(
-                    librdkafka_option = key,
-                    batch_option = "max_bytes",
-                    value,
-                    "Applying batch option as librdkafka option."
-                );
-                client_config.set(key, &value.to_string());
-            }
-        }
-
-        for (key, value) in self.librdkafka_options.iter() {
-            debug!(option = %key, value = %value, "Setting librdkafka option.");
-            client_config.set(key.as_str(), value.as_str());
-        }
-
-        Ok(client_config)
-    }
-}
 
 impl KafkaSink {
     fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
@@ -383,35 +288,7 @@ fn get_headers(event: &Event, headers_key: &str) -> Option<OwnedHeaders> {
     None
 }
 
-async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
-    trace!("Healthcheck started.");
-    let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
-    let topic = match Template::try_from(config.topic)
-        .context(TopicTemplate)?
-        .render_string(&Event::from(""))
-    {
-        Ok(topic) => Some(topic),
-        Err(error) => {
-            warn!(
-                message = "Could not generate topic for healthcheck.",
-                %error,
-            );
-            None
-        }
-    };
 
-    tokio::task::spawn_blocking(move || {
-        let consumer: BaseConsumer = client.create().unwrap();
-        let topic = topic.as_ref().map(|topic| &topic[..]);
-
-        consumer
-            .fetch_metadata(topic, Duration::from_secs(3))
-            .map(|_| ())
-    })
-    .await??;
-    trace!("Healthcheck completed.");
-    Ok(())
-}
 
 fn encode_event(
     mut event: Event,
