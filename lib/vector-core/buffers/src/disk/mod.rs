@@ -2,7 +2,7 @@ use crate::bytes::{DecodeBytes, EncodeBytes};
 use crate::internal_events::EventsSent;
 use futures::StreamExt;
 use futures::{Sink, Stream};
-use internal_event::emit;
+use core_common::internal_event::emit;
 use pin_project::pin_project;
 use snafu::Snafu;
 use std::fmt::Debug;

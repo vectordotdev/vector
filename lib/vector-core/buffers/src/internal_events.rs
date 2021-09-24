@@ -1,4 +1,4 @@
-use internal_event::InternalEvent;
+use core_common::internal_event::InternalEvent;
 use metrics::counter;
 
 pub struct EventsReceived {

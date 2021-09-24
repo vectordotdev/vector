@@ -25,7 +25,7 @@ use crate::internal_events::EventsDropped;
 pub use acker::Acker;
 use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
-use internal_event::emit;
+use core_common::internal_event::emit;
 use internal_events::{EventsReceived, EventsSent};
 use pin_project::pin_project;
 #[cfg(test)]
