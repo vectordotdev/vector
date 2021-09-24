@@ -15,13 +15,13 @@ impl VectorSink {
     /// # Errors
     ///
     /// It is unclear under what conditions this function will error.
-    pub async fn run<S>(mut self, input: S) -> Result<(), ()>
+    pub async fn run<S>(self, input: S) -> Result<(), ()>
     where
         S: Stream<Item = Event> + Send,
     {
         match self {
             Self::Sink(sink) => input.map(Ok).forward(sink).await,
-            Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
+            Self::Stream(s) => s.run(Box::pin(input)).await,
         }
     }
 
@@ -48,5 +48,5 @@ impl fmt::Debug for VectorSink {
 
 #[async_trait]
 pub trait StreamSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()>;
 }
