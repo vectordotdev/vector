@@ -19,6 +19,7 @@ impl KafkaSink {
 #[async_trait]
 impl StreamSink for KafkaSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+
         todo!();
     }
 }
