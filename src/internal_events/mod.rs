@@ -208,7 +208,12 @@ pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-#[cfg(any(feature = "sources-utils-http", feature = "sinks-http"))]
+#[cfg(any(
+    feature = "sources-utils-http",
+    feature = "sources-utils-http-encoding",
+    feature = "sinks-http",
+    feature = "sources-datadog"
+))]
 pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;

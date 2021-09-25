@@ -132,7 +132,7 @@ struct WriterSink {
 
 #[async_trait]
 impl StreamSink for WriterSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             self.acker.ack(1);
             if let Some(mut buf) = encode_event(event, &self.encoding) {

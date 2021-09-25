@@ -249,7 +249,7 @@ impl TcpSink {
 
 #[async_trait]
 impl StreamSink for TcpSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
         let encode_event = Arc::clone(&self.encode_event);
