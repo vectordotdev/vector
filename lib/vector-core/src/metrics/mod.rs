@@ -122,7 +122,7 @@ impl Controller {
     /// This function will fail if the metrics subsystem has not been correctly
     /// initialized.
     pub fn get() -> Result<&'static Self> {
-        CONTROLLER.get().ok_or_else(|| Error::NotInitialized)
+        CONTROLLER.get().ok_or(Error::NotInitialized)
     }
 
     /// Take a snapshot of all gathered metrics and expose them as metric
