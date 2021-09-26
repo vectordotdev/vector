@@ -54,9 +54,10 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Remap {
     program: Program,
+    runtime: Runtime,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -94,10 +95,23 @@ impl Remap {
 
         Ok(Remap {
             program,
+            runtime: Runtime::default(),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
         })
+    }
+}
+
+impl Clone for Remap {
+    fn clone(&self) -> Self {
+        Self {
+            program: self.program.clone(),
+            runtime: Runtime::default(),
+            timezone: self.timezone.clone(),
+            drop_on_error: self.drop_on_error,
+            drop_on_abort: self.drop_on_abort,
+        }
     }
 }
 
@@ -122,9 +136,10 @@ impl FunctionTransform for Remap {
 
         let mut target: VrlTarget = event.into();
 
-        let mut runtime = Runtime::default();
-
-        let result = runtime.resolve(&mut target, &self.program, &self.timezone);
+        self.runtime.clear();
+        let result = self
+            .runtime
+            .resolve(&mut target, &self.program, &self.timezone);
 
         match result {
             Ok(_) => {

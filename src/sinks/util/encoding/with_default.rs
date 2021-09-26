@@ -27,7 +27,7 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
+    pub(crate) only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
@@ -44,7 +44,7 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
         &self.schema
     }
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent<'static>>>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<String>> {
@@ -133,7 +133,11 @@ where
             only_fields: inner.only_fields.map(|fields| {
                 fields
                     .iter()
-                    .map(|only| PathIter::new(only).collect())
+                    .map(|only| {
+                        PathIter::new(only)
+                            .map(|component| component.into_static())
+                            .collect()
+                    })
                     .collect()
             }),
             except_fields: inner.except_fields,
