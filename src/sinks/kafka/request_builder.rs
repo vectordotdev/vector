@@ -1,9 +1,9 @@
-use crate::sinks::util::RequestBuilder;
-use crate::event::{Event, Finalizable, Value};
-use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
-use crate::internal_events::KafkaHeaderExtractionFailed;
-use rdkafka::message::OwnedHeaders;
 use crate::config::log_schema;
+use crate::event::{Event, Finalizable, Value};
+use crate::internal_events::KafkaHeaderExtractionFailed;
+use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
+use crate::sinks::util::RequestBuilder;
+use rdkafka::message::OwnedHeaders;
 
 pub struct KafkaRequestBuilder {
     pub topic: String,
@@ -22,7 +22,7 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
             timestamp_millis: get_timestamp_millis(&event),
-            headers: get_headers(&event, &self.headers_field)
+            headers: get_headers(&event, &self.headers_field),
         };
         let events = [event];
         (metadata, events)
@@ -32,22 +32,18 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
         KafkaRequest {
             topic: self.topic.clone(),
             body: payload,
-            metadata
+            metadata,
         }
     }
 }
 
 fn get_key(event: &Event, key_field: &Option<String>) -> Option<Vec<u8>> {
-    key_field.as_ref().and_then(|key_field|match event {
-        Event::Log(log) => {
-            log.get(key_field).map(|value|value.as_bytes().to_vec())
-        },
-        Event::Metric(metric) => {
-            metric
-                .tags()
-                .and_then(|tags| tags.get(key_field))
-                .map(|value| value.clone().into_bytes())
-        }
+    key_field.as_ref().and_then(|key_field| match event {
+        Event::Log(log) => log.get(key_field).map(|value| value.as_bytes().to_vec()),
+        Event::Metric(metric) => metric
+            .tags()
+            .and_then(|tags| tags.get(key_field))
+            .map(|value| value.clone().into_bytes()),
     })
 }
 
@@ -58,11 +54,12 @@ fn get_timestamp_millis(event: &Event) -> Option<i64> {
             .and_then(|v| v.as_timestamp())
             .copied(),
         Event::Metric(metric) => metric.timestamp(),
-    }.map(|ts| ts.timestamp_millis())
+    }
+    .map(|ts| ts.timestamp_millis())
 }
 
 fn get_headers(event: &Event, headers_field: &Option<String>) -> Option<OwnedHeaders> {
-    headers_field.as_ref().and_then(|headers_field|{
+    headers_field.as_ref().and_then(|headers_field| {
         if let Event::Log(log) = event {
             if let Some(headers) = log.get(headers_field) {
                 match headers {
@@ -73,16 +70,16 @@ fn get_headers(event: &Event, headers_field: &Option<String>) -> Option<OwnedHea
                                 owned_headers = owned_headers.add(key, value_bytes.as_ref());
                             } else {
                                 emit!(&KafkaHeaderExtractionFailed {
-                                header_field: headers_field
-                            });
+                                    header_field: headers_field
+                                });
                             }
                         }
                         return Some(owned_headers);
                     }
                     _ => {
                         emit!(&KafkaHeaderExtractionFailed {
-                        header_field: headers_field
-                    });
+                            header_field: headers_field
+                        });
                     }
                 }
             }

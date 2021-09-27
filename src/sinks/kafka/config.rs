@@ -1,24 +1,26 @@
-use serde::{Serialize, Deserialize};
-use crate::sinks::util::encoding::{EncodingConfig, Encoder, DEFAULT_JSON_ENCODER, DEFAULT_TEXT_ENCODER};
-use crate::sinks::util::BatchConfig;
-use crate::kafka::{KafkaCompression, KafkaAuthConfig, KafkaStatisticsContext};
-use std::collections::HashMap;
-use crate::config::{GenerateConfig, SinkConfig, SinkContext, DataType};
-use crate::sinks::{VectorSink, Healthcheck};
-use vector_core::event::{Event};
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use tokio::time::Duration;
-use crate::sinks::kafka::sink::KafkaSink;
-use futures::FutureExt;
-use rdkafka::ClientConfig;
+use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
+use crate::kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsContext};
 use crate::serde::to_string;
-use rdkafka::error::KafkaError;
-use crate::template::TemplateParseError;
+use crate::sinks::kafka::sink::KafkaSink;
+use crate::sinks::util::encoding::{
+    Encoder, EncodingConfig, DEFAULT_JSON_ENCODER, DEFAULT_TEXT_ENCODER,
+};
+use crate::sinks::util::BatchConfig;
+use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
-use std::convert::TryFrom;
-use snafu::{ResultExt, Snafu};
-use std::io::Write;
+use crate::template::TemplateParseError;
+use futures::FutureExt;
+use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::error::KafkaError;
 use rdkafka::producer::FutureProducer;
+use rdkafka::ClientConfig;
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::io::Write;
+use tokio::time::Duration;
+use vector_core::event::Event;
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
@@ -29,7 +31,6 @@ pub enum BuildError {
     #[snafu(display("invalid topic template: {}", source))]
     TopicTemplate { source: TemplateParseError },
 }
-
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct KafkaSinkConfig {
@@ -154,7 +155,9 @@ impl KafkaSinkConfig {
     }
 }
 
-pub fn create_producer(client_config: ClientConfig) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
+pub fn create_producer(
+    client_config: ClientConfig,
+) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
         .create_with_context(KafkaStatisticsContext)
         .context(KafkaCreateFailed)?;
@@ -174,8 +177,9 @@ impl GenerateConfig for KafkaSinkConfig {
             socket_timeout_ms: default_socket_timeout_ms(),
             message_timeout_ms: default_message_timeout_ms(),
             librdkafka_options: Default::default(),
-            headers_field: None
-        }).unwrap()
+            headers_field: None,
+        })
+        .unwrap()
     }
 }
 
@@ -191,18 +195,15 @@ impl Encoder for Encoding {
         match self {
             Encoding::Json => DEFAULT_JSON_ENCODER.encode_event(event, writer),
             Encoding::Text => match event {
-                Event::Log(log) => {
-                    DEFAULT_TEXT_ENCODER.encode_event(Event::Log(log), writer)
-                },
+                Event::Log(log) => DEFAULT_TEXT_ENCODER.encode_event(Event::Log(log), writer),
                 Event::Metric(metric) => {
                     metric.to_string().into_bytes();
                     Ok(())
                 }
-            }
+            },
         }
     }
 }
-
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
@@ -247,11 +248,10 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
             .fetch_metadata(topic, Duration::from_secs(3))
             .map(|_| ())
     })
-        .await??;
+    .await??;
     trace!("Healthcheck completed.");
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

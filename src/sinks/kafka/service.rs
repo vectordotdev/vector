@@ -1,26 +1,26 @@
-use rdkafka::producer::{FutureProducer, FutureRecord};
-use crate::kafka::KafkaStatisticsContext;
-use tower::Service;
-use std::task::{Context, Poll};
-use futures::future::BoxFuture;
-use rdkafka::message::OwnedHeaders;
-use rdkafka::util::Timeout;
-use rdkafka::error::KafkaError;
 use crate::buffers::Ackable;
-use crate::event::{Finalizable, EventFinalizers, EventStatus};
-use std::sync::atomic::{AtomicU64};
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
-use tokio::time::Duration;
+use crate::event::{EventFinalizers, EventStatus, Finalizable};
+use crate::kafka::KafkaStatisticsContext;
+use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
+use futures::future::BoxFuture;
+use rdkafka::error::KafkaError;
+use rdkafka::message::OwnedHeaders;
+use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::util::Timeout;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use tokio::time::Duration;
 use tokio::time::Sleep;
-use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
+use tower::Service;
 
 pub struct KafkaRequest {
     pub topic: String,
     pub body: Vec<u8>,
-    pub metadata: KafkaRequestMetadata
+    pub metadata: KafkaRequestMetadata,
 }
 
 pub struct KafkaRequestMetadata {
@@ -55,7 +55,7 @@ impl Finalizable for KafkaRequest {
 pub struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
     current_in_flight: Arc<AtomicU64>,
-    delay: Option<Pin<Box<Sleep>>>
+    delay: Option<Pin<Box<Sleep>>>,
 }
 
 impl KafkaService {
@@ -82,8 +82,8 @@ impl Service<KafkaRequest> for KafkaService {
 
         // This is the same amount of time that rdkafka delays when the internal queue is full
         let mut sleep = Box::pin(tokio::time::sleep(Duration::from_millis(100)));
-        let result = sleep.as_mut().poll(cx).map(|_|Ok(()));
-        self.delay = Some(sleep);// prevent the timer from being dropped
+        let result = sleep.as_mut().poll(cx).map(|_| Ok(()));
+        self.delay = Some(sleep); // prevent the timer from being dropped
         result
     }
 
@@ -93,8 +93,7 @@ impl Service<KafkaRequest> for KafkaService {
         let current_in_flight = Arc::clone(&self.current_in_flight);
 
         Box::pin(async move {
-            let mut record = FutureRecord::to(&request.topic)
-                .payload(&request.body);
+            let mut record = FutureRecord::to(&request.topic).payload(&request.body);
             if let Some(key) = &request.metadata.key {
                 record = record.key(key);
             }
@@ -107,8 +106,8 @@ impl Service<KafkaRequest> for KafkaService {
 
             //rdkafka will internally retry forever if the queue is full
             let result = match kafka_producer.send(record, Timeout::Never).await {
-                Ok((_partition, _offset)) => Ok(KafkaResponse{}),
-                Err((kafka_err, _original_record)) => Err(kafka_err)
+                Ok((_partition, _offset)) => Ok(KafkaResponse {}),
+                Err((kafka_err, _original_record)) => Err(kafka_err),
             };
             current_in_flight.fetch_sub(1, Ordering::Relaxed);
             result

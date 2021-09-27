@@ -1,16 +1,16 @@
-use crate::sinks::util::{StreamSink, SinkBuilderExt, Compression};
-use crate::event::Event;
-use futures::stream::BoxStream;
-use async_trait::async_trait;
-use super::config::KafkaSinkConfig;
-use vector_core::buffers::Acker;
-use std::num::NonZeroUsize;
-use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
-use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::kafka::config::{Encoding, create_producer};
-use crate::sinks::kafka::service::{KafkaService};
-use futures::StreamExt;
 use super::config::KafkaRole;
+use super::config::KafkaSinkConfig;
+use crate::event::Event;
+use crate::sinks::kafka::config::{create_producer, Encoding};
+use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
+use crate::sinks::kafka::service::KafkaService;
+use crate::sinks::util::encoding::EncodingConfig;
+use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
+use async_trait::async_trait;
+use futures::stream::BoxStream;
+use futures::StreamExt;
+use std::num::NonZeroUsize;
+use vector_core::buffers::Acker;
 
 pub struct KafkaSink {
     encoding: EncodingConfig<Encoding>,
@@ -23,7 +23,6 @@ pub struct KafkaSink {
 
 impl KafkaSink {
     pub(crate) fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
-
         let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
         let producer = create_producer(producer_config)?;
 
@@ -40,10 +39,10 @@ impl KafkaSink {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
-        let request_builder = KafkaRequestBuilder{
+        let request_builder = KafkaRequestBuilder {
             topic: self.topic,
             key_field: self.key_field,
-            headers_field: self.headers_field
+            headers_field: self.headers_field,
         };
 
         let sink = input
@@ -52,7 +51,7 @@ impl KafkaSink {
                 request_builder,
                 self.encoding,
                 //TODO: This doesn't seem like it would work with Kafka?
-                Compression::None
+                Compression::None,
             )
             .filter_map(|request| async move {
                 match request {
@@ -74,5 +73,3 @@ impl StreamSink for KafkaSink {
         self.run_inner(input).await
     }
 }
-
-
