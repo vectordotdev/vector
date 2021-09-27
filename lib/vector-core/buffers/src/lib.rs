@@ -37,6 +37,7 @@ pub use variant::*;
 ///
 /// This function will fail only when creating a new disk buffer. Because of
 /// legacy reasons the error is not a type but a `String`.
+#[allow(clippy::needless_pass_by_value)]
 pub fn build<'a, T>(
     variant: Variant,
 ) -> Result<
