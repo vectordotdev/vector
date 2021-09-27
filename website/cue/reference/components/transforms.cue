@@ -18,5 +18,9 @@ components: transforms: [Name=string]: {
 		utilization:                          components.sources.internal_metrics.output.metrics.utilization
 		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		buffer_received_events_total:         components.sources.internal_metrics.output.metrics.buffer_received_events_total
+		buffer_received_bytes_total:          components.sources.internal_metrics.output.metrics.buffer_received_bytes_total
+		buffer_sent_events_total:             components.sources.internal_metrics.output.metrics.buffer_sent_events_total
+		buffer_sent_bytes_total:              components.sources.internal_metrics.output.metrics.buffer_sent_bytes_total
 	}
 }
