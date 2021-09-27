@@ -126,6 +126,10 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    pub fn is_empty(&self) -> bool {
+        self.variables.is_empty()
+    }
+
     pub fn clear(&mut self) {
         self.variables.clear();
     }

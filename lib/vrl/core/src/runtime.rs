@@ -49,6 +49,10 @@ impl Runtime {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.state.is_empty()
+    }
+
     pub fn clear(&mut self) {
         self.state.clear();
     }

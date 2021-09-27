@@ -101,6 +101,10 @@ impl Remap {
             drop_on_abort: config.drop_on_abort,
         })
     }
+
+    fn runtime(&self) -> &Runtime {
+        &self.runtime
+    }
 }
 
 impl Clone for Remap {
@@ -136,10 +140,10 @@ impl FunctionTransform for Remap {
 
         let mut target: VrlTarget = event.into();
 
-        self.runtime.clear();
         let result = self
             .runtime
             .resolve(&mut target, &self.program, &self.timezone);
+        self.runtime.clear();
 
         match result {
             Ok(_) => {
@@ -248,6 +252,7 @@ mod tests {
             drop_on_abort: false,
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        assert!(tform.runtime().is_empty());
 
         let event1 = {
             let mut event1 = LogEvent::from("event1");
@@ -259,6 +264,7 @@ mod tests {
         assert_eq!(get_field_string(&result1, "message"), "event1");
         assert_eq!(get_field_string(&result1, "foo"), "bar");
         assert_eq!(result1.metadata(), &metadata1);
+        assert!(tform.runtime().is_empty());
 
         let event2 = {
             let event2 = LogEvent::from("event2");
@@ -269,6 +275,7 @@ mod tests {
         assert_eq!(get_field_string(&result2, "message"), "event2");
         assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
         assert_eq!(result2.metadata(), &metadata2);
+        assert!(tform.runtime().is_empty());
     }
 
     #[test]
