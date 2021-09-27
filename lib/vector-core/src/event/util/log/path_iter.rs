@@ -67,11 +67,6 @@ impl<'a> Iterator for PathIter<'a> {
     type Item = PathComponent<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use State::{
-            ClosingBracket, Dot, End, Escape, EscapedKey, Index, Invalid, Key, OpeningBracket,
-            Start,
-        };
-
         let mut res = None;
         loop {
             if let Some(res) = res {
@@ -80,106 +75,92 @@ impl<'a> Iterator for PathIter<'a> {
 
             let c = self.chars.next();
             self.state = match mem::take(&mut self.state) {
-                Start => match c {
-                    Some('.') | Some('[') | Some(']') | None => Invalid,
-                    Some('\\') => Escape,
-                    Some(_) => Key(self.pos),
+                State::Start => match c {
+                    Some('.') | Some('[') | Some(']') | None => State::Invalid,
+                    Some('\\') => State::Escape,
+                    Some(_) => State::Key(self.pos),
                 },
-                Key(start) => match c {
-                    Some('.') => {
+                State::Key(start) => match c {
+                    Some('.') | Some('[') | None => {
                         res = Some(Some(PathComponent::Key(
                             self.path.substring(start, self.pos).into(),
                         )));
-                        Dot
+                        char_to_state(c)
                     }
-                    Some('[') => {
-                        res = Some(Some(PathComponent::Key(
-                            self.path.substring(start, self.pos).into(),
-                        )));
-                        OpeningBracket
-                    }
-                    Some(']') => Invalid,
+                    Some(']') => State::Invalid,
                     Some('\\') => {
                         self.temp.push_str(self.path.substring(start, self.pos));
-                        Escape
+                        State::Escape
                     }
-                    Some(_) => Key(start),
-                    None => {
-                        res = Some(Some(PathComponent::Key(
-                            self.path.substring(start, self.pos).into(),
-                        )));
-                        End
-                    }
+                    Some(_) => State::Key(start),
                 },
-                EscapedKey => match c {
-                    Some('.') => {
+                State::EscapedKey => match c {
+                    Some('.') | Some('[') | None => {
                         res = Some(Some(PathComponent::Key(
                             std::mem::take(&mut self.temp).into(),
                         )));
-                        Dot
+                        char_to_state(c)
                     }
-                    Some('[') => {
-                        res = Some(Some(PathComponent::Key(
-                            std::mem::take(&mut self.temp).into(),
-                        )));
-                        OpeningBracket
-                    }
-                    Some(']') => Invalid,
-                    Some('\\') => Escape,
+                    Some(']') => State::Invalid,
+                    Some('\\') => State::Escape,
                     Some(c) => {
                         self.temp.push(c);
-                        EscapedKey
-                    }
-                    None => {
-                        res = Some(Some(PathComponent::Key(
-                            std::mem::take(&mut self.temp).into(),
-                        )));
-                        End
+                        State::EscapedKey
                     }
                 },
-                Escape => match c {
+                State::Escape => match c {
                     Some(c) if c == '.' || c == '[' || c == ']' || c == '\\' => {
                         self.temp.push(c);
-                        EscapedKey
+                        State::EscapedKey
                     }
-                    _ => Invalid,
+                    _ => State::Invalid,
                 },
-                Index(i) => match c {
+                State::Index(i) => match c {
                     Some(c) if ('0'..='9').contains(&c) => {
-                        Index(10 * i + (c as usize - '0' as usize))
+                        State::Index(10 * i + (c as usize - '0' as usize))
                     }
                     Some(']') => {
                         res = Some(Some(PathComponent::Index(i)));
-                        ClosingBracket
+                        State::ClosingBracket
                     }
-                    _ => Invalid,
+                    _ => State::Invalid,
                 },
-                Dot => match c {
-                    Some('.') | Some('[') | Some(']') | None => Invalid,
-                    Some('\\') => Escape,
-                    Some(_) => Key(self.pos),
+                State::Dot => match c {
+                    Some('.') | Some('[') | Some(']') | None => State::Invalid,
+                    Some('\\') => State::Escape,
+                    Some(_) => State::Key(self.pos),
                 },
-                OpeningBracket => match c {
-                    Some(c) if ('0'..='9').contains(&c) => Index(c as usize - '0' as usize),
-                    _ => Invalid,
+                State::OpeningBracket => match c {
+                    Some(c) if ('0'..='9').contains(&c) => State::Index(c as usize - '0' as usize),
+                    _ => State::Invalid,
                 },
-                ClosingBracket => match c {
-                    Some('.') => Dot,
-                    Some('[') => OpeningBracket,
-                    None => End,
-                    _ => Invalid,
+                State::ClosingBracket => match c {
+                    Some('.') | Some('[') | None => char_to_state(c),
+                    _ => State::Invalid,
                 },
-                End => {
+                State::End => {
                     res = Some(None);
-                    End
+                    State::End
                 }
-                Invalid => {
+                State::Invalid => {
                     res = Some(Some(PathComponent::Invalid));
-                    End
+                    State::End
                 }
             };
             self.pos += 1;
         }
+    }
+}
+
+#[inline]
+fn char_to_state(c: Option<char>) -> State {
+    match c {
+        Some('.') => State::Dot,
+        Some('[') => State::OpeningBracket,
+        Some(']') => State::ClosingBracket,
+        Some('\\') => State::Escape,
+        None => State::End,
+        _ => State::Invalid,
     }
 }
 

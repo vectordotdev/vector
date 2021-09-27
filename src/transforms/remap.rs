@@ -108,7 +108,7 @@ impl Clone for Remap {
         Self {
             program: self.program.clone(),
             runtime: Runtime::default(),
-            timezone: self.timezone.clone(),
+            timezone: self.timezone,
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
         }
@@ -236,6 +236,40 @@ mod tests {
 
     fn get_field_string(event: &Event, field: &str) -> String {
         event.as_log().get(field).unwrap().to_string_lossy()
+    }
+
+    #[test]
+    fn check_remap_doesnt_share_state_between_events() {
+        let conf = RemapConfig {
+            source: Some(".foo = .sentinel".to_string()),
+            file: None,
+            timezone: TimeZone::default(),
+            drop_on_error: true,
+            drop_on_abort: false,
+        };
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+
+        let event1 = {
+            let mut event1 = LogEvent::from("event1");
+            event1.insert("sentinel", "bar");
+            Event::from(event1)
+        };
+        let metadata1 = event1.metadata().clone();
+        let result1 = transform_one(&mut tform, event1).unwrap();
+        assert_eq!(get_field_string(&result1, "message"), "event1");
+        assert_eq!(get_field_string(&result1, "foo"), "bar");
+        assert_eq!(result1.metadata(), &metadata1);
+
+        let event2 = {
+            let mut event2 = LogEvent::from("event2");
+            event2.insert("sentinel", "quux");
+            Event::from(event2)
+        };
+        let metadata2 = event2.metadata().clone();
+        let result2 = transform_one(&mut tform, event2).unwrap();
+        assert_eq!(get_field_string(&result2, "message"), "event2");
+        assert_eq!(get_field_string(&result2, "foo"), "quux");
+        assert_eq!(result2.metadata(), &metadata2);
     }
 
     #[test]

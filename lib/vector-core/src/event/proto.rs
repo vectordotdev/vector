@@ -237,7 +237,7 @@ impl From<event::Event> for WithMetadata<EventWrapper> {
 
 fn decode_value(input: Value) -> Option<event::Value> {
     match input.kind {
-        Some(value::Kind::RawBytes(data)) => Some(event::Value::Bytes(data.into())),
+        Some(value::Kind::RawBytes(data)) => Some(event::Value::Bytes(data)),
         Some(value::Kind::Timestamp(ts)) => Some(event::Value::Timestamp(
             chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
         )),

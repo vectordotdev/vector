@@ -285,7 +285,7 @@ impl<'a> DnstapParser<'a> {
 
             if dnstap_message.query_message != None {
                 self.parent_key_path
-                    .push(PathComponent::Key(request_message_key.clone().into()));
+                    .push(PathComponent::Key(request_message_key.into()));
 
                 let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
                     self.event_schema.dns_query_message_schema().time()
@@ -342,7 +342,7 @@ impl<'a> DnstapParser<'a> {
 
             if dnstap_message.response_message != None {
                 self.parent_key_path
-                    .push(PathComponent::Key(response_message_key.clone().into()));
+                    .push(PathComponent::Key(response_message_key.into()));
 
                 let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
                     self.event_schema.dns_query_message_schema().time()
@@ -376,11 +376,11 @@ impl<'a> DnstapParser<'a> {
             1..=12 => {
                 if let Some(query_message) = dnstap_message.query_message {
                     let mut query_message_parser = DnsMessageParser::new(query_message);
-                    if let Err(error) = self
-                        .parse_dns_query_message(&request_message_key, &mut query_message_parser)
+                    if let Err(error) =
+                        self.parse_dns_query_message(request_message_key, &mut query_message_parser)
                     {
                         self.log_raw_dns_message(
-                            &request_message_key,
+                            request_message_key,
                             query_message_parser.raw_message(),
                         );
 
@@ -390,12 +390,11 @@ impl<'a> DnstapParser<'a> {
 
                 if let Some(response_message) = dnstap_message.response_message {
                     let mut response_message_parser = DnsMessageParser::new(response_message);
-                    if let Err(error) = self.parse_dns_query_message(
-                        &response_message_key,
-                        &mut response_message_parser,
-                    ) {
+                    if let Err(error) = self
+                        .parse_dns_query_message(response_message_key, &mut response_message_parser)
+                    {
                         self.log_raw_dns_message(
-                            &response_message_key,
+                            response_message_key,
                             response_message_parser.raw_message(),
                         );
 
@@ -408,11 +407,11 @@ impl<'a> DnstapParser<'a> {
                     let mut update_request_message_parser =
                         DnsMessageParser::new(update_request_message);
                     if let Err(error) = self.parse_dns_update_message(
-                        &request_message_key,
+                        request_message_key,
                         &mut update_request_message_parser,
                     ) {
                         self.log_raw_dns_message(
-                            &request_message_key,
+                            request_message_key,
                             update_request_message_parser.raw_message(),
                         );
 
@@ -424,11 +423,11 @@ impl<'a> DnstapParser<'a> {
                     let mut update_response_message_parser =
                         DnsMessageParser::new(update_response_message);
                     if let Err(error) = self.parse_dns_update_message(
-                        &response_message_key,
+                        response_message_key,
                         &mut update_response_message_parser,
                     ) {
                         self.log_raw_dns_message(
-                            &response_message_key,
+                            response_message_key,
                             update_response_message_parser.raw_message(),
                         );
 
