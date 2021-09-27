@@ -14,7 +14,7 @@ impl Function for Tally {
         &[Example {
             title: "tally",
             source: r#"tally!(["foo", "bar", "foo", "baz"])"#,
-            result: Ok(r#"{"foo": 2, "bar": 1, "baz": 1]"#),
+            result: Ok(r#"{"foo": 2, "bar": 1, "baz": 1}"#),
         }]
     }
 
