@@ -1,9 +1,11 @@
 package metadata
 
 remap: functions: del: {
-	category: "Event"
+	category: "Path"
 	description: """
-		Removes the field specified by the `path` from the current event object.
+		Removes the field specified by the static `path` from the target.
+
+		For dynamic path deletion, see the `remove` function.
 		"""
 
 	arguments: [
