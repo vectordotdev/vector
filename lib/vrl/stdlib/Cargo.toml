@@ -145,6 +145,7 @@ default = [
     "string",
     "strip_ansi_escape_codes",
     "strip_whitespace",
+    "tally",
     "tag_types_externally",
     "timestamp",
     "to_bool",
@@ -261,6 +262,7 @@ starts_with = []
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
+tally = []
 tag_types_externally = ["shared/btreemap"]
 timestamp = []
 to_bool = ["shared/conversion"]
