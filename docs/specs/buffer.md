@@ -18,13 +18,13 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 
 ### Terms and Definitions
 
-`component_metadata` - Refers to the metadata (component id, component scope, component kind, and component type) of the component associated with the buffer. Buffer metrics SHOULD be tagged with all or partial `component_metadata` unless specified otherwise. In most cases, these tags are automatically added from tracing span context and do not need to be included as event properties.
+`component_metadata` - Refers to the metadata (component id, component scope, component kind, and component type) of the component associated with the buffer. Buffer metrics MUST be tagged with all or partial `component_metadata` unless specified otherwise. In most cases, these tags are automatically added from tracing span context and do not need to be included as event properties.
 
 ### Events
 
 #### `BufferCreated`
 
-*All buffers* MUST emit a `BufferCreated` event immediately upon creation. To avoid stale metrics, this event will be regularly emitted at an interval.
+*All buffers* MUST emit a `BufferCreated` event immediately upon creation. To avoid stale metrics, this event MUST be regularly emitted at an interval.
 
 * Properties
   * `max_size_bytes` - the max size of the buffer in bytes
