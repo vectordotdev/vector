@@ -2188,7 +2188,7 @@
   inputs = []
   type = "remap"
   source = """
-    .host = reverse_dns(.ip)
+    .host = reverse_dns!(.ip)
   """
 [[tests]]
   name = "remap_function_reverse_dns"
