@@ -102,6 +102,7 @@ impl Remap {
         })
     }
 
+    #[cfg(test)]
     fn runtime(&self) -> &Runtime {
         &self.runtime
     }
