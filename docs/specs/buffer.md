@@ -16,23 +16,27 @@ interpreted as described in [RFC 2119].
 
 Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
 
+### Terms and Definitions
+
+`component_metadata` - Refers to the metadata (component id, component scope, component kind, and component type) of the component associated with the buffer. Buffer metrics SHOULD be tagged with all or partial `component_metadata` unless specified otherwise. In most cases, these tags are automatically added from tracing span context and do not need to be included as event properties.
+
 ### Events
 
 #### `BufferCreated`
 
-*All buffers* MUST emit a `BufferCreated` event immediately upon creation.
+*All buffers* MUST emit a `BufferCreated` event immediately upon creation. To avoid stale metrics, this event will be regularly emitted at an interval.
 
 * Properties
   * `max_size_bytes` - the max size of the buffer in bytes
   * `max_size_events` - the max size of the buffer in number of events
   * `initial_events_size` - the number of events in the buffer at creation
   * `initial_bytes_size` - the byte size of the buffer at creation
-  * `component_metadata` - metadata (ID, scope, etc.) of the component associated with the buffer.
+  * `component_metadata` - as defined in [Terms and Definitions](#terms-and-definitions)
 * Metric
-  * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) if the defined `max_size_events` value is present with `component_metadata` as tags.
-  * MUST emit the `buffer_max_byte_size` gauge (disk buffers) if the defined `max_size_bytes` value is present with `component_metadata` as tags.
-  * MUST emit the `buffer_received_events_total` counter with the defined `initial_events_size` value with `component_metadata` as tags.
-  * MUST emit the `buffer_received_bytes_total` counter with the defined `initial_bytes_size` value with `component_metadata` as tags.
+  * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) if the defined `max_size_events` value is present
+  * MUST emit the `buffer_max_byte_size` gauge (disk buffers) if the defined `max_size_bytes` value is present
+  * MUST emit the `buffer_received_events_total` counter with the defined `initial_events_size` value
+  * MUST emit the `buffer_received_bytes_total` counter with the defined `initial_bytes_size` value
 
 #### `BufferEventsReceived`
 
