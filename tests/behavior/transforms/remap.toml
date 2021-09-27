@@ -1620,117 +1620,569 @@
 #         .b == "fbarbar"
 #       '''
 
-[transforms.remap_function_parse_aws_alb_log]
-  inputs = []
-  type = "remap"
-  source = """
-    .parts = parse_aws_alb_log(.log)
-  """
-[[tests]]
-  name = "remap_function_parse_aws_alb_log"
-  [tests.input]
-    insert_at = "remap_function_parse_aws_alb_log"
-    type = "log"
-    [tests.input.log_fields]
-      log = 'http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-"'
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_aws_alb_log"
-    [[tests.outputs.conditions]]
-      "parts.type.equals" = "http"
-      "parts.timestamp.equals" = "2018-11-30T22:23:00.186641Z"
-      "parts.elb.equals" = "app/my-loadbalancer/50dc6c495c0c9188"
-      "parts.client_host.equals" = "192.168.131.39:2817"
-      "parts.target_host.equals" = "<null>"
-      "parts.request_processing_time.equals" = 0.0
-      "parts.target_processing_time.equals" = 0.001
-      "parts.response_processing_time.equals" = 0.0
-      "parts.elb_status_code.equals" = "200"
-      "parts.target_status_code.equals" = "200"
-      "parts.received_bytes.equals" = 34
-      "parts.sent_bytes.equals" = 366
-      "parts.request_method.equals" = "GET"
-      "parts.request_url.equals" = "http://www.example.com:80/"
-      "parts.request_protocol.equals" = "HTTP/1.1"
-      "parts.user_agent.equals" = "curl/7.46.0"
-      "parts.ssl_cipher.equals" = "<null>"
-      "parts.ssl_protocol.equals" = "<null>"
-      "parts.target_group_arn.equals" = "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067"
-      "parts.trace_id.equals" = "Root=1-58337364-23a8c76965a2ef7629b185e3"
-      "parts.domain_name.equals" = "<null>"
-      "parts.chosen_cert_arn.equals" = "<null>"
-      "parts.matched_rule_priority.equals" = "0"
-      "parts.request_creation_time.equals" = "2018-11-30T22:22:48.364000Z"
-      "parts.actions_executed.equals" = "forward"
-      "parts.redirect_url.equals" = "<null>"
-      "parts.error_reason.equals" = "<null>"
-      "parts.classification.equals" = "<null>"
-      "parts.classification_reason.equals" = "<null>"
+# [transforms.remap_function_parse_aws_alb_log]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .parts = parse_aws_alb_log!(.log)
+#   """
+# [[tests]]
+#   name = "remap_function_parse_aws_alb_log"
+#   [tests.input]
+#     insert_at = "remap_function_parse_aws_alb_log"
+#     type = "log"
+#     [tests.input.log_fields]
+#       log = 'http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-"'
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_aws_alb_log"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .parts.type == "http" &&
+#         .parts.timestamp == "2018-11-30T22:23:00.186641Z" &&
+#         .parts.elb == "app/my-loadbalancer/50dc6c495c0c9188" &&
+#         .parts.client_host == "192.168.131.39:2817" &&
+#         .parts.target_host == null &&
+#         .parts.request_processing_time == 0.0 &&
+#         .parts.target_processing_time == 0.001 &&
+#         .parts.response_processing_time == 0.0 &&
+#         .parts.elb_status_code == "200" &&
+#         .parts.target_status_code == "200" &&
+#         .parts.received_bytes == 34 &&
+#         .parts.sent_bytes == 366 &&
+#         .parts.request_method == "GET" &&
+#         .parts.request_url == "http://www.example.com:80/" &&
+#         .parts.request_protocol == "HTTP/1.1" &&
+#         .parts.user_agent == "curl/7.46.0" &&
+#         .parts.ssl_cipher == null &&
+#         .parts.ssl_protocol == null &&
+#         .parts.target_group_arn == "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067" &&
+#         .parts.trace_id == "Root=1-58337364-23a8c76965a2ef7629b185e3" &&
+#         .parts.domain_name == null &&
+#         .parts.chosen_cert_arn == null &&
+#         .parts.matched_rule_priority == "0" &&
+#         .parts.request_creation_time == "2018-11-30T22:22:48.364000Z" &&
+#         .parts.actions_executed == "forward" &&
+#         .parts.redirect_url == null &&
+#         .parts.error_reason == null &&
+#         .parts.classification == null &&
+#         .parts.classification_reason == null
+#       '''
 
-[transforms.remap_function_parse_aws_vpc_flow_log]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = parse_aws_vpc_flow_log(.a)
-    .b = parse_aws_vpc_flow_log(.b, format = "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
-  """
-[[tests]]
-  name = "remap_function_parse_aws_vpc_flow_log"
-  [tests.input]
-    insert_at = "remap_function_parse_aws_vpc_flow_log"
-    type = "log"
-    [tests.input.log_fields]
-      a = "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"
-      b = "- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_aws_vpc_flow_log"
-    [[tests.outputs.conditions]]
-      "a.version.equals" = 2
-      "a.account_id.equals" = 123456789010
-      "a.interface_id.equals" = "eni-1235b8ca123456789"
-      "a.srcaddr.equals" = "<null>"
-      "a.dstaddr.equals" = "<null>"
-      "a.srcport.equals" = "<null>"
-      "a.dstport.equals" = "<null>"
-      "a.protocol.equals" = "<null>"
-      "a.packets.equals" = "<null>"
-      "a.bytes.equals" = "<null>"
-      "a.start.equals" = 1431280876
-      "a.end.equals" = 1431280934
-      "a.action.equals" = "<null>"
-      "a.log_status.equals" = "NODATA"
-      "b.instance_id.equals" = "<null>"
-      "b.interface_id.equals" = "eni-1235b8ca123456789"
-      "b.srcaddr.equals" = "10.0.1.5"
-      "b.dstaddr.equals" = "10.0.0.220"
-      "b.pkt_srcaddr.equals" = "10.0.1.5"
-      "b.pkt_dstaddr.equals" = "203.0.113.5"
+# [transforms.remap_function_parse_aws_vpc_flow_log]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = parse_aws_vpc_flow_log!(.a)
+#     .b = parse_aws_vpc_flow_log!(.b, format: "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
+#   """
+# [[tests]]
+#   name = "remap_function_parse_aws_vpc_flow_log"
+#   [tests.input]
+#     insert_at = "remap_function_parse_aws_vpc_flow_log"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"
+#       b = "- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_aws_vpc_flow_log"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .a.version == 2 &&
+#         .a.account_id == 123456789010 &&
+#         .a.interface_id == "eni-1235b8ca123456789" &&
+#         .a.srcaddr == null &&
+#         .a.dstaddr == null &&
+#         .a.srcport == null &&
+#         .a.dstport == null &&
+#         .a.protocol == null &&
+#         .a.packets == null &&
+#         .a.bytes == null &&
+#         .a.start == 1431280876 &&
+#         .a.end == 1431280934 &&
+#         .a.action == null &&
+#         .a.log_status == "NODATA" &&
+#         .b.instance_id == null &&
+#         .b.interface_id == "eni-1235b8ca123456789" &&
+#         .b.srcaddr == "10.0.1.5" &&
+#         .b.dstaddr == "10.0.0.220" &&
+#         .b.pkt_srcaddr == "10.0.1.5" &&
+#         .b.pkt_dstaddr == "203.0.113.5"
+#       '''
 
-[transforms.remap_metrics]
-  inputs = []
-  type = "remap"
-  source = """
-      .tags.host = "ook"
-      .tags.name = .name
-      .tags.namespace = .namespace
-      .tags.type = .type
-   """
-[[tests]]
-  name = "remap_metrics"
-  [tests.input]
-    insert_at = "remap_metrics"
-    type = "metric"
-    [tests.input.metric]
-      name = "example counter"
-      namespace = "zork"
-      kind = "absolute"
-      counter.value = 1.0
-  [[tests.outputs]]
-    extract_from = "remap_metrics"
-    [[tests.outputs.conditions]]
-      "name.equals" = "example counter"
-      "namespace.equals" = "zork"
-      "host.equals" = "ook"
-      "type.equals" = "counter"
+# [transforms.remap_metrics]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .tags.host = "ook"
+#     .tags.name = .name
+#     .tags.namespace = .namespace
+#     .tags.type = .type
+#   """
+# [[tests]]
+#   name = "remap_metrics"
+#   [tests.input]
+#     insert_at = "remap_metrics"
+#     type = "metric"
+#     [tests.input.metric]
+#       name = "example counter"
+#       namespace = "zork"
+#       kind = "absolute"
+#       counter.value = 1.0
+#   [[tests.outputs]]
+#     extract_from = "remap_metrics"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .tags.name == "example counter" &&
+#         .tags.namespace == "zork" &&
+#         .tags.host == "ook" &&
+#         .tags.type == "counter"
+#       '''
+
+# [transforms.remap_function_encode_json]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = encode_json!(parse_json(.a))
+#     .b = encode_json!(parse_json(.b))
+#   """
+# [[tests]]
+#   name = "remap_function_encode_json"
+#   [tests.input]
+#     insert_at = "remap_function_encode_json"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "[1, 2, 3]"
+#       b = """{"field1": {"field2": 1, "field3": null}}"""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_encode_json"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .a == "[1,2,3]" &&
+#         .b == "{\"field1\":{\"field2\":1,\"field3\":null}}"
+#       '''
+
+# [transforms.remap_function_parse_regex]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     . = parse_regex!(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
+#     .bytes_in = to_int(.bytes_in)
+#     .status = to_int(.status)
+#     .bytes_out = to_int(.bytes_out)
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_regex"
+#   [tests.input]
+#     insert_at = "remap_function_parse_regex"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_regex"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .bytes_in == 5667 &&
+#         .host == "5.86.210.12" &&
+#         .user == "zieme4647" &&
+#         .timestamp == "19/06/2019:17:20:49 -0400" &&
+#         .method == "GET" &&
+#         .path == "/embrace/supply-chains/dynamic/vertical" &&
+#         .status == 201 &&
+#         .bytes_out == 20574 &&
+#         .0 == "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+#       '''
+
+# [transforms.remap_function_parse_regex_all]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .result = parse_regex_all!(.message, /(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)/)
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_regex_all"
+#   [tests.input]
+#     insert_at = "remap_function_parse_regex_all"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = "apples and carrots, peaches and peas"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_regex_all"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .result[0].fruit == "apples" &&
+#         .result[0].veg == "carrots" &&
+#         .result[0].0 == "apples and carrots" &&
+#         .result[1].fruit == "peaches" &&
+#         .result[1].veg == "peas" &&
+#         .result[1].0 == "peaches and peas"
+#       '''
+
+# [transforms.remap_function_parse_aws_cloudwatch_log_subscription_message]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .result = parse_aws_cloudwatch_log_subscription_message!(.message)
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+#   [tests.input]
+#     insert_at = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = "{\"messageType\":\"CONTROL_MESSAGE\",\"owner\":\"CloudwatchLogs\",\"logGroup\":\"\",\"logStream\":\"\",\"subscriptionFilters\":[],\"logEvents\":[{\"id\":\"\",\"timestamp\":1600110003794,\"message\":\"CWL CONTROL MESSAGE: Checking health of destination Firehose.\"}]}"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .result.owner == "CloudwatchLogs" &&
+#         .result.message_type == "CONTROL_MESSAGE" &&
+#         .result.subscription_filters == [] &&
+#         .result.log_group == "" &&
+#         .result.log_stream == "" &&
+#         .result.log_events == [{ "id": "",
+#                                  "timestamp": to_timestamp!("2020-09-14T19:00:03.794Z"),
+#                                  "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose." }]
+#       '''
+
+# [transforms.remap_function_parse_key_value]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     . = parse_key_value!(.message, key_value_delimiter: "=", field_delimiter: " ")
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_key_value"
+#   [tests.input]
+#     insert_at = "remap_function_parse_key_value"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = '''
+#         path="/cart_link" host=lumberjack-store.herokuapp.com request_id=6ad70ccd-40db-477c-afce-f7e3719a886b fwd="108.30.189.26" dyno=web.1 connect=0ms service=73ms status=304 bytes=656 protocol=https
+#         '''
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_key_value"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .path == "/cart_link" &&
+#         .host == "lumberjack-store.herokuapp.com" &&
+#         .request_id == "6ad70ccd-40db-477c-afce-f7e3719a886b" &&
+#         .fwd == "108.30.189.26" &&
+#         .dyno == "web.1" &&
+#         .connect == "0ms" &&
+#         .service == "73ms" &&
+#         .status == "304" &&
+#         .bytes == "656" &&
+#         .protocol == "https"
+#       '''
+
+# [transforms.remap_function_is_nullish]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = is_nullish(.a)
+#     .b = is_nullish(.b)
+#     .c = is_nullish(.c)
+#     .d = is_nullish(.d)
+#     .e = is_nullish(.e)
+#     .f = is_nullish(.f)
+#     .g = is_nullish(.g)
+#   """
+# [[tests]]
+#   name = "remap_function_is_nullish"
+#   [tests.input]
+#     insert_at = "remap_function_is_nullish"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = ""
+#       b = " "
+#       c = "     "
+#       d = "-"
+#       e = "\n"
+#       f = "\r"
+#       g = "i am a teapot"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_is_nullish"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .a == true &&
+#         .b == true &&
+#         .c == true &&
+#         .d == true &&
+#         .e == true &&
+#         .f == true &&
+#         .g == false
+#       '''
+
+# [transforms.remap_function_to_syslog_facility]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = to_syslog_facility!(.a)
+#     .b = to_syslog_facility!(.b)
+#     .c = to_syslog_facility!(.c)
+#   """
+# [[tests]]
+#   name = "remap_function_to_syslog_facility"
+#   [tests.input]
+#     insert_at = "remap_function_to_syslog_facility"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = 3
+#       b = 11
+#       c = 23
+#   [[tests.outputs]]
+#     extract_from = "remap_function_to_syslog_facility"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .a == "daemon" &&
+#         .b == "ftp" &&
+#         .c == "local7"
+#       '''
+
+# [transforms.remap_function_to_unix_timestamp]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .secs = to_unix_timestamp!(to_timestamp(.time))
+#     .millis = to_unix_timestamp!(to_timestamp(.time), unit: "milliseconds")
+#     .nanos = to_unix_timestamp!(to_timestamp(.time), unit: "nanoseconds")
+#   """
+# [[tests]]
+#   name = "remap_function_to_unix_timestamp"
+#   [tests.input]
+#     insert_at = "remap_function_to_unix_timestamp"
+#     type = "log"
+#     [tests.input.log_fields]
+#       time = "2020-09-14T12:53:44+03:00"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_to_unix_timestamp"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .secs == 1600077224 &&
+#         .millis == 1600077224000 &&
+#         .nanos == 1600077224000000000
+#       '''
+
+# [transforms.remap_function_push_to_array]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .result = push!(parse_json(.fruits), .fruit)
+#   """
+# [[tests]]
+#   name = "remap_function_push_to_array"
+#   [tests.input]
+#     insert_at = "remap_function_push_to_array"
+#     type = "log"
+#     [tests.input.log_fields]
+#       fruits = '["apple", "orange", "banana"]'
+#       fruit = "mango"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_push_to_array"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .result[0] == "apple" &&
+#         .result[1] == "orange" &&
+#         .result[2] == "banana" &&
+#         .result[3] == "mango"
+#       '''
+
+# [transforms.remap_function_append_to_array]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .result = append!(parse_json(.fruits), parse_json!(.other_fruits))
+#   """
+# [[tests]]
+#   name = "remap_function_append_to_array"
+#   [tests.input]
+#     insert_at = "remap_function_append_to_array"
+#     type = "log"
+#     [tests.input.log_fields]
+#       fruits = '["apple", "orange"]'
+#       other_fruits = '["banana", "mango"]'
+#   [[tests.outputs]]
+#     extract_from = "remap_function_append_to_array"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .result[0] == "apple" &&
+#         .result[1] == "orange" &&
+#         .result[2] == "banana" &&
+#         .result[3] == "mango"
+#       '''
+
+# [transforms.remap_function_encode_base64]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .result = encode_base64!(.message)
+#   '''
+# [[tests]]
+#   name = "remap_function_encode_base64"
+#   [tests.input]
+#     insert_at = "remap_function_encode_base64"
+#     type = "raw"
+#     value = "Bron-Y-Aur Stomp"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_encode_base64"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .result == "QnJvbi1ZLUF1ciBTdG9tcA=="
+#       '''
+
+# [transforms.remap_function_decode_base64]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .result = decode_base64!(.message)
+#   '''
+# [[tests]]
+#   name = "remap_function_decode_base64"
+#   [tests.input]
+#     insert_at = "remap_function_decode_base64"
+#     type = "raw"
+#     value = "QnJvbi1ZLUF1ciBTdG9tcA=="
+#   [[tests.outputs]]
+#     extract_from = "remap_function_decode_base64"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .result == "Bron-Y-Aur Stomp"
+#       '''
+
+# [transforms.remap_comments]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .a = 1 # .a = 2
+#     # .a = 3
+
+#     .b = .a == 2 ||
+
+#     # We should ignore this too.
+#     # .a == 3 &&
+
+#     .a == 1
+#   '''
+# [[tests]]
+#   name = "remap_comments"
+#   [tests.input]
+#     insert_at = "remap_comments"
+#     type = "log"
+#     [tests.input.log_fields]
+#   [[tests.outputs]]
+#     extract_from = "remap_comments"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .a == 1
+#         .b == true
+#       '''
+
+# [transforms.remap_multiline]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .a = "A long " +
+
+#          "multiline " +
+#          "string"
+#   '''
+# [[tests]]
+#   name = "remap_multiline"
+#   [tests.input]
+#     insert_at = "remap_multiline"
+#     type = "log"
+#     [tests.input.log_fields]
+#   [[tests.outputs]]
+#     extract_from = "remap_multiline"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '.a == "A long multiline string"'
+
+# [transforms.remap_function_length]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .a = length!(parse_json!(.a))
+#     .b = length!(parse_json!(.b))
+#     .c = length!(parse_json!(.c))
+#   '''
+# [[tests]]
+#   name = "remap_function_length"
+#   [tests.input]
+#     insert_at = "remap_function_length"
+#     type = "log"
+#     [tests.input.log_fields]
+#     a = '[1, 2, 3]'
+#     b = '{"foo":"bar","lorem":{"ipsum": "sicut dolor"}}'
+#     c = '[[1, 2, 3], [4, 5, 6], []]'
+#   [[tests.outputs]]
+#     extract_from = "remap_function_length"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '[.a, .b, .c] == [3, 2, 3]'
+
+# [transforms.remap_function_get_hostname]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = get_hostname!()
+#   """
+# [[tests]]
+#   name = "remap_function_get_hostname"
+#   [tests.input]
+#     insert_at = "remap_function_get_hostname"
+#     type = "log"
+#     [tests.input.log_fields]
+#   [[tests.outputs]]
+#     extract_from = "remap_function_get_hostname"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .a != ""
+#       '''
+
+# [transforms.remap_function_join]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     items = ["foo", "bar", "baz"]
+#     .comma = join(items, ", ")
+#     .space = join(items, " ")
+#     .none = join(items)
+#     .from_split = join!(split("big bad booper", " "), "__")
+#   """
+# [[tests]]
+#   name = "remap_function_join"
+#   [tests.input]
+#     insert_at = "remap_function_join"
+#     type = "log"
+#     [tests.input.log_fields]
+#   [[tests.outputs]]
+#     extract_from = "remap_function_join"
+#     [[tests.outputs.conditions]]
+#       type = "vrl"
+#       source = '''
+#         .comma == "foo, bar, baz" &&
+#         .space == "foo bar baz" &&
+#         .none == "foobarbaz" &&
+#         .from_split == "big__bad__booper"
+#       '''
 
 [transforms.remap_function_reverse_dns]
   inputs = []
@@ -1748,4 +2200,7 @@
   [[tests.outputs]]
     extract_from = "remap_function_reverse_dns"
     [[tests.outputs.conditions]]
-      "host.equals" = "localhost"
+      "type" = "vrl"
+      source = '''
+        .host == "localhost"
+      '''
