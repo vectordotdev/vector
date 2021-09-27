@@ -103,7 +103,7 @@ impl Remap {
     }
 
     #[cfg(test)]
-    fn runtime(&self) -> &Runtime {
+    const fn runtime(&self) -> &Runtime {
         &self.runtime
     }
 }
