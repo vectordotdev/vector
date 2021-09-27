@@ -15,8 +15,8 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
                         eventsOutTotal {
                             eventsOutTotal
@@ -32,8 +32,8 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
                         eventsOutTotal {
                             eventsOutTotal
@@ -49,8 +49,8 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
                         eventsOutTotal {
                             eventsOutTotal

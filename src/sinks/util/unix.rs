@@ -133,7 +133,7 @@ impl UnixSink {
 #[async_trait]
 impl StreamSink for UnixSink {
     // Same as TcpSink, more details there.
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
             .map(|mut event| {

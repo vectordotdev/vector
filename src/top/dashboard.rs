@@ -156,7 +156,7 @@ impl<'a> Widgets<'a> {
             ];
 
             let formatted_metrics = [
-                match r.events_in_total {
+                match r.received_events_total {
                     0 => "N/A".to_string(),
                     v => format!(
                         "{} ({}/s)",
@@ -165,7 +165,7 @@ impl<'a> Widgets<'a> {
                         } else {
                             v.thousands_format()
                         },
-                        r.events_in_throughput_sec.human_format()
+                        r.received_events_throughput_sec.human_format()
                     ),
                 },
                 match r.events_out_total {
