@@ -5,8 +5,8 @@ use vector_core::{config::log_schema, event::Event};
 
 use super::Encoder;
 
-static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
-static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
+pub(crate) static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
+pub(crate) static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
 
 /// A standardized set of encodings with common sense behavior.
 ///

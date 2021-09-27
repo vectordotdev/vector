@@ -3,6 +3,7 @@ use crate::config::SinkDescription;
 pub(crate) mod config;
 pub(crate) mod sink;
 pub(crate) mod service;
+pub(crate) mod request_builder;
 
 // #[cfg(test)]
 // mod tests;

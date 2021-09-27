@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
-use crate::sinks::util::encoding::EncodingConfig;
+use crate::sinks::util::encoding::{EncodingConfig, Encoder, DEFAULT_JSON_ENCODER, DEFAULT_TEXT_ENCODER};
 use crate::sinks::util::BatchConfig;
-use crate::kafka::{KafkaCompression, KafkaAuthConfig};
+use crate::kafka::{KafkaCompression, KafkaAuthConfig, KafkaStatisticsContext};
 use std::collections::HashMap;
 use crate::config::{GenerateConfig, SinkConfig, SinkContext, DataType};
 use crate::sinks::{VectorSink, Healthcheck};
@@ -17,9 +17,13 @@ use crate::template::TemplateParseError;
 use crate::template::Template;
 use std::convert::TryFrom;
 use snafu::{ResultExt, Snafu};
+use std::io::Write;
+use rdkafka::producer::FutureProducer;
+
+pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 #[derive(Debug, Snafu)]
-enum BuildError {
+pub enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
     #[snafu(display("invalid topic template: {}", source))]
@@ -46,7 +50,7 @@ pub(crate) struct KafkaSinkConfig {
     pub message_timeout_ms: u64,
     #[serde(default)]
     pub librdkafka_options: HashMap<String, String>,
-    pub headers_key: Option<String>,
+    pub headers_field: Option<String>,
 }
 
 const fn default_socket_timeout_ms() -> u64 {
@@ -60,20 +64,21 @@ const fn default_message_timeout_ms() -> u64 {
 /// Used to determine the options to set in configs, since both Kafka consumers and producers have
 /// unique options, they use the same struct, and the error if given the wrong options.
 #[derive(Debug, PartialOrd, PartialEq)]
-enum KafkaRole {
+pub enum KafkaRole {
     Consumer,
     Producer,
 }
 
 impl KafkaSinkConfig {
-    fn to_rdkafka(&self, kafka_role: KafkaRole) -> crate::Result<ClientConfig> {
+    pub(crate) fn to_rdkafka(&self, kafka_role: KafkaRole) -> crate::Result<ClientConfig> {
         let mut client_config = ClientConfig::new();
         client_config
             .set("bootstrap.servers", &self.bootstrap_servers)
             .set("compression.codec", &to_string(self.compression))
             .set("socket.timeout.ms", &self.socket_timeout_ms.to_string())
             .set("message.timeout.ms", &self.message_timeout_ms.to_string())
-            .set("statistics.interval.ms", "1000");
+            .set("statistics.interval.ms", "1000")
+            .set("queued.min.messages", QUEUED_MIN_MESSAGES.to_string());
 
         self.auth.apply(&mut client_config)?;
 
@@ -149,6 +154,13 @@ impl KafkaSinkConfig {
     }
 }
 
+pub fn create_producer(client_config: ClientConfig) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
+    let producer = client_config
+        .create_with_context(KafkaStatisticsContext)
+        .context(KafkaCreateFailed)?;
+    Ok(producer)
+}
+
 impl GenerateConfig for KafkaSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -162,7 +174,7 @@ impl GenerateConfig for KafkaSinkConfig {
             socket_timeout_ms: default_socket_timeout_ms(),
             message_timeout_ms: default_message_timeout_ms(),
             librdkafka_options: Default::default(),
-            headers_key: None
+            headers_field: None
         }).unwrap()
     }
 }
@@ -172,6 +184,23 @@ impl GenerateConfig for KafkaSinkConfig {
 pub enum Encoding {
     Text,
     Json,
+}
+
+impl Encoder for Encoding {
+    fn encode_event(&self, event: Event, writer: &mut dyn Write) -> std::io::Result<()> {
+        match self {
+            Encoding::Json => DEFAULT_JSON_ENCODER.encode_event(event, writer),
+            Encoding::Text => match event {
+                Event::Log(log) => {
+                    DEFAULT_TEXT_ENCODER.encode_event(Event::Log(log), writer)
+                },
+                Event::Metric(metric) => {
+                    metric.to_string().into_bytes();
+                    Ok(())
+                }
+            }
+        }
+    }
 }
 
 
