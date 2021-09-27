@@ -3,13 +3,12 @@ mod udp;
 #[cfg(unix)]
 mod unix;
 
-use super::util::TcpSource;
 use crate::{
-    codecs::{BytesParser, Decoder, NewlineDelimitedCodec},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
+    sources::util::TcpSource,
     tls::MaybeTlsSettings,
 };
 use serde::{Deserialize, Serialize};
@@ -81,9 +80,8 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let tcp = tcp::RawTcpSource {
-                    config: config.clone(),
-                };
+                let decoder = config.decoding().build()?;
+                let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
                     config.address(),
@@ -100,12 +98,7 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder = Decoder::new(
-                    Box::new(NewlineDelimitedCodec::new_with_max_length(
-                        config.max_length(),
-                    )),
-                    Box::new(BytesParser),
-                );
+                let decoder = config.decoding().build()?;
                 Ok(udp::udp(
                     config.address(),
                     host_key,
@@ -120,12 +113,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder = Decoder::new(
-                    Box::new(NewlineDelimitedCodec::new_with_max_length(
-                        config.max_length,
-                    )),
-                    Box::new(BytesParser),
-                );
+                let decoder = config.decoding.build()?;
                 Ok(unix::unix_datagram(
                     config.path,
                     config.max_length,
@@ -140,12 +128,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder = Decoder::new(
-                    Box::new(NewlineDelimitedCodec::new_with_max_length(
-                        config.max_length,
-                    )),
-                    Box::new(BytesParser),
-                );
+                let decoder = config.decoding.build()?;
                 Ok(unix::unix_stream(
                     config.path,
                     host_key,
@@ -181,6 +164,7 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
+        codecs::{DecodingConfig, NewlineDelimitedDecoderConfig},
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
@@ -276,7 +260,12 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
+        config.set_decoding(DecodingConfig::new(
+            Some(Box::new(
+                NewlineDelimitedDecoderConfig::new_with_max_length(10),
+            )),
+            None,
+        ));
 
         let server = SocketConfig::from(config)
             .build(SourceContext::new_test(tx))
@@ -309,7 +298,6 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
         config.set_tls(Some(TlsConfig::test_config()));
 
         let server = SocketConfig::from(config)
@@ -318,11 +306,7 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let lines = vec![
-            "short".to_owned(),
-            "this is too long".to_owned(),
-            "more short".to_owned(),
-        ];
+        let lines = vec!["one line".to_owned(), "another line".to_owned()];
 
         wait_for_tcp(addr).await;
         send_lines_tls(addr, "localhost".into(), lines.into_iter(), None)
@@ -330,12 +314,15 @@ mod test {
             .unwrap();
 
         let event = rx.next().await.unwrap();
-        assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            "one line".into()
+        );
 
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
-            "more short".into()
+            "another line".into()
         );
     }
 
@@ -345,7 +332,6 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
         config.set_tls(Some(TlsConfig {
             enabled: Some(true),
             options: TlsOptions {
@@ -361,11 +347,7 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let lines = vec![
-            "short".to_owned(),
-            "this is too long".to_owned(),
-            "more short".to_owned(),
-        ];
+        let lines = vec!["one line".to_owned(), "another line".to_owned()];
 
         wait_for_tcp(addr).await;
         send_lines_tls(
@@ -380,13 +362,13 @@ mod test {
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
-            "short".into()
+            "one line".into()
         );
 
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
-            "more short".into()
+            "another line".into()
         );
     }
 
