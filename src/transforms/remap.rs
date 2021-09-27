@@ -261,14 +261,13 @@ mod tests {
         assert_eq!(result1.metadata(), &metadata1);
 
         let event2 = {
-            let mut event2 = LogEvent::from("event2");
-            event2.insert("sentinel", "quux");
+            let event2 = LogEvent::from("event2");
             Event::from(event2)
         };
         let metadata2 = event2.metadata().clone();
         let result2 = transform_one(&mut tform, event2).unwrap();
         assert_eq!(get_field_string(&result2, "message"), "event2");
-        assert_eq!(get_field_string(&result2, "foo"), "quux");
+        assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
         assert_eq!(result2.metadata(), &metadata2);
     }
 
