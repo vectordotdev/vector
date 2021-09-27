@@ -1,7 +1,7 @@
 use super::Key;
 use crate::{
     bytes::{DecodeBytes, EncodeBytes},
-    internal_events::EventsReceived,
+    internal_events::BufferEventsReceived,
 };
 use bytes::BytesMut;
 use core_common::internal_event::emit;
@@ -173,7 +173,7 @@ where
             self.flush();
         }
 
-        emit(&EventsReceived {
+        emit(&BufferEventsReceived {
             count: 1,
             byte_size: event_size,
         });

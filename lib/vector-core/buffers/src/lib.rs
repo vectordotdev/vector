@@ -27,7 +27,7 @@ use core_common::byte_size_of::ByteSizeOf;
 use core_common::internal_event::emit;
 use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
-use internal_events::{EventsReceived, EventsSent};
+use internal_events::{BufferEventsReceived, BufferEventsSent};
 use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
@@ -81,7 +81,7 @@ where
             let (tx, rx) = mpsc::channel(max_events);
             let tx = BufferInputCloner::Memory(tx, when_full);
             let rx = rx.inspect(|item: &T| {
-                emit(&EventsSent {
+                emit(&BufferEventsSent {
                     count: 1,
                     byte_size: item.allocated_bytes(),
                 });
@@ -244,7 +244,7 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for InstrumentMemoryBuffer<S> {
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let byte_size = item.allocated_bytes();
         self.project().inner.start_send(item).map(|()| {
-            emit(&EventsReceived {
+            emit(&BufferEventsReceived {
                 count: 1,
                 byte_size,
             });

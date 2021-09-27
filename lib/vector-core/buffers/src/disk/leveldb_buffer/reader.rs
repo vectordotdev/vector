@@ -1,5 +1,5 @@
 use super::Key;
-use crate::{bytes::DecodeBytes, internal_events::EventsSent};
+use crate::{bytes::DecodeBytes, internal_events::BufferEventsSent};
 use bytes::Bytes;
 use core_common::internal_event::emit;
 use futures::{task::AtomicWaker, Stream};
@@ -160,7 +160,7 @@ where
             let byte_size = buffer.len();
             match T::decode(buffer) {
                 Ok(event) => {
-                    emit(&EventsSent {
+                    emit(&BufferEventsSent {
                         count: 1,
                         byte_size,
                     });

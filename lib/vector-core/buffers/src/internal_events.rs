@@ -1,12 +1,12 @@
 use core_common::internal_event::InternalEvent;
 use metrics::counter;
 
-pub struct EventsReceived {
+pub struct BufferEventsReceived {
     pub count: usize,
     pub byte_size: usize,
 }
 
-impl InternalEvent for EventsReceived {
+impl InternalEvent for BufferEventsReceived {
     fn emit_logs(&self) {}
 
     fn emit_metrics(&self) {
@@ -15,12 +15,12 @@ impl InternalEvent for EventsReceived {
     }
 }
 
-pub struct EventsSent {
+pub struct BufferEventsSent {
     pub count: usize,
     pub byte_size: usize,
 }
 
-impl InternalEvent for EventsSent {
+impl InternalEvent for BufferEventsSent {
     fn emit_logs(&self) {}
 
     fn emit_metrics(&self) {
