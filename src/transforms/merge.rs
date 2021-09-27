@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
@@ -55,7 +55,7 @@ impl Default for MergeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::task(Merge::from(self.clone())))
     }
 

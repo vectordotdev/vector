@@ -24,6 +24,7 @@ enum EsResultItem {
 }
 
 impl EsResultItem {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     fn result(self) -> EsIndexResult {
         match self {
             EsResultItem::Index(r) => r,

@@ -198,7 +198,7 @@ administration: management: {
 			observe: {
 				logs: {
 					info: """
-						The Vector MSI package doesn't install Vector into a proces manager. Therefore, you need to
+						The Vector MSI package doesn't install Vector into a process manager. Therefore, you need to
 						start Vector by executing the Vector binary directly. Vector's logs are written to `STDOUT`. You
 						are in charge of routing `STDOUT`, and this determines how you access Vector's logs.
 						"""
@@ -230,7 +230,7 @@ administration: management: {
 			observe: {
 				logs: {
 					info: """
-						The Vector Nix package doesn't install Vector into a proces manager. Therefore, Vector must be
+						The Vector Nix package doesn't install Vector into a process manager. Therefore, Vector must be
 						started by executing the Vector binary directly. Vector's logs are written to `STDOUT`. You are
 						in charge of routing `STDOUT`, and this determines how you access Vector's logs.
 						"""

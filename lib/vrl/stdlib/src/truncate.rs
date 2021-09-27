@@ -48,7 +48,12 @@ impl Function for Truncate {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let limit = arguments.required("limit");
         let ellipsis = arguments.optional("ellipsis").unwrap_or(expr!(false));

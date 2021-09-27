@@ -63,9 +63,9 @@ with an `inputs` field that specifies the component before it:
   # etc ...
 ```
 
-The names of the generated components are sequential (`transform0`,
+The IDs of the generated components are sequential (`transform0`,
 `transform1`, and so on). It's therefore worth doing a search and replace with
-your editor to give them better names, e.g. `s/transform2/scrub_emails/g`.
+your editor to give them better IDs, e.g. `s/transform2/scrub_emails/g`.
 
 ## Testing Configs
 

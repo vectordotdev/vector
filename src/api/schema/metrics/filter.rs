@@ -1,17 +1,20 @@
-use super::{EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal};
+use super::{
+    EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal, ReceivedEventsTotal,
+};
 use crate::{
+    config::ComponentKey,
     event::{Metric, MetricValue},
     metrics::{capture_metrics, get_controller, Controller},
 };
 use async_stream::stream;
 use lazy_static::lazy_static;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 lazy_static! {
-    static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =
-        Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
+    static ref GLOBAL_CONTROLLER: &'static Controller =
+        get_controller().expect("Metrics system not initialized. Please report.");
 }
 
 /// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically
@@ -44,6 +47,7 @@ fn sum_metrics_owned<I: IntoIterator<Item = Metric>>(metrics: I) -> Option<Metri
 pub trait MetricsFilter<'a> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
     fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal>;
+    fn received_events_total(&self) -> Option<ReceivedEventsTotal>;
     fn events_in_total(&self) -> Option<EventsInTotal>;
     fn events_out_total(&self) -> Option<EventsOutTotal>;
 }
@@ -65,6 +69,15 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
         let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_in_total"))?;
 
         Some(EventsInTotal::new(sum))
+    }
+
+    fn received_events_total(&self) -> Option<ReceivedEventsTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_received_events_total"),
+        )?;
+
+        Some(ReceivedEventsTotal::new(sum))
     }
 
     fn events_out_total(&self) -> Option<EventsOutTotal> {
@@ -93,6 +106,16 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
         )?;
 
         Some(ProcessedBytesTotal::new(sum))
+    }
+
+    fn received_events_total(&self) -> Option<ReceivedEventsTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_received_events_total")
+                .copied(),
+        )?;
+
+        Some(ReceivedEventsTotal::new(sum))
     }
 
     fn events_in_total(&self) -> Option<EventsInTotal> {
@@ -143,10 +166,18 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     }
 }
 
-/// Return Vec<Metric> based on a component name tag.
-pub fn by_component_name(component_name: &str) -> Vec<Metric> {
+/// Return Vec<Metric> based on a component id tag.
+pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
     capture_metrics(&GLOBAL_CONTROLLER)
-        .filter_map(|m| m.tag_matches("component_name", component_name).then(|| m))
+        .filter_map(|m| {
+            if let Some(pipeline) = component_key.pipeline_str() {
+                m.tag_matches("component_id", component_key.id())
+                    && m.tag_matches("pipeline_id", pipeline)
+            } else {
+                m.tag_matches("component_id", component_key.id())
+            }
+            .then(|| m)
+        })
         .collect()
 }
 
@@ -154,7 +185,7 @@ type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
 
 /// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
 /// (e.g. "processed_events_total"), and the value is derived from `MetricValue::Counter`. Uses a
-/// local cache to match against the `component_name` of a metric, to return results only when
+/// local cache to match against the `component_id` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
 /// to be notified as metrics increase without returning 'empty' or identical results.
 pub fn component_counter_metrics(
@@ -166,17 +197,17 @@ pub fn component_counter_metrics(
     get_all_metrics(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
-            .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
-            .fold(BTreeMap::new(), |mut map, (name, m)| {
-                map.entry(name).or_insert_with(Vec::new).push(m);
+            .filter_map(|m| m.tag_value("component_id").map(|id| (id, m)))
+            .fold(BTreeMap::new(), |mut map, (id, m)| {
+                map.entry(id).or_insert_with(Vec::new).push(m);
                 map
             })
             .into_iter()
-            .filter_map(|(name, metrics)| {
+            .filter_map(|(id, metrics)| {
                 let m = sum_metrics_owned(metrics)?;
                 match m.value() {
                     MetricValue::Counter { value }
-                        if cache.insert(name, *value).unwrap_or(0.00) < *value =>
+                        if cache.insert(id, *value).unwrap_or(0.00) < *value =>
                     {
                         Some(m)
                     }
@@ -221,17 +252,17 @@ pub fn component_counter_throughputs(
         .map(move |m| {
             m.into_iter()
                 .filter(filter_fn)
-                .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
-                .fold(BTreeMap::new(), |mut map, (name, m)| {
-                    map.entry(name).or_insert_with(Vec::new).push(m);
+                .filter_map(|m| m.tag_value("component_id").map(|id| (id, m)))
+                .fold(BTreeMap::new(), |mut map, (id, m)| {
+                    map.entry(id).or_insert_with(Vec::new).push(m);
                     map
                 })
                 .into_iter()
-                .filter_map(|(name, metrics)| {
+                .filter_map(|(id, metrics)| {
                     let m = sum_metrics_owned(metrics)?;
                     match m.value() {
                         MetricValue::Counter { value } => {
-                            let last = cache.insert(name, *value).unwrap_or(0.00);
+                            let last = cache.insert(id, *value).unwrap_or(0.00);
                             let throughput = value - last;
                             Some((m, throughput))
                         }

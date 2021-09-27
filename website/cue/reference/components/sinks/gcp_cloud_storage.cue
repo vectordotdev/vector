@@ -32,16 +32,16 @@ components: sinks: gcp_cloud_storage: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
+					batched: true
 					enum: ["ndjson", "text"]
 				}
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				concurrency:                25
-				rate_limit_num:             1000
-				headers:                    false
+				enabled:        true
+				concurrency:    25
+				rate_limit_num: 1000
+				headers:        false
 			}
 			tls: {
 				enabled:                true
@@ -281,7 +281,7 @@ components: sinks: gcp_cloud_storage: {
 			policies: [
 				{
 					_action: "objects.create"
-					required_for: ["write"]
+					required_for: ["operation"]
 				},
 				{
 					_action: "objects.get"

@@ -1,7 +1,8 @@
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, ExpandType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::RouteEventDiscarded,
@@ -21,8 +22,10 @@ pub struct LaneConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "lane")]
 impl TransformConfig for LaneConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        Ok(Transform::function(Lane::new(self.condition.build()?)))
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(Lane::new(
+            self.condition.build(&context.enrichment_tables)?,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -56,7 +59,7 @@ impl FunctionTransform for Lane {
         if self.condition.check(&event) {
             output.push(event);
         } else {
-            emit!(RouteEventDiscarded);
+            emit!(&RouteEventDiscarded);
         }
     }
 }
@@ -91,7 +94,7 @@ impl GenerateConfig for RouteConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Err("this transform must be expanded".into())
     }
 
@@ -131,8 +134,8 @@ struct RouteCompatConfig(RouteConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for RouteCompatConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
-        self.0.build(globals).await
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        self.0.build(context).await
     }
 
     fn expand(

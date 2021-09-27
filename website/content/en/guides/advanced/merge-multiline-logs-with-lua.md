@@ -9,6 +9,7 @@ tags: ["lua", "merge", "multiline", "multi-line", "advanced", "guides", "guide"]
 ---
 
 {{< requirement title="Pre-requisites" >}}
+
 * You understand the [basic Lua concepts][docs.transforms.lua].
 * You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a basic pipeline][docs.setup.quickstart].
 * You know how to [parse CSV logs with Lua][guides.parsing-csv-logs-with-lua].

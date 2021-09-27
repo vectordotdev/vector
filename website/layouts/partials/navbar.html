@@ -11,9 +11,9 @@
   class="z-50 dark:bg-dark dark:border-gray-700 border-b"
   tabindex="0">
 
-  <div class="max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-1 md:py-1.5 lg:py-2">
+  <div class="mx-auto px-4 sm:px-6 lg:px-10 py-1 md:py-1.5 lg:py-2">
     <div class="relative flex items-center justify-between h-16">
-      <div class="flex items-center px-2 lg:px-0">
+      <div class="flex items-center">
         <div class="flex-shrink-0">
           <a href="{{ site.BaseURL }}">
             {{ range $modes }}
@@ -28,12 +28,12 @@
           <div class="flex space-x-4">
             {{ range $menu }}
             {{ $isActive := hasPrefix $here .URL }}
-            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm text-normal font-normal">
+            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm text-normal font-normal" {{ if .Params.flyout }}@mouseover="flyout = true"{{ end }}>
               <span class="dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
                 {{ .Name }}
               </span>
               {{ if .Params.flyout }}
-              <span :class="{ 'transform rotate-180': flyout }" class="cursor-pointer ml-1.5 dark:text-gray-300 text-black" @mouseover="flyout = true">
+              <span :class="{ 'transform rotate-180': flyout }" class="cursor-pointer ml-1.5 dark:text-gray-300 text-black">
                 {{/* Heroicon: outline/chevron-down */}}
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -47,12 +47,13 @@
       </div>
       <div class="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end">
         {{/* Dark/light mode toggler */}}
-        {{ partial "navbar/mode-toggler.html" . }}
+        <div class="mr-6 pt-0.5">
+          {{ partial "navbar/mode-toggler.html" . }}
+        </div>
 
 
         {{/* Search bar */}}
-        {{ partial "navbar/search-bar.html" . }}
-      </div>
+        {{ partial "navbar/search-bar.html" }}
 
       {{/* Social icons */}}
       <div class="hidden lg:flex space-x-3.5 md:order-2 text-lg pt-1.5 ml-2 lg:ml-4 md:ml-3">

@@ -68,6 +68,19 @@ pub struct Opts {
         use_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
+
+    /// Read pipeline configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "pipeline-dir",
+        short = "P",
+        long,
+        env = "VECTOR_PIPELINE_DIR",
+        use_delimiter(true)
+    )]
+    pub pipeline_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
@@ -133,12 +146,13 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    config::init_log_schema(&paths, true)
+    config::init_log_schema(&paths, &opts.pipeline_dirs, true)
         .map_err(&mut report_error)
         .ok()?;
-    let (builder, load_warnings) = config::load_builder_from_paths(&paths)
-        .map_err(&mut report_error)
-        .ok()?;
+    let (builder, load_warnings) =
+        config::load_builder_and_pipelines_from_paths(&paths, &opts.pipeline_dirs)
+            .map_err(&mut report_error)
+            .ok()?;
 
     // Build
     let (config, build_warnings) = builder
@@ -212,7 +226,7 @@ async fn validate_healthchecks(
     // We are running health checks in serial so it's easier for the users
     // to parse which errors/warnings/etc. belong to which healthcheck.
     let mut validated = true;
-    for (name, healthcheck) in healthchecks {
+    for (id, healthcheck) in healthchecks {
         let mut failed = |error| {
             validated = false;
             fmt.error(error);
@@ -222,23 +236,22 @@ async fn validate_healthchecks(
             Ok(Ok(_)) => {
                 if config
                     .sinks
-                    .get(&name)
+                    .get(&id)
                     .expect("Sink not present")
                     .healthcheck()
                     .enabled
                 {
-                    fmt.success(format!("Health check `{}`", name.as_str()));
+                    fmt.success(format!("Health check \"{}\"", id));
                 } else {
-                    fmt.warning(format!("Health check disabled for `{}`", name));
+                    fmt.warning(format!("Health check disabled for \"{}\"", id));
                     validated &= !opts.deny_warnings;
                 }
             }
-            Ok(Err(())) => failed(format!("Health check for `{}` failed", name.as_str())),
-            Err(error) if error.is_cancelled() => failed(format!(
-                "Health check for `{}` was cancelled",
-                name.as_str()
-            )),
-            Err(_) => failed(format!("Health check for `{}` panicked", name.as_str())),
+            Ok(Err(())) => failed(format!("Health check for \"{}\" failed", id)),
+            Err(error) if error.is_cancelled() => {
+                failed(format!("Health check for \"{}\" was cancelled", id))
+            }
+            Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
         }
     }
 

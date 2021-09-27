@@ -50,8 +50,8 @@ scripts/helm-dependencies.sh validate
 # Read the shared scripting config.
 source "distribution/helm/scripting-config.sh"
 
-# Filter out vector and aggregator if not publishing to nightly
-NIGHTLY_CHARTS=( "vector" "vector-aggregator" )
+# Filter out vector if not publishing to nightly
+NIGHTLY_CHARTS=( "vector" )
 
 if [ "${CHANNEL}" != "nightly" ]; then
     for IDX in "${!CHARTS_TO_PUBLISH[@]}"; do

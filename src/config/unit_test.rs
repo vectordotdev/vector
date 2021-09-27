@@ -1,17 +1,24 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{self, ConfigPath, GlobalOptions, TransformConfig};
+use crate::config::{
+    self, ComponentKey, ConfigDiff, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
+};
 use crate::{
     conditions::Condition,
     event::{Event, Value},
+    topology::builder::load_enrichment_tables,
     transforms::Transform,
 };
 use indexmap::IndexMap;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
-pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
-    config::init_log_schema(paths, false)?;
+pub async fn build_unit_tests_main(
+    paths: &[ConfigPath],
+    pipeline_paths: &[PathBuf],
+) -> Result<Vec<UnitTest>, Vec<String>> {
+    config::init_log_schema(paths, pipeline_paths, false)?;
 
-    let (config, _) = super::loading::load_builder_from_paths(paths)?;
+    let (config, _) = super::loading::load_builder_and_pipelines_from_paths(paths, pipeline_paths)?;
 
     build_unit_tests(config).await
 }
@@ -27,7 +34,10 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         global: builder.global,
         #[cfg(feature = "api")]
         api: builder.api,
+        #[cfg(feature = "datadog-pipelines")]
+        datadog: builder.datadog,
         healthchecks: builder.healthchecks,
+        enrichment_tables: builder.enrichment_tables,
         sources: builder.sources,
         sinks: builder.sinks,
         transforms: builder.transforms,
@@ -57,21 +67,21 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
 
 pub struct UnitTest {
     pub name: String,
-    inputs: Vec<(Vec<String>, Event)>,
-    transforms: IndexMap<String, UnitTestTransform>,
+    inputs: Vec<(Vec<ComponentKey>, Event)>,
+    transforms: IndexMap<ComponentKey, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
-    no_outputs_from: Vec<String>,
+    no_outputs_from: Vec<ComponentKey>,
     globals: GlobalOptions,
 }
 
 struct UnitTestTransform {
     transform: Transform,
     config: Box<dyn TransformConfig>,
-    next: Vec<String>,
+    next: Vec<ComponentKey>,
 }
 
 struct UnitTestCheck {
-    extract_from: String,
+    extract_from: ComponentKey,
     conditions: Vec<Box<dyn Condition>>,
 }
 
@@ -102,10 +112,10 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
 }
 
 fn walk(
-    node: &str,
+    node: &ComponentKey,
     mut inputs: Vec<Event>,
-    transforms: &mut IndexMap<String, UnitTestTransform>,
-    aggregated_results: &mut HashMap<String, (Vec<Event>, Vec<Event>)>,
+    transforms: &mut IndexMap<ComponentKey, UnitTestTransform>,
+    aggregated_results: &mut HashMap<ComponentKey, (Vec<Event>, Vec<Event>)>,
     globals: &GlobalOptions,
 ) {
     let mut results = Vec::new();
@@ -132,7 +142,7 @@ fn walk(
                 // TODO: This is a hack.
                 // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
                 transforms.insert(key, UnitTestTransform {
-                    transform:  futures::executor::block_on(target.config.clone().build(globals))
+                    transform:  futures::executor::block_on(target.config.clone().build(&TransformContext::new_with_globals(globals.clone())))
                         .expect("Failed to build a known valid transform config. Things may have changed during runtime."),
                     config: target.config,
                     next: target.next
@@ -155,7 +165,7 @@ fn walk(
         inputs.append(&mut e_inputs);
         results.append(&mut e_results);
     }
-    aggregated_results.insert(node.into(), (inputs, results));
+    aggregated_results.insert(node.clone(), (inputs, results));
 }
 
 impl UnitTest {
@@ -233,7 +243,7 @@ impl UnitTest {
                 }
                 if outputs.is_empty() {
                     errors.push(format!(
-                        "check transform '{}' failed, no events received.",
+                        "check transform {:?} failed, no events received.",
                         check.extract_from,
                     ));
                 }
@@ -265,10 +275,10 @@ impl UnitTest {
 //------------------------------------------------------------------------------
 
 fn links_to_a_leaf(
-    target: &str,
-    leaves: &IndexMap<String, ()>,
-    link_checked: &mut IndexMap<String, bool>,
-    transform_outputs: &IndexMap<String, IndexMap<String, ()>>,
+    target: &ComponentKey,
+    leaves: &IndexMap<ComponentKey, ()>,
+    link_checked: &mut IndexMap<ComponentKey, bool>,
+    transform_outputs: &IndexMap<ComponentKey, IndexMap<ComponentKey, ()>>,
 ) -> bool {
     if *link_checked.get(target).unwrap_or(&false) {
         return true;
@@ -290,11 +300,11 @@ fn links_to_a_leaf(
 /// Reduces a collection of transforms into a set that only contains those that
 /// link between our root (test input) and a set of leaves (test outputs).
 fn reduce_transforms(
-    roots: Vec<String>,
-    leaves: &IndexMap<String, ()>,
-    transform_outputs: &mut IndexMap<String, IndexMap<String, ()>>,
+    roots: Vec<ComponentKey>,
+    leaves: &IndexMap<ComponentKey, ()>,
+    transform_outputs: &mut IndexMap<ComponentKey, IndexMap<ComponentKey, ()>>,
 ) {
-    let mut link_checked: IndexMap<String, bool> = IndexMap::new();
+    let mut link_checked: IndexMap<ComponentKey, bool> = IndexMap::new();
 
     if roots
         .iter()
@@ -306,19 +316,19 @@ fn reduce_transforms(
         transform_outputs.clear();
     }
 
-    transform_outputs.retain(|name, children| {
-        let linked = roots.contains(name) || *link_checked.get(name).unwrap_or(&false);
+    transform_outputs.retain(|id, children| {
+        let linked = roots.contains(id) || *link_checked.get(id).unwrap_or(&false);
         if linked {
             // Also remove all unlinked children.
-            children.retain(|child_name, _| {
-                roots.contains(child_name) || *link_checked.get(child_name).unwrap_or(&false)
+            children.retain(|child_id, _| {
+                roots.contains(child_id) || *link_checked.get(child_id).unwrap_or(&false)
             })
         }
         linked
     });
 }
 
-fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event), String> {
+fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<ComponentKey>, Event), String> {
     let target = config.get_inputs(&input.insert_at);
 
     match input.type_str.as_ref() {
@@ -360,7 +370,7 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
 fn build_inputs(
     config: &Config,
     definition: &TestDefinition,
-) -> Result<Vec<(Vec<String>, Event)>, Vec<String>> {
+) -> Result<Vec<(Vec<ComponentKey>, Event)>, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
 
@@ -402,7 +412,7 @@ async fn build_unit_test(
 
     // Maps transform names with their output targets (transforms that use it as
     // an input).
-    let mut transform_outputs: IndexMap<String, IndexMap<String, ()>> = config
+    let mut transform_outputs: IndexMap<ComponentKey, IndexMap<ComponentKey, ()>> = config
         .transforms
         .iter()
         .map(|(k, _)| (k.clone(), IndexMap::new()))
@@ -411,7 +421,7 @@ async fn build_unit_test(
     config.transforms.iter().for_each(|(k, t)| {
         t.inputs.iter().for_each(|i| {
             if let Some(outputs) = transform_outputs.get_mut(i) {
-                outputs.insert(k.to_string(), ());
+                outputs.insert(k.clone(), ());
             }
         })
     });
@@ -430,7 +440,7 @@ async fn build_unit_test(
         return Err(errors);
     }
 
-    let mut leaves: IndexMap<String, ()> = IndexMap::new();
+    let mut leaves: IndexMap<ComponentKey, ()> = IndexMap::new();
     definition.outputs.iter().for_each(|o| {
         leaves.insert(o.extract_from.clone(), ());
     });
@@ -451,14 +461,24 @@ async fn build_unit_test(
         &mut transform_outputs,
     );
 
+    let diff = ConfigDiff::initial(config);
+    let (enrichment_tables, tables_errors) = load_enrichment_tables(config, &diff).await;
+
+    errors.extend(tables_errors);
+
+    let context = TransformContext {
+        globals: config.global.clone(),
+        enrichment_tables: enrichment_tables.clone(),
+    };
+
     // Build reduced transforms.
-    let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
-    for (name, transform_config) in &config.transforms {
-        if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config.inner.build(&config.global).await {
+    let mut transforms: IndexMap<ComponentKey, UnitTestTransform> = IndexMap::new();
+    for (id, transform_config) in &config.transforms {
+        if let Some(outputs) = transform_outputs.remove(id) {
+            match transform_config.inner.build(&context).await {
                 Ok(transform) => {
                     transforms.insert(
-                        name.clone(),
+                        id.clone(),
                         UnitTestTransform {
                             transform,
                             config: transform_config.inner.clone(),
@@ -469,7 +489,7 @@ async fn build_unit_test(
                 Err(err) => {
                     errors.push(format!(
                         "failed to build transform '{}': {:#}",
-                        name,
+                        id,
                         anyhow::anyhow!(err)
                     ));
                 }
@@ -492,7 +512,7 @@ async fn build_unit_test(
             } else {
                 errors.push(format!(
                     "unable to complete topology between target transforms {:?} and output target '{}'",
-                    targets, o.extract_from
+                    targets.iter().map(|item| item.to_string()).collect::<Vec<_>>(), o.extract_from
                 ));
             }
         }
@@ -511,7 +531,7 @@ async fn build_unit_test(
                 .iter()
                 .enumerate()
             {
-                match cond_conf.build() {
+                match cond_conf.build(&Default::default()) {
                     Ok(c) => conditions.push(c),
                     Err(e) => errors.push(format!(
                         "failed to create test condition '{}': {}",
@@ -971,9 +991,9 @@ mod tests {
                 type = "check_fields"
                 "message.eq" = "test swimlane 2"
 
-              [transforms.bar]
-                inputs = ["foo.first"]
-                type = "add_fields"
+            [transforms.bar]
+              inputs = ["foo.first"]
+              type = "add_fields"
               [transforms.bar.fields]
                 new_field = "new field added"
 
@@ -1460,16 +1480,18 @@ mod tests {
             [transforms.foo]
               inputs = ["input"]
               type = "compound"
-              [transforms.foo.nested.step1]
+              [[transforms.foo.steps]]
+                id = "step1"
                 type = "log_to_metric"
-                [[transforms.foo.nested.step1.metrics]]
+                [[transforms.foo.steps.metrics]]
                   type = "counter"
                   field = "c"
                   name = "sum"
                   namespace = "ns"
-              [transforms.foo.nested.step2]
+              [[transforms.foo.steps]]
+                id = "step2"
                 type = "log_to_metric"
-                [[transforms.foo.nested.step2.metrics]]
+                [[transforms.foo.steps.metrics]]
                   type = "counter"
                   field = "c"
                   name = "sum"

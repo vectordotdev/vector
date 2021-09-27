@@ -50,5 +50,6 @@ It now serialized like:
 ```
 
 ## Upgrade Guide
+
 Upgrading should involve handling changes in any systems that are consuming
 metrics data from the `console` sink.

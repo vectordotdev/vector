@@ -1,7 +1,8 @@
 subscription ComponentAddedSubscription {
   componentAdded {
     __typename
-    name
+    pipelineId
+    componentId
     componentType
   }
 }

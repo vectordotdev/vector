@@ -46,7 +46,11 @@ components: sources: kubernetes_logs: {
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
 		}
-		requirements: []
+		requirements: [
+			"""
+				[Kubernetes](\(urls.kubernetes)) version `\(services.kubernetes.versions)` is required.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
@@ -105,6 +109,15 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_labels"
+							syntax:  "literal"
+						}
+					}
+					pod_annotations: {
+						common:      false
+						description: "Event field for Pod annotations."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_annotations"
 							syntax:  "literal"
 						}
 					}
@@ -345,6 +358,15 @@ components: sources: kubernetes_logs: {
 					options: {}
 				}
 			}
+			"kubernetes.pod_annotations": {
+				description: "Set of annotations attached to the Pod."
+				required:    false
+				common:      true
+				type: object: {
+					examples: [{"myannotation": "myvalue"}]
+					options: {}
+				}
+			}
 			"kubernetes.pod_name": {
 				description: "Pod name."
 				required:    false
@@ -420,9 +442,7 @@ components: sources: kubernetes_logs: {
 			title: "Sample Output"
 			configuration: {}
 			input: """
-				```text
 				F1015 11:01:46.499073       1 main.go:39] error getting server version: Get \"https://10.96.0.1:443/version?timeout=32s\": dial tcp 10.96.0.1:443: connect: network is unreachable
-				```
 				"""
 			output: log: {
 				"file":                       "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log"
@@ -437,6 +457,9 @@ components: sources: kubernetes_logs: {
 					"addonmanager.kubernetes.io/mode": "Reconcile"
 					"gcp-auth-skip-secret":            "true"
 					"integration-test":                "storage-provisioner"
+				}
+				"kubernetes.pod_annotations": {
+					"prometheus.io/scrape": "false"
 				}
 				"kubernetes.pod_name":      "storage-provisioner"
 				"kubernetes.pod_namespace": "kube-system"
@@ -584,7 +607,7 @@ components: sources: kubernetes_logs: {
 						```
 
 						As with all Kubernetes resource limit recommendations, **use these
-						as a reference point and adjust as ncessary**. If your configured
+						as a reference point and adjust as necessary**. If your configured
 						Vector pipeline is complex, you may need more resources; if you
 						have a more straightforward pipeline, you may need less.
 						"""
@@ -634,7 +657,7 @@ components: sources: kubernetes_logs: {
 
 				If your cluster doesn't use any access control scheme	and doesn't
 				restrict access to the Kubernetes API, you don't need to do any extra
-				configuration - Vector willjust work.
+				configuration - Vector will just work.
 
 				Clusters using legacy ABAC scheme are not officially supported
 				(although Vector might work if you configure access properly) -
@@ -661,5 +684,6 @@ components: sources: kubernetes_logs: {
 		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
 		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

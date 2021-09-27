@@ -60,10 +60,12 @@ impl NamespaceMetadataAnnotator {
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
     // Calculate and cache the prefix path.
     let prefix_path = PathIter::new(fields_spec.namespace_labels.as_ref()).collect::<Vec<_>>();
-    for (key, val) in metadata.labels.iter() {
-        let mut path = prefix_path.clone();
-        path.push(PathComponent::Key(key.clone()));
-        log.insert_path(path, val.to_owned());
+    if let Some(labels) = &metadata.labels {
+        for (key, val) in labels.iter() {
+            let mut path = prefix_path.clone();
+            path.push(PathComponent::Key(key.clone().into()));
+            log.insert_path(path, val.to_owned());
+        }
     }
 }
 
@@ -85,12 +87,14 @@ mod tests {
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
                     uid: Some("sandbox0-uid".to_owned()),
-                    labels: vec![
-                        ("sandbox0-label0".to_owned(), "val0".to_owned()),
-                        ("sandbox0-label1".to_owned(), "val1".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    labels: Some(
+                        vec![
+                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
                     ..ObjectMeta::default()
                 },
                 {
@@ -107,12 +111,14 @@ mod tests {
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
                     uid: Some("sandbox0-uid".to_owned()),
-                    labels: vec![
-                        ("sandbox0-label0".to_owned(), "val0".to_owned()),
-                        ("sandbox0-label1".to_owned(), "val1".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    labels: Some(
+                        vec![
+                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
+                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
                     ..ObjectMeta::default()
                 },
                 {
@@ -128,14 +134,16 @@ mod tests {
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
                     uid: Some("sandbox0-uid".to_owned()),
-                    labels: vec![
-                        ("nested0.label0".to_owned(), "val0".to_owned()),
-                        ("nested0.label1".to_owned(), "val1".to_owned()),
-                        ("nested1.label0".to_owned(), "val2".to_owned()),
-                        ("nested2.label0.deep0".to_owned(), "val3".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    labels: Some(
+                        vec![
+                            ("nested0.label0".to_owned(), "val0".to_owned()),
+                            ("nested0.label1".to_owned(), "val1".to_owned()),
+                            ("nested1.label0".to_owned(), "val2".to_owned()),
+                            ("nested2.label0.deep0".to_owned(), "val3".to_owned()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
 
                     ..ObjectMeta::default()
                 },

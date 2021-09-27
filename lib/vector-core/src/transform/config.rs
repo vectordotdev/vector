@@ -15,10 +15,36 @@ pub enum ExpandType {
     Serial,
 }
 
+#[cfg(feature = "vrl")]
+#[derive(Debug, Default)]
+pub struct TransformContext {
+    pub globals: GlobalOptions,
+    pub enrichment_tables: enrichment::TableRegistry,
+}
+
+#[cfg(not(feature = "vrl"))]
+#[derive(Debug, Default)]
+pub struct TransformContext {
+    pub globals: GlobalOptions,
+}
+
+impl TransformContext {
+    // clippy allow avoids an issue where vrl is flagged off and `globals` is
+    // the sole field in the struct
+    #[allow(clippy::needless_update)]
+    pub fn new_with_globals(globals: GlobalOptions) -> Self {
+        Self {
+            globals,
+            ..Default::default()
+        }
+    }
+}
+
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<crate::transform::Transform>;
+    async fn build(&self, globals: &TransformContext)
+        -> crate::Result<crate::transform::Transform>;
 
     fn input_type(&self) -> DataType;
 

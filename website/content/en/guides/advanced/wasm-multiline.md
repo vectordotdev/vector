@@ -5,10 +5,20 @@ authors: ["hoverbear"]
 domain: transforms
 transforms: ["wasm"]
 weight: 1
+noindex: true
 tags: ["webassembly", "wasm", "multiline", "multi-line", "advanced", "guides", "guide"]
 ---
 
+{{< warning >}}
+[Vector `wasm` support was removed in
+v0.17.0](https://github.com/vectordotdev/vector/issues/8036). This guide remains for
+posterity.
+
+It can be used with Vector versions prior to its removal.
+{{< /warning >}}
+
 {{< requirement title="Pre-requisites" >}}
+
 * You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][docs.setup.quickstart].
 * You must be using a Linux system (or WSL2 for Windows users) for WASM related work right now.
 * You read the [Hello, WASM World][wasm_guide] guide and feel comfortable with the topics it discussed.
@@ -76,7 +86,7 @@ Next, add the following content, setting the crate up as a `cdylib` and adding s
 crate-type = ["cdylib"]
 
 [dependencies]
-vector-wasm = { version = "0.1", git = "https://github.com/timberio/vector/"}
+vector-wasm = { version = "0.1", git = "https://github.com/vectordotdev/vector/"}
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0"
@@ -380,7 +390,7 @@ data_dir = "/var/lib/vector/"
 Then, using your Wasm-capable Vector build take it for a test drive:
 
 ```bash
-ana@autonoma:~/git/timberio/banana$ ../vector/target/release/vector --config banana.toml
+ana@autonoma:~/git/vectordotdev/banana$ ../vector/target/release/vector --config banana.toml
 Aug 25 10:29:19.705  INFO vector: Log level "info" is enabled.
 Aug 25 10:29:19.706  INFO vector: Loading configs. path=["banana.toml"]
 Aug 25 10:29:19.708  INFO vector: Vector is starting. version="0.11.0" git_version="v0.9.0-530-g1b9eadd" released="Mon, 17 Aug 2020 20:48:21 +0000" arch="x86_64"
@@ -395,12 +405,12 @@ Aug 25 10:29:19.708  INFO vector::topology::builder: Healthcheck: Passed.
 { "foo": "bar" }
 {"foo":"bar"}
 123
-Aug 25 10:29:29.478 ERROR transform{name=transform0 type=wasm}: vector::wasm: WASM plugin errored: Was provided 123, not an object
+Aug 25 10:29:29.478 ERROR transform{id=transform0 type=wasm}: vector::wasm: WASM plugin errored: Was provided 123, not an object
 { "foo":
 "bar" }
 {"foo":"bar"}
 Aug 25 10:29:38.135  INFO vector::shutdown: All sources have finished.
-Aug 25 10:29:38.135  INFO source{name=source0 type=stdin}: vector::sources::stdin: finished sending
+Aug 25 10:29:38.135  INFO source{id=source0 type=stdin}: vector::sources::stdin: finished sending
 Aug 25 10:29:38.135  INFO vector: Shutting down.
 ```
 
@@ -435,7 +445,7 @@ When you have some ideas of what to test, you can add a new behavior test to Vec
 Running the test:
 
 ```bash
-ana@autonoma:~/git/timberio/banana$ ../vector/target/release/vector test banana.toml
+ana@autonoma:~/git/vectordotdev/banana$ ../vector/target/release/vector test banana.toml
 Aug 25 10:49:42.370  INFO vector: Log level "info" is enabled.
 Running banana.toml tests
 Aug 25 10:49:42.374  INFO vector::internal_events::wasm::compilation: WASM Compilation via `lucet` state="beginning" role="transform"

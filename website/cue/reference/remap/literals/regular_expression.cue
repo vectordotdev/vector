@@ -28,16 +28,19 @@ remap: literals: regular_expression: {
 				in-browser [Rustexp expression editor and tester](\#(urls.regex_tester)).
 				"""#
 			enum: {
-				"x": "Ignore whitespace"
 				"i": "Case insensitive"
 				"m": "Multi-line mode"
+				"x": "Ignore whitespace"
+				"s": "Allow . to match \n"
+				"U": "Swap the meaning of x* and x*?"
+				"u": "Unicode support (enabled by default)"
 			}
 		}
 		named_captures: {
 			title: "Named Captures"
 			description: #"""
 				Regular expressions support named capture groups, allowing extractions to be associated with keys.
-				Named captures should be preceded with a `?P<name>` declaraction. This regex, for example...
+				Named captures should be preceded with a `?P<name>` declaration. This regex, for example...
 
 				```ruby
 				r'(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})'

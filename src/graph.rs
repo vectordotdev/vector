@@ -42,6 +42,19 @@ pub struct Opts {
         use_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
+
+    /// Read pipeline configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "pipeline-dir",
+        short = "P",
+        long,
+        env = "VECTOR_PIPELINE_DIR",
+        use_delimiter(true)
+    )]
+    pub pipeline_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
@@ -69,7 +82,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    let config = match config::load_from_paths(&paths) {
+    let config = match config::load_from_paths(&paths, &opts.pipeline_dirs) {
         Ok(config) => config,
         Err(errs) => {
             for err in errs {
@@ -81,23 +94,23 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let mut dot = String::from("digraph {\n");
 
-    for (name, _source) in &config.sources {
-        dot += &format!("  \"{}\" [shape=trapezium]\n", name);
+    for (id, _source) in &config.sources {
+        dot += &format!("  \"{}\" [shape=trapezium]\n", id);
     }
 
-    for (name, transform) in &config.transforms {
-        dot += &format!("  \"{}\" [shape=diamond]\n", name);
+    for (id, transform) in &config.transforms {
+        dot += &format!("  \"{}\" [shape=diamond]\n", id);
 
         for input in transform.inputs.iter() {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, name);
+            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
         }
     }
 
-    for (name, sink) in &config.sinks {
-        dot += &format!("  \"{}\" [shape=invtrapezium]\n", name);
+    for (id, sink) in &config.sinks {
+        dot += &format!("  \"{}\" [shape=invtrapezium]\n", id);
 
         for input in &sink.inputs {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, name);
+            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
         }
     }
 

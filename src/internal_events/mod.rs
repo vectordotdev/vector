@@ -25,9 +25,11 @@ pub(crate) mod aws_s3;
 mod aws_sqs;
 #[cfg(feature = "sinks-azure_blob")]
 pub(crate) mod azure_blob;
+mod batch;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
+mod common;
 #[cfg(feature = "transforms-concat")]
 mod concat;
 mod conditions;
@@ -37,6 +39,8 @@ mod console;
 mod datadog_events;
 #[cfg(feature = "sinks-datadog")]
 mod datadog_logs;
+#[cfg(any(feature = "codecs"))]
+mod decoder;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-dnstap")]
@@ -79,6 +83,8 @@ mod log_to_metric;
 #[cfg(feature = "transforms-logfmt_parser")]
 mod logfmt_parser;
 mod logplex;
+#[cfg(feature = "sinks-loki")]
+mod loki;
 #[cfg(feature = "transforms-lua")]
 mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
@@ -128,12 +134,9 @@ mod tcp;
 mod template;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
-mod topology;
 mod udp;
 mod unix;
 mod vector;
-#[cfg(feature = "wasm")]
-mod wasm;
 
 pub mod kubernetes;
 
@@ -158,9 +161,11 @@ pub use self::aws_kinesis_firehose::*;
 pub use self::aws_kinesis_streams::*;
 #[cfg(feature = "sinks-aws_sqs")]
 pub use self::aws_sqs::*;
+pub use self::batch::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
+pub use self::common::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
 pub use self::conditions::*;
@@ -170,6 +175,8 @@ pub use self::console::*;
 pub use self::datadog_events::*;
 #[cfg(feature = "sinks-datadog")]
 pub use self::datadog_logs::*;
+#[cfg(any(feature = "codecs"))]
+pub use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-dnstap")]
@@ -201,7 +208,12 @@ pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-#[cfg(any(feature = "sources-utils-http", feature = "sinks-http"))]
+#[cfg(any(
+    feature = "sources-utils-http",
+    feature = "sources-utils-http-encoding",
+    feature = "sinks-http",
+    feature = "sources-datadog"
+))]
 pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
@@ -218,6 +230,8 @@ pub(crate) use self::log_to_metric::*;
 #[cfg(feature = "transforms-logfmt_parser")]
 pub use self::logfmt_parser::*;
 pub use self::logplex::*;
+#[cfg(feature = "sinks-loki")]
+pub(crate) use self::loki::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
@@ -265,31 +279,18 @@ pub use self::tcp::*;
 pub use self::template::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
-pub use self::topology::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
-#[cfg(feature = "wasm")]
-pub use self::wasm::*;
 #[cfg(windows)]
 pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
-pub trait InternalEvent {
-    fn emit_logs(&self) {}
-    fn emit_metrics(&self) {}
-}
-
-pub fn emit(event: impl InternalEvent) {
-    event.emit_logs();
-    event.emit_metrics();
-}
-
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        $crate::internal_events::emit($event);
+        vector_core::internal_event::emit($event)
     };
 }
 

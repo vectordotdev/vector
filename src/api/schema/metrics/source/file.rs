@@ -18,6 +18,7 @@ pub struct FileSourceMetricFile<'a> {
 
 impl<'a> FileSourceMetricFile<'a> {
     /// Returns a new FileSourceMetricFile from a (name, Vec<&Metric>) tuple
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     fn from_tuple((name, metrics): (String, Vec<&'a Metric>)) -> Self {
         Self { name, metrics }
     }
@@ -47,6 +48,11 @@ impl<'a> FileSourceMetricFile<'a> {
     /// Metric indicating incoming events for the current file
     async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
         self.metrics.events_in_total()
+    }
+
+    /// Metric indicating received events for the current file
+    async fn received_events_total(&self) -> Option<metrics::ReceivedEventsTotal> {
+        self.metrics.received_events_total()
     }
 
     /// Metric indicating outgoing events for the current file
@@ -82,6 +88,7 @@ pub enum FileSourceMetricFilesSortFieldName {
     Name,
     ProcessedBytesTotal,
     ProcessedEventsTotal,
+    ReceivedEventsTotal,
     EventsInTotal,
     EventsOutTotal,
 }
@@ -110,6 +117,17 @@ impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMet
                 &rhs.metrics
                     .processed_events_total()
                     .map(|m| m.get_processed_events_total() as i64)
+                    .unwrap_or(0),
+            ),
+            FileSourceMetricFilesSortFieldName::ReceivedEventsTotal => Ord::cmp(
+                &self
+                    .metrics
+                    .received_events_total()
+                    .map(|m| m.get_received_events_total() as i64)
+                    .unwrap_or(0),
+                &rhs.metrics
+                    .received_events_total()
+                    .map(|m| m.get_received_events_total() as i64)
                     .unwrap_or(0),
             ),
             FileSourceMetricFilesSortFieldName::EventsInTotal => Ord::cmp(
@@ -170,7 +188,7 @@ impl FileSourceMetrics {
         filter: Option<FileSourceMetricsFilesFilter>,
         sort: Option<Vec<sort::SortField<FileSourceMetricFilesSortFieldName>>>,
     ) -> relay::ConnectionResult<FileSourceMetricFile<'_>> {
-        let filter = filter.unwrap_or_else(FileSourceMetricsFilesFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut files = filter_items(self.get_files().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {
@@ -198,6 +216,11 @@ impl FileSourceMetrics {
     /// Total incoming events for the current file source
     pub async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
         self.0.events_in_total()
+    }
+
+    /// Total received events for the current file source
+    pub async fn received_events_total(&self) -> Option<metrics::ReceivedEventsTotal> {
+        self.0.received_events_total()
     }
 
     /// Total outgoing events for the current file source

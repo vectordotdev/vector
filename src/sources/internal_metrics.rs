@@ -17,6 +17,22 @@ pub struct InternalMetricsConfig {
     #[derivative(Default(value = "2"))]
     scrape_interval_secs: u64,
     tags: TagsConfig,
+    namespace: Option<String>,
+}
+
+impl InternalMetricsConfig {
+    /// Override the default namespace.
+    pub fn namespace<T: Into<String>>(namespace: T) -> Self {
+        Self {
+            namespace: Some(namespace.into()),
+            ..Self::default()
+        }
+    }
+
+    /// Set the interval to collect internal metrics.
+    pub fn scrape_interval_secs(&mut self, value: u64) {
+        self.scrape_interval_secs = value;
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -43,6 +59,7 @@ impl SourceConfig for InternalMetricsConfig {
             );
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
+        let namespace = self.namespace.clone();
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None
@@ -56,6 +73,7 @@ impl SourceConfig for InternalMetricsConfig {
                 .as_deref()
                 .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
         Ok(Box::pin(run(
+            namespace,
             host_key,
             pid_key,
             get_controller()?,
@@ -75,6 +93,7 @@ impl SourceConfig for InternalMetricsConfig {
 }
 
 async fn run(
+    namespace: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
@@ -93,6 +112,12 @@ async fn run(
         let metrics = capture_metrics(controller);
 
         out.send_all(&mut stream::iter(metrics).map(|mut metric| {
+            // A metric starts out with a default "vector" namespace, but will be overridden
+            // if an explicit namespace is provided to this source.
+            if namespace.is_some() {
+                metric = metric.with_namespace(namespace.as_ref());
+            }
+
             if let Some(host_key) = host_key {
                 if let Ok(hostname) = &hostname {
                     metric.insert_tag(host_key.to_owned(), hostname.to_owned());
@@ -111,14 +136,21 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
-    use crate::event::metric::{Metric, MetricValue};
-    use crate::metrics::{capture_metrics, get_controller};
+    use super::*;
+    use crate::{
+        event::{
+            metric::{Metric, MetricValue},
+            Event,
+        },
+        metrics::{capture_metrics, get_controller},
+        Pipeline,
+    };
     use metrics::{counter, gauge, histogram};
     use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::InternalMetricsConfig>();
+        crate::test_util::test_generate_config::<InternalMetricsConfig>();
     }
 
     #[test]
@@ -187,5 +219,46 @@ mod tests {
         let mut labels = BTreeMap::new();
         labels.insert(String::from("host"), String::from("foo"));
         assert_eq!(Some(&labels), output["quux"].tags());
+    }
+
+    async fn event_from_config(config: InternalMetricsConfig) -> Event {
+        let _ = crate::metrics::init();
+
+        let (sender, mut recv) = Pipeline::new_test();
+
+        tokio::spawn(async move {
+            config
+                .build(SourceContext::new_test(sender))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+        });
+
+        time::timeout(time::Duration::from_millis(100), recv.next())
+            .await
+            .expect("fetch metrics timeout")
+            .expect("failed to get metrics from a stream")
+    }
+
+    #[tokio::test]
+    async fn default_namespace() {
+        let event = event_from_config(InternalMetricsConfig::default()).await;
+
+        assert_eq!(event.as_metric().namespace(), Some("vector"));
+    }
+
+    #[tokio::test]
+    async fn namespace() {
+        let namespace = "totally_custom";
+
+        let config = InternalMetricsConfig {
+            namespace: Some(namespace.to_owned()),
+            ..InternalMetricsConfig::default()
+        };
+
+        let event = event_from_config(config).await;
+
+        assert_eq!(event.as_metric().namespace(), Some(namespace));
     }
 }

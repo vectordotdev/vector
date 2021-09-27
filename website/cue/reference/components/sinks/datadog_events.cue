@@ -20,9 +20,9 @@ components: sinks: datadog_events: {
 			encoding: enabled:    false
 			proxy: enabled:       true
 			request: {
-				enabled:                    true
-				adaptive_concurrency:       true
-				headers:                    false
+				enabled:              true
+				adaptive_concurrency: true
+				headers:              false
 			}
 			tls: {
 				enabled:                true
@@ -68,5 +68,12 @@ components: sinks: datadog_events: {
 	input: {
 		logs:    true
 		metrics: null
+	}
+
+	telemetry: metrics: {
+		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 	}
 }

@@ -28,8 +28,8 @@ components: sinks: influxdb_metrics: {
 				codec: enabled: false
 			}
 			request: {
-				enabled:                    true
-				headers:                    false
+				enabled: true
+				headers: false
 			}
 			tls: sinks._influxdb.features.send.tls
 			to:  sinks._influxdb.features.send.to

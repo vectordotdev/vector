@@ -26,14 +26,13 @@ components: sinks: redis: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
 					enum: ["json", "text"]
 				}
 			}
 			request: {
-				enabled:                    true
-				concurrency:                1
-				headers:                    false
+				enabled:     true
+				concurrency: 1
+				headers:     false
 			}
 			tls: {
 				enabled:                true

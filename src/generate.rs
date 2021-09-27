@@ -180,7 +180,7 @@ fn generate_example(
             } else {
                 vec![transform_names
                     .get(i - 1)
-                    .unwrap_or(&"component-name".to_owned())
+                    .unwrap_or(&"component-id".to_owned())
                     .to_owned()]
             };
 
@@ -263,7 +263,7 @@ fn generate_example(
                                 None
                             }
                         })
-                        .unwrap_or_else(|| vec!["component-name".to_owned()]),
+                        .unwrap_or_else(|| vec!["component-id".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
                     healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
@@ -531,7 +531,7 @@ mod tests {
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sinks.sink0]
-                inputs = ["component-name"]
+                inputs = ["component-id"]
                 target = "stdout"
                 type = "console"
 

@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{Event, Value},
@@ -87,7 +88,7 @@ impl MetricConfig {
     }
 }
 
-fn default_increment_by_value() -> bool {
+const fn default_increment_by_value() -> bool {
     false
 }
 
@@ -118,7 +119,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
@@ -136,7 +137,7 @@ impl TransformConfig for LogToMetricConfig {
 }
 
 impl LogToMetric {
-    pub fn new(config: LogToMetricConfig) -> Self {
+    pub const fn new(config: LogToMetricConfig) -> Self {
         LogToMetric { config }
     }
 }
@@ -177,7 +178,7 @@ fn render_tags(
                         map.insert(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(TemplateRenderingFailed {
+                        emit!(&TemplateRenderingFailed {
                             error,
                             drop_event: false,
                             field: Some(name.as_str()),
@@ -374,27 +375,27 @@ impl FunctionTransform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNull { field }) => emit!(LogToMetricFieldNull {
+                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNull {
                     field: field.as_ref()
                 }),
-                Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
+                Err(TransformError::FieldNotFound { field }) => emit!(&LogToMetricFieldNotFound {
                     field: field.as_ref()
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError {
+                    emit!(&LogToMetricParseFloatError {
                         field: field.as_ref(),
                         error
                     })
                 }
                 Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         drop_event: false,
                         field: None,
                     })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
-                    emit!(LogToMetricTemplateParseError { error })
+                    emit!(&LogToMetricTemplateParseError { error })
                 }
             }
         }

@@ -227,15 +227,15 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
                 .inspect_err(|reason| {
                     match reason.downcast_ref::<HttpError>() {
                         Some(HttpError::UnexpectedStatusCode { received, .. }) => {
-                            emit!(AzureBlobErrorResponse { code: *received })
+                            emit!(&AzureBlobErrorResponse { code: *received })
                         }
-                        _ => emit!(AzureBlobHttpError {
+                        _ => emit!(&AzureBlobHttpError {
                             error: reason.to_string()
                         }),
                     };
                 })
                 .inspect_ok(|result| {
-                    emit!(AzureBlobEventSent {
+                    emit!(&AzureBlobEventSent {
                         request_id: result.request_id,
                         byte_size
                     })
@@ -247,7 +247,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
 }
 
 impl Compression {
-    pub fn content_type(&self) -> &'static str {
+    pub const fn content_type(&self) -> &'static str {
         match self {
             Self::None => "text/plain",
             Self::Gzip(_) => "application/gzip",
@@ -279,7 +279,7 @@ fn encode_event(
     let key = blob_prefix
         .render_string(&event)
         .map_err(|error| {
-            emit!(TemplateRenderingFailed {
+            emit!(&TemplateRenderingFailed {
                 error,
                 field: Some("blob_prefix"),
                 drop_event: true,

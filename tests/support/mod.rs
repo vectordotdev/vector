@@ -30,8 +30,8 @@ use tracing::{error, info};
 use vector::{
     buffers::Acker,
     config::{
-        DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
-        TransformConfig,
+        DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
+        TransformContext,
     },
     event::{
         metric::{self, MetricData, MetricValue},
@@ -257,7 +257,7 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform, vector::Error> {
+    async fn build(&self, _globals: &TransformContext) -> Result<Transform, vector::Error> {
         Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -354,7 +354,7 @@ where
     S: Sink<Event> + Send + std::marker::Unpin,
     <S as Sink<Event>>::Error: std::fmt::Display,
 {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             if let Err(error) = self.sink.send(event).await {
                 error!(message = "Ingesting an event failed at mock sink.", %error);

@@ -172,7 +172,7 @@ impl FileSink {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("path"),
                     drop_event: true,
@@ -213,7 +213,7 @@ impl FileSink {
                                 }
                             }
 
-                            emit!(FileOpen {
+                            emit!(&FileOpen {
                                 count: 0
                             });
 
@@ -233,7 +233,7 @@ impl FileSink {
                                 error!(message = "Failed to close file.", path = ?path, %error);
                             }
                             drop(expired_file); // ignore close error
-                            emit!(FileOpen {
+                            emit!(&FileOpen {
                                 count: self.files.len()
                             });
                         }
@@ -283,7 +283,7 @@ impl FileSink {
             let outfile = OutFile::new(file, self.compression);
 
             self.files.insert_at(path.clone(), outfile, next_deadline);
-            emit!(FileOpen {
+            emit!(&FileOpen {
                 count: self.files.len()
             });
             self.files.get_mut(&path).unwrap()
@@ -336,8 +336,10 @@ async fn write_event_to_file(
 
 #[async_trait]
 impl StreamSink for FileSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        FileSink::run(self, input).await.expect("file sink error");
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        FileSink::run(&mut self, input)
+            .await
+            .expect("file sink error");
         Ok(())
     }
 }

@@ -138,7 +138,7 @@ configuration:
    index). However, the configuration may be reloaded while the event is
    buffered in such a way that the source name provided in the
    configuration may change, or a different component may be substituted
-   for the same identifier. As such, the configured component name is
+   for the same identifier. As such, the configured component id is
    not sufficient to uniquely identify the source. Further, Vector may
    be stopped while the event is buffered and then restarted with an
    identical configuration. At this point, the old source will be

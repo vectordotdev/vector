@@ -201,51 +201,55 @@ impl LookupBuf {
     }
 }
 
-#[inherent(pub)]
+#[inherent]
 impl Look<'static> for LookupBuf {
     type Segment = SegmentBuf;
 
     /// Get from the internal list of segments.
-    fn get(&mut self, index: usize) -> Option<&SegmentBuf> {
+    pub fn get(&mut self, index: usize) -> Option<&SegmentBuf> {
         self.segments.get(index)
     }
 
     /// Push onto the internal list of segments.
-    fn push_back(&mut self, segment: impl Into<SegmentBuf>) {
+    pub fn push_back(&mut self, segment: impl Into<SegmentBuf>) {
         self.segments.push_back(segment.into());
     }
 
-    fn pop_back(&mut self) -> Option<SegmentBuf> {
+    pub fn pop_back(&mut self) -> Option<SegmentBuf> {
         self.segments.pop_back()
     }
 
-    fn push_front(&mut self, segment: impl Into<SegmentBuf>) {
+    pub fn push_front(&mut self, segment: impl Into<SegmentBuf>) {
         self.segments.push_front(segment.into())
     }
 
-    fn pop_front(&mut self) -> Option<SegmentBuf> {
+    pub fn pop_front(&mut self) -> Option<SegmentBuf> {
         self.segments.pop_front()
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.segments.len()
     }
 
-    fn is_root(&self) -> bool {
+    pub fn is_root(&self) -> bool {
         self.is_empty()
     }
 
-    fn from_str(value: &'static str) -> Result<LookupBuf, LookupError> {
+    #[allow(clippy::should_implement_trait)]
+    // This is also defined as `FromStr` on `LookupBuf` but we need `from_str` to be defined on the
+    // `Lookup` trait itself since we cannot define `FromStr` for `LookupView` due to the lifetime
+    // constraint
+    pub fn from_str(value: &'static str) -> Result<LookupBuf, LookupError> {
         Lookup::from_str(value).map(|l| l.into_buf())
     }
 
     /// Merge a lookup.
-    fn extend(&mut self, other: Self) {
+    pub fn extend(&mut self, other: Self) {
         self.segments.extend(other.segments)
     }
 
     /// Returns `true` if `needle` is a prefix of the lookup.
-    fn starts_with(&self, needle: &LookupBuf) -> bool {
+    pub fn starts_with(&self, needle: &LookupBuf) -> bool {
         needle.iter().zip(&self.segments).all(|(n, s)| n == s)
     }
 }

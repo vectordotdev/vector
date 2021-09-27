@@ -1,6 +1,5 @@
 #[cfg(feature = "sources-aws_s3")]
 pub mod source {
-    use crate::internal_events::InternalEvent;
     use crate::sources::aws_s3::sqs::ProcessingError;
     use metrics::counter;
     use rusoto_core::RusotoError;
@@ -8,21 +7,23 @@ pub mod source {
         BatchResultErrorEntry, DeleteMessageBatchError, DeleteMessageBatchRequestEntry,
         DeleteMessageBatchResultEntry, ReceiveMessageError,
     };
+    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub(crate) struct SqsS3EventReceived {
+    pub struct SqsS3EventReceived {
         pub byte_size: usize,
     }
 
     impl InternalEvent for SqsS3EventReceived {
         fn emit_metrics(&self) {
+            counter!("component_received_events_total", 1);
             counter!("events_in_total", 1);
             counter!("processed_bytes_total", self.byte_size as u64);
         }
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsMessageReceiveFailed<'a> {
+    pub struct SqsMessageReceiveFailed<'a> {
         pub error: &'a RusotoError<ReceiveMessageError>,
     }
 
@@ -37,7 +38,7 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsMessageReceiveSucceeded {
+    pub struct SqsMessageReceiveSucceeded {
         pub count: usize,
     }
 
@@ -53,7 +54,7 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsMessageProcessingSucceeded<'a> {
+    pub struct SqsMessageProcessingSucceeded<'a> {
         pub message_id: &'a str,
     }
 
@@ -68,7 +69,7 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsMessageProcessingFailed<'a> {
+    pub struct SqsMessageProcessingFailed<'a> {
         pub message_id: &'a str,
         pub error: &'a ProcessingError,
     }
@@ -84,7 +85,7 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsMessageDeleteSucceeded {
+    pub struct SqsMessageDeleteSucceeded {
         pub message_ids: Vec<DeleteMessageBatchResultEntry>,
     }
 
@@ -106,7 +107,7 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsMessageDeletePartialFailure {
+    pub struct SqsMessageDeletePartialFailure {
         pub entries: Vec<BatchResultErrorEntry>,
     }
 
@@ -125,7 +126,7 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsMessageDeleteBatchFailed {
+    pub struct SqsMessageDeleteBatchFailed {
         pub entries: Vec<DeleteMessageBatchRequestEntry>,
         pub error: RusotoError<DeleteMessageBatchError>,
     }
@@ -147,7 +148,7 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsS3EventRecordInvalidEventIgnored<'a> {
+    pub struct SqsS3EventRecordInvalidEventIgnored<'a> {
         pub bucket: &'a str,
         pub key: &'a str,
         pub kind: &'a str,
@@ -170,7 +171,7 @@ pub mod source {
 pub mod sink {
     use metrics::counter;
 
-    use crate::internal_events::InternalEvent;
+    use vector_core::internal_event::InternalEvent;
 
     pub struct S3EventsSent {
         pub byte_size: usize,

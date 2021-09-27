@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
+use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
 use shared::btreemap;
@@ -27,6 +27,7 @@ criterion_group!(
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
+              find,
               flatten,
               floor,
               format_int,
@@ -110,6 +111,7 @@ criterion_group!(
               to_timestamp,
               to_unix_timestamp,
               truncate,
+              unique,
               // TODO: Cannot pass a Path to bench_function
               //unnest
               // TODO: value is dynamic so we cannot assert equality
@@ -338,6 +340,25 @@ bench_function! {
 }
 
 bench_function! {
+    find => vrl_stdlib::Find;
+
+    str_matching {
+        args: func_args![value: "foobarfoo", pattern: "bar"],
+        want: Ok(value!(3)),
+    }
+
+    str_too_long {
+        args: func_args![value: "foo", pattern: "foobar"],
+        want: Ok(value!(-1)),
+    }
+
+    regex_matching_start {
+        args: func_args![value: "foobar", pattern: Value::Regex(Regex::new("fo+z?").unwrap().into())],
+        want: Ok(value!(0)),
+    }
+}
+
+bench_function! {
     flatten => vrl_stdlib::Flatten;
 
     nested_map {
@@ -446,7 +467,7 @@ bench_function! {
 
     valid {
         args: func_args![value: "1.2.3.4"],
-        want: Ok(value!(67305985)),
+        want: Ok(value!(16909060)),
     }
 }
 
@@ -468,7 +489,7 @@ bench_function! {
     ip_ntoa => vrl_stdlib::IpNtoa;
 
     valid {
-        args: func_args![value: 67305985],
+        args: func_args![value: 16909060],
         want: Ok(value!("1.2.3.4")),
     }
 }
@@ -1394,7 +1415,7 @@ bench_function! {
         want: Ok(value!({
             "severity": "info",
             "facility": "local7",
-            "timestamp": (Local.ymd(2020, 12, 28).and_hms_milli(16, 49, 7, 0).with_timezone(&Utc)),
+            "timestamp": (Utc.ymd(2020, 12, 28).and_hms_milli(16, 49, 7, 0)),
             "hostname": "plertrood-thinkpad-x220",
             "appname": "nginx",
             "message": r#"127.0.0.1 - - [28/Dec/2019:16:49:07 +0000] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:71.0) Gecko/20100101 Firefox/71.0""#,
@@ -2078,6 +2099,24 @@ bench_function! {
             ellipsis: false,
         ],
         want: Ok("Super"),
+    }
+}
+
+bench_function! {
+    unique => vrl_stdlib::Unique;
+
+    default {
+        args: func_args![
+            value: value!(["bar", "foo", "baz", "foo"]),
+        ],
+        want: Ok(value!(["bar", "foo", "baz"])),
+    }
+
+    mixed_values {
+        args: func_args![
+            value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
+        ],
+        want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
     }
 }
 

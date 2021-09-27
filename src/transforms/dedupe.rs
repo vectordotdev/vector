@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, Value},
     internal_events::DedupeEventDiscarded,
@@ -36,7 +37,7 @@ pub struct DedupeConfig {
     pub cache: CacheConfig,
 }
 
-fn default_cache_config() -> CacheConfig {
+const fn default_cache_config() -> CacheConfig {
     CacheConfig { num_events: 5000 }
 }
 
@@ -79,7 +80,7 @@ impl GenerateConfig for DedupeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::task(Dedupe::new(self.clone())))
     }
 
@@ -128,7 +129,7 @@ enum CacheEntry {
 }
 
 /// Assigns a unique number to each of the types supported by Event::Value.
-fn type_id_for_value(val: &Value) -> TypeId {
+const fn type_id_for_value(val: &Value) -> TypeId {
     match val {
         Value::Bytes(_) => 0,
         Value::Timestamp(_) => 1,
@@ -154,7 +155,7 @@ impl Dedupe {
     fn transform_one(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
-            emit!(DedupeEventDiscarded { event });
+            emit!(&DedupeEventDiscarded { event });
             None
         } else {
             Some(event)

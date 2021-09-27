@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 /// A wrapper for `http::Uri` that implements the serde traits.
 /// Authorization credentials, if exist, will be removed from the URI and stored in `auth`.
-/// For example: "http://user:password@example.com".
+/// For example: `http://user:password@example.com`.
 #[derive(Default, Debug, Clone)]
 pub struct UriSerde {
     pub uri: Uri,

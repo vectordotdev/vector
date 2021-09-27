@@ -1,6 +1,7 @@
 subscription ComponentProcessedEventsTotalsSubscription($interval: Int!) {
     componentProcessedEventsTotals(interval: $interval) {
-        name
+        pipelineId
+        componentId
         metric {
             processedEventsTotal
         }

@@ -8,6 +8,10 @@
 {{ $postCssOpts  := dict "inlineImports" true }}
 {{ $ctx := . }}
 
+{{/* Algolia search widget theme (classic) */}}
+{{ $theme := site.Params.search.algolia_autocomplete_theme }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@algolia/autocomplete-theme-{{ $theme }}" />
+
 {{ range $cssInputs }}
 {{ $opts := merge $cssOpts (dict "targetPath" .output) }}
 
@@ -32,7 +36,3 @@
 {{ end }}
 {{ end }}
 {{ end }}
-
-{{/* Algolia search widget theme (classic) */}}
-{{ $theme := site.Params.search.algolia_autocomplete_theme }}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@algolia/autocomplete-theme-{{ $theme }}" />

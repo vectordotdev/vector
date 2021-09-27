@@ -1,16 +1,16 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)] // some features only use some variants
-pub(crate) enum SocketMode {
+pub enum SocketMode {
     Tcp,
     Udp,
     Unix,
 }
 
 impl SocketMode {
-    fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::Tcp => "tcp",
             Self::Udp => "udp",
@@ -20,24 +20,31 @@ impl SocketMode {
 }
 
 #[derive(Debug)]
-pub(crate) struct SocketEventReceived {
+pub struct SocketEventsReceived {
     pub mode: SocketMode,
     pub byte_size: usize,
+    pub count: usize,
 }
 
-impl InternalEvent for SocketEventReceived {
+impl InternalEvent for SocketEventsReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.", byte_size = %self.byte_size, mode = self.mode.as_str());
+        trace!(
+            message = "Received events.",
+            count = self.count,
+            byte_size = self.byte_size,
+            mode = self.mode.as_str()
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!("component_received_events_total", 1, "mode" => self.mode.as_str());
         counter!("events_in_total", 1, "mode" => self.mode.as_str());
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct SocketEventsSent {
+pub struct SocketEventsSent {
     pub mode: SocketMode,
     pub count: u64,
     pub byte_size: usize,
@@ -53,13 +60,15 @@ impl InternalEvent for SocketEventsSent {
     }
 }
 
+#[cfg(feature = "codecs")]
 #[derive(Debug)]
-pub(crate) struct SocketReceiveError {
+pub struct SocketReceiveError<'a> {
     pub mode: SocketMode,
-    pub error: std::io::Error,
+    pub error: &'a crate::codecs::Error,
 }
 
-impl InternalEvent for SocketReceiveError {
+#[cfg(feature = "codecs")]
+impl<'a> InternalEvent for SocketReceiveError<'a> {
     fn emit_logs(&self) {
         error!(message = "Error receiving data.", error = ?self.error, mode = %self.mode.as_str());
     }

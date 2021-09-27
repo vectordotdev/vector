@@ -15,7 +15,7 @@ releases: "0.9.0": {
 		},
 		{
 			title:       "Dynamic HTTP Rate-Limiting (AIMD)"
-			description: "Fiddling with rate-limits is a frustratin endaevor. If you set them too high you risk overwhelming the service; too low and you're unecessarily limiting throughput. And what happens if you deploy a few more Vector instances? Vector is planning to solve this by automatically detecting the optimal rate limits, taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC](\(urls.vector_pull_requests)/2329)."
+			description: "Fiddling with rate-limits is a frustrating endeavor. If you set them too high you risk overwhelming the service; too low and you're unnecessarily limiting throughput. And what happens if you deploy a few more Vector instances? Vector is planning to solve this by automatically detecting the optimal rate limits, taking inspiration from TCP congestion control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC](\(urls.vector_pull_requests)/2329)."
 		},
 		{
 			title:       "Vector Observability"

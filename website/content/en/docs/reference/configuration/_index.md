@@ -13,6 +13,7 @@ The following is an example of a popular Vector configuration that ingests logs 
 
 {{< tabs default="vector.toml" >}}
 {{< tab title="vector.toml" >}}
+
 ```toml
 # Set global options
 data_dir = "/var/lib/vector"
@@ -61,8 +62,10 @@ compression  = "gzip"                        # compress final objects
 encoding     = "ndjson"                      # new line delimited JSON
 batch.max_size   = 10000000                  # 10mb uncompressed
 ```
+
 {{< /tab >}}
 {{< tab title="vector.yaml" >}}
+
 ```yaml
 data_dir: /var/lib/vector
 sources:
@@ -102,8 +105,10 @@ sinks:
     batch:
       max_size: 10000000
 ```
+
 {{< /tab >}}
 {{< tab title="vector.json" >}}
+
 ```json
 {
    "data_dir": "/var/lib/vector",
@@ -158,6 +163,7 @@ sinks:
    }
 }
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -165,19 +171,25 @@ To use this configuration file, specify it with the `--config` flag when startin
 
 {{< tabs default="TOML" >}}
 {{< tab title="TOML" >}}
+
 ```shell
 vector --config /etc/vector/vector.toml
 ```
+
 {{< /tab >}}
 {{< tab title="YAML" >}}
+
 ```shell
 vector --config /etc/vector/vector.yaml
 ```
+
 {{< /tab >}}
 {{< tab title="JSON" >}}
+
 ```shell
 vector --config /etc/vector/vector.json
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -205,7 +217,7 @@ Vector interpolates environment variables within your configuration file with th
 type = "add_fields"
 
 [transforms.add_host.fields]
-host = "${HOSTNAME}"
+host = "${HOSTNAME}" # or "$HOSTNAME"
 environment = "${ENV:-development}" # default value when not present
 ```
 
@@ -219,7 +231,7 @@ option = "${ENV_VAR:-default}"
 
 #### Escaping
 
-You can escape environment variables by prefacing them with a `$` character. For example `$${HOSTNAME}` is treated literally in the above environment variable example.
+You can escape environment variables by prefacing them with a `$` character. For example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above environment variable example.
 
 ### Formats
 
@@ -243,9 +255,9 @@ Or using a [globbing syntax][glob]:
 vector --config /etc/vector/*.toml
 ```
 
-#### Wilcards in component names
+#### Wilcards in component IDs
 
-Vector supports wildcards (`*`) in component names when building your topology, but only supports them as the last character. For example:
+Vector supports wildcards (`*`) in component IDs when building your topology. For example:
 
 ```toml
 [sources.app1_logs]

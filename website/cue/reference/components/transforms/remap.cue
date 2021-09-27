@@ -48,8 +48,11 @@ components: transforms: "remap": {
 		source: {
 			description: """
 				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
+
+				Required if `file` is missing.
 				"""
-			required:    true
+			common:      true
+			required:    false
 			type: string: {
 				examples: [
 					"""
@@ -60,7 +63,26 @@ components: transforms: "remap": {
 						.new_name = del(.old_name)
 						""",
 				]
-				syntax: "remap_program"
+				syntax:  "remap_program"
+				default: null
+			}
+		}
+		file: {
+			description: """
+				File path to the [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
+
+				If a relative path is provided, its root is the current working directory.
+
+				Required if `source` is missing.
+				"""
+			common:      true
+			required:    false
+			type: string: {
+				examples: [
+					"./my/program.vrl",
+				]
+				syntax:  "literal"
+				default: null
 			}
 		}
 		drop_on_error: {
@@ -119,6 +141,22 @@ components: transforms: "remap": {
 				Learn more about Vector's Remap Language in the
 				[Vector Remap Language reference](\#(urls.vrl_reference)).
 				"""#
+		}
+		event_data_model: {
+			title: "Event Data Model"
+			body:  """
+				You can use the `remap` transform with both log and metric events.
+
+				Log events in the `remap` transform correspond directly to Vector's [log schema](\(urls.vector_log)),
+				which means that the transform has access to the whole event.
+
+				With metric events the remap transform has:
+
+				* read-only access to the event's`.type`
+				* read/write access to `kind`, but it can only be set to one of `incremental` or `absolute` and cannot be deleted
+				* read/write access to `name`, but it cannot be deleted
+				* read/write/delete access to `namespace`, `timestamp`, and keys in `tags`
+				"""
 		}
 		lazy_event_mutation: {
 			title: "Lazy Event Mutation"

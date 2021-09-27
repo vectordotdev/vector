@@ -33,14 +33,13 @@ components: sinks: aws_kinesis_streams: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
 					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				headers:                    false
+				enabled: true
+				headers: false
 			}
 			tls: enabled: false
 			to: {

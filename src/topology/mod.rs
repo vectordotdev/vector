@@ -16,7 +16,7 @@ mod test;
 
 use crate::{
     buffers::{self, EventStream},
-    config::{Config, ConfigDiff},
+    config::{ComponentKey, Config, ConfigDiff},
     event::Event,
     topology::{
         builder::Pieces,
@@ -41,7 +41,7 @@ type BuiltBuffer = (
     buffers::Acker,
 );
 
-type Outputs = HashMap<String, fanout::ControlChannel>;
+type Outputs = HashMap<ComponentKey, fanout::ControlChannel>;
 
 // Watcher types for topology changes. These are currently specific to receiving
 // `Outputs`. This could be expanded in the future to send an enum of types if,
@@ -73,7 +73,7 @@ pub async fn start_validated(
 pub async fn build_or_log_errors(
     config: &Config,
     diff: &ConfigDiff,
-    buffers: HashMap<String, BuiltBuffer>,
+    buffers: HashMap<ComponentKey, BuiltBuffer>,
 ) -> Option<Pieces> {
     match builder::build_pieces(config, diff, buffers).await {
         Err(errors) => {
@@ -86,15 +86,10 @@ pub async fn build_or_log_errors(
     }
 }
 
-pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String, Task)> {
+pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(ComponentKey, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
-        .filter_map(|name| {
-            pieces
-                .healthchecks
-                .remove(&name)
-                .map(move |task| (name, task))
-        })
+        .filter_map(|id| pieces.healthchecks.remove(&id).map(move |task| (id, task)))
         .collect()
 }
 

@@ -1,28 +1,30 @@
+use super::StatsdParser;
 use crate::{
-    event::Event, shutdown::ShutdownSignal, sources::util::build_unix_stream_source,
-    sources::Source, Pipeline,
+    codecs::{Decoder, NewlineDelimitedCodec},
+    shutdown::ShutdownSignal,
+    sources::util::build_unix_stream_source,
+    sources::Source,
+    Pipeline,
 };
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tokio_util::codec::LinesCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct UnixConfig {
     pub path: PathBuf,
 }
 
-fn build_event(_: &str, _: Option<Bytes>, line: &str) -> Option<Event> {
-    super::parse_event(line)
-}
-
 pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: Pipeline) -> Source {
+    let decoder = Decoder::new(
+        Box::new(NewlineDelimitedCodec::new()),
+        Box::new(StatsdParser),
+    );
+
     build_unix_stream_source(
         config.path,
-        LinesCodec::new(),
-        String::new(),
+        decoder,
+        |_events, _host, _byte_size| {},
         shutdown,
         out,
-        build_event,
     )
 }

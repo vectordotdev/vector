@@ -39,6 +39,8 @@ jobs:
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
+        cue: ${{ steps.filter.outputs.cue }}
+        markdown: ${{ steps.filter.outputs.cue }}
       steps:
       - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2
@@ -71,6 +73,8 @@ jobs:
               - 'scripts/cross/**'
             cue:
               - 'website/cue/**'
+            markdown:
+              - '**/**.md'
             internal_events:
               - 'src/internal_events/**'
             helm:
@@ -280,6 +284,32 @@ jobs:
       - name: Stop sccache
         run: sccache --stop-server
 
+  check-stdlib-features:
+    name: VRL Stdlib Features - Linux
+    continue-on-error: true
+    runs-on: [self-hosted, linux, x64, general]
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      # We always make sure to stop any previous sccache process before starting it fresh, that
+      # way we can be sure we're using the right credentials for storage, etc.
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --stop-server || true
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+      - run: cargo install cargo-hack
+      - run: make check-stdlib-features
+      - name: Stop sccache
+        run: sccache --stop-server
+
   check-component-features:
     name: Component Features - Linux
     runs-on: [self-hosted, linux, x64, general]
@@ -328,6 +358,8 @@ jobs:
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds
         run: make slim-builds
+      - name: Check style
+        run: make check-style
       - name: Check code format || needs.changes.outputs.source == 'true'
         if: needs.changes.outputs.source == 'true'
         run: make check-fmt
@@ -363,7 +395,12 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check licenses
-
+      - name: Check Cue docs
+        if: needs.changes.outputs.cue == 'true'
+        run: make check-docs
+      - name: Check Markdown
+        if: needs.changes.outputs.markdown == 'true'
+        run: make check-markdown
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'

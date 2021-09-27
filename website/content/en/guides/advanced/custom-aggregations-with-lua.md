@@ -80,7 +80,7 @@ Using the knowledge from the previous section, it is possible to write down the 
 [transforms.aggregator]
 type = "lua"
 version = "2"
-inputs = [] # add names of the input components here
+inputs = [] # add IDs of the input components here
 
 hooks.init = """
   function (emit)
@@ -182,7 +182,7 @@ all functions into the `source` section, resulting in the following component de
 [transforms.aggregator]
 type = "lua"
 version = "2"
-inputs = [] # add names of the input components here
+inputs = [] # add IDs of the input components here
 hooks.init = "init"
 hooks.process = "process"
 hooks.shutdown = "shutdown"
@@ -266,7 +266,7 @@ and
 [transforms.aggregator]
 type = "lua"
 version = "2"
-inputs = [] # add names of the input components here
+inputs = [] # add IDs of the input components here
 hooks.init = "init"
 hooks.process = "process"
 hooks.shutdown = "shutdown"

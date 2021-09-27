@@ -1,6 +1,6 @@
 use crate::transforms::TaskTransform;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
@@ -59,15 +59,15 @@ pub struct TagCardinalityLimit {
     accepted_tags: HashMap<String, TagValueSet>,
 }
 
-fn default_limit_exceeded_action() -> LimitExceededAction {
+const fn default_limit_exceeded_action() -> LimitExceededAction {
     LimitExceededAction::DropTag
 }
 
-fn default_value_limit() -> u32 {
+const fn default_value_limit() -> u32 {
     500
 }
 
-fn default_cache_size() -> usize {
+const fn default_cache_size() -> usize {
     5000 * 1024 // 5KB
 }
 
@@ -89,7 +89,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
     }
 
@@ -155,7 +155,7 @@ impl TagValueSet {
         }
     }
 
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.num_elements
     }
 
@@ -172,20 +172,21 @@ impl TagValueSet {
 }
 
 impl TagCardinalityLimit {
-    fn new(config: TagCardinalityLimitConfig) -> TagCardinalityLimit {
-        TagCardinalityLimit {
+    fn new(config: TagCardinalityLimitConfig) -> Self {
+        Self {
             config,
             accepted_tags: HashMap::new(),
         }
     }
 
-    /// Takes in key and a value corresponding to a tag on an incoming Metric Event.
-    /// If that value is already part of set of accepted values for that key, then simply returns
-    /// true.  If that value is not yet part of the accepted values for that key, checks whether
-    /// we have hit the value_limit for that key yet and if not adds the value to the set of
-    /// accepted values for the key and returns true, otherwise returns false.  A false return
-    /// value indicates to the caller that the value is not accepted for this key, and the
-    /// configured limit_exceeded_action should be taken.
+    /// Takes in key and a value corresponding to a tag on an incoming Metric
+    /// Event.  If that value is already part of set of accepted values for that
+    /// key, then simply returns true.  If that value is not yet part of the
+    /// accepted values for that key, checks whether we have hit the value_limit
+    /// for that key yet and if not adds the value to the set of accepted values
+    /// for the key and returns true, otherwise returns false.  A false return
+    /// value indicates to the caller that the value is not accepted for this
+    /// key, and the configured limit_exceeded_action should be taken.
     fn try_accept_tag(&mut self, key: &str, value: Cow<'_, String>) -> bool {
         if !self.accepted_tags.contains_key(key) {
             self.accepted_tags.insert(
@@ -206,7 +207,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value);
 
             if tag_value_set.len() == self.config.value_limit as usize {
-                emit!(TagCardinalityValueLimitReached { key });
+                emit!(&TagCardinalityValueLimitReached { key });
             }
 
             true
@@ -223,7 +224,7 @@ impl TagCardinalityLimit {
                 LimitExceededAction::DropEvent => {
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                            emit!(TagCardinalityLimitRejectingEvent {
+                            emit!(&TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
                                 tag_value: value,
                             });
@@ -235,7 +236,7 @@ impl TagCardinalityLimit {
                     let mut to_delete = Vec::new();
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                            emit!(TagCardinalityLimitRejectingTag {
+                            emit!(&TagCardinalityLimitRejectingTag {
                                 tag_key: key,
                                 tag_value: value,
                             });

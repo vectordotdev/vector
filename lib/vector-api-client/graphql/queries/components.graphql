@@ -3,7 +3,8 @@ query ComponentsQuery($first: Int!) {
         edges {
             node {
                 __typename
-                name
+                componentId
+                pipelineId
                 componentType
                 ... on Source {
                     metrics {
@@ -14,8 +15,8 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
                         eventsOutTotal {
                             eventsOutTotal
@@ -31,8 +32,8 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
                         eventsOutTotal {
                             eventsOutTotal
@@ -48,8 +49,8 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
                         eventsOutTotal {
                             eventsOutTotal

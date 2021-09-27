@@ -58,10 +58,10 @@ where
             max_size,
             when_full,
             data_dir,
-            name,
+            id,
             ..
         } => {
-            let buffer_dir = format!("{}_buffer", name);
+            let buffer_dir = format!("{}_buffer", id);
 
             let (tx, rx, acker) =
                 disk::open(&data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;

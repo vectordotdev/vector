@@ -71,7 +71,7 @@ where
 ///
 /// # Errors
 ///
-/// This function will fail with [`Error`] if the directory does not exist at
+/// This function will fail with [`DataDirError`] if the directory does not exist at
 /// `data_dir`, if permissions are not sufficient etc.
 pub fn open<'a, T>(
     data_dir: &Path,

@@ -5,14 +5,14 @@
     {{ partial "home/heading.html" (dict "title" $comm.title) }}
 
     {{/* Project stats */}}
-    <div class="mt-4 md:mt-6 inline-flex divide-x dark:divide-gray-600">
-      {{ range $comm.stats }}
-      <div class="flex flex-col px-6 lg:px-8 py-2">
-        <span class="text-3xl md:text-4xl lg:text-4.5xl font-light dark:text-gray-100">
-          {{ .figure }}
+    <div class="mt-4 md:mt-6 inline-flex divide-x dark:divide-gray-600 w-full lg:w-8/12 xl:w-6/12">
+      {{ range $index, $stat := $comm.stats }}
+      <div class="flex flex-col px-1 sm:px-6 lg:px-8 py-2 {{ if eq $index 0 }}pl-0{{ else if eq $index 3 }}pr-0{{ end }} max-w-1/4 flex-grow">
+        <span class="text-xl sm:text-3xl md:text-4xl lg:text-4.5xl font-light dark:text-gray-100">
+          {{ $stat.figure }}
         </span>
-        <span class="mt-2 text-sm md:text-base text-gray-400 tracking-tight leading-tight font-semibold">
-          {{ .title }}
+        <span class="mt-2 text-xs sm:text-sm md:text-base text-gray-400 tracking-tight leading-tight font-semibold">
+          {{ $stat.title }}
         </span>
       </div>
       {{ end }}
@@ -37,7 +37,7 @@
 </div>
 
 {{ define "community-button" }}
-<div class="flex items-center space-x-1.5 text-md lg:text-lg">
+<div class="prose flex items-center space-x-1.5 text-md lg:text-lg">
   <ion-icon name="logo-{{ .Params.icon }}" class="text-{{ .Params.color }}{{ with .Params.dark }} dark:text-{{ . }}{{ end }}"></ion-icon>
 
   <a href="{{ .URL }}" class="hover:underline text-gray-400 tracking-tight" target="_blank">

@@ -111,11 +111,7 @@ components: sources: fluent: {
 			title: "Dummy message from fluentd"
 			configuration: {}
 			input: """
-				```text
 				2021-05-20 16:23:03.021497000 -0400 dummy: {"message":"dummy"}
-				```
-
-				(this is the fluentd stdout encoding of the dummy message)
 				"""
 			output: log: {
 				host:      _values.remote_host
@@ -128,11 +124,7 @@ components: sources: fluent: {
 			title: "Dummy message from fluent-bit"
 			configuration: {}
 			input: """
-				```text
 				dummy.0: [1621541848.161827000, {"message"=>"dummy"}]
-				```
-
-				(this is the fluent-bit stdout encoding of the dummy message)
 				"""
 			output: log: {
 				host:      _values.remote_host
@@ -215,9 +207,10 @@ components: sources: fluent: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:        components.sources.internal_metrics.output.metrics.events_in_total
-		decode_errors_total:    components.sources.internal_metrics.output.metrics.decode_errors_total
-		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		decode_errors_total:             components.sources.internal_metrics.output.metrics.decode_errors_total
+		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

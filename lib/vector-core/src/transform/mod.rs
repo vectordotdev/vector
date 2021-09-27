@@ -3,7 +3,7 @@ use futures::Stream;
 use std::pin::Pin;
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;
-pub use config::{DataType, ExpandType, TransformConfig};
+pub use config::{DataType, ExpandType, TransformConfig, TransformContext};
 
 mod config;
 

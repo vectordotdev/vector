@@ -1,7 +1,7 @@
 use crate::{
     event::Event,
     internal_events::{
-        SocketEventReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteFailed,
+        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::Source,
@@ -51,7 +51,7 @@ struct FrameStreamState {
     is_bidirectional: bool,
 }
 impl FrameStreamState {
-    fn new() -> Self {
+    const fn new() -> Self {
         FrameStreamState {
             expect_control_frame: false,
             //first control frame should be READY (if bidirectional -- if unidirectional first will be START)
@@ -93,7 +93,7 @@ impl ControlHeader {
         }
     }
 
-    fn to_u32(self) -> u32 {
+    const fn to_u32(self) -> u32 {
         match self {
             ControlHeader::Accept => 0x01,
             ControlHeader::Start => 0x02,
@@ -118,7 +118,7 @@ impl ControlField {
             }
         }
     }
-    fn to_u32(&self) -> u32 {
+    const fn to_u32(&self) -> u32 {
         match self {
             ControlField::ContentType => 0x01,
         }
@@ -155,9 +155,10 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
-                emit!(SocketEventReceived {
-                    byte_size: frame.len(),
+                emit!(&SocketEventsReceived {
                     mode: SocketMode::Unix,
+                    byte_size: frame.len(),
+                    count: 1
                 });
                 Some(frame) //return data frame
             } else {
@@ -485,8 +486,8 @@ pub fn build_framestream_unix_source(
             let frames = sock_stream
                 .take_until(shutdown.clone())
                 .map_err(move |error| {
-                    emit!(UnixSocketError {
-                        error,
+                    emit!(&UnixSocketError {
+                        error: &error,
                         path: &listen_path,
                     });
                 })
@@ -544,7 +545,7 @@ pub fn build_framestream_unix_source(
 
         // Delete socket file
         if let Err(error) = fs::remove_file(&path) {
-            emit!(UnixSocketFileDeleteFailed { path: &path, error });
+            emit!(&UnixSocketFileDeleteError { path: &path, error });
         }
 
         Ok(())
@@ -593,7 +594,7 @@ mod test {
         FrameHandler,
     };
     use crate::{
-        config::log_schema,
+        config::{log_schema, ComponentKey},
         test_util::{collect_n, collect_n_stream},
     };
     use crate::{event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
@@ -707,7 +708,7 @@ mod test {
     }
 
     fn init_framstream_unix(
-        source_name: &str,
+        source_id: &str,
         frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
         pipeline: Pipeline,
     ) -> (
@@ -715,9 +716,10 @@ mod test {
         JoinHandle<Result<(), ()>>,
         SourceShutdownCoordinator,
     ) {
+        let source_id = ComponentKey::from(source_id);
         let socket_path = frame_handler.socket_path();
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(source_name);
+        let (shutdown_signal, _) = shutdown.register_source(&source_id);
         let server = build_framestream_unix_source(frame_handler, shutdown_signal, pipeline)
             .expect("Failed to build framestream unix source.");
 
@@ -799,7 +801,8 @@ mod test {
     async fn signal_shutdown(source_name: &str, shutdown: &mut SourceShutdownCoordinator) {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let id = ComponentKey::from(source_name);
+        let shutdown_complete = shutdown.shutdown_source(&id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
     }

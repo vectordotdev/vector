@@ -32,7 +32,12 @@ impl Function for ParseLogFmt {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         // The parse_logfmt function is just an alias for `parse_key_value` with the following

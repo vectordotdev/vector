@@ -1,8 +1,8 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct JournaldEventReceived {
+pub struct JournaldEventReceived {
     pub byte_size: usize,
 }
 
@@ -12,13 +12,14 @@ impl InternalEvent for JournaldEventReceived {
     }
 
     fn emit_metrics(&self) {
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct JournaldInvalidRecord {
+pub struct JournaldInvalidRecord {
     pub error: serde_json::Error,
     pub text: String,
 }

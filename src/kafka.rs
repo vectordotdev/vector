@@ -99,7 +99,7 @@ pub(crate) struct KafkaStatisticsContext;
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
-        emit!(KafkaStatisticsReceived {
+        emit!(&KafkaStatisticsReceived {
             statistics: &statistics
         });
     }

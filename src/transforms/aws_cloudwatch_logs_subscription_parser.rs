@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
@@ -27,7 +28,7 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs_subscription_parser")]
 impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(
             AwsCloudwatchLogsSubscriptionParser::from(self.clone()),
         ))
@@ -79,7 +80,7 @@ impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
             .and_then(|to_parse| {
                 serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&to_parse)
                     .map_err(|error| {
-                        emit!(AwsCloudwatchLogsSubscriptionParserFailedParse { error })
+                        emit!(&AwsCloudwatchLogsSubscriptionParserFailedParse { error })
                     })
                     .ok()
             });

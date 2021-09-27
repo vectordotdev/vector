@@ -6,66 +6,80 @@ edition = "2018"
 publish = false
 
 [dependencies]
-async-graphql = { version = "=2.6.4", default-features = false, optional = true }
+async-graphql = { version = "2.10.0", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.1", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
-bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
+bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
-futures = { version = "0.3.16", default-features = false, features = ["std"] }
+enrichment = { path = "../enrichment", optional = true }
+futures = { version = "0.3.17", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
-http = { version = "0.2.4", default-features = false }
+http = { version = "0.2.5", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "1.7.0", default-features = false, features = ["serde"] }
+# pinned due to https://github.com/tkaitchuck/aHash/issues/95
+indexmap = { version = "~1.6.2", default-features = false, features = ["serde"] }
+core_common = { path = "core-common", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.0", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.8.0", default-features = false }
-metrics-util = { version = "0.10.0", default-features = false, features = ["std"] }
-mlua = { version = "0.6.2", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+metrics-util = { version = "0.10.1", default-features = false, features = ["std"] }
+mlua = { version = "0.6.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.8", default-features = false }
 pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.8", default-features = false }
-prost = { version = "0.7.0", default-features = false }
-prost-types = { version = "0.7.0", default-features = false }
+prost = { version = "0.8", default-features = false }
+prost-types = { version = "0.8", default-features = false }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.127", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.66", default-features = false }
+serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.68", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
-tokio = { version = "1.9.0", default-features = false }
+substring = { version = "1.4", default-features = false }
+tokio = { version = "1.12.0", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
+tokio-util = { version = "0.6.8", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
-tracing = { version = "0.1.26", default-features = false }
-tracing-core = { version = "0.1.17", default-features = false }
+tracing = { version = "0.1.28", default-features = false }
+tracing-core = { version = "0.1.20", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.2.19", default-features = false }
+tracing-subscriber = { version = "0.2.24", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 
 [build-dependencies]
-prost-build = "0.7.0"
+prost-build = "0.8"
 
 [dev-dependencies]
 criterion = { version = "0.3.5", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1.0.3"
+proptest = "1.0"
 pretty_assertions = "0.7.2"
 tokio-test = "0.4.2"
 
 [features]
-default = []
 api = ["async-graphql"]
-lua = ["mlua", "tokio-stream"]
-vrl = ["vrl-core"]
+default = []
 disk-buffer = ["buffers/disk-buffer"]
+lua = ["mlua", "tokio-stream"]
+vrl = ["vrl-core", "enrichment"]
 
 [[bench]]
 name = "lookup"
+harness = false
+
+[[bench]]
+name = "event"
+harness = false
+
+[[bench]]
+name = "path_iter"
 harness = false

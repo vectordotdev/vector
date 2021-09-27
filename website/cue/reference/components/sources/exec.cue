@@ -191,11 +191,7 @@ components: sources: exec: {
 			_timestamp: "2020-03-13T20:45:38.119Z"
 			title:      "Exec line"
 			configuration: {}
-			input: """
-				```text
-				(_message)
-				```
-				"""
+			input: _line
 			output: log: {
 				data_stream: "stdout"
 				pid:         5678
@@ -217,11 +213,12 @@ components: sources: exec: {
 	}
 
 	telemetry: metrics: {
+		command_executed_total:             components.sources.internal_metrics.output.metrics.command_executed_total
+		command_execution_duration_seconds: components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
 		events_in_total:                    components.sources.internal_metrics.output.metrics.events_in_total
 		processed_bytes_total:              components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:             components.sources.internal_metrics.output.metrics.processed_events_total
 		processing_errors_total:            components.sources.internal_metrics.output.metrics.processing_errors_total
-		command_executed_total:             components.sources.internal_metrics.output.metrics.command_executed_total
-		command_execution_duration_seconds: components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
+		component_received_events_total:    components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

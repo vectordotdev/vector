@@ -38,7 +38,12 @@ impl Function for Merge {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let to = arguments.required("to");
         let from = arguments.required("from");
         let deep = arguments.optional("deep").unwrap_or_else(|| expr!(false));

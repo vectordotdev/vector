@@ -350,7 +350,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						default: #EncodingCodec | null
+						batched: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
@@ -369,14 +369,15 @@ components: {
 			enabled: bool
 
 			if enabled {
-				adaptive_concurrency:       bool | *false
-				concurrency:                uint64 | *1024
+				adaptive_concurrency:       bool | *true
+				concurrency:                uint64 | *null
 				rate_limit_duration_secs:   uint64 | *1
 				rate_limit_num:             uint64 | *9223372036854775807
 				retry_initial_backoff_secs: uint64 | *1
 				retry_max_duration_secs:    uint64 | *3600
 				timeout_secs:               uint64 | *60
 				headers:                    bool
+				relevant_when?:             string
 			}
 		}
 
@@ -443,11 +444,11 @@ components: {
 
 	#IAM: {
 		#Policy: {
-			#RequiredFor: "write" | "healthcheck"
+			#RequiredFor: "operation" | "healthcheck"
 
 			// TODO: come up with a less janky URL generation scheme
 			_action:        !=""
-			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
+			required_for:   *["operation"] | [#RequiredFor, ...#RequiredFor]
 			docs_url:       !=""
 			required_when?: !=""
 
@@ -694,7 +695,7 @@ components: {
 
 			_proxy: {
 				common:      false
-				description: "Configures an HTTP(S) proxy for Vector to use."
+				description: "Configures an HTTP(S) proxy for Vector to use. By default, the globally configured proxy is used."
 				required:    false
 				type: object: options: {
 					enabled: {
@@ -724,18 +725,19 @@ components: {
 						}
 					}
 					no_proxy: {
-						common: false
+						common:      false
 						description: """
-							List of hosts to avoid proxying globally.
+							A list of hosts to avoid proxying. Allowed patterns here include:
 
-							Allowed patterns here include:
-								- Domain names. For example, `example.com` will match requests to to `example.com`
-								- Wildcard domains. For example, `.example.com` will match requests to `example.com` and its subdomains
-								- IP addresses. For example, `127.0.0.1` will match requests to 127.0.0.1
-								- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
-								- `*` will match all hosts
+							Pattern | Example match
+							:-------|:-------------
+							Domain names | `example.com` matches requests to `example.com`
+							Wildcard domains | `.example.com` matches requests to `example.com` and its subdomains
+							IP addresses | `127.0.0.1` matches requests to 127.0.0.1
+							[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
+							Splat | `*` matches all hosts
 							"""
-						required: false
+						required:    false
 						type: array: {
 							default: null
 							items: type: string: {
@@ -914,7 +916,7 @@ components: {
 				inputs: {
 					description: """
 						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
-						IDs. Wildcards (`*`) are supported but _must_ be the last character in the ID.
+						IDs. Wildcards (`*`) are supported.
 
 						See [configuration](\(urls.vector_configuration)) for more info.
 						"""
@@ -964,7 +966,7 @@ components: {
 					The global URL to proxy HTTPS requests through.
 
 					If another HTTPS proxy is set in the configuration file or at a component level,
-					this one will be overriden.
+					this one will be overridden.
 
 					The lowercase variant has priority over the uppercase one.
 					"""
@@ -979,19 +981,23 @@ components: {
 					List of hosts to avoid proxying globally.
 
 					Allowed patterns here include:
-						- Domain names. For example, `example.com` will match requests to to `example.com`
-						- Wildcard domains. For example, `.example.com` will match requests to `example.com` and its subdomains
-						- IP addresses. For example, `127.0.0.1` will match requests to 127.0.0.1
-						- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
-						- `*` will match all hosts
 
-					If another no_proxy value is set in the configuration file or at a component level, this one will be overridden.
+					Pattern | Example match
+					:-------|:-------------
+					Domain names | `example.com` matches requests to `example.com`
+					Wildcard domains | `.example.come` matches requests to `example.com` and its subdomains
+					IP addresses | `127.0.0.1` matches requests to `127.0.0.1`
+					[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
+					Splat | `*` matches all hosts
+
+					If another `no_proxy` value is set in the configuration file or at a component level, this
+					one is overridden.
 
 					The lowercase variant has priority over the uppercase one.
 					"""
 				type: string: {
 					default: null
-					examples: ["localhost,.exampl.com,192.168.0.0./16", "*"]
+					examples: ["localhost,.example.com,192.168.0.0./16", "*"]
 					syntax: "literal"
 				}
 			}

@@ -7,7 +7,6 @@ use std::{
     io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
-use tracing::trace_span;
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
@@ -109,7 +108,6 @@ impl Fingerprinter {
         known_small_files: &mut HashSet<PathBuf>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
-        let _span = trace_span!("fingerprinting", ?path).entered();
         metadata(path)
             .and_then(|metadata| {
                 if metadata.is_dir() {
@@ -127,11 +125,11 @@ impl Fingerprinter {
                 }
                 io::ErrorKind::NotFound => {
                     if !self.ignore_not_found {
-                        emitter.emit_file_fingerprint_read_failed(path, error);
+                        emitter.emit_file_fingerprint_read_error(path, error);
                     }
                 }
                 _ => {
-                    emitter.emit_file_fingerprint_read_failed(path, error);
+                    emitter.emit_file_fingerprint_read_error(path, error);
                 }
             })
             .ok()
@@ -161,7 +159,7 @@ impl Fingerprinter {
     }
 
     /// Calculates checksums using strategy pre-0.14.0
-    /// https://github.com/timberio/vector/issues/8182
+    /// <https://github.com/timberio/vector/issues/8182>
     pub fn get_legacy_checksum(
         &self,
         path: &Path,
@@ -470,7 +468,7 @@ mod test {
 
         fn emit_file_resumed(&self, _: &Path, _: u64) {}
 
-        fn emit_file_watch_failed(&self, _: &Path, _: Error) {
+        fn emit_file_watch_error(&self, _: &Path, _: Error) {
             panic!();
         }
 
@@ -478,11 +476,11 @@ mod test {
 
         fn emit_file_deleted(&self, _: &Path) {}
 
-        fn emit_file_delete_failed(&self, _: &Path, _: Error) {
+        fn emit_file_delete_error(&self, _: &Path, _: Error) {
             panic!();
         }
 
-        fn emit_file_fingerprint_read_failed(&self, _: &Path, _: Error) {
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {
             panic!();
         }
 
@@ -492,7 +490,7 @@ mod test {
             panic!();
         }
 
-        fn emit_file_checkpoint_write_failed(&self, _: Error) {
+        fn emit_file_checkpoint_write_error(&self, _: Error) {
             panic!();
         }
 

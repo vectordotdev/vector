@@ -29,3 +29,4 @@
 /docs/setup/installation/deployment/roles/service   /docs/setup/installation/deployment/roles/#aggregator  301
 /docs/reference/env_vars   /docs/reference/cli/#environment-variables  301
 /docs/usage/*   /docs/administration/:splat  301
+/docs/setup/installation/package-managers/vector-installer   /docs/setup/installation/manual/vector-installer  301

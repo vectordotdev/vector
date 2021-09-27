@@ -1,3 +1,39 @@
+[transforms.remap_source]
+  inputs = []
+  type = "remap"
+  source = """
+    .message = "foo"
+  """
+[[tests]]
+  name = "remap_source"
+  [tests.input]
+    insert_at = "remap_source"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+  [[tests.outputs]]
+    extract_from = "remap_source"
+    [[tests.outputs.conditions]]
+      type = "vrl"
+      source = ".message == \"foo\""
+
+[transforms.remap_file]
+  inputs = []
+  type = "remap"
+  file = "tests/data/remap/program.vrl"
+[[tests]]
+  name = "remap_file"
+  [tests.input]
+    insert_at = "remap_file"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+  [[tests.outputs]]
+    extract_from = "remap_file"
+    [[tests.outputs.conditions]]
+      type = "vrl"
+      source = ".message == \"foo\""
+
 [transforms.remap_emit_multiple]
   inputs = []
   type = "remap"

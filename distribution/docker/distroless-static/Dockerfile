@@ -1,4 +1,4 @@
-FROM alpine:3.12 AS builder
+FROM alpine:3.14 AS builder
 
 WORKDIR /vector
 

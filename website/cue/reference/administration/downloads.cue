@@ -70,7 +70,7 @@ administration: {
 			{
 				os:              "Linux"
 				title:           "Linux (deb)"
-				package_manager: administration.package_managers.dpkg.name
+				package_manager: "DPKG"
 				file_type:       "deb"
 				library:         "gnu"
 				options: [
@@ -93,7 +93,7 @@ administration: {
 			{
 				os:              "Linux"
 				title:           "Linux (rpm)"
-				package_manager: administration.package_managers.rpm.name
+				package_manager: "RPM"
 				file_type:       "rpm"
 				version_postfix: "1."
 				library:         "gnu"
@@ -139,7 +139,7 @@ administration: {
 			{
 				os:              "Windows"
 				title:           "Windows (MSI)"
-				package_manager: administration.package_managers.msi.name
+				package_manager: "MSI"
 				file_type:       "msi"
 				options: [
 					{

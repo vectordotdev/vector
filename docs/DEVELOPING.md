@@ -141,7 +141,7 @@ make test scope="sources::example"
 cargo test
 make test
 # Validate your tests pass (starting required services in Docker)
-make test-integration scope="sources::example" autospawn=false
+make test-integration scope="sources::example"
 # Validate your tests pass against a live service.
 make test-integration scope="sources::example" autospawn=false
 cargo test --features docker sources::example
@@ -394,7 +394,7 @@ times:
 
    ```sh
    cargo watch -s clear -s \
-     'cargo test --lib --no-default-features --features=<component type>-<component name> <component type>::<component name>'
+     'cargo test --lib --no-default-features --features=<component type>-<component id> <component type>::<component id>'
    ```
 
    For example, if the component is `add_fields` transform, the command above

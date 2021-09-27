@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::histogram;
 use std::time::Duration;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AdaptiveConcurrencyLimit {
@@ -9,6 +9,7 @@ pub struct AdaptiveConcurrencyLimit {
     pub had_back_pressure: bool,
     pub current_rtt: Option<Duration>,
     pub past_rtt: Duration,
+    pub past_rtt_deviation: Duration,
 }
 
 impl InternalEvent for AdaptiveConcurrencyLimit {
@@ -20,11 +21,20 @@ impl InternalEvent for AdaptiveConcurrencyLimit {
             had_back_pressure = %self.had_back_pressure,
             current_rtt = ?self.current_rtt,
             past_rtt = ?self.past_rtt,
+            past_rtt_deviation = ?self.past_rtt_deviation,
         );
     }
 
     fn emit_metrics(&self) {
+        // These are histograms, as they may have a number of different
+        // values over each reporting interval, and each of those values
+        // is valuable for diagnosis.
         histogram!("adaptive_concurrency_limit", self.concurrency as f64);
+        let reached_limit = self.reached_limit.then(|| 1.0).unwrap_or_default();
+        histogram!("adaptive_concurrency_reached_limit", reached_limit);
+        let back_pressure = self.had_back_pressure.then(|| 1.0).unwrap_or_default();
+        histogram!("adaptive_concurrency_back_pressure", back_pressure);
+        histogram!("adaptive_concurrency_past_rtt_mean", self.past_rtt);
     }
 }
 

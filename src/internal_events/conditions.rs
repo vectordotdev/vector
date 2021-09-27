@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug, Copy, Clone)]
 pub struct VrlConditionExecutionError;

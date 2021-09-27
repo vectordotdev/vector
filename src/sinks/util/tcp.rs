@@ -60,7 +60,7 @@ pub struct TcpSinkConfig {
 }
 
 impl TcpSinkConfig {
-    pub fn new(
+    pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
@@ -74,7 +74,7 @@ impl TcpSinkConfig {
         }
     }
 
-    pub fn from_address(address: String) -> Self {
+    pub const fn from_address(address: String) -> Self {
         Self {
             address,
             keepalive: None,
@@ -112,7 +112,7 @@ struct TcpConnector {
 }
 
 impl TcpConnector {
-    fn new(
+    const fn new(
         host: String,
         port: u16,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -133,7 +133,7 @@ impl TcpConnector {
         Self::new(host, port, None, None.into(), None)
     }
 
-    fn fresh_backoff() -> ExponentialBackoff {
+    const fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
         ExponentialBackoff::from_millis(2)
             .factor(250)
@@ -175,13 +175,13 @@ impl TcpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(TcpSocketConnectionEstablished {
+                    emit!(&TcpSocketConnectionEstablished {
                         peer_addr: socket.peer_addr().ok(),
                     });
                     return socket;
                 }
                 Err(error) => {
-                    emit!(TcpSocketConnectionFailed { error });
+                    emit!(&TcpSocketConnectionFailed { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -249,7 +249,7 @@ impl TcpSink {
 
 #[async_trait]
 impl StreamSink for TcpSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
         let encode_event = Arc::clone(&self.encode_event);
@@ -264,7 +264,7 @@ impl StreamSink for TcpSink {
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
 
             let result = match sink
                 .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
@@ -276,9 +276,9 @@ impl StreamSink for TcpSink {
 
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown {});
+                    emit!(&TcpSocketConnectionShutdown {});
                 } else {
-                    emit!(TcpSocketError { error });
+                    emit!(&TcpSocketError { error });
                 }
             }
         }

@@ -132,7 +132,7 @@ components: sources: kafka: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "headers"
 				examples: ["headers"]
 				syntax: "literal"
 			}
@@ -254,11 +254,9 @@ components: sources: kafka: {
 	}
 
 	telemetry: metrics: {
+		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
-		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
 		kafka_queue_messages:                 components.sources.internal_metrics.output.metrics.kafka_queue_messages
 		kafka_queue_messages_bytes:           components.sources.internal_metrics.output.metrics.kafka_queue_messages_bytes
 		kafka_requests_total:                 components.sources.internal_metrics.output.metrics.kafka_requests_total
@@ -269,6 +267,9 @@ components: sources: kafka: {
 		kafka_produced_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_produced_messages_bytes_total
 		kafka_consumed_messages_total:        components.sources.internal_metrics.output.metrics.kafka_consumed_messages_total
 		kafka_consumed_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_consumed_messages_bytes_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 
 	how_it_works: components._kafka.how_it_works

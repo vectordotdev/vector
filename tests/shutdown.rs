@@ -68,7 +68,6 @@ data_dir = "${{VECTOR_DATA_DIR}}"
 [sinks.out]
     inputs = ["in"]
     type = "blackhole"
-    print_amount = 10000
 "#,
         source
     )

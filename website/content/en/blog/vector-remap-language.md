@@ -55,7 +55,7 @@ transforms** and **runtime transforms**.
   the fields that you specify in your Vector configuration.
 
 * Runtime transforms enable you to modify event data using full-blown language
-  runtimes, such as [Lua][lua] and [WebAssembly][wasm] (Wasm).
+  runtimes, such as [Lua][lua].
 
 Both of these options have enabled our users to transform their data
 successfully, but they have severe limitations that we needed to address with
@@ -109,6 +109,7 @@ Parsing this log, without VRL, looks like this:
 
 {{< tabs default="Vector" >}}
 {{< tab title="Vector" >}}
+
 ```toml title="vector.toml"
 # ... sources ...
 
@@ -135,8 +136,10 @@ types.bytes_out = "int"
 
 # ... sinks ...
 ```
+
 {{< /tab >}}
 {{< tab title="Logstash" >}}
+
 ```text title="logstash.conf"
 # ... inputs ...
 
@@ -163,8 +166,10 @@ filter {
 
 # ... outputs ...
 ```
+
 {{< /tab >}}
 {{< tab title="Fluentd" >}}
+
 ```text title="fluentd.conf"
 <source>
   # ... source options ...
@@ -186,6 +191,7 @@ filter {
 
 # ... outputs ...
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -498,7 +504,6 @@ with us [on Discord][chat] if you have any issues, comments, or suggestions.
 [Memory safety]: /docs/reference/vrl/#memory-safety
 [Progressive type safety]: /docs/reference/vrl/#progressive-type-safety
 [route_transform]: /docs/reference/configuration/transforms/route/
-[wasm]: /docs/reference/configuration/transforms/wasm/
 [Stateless]: /docs/reference/vrl/#stateless
 [stephen]: https://github.com/FungusHumungus
 [Vector/Rust native]: /docs/reference/vrl/#vector-rust-native

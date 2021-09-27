@@ -1,6 +1,9 @@
 use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
+    config::{
+        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
+        TransformContext,
+    },
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
@@ -15,30 +18,27 @@ use serde::{Deserialize, Serialize};
 pub struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
-
     token: String,
     // Deprecated name
     #[serde(alias = "host")]
     pub(in crate::sinks::humio) endpoint: Option<String>,
     source: Option<Template>,
     encoding: EncodingConfig<Encoding>,
-
     event_type: Option<Template>,
-
     #[serde(default = "host_key")]
     host_key: String,
-
+    #[serde(default)]
+    indexed_fields: Vec<String>,
+    #[serde(default)]
+    index: Option<Template>,
     #[serde(default)]
     compression: Compression,
-
     #[serde(default)]
     request: TowerRequestConfig,
-
     #[serde(default)]
     batch: BatchConfig,
-
     tls: Option<TlsOptions>,
-    // The obove settings are copied from HumioLogsConfig. In theory we should do below:
+    // The above settings are copied from HumioLogsConfig. In theory we should do below:
     //
     // #[serde(flatten)]
     // sink: HumioLogsConfig,
@@ -67,7 +67,11 @@ impl GenerateConfig for HumioMetricsConfig {
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut transform = self.transform.clone().build(&cx.globals).await?;
+        let mut transform = self
+            .transform
+            .clone()
+            .build(&TransformContext::new_with_globals(cx.globals.clone()))
+            .await?;
         let sink = HumioLogsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
@@ -75,6 +79,8 @@ impl SinkConfig for HumioMetricsConfig {
             encoding: self.encoding.clone(),
             event_type: self.event_type.clone(),
             host_key: self.host_key.clone(),
+            indexed_fields: self.indexed_fields.clone(),
+            index: self.index.clone(),
             compression: self.compression,
             request: self.request,
             batch: self.batch,

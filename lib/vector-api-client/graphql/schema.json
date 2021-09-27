@@ -88,7 +88,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -97,6 +97,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -247,9 +259,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -258,6 +270,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -290,9 +314,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -301,6 +325,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -333,9 +369,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -344,6 +380,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -376,9 +424,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -387,6 +435,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -419,9 +479,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -430,6 +490,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -522,9 +594,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -533,6 +605,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -565,9 +649,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -576,6 +660,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -608,9 +704,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -619,6 +715,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -651,9 +759,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Component name",
+              "description": "Component id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -662,6 +770,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -690,12 +810,122 @@
         {
           "description": null,
           "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Component id",
+              "isDeprecated": false,
+              "name": "componentId",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Received events throughput",
+              "isDeprecated": false,
+              "name": "throughput",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "ComponentReceivedEventsThroughput",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Component id",
+              "isDeprecated": false,
+              "name": "componentId",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Pipeline id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total received events metric",
+              "isDeprecated": false,
+              "name": "metric",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ReceivedEventsTotal",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "ComponentReceivedEventsTotal",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
           "fields": null,
           "inputFields": [
             {
               "defaultValue": null,
               "description": null,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -798,7 +1028,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "NAME"
+              "name": "COMPONENT_KEY"
             },
             {
               "deprecationReason": null,
@@ -1018,9 +1248,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Name of the component associated with the notification",
+              "description": "Id of the component associated with the notification",
               "isDeprecated": false,
-              "name": "componentName",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1029,6 +1259,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Id of the pipeline associated to the component",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -1208,6 +1450,18 @@
               "type": {
                 "kind": "OBJECT",
                 "name": "EventsInTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating received events for the current file",
+              "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ReceivedEventsTotal",
                 "ofType": null
               }
             },
@@ -1396,6 +1650,12 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
+              "name": "RECEIVED_EVENTS_TOTAL"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
               "name": "EVENTS_IN_TOTAL"
             },
             {
@@ -1534,6 +1794,18 @@
               "type": {
                 "kind": "OBJECT",
                 "name": "EventsInTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total received events for the current file source",
+              "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ReceivedEventsTotal",
                 "ofType": null
               }
             },
@@ -1721,6 +1993,18 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Total received events for the current sink",
+              "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ReceivedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Total outgoing events for the current sink",
               "isDeprecated": false,
               "name": "eventsOutTotal",
@@ -1786,6 +2070,18 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Total received events for the current source",
+              "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ReceivedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Total outgoing events for the current source",
               "isDeprecated": false,
               "name": "eventsOutTotal",
@@ -1845,6 +2141,18 @@
               "type": {
                 "kind": "OBJECT",
                 "name": "EventsInTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total received events for the current transform",
+              "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ReceivedEventsTotal",
                 "ofType": null
               }
             },
@@ -2115,9 +2423,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Name of the component associated with the log event",
+              "description": "Id of the component associated with the log event",
               "isDeprecated": false,
-              "name": "componentName",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -2126,6 +2434,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Id of the pipeline associated with the log event",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -2738,31 +3058,15 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
+              "description": "Returns `true` to denote the GraphQL server is reachable",
               "isDeprecated": false,
-              "name": "meta",
+              "name": "health",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Meta",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Vector host metrics",
-              "isDeprecated": false,
-              "name": "hostMetrics",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "HostMetrics",
+                  "kind": "SCALAR",
+                  "name": "Boolean",
                   "ofType": null
                 }
               }
@@ -3112,7 +3416,17 @@
                 {
                   "defaultValue": null,
                   "description": null,
-                  "name": "name",
+                  "name": "pipelineId",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "componentId",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -3125,9 +3439,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Gets a configured component by name",
+              "description": "Gets a configured component by component_key",
               "isDeprecated": false,
-              "name": "componentByName",
+              "name": "componentByComponentKey",
               "type": {
                 "kind": "INTERFACE",
                 "name": "Component",
@@ -3137,15 +3451,31 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Returns `true` to denote the GraphQL server is reachable",
+              "description": "Vector host metrics",
               "isDeprecated": false,
-              "name": "health",
+              "name": "hostMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
+                  "kind": "OBJECT",
+                  "name": "HostMetrics",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "meta",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Meta",
                   "ofType": null
                 }
               }
@@ -3164,9 +3494,48 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Sink name",
+              "description": "Metric timestamp",
               "isDeprecated": false,
-              "name": "name",
+              "name": "timestamp",
+              "type": {
+                "kind": "SCALAR",
+                "name": "DateTime",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total incoming events",
+              "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "ReceivedEventsTotal",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Sink component_id",
+              "isDeprecated": false,
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3175,6 +3544,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Sink component_id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -3405,6 +3786,18 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ReceivedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": "Use received_events_total instead",
+              "description": null,
+              "isDeprecated": true,
               "name": "eventsInTotal",
               "type": {
                 "kind": "OBJECT",
@@ -3445,7 +3838,7 @@
             {
               "defaultValue": null,
               "description": null,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -3548,7 +3941,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "NAME"
+              "name": "COMPONENT_KEY"
             },
             {
               "deprecationReason": null,
@@ -3571,9 +3964,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Source name",
+              "description": "Source component_id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3582,6 +3975,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Source pipeline_id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -3828,6 +4233,18 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ReceivedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": "Use received_events_total instead",
+              "description": null,
+              "isDeprecated": true,
               "name": "eventsInTotal",
               "type": {
                 "kind": "OBJECT",
@@ -3933,7 +4350,7 @@
             {
               "defaultValue": null,
               "description": null,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -4054,7 +4471,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "NAME"
+              "name": "COMPONENT_KEY"
             },
             {
               "deprecationReason": null,
@@ -4164,45 +4581,9 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
-                  "description": null,
-                  "name": "componentNames",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "LIST",
-                      "name": null,
-                      "ofType": {
-                        "kind": "NON_NULL",
-                        "name": null,
-                        "ofType": {
-                          "kind": "SCALAR",
-                          "name": "String",
-                          "ofType": null
-                        }
-                      }
-                    }
-                  }
-                },
-                {
-                  "defaultValue": "500",
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  }
-                },
-                {
-                  "defaultValue": "100",
-                  "description": null,
-                  "name": "limit",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -4215,55 +4596,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "A stream of events emitted from matched component(s)",
+              "description": "Heartbeat, containing the UTC timestamp of the last server-sent payload",
               "isDeprecated": false,
-              "name": "outputEvents",
+              "name": "heartbeat",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "UNION",
-                      "name": "OutputEventsPayload",
-                      "ofType": null
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Subscribes to all newly added components",
-              "isDeprecated": false,
-              "name": "componentAdded",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INTERFACE",
-                  "name": "Component",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Subscribes to all removed components",
-              "isDeprecated": false,
-              "name": "componentRemoved",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INTERFACE",
-                  "name": "Component",
+                  "kind": "OBJECT",
+                  "name": "Heartbeat",
                   "ofType": null
                 }
               }
@@ -4286,7 +4627,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Metrics for how long the Vector instance has been running.",
+              "description": "Metrics for how long the Vector instance has been running",
               "isDeprecated": false,
               "name": "uptime",
               "type": {
@@ -4456,9 +4797,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "Use received_events_total instead",
               "description": "Total incoming events metrics",
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "eventsInTotal",
               "type": {
                 "kind": "NON_NULL",
@@ -4488,8 +4829,39 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Total incoming events throughput sampled over the provided millisecond `interval`",
+              "description": "Total received events metrics",
               "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ReceivedEventsTotal",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": "Use received_events_throughput instead",
+              "description": "Total incoming events throughput sampled over the provided millisecond `interval`",
+              "isDeprecated": true,
               "name": "eventsInThroughput",
               "type": {
                 "kind": "NON_NULL",
@@ -4519,8 +4891,39 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Total incoming component events throughput metrics over `interval`",
+              "description": "Total received events throughput sampled over the provided millisecond `interval`",
               "isDeprecated": false,
+              "name": "receivedEventsThroughput",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": "Use component_received_events_throughputs instead",
+              "description": "Total incoming component events throughput metrics over `interval`",
+              "isDeprecated": true,
               "name": "componentEventsInThroughputs",
               "type": {
                 "kind": "NON_NULL",
@@ -4558,8 +4961,47 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Total incoming component event metrics over `interval`",
+              "description": "Total incoming component events throughput metrics over `interval`",
               "isDeprecated": false,
+              "name": "componentReceivedEventsThroughputs",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentReceivedEventsThroughput",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": "Use component_received_events_totals instead",
+              "description": "Total incoming component event metrics over `interval`",
+              "isDeprecated": true,
               "name": "componentEventsInTotals",
               "type": {
                 "kind": "NON_NULL",
@@ -4573,6 +5015,45 @@
                     "ofType": {
                       "kind": "OBJECT",
                       "name": "ComponentEventsInTotal",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Total received component event metrics over `interval`",
+              "isDeprecated": false,
+              "name": "componentReceivedEventsTotals",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentReceivedEventsTotal",
                       "ofType": null
                     }
                   }
@@ -4961,11 +5442,79 @@
               }
             },
             {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all newly added components",
+              "isDeprecated": false,
+              "name": "componentAdded",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Component",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all removed components",
+              "isDeprecated": false,
+              "name": "componentRemoved",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Component",
+                  "ofType": null
+                }
+              }
+            },
+            {
               "args": [
                 {
-                  "defaultValue": "1000",
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "componentIds",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "defaultValue": "500",
                   "description": null,
                   "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                },
+                {
+                  "defaultValue": "100",
+                  "description": null,
+                  "name": "limit",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -4978,16 +5527,24 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Heartbeat, containing the UTC timestamp of the last server-sent payload",
+              "description": "A stream of events emitted from matched component(s)",
               "isDeprecated": false,
-              "name": "heartbeat",
+              "name": "outputEvents",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Heartbeat",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "UNION",
+                      "name": "OutputEventsPayload",
+                      "ofType": null
+                    }
+                  }
                 }
               }
             }
@@ -5088,9 +5645,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Transform name",
+              "description": "Transform component_id",
               "isDeprecated": false,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -5099,6 +5656,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Transform component_id",
+              "isDeprecated": false,
+              "name": "pipelineId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
               }
             },
             {
@@ -5353,6 +5922,18 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
+              "name": "receivedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ReceivedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": "Use received_events_total instead",
+              "description": null,
+              "isDeprecated": true,
               "name": "eventsInTotal",
               "type": {
                 "kind": "OBJECT",
@@ -5393,7 +5974,7 @@
             {
               "defaultValue": null,
               "description": null,
-              "name": "name",
+              "name": "componentId",
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -5496,7 +6077,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "NAME"
+              "name": "COMPONENT_KEY"
             },
             {
               "deprecationReason": null,

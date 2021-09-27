@@ -38,11 +38,11 @@ fn check(variant: &Variant) -> bool {
             true
         }
         #[cfg(feature = "disk-buffer")]
-        Variant::Disk { name, data_dir, .. } => {
-            // determine if data_dir is in temp_dir/name
+        Variant::Disk { id, data_dir, .. } => {
+            // determine if data_dir is in temp_dir/id
             let mut prefix = std::path::PathBuf::new();
             prefix.push(std::env::temp_dir());
-            prefix.push(name);
+            prefix.push(id);
 
             data_dir.starts_with(prefix)
         }
@@ -62,13 +62,13 @@ impl VariantGuard {
             Variant::Disk {
                 max_size,
                 when_full,
-                name,
+                id,
                 ..
             } => {
                 // SAFETY: We allow tempdir to create the directory but by
                 // calling `into_path` we obligate ourselves to delete it. This
                 // is done in the drop implementation for `VariantGuard`.
-                let data_dir = tempdir::TempDir::new_in(std::env::temp_dir(), &name)
+                let data_dir = tempdir::TempDir::new_in(std::env::temp_dir(), &id)
                     .unwrap()
                     .into_path();
                 VariantGuard {
@@ -76,7 +76,7 @@ impl VariantGuard {
                         max_size,
                         when_full,
                         data_dir,
-                        name,
+                        id,
                     },
                 }
             }

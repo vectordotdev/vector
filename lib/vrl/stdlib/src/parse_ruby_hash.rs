@@ -1,13 +1,13 @@
 use nom::{
     branch::alt,
-    bytes::complete::{escaped, tag, take_while},
-    character::complete::{alphanumeric1 as alphanumeric, char, one_of},
-    combinator::{cut, map, value},
+    bytes::complete::{escaped, tag, take_while, take_while1},
+    character::complete::{char, digit1, satisfy},
+    combinator::{cut, map, opt, recognize, value},
     error::{context, ContextError, FromExternalError, ParseError},
-    multi::separated_list0,
+    multi::{many1, separated_list0},
     number::complete::double,
-    sequence::{preceded, separated_pair, terminated},
-    IResult,
+    sequence::{preceded, separated_pair, terminated, tuple},
+    AsChar, IResult, InputTakeAtPosition,
 };
 use std::num::ParseIntError;
 use vrl::prelude::*;
@@ -38,7 +38,12 @@ impl Function for ParseRubyHash {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         Ok(Box::new(ParseRubyHashFn { value }))
     }
@@ -91,8 +96,39 @@ fn sp<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E
     take_while(move |c| chars.contains(c))(input)
 }
 
-fn parse_str<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
-    escaped(alphanumeric, '\\', one_of("\"n\\"))(input)
+fn parse_inner_str<'a, E: ParseError<&'a str>>(
+    delimiter: char,
+) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
+    move |input| {
+        map(
+            opt(escaped(
+                recognize(many1(tuple((
+                    take_while1(|c: char| c != '\\' && c != delimiter),
+                    // Consume \something
+                    opt(tuple((
+                        satisfy(|c| c == '\\'),
+                        satisfy(|c| c != '\\' && c != delimiter),
+                    ))),
+                )))),
+                '\\',
+                satisfy(|c| c == '\\' || c == delimiter),
+            )),
+            |inner| inner.unwrap_or(""),
+        )(input)
+    }
+}
+
+/// Parses text with a given delimiter.
+fn parse_str<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+    delimiter: char,
+) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
+    context(
+        "string",
+        preceded(
+            char(delimiter),
+            cut(terminated(parse_inner_str(delimiter), char(delimiter))),
+        ),
+    )
 }
 
 fn parse_boolean<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, bool, E> {
@@ -109,36 +145,65 @@ fn parse_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Val
 fn parse_bytes<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Bytes, E> {
     context(
         "bytes",
-        map(
-            preceded(char('\"'), cut(terminated(parse_str::<'a, E>, char('\"')))),
-            |value| Bytes::copy_from_slice(value.as_bytes()),
-        ),
+        map(alt((parse_str('"'), parse_str('\''))), |value| {
+            Bytes::copy_from_slice(value.as_bytes())
+        }),
     )(input)
 }
 
+fn parse_symbol_key<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar,
+{
+    take_while1(move |item: <T as InputTakeAtPosition>::Item| {
+        let c = item.as_char();
+        c.is_alphanum() || c == '_'
+    })(input)
+}
+
+fn parse_colon_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+    input: &'a str,
+) -> IResult<&'a str, String, E> {
+    map(
+        preceded(
+            char(':'),
+            alt((parse_str('"'), parse_str('\''), parse_symbol_key)),
+        ),
+        |res| String::from(":") + res,
+    )(input)
+}
+
+// This parse_key function allows some cases that shouldn't be produced by ruby.
+// For example, { foo => "bar" } shouldn't be parsed but { foo: "bar" } should.
+// Considering that Vector's goal is to parse log produced by other applications
+// and that Vector is NOT a ruby parser, cases like the following one are ignored
+// because they shouldn't appear in the logs.
+// That being said, handling all the corner cases from Ruby's syntax would imply
+// increasing a lot the code complexity which is probably not necessary considering
+// that Vector is not a Ruby parser.
 fn parse_key<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
-    context(
-        "string",
+    alt((
         map(
-            alt((
-                preceded(char('\"'), cut(terminated(parse_str, char('\"')))),
-                preceded(char('\''), cut(terminated(parse_str, char('\'')))),
-                alphanumeric,
-            )),
+            alt((parse_str('"'), parse_str('\''), parse_symbol_key, digit1)),
             String::from,
         ),
-    )(input)
+        parse_colon_key,
+    ))(input)
 }
 
-fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Vec<Value>, E> {
+fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
     context(
         "array",
-        preceded(
-            char('['),
-            cut(terminated(
-                separated_list0(preceded(sp, char(',')), parse_value),
-                preceded(sp, char(']')),
-            )),
+        map(
+            preceded(
+                char('['),
+                cut(terminated(
+                    separated_list0(preceded(sp, char(',')), parse_value),
+                    preceded(sp, char(']')),
+                )),
+            ),
+            Value::Array,
         ),
     )(input)
 }
@@ -148,7 +213,7 @@ fn parse_key_value<'a, E: HashParseError<&'a str>>(
 ) -> IResult<&'a str, (String, Value), E> {
     separated_pair(
         preceded(sp, parse_key),
-        cut(preceded(sp, tag("=>"))),
+        cut(preceded(sp, alt((tag(":"), tag("=>"))))),
         parse_value,
     )(input)
 }
@@ -178,7 +243,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
         alt((
             parse_nil,
             parse_hash,
-            map(parse_array, Value::Array),
+            parse_array,
             map(parse_bytes, Value::Bytes),
             map(double, |value| Value::Float(NotNan::new(value).unwrap())),
             map(parse_boolean, Value::Boolean),
@@ -216,7 +281,12 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_simple_object() {
+    fn test_parse_arrow_empty_array() {
+        parse("{ :array => [] }").unwrap();
+    }
+
+    #[test]
+    fn test_parse_arrow_object() {
         let result = parse(
             r#"{ "hello" => "world", "number" => 42, "float" => 4.2, "array" => [1, 2.3], "object" => { "nope" => nil } }"#,
         )
@@ -233,11 +303,83 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_weird_format() {
-        let result = parse(r#"{hello=>"world",'number'=>42}"#).unwrap();
+    fn test_parse_arrow_object_key_number() {
+        let result = parse(r#"{ 42 => "hello world" }"#).unwrap();
         assert!(result.is_object());
         let result = result.as_object().unwrap();
-        assert!(result.get("hello").unwrap().is_bytes());
+        assert!(result.get("42").unwrap().is_bytes());
+    }
+
+    #[test]
+    fn test_parse_arrow_object_key_colon() {
+        let result =
+            parse(r#"{ :colon => "hello world", :"double" => "quote", :'simple' => "quote" }"#)
+                .unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get(":colon").unwrap().is_bytes());
+        assert!(result.get(":double").unwrap().is_bytes());
+        assert!(result.get(":simple").unwrap().is_bytes());
+    }
+
+    #[test]
+    fn test_parse_arrow_object_key_underscore() {
+        let result = parse(r#"{ :with_underscore => "hello world" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get(":with_underscore").unwrap().is_bytes());
+    }
+
+    #[test]
+    fn test_parse_colon_object_double_quote() {
+        let result = parse(r#"{ "hello": "world" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("hello").unwrap();
+        assert_eq!(value, &Value::Bytes("world".into()));
+    }
+
+    #[test]
+    fn test_parse_colon_object_single_quote() {
+        let result = parse(r#"{ 'hello': 'world' }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("hello").unwrap();
+        assert_eq!(value, &Value::Bytes("world".into()));
+    }
+
+    #[test]
+    fn test_parse_colon_object_no_quote() {
+        let result = parse(r#"{ hello: "world" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("hello").unwrap();
+        assert_eq!(value, &Value::Bytes("world".into()));
+    }
+
+    #[test]
+    fn test_parse_dash() {
+        let result = parse(r#"{ "with-dash" => "foo" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get("with-dash").unwrap().is_bytes());
+    }
+
+    #[test]
+    fn test_parse_quote() {
+        let result = parse(r#"{ "with'quote" => "and\"double\"quote" }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("with'quote").unwrap();
+        assert_eq!(value, &Value::Bytes("and\\\"double\\\"quote".into()));
+    }
+
+    #[test]
+    fn test_parse_weird_format() {
+        let result = parse(r#"{:hello=>"world",'number'=>42,"weird"=>'format\'here'}"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        assert!(result.get(":hello").unwrap().is_bytes());
         assert!(result.get("number").unwrap().is_float());
     }
 

@@ -62,8 +62,9 @@ impl HttpSource for LogplexSource {
         query_parameters: HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        decode_message(body, header_map)
-            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
+        let mut events = decode_message(body, header_map)?;
+        add_query_parameters(&mut events, &self.query_parameters, query_parameters);
+        Ok(events)
     }
 }
 
@@ -123,7 +124,7 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
     let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
     let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
 
-    emit!(HerokuLogplexRequestReceived {
+    emit!(&HerokuLogplexRequestReceived {
         msg_count,
         frame_id,
         drain_token
@@ -169,7 +170,7 @@ fn body_to_events(body: Bytes) -> Vec<Event> {
     let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
-            res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
+            res.map_err(|error| emit!(&HerokuLogplexRequestReadError { error }))
                 .ok()
         })
         .filter(|s| !s.is_empty())

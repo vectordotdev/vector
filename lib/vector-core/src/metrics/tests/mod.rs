@@ -10,7 +10,7 @@ fn test_labels_injection() {
     let span = span!(
         Level::ERROR,
         "my span",
-        component_name = "my_component_name",
+        component_id = "my_component_id",
         component_type = "my_component_type",
         component_kind = "my_component_kind",
         some_other_label = "qwerty"
@@ -30,7 +30,7 @@ fn test_labels_injection() {
 
     let expected_tags = Some(
         vec![
-            ("component_name".to_owned(), "my_component_name".to_owned()),
+            ("component_id".to_owned(), "my_component_id".to_owned()),
             ("component_type".to_owned(), "my_component_type".to_owned()),
             ("component_kind".to_owned(), "my_component_kind".to_owned()),
         ]

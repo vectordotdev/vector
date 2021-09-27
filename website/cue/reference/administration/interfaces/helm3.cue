@@ -21,13 +21,13 @@ administration: interfaces: "helm3": {
 
 	role_implementations: [Name=string]: {
 		commands: {
-			_repo_name:                string | *"timberio"
+			_repo_name:                string | *"vector"
 			_chart_name:               string
 			_namespace:                string | *"vector"
 			_release_name:             string | *"vector"
 			_controller_resource_type: string
 			_controller_resource_name: string | *_chart_name
-			add_repo:                  #"helm repo add \#(_repo_name) https://packages.timber.io/helm/latest"#
+			add_repo:                  #"helm repo add \#(_repo_name) https://helm.vector.dev/"#
 			helm_values_show:          #"helm show values \#(_repo_name)/\#(_chart_name)"#
 			configure: #"""
 				cat <<-'VALUES' > values.yaml

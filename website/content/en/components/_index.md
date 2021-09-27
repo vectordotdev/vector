@@ -10,4 +10,4 @@ criteria: [
   { "Sink functions": ["Exposes", "Send"] },
   { "Operating systems": ["Linux", "Windows", "macOS"] }
 ]
-----
+---

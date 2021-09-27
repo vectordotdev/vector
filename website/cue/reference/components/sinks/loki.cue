@@ -28,15 +28,14 @@ components: sinks: loki: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: "json"
-					enum: ["json", "text"]
+					enum: ["json", "logfmt", "text"]
 				}
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				concurrency:                1
-				headers:                    false
+				enabled:     true
+				concurrency: 5
+				headers:     false
 			}
 			tls: {
 				enabled:                true
@@ -109,7 +108,7 @@ components: sinks: loki: {
 				options: {
 					"*": {
 						common:      false
-						description: "Any Loki label, templateable"
+						description: "Any Loki label, templatable"
 						required:    false
 						type: string: {
 							default: null
@@ -190,15 +189,6 @@ components: sinks: loki: {
 				"""
 		}
 
-		concurrency: {
-			title: "Concurrency"
-			body: """
-				To make sure logs arrive at Loki in a correct order,
-				the `loki` sink only sends one request at a time.
-				Setting `request.concurrency` will not have any effects.
-				"""
-		}
-
 		event_ordering: {
 			title: "Event Ordering"
 			body: """
@@ -209,5 +199,16 @@ components: sinks: loki: {
 				increasing timestamp.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
+		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
+		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
+		streams_total:                    components.sources.internal_metrics.output.metrics.streams_total
 	}
 }

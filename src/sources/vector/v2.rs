@@ -4,16 +4,17 @@ use crate::{
     proto::vector as proto,
     shutdown::ShutdownSignalToken,
     sources::Source,
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::net::TcpStream;
 use tonic::{
-    transport::{Certificate, Identity, Server, ServerTlsConfig},
+    transport::{server::Connected, Certificate, Server},
     Request, Response, Status,
 };
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
@@ -89,18 +90,10 @@ pub struct VectorConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
     #[serde(default)]
-    pub tls: Option<GrpcTlsConfig>,
+    tls: Option<TlsConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct GrpcTlsConfig {
-    ca_file: PathBuf,
-    crt_file: PathBuf,
-    key_file: PathBuf,
-}
-
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
@@ -117,18 +110,20 @@ impl GenerateConfig for VectorConfig {
 
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let source = run(self.address, self.tls.clone(), cx).map_err(|error| {
+        let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
+
+        let source = run(self.address, tls_settings, cx).map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
 
         Ok(Box::pin(source))
     }
 
-    pub(super) fn output_type(&self) -> DataType {
+    pub(super) const fn output_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn source_type(&self) -> &'static str {
+    pub(super) const fn source_type(&self) -> &'static str {
         "vector"
     }
 
@@ -139,7 +134,7 @@ impl VectorConfig {
 
 async fn run(
     address: SocketAddr,
-    tls: Option<GrpcTlsConfig>,
+    tls_settings: MaybeTlsSettings,
     cx: SourceContext,
 ) -> crate::Result<()> {
     let _span = crate::trace::current_span();
@@ -150,26 +145,40 @@ async fn run(
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
-    let mut server = match tls {
-        Some(tls) => {
-            let ca = Certificate::from_pem(tokio::fs::read(&tls.ca_file).await?);
-            let crt = tokio::fs::read(&tls.crt_file).await?;
-            let key = tokio::fs::read(&tls.key_file).await?;
-            let identity = Identity::from_pem(crt, key);
+    let listener = tls_settings.bind(&address).await?;
+    let stream = listener.accept_stream();
 
-            let tls_config = ServerTlsConfig::new().identity(identity).client_ca_root(ca);
-
-            Server::builder().tls_config(tls_config)?
-        }
-        None => Server::builder(),
-    };
-
-    server
+    Server::builder()
         .add_service(service)
-        .serve_with_shutdown(address, cx.shutdown.map(|token| tx.send(token).unwrap()))
+        .serve_with_incoming_shutdown(stream, cx.shutdown.map(|token| tx.send(token).unwrap()))
         .await?;
 
     drop(rx.await);
 
     Ok(())
+}
+
+#[derive(Clone)]
+pub struct MaybeTlsConnectInfo {
+    pub remote_addr: SocketAddr,
+    pub peer_certs: Option<Vec<Certificate>>,
+}
+
+impl Connected for MaybeTlsIncomingStream<TcpStream> {
+    type ConnectInfo = MaybeTlsConnectInfo;
+
+    fn connect_info(&self) -> Self::ConnectInfo {
+        MaybeTlsConnectInfo {
+            remote_addr: self.peer_addr(),
+            peer_certs: self
+                .ssl_stream()
+                .and_then(|s| s.ssl().peer_cert_chain())
+                .map(|s| {
+                    s.into_iter()
+                        .filter_map(|c| c.to_pem().ok())
+                        .map(Certificate::from_pem)
+                        .collect()
+                }),
+        }
+    }
 }

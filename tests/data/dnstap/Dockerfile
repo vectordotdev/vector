@@ -1,4 +1,4 @@
-FROM docker.io/library/debian:buster
+FROM docker.io/library/debian:bullseye
 
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends install apt-utils

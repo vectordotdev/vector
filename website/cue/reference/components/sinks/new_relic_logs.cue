@@ -34,9 +34,9 @@ components: sinks: new_relic_logs: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:                    true
-				concurrency:                100
-				headers:                    false
+				enabled:     true
+				concurrency: 100
+				headers:     false
 			}
 			tls: enabled: false
 			to: {
@@ -117,4 +117,6 @@ components: sinks: new_relic_logs: {
 		logs:    true
 		metrics: null
 	}
+
+	telemetry: components.sinks.http.telemetry
 }

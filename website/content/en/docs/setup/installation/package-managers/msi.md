@@ -9,9 +9,9 @@ MSI is the file format and command line utility for the [Windows Installer][inst
 ## Installation
 
 ```powershell
-powershell Invoke-WebRequest https://packages.timber.io/vector/{{< version >}}/vector-x86_64.msi \
-  -OutFile vector-{{< version >}}-x86_64.msi && \
-  msiexec /i vector-{{< version >}}-x86_64.msi /quiet
+powershell Invoke-WebRequest https://packages.timber.io/vector/{{% version %}}/vector-x86_64.msi \
+  -OutFile vector-{{% version %}}-x86_64.msi && \
+  msiexec /i vector-{{% version %}}-x86_64.msi /quiet
 ```
 
 ## Management

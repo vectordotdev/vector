@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, DataType, Resource};
+use super::{builder::ConfigBuilder, pipeline::Pipelines, ComponentKey, DataType, Resource};
 use std::collections::HashMap;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -11,6 +11,47 @@ pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         ])
     } else {
         Ok(())
+    }
+}
+
+pub fn check_pipelines(pipelines: &Pipelines) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+
+    for (pipeline_id, pipeline) in pipelines.inner() {
+        if pipeline_id.contains('.') {
+            errors.push(format!(
+                "Pipeline name \"{}\" shouldn't container a '.'.",
+                pipeline_id
+            ));
+        }
+
+        if let Err(err) = check_names(pipeline.transforms.keys()) {
+            errors.extend(err);
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result<(), Vec<String>> {
+    let errors: Vec<_> = names
+        .filter(|component_key| component_key.id().contains('.'))
+        .map(|component_key| {
+            format!(
+                "Component name \"{}\" should not contain a \".\"",
+                component_key.id()
+            )
+        })
+        .collect();
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 
@@ -28,25 +69,25 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     // Helper for below
     fn tagged<'a>(
         tag: &'static str,
-        iter: impl Iterator<Item = &'a String>,
-    ) -> impl Iterator<Item = (&'static str, &'a String)> {
+        iter: impl Iterator<Item = &'a ComponentKey>,
+    ) -> impl Iterator<Item = (&'static str, &'a ComponentKey)> {
         iter.map(move |x| (tag, x))
     }
 
     // Check for non-unique names across sources, sinks, and transforms
-    let mut name_uses = HashMap::<&str, Vec<&'static str>>::new();
-    for (ctype, name) in tagged("source", config.sources.keys())
+    let mut used_keys = HashMap::<&ComponentKey, Vec<&'static str>>::new();
+    for (ctype, id) in tagged("source", config.sources.keys())
         .chain(tagged("transform", config.transforms.keys()))
         .chain(tagged("sink", config.sinks.keys()))
     {
-        let uses = name_uses.entry(name).or_default();
+        let uses = used_keys.entry(id).or_default();
         uses.push(ctype);
     }
 
-    for (name, uses) in name_uses.into_iter().filter(|(_name, uses)| uses.len() > 1) {
+    for (id, uses) in used_keys.into_iter().filter(|(_id, uses)| uses.len() > 1) {
         errors.push(format!(
             "More than one component with name \"{}\" ({}).",
-            name,
+            id,
             uses.join(", ")
         ));
     }
@@ -55,27 +96,40 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let sink_inputs = config
         .sinks
         .iter()
-        .map(|(name, sink)| ("sink", name.clone(), sink.inputs.clone()));
+        .map(|(key, sink)| ("sink", key.clone(), sink.inputs.clone()));
     let transform_inputs = config
         .transforms
         .iter()
-        .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
-    for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
+        .map(|(key, transform)| ("transform", key.clone(), transform.inputs.clone()));
+    for (output_type, key, inputs) in sink_inputs.chain(transform_inputs) {
         if inputs.is_empty() {
             errors.push(format!(
-                "{} {:?} has no inputs",
+                "{} \"{}\" has no inputs",
                 capitalize(output_type),
-                name
+                key
             ));
         }
 
+        let mut frequencies = HashMap::new();
         for input in inputs {
+            let entry = frequencies.entry(input.clone()).or_insert(0usize);
+            *entry += 1;
             if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
                 errors.push(format!(
-                    "Input {:?} for {} {:?} doesn't exist.",
-                    input, output_type, name
+                    "Input \"{}\" for {} \"{}\" doesn't match any components.",
+                    input, output_type, key
                 ));
             }
+        }
+
+        for (dup, count) in frequencies.into_iter().filter(|(_name, count)| *count > 1) {
+            errors.push(format!(
+                "{} \"{}\" has input \"{}\" duplicated {} times",
+                capitalize(output_type),
+                key,
+                dup,
+                count,
+            ));
         }
     }
 
@@ -90,11 +144,11 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let source_resources = config
         .sources
         .iter()
-        .map(|(name, config)| (name, config.inner.resources()));
+        .map(|(id, config)| (id, config.inner.resources()));
     let sink_resources = config
         .sinks
         .iter()
-        .map(|(name, config)| (name, config.resources(name)));
+        .map(|(id, config)| (id, config.resources(id)));
 
     let conflicting_components = Resource::conflicts(source_resources.chain(sink_resources));
 
@@ -132,7 +186,7 @@ pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
                 .any(|(_, sink)| sink.inputs.contains(&name))
         {
             warnings.push(format!(
-                "{} {:?} has no consumers",
+                "{} \"{}\" has no consumers",
                 capitalize(input_type),
                 name
             ));
@@ -154,34 +208,34 @@ enum Node {
     Transform {
         in_ty: DataType,
         out_ty: DataType,
-        inputs: Vec<String>,
+        inputs: Vec<ComponentKey>,
     },
     Sink {
         ty: DataType,
-        inputs: Vec<String>,
+        inputs: Vec<ComponentKey>,
     },
 }
 
 #[derive(Default)]
 struct Graph {
-    nodes: HashMap<String, Node>,
+    nodes: HashMap<ComponentKey, Node>,
 }
 
 impl Graph {
-    fn add_source(&mut self, name: &str, ty: DataType) {
-        self.nodes.insert(name.to_string(), Node::Source { ty });
+    fn add_source<I: Into<ComponentKey>>(&mut self, id: I, ty: DataType) {
+        self.nodes.insert(id.into(), Node::Source { ty });
     }
 
-    fn add_transform(
+    fn add_transform<I: Into<ComponentKey>>(
         &mut self,
-        name: &str,
+        id: I,
         in_ty: DataType,
         out_ty: DataType,
-        inputs: Vec<impl Into<String>>,
+        inputs: Vec<impl Into<ComponentKey>>,
     ) {
         let inputs = self.clean_inputs(inputs);
         self.nodes.insert(
-            name.to_string(),
+            id.into(),
             Node::Transform {
                 in_ty,
                 out_ty,
@@ -190,13 +244,17 @@ impl Graph {
         );
     }
 
-    fn add_sink(&mut self, name: &str, ty: DataType, inputs: Vec<impl Into<String>>) {
+    fn add_sink<I: Into<ComponentKey>>(
+        &mut self,
+        id: I,
+        ty: DataType,
+        inputs: Vec<impl Into<ComponentKey>>,
+    ) {
         let inputs = self.clean_inputs(inputs);
-        self.nodes
-            .insert(name.to_string(), Node::Sink { ty, inputs });
+        self.nodes.insert(id.into(), Node::Sink { ty, inputs });
     }
 
-    fn paths(&self) -> Result<Vec<Vec<String>>, Vec<String>> {
+    fn paths(&self) -> Result<Vec<Vec<ComponentKey>>, Vec<String>> {
         let mut errors = Vec::new();
 
         let nodes = self
@@ -223,7 +281,7 @@ impl Graph {
         }
     }
 
-    fn clean_inputs(&self, inputs: Vec<impl Into<String>>) -> Vec<String> {
+    fn clean_inputs(&self, inputs: Vec<impl Into<ComponentKey>>) -> Vec<ComponentKey> {
         inputs.into_iter().map(Into::into).collect()
     }
 
@@ -268,21 +326,21 @@ impl From<&ConfigBuilder> for Graph {
         let mut graph = Graph::default();
 
         // TODO: validate that node names are unique across sources/transforms/sinks?
-        for (name, config) in config.sources.iter() {
-            graph.add_source(name, config.inner.output_type());
+        for (id, config) in config.sources.iter() {
+            graph.add_source(id.clone(), config.inner.output_type());
         }
 
-        for (name, config) in config.transforms.iter() {
+        for (id, config) in config.transforms.iter() {
             graph.add_transform(
-                name,
+                id.clone(),
                 config.inner.input_type(),
                 config.inner.output_type(),
                 config.inputs.clone(),
             );
         }
 
-        for (name, config) in config.sinks.iter() {
-            graph.add_sink(name, config.inner.input_type(), config.inputs.clone());
+        for (id, config) in config.sinks.iter() {
+            graph.add_sink(id.clone(), config.inner.input_type(), config.inputs.clone());
         }
 
         graph
@@ -290,10 +348,10 @@ impl From<&ConfigBuilder> for Graph {
 }
 
 fn paths_rec(
-    nodes: &HashMap<String, Node>,
-    node: &str,
-    mut path: Vec<String>,
-) -> Result<Vec<Vec<String>>, String> {
+    nodes: &HashMap<ComponentKey, Node>,
+    node: &ComponentKey,
+    mut path: Vec<ComponentKey>,
+) -> Result<Vec<Vec<ComponentKey>>, String> {
     if let Some(i) = path.iter().position(|p| p == node) {
         let mut segment = path.split_off(i);
         segment.push(node.into());
@@ -302,10 +360,14 @@ fn paths_rec(
         segment.reverse();
         return Err(format!(
             "Cyclic dependency detected in the chain [ {} ]",
-            segment.join(" -> ")
+            segment
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<_>>()
+                .join(" -> ")
         ));
     }
-    path.push(node.to_string());
+    path.push(node.clone());
     match nodes.get(node) {
         Some(Node::Source { .. }) | None => {
             path.reverse();
@@ -342,7 +404,7 @@ mod test {
     #[test]
     fn paths_detects_cycles() {
         let mut graph = Graph::default();
-        graph.add_source("in", DataType::Log);
+        graph.add_source(ComponentKey::from("in"), DataType::Log);
         graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
         graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
         graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
@@ -377,7 +439,12 @@ mod test {
 
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
-        graph.add_transform("in", DataType::Log, DataType::Log, vec!["in"]);
+        graph.add_transform(
+            ComponentKey::from("in"),
+            DataType::Log,
+            DataType::Log,
+            vec!["in"],
+        );
         graph.add_sink("out", DataType::Log, vec!["in"]);
 
         // This isn't really a cyclic dependency but let me have this one.

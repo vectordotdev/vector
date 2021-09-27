@@ -6,7 +6,7 @@
 //! discussion](https://github.com/danburkert/prost#faq) for details. But, we
 //! want generic structures that have type constraints for ser/de and so that's
 //! what this module provides. The definition is inspired by the types from
-//! [`prost::Message`], though split into an encode and decode side as serde
+//! `prost::Message`, though split into an encode and decode side as serde
 //! does.
 use bytes::{Buf, BufMut};
 

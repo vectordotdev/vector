@@ -3,12 +3,12 @@ mod udp;
 #[cfg(unix)]
 mod unix;
 
-use super::util::TcpSource;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
+    sources::util::TcpSource,
     tls::MaybeTlsSettings,
 };
 use serde::{Deserialize, Serialize};
@@ -80,9 +80,8 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let tcp = tcp::RawTcpSource {
-                    config: config.clone(),
-                };
+                let decoder = config.decoding().build()?;
+                let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
                     config.address(),
@@ -99,11 +98,12 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = config.decoding().build()?;
                 Ok(udp::udp(
                     config.address(),
-                    config.max_length(),
                     host_key,
                     config.receive_buffer_bytes(),
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -113,10 +113,12 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = config.decoding.build()?;
                 Ok(unix::unix_datagram(
                     config.path,
                     config.max_length,
                     host_key,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -126,10 +128,11 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
+                let decoder = config.decoding.build()?;
                 Ok(unix::unix_stream(
                     config.path,
-                    config.max_length,
                     host_key,
+                    decoder,
                     cx.shutdown,
                     cx.out,
                 ))
@@ -161,7 +164,10 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{log_schema, GlobalOptions, SinkContext, SourceConfig, SourceContext},
+        codecs::{DecodingConfig, NewlineDelimitedDecoderConfig},
+        config::{
+            log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
+        },
         event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
@@ -254,7 +260,12 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
+        config.set_decoding(DecodingConfig::new(
+            Some(Box::new(
+                NewlineDelimitedDecoderConfig::new_with_max_length(10),
+            )),
+            None,
+        ));
 
         let server = SocketConfig::from(config)
             .build(SourceContext::new_test(tx))
@@ -287,7 +298,6 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
         config.set_tls(Some(TlsConfig::test_config()));
 
         let server = SocketConfig::from(config)
@@ -296,11 +306,7 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let lines = vec![
-            "short".to_owned(),
-            "this is too long".to_owned(),
-            "more short".to_owned(),
-        ];
+        let lines = vec!["one line".to_owned(), "another line".to_owned()];
 
         wait_for_tcp(addr).await;
         send_lines_tls(addr, "localhost".into(), lines.into_iter(), None)
@@ -308,12 +314,15 @@ mod test {
             .unwrap();
 
         let event = rx.next().await.unwrap();
-        assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            "one line".into()
+        );
 
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
-            "more short".into()
+            "another line".into()
         );
     }
 
@@ -323,7 +332,6 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_max_length(10);
         config.set_tls(Some(TlsConfig {
             enabled: Some(true),
             options: TlsOptions {
@@ -339,11 +347,7 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let lines = vec![
-            "short".to_owned(),
-            "this is too long".to_owned(),
-            "more short".to_owned(),
-        ];
+        let lines = vec!["one line".to_owned(), "another line".to_owned()];
 
         wait_for_tcp(addr).await;
         send_lines_tls(
@@ -358,22 +362,22 @@ mod test {
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
-            "short".into()
+            "one line".into()
         );
 
         let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
-            "more short".into()
+            "another line".into()
         );
     }
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
-        let source_name = "tcp_shutdown_simple";
+        let source_id = ComponentKey::from("tcp_shutdown_simple");
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(source_name, tx);
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
 
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
@@ -393,7 +397,7 @@ mod test {
 
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -407,10 +411,10 @@ mod test {
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
         let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
-        let source_name = "tcp_shutdown_infinite_stream";
+        let source_id = ComponentKey::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(source_name, tx);
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
 
         // Start TCP Source
         let server = SocketConfig::from({
@@ -452,7 +456,7 @@ mod test {
         }
 
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -490,28 +494,33 @@ mod test {
 
     async fn init_udp_with_shutdown(
         sender: Pipeline,
-        source_name: &str,
+        source_id: &ComponentKey,
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
-        let (shutdown_signal, _) = shutdown.register_source(source_name);
-        init_udp_inner(sender, source_name, shutdown_signal).await
+        let (shutdown_signal, _) = shutdown.register_source(source_id);
+        init_udp_inner(sender, source_id, shutdown_signal).await
     }
 
     async fn init_udp(sender: Pipeline) -> SocketAddr {
-        let (addr, _handle) = init_udp_inner(sender, "default", ShutdownSignal::noop()).await;
+        let (addr, _handle) = init_udp_inner(
+            sender,
+            &ComponentKey::from("default"),
+            ShutdownSignal::noop(),
+        )
+        .await;
         addr
     }
 
     async fn init_udp_inner(
         sender: Pipeline,
-        source_name: &str,
+        source_key: &ComponentKey,
         shutdown_signal: ShutdownSignal,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let address = next_addr();
 
         let server = SocketConfig::from(UdpConfig::from_address(address))
             .build(SourceContext {
-                name: source_name.into(),
+                key: source_key.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,
@@ -609,10 +618,10 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_simple() {
         let (tx, rx) = Pipeline::new_test();
-        let source_name = "udp_shutdown_simple";
+        let source_id = ComponentKey::from("udp_shutdown_simple");
 
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown).await;
+        let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
 
         send_lines_udp(address, vec!["test".to_string()]);
         let events = collect_n(rx, 1).await;
@@ -624,7 +633,7 @@ mod test {
 
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -635,10 +644,10 @@ mod test {
     #[tokio::test]
     async fn udp_shutdown_infinite_stream() {
         let (tx, rx) = Pipeline::new_test();
-        let source_name = "udp_shutdown_infinite_stream";
+        let source_id = ComponentKey::from("udp_shutdown_infinite_stream");
 
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown).await;
+        let (address, source_handle) = init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
 
         // Stream that keeps sending lines to the UDP source forever.
         let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
@@ -659,7 +668,7 @@ mod test {
         }
 
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         let shutdown_success = shutdown_complete.await;
         assert!(shutdown_success);
 
@@ -768,13 +777,13 @@ mod test {
     }
 
     #[cfg(unix)]
-    fn parses_unix_config(name: &str) -> SocketConfig {
+    fn parses_unix_config(mode: &str) -> SocketConfig {
         toml::from_str::<SocketConfig>(&format!(
             r#"
                mode = "{}"
                path = "/does/not/exist"
             "#,
-            name
+            mode
         ))
         .unwrap()
     }

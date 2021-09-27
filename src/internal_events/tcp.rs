@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use crate::tls::TlsError;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
@@ -87,7 +87,7 @@ pub struct TcpSocketError {
 
 impl InternalEvent for TcpSocketError {
     fn emit_logs(&self) {
-        debug!(message = "TCP socket error.", error = %self.error);
+        warn!(message = "TCP socket error.", error = %self.error);
     }
 
     fn emit_metrics(&self) {

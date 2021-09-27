@@ -1,6 +1,8 @@
 package metadata
 
 components: sinks: vector: {
+	_port: 6000
+
 	title: "Vector"
 
 	description: """
@@ -15,16 +17,20 @@ components: sinks: vector: {
 		service_providers: []
 		stateful: false
 	}
-
 	features: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
-			compression: enabled: false
-			encoding: enabled: false
+			compression: enabled:       false
+			encoding: enabled:          false
 			send_buffer_bytes: enabled: true
 			keepalive: enabled:         true
-			request: enabled:           false
+			request: {
+				enabled:       true
+				headers:       false
+				relevant_when: "version = \"2\""
+			}
+
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -38,7 +44,7 @@ components: sinks: vector: {
 				interface: {
 					socket: {
 						direction: "outgoing"
-						protocols: ["tcp"]
+						protocols: ["http"]
 						ssl: "optional"
 					}
 				}
@@ -80,8 +86,22 @@ components: sinks: vector: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["92.12.333.224:5000"]
+				examples: ["92.12.333.224:\(_port)"]
 				syntax: "literal"
+			}
+		}
+		version: {
+			description: "Sink API version. Specifying this version ensures that Vector does not break backward compatibility."
+			common:      true
+			required:    false
+			warnings: ["Ensure you use the same version for both the sink and source."]
+			type: string: {
+				enum: {
+					"1": "Vector sink API version 1"
+					"2": "Vector sink API version 2"
+				}
+				default: "1"
+				syntax:  "literal"
 			}
 		}
 	}

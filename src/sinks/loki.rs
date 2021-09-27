@@ -3,11 +3,10 @@
 //! This sink provides downstream support for `Loki` via
 //! the v1 http json endpoint.
 //!
-//! https://github.com/grafana/loki/blob/master/docs/api.md
+//! <https://github.com/grafana/loki/blob/master/docs/api.md>
 //!
-//! This sink does not use `PartitionBatching` but elects to do
-//! stream multiplexing by organizing the streams in the `build_request`
-//! phase. There must be at least one valid set of labels.
+//! This sink uses `PartitionBatching` to partition events
+//! by streams. There must be at least one valid set of labels.
 //!
 //! If an event produces no labels, this can happen if the template
 //! does not match, we will add a default label `{agent="vector"}`.
@@ -16,19 +15,20 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     http::{Auth, HttpClient, MaybeAuth},
+    internal_events::{LokiEventUnlabeled, LokiEventsProcessed, TemplateRenderingFailed},
     sinks::util::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
-        service::ConcurrencyOption,
-        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
-        UriSerde,
+        BatchConfig, BatchSettings, Concurrency, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig, UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use futures::{FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
+use shared::encode_logfmt;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -72,6 +72,7 @@ pub enum OutOfOrderAction {
 enum Encoding {
     Json,
     Text,
+    Logfmt,
 }
 
 inventory::submit! {
@@ -100,11 +101,16 @@ impl SinkConfig for LokiConfig {
             return Err("`labels` must include at least one label.".into());
         }
 
-        if self.request.concurrency.is_some() {
-            warn!("Option `request.concurrency` is not supported.");
+        for label in self.labels.keys() {
+            if !valid_label_name(label) {
+                return Err(format!("Invalid label name {:?}", label.get_ref()).into());
+            }
         }
-        let mut request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        request_settings.concurrency = Some(1);
+
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(5),
+            ..Default::default()
+        });
 
         let batch_settings = BatchSettings::default()
             .bytes(102_400)
@@ -133,6 +139,7 @@ impl SinkConfig for LokiConfig {
             client.clone(),
             cx.acker(),
         )
+        .ordered()
         .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
         let healthcheck = healthcheck(config, client).boxed();
@@ -163,6 +170,7 @@ struct LokiSink {
 }
 
 impl LokiSink {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     fn new(config: LokiConfig) -> Self {
         Self {
             endpoint: config.endpoint,
@@ -184,16 +192,15 @@ impl HttpSink for LokiSink {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let tenant_id = self.tenant_id.as_ref().and_then(|t| {
             t.render_string(&event)
-                .map_err(|missing| {
-                    error!(
-                        message = "Error rendering `tenant_id` template.",
-                        ?missing,
-                        internal_log_rate_secs = 30
-                    );
+                .map_err(|error| {
+                    emit!(&TemplateRenderingFailed {
+                        error,
+                        field: Some("tenant_id"),
+                        drop_event: false,
+                    })
                 })
                 .ok()
         });
-        let key = PartitionKey { tenant_id };
 
         let mut labels = Vec::new();
 
@@ -228,20 +235,28 @@ impl HttpSink for LokiSink {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
         let event = match &self.encoding.codec() {
-            Encoding::Json => serde_json::to_string(&log).expect("json encoding should never fail"),
+            Encoding::Json => {
+                serde_json::to_string(&log).expect("json encoding should never fail.")
+            }
 
             Encoding::Text => log
                 .get(log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
+
+            Encoding::Logfmt => encode_logfmt::to_string(log.into_parts().0)
+                .expect("Logfmt encoding should never fail."),
         };
 
         // If no labels are provided we set our own default
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
+            emit!(&LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
+
+        let key = PartitionKey::new(tenant_id, &mut labels);
 
         let event = LokiEvent { timestamp, event };
         Some(PartitionInnerBuffer::new(
@@ -259,6 +274,10 @@ impl HttpSink for LokiSink {
         let tenant_id = key.tenant_id;
 
         let body = serde_json::to_vec(&json).unwrap();
+
+        emit!(&LokiEventsProcessed {
+            byte_size: body.len(),
+        });
 
         let uri = format!("{}loki/api/v1/push", self.endpoint.uri);
 
@@ -322,6 +341,24 @@ async fn fetch_status(
     Ok(client.send(req).await?.status())
 }
 
+fn valid_label_name(label: &Template) -> bool {
+    label.is_dynamic() || {
+        // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
+        // Although that isn't explicitly said anywhere besides what's in the code.
+        // The closest mention is in section about Parser Expression https://grafana.com/docs/loki/latest/logql/
+        //
+        // [a-zA-Z_][a-zA-Z0-9_]*
+        let label_trim = label.get_ref().trim();
+        let mut label_chars = label_trim.chars();
+        if let Some(ch) = label_chars.next() {
+            (ch.is_ascii_alphabetic() || ch == '_')
+                && label_chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+        } else {
+            false
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,6 +368,7 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use futures::StreamExt;
+    use std::convert::TryInto;
 
     #[test]
     fn generate_config() {
@@ -468,6 +506,21 @@ mod tests {
             .await
             .expect("healthcheck failed");
     }
+
+    #[test]
+    fn valid_label_names() {
+        assert!(valid_label_name(&"name".try_into().unwrap()));
+        assert!(valid_label_name(&" name ".try_into().unwrap()));
+        assert!(valid_label_name(&"bee_bop".try_into().unwrap()));
+        assert!(valid_label_name(&"a09b".try_into().unwrap()));
+
+        assert!(!valid_label_name(&"0ab".try_into().unwrap()));
+        assert!(!valid_label_name(&"*".try_into().unwrap()));
+        assert!(!valid_label_name(&"".try_into().unwrap()));
+        assert!(!valid_label_name(&" ".try_into().unwrap()));
+
+        assert!(valid_label_name(&"{{field}}".try_into().unwrap()));
+    }
 }
 
 #[cfg(feature = "loki-integration-tests")]
@@ -593,6 +646,33 @@ mod integration_tests {
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log()).unwrap();
             assert_eq!(output, &expected_json);
+        }
+    }
+
+    #[tokio::test]
+    async fn logfmt() {
+        let (stream, sink) = build_sink("logfmt").await;
+
+        let events = random_lines(100)
+            .take(10)
+            .map(Event::from)
+            .collect::<Vec<_>>();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events.clone().into_iter().map(
+                move |event| Ok(event.into_log().with_batch_notifier(&batch).into()),
+            )))
+            .await
+            .unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(events.len(), outputs.len());
+        for (i, output) in outputs.iter().enumerate() {
+            let expected_logfmt =
+                encode_logfmt::to_string(events[i].clone().into_log().into_parts().0).unwrap();
+            assert_eq!(output, &expected_logfmt);
         }
     }
 
@@ -833,6 +913,33 @@ mod integration_tests {
         .await;
     }
 
+    #[tokio::test]
+    async fn out_of_order_per_partition() {
+        let batch_size = 2;
+        let big_lines = random_lines(1_000_000).take(2);
+        let small_lines = random_lines(1).take(20);
+        let mut events = big_lines
+            .into_iter()
+            .chain(small_lines)
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        let base = chrono::Utc::now() - Duration::seconds(30);
+        for (i, event) in events.iter_mut().enumerate() {
+            let log = event.as_mut_log();
+            log.insert(
+                log_schema().timestamp_key(),
+                base + Duration::seconds(i as i64),
+            );
+        }
+
+        // So, since all of the events are of the same partition, and if there is concurrency,
+        // then if ordering inside paritions isn't upheld, the big line events will take longer
+        // time to flush than small line events so loki will receive smaller ones before large
+        // ones hence out of order events.
+        test_out_of_order_events(OutOfOrderAction::Drop, batch_size, events.clone(), events).await;
+    }
+
     async fn test_out_of_order_events(
         action: OutOfOrderAction,
         batch_size: usize,
@@ -857,6 +964,7 @@ mod integration_tests {
             Template::try_from(stream.to_string()).unwrap(),
         );
         config.batch.max_events = Some(batch_size);
+        config.batch.max_bytes = Some(4_000_000);
 
         let (sink, _) = config.build(cx).await.unwrap();
         sink.into_sink()
