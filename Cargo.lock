@@ -1785,7 +1785,7 @@ checksum = "53ecafc952c4528d9b51a458d1a8904b81783feff9fde08ab6ed2545ff396872"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "socket2 0.4.0",
+ "socket2 0.4.2",
  "winapi 0.3.9",
 ]
 

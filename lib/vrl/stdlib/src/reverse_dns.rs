@@ -27,7 +27,12 @@ impl Function for ReverseDns {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ReverseDnsFn { value }))
@@ -55,10 +60,7 @@ impl Expression for ReverseDnsFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
-            .bytes()
+        self.value.type_def(state).fallible().bytes()
     }
 }
 
@@ -72,13 +74,13 @@ mod tests {
         invalid_ip {
             args: func_args![value: value!("999.999.999.999")],
             want: Err("unable to parse IP address: invalid IP address syntax"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         localhost {
             args: func_args![value: value!("127.0.0.1")],
             want: Ok(value!("localhost")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         invalid_type {
