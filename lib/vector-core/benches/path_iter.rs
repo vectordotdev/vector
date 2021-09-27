@@ -1,7 +1,6 @@
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion, SamplingMode,
 };
-use std::time::Duration;
 use vector_core::event::PathIter;
 
 fn path_iter(c: &mut Criterion) {
