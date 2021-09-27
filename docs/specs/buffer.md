@@ -23,14 +23,17 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 *All buffers* MUST emit a `BufferCreated` event immediately upon creation.
 
 * Properties
-  * `max_size` - the maximum number of events or byte size of the buffer
+  * `max_size_bytes` - the max size of the buffer in bytes
+  * `max_size_events` - the max size of the buffer in number of events
   * `initial_events_size` - the number of events in the buffer at creation
   * `initial_bytes_size` - the byte size of the buffer at creation
   * `component_id` - the ID of the component associated with the buffer
+  * `component_scope` - the scope of the component associated with the buffer
 * Metric
-  * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) or `buffer_max_byte_size` gauge (disk buffers) with the defined `max_size` value and `component_id` as tag.
-  * MUST emit the `buffer_received_events_total` counter with the defined `initial_events_size` value with `component_id` as tag.
-  * MUST emit the `buffer_received_bytes_total` counter with the defined `initial_bytes_size` value with `component_id` as tag.
+  * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) if the defined `max_size_events` value is present with `component_id, component_scope` as tags.
+  * MUST emit the `buffer_max_byte_size` gauge (disk buffers) if the defined `max_size_bytes` value is present with `component_id, component_scope` as tags.
+  * MUST emit the `buffer_received_events_total` counter with the defined `initial_events_size` value with `component_id, component_scope` as tags.
+  * MUST emit the `buffer_received_bytes_total` counter with the defined `initial_bytes_size` value with `component_id, component_scope` as tags.
 
 #### `EventsReceived`
 
