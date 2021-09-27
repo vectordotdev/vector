@@ -35,9 +35,9 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
   * MUST emit the `buffer_received_events_total` counter with the defined `initial_events_size` value with `component_id, component_scope` as tags.
   * MUST emit the `buffer_received_bytes_total` counter with the defined `initial_bytes_size` value with `component_id, component_scope` as tags.
 
-#### `EventsReceived`
+#### `BufferEventsReceived`
 
-*All buffers* MUST emit an `EventsReceived` event immediately after receiving one or more Vector events.
+*All buffers* MUST emit an `BufferEventsReceived` event immediately after receiving one or more Vector events.
 
 * Properties
   * `count` - the number of received events
@@ -48,9 +48,9 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
   * MUST increment the `buffer_events` gauge by the defined `count`
   * MUST increment the `buffer_byte_size` gauge by the defined `byte_size`
 
-#### `EventsSent`
+#### `BufferEventsSent`
 
-*All buffers* MUST emit an `EventsSent` event immediately after sending one or more Vector events.
+*All buffers* MUST emit an `BufferEventsSent` event immediately after sending one or more Vector events.
 
 * Properties
   * `count` - the number of sent events
