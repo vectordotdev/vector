@@ -363,8 +363,7 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    let mut send_error = false;
-    while let (Some(((events, byte_size), stream)), false) = (receiver.recv().await, send_error) {
+    'send: while let Some(((events, byte_size), stream)) = receiver.recv().await {
         emit!(&ExecEventsReceived {
             count: events.len(),
             command: config.command_line().as_str(),
@@ -382,8 +381,7 @@ async fn run_command(
 
             if out.send(event).await.is_err() {
                 error!(message = "Failed to forward event; downstream is closed.");
-                send_error = true;
-                break;
+                break 'send;
             }
         }
     }
