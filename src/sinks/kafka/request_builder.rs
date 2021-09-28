@@ -21,8 +21,7 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
 
     fn split_input(&self, mut event: Event) -> Result<(Self::Metadata, Self::Events), Self::SplitError> {
 
-        //TODO: error handling?
-        let topic = self.topic.render_string(&event).unwrap();
+        let topic = self.topic.render_string(&event)?;
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
@@ -91,4 +90,29 @@ fn get_headers(event: &Event, headers_field: &Option<String>) -> Option<OwnedHea
         }
         None
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use bytes::Bytes;
+    use rdkafka::message::Headers;
+
+    #[test]
+    fn kafka_get_headers() {
+        let headers_key = "headers";
+        let mut header_values = BTreeMap::new();
+        header_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
+        header_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
+
+        let mut event = Event::from("hello");
+        event.as_mut_log().insert(headers_key, header_values);
+
+        let headers = get_headers(&event, &Some(headers_key.to_string())).unwrap();
+        assert_eq!(headers.get(0).unwrap().0, "a-key");
+        assert_eq!(headers.get(0).unwrap().1, "a-value".as_bytes());
+        assert_eq!(headers.get(1).unwrap().0, "b-key");
+        assert_eq!(headers.get(1).unwrap().1, "b-value".as_bytes());
+    }
 }

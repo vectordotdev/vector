@@ -1,7 +1,7 @@
 use super::config::KafkaRole;
 use super::config::KafkaSinkConfig;
 use crate::event::Event;
-use crate::sinks::kafka::config::Encoding;
+use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
 use crate::sinks::kafka::service::KafkaService;
 use crate::sinks::util::encoding::EncodingConfig;
@@ -78,7 +78,6 @@ impl KafkaSink {
                 request_builder_concurrency_limit,
                 request_builder,
                 self.encoding,
-                //TODO: This doesn't seem like it would work with Kafka?
                 Compression::None,
             )
             .filter_map(|request| async move {

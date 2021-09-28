@@ -2,18 +2,14 @@ use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::kafka::{KafkaAuthConfig, KafkaCompression};
 use crate::serde::to_string;
 use crate::sinks::kafka::sink::{KafkaSink, healthcheck};
-use crate::sinks::util::encoding::{
-    Encoder, EncodingConfig,
-};
+use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::util::BatchConfig;
 use crate::sinks::{Healthcheck, VectorSink};
 use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::Write;
-use vector_core::event::Event;
-use vector_core::config::log_schema;
+use crate::sinks::kafka::encoder::Encoding;
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
@@ -159,38 +155,7 @@ impl GenerateConfig for KafkaSinkConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
 
-impl Encoder for Encoding {
-    fn encode_event(&self, event: Event, writer: &mut dyn Write) -> std::io::Result<()> {
-        match self {
-            Encoding::Json => {
-                match event {
-                    Event::Log(log) => serde_json::to_writer(writer, &log)?,
-                    Event::Metric(metric) => serde_json::to_writer(writer, &metric)?,
-                }
-                Ok(())
-            }
-            Encoding::Text => match event {
-                Event::Log(log) => {
-                    let message = log
-                        .get(log_schema().message_key())
-                        .map(|v| v.as_bytes().to_vec())
-                        .unwrap_or_default();
-                    writer.write_all(&message)
-                },
-                Event::Metric(metric) => {
-                    writer.write_all(&metric.to_string().into_bytes())
-                }
-            },
-        }
-    }
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
