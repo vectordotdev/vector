@@ -454,6 +454,7 @@ fn create_event(
     file_key: &Option<String>,
 ) -> Event {
     emit!(&FileEventsReceived {
+        count: 1,
         file: &file,
         byte_size: line.len(),
     });

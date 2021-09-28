@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
 
@@ -51,6 +49,7 @@ mod source {
 
     #[derive(Debug)]
     pub struct FileEventsReceived<'a> {
+        pub count: usize,
         pub file: &'a str,
         pub byte_size: usize,
     }
@@ -58,15 +57,16 @@ mod source {
     impl InternalEvent for FileEventsReceived<'_> {
         fn emit_logs(&self) {
             trace!(
-                message = "Received one event.",
-                file = %self.file,
-                byte_size = %self.byte_size
+                message = "Received events.",
+                count = %self.count,
+                byte_size = %self.byte_size,
+                file = %self.file
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
-                "events_in_total", 1,
+                "events_in_total", self.count as u64,
                 "file" => self.file.to_owned(),
             );
             counter!(
@@ -74,7 +74,7 @@ mod source {
                 "file" => self.file.to_owned(),
             );
             counter!(
-                "component_received_events_total", 1,
+                "component_received_events_total", self.count as u64,
                 "file" => self.file.to_owned(),
             );
             counter!(
