@@ -51,7 +51,6 @@ impl Finalizable for KafkaRequest {
     }
 }
 
-// #[derive(Clone)]
 pub struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
     current_in_flight: Arc<AtomicU64>,
