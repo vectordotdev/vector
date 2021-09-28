@@ -9,22 +9,34 @@ of VRL, the [language documentation][docs] exists for that audience.
 
 ## Table of Contents
 
+<!-- vim-markdown-toc GFM -->
+
 * [The Zen of VRL](#the-zen-of-vrl)
 * [Why VRL](#why-vrl)
 * [Target Audience](#target-audience)
 * [Language Limits](#language-limits)
 * [Conventions](#conventions)
+  * [Performance](#performance)
+    * [Copying Data](#copying-data)
+    * [Program Optimizations](#program-optimizations)
+  * [Diagnostics](#diagnostics)
   * [Syntax](#syntax)
+  * [Fallibility](#fallibility)
+    * [Fallible Expressions](#fallible-expressions)
+    * [Type Checking](#type-checking)
+    * [Progressive Type Checking](#progressive-type-checking)
+  * [Errors](#errors)
   * [Functions](#functions)
     * [Composition](#composition)
     * [Naming](#naming)
     * [Return Types](#return-types)
     * [Mutability](#mutability)
-    * [Fallibility](#fallibility)
+    * [Fallibility](#fallibility-1)
     * [Signatures](#signatures)
-  * [Errors](#errors)
 * [Patterns](#patterns)
   * [Error Chaining](#error-chaining)
+
+<!-- vim-markdown-toc -->
 
 ## The Zen of VRL
 
@@ -38,7 +50,7 @@ of VRL, the [language documentation][docs] exists for that audience.
   is not a programming language. Users should not sacrifice the clarity of their
   data transformation for things like performance. The best VRL program is the
   one that most clearly describes the intended output. There should be no
-  "tricks" to making VRL fast that takeaway from readability.
+  "tricks" to making VRL fast that take away from readability.
 
 ## Why VRL
 
@@ -101,21 +113,84 @@ do so.
   User-defined functions again produce indirection. While it _might_ be useful
   to some extremely large use-cases, in most cases, allowing people to read
   a program from top to bottom without having to jump around is more clear in
-  the context within which VRL is used (remapping).
+  the context within which VRL is used.
 
 - network calls (see [#4517][] and [#8717][])
 
-  In order to avoid performance footguns, we want to ensure each function is as
+  In order to avoid performance foot guns, we want to ensure each function is as
   performant as it can be, and there's no way to use functions in such a way
   that performance of a VRL program tanks. We might introduce network calls at
   some point, if we find a good caching solution to solve most of our concerns,
   but so far we've avoided any network calls inside our stdlib.
 
+- assignable closures (see [#9001])
+
+  While we _do_ support closures, they are tied to function calls, and cannot be
+  used elsewhere. This also means closures cannot be assigned to variables, and
+  re-used between function-calls. This decision was made because it can lead to
+  poor-performing code (to the extend of introducing infinite loops), and makes
+  code less clear to reason about. While this is undoubtedly a powerful feature
+  to have, the cons do not outweigh the pro's.
+
 [#5507]: https://github.com/timberio/vector/issues/5507
 [#4517]: https://github.com/timberio/vector/issues/4517#issuecomment-754160338
 [#8717]: https://github.com/timberio/vector/pull/8717
+[#9001]: https://github.com/vectordotdev/vector/pull/9001#discussion_r701830595
 
 ## Conventions
+
+### Performance
+
+The performance of VRL is a corner-stone of the language. However, given the
+target audience, and the goal to make the language as simple and
+straight-forward as possible, there are always trade-offs to be made when
+considering the performance implications of a feature or design decision.
+
+#### Copying Data
+
+For example, VRL is an expression-oriented language, and we favor returning
+a new copy of a piece of manipulated data over mutating the underlying data.
+
+That is, you write this:
+
+```coffee
+# explicitly assign the parsed JSON to `.message`
+.message = parse_json(.message)
+```
+
+Instead of this:
+
+```coffee
+# mutate `.message` in place
+parse_json(.message)
+```
+
+While this results in less performance, it makes VRL programs easier to reason
+about, which _in this particular case_ weigh more heavily than the performance
+implications.
+
+#### Program Optimizations
+
+We plan on introducing an "optimization step" to the compiler in the future,
+that would allow us to rewrite parts of a program into a more optimized variant,
+without having the operator having to worry about these transformations.
+
+This means that if there's a reasonable path forward towards optimizing certain
+language constructs internally, we should not burden the operator with
+using/applying to optimizations manually.
+
+For example, we favor composition over single-purpose functions, and while each
+individual function call adds extra performance overhead, the thought is that in
+the future, we can optimize multiple function calls into a single call
+(inlining), without having to expose this optimization technique to operators.
+
+### Diagnostics
+
+Diagnostic messages shown by the compiler during compilation are one of the
+biggest tools we expose to operators to help them write correct programs.
+
+Adding diagnostic messages to new and existing features in VRL should never be
+an afterthought.
 
 ### Syntax
 
@@ -126,6 +201,94 @@ Use functions whenever possible, and only introduce new syntax if a common
 pattern warrants a more convenient syntax-based solution, or functions are too
 limited in their capability to solve the required need.
 
+### Fallibility
+
+A VRL program must be **infallible by default** once the compiler generates
+a program from the provided source. This means that any expression that can
+result in an error (adding a string and an object, dividing by zero, calling
+a fallible function) must be explicitly handled before the compiler accepts the
+input source.
+
+The fallibility system is an important part of the language and its goals, and
+is also the part that most often trips people up. This chapter tries to shed
+some light on its inner workings.
+
+#### Fallible Expressions
+
+When the VRL compiler compiles a source to a valid program, it queries each
+expression whether the expression itself can fail at runtime or not. If it can,
+the compiler refuses to compile the program, until the operator handles the
+failure case.
+
+For example:
+
+```coffee
+. = parse_json(.message)
+```
+
+The above program can fail at runtime, because there's no guarantee the
+`message` field contains a JSON-encoded string.
+
+The operator needs to handle the failure case using one of the available
+[failure-handling features][fail] in VRL.
+
+#### Type Checking
+
+In addition to expressions being fallible, the type checker also considers
+a program fallible if the type expected by an expression cannot be guaranteed at
+compile-time.
+
+For example:
+
+```coffee
+.message = "log message: " + .log
+```
+
+In this case, the `log` field type cannot be determined at compile-time, and
+thus concatenating the field value with a string might fail (e.g. if it's an
+array, or any other type that cannot be combined with a string).
+
+This too needs to be handled at compile-time by the operator.
+
+#### Progressive Type Checking
+
+A quirk in the type checker is that arguments passed to functions are _not_ type
+checked individually. Instead, the function call itself can be marked fallible
+if any of its arguments do not adhere to the expected type.
+
+For example:
+
+```coffee
+upcase(.message)
+```
+
+Upcasing a string is an infallible operation, however, because we can't
+guarantee that the `message` field will actually be a string, the function call
+is still invalid, as the function is marked as fallible.
+
+This decision [was made][#6507] for ergonomics purposes.
+
+[fail]: https://vrl.dev/errors/#runtime-errors
+[#6507]: https://github.com/vectordotdev/vector/issues/6507
+
+### Errors
+
+- All errors are caught at compile-time by the compiler (see "fallibility"
+  chapter).
+
+- The only exception to this rule is if the operator explicitly allows
+  a function to fail the program at runtime (e.g. `safe_call()` vs
+  `unsafe_call!()`).
+
+- A function should be marked as "fallible" if its internal implementation can
+  fail.
+
+- A function _should not_ be marked as fallible if it receives the wrong
+  argument type. This is handled by the compiler.
+
+- Errors should contain explicit messages detailing what went wrong, and how the
+  operator can solve the problem.
+
 ### Functions
 
 #### Composition
@@ -135,7 +298,7 @@ limited in their capability to solve the required need.
 - If a problem needs to be solved in multiple steps, consider adding
   single-purpose functions for each individual step.
 
-- If useability or readability is hurt by composition, favor single-purpose
+- If usability or readability is hurt by composition, favor single-purpose
   functions.
 
 #### Naming
@@ -151,8 +314,8 @@ limited in their capability to solve the required need.
 - Functions should be preceded with their function category for organization and
   discovery.
 
-  - Use `parse_*` for string to type decoding functions (e.g. `parse_json` and
-    `parse_grok`).
+  - Use `parse_*` for functions that decode a string to another type of data
+    (e.g. `parse_json` and `parse_grok`).
   
   - Use `decode_*` for string to string decoding functions (e.g.
     `decode_base64`).
@@ -166,6 +329,11 @@ limited in their capability to solve the required need.
   
   - Use `format_*` for string formatting functions (e.g. `format_timestamp` and
     `format_number`).
+
+  - Use `get_*` for functions that return a single result, or error if zero or
+    more results are found.
+
+  - Use `find_*` when multiple possible results are returned in an array.
 
 #### Return Types
 
@@ -200,14 +368,17 @@ limited, and additional exceptions should be well reasoned.
 
 - A function must be marked as fallible if it can fail in any way.
 
-- Design a function with the goal of making it infallible.
+- A function should be designed with the goal of making it infallible.
 
-- But don't hide fallibility for the sake of persuing the previous rule.
+- A function must not hide fallibility for the sake of pursuing the previous
+  rule.
 
-- A function implementation can assume it receives the argument type it has
+- A function implementation may assume it receives the argument type it has
   defined.
 
 - `parse_*` functions should almost always error when used incorrectly.
+
+- `get_*` functions should fail when it can't find a single result to return.
 
 - `to_*` functions must never fail.
 
@@ -224,23 +395,6 @@ limited, and additional exceptions should be well reasoned.
 
 - The exception to this is when you're dealing with an actual VRL path (e.g.
   `del(path)`) or in special cases such as `assert`.
-
-### Errors
-
-- All errors are caught at compile-time by the compiler.
-
-- The only exception to this rule is if the operator explicitly allows
-  a function to fail the program at runtime (e.g. `safe_call()` vs
-  `unsafe_call!()`).
-
-- A function should be marked as "fallible" if its internal implementation can
-  fail.
-
-- A function _should not_ be marked as fallible if it receives the wrong
-  argument type. This is handled by the compiler.
-
-- Errors should contain explicit messages detailing what went wrong, and how the
-  operator can solve the problem.
 
 ## Patterns
 
