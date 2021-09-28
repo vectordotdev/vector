@@ -77,9 +77,9 @@ mod tests {
             tdef: TypeDef::new().fallible().bytes(),
         }
 
-        localhost {
-            args: func_args![value: value!("127.0.0.1")],
-            want: Ok(value!("localhost")),
+        google {
+            args: func_args![value: value!("8.8.8.8")],
+            want: Ok(value!("dns.google")),
             tdef: TypeDef::new().fallible().bytes(),
         }
 
