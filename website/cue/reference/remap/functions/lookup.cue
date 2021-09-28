@@ -37,7 +37,7 @@ remap: functions: lookup: {
 			source: #"""
 				lookup!(value: { "foo": "bar" }, path: ["foo"])
 				"""#
-			return: "foo"
+			return: "bar"
 		},
 		{
 			title: "multi-segment nested field"
