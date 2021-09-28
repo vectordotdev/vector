@@ -1,3 +1,5 @@
+// ## skip check-events ##
+
 use crate::sources::aws_kinesis_firehose::Compression;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;

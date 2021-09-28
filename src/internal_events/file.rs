@@ -1,3 +1,5 @@
+// ## skip check-events ##
+
 use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
 

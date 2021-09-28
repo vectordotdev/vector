@@ -1,3 +1,5 @@
+// ## skip check-events ##
+
 use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
