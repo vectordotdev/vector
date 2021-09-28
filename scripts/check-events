@@ -161,10 +161,12 @@ Find.find('src') do |path|
 
     if path.start_with? 'src/internal_events/'
       # Scan internal event structs for member names
-      text.scan(/[\n ]struct (\S+?)(?:<.+?>)? {\n(.+?)\n}\n/m) do |struct_name, members|
+      text.scan(/[\n ]struct (\S+?)(?:<.+?>)?(?: {\n(.+?)\n}|;)\n/m) do |struct_name, members|
         $all_events[struct_name].path = path
-        member_names = members.scan(/ ([A-Za-z0-9_]+): /).map { |member,| member }
-        $all_events[struct_name].members = member_names
+        if members
+          member_names = members.scan(/ ([A-Za-z0-9_]+): /).map { |member,| member }
+          $all_events[struct_name].members = member_names
+        end
       end
 
       # Scan internal event implementation blocks for logs and metrics
