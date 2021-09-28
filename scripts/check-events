@@ -18,29 +18,6 @@ def hash_array_add(hash, key, item)
   hash[key] = arr
 end
 
-# Reduce a path to a component name, used to group all the emits for a
-# component that may be split over multiple files.
-def path_component(path)
-  parts = path.split('/')
-  parts.shift # Drop the leading 'src'
-  group = parts.shift
-  component = parts.shift
-
-  # Skip the top-level module files and utilities
-  if component == 'mod.rs' or component == 'util'
-    return nil
-  end
-
-  if component == 'gcp'
-    component = "gcp_#{parts.shift}"
-  end
-
-  if component.end_with? '.rs'
-    component = component[..-4]
-  end
-  "#{group}/#{component}"
-end
-
 # A class to hold error reports and common functionality
 class Event
   attr_accessor :path
