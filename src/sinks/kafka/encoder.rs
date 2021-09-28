@@ -47,7 +47,7 @@ mod tests {
         crate::test_util::trace_init();
         let message = "hello world".to_string();
         let mut bytes = vec![];
-        Encoding::Text.encode_event(message.clone().into(), &mut bytes);
+        Encoding::Text.encode_event(message.clone().into(), &mut bytes).unwrap();
         assert_eq!(&bytes[..], message.as_bytes());
     }
 
@@ -60,7 +60,7 @@ mod tests {
         event.as_mut_log().insert("foo", "bar");
 
         let mut bytes = vec![];
-        Encoding::Json.encode_event(event, &mut bytes);
+        Encoding::Json.encode_event(event, &mut bytes).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
@@ -77,7 +77,7 @@ mod tests {
             MetricValue::Counter { value: 0.0 },
         );
         let mut bytes = vec![];
-        Encoding::Text.encode_event(metric.clone().into(), &mut bytes);
+        Encoding::Text.encode_event(metric.clone().into(), &mut bytes).unwrap();
         assert_eq!(metric.to_string(), String::from_utf8_lossy(&bytes));
     }
 
@@ -90,7 +90,7 @@ mod tests {
         );
 
         let mut bytes = vec![];
-        Encoding::Json.encode_event(metric.clone().into());
+        Encoding::Json.encode_event(metric.clone().into(), &mut bytes).unwrap();
 
         assert_eq!(
             serde_json::to_string(&metric).unwrap(),
