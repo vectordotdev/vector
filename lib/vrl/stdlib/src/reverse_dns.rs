@@ -77,8 +77,14 @@ mod tests {
             tdef: TypeDef::new().fallible().bytes(),
         }
 
-        google {
+        google_ipv4 {
             args: func_args![value: value!("8.8.8.8")],
+            want: Ok(value!("dns.google")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+
+        google_ipv6 {
+            args: func_args![value: value!("2001:4860:4860::8844")],
             want: Ok(value!("dns.google")),
             tdef: TypeDef::new().fallible().bytes(),
         }
