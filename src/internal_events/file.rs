@@ -25,7 +25,7 @@ mod source {
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
         pub byte_size: usize,
-        pub path: &'a str,
+        pub file: &'a str,
     }
 
     impl<'a> InternalEvent for FileBytesReceived<'a> {
@@ -34,7 +34,7 @@ mod source {
                 message = "Bytes received.",
                 byte_size = %self.byte_size,
                 protocol = "file",
-                path = %self.path,
+                file = %self.file,
             );
         }
 
@@ -42,7 +42,7 @@ mod source {
             counter!(
                 "component_received_bytes_total", self.byte_size as u64,
                 "protocol" => "file",
-                "file" => self.path.to_string()
+                "file" => self.file.to_owned()
             );
         }
     }
@@ -86,28 +86,28 @@ mod source {
 
     #[derive(Debug)]
     pub struct FileChecksumFailed<'a> {
-        pub path: &'a Path,
+        pub file: &'a Path,
     }
 
     impl<'a> InternalEvent for FileChecksumFailed<'a> {
         fn emit_logs(&self) {
             warn!(
                 message = "Currently ignoring file too small to fingerprint.",
-                path = %self.path.display(),
+                file = %self.file.display(),
             )
         }
 
         fn emit_metrics(&self) {
             counter!(
                 "checksum_errors_total", 1,
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
 
     #[derive(Debug)]
     pub struct FileFingerprintReadError<'a> {
-        pub path: &'a Path,
+        pub file: &'a Path,
         pub error: Error,
     }
 
@@ -115,7 +115,7 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Failed reading file for fingerprinting.",
-                path = %self.path.display(),
+                file = %self.file.display(),
                 error_type = "read_failed",
                 error = %self.error,
                 stage = "receiving",
@@ -125,12 +125,12 @@ mod source {
         fn emit_metrics(&self) {
             counter!(
                 "fingerprint_read_errors_total", 1,
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
             );
             counter!(
                 "component_errors_total", 1,
                 "error_type" => "read_failed",
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
                 "stage" => "receiving",
             );
         }
@@ -138,7 +138,7 @@ mod source {
 
     #[derive(Debug)]
     pub struct FileDeleteError<'a> {
-        pub path: &'a Path,
+        pub file: &'a Path,
         pub error: Error,
     }
 
@@ -146,7 +146,7 @@ mod source {
         fn emit_logs(&self) {
             warn!(
                 message = "Failed in deleting file.",
-                path = %self.path.display(),
+                file = %self.file.display(),
                 error = %self.error,
                 internal_log_rate_secs = 1
             );
@@ -155,12 +155,12 @@ mod source {
         fn emit_metrics(&self) {
             counter!(
                 "file_delete_errors_total", 1,
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
             );
             counter!(
                 "component_errors_total", 1,
                 "error_type" => "delete_failed",
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
                 "stage" => "receiving"
             );
         }
@@ -168,49 +168,49 @@ mod source {
 
     #[derive(Debug)]
     pub struct FileDeleted<'a> {
-        pub path: &'a Path,
+        pub file: &'a Path,
     }
 
     impl<'a> InternalEvent for FileDeleted<'a> {
         fn emit_logs(&self) {
             info!(
                 message = "File deleted.",
-                path = %self.path.display(),
+                file = %self.file.display(),
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
                 "files_deleted_total", 1,
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
 
     #[derive(Debug)]
     pub struct FileUnwatched<'a> {
-        pub path: &'a Path,
+        pub file: &'a Path,
     }
 
     impl<'a> InternalEvent for FileUnwatched<'a> {
         fn emit_logs(&self) {
             info!(
                 message = "Stopped watching file.",
-                path = %self.path.display(),
+                file = %self.file.display(),
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
                 "files_unwatched_total", 1,
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
 
     #[derive(Debug)]
     pub struct FileWatchError<'a> {
-        pub path: &'a Path,
+        pub file: &'a Path,
         pub error: Error,
     }
 
@@ -218,7 +218,7 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Failed to watch file.",
-                path = %self.path.display(),
+                file = %self.file.display(),
                 error_type = "watch_failed",
                 error = %self.error,
                 stage = "receiving"
@@ -228,12 +228,12 @@ mod source {
         fn emit_metrics(&self) {
             counter!(
                 "file_watch_errors_total", 1,
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
             );
             counter!(
                 "component_errors_total", 1,
                 "error_type" => "watch_failed",
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
                 "stage" => "receiving"
             );
         }
@@ -241,7 +241,7 @@ mod source {
 
     #[derive(Debug)]
     pub struct FileResumed<'a> {
-        pub path: &'a Path,
+        pub file: &'a Path,
         pub file_position: u64,
     }
 
@@ -249,7 +249,7 @@ mod source {
         fn emit_logs(&self) {
             info!(
                 message = "Resuming to watch file.",
-                path = %self.path.display(),
+                file = %self.file.display(),
                 file_position = %self.file_position
             );
         }
@@ -257,28 +257,28 @@ mod source {
         fn emit_metrics(&self) {
             counter!(
                 "files_resumed_total", 1,
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
 
     #[derive(Debug)]
     pub struct FileAdded<'a> {
-        pub path: &'a Path,
+        pub file: &'a Path,
     }
 
     impl<'a> InternalEvent for FileAdded<'a> {
         fn emit_logs(&self) {
             info!(
                 message = "Found new file to watch.",
-                path = %self.path.display(),
+                file = %self.file.display(),
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
                 "files_added_total", 1,
-                "file" => self.path.to_string_lossy().into_owned(),
+                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
@@ -353,7 +353,7 @@ mod source {
             counter!(
                 "component_errors_total", 1,
                 "error_type" => "glob_failed",
-                "file" => self.path.to_string_lossy().into_owned(),
+                "path" => self.path.to_string_lossy().into_owned(),
                 "stage" => "receiving"
             );
         }
@@ -363,39 +363,39 @@ mod source {
     pub struct FileSourceInternalEventsEmitter;
 
     impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
-        fn emit_file_added(&self, path: &Path) {
-            emit!(&FileAdded { path });
+        fn emit_file_added(&self, file: &Path) {
+            emit!(&FileAdded { file });
         }
 
-        fn emit_file_resumed(&self, path: &Path, file_position: u64) {
+        fn emit_file_resumed(&self, file: &Path, file_position: u64) {
             emit!(&FileResumed {
-                path,
+                file,
                 file_position
             });
         }
 
-        fn emit_file_watch_error(&self, path: &Path, error: Error) {
-            emit!(&FileWatchError { path, error });
+        fn emit_file_watch_error(&self, file: &Path, error: Error) {
+            emit!(&FileWatchError { file, error });
         }
 
-        fn emit_file_unwatched(&self, path: &Path) {
-            emit!(&FileUnwatched { path });
+        fn emit_file_unwatched(&self, file: &Path) {
+            emit!(&FileUnwatched { file });
         }
 
-        fn emit_file_deleted(&self, path: &Path) {
-            emit!(&FileDeleted { path });
+        fn emit_file_deleted(&self, file: &Path) {
+            emit!(&FileDeleted { file });
         }
 
-        fn emit_file_delete_error(&self, path: &Path, error: Error) {
-            emit!(&FileDeleteError { path, error });
+        fn emit_file_delete_error(&self, file: &Path, error: Error) {
+            emit!(&FileDeleteError { file, error });
         }
 
-        fn emit_file_fingerprint_read_error(&self, path: &Path, error: Error) {
-            emit!(&FileFingerprintReadError { path, error });
+        fn emit_file_fingerprint_read_error(&self, file: &Path, error: Error) {
+            emit!(&FileFingerprintReadError { file, error });
         }
 
-        fn emit_file_checksum_failed(&self, path: &Path) {
-            emit!(&FileChecksumFailed { path });
+        fn emit_file_checksum_failed(&self, file: &Path) {
+            emit!(&FileChecksumFailed { file });
         }
 
         fn emit_file_checkpointed(&self, count: usize, duration: Duration) {
