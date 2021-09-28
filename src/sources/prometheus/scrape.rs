@@ -4,7 +4,7 @@ use crate::{
     http::Auth,
     http::HttpClient,
     internal_events::{
-        PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
+        PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
         PrometheusParseError, PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
@@ -211,7 +211,7 @@ fn prometheus(
                                     endpoint = %url
                                 );
                             }
-                            emit!(&PrometheusErrorResponse {
+                            emit!(&PrometheusHttpResponseError {
                                 code: header.status,
                                 url: url.clone(),
                             });
