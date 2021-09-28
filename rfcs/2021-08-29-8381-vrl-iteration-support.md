@@ -40,7 +40,6 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
   * [Schema Support](#schema-support)
   * [Pipeline Operator Support](#pipeline-operator-support)
   * [Dynamic Field Assignment Support](#dynamic-field-assignment-support)
-  * [Short-Hand Object Notation](#short-hand-object-notation)
 
 <!-- vim-markdown-toc -->
 
@@ -94,9 +93,6 @@ compile-time, which you still want to manipulate.
 To do this, you have to be able to _iterate_ over key/value pairs of your
 object, and remap them individually. This requires some form of iteration
 support in the language.
-
-- **TODO: list existing issues and problems that operators want to solve.**
-- **TODO: list requests from Discord/Slack (e.g. the `count` example).**
 
 ## Proposal
 
@@ -218,7 +214,7 @@ Let's break this down:
 - It takes two arguments, `value` and `recursive`.
   - `value` has to be of type `object`, which is the object to be iterated over.
   - `recursive` has to be of type `boolean`, determining whether to iterate over
-    nested objects. It defaults to `false`.
+    nested objects (_not_ arrays). It defaults to `false`.
 - A closure-like expression is expected as part of the function call, but after
   the closing `)`.
   - This takes the form of `{ |...| expression }`.
@@ -267,7 +263,8 @@ map(value: ARRAY, recursive: BOOLEAN) { |<index variable>, <value variable>| EXP
 
 This is nearly identical to the object signature, except that it takes an array,
 has a variable for the index of the current item, and returns a single
-expression to use as the value at the given index.
+expression to use as the value at the given index. Additionally, the `recursive`
+flag only recurses into nested arrays, _not_ objects.
 
 Here's an example:
 
