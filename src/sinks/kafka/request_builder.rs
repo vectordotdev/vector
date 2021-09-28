@@ -17,8 +17,9 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
     type Events = [Event; 1];
     type Payload = Vec<u8>;
     type Request = KafkaRequest;
+    type SplitError = TemplateRenderingError;
 
-    fn split_input(&self, mut event: Event) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, mut event: Event) -> Result<(Self::Metadata, Self::Events), Self::SplitError> {
 
         //TODO: error handling?
         let topic = self.topic.render_string(&event).unwrap();
@@ -30,7 +31,7 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
             topic
         };
         let events = [event];
-        (metadata, events)
+        Ok((metadata, events))
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {

@@ -1,4 +1,4 @@
-use std::{fmt, future::Future, io, num::NonZeroUsize, pin::Pin, sync::Arc, time::Duration};
+use std::{fmt, future::Future, num::NonZeroUsize, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::Stream;
 use tower::Service;
@@ -13,6 +13,7 @@ use vector_core::{
 };
 
 use super::{encoding::Encoder, Compression, Compressor, ConcurrentMap, RequestBuilder};
+use crate::sinks::util::request_builder::{RequestBuilderResult, RequestBuilderError};
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
@@ -76,7 +77,7 @@ pub trait SinkBuilderExt: Stream {
         builder: B,
         encoding: E,
         compression: Compression,
-    ) -> ConcurrentMap<Self, io::Result<B::Request>>
+    ) -> ConcurrentMap<Self, RequestBuilderResult<B::Request, B::SplitError>>
     where
         Self: Sized,
         Self: Stream<Item = I>,
@@ -84,6 +85,7 @@ pub trait SinkBuilderExt: Stream {
         B::Events: IntoIterator<Item = Event>,
         B::Payload: From<Vec<u8>>,
         B::Request: Send,
+        B::SplitError: Send,
         I: Send + 'static,
         E: Encoder + Send + Sync + 'static,
     {
@@ -97,7 +99,8 @@ pub trait SinkBuilderExt: Stream {
 
             Box::pin(async move {
                 // Split the input into metadata and events.
-                let (metadata, events) = builder.split_input(input);
+                let (metadata, events) = builder.split_input(input)
+                    .map_err(|e|RequestBuilderError::SplitError(e))?;
 
                 // Encode/compress each event.
                 for event in events.into_iter() {
@@ -105,7 +108,8 @@ pub trait SinkBuilderExt: Stream {
                     // as the write target, but the `std::io::Write` interface _is_ fallible, and
                     // technically we might run out of memory when allocating for the vector, so we
                     // pass the error through.
-                    let _ = encoder.encode_event(event, &mut compressor)?;
+                    let _ = encoder.encode_event(event, &mut compressor)
+                        .map_err(|e| RequestBuilderError::EncodingError(e))?;
                 }
 
                 // Now build the actual request.

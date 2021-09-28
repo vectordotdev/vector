@@ -1,5 +1,5 @@
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsContext};
+use crate::kafka::{KafkaAuthConfig, KafkaCompression};
 use crate::serde::to_string;
 use crate::sinks::kafka::sink::{KafkaSink, healthcheck};
 use crate::sinks::util::encoding::{
@@ -7,17 +7,11 @@ use crate::sinks::util::encoding::{
 };
 use crate::sinks::util::BatchConfig;
 use crate::sinks::{Healthcheck, VectorSink};
-use crate::template::Template;
-use crate::template::TemplateParseError;
 use futures::FutureExt;
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use rdkafka::error::KafkaError;
-use rdkafka::producer::FutureProducer;
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Write;
-use tokio::time::Duration;
 use vector_core::event::Event;
 use vector_core::config::log_schema;
 

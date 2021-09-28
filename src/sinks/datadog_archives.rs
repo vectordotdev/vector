@@ -301,12 +301,13 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
     type Events = Vec<Event>;
     type Payload = Bytes;
     type Request = S3Request;
+    type SplitError = ();
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, input: (String, Vec<Event>)) -> Result<(Self::Metadata, Self::Events), Self::SplitError> {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
 
-        ((partition_key, events.len(), finalizers), events)
+        Ok(((partition_key, events.len(), finalizers), events))
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {

@@ -12,6 +12,7 @@ use vector_core::{buffers::Ackable, event::Finalizable, sink::StreamSink};
 use vector_core::{buffers::Acker, event::EventStatus};
 
 use crate::sinks::s3_common::partitioner::KeyPartitioner;
+use std::fmt::Debug;
 
 pub struct S3Sink<Svc, RB, E> {
     acker: Acker,
@@ -61,6 +62,7 @@ where
     RB::Events: IntoIterator<Item = Event>,
     RB::Payload: From<Vec<u8>>,
     RB::Request: Ackable + Finalizable + Send,
+    RB::SplitError: Send + Debug,
     E: Encoder + Send + Sync + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -113,6 +115,7 @@ where
     RB::Events: IntoIterator<Item = Event>,
     RB::Payload: From<Vec<u8>>,
     RB::Request: Ackable + Finalizable + Send,
+    RB::SplitError: Send + Debug,
     E: Encoder + Send + Sync + 'static,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

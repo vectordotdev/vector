@@ -20,6 +20,8 @@ use crate::kafka::KafkaStatisticsContext;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use tokio::time::Duration;
 use rdkafka::error::KafkaError;
+use crate::sinks::util::request_builder::RequestBuilderError;
+use crate::internal_events::TemplateRenderingFailed;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -81,11 +83,19 @@ impl KafkaSink {
             )
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("failed to build Kafka request: {:?}", e);
+                    Ok(req) => Some(req),
+                    Err(RequestBuilderError::EncodingError(e)) => {
+                        error!("failed to encode Kafka request: {:?}", e);
+                        None
+                    },
+                    Err(RequestBuilderError::SplitError(error)) => {
+                        emit!(&TemplateRenderingFailed {
+                            error,
+                            field: Some("topic"),
+                            drop_event: true,
+                        });
                         None
                     }
-                    Ok(req) => Some(req),
                 }
             })
             .into_driver(self.service, self.acker);
