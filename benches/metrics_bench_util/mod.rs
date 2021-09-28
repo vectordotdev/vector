@@ -36,7 +36,7 @@ fn disable_metrics_tracing_integration() {
 #[inline]
 fn boot() {
     vector::trace::init(false, false, "warn");
-    vector::metrics::init().expect("metrics initialization failed");
+    vector::metrics::init_test().expect("metrics initialization failed");
 }
 
 #[allow(dead_code)] // condition compilation
@@ -74,7 +74,7 @@ pub fn benchmark(c: &mut Criterion, mode: Mode) {
     boot();
     let metrics_core_enabled = mode != Mode::MetricsOff;
     assert_eq!(
-        vector::metrics::get_controller().is_ok(),
+        vector::metrics::Controller::get().is_ok(),
         metrics_core_enabled,
         "the presence of a controller must correspond to whether metrics core is on or off"
     );
